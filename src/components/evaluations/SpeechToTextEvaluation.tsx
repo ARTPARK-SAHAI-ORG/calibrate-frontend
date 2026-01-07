@@ -303,6 +303,7 @@ export function SpeechToTextEvaluation() {
         method: "GET",
         headers: {
           accept: "application/json",
+          "ngrok-skip-browser-warning": "true",
         },
       });
 
@@ -385,6 +386,7 @@ export function SpeechToTextEvaluation() {
         headers: {
           "Content-Type": "application/json",
           accept: "application/json",
+          "ngrok-skip-browser-warning": "true",
         },
         body: JSON.stringify({
           audio_paths: audioPaths,
