@@ -755,6 +755,50 @@ export function AgentDetail({ agentUuid, onHeaderUpdate }: AgentDetailProps) {
   const [toolToDelete, setToolToDelete] = useState<ToolData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Data extraction sidebar state
+  const [addDataPointSidebarOpen, setAddDataPointSidebarOpen] = useState(false);
+  const [dataPointDataType, setDataPointDataType] = useState("string");
+  const [dataPointIdentifier, setDataPointIdentifier] = useState("");
+  const [dataPointDescription, setDataPointDescription] = useState("");
+  const [dataPointEnumValues, setDataPointEnumValues] = useState<string[]>([]);
+  const [dataPointNewEnumValue, setDataPointNewEnumValue] = useState("");
+
+  // Reset data point form
+  const resetDataPointForm = () => {
+    setDataPointDataType("string");
+    setDataPointIdentifier("");
+    setDataPointDescription("");
+    setDataPointEnumValues([]);
+    setDataPointNewEnumValue("");
+  };
+
+  // Add enum value for data point
+  const addDataPointEnumValue = () => {
+    if (dataPointNewEnumValue.trim()) {
+      const trimmedValue = dataPointNewEnumValue.trim();
+      if (!dataPointEnumValues.includes(trimmedValue)) {
+        setDataPointEnumValues([...dataPointEnumValues, trimmedValue]);
+        setDataPointNewEnumValue("");
+      }
+    }
+  };
+
+  // Remove enum value for data point
+  const removeDataPointEnumValue = (index: number) => {
+    setDataPointEnumValues(dataPointEnumValues.filter((_, i) => i !== index));
+  };
+
+  // Evaluation criteria sidebar state
+  const [addCriteriaSidebarOpen, setAddCriteriaSidebarOpen] = useState(false);
+  const [criteriaName, setCriteriaName] = useState("");
+  const [criteriaInstructions, setCriteriaInstructions] = useState("");
+
+  // Reset criteria form
+  const resetCriteriaForm = () => {
+    setCriteriaName("");
+    setCriteriaInstructions("");
+  };
+
   useEffect(() => {
     const fetchAgent = async () => {
       try {
@@ -782,15 +826,17 @@ export function AgentDetail({ agentUuid, onHeaderUpdate }: AgentDetailProps) {
 
         // Initialize form fields from agent config if available
         if (data.config) {
-          if (data.config.system_prompt) {
-            setSystemPrompt(data.config.system_prompt);
-          }
+          setSystemPrompt(
+            data.config.system_prompt || "You are a helpful assistant."
+          );
           if (data.config.stt_provider) {
             setSttProvider(data.config.stt_provider);
           }
           if (data.config.tts_provider) {
             setTtsProvider(data.config.tts_provider);
           }
+        } else {
+          setSystemPrompt("You are a helpful assistant.");
         }
 
         // Update header when agent is loaded
@@ -1063,7 +1109,6 @@ export function AgentDetail({ agentUuid, onHeaderUpdate }: AgentDetailProps) {
               <textarea
                 value={systemPrompt}
                 onChange={(e) => setSystemPrompt(e.target.value)}
-                defaultValue="You are a helpful assistant."
                 className="w-full h-full px-4 py-3 text-base bg-muted/30 text-foreground focus:outline-none resize-none"
               />
             </div>
@@ -1454,24 +1499,9 @@ export function AgentDetail({ agentUuid, onHeaderUpdate }: AgentDetailProps) {
                         className="grid grid-cols-[1fr_2fr_auto] gap-4 px-4 py-4 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
                       >
                         {/* Name Column */}
-                        <div className="flex items-center gap-3">
-                          <svg
-                            className="w-5 h-5 text-muted-foreground flex-shrink-0"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={1.5}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
-                            />
-                          </svg>
-                          <div>
-                            <div className="text-base font-medium text-foreground">
-                              {tool.name}
-                            </div>
+                        <div className="flex items-center">
+                          <div className="text-base font-medium text-foreground">
+                            {tool.name}
                           </div>
                         </div>
                         {/* Description Column */}
@@ -1751,35 +1781,9 @@ export function AgentDetail({ agentUuid, onHeaderUpdate }: AgentDetailProps) {
               )}
             </div>
 
-            {/* Footer */}
-            <div className="px-4 py-3 border-t border-border flex items-center justify-end gap-3">
-              {/* Add New Tool Button */}
-              <button
-                onClick={() => {
-                  // Navigate to tools page or open add tool form
-                  setAddToolDialogOpen(false);
-                  setAddToolDialogSearchQuery("");
-                  setSelectedToolsForAdd(new Set());
-                }}
-                className="h-10 px-4 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex items-center gap-2"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
-                  />
-                </svg>
-                Add new tool
-              </button>
-              {/* Add Selected Tools Button - only shown when tools are selected */}
-              {selectedToolsForAdd.size > 0 && (
+            {/* Footer - only shown when tools are selected */}
+            {selectedToolsForAdd.size > 0 && (
+              <div className="px-4 py-3 border-t border-border flex items-center justify-end">
                 <button
                   onClick={async () => {
                     try {
@@ -1830,8 +1834,8 @@ export function AgentDetail({ agentUuid, onHeaderUpdate }: AgentDetailProps) {
                 >
                   Add ({selectedToolsForAdd.size})
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Backdrop click to close */}
@@ -1910,7 +1914,7 @@ export function AgentDetail({ agentUuid, onHeaderUpdate }: AgentDetailProps) {
                   }
                 }}
                 disabled={isDeleting}
-                className="h-10 px-4 rounded-md text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="h-10 px-4 rounded-md text-sm font-medium bg-red-800 text-white hover:bg-red-900 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isDeleting && (
                   <svg
@@ -1954,11 +1958,149 @@ export function AgentDetail({ agentUuid, onHeaderUpdate }: AgentDetailProps) {
       {/* Evaluation Tab Content */}
       {activeTab === "evaluation" && (
         <div className="space-y-4">
-          <div>
-            <p className="text-base text-muted-foreground mt-1">
+          {/* Empty State Placeholder */}
+          <div className="border border-border rounded-xl p-12 flex flex-col items-center justify-center bg-muted/20">
+            <div className="w-14 h-14 rounded-xl bg-muted flex items-center justify-center mb-4">
+              <svg
+                className="w-7 h-7 text-muted-foreground"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-foreground mb-1">
+              No evaluation criteria defined
+            </h3>
+            <p className="text-base text-muted-foreground mb-4 text-center max-w-2xl">
               Define criteria to evaluate whether conversations were successful
               or not
             </p>
+            <button
+              onClick={() => {
+                resetCriteriaForm();
+                setAddCriteriaSidebarOpen(true);
+              }}
+              className="h-10 px-4 rounded-md text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+            >
+              Add criteria
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Evaluation Criteria Sidebar */}
+      {addCriteriaSidebarOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => {
+              resetCriteriaForm();
+              setAddCriteriaSidebarOpen(false);
+            }}
+          />
+          {/* Sidebar */}
+          <div className="relative w-full max-w-xl bg-background border-l border-border flex flex-col h-full shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div className="flex items-center gap-3">
+                <svg
+                  className="w-5 h-5 text-muted-foreground"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
+                  />
+                </svg>
+                <h2 className="text-lg font-semibold">
+                  Add evaluation criteria
+                </h2>
+              </div>
+              <button
+                onClick={() => {
+                  resetCriteriaForm();
+                  setAddCriteriaSidebarOpen(false);
+                }}
+                className="flex items-center justify-center w-8 h-8 rounded-full border border-border hover:bg-muted transition-colors cursor-pointer"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Criteria name */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Criteria name
+                </label>
+                <input
+                  type="text"
+                  value={criteriaName}
+                  onChange={(e) => setCriteriaName(e.target.value)}
+                  className="w-full h-10 px-4 rounded-md text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                />
+                <p className="text-sm text-muted-foreground mt-2">
+                  Enter the name of the criteria
+                </p>
+              </div>
+
+              {/* Evaluation instructions */}
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Evaluation instructions
+                </label>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Describe how the agent should evaluate whether the
+                  conversation was a success or not.
+                </p>
+                <textarea
+                  value={criteriaInstructions}
+                  onChange={(e) => setCriteriaInstructions(e.target.value)}
+                  rows={10}
+                  className="w-full px-4 py-3 rounded-md text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-border">
+              <button
+                onClick={() => {
+                  // For now, just close the sidebar
+                  // TODO: Add API integration to save criteria
+                  resetCriteriaForm();
+                  setAddCriteriaSidebarOpen(false);
+                }}
+                className="h-10 px-4 rounded-md text-base font-medium bg-white text-gray-900 hover:opacity-90 transition-opacity cursor-pointer"
+              >
+                Add criteria
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1966,11 +2108,254 @@ export function AgentDetail({ agentUuid, onHeaderUpdate }: AgentDetailProps) {
       {/* Data Extraction Tab Content */}
       {activeTab === "data-extraction" && (
         <div className="space-y-4">
-          <div>
-            <p className="text-base text-muted-foreground mt-1">
+          {/* Empty State Placeholder */}
+          <div className="border border-border rounded-xl p-12 flex flex-col items-center justify-center bg-muted/20">
+            <div className="w-14 h-14 rounded-xl bg-muted flex items-center justify-center mb-4">
+              <svg
+                className="w-7 h-7 text-muted-foreground"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0112 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M13.125 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M20.625 12c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5M12 14.625v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 14.625c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m0 0v1.5c0 .621-.504 1.125-1.125 1.125M12 18.375h-7.5"
+                />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-foreground mb-1">
+              No extraction fields defined
+            </h3>
+            <p className="text-base text-muted-foreground mb-4 text-center max-w-2xl">
               Define custom data specifications to extract from conversation
               transcripts
             </p>
+            <button
+              onClick={() => {
+                resetDataPointForm();
+                setAddDataPointSidebarOpen(true);
+              }}
+              className="h-10 px-4 rounded-md text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+            >
+              Add field
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Data Point Sidebar */}
+      {addDataPointSidebarOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => {
+              resetDataPointForm();
+              setAddDataPointSidebarOpen(false);
+            }}
+          />
+          {/* Sidebar */}
+          <div className="relative w-full max-w-xl bg-background border-l border-border flex flex-col h-full shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div className="flex items-center gap-3">
+                <svg
+                  className="w-5 h-5 text-muted-foreground"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0112 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M13.125 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M20.625 12c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5M12 14.625v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 14.625c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m0 0v1.5c0 .621-.504 1.125-1.125 1.125M12 18.375h-7.5"
+                  />
+                </svg>
+                <h2 className="text-lg font-semibold">Add data point</h2>
+              </div>
+              <button
+                onClick={() => {
+                  resetDataPointForm();
+                  setAddDataPointSidebarOpen(false);
+                }}
+                className="flex items-center justify-center w-8 h-8 rounded-full border border-border hover:bg-muted transition-colors cursor-pointer"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Data type and Identifier */}
+              <div className="flex gap-4">
+                <div className="w-40">
+                  <label className="block text-sm font-medium mb-2">
+                    Data type
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={dataPointDataType}
+                      onChange={(e) => setDataPointDataType(e.target.value)}
+                      className="w-full h-10 pl-4 pr-10 rounded-md text-base border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer appearance-none"
+                    >
+                      <option value="boolean">Boolean</option>
+                      <option value="integer">Integer</option>
+                      <option value="number">Number</option>
+                      <option value="string">String</option>
+                      <option value="object">Object</option>
+                      <option value="array">Array</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <svg
+                        className="w-4 h-4 text-muted-foreground"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-medium mb-2">
+                    Identifier
+                  </label>
+                  <input
+                    type="text"
+                    value={dataPointIdentifier}
+                    onChange={(e) => setDataPointIdentifier(e.target.value)}
+                    className="w-full h-10 px-4 rounded-md text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={dataPointDescription}
+                  onChange={(e) => setDataPointDescription(e.target.value)}
+                  rows={4}
+                  className="w-full px-4 py-3 rounded-md text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none"
+                />
+                <p className="text-sm text-muted-foreground mt-2">
+                  This field will be passed to the LLM and should describe in
+                  detail how to extract the data from the transcript.
+                </p>
+              </div>
+
+              {/* Enum Values */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Enum Values (optional)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={dataPointNewEnumValue}
+                    onChange={(e) => setDataPointNewEnumValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addDataPointEnumValue();
+                      }
+                    }}
+                    placeholder="Enter an enum value"
+                    className="flex-1 h-10 px-4 rounded-md text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                  />
+                  <button
+                    onClick={addDataPointEnumValue}
+                    className="w-10 h-10 rounded-md border border-border bg-background hover:bg-muted/50 flex items-center justify-center transition-colors cursor-pointer"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M12 4.5v15m7.5-7.5h-15"
+                      />
+                    </svg>
+                  </button>
+                </div>
+                {dataPointEnumValues.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {dataPointEnumValues.map((value, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-1 px-3 py-1 rounded-md bg-muted text-sm"
+                      >
+                        <span>{value}</span>
+                        <button
+                          onClick={() => removeDataPointEnumValue(index)}
+                          className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="text-sm text-muted-foreground mt-2">
+                  Add predefined values that the LLM can select from. If no
+                  values are provided, the LLM can use any string value.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-border">
+              <button
+                onClick={() => {
+                  // For now, just close the sidebar
+                  // TODO: Add API integration to save data point
+                  resetDataPointForm();
+                  setAddDataPointSidebarOpen(false);
+                }}
+                className="h-10 px-4 rounded-md text-base font-medium bg-white text-gray-900 hover:opacity-90 transition-opacity cursor-pointer"
+              >
+                Add data point
+              </button>
+            </div>
           </div>
         </div>
       )}
