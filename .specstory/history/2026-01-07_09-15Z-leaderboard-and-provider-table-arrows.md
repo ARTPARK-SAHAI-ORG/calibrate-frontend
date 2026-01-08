@@ -1890,3 +1890,3648 @@ The component now only starts polling when a user clicks "Evaluate", which trigg
 
 ---
 
+_**User (2026-01-07 12:48Z)**_
+
+add language to @src/components/evaluations/TextToSpeechEvaluation.tsx similar to @src/components/evaluations/SpeechToTextEvaluation.tsx but keep it above the list of providers
+
+---
+
+_**Agent (model composer-1, mode Agent)**_
+
+
+
+---
+
+
+Adding language selection to TextToSpeechEvaluation, placing it above the provider selection, matching SpeechToTextEvaluation.
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Adding language state and the language selection UI above the provider selection:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -24,4 +24,5 @@
+      new Set(providers)
+    );
++   const [language, setLanguage] = useState&lt;"english" | "hindi"&gt;("english");
+  
+    const addRow = () =&gt; {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 32, lines removed: undefined
+
+```diff
+@@ -171,4 +171,36 @@
+          Add another sample
+        &lt;/button&gt;
++ 
++       {/* Language Selection */}
++       &lt;div className="pt-4 flex items-center gap-3"&gt;
++         &lt;label className="text-[13px] font-medium text-foreground"&gt;
++           Language
++         &lt;/label&gt;
++         &lt;div className="relative"&gt;
++           &lt;select
++             value={language}
++             onChange={(e) =&gt; setLanguage(e.target.value as "english" | "hindi")}
++             className="h-10 px-4 pr-10 rounded-md text-[13px] border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer appearance-none min-w-[140px]"
++           &gt;
++             &lt;option value="english"&gt;English&lt;/option&gt;
++             &lt;option value="hindi"&gt;Hindi&lt;/option&gt;
++           &lt;/select&gt;
++           &lt;div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"&gt;
++             &lt;svg
++               className="w-4 h-4 text-muted-foreground"
++               fill="none"
++               viewBox="0 0 24 24"
++               stroke="currentColor"
++               strokeWidth={2}
++             &gt;
++               &lt;path
++                 strokeLinecap="round"
++                 strokeLinejoin="round"
++                 d="M19.5 8.25l-7.5 7.5-7.5-7.5"
++               /&gt;
++             &lt;/svg&gt;
++           &lt;/div&gt;
++         &lt;/div&gt;
++       &lt;/div&gt;
+  
+        {/* Provider Selection */}
+```
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
+
+Checking for linting errors:
+
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Added language selection to the TextToSpeechEvaluation component:
+
+1. **Added language state** — `useState<"english" | "hindi">("english")` matching SpeechToTextEvaluation
+2. **Added language selection UI** — Placed above the provider selection section, matching the SpeechToTextEvaluation style
+
+The language selector appears between the "Add another sample" button and the "Select providers to evaluate" section, with a dropdown for English and Hindi. The component now tracks the selected language, ready to be used in the evaluation API call when implemented.
+
+---
+
+_**User (2026-01-07 12:48Z)**_
+
+add the same check about empty rows on clicking evaluate as it is for add another sample 
+
+---
+
+_**Agent (model composer-1, mode Agent)**_
+
+
+
+---
+
+
+Adding empty-row validation to the evaluate button, matching the "add another sample" check. Checking the current implementation:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Updating `handleEvaluate` to add the same empty-row validation as `addRow`:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 16, lines removed: undefined
+
+```diff
+@@ -78,4 +78,20 @@
+  
+    const handleEvaluate = () =&gt; {
++     // Validate all rows (same check as addRow)
++     const invalidIds = new Set&lt;string&gt;();
++     rows.forEach((row) =&gt; {
++       if (!row.text.trim()) {
++         invalidIds.add(row.id);
++       }
++     });
++ 
++     if (invalidIds.size &gt; 0) {
++       // Highlight invalid rows
++       setInvalidRowIds(invalidIds);
++       return; // Don't evaluate if validation fails
++     }
++ 
++     // Clear validation errors and proceed with evaluation
++     setInvalidRowIds(new Set());
+      // TODO: Implement evaluation logic
+      console.log("Evaluating:", rows);
+```
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
+
+Checking for linting errors:
+
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Added empty-row validation to the evaluate button. When clicking "Evaluate":
+
+1. **Validates all rows** — Checks if any row has empty text (same as "Add another sample")
+2. **Highlights invalid rows** — If empty rows are found, they are highlighted with red borders and background
+3. **Prevents evaluation** — Returns early if validation fails
+4. **Clears validation errors** — If all rows are valid, clears any previous validation errors before proceeding
+
+This matches the validation behavior of the "Add another sample" button, ensuring users can't evaluate with empty text rows.
+
+---
+
+_**User (2026-01-07 12:48Z)**_
+
+now, similar to @src/components/evaluations/SpeechToTextEvaluation.tsx call /tts/evaluate with this structure
+
+{
+  "texts": [
+    "Please write Rekha kumari sister"
+  ],
+  "providers": [
+    "openai"
+  ],
+  "language": "english"
+}
+
+and poll for the task_id that you receive to check for the task to be done.
+If done, you will receive an output like this
+
+{
+  "task_id": "6f88395a-c178-48f8-b804-3f122954a05c",
+  "status": "done",
+  "provider_results": [
+    {
+      "provider": "openai",
+      "success": true,
+      "message": "TTS evaluation completed successfully for openai",
+      "metrics": [
+        {
+          "llm_judge_score": 0
+        },
+        {
+          "metric_name": "ttfb",
+          "processor": "OpenAITTSService#0",
+          "mean": 1.6858880519866943,
+          "std": 0,
+          "values": [
+            1.6858880519866943
+          ]
+        },
+        {
+          "metric_name": "processing_time",
+          "processor": "OpenAITTSService#0",
+          "mean": 2.3703737258911133,
+          "std": 0,
+          "values": [
+            2.3703737258911133
+          ]
+        }
+      ],
+      "results": [
+        {
+          "id": "0",
+          "text": "Please write Rekha kumari sister",
+          "audio_path": "/var/folders/1f/s3v3bppd0ws4v19bk0l0f8gw0000gn/T/tmpm52bvkhu/output/openai/audios/0.wav",
+          "llm_judge_score": "False",
+          "llm_judge_reasoning": "The audio says 'Please write Reka Kumari sister' while the reference text is 'Please write Rekha kumari sister'. The difference is in the pronunciation and spelling of the name: 'Rekha' in the text versus 'Reka' in the audio. This slight variation means the audio does not exactly match the provided text."
+        }
+      ]
+    }
+  ],
+  "leaderboard_summary": [
+    {
+      "run": "openai",
+      "count": 1,
+      "llm_judge_score": 0,
+      "ttfb": 1.685888051986694,
+      "processing_time": 2.370373725891113
+    }
+  ],
+  "error": null
+}
+
+assume that the audio path will be a presigned s3 url path and I want you to render the audio in the results table for each provider output
+
+keep similar structure of tabs and leaderboard and outputs as in STT
+
+---
+
+_**Agent (model composer-1, mode Agent)**_
+
+
+
+---
+
+
+Reviewing the current TextToSpeechEvaluation component, then implementing the TTS evaluation similar to STT:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Implementing TTS evaluation similar to STT. Updating the component:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Rewriting the TextToSpeechEvaluation component with full evaluation functionality:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="write">
+
+<details><summary>Tool use: **write** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 51, lines removed: 1
+
+```diff
+@@ -1,10 +1,60 @@
+  "use client";
+  
+- import { useState } from "react";
++ import { useState, useRef, useEffect } from "react";
++ import {
++   BarChart,
++   Bar,
++   XAxis,
++   YAxis,
++   CartesianGrid,
++   Tooltip,
++   ResponsiveContainer,
++   Cell,
++ } from "recharts";
+  
+  type TextRow = {
+    id: string;
+    text: string;
+  };
++ 
++ type MetricItem =
++   | { llm_judge_score: number }
++   | {
++       metric_name: string;
++       processor: string;
++       mean: number;
++       std: number;
++       values: number[];
++     };
++ 
++ type ProviderResult = {
++   provider: string;
++   success: boolean;
++   message: string;
++   metrics: MetricItem[];
++   results: Array&lt;{
++     id: string;
++     text: string;
++     audio_path: string;
++     llm_judge_score: string;
++     llm_judge_reasoning: string;
++   }&gt;;
++ };
++ 
++ type LeaderboardSummary = {
++   run: string;
++   count: number;
++   llm_judge_score: number;
++   ttfb: number;
++   processing_time: number;
++ };
++ 
++ type EvaluationResult = {
++   task_id: string;
++   status: "in_progress" | "done";
++   provider_results?: ProviderResult[];
++   leaderboard_summary?: LeaderboardSummary[];
++   error?: string | null;
++ };
+  
+  const providers = [
+```
+
+**Chunk 2**
+Lines added: 23, lines removed: undefined
+
+```diff
+@@ -16,4 +66,27 @@
+    "sarvam",
+  ];
++ 
++ // Pastel color palette for providers
++ const pastelColors = [
++   "#A8D5E2", // Light blue
++   "#F4A5AE", // Light pink
++   "#B5E5CF", // Light green
++   "#FFD3A5", // Light orange
++   "#C7B9FF", // Light purple
++   "#FFE5B4", // Light peach
++   "#B8E6B8", // Light mint
++   "#E6B8E6", // Light lavender
++   "#B8D4E6", // Light sky blue
++   "#FFB8D4", // Light rose
++ ];
++ 
++ // Generate color mapping for providers
++ const getProviderColorMap = (providerNames: string[]): Map&lt;string, string&gt; =&gt; {
++   const colorMap = new Map&lt;string, string&gt;();
++   providerNames.forEach((provider, index) =&gt; {
++     colorMap.set(provider, pastelColors[index % pastelColors.length]);
++   });
++   return colorMap;
++ };
+  
+  export function TextToSpeechEvaluation() {
+```
+
+**Chunk 3**
+Lines added: 32, lines removed: undefined
+
+```diff
+@@ -25,4 +98,36 @@
+    );
+    const [language, setLanguage] = useState&lt;"english" | "hindi"&gt;("english");
++   const [isEvaluating, setIsEvaluating] = useState(false);
++   const [evaluationResult, setEvaluationResult] =
++     useState&lt;EvaluationResult | null&gt;(null);
++   const [activeTab, setActiveTab] = useState&lt;
++     "leaderboard" | "outputs" | "about"
++   &gt;("leaderboard");
++   const [activeProviderTab, setActiveProviderTab] = useState&lt;string | null&gt;(
++     null
++   );
++   const pollingIntervalRef = useRef&lt;NodeJS.Timeout | null&gt;(null);
++ 
++   // Cleanup polling interval on unmount
++   useEffect(() =&gt; {
++     return () =&gt; {
++       if (pollingIntervalRef.current) {
++         clearInterval(pollingIntervalRef.current);
++       }
++     };
++   }, []);
++ 
++   // Scroll to bottom when evaluation completes
++   useEffect(() =&gt; {
++     if (evaluationResult &amp;&amp; evaluationResult.status === "done") {
++       // Small delay to ensure DOM has updated
++       setTimeout(() =&gt; {
++         window.scrollTo({
++           top: document.documentElement.scrollHeight,
++           behavior: "smooth",
++         });
++       }, 100);
++     }
++   }, [evaluationResult]);
+  
+    const addRow = () =&gt; {
+```
+
+**Chunk 4**
+Lines added: 39, lines removed: 1
+
+```diff
+@@ -77,5 +182,43 @@
+    };
+  
+-   const handleEvaluate = () =&gt; {
++   const pollTaskStatus = async (taskId: string, backendUrl: string) =&gt; {
++     try {
++       const response = await fetch(&#96;${backendUrl}/tts/evaluate/${taskId}&#96;, {
++         method: "GET",
++         headers: {
++           accept: "application/json",
++           "ngrok-skip-browser-warning": "true",
++         },
++       });
++ 
++       if (!response.ok) {
++         throw new Error("Failed to poll task status");
++       }
++ 
++       const result: EvaluationResult = await response.json();
++       setEvaluationResult(result);
++ 
++       if (result.status === "done") {
++         setIsEvaluating(false);
++         if (pollingIntervalRef.current) {
++           clearInterval(pollingIntervalRef.current);
++           pollingIntervalRef.current = null;
++         }
++         // Set first provider as active tab if results exist
++         if (result.provider_results &amp;&amp; result.provider_results.length &gt; 0) {
++           setActiveProviderTab(result.provider_results[0].provider);
++         }
++       }
++     } catch (error) {
++       console.error("Error polling task status:", error);
++       setIsEvaluating(false);
++       if (pollingIntervalRef.current) {
++         clearInterval(pollingIntervalRef.current);
++         pollingIntervalRef.current = null;
++       }
++     }
++   };
++ 
++   const handleEvaluate = async () =&gt; {
+      // Validate all rows (same check as addRow)
+      const invalidIds = new Set&lt;string&gt;();
+```
+
+**Chunk 5**
+Lines added: 63, lines removed: 3
+
+```diff
+@@ -94,7 +237,67 @@
+      // Clear validation errors and proceed with evaluation
+      setInvalidRowIds(new Set());
+-     // TODO: Implement evaluation logic
+-     console.log("Evaluating:", rows);
+-     console.log("Selected providers:", Array.from(selectedProviders));
++     setIsEvaluating(true);
++     setEvaluationResult(null);
++     setActiveTab("leaderboard");
++     setActiveProviderTab(null);
++ 
++     // Clear any existing polling interval
++     if (pollingIntervalRef.current) {
++       clearInterval(pollingIntervalRef.current);
++       pollingIntervalRef.current = null;
++     }
++ 
++     try {
++       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
++       if (!backendUrl) {
++         console.error("BACKEND_URL environment variable is not set");
++         setIsEvaluating(false);
++         return;
++       }
++ 
++       // Collect texts
++       const texts = rows.map((row) =&gt; row.text.trim());
++ 
++       // Make API call
++       const response = await fetch(&#96;${backendUrl}/tts/evaluate&#96;, {
++         method: "POST",
++         headers: {
++           "Content-Type": "application/json",
++           accept: "application/json",
++           "ngrok-skip-browser-warning": "true",
++         },
++         body: JSON.stringify({
++           texts: texts,
++           providers: Array.from(selectedProviders),
++           language: language,
++         }),
++       });
++ 
++       if (!response.ok) {
++         throw new Error("Failed to evaluate");
++       }
++ 
++       const result: EvaluationResult = await response.json();
++       setEvaluationResult(result);
++ 
++       if (result.status === "in_progress" &amp;&amp; result.task_id) {
++         // Start polling
++         pollingIntervalRef.current = setInterval(() =&gt; {
++           pollTaskStatus(result.task_id, backendUrl);
++         }, 2000); // Poll every 2 seconds
++       } else if (result.status === "done") {
++         setIsEvaluating(false);
++         if (result.provider_results &amp;&amp; result.provider_results.length &gt; 0) {
++           setActiveProviderTab(result.provider_results[0].provider);
++         }
++       }
++     } catch (error) {
++       console.error("Error evaluating:", error);
++       setIsEvaluating(false);
++       if (pollingIntervalRef.current) {
++         clearInterval(pollingIntervalRef.current);
++         pollingIntervalRef.current = null;
++       }
++     }
+    };
+  
+```
+
+**Chunk 6**
+Lines added: 2, lines removed: 1
+
+```diff
+@@ -107,5 +310,6 @@
+          &lt;/h2&gt;
+          &lt;p className="text-muted-foreground text-[15px] leading-relaxed max-w-2xl"&gt;
+-           Provide text inputs to evaluate TTS quality.
++           Provide text inputs to evaluate TTS quality. Get metrics like LLM
++           Judge Score, TTFB, and detailed analysis.
+          &lt;/p&gt;
+        &lt;/div&gt;
+```
+
+**Chunk 7**
+Lines added: 590, lines removed: 20
+
+```diff
+@@ -266,25 +470,595 @@
+  
+        {/* Evaluate Button */}
+-       &lt;div className="pt-6 border-t border-border"&gt;
+-         &lt;button
+-           onClick={handleEvaluate}
+-           className="h-11 px-8 rounded-md text-[14px] font-semibold bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-2 shadow-sm"
+-         &gt;
+-           &lt;svg
+-             className="w-4 h-4"
+-             fill="none"
+-             viewBox="0 0 24 24"
+-             stroke="currentColor"
+-             strokeWidth={2}
+-           &gt;
+-             &lt;path
+-               strokeLinecap="round"
+-               strokeLinejoin="round"
+-               d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
+-             /&gt;
+-           &lt;/svg&gt;
+-           Evaluate
+-         &lt;/button&gt;
++       &lt;div className="pt-6"&gt;
++         {isEvaluating ? (
++           &lt;div className="flex items-center gap-3 h-11 px-8"&gt;
++             &lt;svg
++               className="w-5 h-5 animate-spin"
++               fill="none"
++               viewBox="0 0 24 24"
++             &gt;
++               &lt;circle
++                 className="opacity-25"
++                 cx="12"
++                 cy="12"
++                 r="10"
++                 stroke="currentColor"
++                 strokeWidth="4"
++               &gt;&lt;/circle&gt;
++               &lt;path
++                 className="opacity-75"
++                 fill="currentColor"
++                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
++               &gt;&lt;/path&gt;
++             &lt;/svg&gt;
++             &lt;span className="text-[14px] font-medium"&gt;Evaluating...&lt;/span&gt;
++           &lt;/div&gt;
++         ) : (
++           &lt;button
++             onClick={handleEvaluate}
++             className="h-11 px-8 rounded-md text-[14px] font-semibold bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-2 shadow-sm"
++           &gt;
++             &lt;svg
++               className="w-4 h-4"
++               fill="none"
++               viewBox="0 0 24 24"
++               stroke="currentColor"
++               strokeWidth={2}
++             &gt;
++               &lt;path
++                 strokeLinecap="round"
++                 strokeLinejoin="round"
++                 d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
++               /&gt;
++             &lt;/svg&gt;
++             Evaluate
++           &lt;/button&gt;
++         )}
+        &lt;/div&gt;
++ 
++       {/* Results Tabs */}
++       {evaluationResult &amp;&amp; evaluationResult.status === "done" &amp;&amp; (
++         &lt;div className="pt-6 space-y-4"&gt;
++           {/* Tab Navigation */}
++           &lt;div className="flex gap-2 border-b border-border"&gt;
++             &lt;button
++               onClick={() =&gt; setActiveTab("leaderboard")}
++               className={&#96;px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
++                 activeTab === "leaderboard"
++                   ? "border-foreground text-foreground"
++                   : "border-transparent text-muted-foreground hover:text-foreground"
++               }&#96;}
++             &gt;
++               Leaderboard
++             &lt;/button&gt;
++             &lt;button
++               onClick={() =&gt; {
++                 setActiveTab("outputs");
++                 if (
++                   !activeProviderTab &amp;&amp;
++                   evaluationResult?.provider_results &amp;&amp;
++                   evaluationResult.provider_results.length &gt; 0
++                 ) {
++                   setActiveProviderTab(
++                     evaluationResult.provider_results[0].provider
++                   );
++                 }
++               }}
++               className={&#96;px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
++                 activeTab === "outputs"
++                   ? "border-foreground text-foreground"
++                   : "border-transparent text-muted-foreground hover:text-foreground"
++               }&#96;}
++             &gt;
++               Outputs
++             &lt;/button&gt;
++             &lt;button
++               onClick={() =&gt; setActiveTab("about")}
++               className={&#96;px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
++                 activeTab === "about"
++                   ? "border-foreground text-foreground"
++                   : "border-transparent text-muted-foreground hover:text-foreground"
++               }&#96;}
++             &gt;
++               About
++             &lt;/button&gt;
++           &lt;/div&gt;
++ 
++           {/* About Tab */}
++           {activeTab === "about" &amp;&amp; (
++             &lt;div className="space-y-6"&gt;
++               &lt;div className="border rounded-xl overflow-hidden"&gt;
++                 &lt;table className="w-full"&gt;
++                   &lt;thead className="bg-muted/50 border-b border-border"&gt;
++                     &lt;tr&gt;
++                       &lt;th className="px-4 py-3 text-left text-[13px] font-medium text-foreground"&gt;
++                         Metric
++                       &lt;/th&gt;
++                       &lt;th className="px-4 py-3 text-left text-[13px] font-medium text-foreground"&gt;
++                         Description
++                       &lt;/th&gt;
++                       &lt;th className="px-4 py-3 text-left text-[13px] font-medium text-foreground"&gt;
++                         Preference
++                       &lt;/th&gt;
++                       &lt;th className="px-4 py-3 text-left text-[13px] font-medium text-foreground"&gt;
++                         Range
++                       &lt;/th&gt;
++                     &lt;/tr&gt;
++                   &lt;/thead&gt;
++                   &lt;tbody&gt;
++                     &lt;tr className="border-b border-border"&gt;
++                       &lt;td className="px-4 py-3 text-[13px] font-medium text-foreground"&gt;
++                         LLM Judge
++                       &lt;/td&gt;
++                       &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
++                         The LLM judge evaluates whether the synthesized audio
++                         accurately matches the reference text. It checks for
++                         semantic equivalence and pronunciation accuracy.
++                       &lt;/td&gt;
++                       &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
++                         Higher is better
++                       &lt;/td&gt;
++                       &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
++                         0 - 1
++                       &lt;/td&gt;
++                     &lt;/tr&gt;
++                     &lt;tr className="border-b border-border"&gt;
++                       &lt;td className="px-4 py-3 text-[13px] font-medium text-foreground"&gt;
++                         TTFB (Time To First Byte)
++                       &lt;/td&gt;
++                       &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
++                         Time to first byte measures the latency from when a
++                         request is sent until the first byte of the response is
++                         received.
++                       &lt;/td&gt;
++                       &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
++                         Lower is better
++                       &lt;/td&gt;
++                       &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
++                         0 - ∞
++                       &lt;/td&gt;
++                     &lt;/tr&gt;
++                     &lt;tr className="border-b border-border last:border-b-0"&gt;
++                       &lt;td className="px-4 py-3 text-[13px] font-medium text-foreground"&gt;
++                         Processing Time
++                       &lt;/td&gt;
++                       &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
++                         Total time taken to process the text and generate the
++                         audio output.
++                       &lt;/td&gt;
++                       &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
++                         Lower is better
++                       &lt;/td&gt;
++                       &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
++                         0 - ∞
++                       &lt;/td&gt;
++                     &lt;/tr&gt;
++                   &lt;/tbody&gt;
++                 &lt;/table&gt;
++               &lt;/div&gt;
++             &lt;/div&gt;
++           )}
++ 
++           {/* Leaderboard Tab */}
++           {activeTab === "leaderboard" &amp;&amp; (
++             &lt;div className="space-y-6 -mx-8 px-8 w-[calc(100vw-260px)] ml-[calc((260px-100vw)/2+50%)] relative"&gt;
++               {evaluationResult.leaderboard_summary &amp;&amp;
++                 evaluationResult.leaderboard_summary.length &gt; 0 &amp;&amp; (
++                   &lt;&gt;
++                     &lt;div className="border rounded-xl overflow-visible"&gt;
++                       &lt;div className="overflow-hidden rounded-xl"&gt;
++                         &lt;table className="w-full"&gt;
++                           &lt;thead className="bg-muted/50 border-b border-border overflow-visible"&gt;
++                             &lt;tr&gt;
++                               &lt;th className="px-4 py-3 text-left text-[13px] font-medium text-foreground"&gt;
++                                 Run
++                               &lt;/th&gt;
++                               &lt;th className="px-4 py-3 text-left text-[13px] font-medium text-foreground"&gt;
++                                 Count
++                               &lt;/th&gt;
++                               &lt;th className="px-4 py-3 text-left text-[13px] font-medium text-foreground overflow-visible"&gt;
++                                 LLM Judge Score
++                               &lt;/th&gt;
++                               &lt;th className="px-4 py-3 text-left text-[13px] font-medium text-foreground overflow-visible"&gt;
++                                 TTFB (s)
++                               &lt;/th&gt;
++                               &lt;th className="px-4 py-3 text-left text-[13px] font-medium text-foreground overflow-visible"&gt;
++                                 Processing Time (s)
++                               &lt;/th&gt;
++                             &lt;/tr&gt;
++                           &lt;/thead&gt;
++                           &lt;tbody&gt;
++                             {evaluationResult.leaderboard_summary.map(
++                               (summary, index) =&gt; (
++                                 &lt;tr
++                                   key={index}
++                                   className="border-b border-border last:border-b-0"
++                                 &gt;
++                                   &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
++                                     {summary.run}
++                                   &lt;/td&gt;
++                                   &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
++                                     {summary.count}
++                                   &lt;/td&gt;
++                                   &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
++                                     {summary.llm_judge_score}
++                                   &lt;/td&gt;
++                                   &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
++                                     {summary.ttfb.toFixed(5)}
++                                   &lt;/td&gt;
++                                   &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
++                                     {summary.processing_time.toFixed(5)}
++                                   &lt;/td&gt;
++                                 &lt;/tr&gt;
++                               )
++                             )}
++                           &lt;/tbody&gt;
++                         &lt;/table&gt;
++                       &lt;/div&gt;
++                     &lt;/div&gt;
++ 
++                     {/* Charts Section */}
++                     {(() =&gt; {
++                       const providerNames =
++                         evaluationResult.leaderboard_summary.map((s) =&gt; s.run);
++                       const colorMap = getProviderColorMap(providerNames);
++                       return (
++                         &lt;div className="space-y-6"&gt;
++                           {/* Row 1: LLM Judge Score and TTFB */}
++                           &lt;div className="grid grid-cols-2 gap-6"&gt;
++                             {/* LLM Judge Score Chart */}
++                             &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
++                               &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
++                                 LLM Judge Score
++                               &lt;/h3&gt;
++                               &lt;ResponsiveContainer width="100%" height={300}&gt;
++                                 &lt;BarChart
++                                   data={evaluationResult.leaderboard_summary.map(
++                                     (s) =&gt; ({
++                                       provider: s.run,
++                                       value: s.llm_judge_score,
++                                     })
++                                   )}
++                                   margin={{
++                                     top: 5,
++                                     right: 30,
++                                     left: 20,
++                                     bottom: 80,
++                                   }}
++                                 &gt;
++                                   &lt;CartesianGrid strokeDasharray="3 3" /&gt;
++                                   &lt;XAxis
++                                     dataKey="provider"
++                                     tick={{
++                                       fontSize: 13,
++                                       fill: "currentColor",
++                                       fontWeight: 500,
++                                     }}
++                                     angle={-45}
++                                     textAnchor="end"
++                                     height={100}
++                                   /&gt;
++                                   &lt;YAxis tick={{ fontSize: 12 }} /&gt;
++                                   &lt;Tooltip /&gt;
++                                   &lt;Bar dataKey="value"&gt;
++                                     {evaluationResult.leaderboard_summary.map(
++                                       (entry, index) =&gt; (
++                                         &lt;Cell
++                                           key={&#96;cell-${index}&#96;}
++                                           fill={
++                                             colorMap.get(entry.run) ||
++                                             "#A8D5E2"
++                                           }
++                                         /&gt;
++                                       )
++                                     )}
++                                   &lt;/Bar&gt;
++                                 &lt;/BarChart&gt;
++                               &lt;/ResponsiveContainer&gt;
++                             &lt;/div&gt;
++ 
++                             {/* TTFB Chart */}
++                             &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
++                               &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
++                                 TTFB (s)
++                               &lt;/h3&gt;
++                               &lt;ResponsiveContainer width="100%" height={300}&gt;
++                                 &lt;BarChart
++                                   data={evaluationResult.leaderboard_summary.map(
++                                     (s) =&gt; ({
++                                       provider: s.run,
++                                       value: s.ttfb,
++                                     })
++                                   )}
++                                   margin={{
++                                     top: 5,
++                                     right: 30,
++                                     left: 20,
++                                     bottom: 80,
++                                   }}
++                                 &gt;
++                                   &lt;CartesianGrid strokeDasharray="3 3" /&gt;
++                                   &lt;XAxis
++                                     dataKey="provider"
++                                     tick={{
++                                       fontSize: 13,
++                                       fill: "currentColor",
++                                       fontWeight: 500,
++                                     }}
++                                     angle={-45}
++                                     textAnchor="end"
++                                     height={100}
++                                   /&gt;
++                                   &lt;YAxis tick={{ fontSize: 12 }} /&gt;
++                                   &lt;Tooltip /&gt;
++                                   &lt;Bar dataKey="value"&gt;
++                                     {evaluationResult.leaderboard_summary.map(
++                                       (entry, index) =&gt; (
++                                         &lt;Cell
++                                           key={&#96;cell-${index}&#96;}
++                                           fill={
++                                             colorMap.get(entry.run) ||
++                                             "#A8D5E2"
++                                           }
++                                         /&gt;
++                                       )
++                                     )}
++                                   &lt;/Bar&gt;
++                                 &lt;/BarChart&gt;
++                               &lt;/ResponsiveContainer&gt;
++                             &lt;/div&gt;
++                           &lt;/div&gt;
++ 
++                           {/* Row 2: Processing Time */}
++                           &lt;div className="grid grid-cols-2 gap-6"&gt;
++                             {/* Processing Time Chart */}
++                             &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
++                               &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
++                                 Processing Time (s)
++                               &lt;/h3&gt;
++                               &lt;ResponsiveContainer width="100%" height={300}&gt;
++                                 &lt;BarChart
++                                   data={evaluationResult.leaderboard_summary.map(
++                                     (s) =&gt; ({
++                                       provider: s.run,
++                                       value: s.processing_time,
++                                     })
++                                   )}
++                                   margin={{
++                                     top: 5,
++                                     right: 30,
++                                     left: 20,
++                                     bottom: 80,
++                                   }}
++                                 &gt;
++                                   &lt;CartesianGrid strokeDasharray="3 3" /&gt;
++                                   &lt;XAxis
++                                     dataKey="provider"
++                                     tick={{
++                                       fontSize: 13,
++                                       fill: "currentColor",
++                                       fontWeight: 500,
++                                     }}
++                                     angle={-45}
++                                     textAnchor="end"
++                                     height={100}
++                                   /&gt;
++                                   &lt;YAxis tick={{ fontSize: 12 }} /&gt;
++                                   &lt;Tooltip /&gt;
++                                   &lt;Bar dataKey="value"&gt;
++                                     {evaluationResult.leaderboard_summary.map(
++                                       (entry, index) =&gt; (
++                                         &lt;Cell
++                                           key={&#96;cell-${index}&#96;}
++                                           fill={
++                                             colorMap.get(entry.run) ||
++                                             "#A8D5E2"
++                                           }
++                                         /&gt;
++                                       )
++                                     )}
++                                   &lt;/Bar&gt;
++                                 &lt;/BarChart&gt;
++                               &lt;/ResponsiveContainer&gt;
++                             &lt;/div&gt;
++                           &lt;/div&gt;
++                         &lt;/div&gt;
++                       );
++                     })()}
++                   &lt;/&gt;
++                 )}
++             &lt;/div&gt;
++           )}
++ 
++           {/* Outputs Tab */}
++           {activeTab === "outputs" &amp;&amp; evaluationResult.provider_results &amp;&amp; (
++             &lt;div className="space-y-4 -mx-8 px-8 w-[calc(100vw-260px)] ml-[calc((260px-100vw)/2+50%)] relative"&gt;
++               {/* Provider Dropdown */}
++               &lt;div className="flex items-center gap-3"&gt;
++                 &lt;div className="relative"&gt;
++                   &lt;select
++                     value={
++                       activeProviderTab ||
++                       (evaluationResult.provider_results.length &gt; 0
++                         ? evaluationResult.provider_results[0].provider
++                         : "")
++                     }
++                     onChange={(e) =&gt; setActiveProviderTab(e.target.value)}
++                     className="h-10 px-4 pr-10 rounded-md text-[13px] border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer appearance-none min-w-[180px]"
++                   &gt;
++                     {evaluationResult.provider_results.map((providerResult) =&gt; (
++                       &lt;option
++                         key={providerResult.provider}
++                         value={providerResult.provider}
++                       &gt;
++                         {providerResult.provider}
++                       &lt;/option&gt;
++                     ))}
++                   &lt;/select&gt;
++                   &lt;div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"&gt;
++                     &lt;svg
++                       className="w-4 h-4 text-muted-foreground"
++                       fill="none"
++                       viewBox="0 0 24 24"
++                       stroke="currentColor"
++                       strokeWidth={2}
++                     &gt;
++                       &lt;path
++                         strokeLinecap="round"
++                         strokeLinejoin="round"
++                         d="M19.5 8.25l-7.5 7.5-7.5-7.5"
++                       /&gt;
++                     &lt;/svg&gt;
++                   &lt;/div&gt;
++                 &lt;/div&gt;
++               &lt;/div&gt;
++ 
++               {/* Provider Content */}
++               {(activeProviderTab ||
++                 (evaluationResult.provider_results.length &gt; 0 &amp;&amp;
++                   evaluationResult.provider_results[0].provider)) &amp;&amp; (
++                 &lt;&gt;
++                   {evaluationResult.provider_results
++                     .filter(
++                       (pr) =&gt;
++                         pr.provider ===
++                         (activeProviderTab ||
++                           (evaluationResult.provider_results &amp;&amp;
++                             evaluationResult.provider_results[0]?.provider))
++                     )
++                     .map((providerResult) =&gt; (
++                       &lt;div key={providerResult.provider} className="space-y-6"&gt;
++                         {/* Error Message */}
++                         {!providerResult.success &amp;&amp; providerResult.message &amp;&amp; (
++                           &lt;div className="text-[13px] text-red-500 flex items-center gap-2"&gt;
++                             &lt;span&gt;❌&lt;/span&gt;
++                             &lt;span&gt;{providerResult.message}&lt;/span&gt;
++                           &lt;/div&gt;
++                         )}
++ 
++                         {/* Overall Metrics - Only show if success */}
++                         {providerResult.success &amp;&amp; (
++                           &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
++                             &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
++                               Overall Metrics
++                             &lt;/h3&gt;
++                             &lt;div className="space-y-4"&gt;
++                               {/* First Row: LLM Judge Score */}
++                               &lt;div className="grid grid-cols-3 gap-4"&gt;
++                                 {providerResult.metrics.map((metric, index) =&gt; {
++                                   if ("llm_judge_score" in metric) {
++                                     return (
++                                       &lt;div key={index}&gt;
++                                         &lt;div className="text-[12px] text-muted-foreground mb-1"&gt;
++                                           LLM Judge Score
++                                         &lt;/div&gt;
++                                         &lt;div className="text-[18px] font-semibold text-foreground"&gt;
++                                           {metric.llm_judge_score}
++                                         &lt;/div&gt;
++                                       &lt;/div&gt;
++                                     );
++                                   }
++                                   return null;
++                                 })}
++                               &lt;/div&gt;
++                               {/* Second Row: TTFB, Processing Time */}
++                               &lt;div className="grid grid-cols-3 gap-4"&gt;
++                                 {providerResult.metrics.map((metric, index) =&gt; {
++                                   if ("metric_name" in metric) {
++                                     const displayName =
++                                       metric.metric_name === "ttfb"
++                                         ? "TTFB (s)"
++                                         : metric.metric_name ===
++                                           "processing_time"
++                                         ? "Processing Time (s)"
++                                         : metric.metric_name;
++                                     return (
++                                       &lt;div key={index}&gt;
++                                         &lt;div className="text-[12px] text-muted-foreground mb-1"&gt;
++                                           {displayName}
++                                         &lt;/div&gt;
++                                         &lt;div className="text-[18px] font-semibold text-foreground"&gt;
++                                           {metric.mean.toFixed(5)}
++                                         &lt;/div&gt;
++                                       &lt;/div&gt;
++                                     );
++                                   }
++                                   return null;
++                                 })}
++                               &lt;/div&gt;
++                             &lt;/div&gt;
++                           &lt;/div&gt;
++                         )}
++ 
++                         {/* Results Table */}
++                         {providerResult.results &amp;&amp;
++                           providerResult.results.length &gt; 0 &amp;&amp; (
++                             &lt;div className="border rounded-xl overflow-visible"&gt;
++                               &lt;div className="overflow-hidden rounded-xl"&gt;
++                                 &lt;table className="w-full"&gt;
++                                   &lt;thead className="bg-muted/50 border-b border-border"&gt;
++                                     &lt;tr&gt;
++                                       &lt;th className="px-4 py-3 text-left text-[12px] font-medium text-foreground"&gt;
++                                         ID
++                                       &lt;/th&gt;
++                                       &lt;th className="px-4 py-3 text-left text-[12px] font-medium text-foreground"&gt;
++                                         Text
++                                       &lt;/th&gt;
++                                       &lt;th className="px-4 py-3 text-left text-[12px] font-medium text-foreground"&gt;
++                                         Audio
++                                       &lt;/th&gt;
++                                       &lt;th className="px-4 py-3 text-left text-[12px] font-medium text-foreground"&gt;
++                                         LLM Judge Score
++                                       &lt;/th&gt;
++                                       &lt;th className="px-4 py-3 text-left text-[12px] font-medium text-foreground"&gt;
++                                         LLM Judge Reasoning
++                                       &lt;/th&gt;
++                                     &lt;/tr&gt;
++                                   &lt;/thead&gt;
++                                   &lt;tbody&gt;
++                                     {providerResult.results.map(
++                                       (result, index) =&gt; (
++                                         &lt;tr
++                                           key={index}
++                                           className="border-b border-border last:border-b-0"
++                                         &gt;
++                                           &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
++                                             {index + 1}
++                                           &lt;/td&gt;
++                                           &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
++                                             {result.text}
++                                           &lt;/td&gt;
++                                           &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
++                                             &lt;audio
++                                               controls
++                                               className="w-full max-w-xs"
++                                               src={result.audio_path}
++                                             &gt;
++                                               Your browser does not support the
++                                               audio element.
++                                             &lt;/audio&gt;
++                                           &lt;/td&gt;
++                                           &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
++                                             {result.llm_judge_score}
++                                           &lt;/td&gt;
++                                           &lt;td className="px-4 py-3 text-[13px] text-muted-foreground max-w-md"&gt;
++                                             {result.llm_judge_reasoning}
++                                           &lt;/td&gt;
++                                         &lt;/tr&gt;
++                                       )
++                                     )}
++                                   &lt;/tbody&gt;
++                                 &lt;/table&gt;
++                               &lt;/div&gt;
++                             &lt;/div&gt;
++                           )}
++                       &lt;/div&gt;
++                     ))}
++                 &lt;/&gt;
++               )}
++             &lt;/div&gt;
++           )}
++         &lt;/div&gt;
++       )}
+  
+        {/* Delete Confirmation Dialog */}
+```
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
+
+Checking for linting errors:
+
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+## Features implemented
+
+1. **API integration**
+   - Calls `/tts/evaluate` with `texts`, `providers`, and `language`
+   - Polls `/tts/evaluate/{taskId}` every 2 seconds until done
+
+2. **Types and state**
+   - Types for TTS evaluation results
+   - State for evaluation status, results, tabs, and provider selection
+   - Polling interval management
+
+3. **Tabs**
+   - **Leaderboard**: Table and charts comparing providers
+   - **Outputs**: Provider dropdown and results table with audio players
+   - **About**: Metric descriptions
+
+4. **Leaderboard**
+   - Table with LLM Judge Score, TTFB, Processing Time
+   - Charts (2 per row) with consistent pastel colors per provider
+   - Metrics: LLM Judge Score, TTFB, Processing Time
+
+5. **Outputs tab**
+   - Provider dropdown to switch providers
+   - Overall metrics display
+   - Results table with:
+     - Text input
+     - Audio player (using `<audio>` with presigned S3 URL)
+     - LLM Judge Score
+     - LLM Judge Reasoning
+
+6. **About tab**
+   - Descriptions for LLM Judge, TTFB, and Processing Time metrics
+
+The component follows the same structure as SpeechToTextEvaluation, adapted for TTS with audio playback in the results table.
+
+---
+
+_**User (2026-01-07 12:48Z)**_
+
+for now hard code the task id as acd56bf4-30ab-47ee-9b7c-1d1ea672ff88
+and start the tts eval in a state as if evaluate has been clicked and this is the task id and start polling
+
+---
+
+_**Agent (model composer-1, mode Agent)**_
+
+
+
+---
+
+
+Adding a useEffect to hardcode the task ID and start polling on mount, simulating an evaluation in progress:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Adding a useEffect to start polling with the hardcoded task ID:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 39, lines removed: undefined
+
+```diff
+@@ -117,4 +117,43 @@
+      };
+    }, []);
++ 
++   // TEMPORARY: Start polling with hardcoded task ID on mount
++   useEffect(() =&gt; {
++     const taskId = "acd56bf4-30ab-47ee-9b7c-1d1ea672ff88";
++     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
++ 
++     if (!backendUrl) {
++       console.error("BACKEND_URL environment variable is not set");
++       return;
++     }
++ 
++     // Set initial state
++     setIsEvaluating(true);
++     setEvaluationResult({
++       task_id: taskId,
++       status: "in_progress",
++     });
++     setActiveTab("leaderboard");
++     setActiveProviderTab(null);
++ 
++     // Start polling immediately
++     const poll = () =&gt; {
++       pollTaskStatus(taskId, backendUrl);
++     };
++ 
++     // Poll immediately
++     poll();
++ 
++     // Then poll every 2 seconds
++     pollingIntervalRef.current = setInterval(poll, 2000);
++ 
++     // Cleanup on unmount
++     return () =&gt; {
++       if (pollingIntervalRef.current) {
++         clearInterval(pollingIntervalRef.current);
++         pollingIntervalRef.current = null;
++       }
++     };
++   }, []);
+  
+    // Scroll to bottom when evaluation completes
+```
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
+
+Checking if `pollTaskStatus` is defined before the useEffect that uses it:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Checking for linting errors:
+
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Moving the useEffect after `pollTaskStatus` is defined to avoid potential issues:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Moving the useEffect that calls `pollTaskStatus` to after `pollTaskStatus` is defined:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: undefined, lines removed: 39
+
+```diff
+@@ -117,43 +117,4 @@
+      };
+    }, []);
+- 
+-   // TEMPORARY: Start polling with hardcoded task ID on mount
+-   useEffect(() =&gt; {
+-     const taskId = "acd56bf4-30ab-47ee-9b7c-1d1ea672ff88";
+-     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+- 
+-     if (!backendUrl) {
+-       console.error("BACKEND_URL environment variable is not set");
+-       return;
+-     }
+- 
+-     // Set initial state
+-     setIsEvaluating(true);
+-     setEvaluationResult({
+-       task_id: taskId,
+-       status: "in_progress",
+-     });
+-     setActiveTab("leaderboard");
+-     setActiveProviderTab(null);
+- 
+-     // Start polling immediately
+-     const poll = () =&gt; {
+-       pollTaskStatus(taskId, backendUrl);
+-     };
+- 
+-     // Poll immediately
+-     poll();
+- 
+-     // Then poll every 2 seconds
+-     pollingIntervalRef.current = setInterval(poll, 2000);
+- 
+-     // Cleanup on unmount
+-     return () =&gt; {
+-       if (pollingIntervalRef.current) {
+-         clearInterval(pollingIntervalRef.current);
+-         pollingIntervalRef.current = null;
+-       }
+-     };
+-   }, []);
+  
+    // Scroll to bottom when evaluation completes
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 39, lines removed: undefined
+
+```diff
+@@ -219,4 +219,43 @@
+      }
+    };
++ 
++   // TEMPORARY: Start polling with hardcoded task ID on mount
++   useEffect(() =&gt; {
++     const taskId = "acd56bf4-30ab-47ee-9b7c-1d1ea672ff88";
++     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
++ 
++     if (!backendUrl) {
++       console.error("BACKEND_URL environment variable is not set");
++       return;
++     }
++ 
++     // Set initial state
++     setIsEvaluating(true);
++     setEvaluationResult({
++       task_id: taskId,
++       status: "in_progress",
++     });
++     setActiveTab("leaderboard");
++     setActiveProviderTab(null);
++ 
++     // Start polling immediately
++     const poll = () =&gt; {
++       pollTaskStatus(taskId, backendUrl);
++     };
++ 
++     // Poll immediately
++     poll();
++ 
++     // Then poll every 2 seconds
++     pollingIntervalRef.current = setInterval(poll, 2000);
++ 
++     // Cleanup on unmount
++     return () =&gt; {
++       if (pollingIntervalRef.current) {
++         clearInterval(pollingIntervalRef.current);
++         pollingIntervalRef.current = null;
++       }
++     };
++   }, []);
+  
+    const handleEvaluate = async () =&gt; {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
+
+Checking for linting errors:
+
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Added a useEffect that:
+
+1. **Hardcodes the task ID**: `acd56bf4-30ab-47ee-9b7c-1d1ea672ff88`
+2. **Sets initial state** as if evaluate was clicked:
+   - Sets `isEvaluating` to `true`
+   - Sets `evaluationResult` with the task_id and status "in_progress"
+   - Sets `activeTab` to "leaderboard"
+   - Clears `activeProviderTab`
+3. **Starts polling**:
+   - Polls immediately
+   - Then polls every 2 seconds until the task is done
+
+The useEffect is placed after `pollTaskStatus` is defined to avoid reference issues. On component mount, it starts polling the hardcoded task ID and updates the UI accordingly.
+
+---
+
+_**User (2026-01-07 12:48Z)**_
+
+the value shown upon hovering over the bars in any of the chart - keep it up to 5 decimals max and do the same for stt
+
+---
+
+_**Agent (model composer-1, mode Agent)**_
+
+
+
+---
+
+
+Updating chart tooltips in both components to show values with up to 5 decimal places. Checking the current chart implementation:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "Tooltip" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx" • 4 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `Tooltip,` | L10 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `<Tooltip />` | L781 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `<Tooltip />` | L831 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `<Tooltip />` | L884 |
+
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Updating Tooltip components in both files to format values to 5 decimal places:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Updating all Tooltip components in both files to format values to 5 decimal places:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 7, lines removed: 1
+
+```diff
+@@ -779,5 +779,11 @@
+                                    /&gt;
+                                    &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+-                                   &lt;Tooltip /&gt;
++                                   &lt;Tooltip
++                                     formatter={(value: any) =&gt;
++                                       typeof value === "number"
++                                         ? value.toFixed(5)
++                                         : value
++                                     }
++                                   /&gt;
+                                    &lt;Bar dataKey="value"&gt;
+                                      {evaluationResult.leaderboard_summary.map(
+```
+
+**Chunk 2**
+Lines added: 7, lines removed: 1
+
+```diff
+@@ -829,5 +835,11 @@
+                                    /&gt;
+                                    &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+-                                   &lt;Tooltip /&gt;
++                                   &lt;Tooltip
++                                     formatter={(value: any) =&gt;
++                                       typeof value === "number"
++                                         ? value.toFixed(5)
++                                         : value
++                                     }
++                                   /&gt;
+                                    &lt;Bar dataKey="value"&gt;
+                                      {evaluationResult.leaderboard_summary.map(
+```
+
+**Chunk 3**
+Lines added: 7, lines removed: 1
+
+```diff
+@@ -882,5 +894,11 @@
+                                    /&gt;
+                                    &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+-                                   &lt;Tooltip /&gt;
++                                   &lt;Tooltip
++                                     formatter={(value: any) =&gt;
++                                       typeof value === "number"
++                                         ? value.toFixed(5)
++                                         : value
++                                     }
++                                   /&gt;
+                                    &lt;Bar dataKey="value"&gt;
+                                      {evaluationResult.leaderboard_summary.map(
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "Tooltip" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx" • 6 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `Tooltip,` | L10 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `<Tooltip />` | L1012 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `<Tooltip />` | L1062 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `<Tooltip />` | L1115 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `<Tooltip />` | L1165 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `<Tooltip />` | L1218 |
+
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Updating Tooltip components in SpeechToTextEvaluation.tsx:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 7, lines removed: 1
+
+```diff
+@@ -1010,5 +1010,11 @@
+                                /&gt;
+                                &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+-                               &lt;Tooltip /&gt;
++                               &lt;Tooltip
++                                 formatter={(value: any) =&gt;
++                                   typeof value === "number"
++                                     ? value.toFixed(5)
++                                     : value
++                                 }
++                               /&gt;
+                                &lt;Bar dataKey="value"&gt;
+                                  {evaluationResult.leaderboard_summary.map(
+```
+
+**Chunk 2**
+Lines added: 7, lines removed: 1
+
+```diff
+@@ -1060,5 +1066,11 @@
+                                /&gt;
+                                &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+-                               &lt;Tooltip /&gt;
++                               &lt;Tooltip
++                                 formatter={(value: any) =&gt;
++                                   typeof value === "number"
++                                     ? value.toFixed(5)
++                                     : value
++                                 }
++                               /&gt;
+                                &lt;Bar dataKey="value"&gt;
+                                  {evaluationResult.leaderboard_summary.map(
+```
+
+**Chunk 3**
+Lines added: 7, lines removed: 1
+
+```diff
+@@ -1113,5 +1125,11 @@
+                                /&gt;
+                                &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+-                               &lt;Tooltip /&gt;
++                               &lt;Tooltip
++                                 formatter={(value: any) =&gt;
++                                   typeof value === "number"
++                                     ? value.toFixed(5)
++                                     : value
++                                 }
++                               /&gt;
+                                &lt;Bar dataKey="value"&gt;
+                                  {evaluationResult.leaderboard_summary.map(
+```
+
+**Chunk 4**
+Lines added: 7, lines removed: 1
+
+```diff
+@@ -1163,5 +1181,11 @@
+                                /&gt;
+                                &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+-                               &lt;Tooltip /&gt;
++                               &lt;Tooltip
++                                 formatter={(value: any) =&gt;
++                                   typeof value === "number"
++                                     ? value.toFixed(5)
++                                     : value
++                                 }
++                               /&gt;
+                                &lt;Bar dataKey="value"&gt;
+                                  {evaluationResult.leaderboard_summary.map(
+```
+
+**Chunk 5**
+Lines added: 7, lines removed: 1
+
+```diff
+@@ -1216,5 +1240,11 @@
+                                /&gt;
+                                &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+-                               &lt;Tooltip /&gt;
++                               &lt;Tooltip
++                                 formatter={(value: any) =&gt;
++                                   typeof value === "number"
++                                     ? value.toFixed(5)
++                                     : value
++                                 }
++                               /&gt;
+                                &lt;Bar dataKey="value"&gt;
+                                  {evaluationResult.leaderboard_summary.map(
+```
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
+
+Checking for linting errors:
+
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 2 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Verifying one of the changes:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Updated all Tooltip components in both files to format values to 5 decimal places.
+
+## Changes Made:
+
+1. **TextToSpeechEvaluation.tsx** — Updated all 3 Tooltip components (LLM Judge Score, TTFB, Processing Time)
+2. **SpeechToTextEvaluation.tsx** — Updated all 5 Tooltip components (WER, String Similarity, LLM Judge Score, TTFB, Processing Time)
+
+Each Tooltip now uses a `formatter` prop that:
+- Checks if the value is a number
+- Formats it to 5 decimal places using `toFixed(5)`
+- Returns the original value if it's not a number
+
+Hovering over chart bars will show values formatted to 5 decimal places (e.g., `1.14911` instead of `1.149112939834595`).
+
+---
+
+_**User (2026-01-07 12:48Z)**_
+
+the audio player should be displayed longer so that it can be played
+
+---
+
+_**Agent (model composer-1, mode Agent)**_
+
+
+
+---
+
+
+Finding where the audio player is rendered and increasing its width:
+
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "audio.*controls" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx" • 0 matches</summary>
+
+Output mode: content
+
+
+_No matches found_
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "&lt;audio" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx" • 0 matches</summary>
+
+Output mode: content
+
+
+_No matches found_
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "audio" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx" • 8 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `audio_path: string;` | L38 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `The LLM judge evaluates whether the synthesized audio` | L633 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `audio output.` | L666 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `Audio` | L1062 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `<audio` | L1086 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `src=\{result.audio_path\}` | L1089 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `audio element.` | L1092 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `</audio>` | L1093 |
+
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Increasing the audio player width by updating its max-width class:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1086,5 +1086,5 @@
+                                              &lt;audio
+                                                controls
+-                                               className="w-full max-w-xs"
++                                               className="w-full min-w-[400px]"
+                                                src={result.audio_path}
+                                              &gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Updated the audio player width. Changed from `max-w-xs` (320px max) to `min-w-[400px]` (400px minimum), so it's wider and easier to use. The `w-full` class still lets it fill the table cell width, but it won't shrink below 400px.
+
+---
+
+_**User (2026-01-07 12:48Z)**_
+
+in the value shown on the leaderboard charts don't show any trailing decimal zeros 
+
+---
+
+_**Agent (model composer-1, mode Agent)**_
+
+
+
+---
+
+
+Updating the Tooltip formatter in both components to remove trailing zeros while keeping up to 5 decimal places:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "formatter.*toFixed" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations" • 0 matches</summary>
+
+Output mode: content
+
+
+_No matches found_
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "toFixed\(5\)" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations" • 17 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `\{summary.ttfb.toFixed(5)\}` | L726 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `\{summary.processing_time.toFixed(5)\}` | L729 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `? value.toFixed(5)` | L784 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `? value.toFixed(5)` | L840 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `? value.toFixed(5)` | L899 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `\{metric.mean.toFixed(5)\}` | L1035 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `\{summary.string_similarity.toFixed(5)\}` | L949 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `\{summary.ttfb.toFixed(5)\}` | L955 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `\{summary.processing_time.toFixed(5)\}` | L958 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `? value.toFixed(5)` | L1015 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `? value.toFixed(5)` | L1071 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `? value.toFixed(5)` | L1130 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `? value.toFixed(5)` | L1186 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `? value.toFixed(5)` | L1245 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `\{metric.string_similarity.toFixed(5)\}` | L1366 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `\{metric.mean.toFixed(5)\}` | L1403 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `).toFixed(5)\}` | L1468 |
+
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Updating the Tooltip formatters in both files to remove trailing zeros:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -782,5 +782,5 @@
+                                      formatter={(value: any) =&gt;
+                                        typeof value === "number"
+-                                         ? value.toFixed(5)
++                                         ? parseFloat(value.toFixed(5)).toString()
+                                          : value
+                                      }
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -838,5 +838,5 @@
+                                      formatter={(value: any) =&gt;
+                                        typeof value === "number"
+-                                         ? value.toFixed(5)
++                                         ? parseFloat(value.toFixed(5)).toString()
+                                          : value
+                                      }
+```
+
+**Chunk 3**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -897,5 +897,5 @@
+                                      formatter={(value: any) =&gt;
+                                        typeof value === "number"
+-                                         ? value.toFixed(5)
++                                         ? parseFloat(value.toFixed(5)).toString()
+                                          : value
+                                      }
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1013,5 +1013,5 @@
+                                  formatter={(value: any) =&gt;
+                                    typeof value === "number"
+-                                     ? value.toFixed(5)
++                                     ? parseFloat(value.toFixed(5)).toString()
+                                      : value
+                                  }
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1069,5 +1069,5 @@
+                                  formatter={(value: any) =&gt;
+                                    typeof value === "number"
+-                                     ? value.toFixed(5)
++                                     ? parseFloat(value.toFixed(5)).toString()
+                                      : value
+                                  }
+```
+
+**Chunk 3**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1128,5 +1128,5 @@
+                                  formatter={(value: any) =&gt;
+                                    typeof value === "number"
+-                                     ? value.toFixed(5)
++                                     ? parseFloat(value.toFixed(5)).toString()
+                                      : value
+                                  }
+```
+
+**Chunk 4**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1184,5 +1184,5 @@
+                                  formatter={(value: any) =&gt;
+                                    typeof value === "number"
+-                                     ? value.toFixed(5)
++                                     ? parseFloat(value.toFixed(5)).toString()
+                                      : value
+                                  }
+```
+
+**Chunk 5**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1243,5 +1243,5 @@
+                                  formatter={(value: any) =&gt;
+                                    typeof value === "number"
+-                                     ? value.toFixed(5)
++                                     ? parseFloat(value.toFixed(5)).toString()
+                                      : value
+                                  }
+```
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 2 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Updated the Tooltip formatters in both components. They now:
+
+1. Format numbers to 5 decimal places using `toFixed(5)`
+2. Remove trailing zeros using `parseFloat()`
+3. Convert back to a string for display
+
+Examples:
+- `1.20000` → `1.2`
+- `0.50000` → `0.5`
+- `1.14911` → `1.14911` (no change if all digits are significant)
+- `1.12345` → `1.12345`
+
+Chart tooltips now show values without trailing zeros while preserving up to 5 decimal places when needed.
+
+---
+
+_**User (2026-01-07 12:48Z)**_
+
+there is too much space below the x-axis in each chart box - make each chart take the full height of the box
+
+---
+
+_**Agent (model composer-1, mode Agent)**_
+
+
+
+---
+
+
+Checking chart margin settings and reducing bottom margin to remove extra space below the x-axis:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "margin.*bottom.*80" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations" • 0 matches</summary>
+
+Output mode: content
+
+
+_No matches found_
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "bottom: 80" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations" • 8 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `bottom: 80,` | L996 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `bottom: 80,` | L1052 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `bottom: 80,` | L1111 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `bottom: 80,` | L1167 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `bottom: 80,` | L1226 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `bottom: 80,` | L765 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `bottom: 80,` | L823 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `bottom: 80,` | L884 |
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "height=\{100\}" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations" • 8 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `height=\{100\}` | L1009 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `height=\{100\}` | L1065 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `height=\{100\}` | L1124 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `height=\{100\}` | L1180 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `height=\{100\}` | L1239 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `height=\{100\}` | L778 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `height=\{100\}` | L836 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `height=\{100\}` | L897 |
+
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Reducing bottom margin and XAxis height to remove extra space:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -763,5 +763,5 @@
+                                      right: 30,
+                                      left: 20,
+-                                     bottom: 80,
++                                     bottom: 60,
+                                    }}
+                                  &gt;
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -776,5 +776,5 @@
+                                      angle={-45}
+                                      textAnchor="end"
+-                                     height={100}
++                                     height={80}
+                                    /&gt;
+                                    &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+```
+
+**Chunk 3**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -821,5 +821,5 @@
+                                      right: 30,
+                                      left: 20,
+-                                     bottom: 80,
++                                     bottom: 60,
+                                    }}
+                                  &gt;
+```
+
+**Chunk 4**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -834,5 +834,5 @@
+                                      angle={-45}
+                                      textAnchor="end"
+-                                     height={100}
++                                     height={80}
+                                    /&gt;
+                                    &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+```
+
+**Chunk 5**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -882,5 +882,5 @@
+                                      right: 30,
+                                      left: 20,
+-                                     bottom: 80,
++                                     bottom: 60,
+                                    }}
+                                  &gt;
+```
+
+**Chunk 6**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -895,5 +895,5 @@
+                                      angle={-45}
+                                      textAnchor="end"
+-                                     height={100}
++                                     height={80}
+                                    /&gt;
+                                    &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -994,5 +994,5 @@
+                                  right: 30,
+                                  left: 20,
+-                                 bottom: 80,
++                                 bottom: 60,
+                                }}
+                              &gt;
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1007,5 +1007,5 @@
+                                  angle={-45}
+                                  textAnchor="end"
+-                                 height={100}
++                                 height={80}
+                                /&gt;
+                                &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+```
+
+**Chunk 3**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1050,5 +1050,5 @@
+                                  right: 30,
+                                  left: 20,
+-                                 bottom: 80,
++                                 bottom: 60,
+                                }}
+                              &gt;
+```
+
+**Chunk 4**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1063,5 +1063,5 @@
+                                  angle={-45}
+                                  textAnchor="end"
+-                                 height={100}
++                                 height={80}
+                                /&gt;
+                                &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+```
+
+**Chunk 5**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1109,5 +1109,5 @@
+                                  right: 30,
+                                  left: 20,
+-                                 bottom: 80,
++                                 bottom: 60,
+                                }}
+                              &gt;
+```
+
+**Chunk 6**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1122,5 +1122,5 @@
+                                  angle={-45}
+                                  textAnchor="end"
+-                                 height={100}
++                                 height={80}
+                                /&gt;
+                                &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+```
+
+**Chunk 7**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1165,5 +1165,5 @@
+                                  right: 30,
+                                  left: 20,
+-                                 bottom: 80,
++                                 bottom: 60,
+                                }}
+                              &gt;
+```
+
+**Chunk 8**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1178,5 +1178,5 @@
+                                  angle={-45}
+                                  textAnchor="end"
+-                                 height={100}
++                                 height={80}
+                                /&gt;
+                                &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+```
+
+**Chunk 9**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1224,5 +1224,5 @@
+                                  right: 30,
+                                  left: 20,
+-                                 bottom: 80,
++                                 bottom: 60,
+                                }}
+                              &gt;
+```
+
+**Chunk 10**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1237,5 +1237,5 @@
+                                  angle={-45}
+                                  textAnchor="end"
+-                                 height={100}
++                                 height={80}
+                                /&gt;
+                                &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 2 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Reduced the space below the x-axis in all charts in both components:
+
+1. **Reduced bottom margin** from `80` to `60`
+2. **Reduced XAxis height** from `100` to `80`
+
+Charts now use more of the container height while still leaving room for the angled provider labels. Applied to all charts in both TextToSpeechEvaluation and SpeechToTextEvaluation.
+
+---
+
+_**User (2026-01-07 12:48Z)**_
+
+still a lot of space
+
+---
+
+_**Agent (model composer-1, mode Agent)**_
+
+
+
+---
+
+
+Reducing the bottom margin and XAxis height further:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -763,5 +763,5 @@
+                                      right: 30,
+                                      left: 20,
+-                                     bottom: 60,
++                                     bottom: 40,
+                                    }}
+                                  &gt;
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -776,5 +776,5 @@
+                                      angle={-45}
+                                      textAnchor="end"
+-                                     height={80}
++                                     height={60}
+                                    /&gt;
+                                    &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+```
+
+**Chunk 3**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -821,5 +821,5 @@
+                                      right: 30,
+                                      left: 20,
+-                                     bottom: 60,
++                                     bottom: 40,
+                                    }}
+                                  &gt;
+```
+
+**Chunk 4**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -834,5 +834,5 @@
+                                      angle={-45}
+                                      textAnchor="end"
+-                                     height={80}
++                                     height={60}
+                                    /&gt;
+                                    &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+```
+
+**Chunk 5**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -882,5 +882,5 @@
+                                      right: 30,
+                                      left: 20,
+-                                     bottom: 60,
++                                     bottom: 40,
+                                    }}
+                                  &gt;
+```
+
+**Chunk 6**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -895,5 +895,5 @@
+                                      angle={-45}
+                                      textAnchor="end"
+-                                     height={80}
++                                     height={60}
+                                    /&gt;
+                                    &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -994,5 +994,5 @@
+                                  right: 30,
+                                  left: 20,
+-                                 bottom: 60,
++                                 bottom: 40,
+                                }}
+                              &gt;
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1007,5 +1007,5 @@
+                                  angle={-45}
+                                  textAnchor="end"
+-                                 height={80}
++                                 height={60}
+                                /&gt;
+                                &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+```
+
+**Chunk 3**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1050,5 +1050,5 @@
+                                  right: 30,
+                                  left: 20,
+-                                 bottom: 60,
++                                 bottom: 40,
+                                }}
+                              &gt;
+```
+
+**Chunk 4**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1063,5 +1063,5 @@
+                                  angle={-45}
+                                  textAnchor="end"
+-                                 height={80}
++                                 height={60}
+                                /&gt;
+                                &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+```
+
+**Chunk 5**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1109,5 +1109,5 @@
+                                  right: 30,
+                                  left: 20,
+-                                 bottom: 60,
++                                 bottom: 40,
+                                }}
+                              &gt;
+```
+
+**Chunk 6**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1122,5 +1122,5 @@
+                                  angle={-45}
+                                  textAnchor="end"
+-                                 height={80}
++                                 height={60}
+                                /&gt;
+                                &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+```
+
+**Chunk 7**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1165,5 +1165,5 @@
+                                  right: 30,
+                                  left: 20,
+-                                 bottom: 60,
++                                 bottom: 40,
+                                }}
+                              &gt;
+```
+
+**Chunk 8**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1178,5 +1178,5 @@
+                                  angle={-45}
+                                  textAnchor="end"
+-                                 height={80}
++                                 height={60}
+                                /&gt;
+                                &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+```
+
+**Chunk 9**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1224,5 +1224,5 @@
+                                  right: 30,
+                                  left: 20,
+-                                 bottom: 60,
++                                 bottom: 40,
+                                }}
+                              &gt;
+```
+
+**Chunk 10**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1237,5 +1237,5 @@
+                                  angle={-45}
+                                  textAnchor="end"
+-                                 height={80}
++                                 height={60}
+                                /&gt;
+                                &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 2 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Reduced the space further:
+
+1. **Bottom margin**: `60` → `40`
+2. **XAxis height**: `80` → `60`
+
+Charts should now use more of the container height. The angled provider labels should still fit. If you want it tighter, I can reduce it further.
+
+---
+
+_**User (2026-01-07 12:48Z)**_
+
+now remove the hardcoded task id and connect evaluate with the actual options selected
+
+---
+
+_**Agent (model composer-1, mode Agent)**_
+
+
+
+---
+
+
+Removing the hardcoded task ID and ensuring the evaluate button uses the selected options. Checking the current implementation:
+
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "acd56bf4-30ab-47ee-9b7c-1d1ea672ff88" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx" • 1 match</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `const taskId = "acd56bf4-30ab-47ee-9b7c-1d1ea672ff88";` | L224 |
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Removing the hardcoded task ID useEffect. The evaluate function already uses the selected options:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: undefined, lines removed: 39
+
+```diff
+@@ -219,43 +219,4 @@
+      }
+    };
+- 
+-   // TEMPORARY: Start polling with hardcoded task ID on mount
+-   useEffect(() =&gt; {
+-     const taskId = "acd56bf4-30ab-47ee-9b7c-1d1ea672ff88";
+-     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+- 
+-     if (!backendUrl) {
+-       console.error("BACKEND_URL environment variable is not set");
+-       return;
+-     }
+- 
+-     // Set initial state
+-     setIsEvaluating(true);
+-     setEvaluationResult({
+-       task_id: taskId,
+-       status: "in_progress",
+-     });
+-     setActiveTab("leaderboard");
+-     setActiveProviderTab(null);
+- 
+-     // Start polling immediately
+-     const poll = () =&gt; {
+-       pollTaskStatus(taskId, backendUrl);
+-     };
+- 
+-     // Poll immediately
+-     poll();
+- 
+-     // Then poll every 2 seconds
+-     pollingIntervalRef.current = setInterval(poll, 2000);
+- 
+-     // Cleanup on unmount
+-     return () =&gt; {
+-       if (pollingIntervalRef.current) {
+-         clearInterval(pollingIntervalRef.current);
+-         pollingIntervalRef.current = null;
+-       }
+-     };
+-   }, []);
+  
+    const handleEvaluate = async () =&gt; {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
+
+Verifying that handleEvaluate uses the selected options correctly:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Checking for linting errors:
+
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Removed the hardcoded task ID useEffect. The evaluate button is connected to the selected options:
+
+1. **Selected providers**: Uses `Array.from(selectedProviders)` from the provider selection
+2. **Language**: Uses the `language` state (english/hindi)
+3. **Text inputs**: Uses the text from all rows
+
+When you click "Evaluate", it will:
+- Call `/tts/evaluate` with the selected providers, language, and texts
+- Start polling the returned task_id until completion
+- Display results in the leaderboard and outputs tabs
+
+The component no longer auto-starts with a hardcoded task ID; it only evaluates when you click the Evaluate button with your selected options.
+
+---
+
+_**User (2026-01-07 12:48Z)**_
+
+add select all / deselect all button for providers as in @src/components/evaluations/SpeechToTextEvaluation.tsx 
+
+---
+
+_**Agent (model composer-1, mode Agent)**_
+
+
+
+---
+
+
+Checking SpeechToTextEvaluation for the select all/deselect all implementation, then adding it to TextToSpeechEvaluation:
+
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "Select all|Deselect all|toggleAllProviders" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx" • 6 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `const toggleAllProviders = () => \{` | L290 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `// Deselect all` | L292 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `// Select all` | L295 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `onClick=\{toggleAllProviders\}` | L619 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `? "Deselect all"` | L623 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `: "Select all"\}` | L624 |
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Adding the toggleAllProviders function and the button:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 10, lines removed: undefined
+
+```diff
+@@ -181,4 +181,14 @@
+      });
+    };
++ 
++   const toggleAllProviders = () =&gt; {
++     if (selectedProviders.size === providers.length) {
++       // Deselect all
++       setSelectedProviders(new Set());
++     } else {
++       // Select all
++       setSelectedProviders(new Set(providers));
++     }
++   };
+  
+    const pollTaskStatus = async (taskId: string, backendUrl: string) =&gt; {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 8, lines removed: undefined
+
+```diff
+@@ -443,4 +443,12 @@
+              ({selectedProviders.size} selected)
+            &lt;/span&gt;
++           &lt;button
++             onClick={toggleAllProviders}
++             className="ml-auto text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
++           &gt;
++             {selectedProviders.size === providers.length
++               ? "Deselect all"
++               : "Select all"}
++           &lt;/button&gt;
+          &lt;/div&gt;
+          &lt;div className="flex flex-wrap gap-3"&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Added the "Select all / Deselect all" button to TextToSpeechEvaluation, matching SpeechToTextEvaluation.
+
+## Changes Made:
+
+1. **Added `toggleAllProviders` function** — Toggles between selecting all providers and deselecting all, based on current selection state.
+
+2. **Added button in provider selection header** — Placed next to the selected count, aligned to the right with `ml-auto`. Shows:
+   - "Deselect all" when all providers are selected
+   - "Select all" otherwise
+
+The button matches the styling and behavior from SpeechToTextEvaluation, allowing quick selection/deselection of all providers.
+
+---
+

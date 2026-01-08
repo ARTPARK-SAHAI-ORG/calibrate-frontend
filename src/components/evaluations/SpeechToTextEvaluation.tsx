@@ -842,7 +842,7 @@ export function SpeechToTextEvaluation() {
                     </tr>
                     <tr className="border-b border-border">
                       <td className="px-4 py-3 text-[13px] font-medium text-foreground">
-                        LLM Judge
+                        LLM Judge Score
                       </td>
                       <td className="px-4 py-3 text-[13px] text-foreground">
                         This metric is used because WER and string similarity
@@ -993,7 +993,7 @@ export function SpeechToTextEvaluation() {
                                 top: 5,
                                 right: 30,
                                 left: 20,
-                                bottom: 80,
+                                bottom: 40,
                               }}
                             >
                               <CartesianGrid strokeDasharray="3 3" />
@@ -1006,10 +1006,16 @@ export function SpeechToTextEvaluation() {
                                 }}
                                 angle={-45}
                                 textAnchor="end"
-                                height={100}
+                                height={60}
                               />
                               <YAxis tick={{ fontSize: 12 }} />
-                              <Tooltip />
+                              <Tooltip
+                                formatter={(value: any) =>
+                                  typeof value === "number"
+                                    ? parseFloat(value.toFixed(5)).toString()
+                                    : value
+                                }
+                              />
                               <Bar dataKey="value">
                                 {evaluationResult.leaderboard_summary.map(
                                   (entry, index) => (
@@ -1043,7 +1049,7 @@ export function SpeechToTextEvaluation() {
                                 top: 5,
                                 right: 30,
                                 left: 20,
-                                bottom: 80,
+                                bottom: 40,
                               }}
                             >
                               <CartesianGrid strokeDasharray="3 3" />
@@ -1056,10 +1062,16 @@ export function SpeechToTextEvaluation() {
                                 }}
                                 angle={-45}
                                 textAnchor="end"
-                                height={100}
+                                height={60}
                               />
                               <YAxis tick={{ fontSize: 12 }} />
-                              <Tooltip />
+                              <Tooltip
+                                formatter={(value: any) =>
+                                  typeof value === "number"
+                                    ? parseFloat(value.toFixed(5)).toString()
+                                    : value
+                                }
+                              />
                               <Bar dataKey="value">
                                 {evaluationResult.leaderboard_summary.map(
                                   (entry, index) => (
@@ -1096,7 +1108,7 @@ export function SpeechToTextEvaluation() {
                                 top: 5,
                                 right: 30,
                                 left: 20,
-                                bottom: 80,
+                                bottom: 40,
                               }}
                             >
                               <CartesianGrid strokeDasharray="3 3" />
@@ -1109,10 +1121,16 @@ export function SpeechToTextEvaluation() {
                                 }}
                                 angle={-45}
                                 textAnchor="end"
-                                height={100}
+                                height={60}
                               />
                               <YAxis tick={{ fontSize: 12 }} />
-                              <Tooltip />
+                              <Tooltip
+                                formatter={(value: any) =>
+                                  typeof value === "number"
+                                    ? parseFloat(value.toFixed(5)).toString()
+                                    : value
+                                }
+                              />
                               <Bar dataKey="value">
                                 {evaluationResult.leaderboard_summary.map(
                                   (entry, index) => (
@@ -1146,7 +1164,7 @@ export function SpeechToTextEvaluation() {
                                 top: 5,
                                 right: 30,
                                 left: 20,
-                                bottom: 80,
+                                bottom: 40,
                               }}
                             >
                               <CartesianGrid strokeDasharray="3 3" />
@@ -1159,10 +1177,16 @@ export function SpeechToTextEvaluation() {
                                 }}
                                 angle={-45}
                                 textAnchor="end"
-                                height={100}
+                                height={60}
                               />
                               <YAxis tick={{ fontSize: 12 }} />
-                              <Tooltip />
+                              <Tooltip
+                                formatter={(value: any) =>
+                                  typeof value === "number"
+                                    ? parseFloat(value.toFixed(5)).toString()
+                                    : value
+                                }
+                              />
                               <Bar dataKey="value">
                                 {evaluationResult.leaderboard_summary.map(
                                   (entry, index) => (
@@ -1199,7 +1223,7 @@ export function SpeechToTextEvaluation() {
                                 top: 5,
                                 right: 30,
                                 left: 20,
-                                bottom: 80,
+                                bottom: 40,
                               }}
                             >
                               <CartesianGrid strokeDasharray="3 3" />
@@ -1212,10 +1236,16 @@ export function SpeechToTextEvaluation() {
                                 }}
                                 angle={-45}
                                 textAnchor="end"
-                                height={100}
+                                height={60}
                               />
                               <YAxis tick={{ fontSize: 12 }} />
-                              <Tooltip />
+                              <Tooltip
+                                formatter={(value: any) =>
+                                  typeof value === "number"
+                                    ? parseFloat(value.toFixed(5)).toString()
+                                    : value
+                                }
+                              />
                               <Bar dataKey="value">
                                 {evaluationResult.leaderboard_summary.map(
                                   (entry, index) => (
