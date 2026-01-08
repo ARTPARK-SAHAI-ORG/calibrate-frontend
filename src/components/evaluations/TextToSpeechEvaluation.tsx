@@ -318,7 +318,7 @@ export function TextToSpeechEvaluation() {
         <h2 className="text-2xl font-semibold tracking-tight">
           Text-to-Speech Evaluation
         </h2>
-        <p className="text-muted-foreground text-[15px] leading-relaxed max-w-2xl">
+        <p className="text-muted-foreground text-[15px] leading-relaxed">
           Provide text inputs to evaluate TTS quality. Get metrics like LLM
           Judge Score, TTFB, and detailed analysis.
         </p>

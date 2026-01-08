@@ -438,7 +438,7 @@ export function SpeechToTextEvaluation() {
         <h2 className="text-2xl font-semibold tracking-tight">
           Speech-to-Text Evaluation
         </h2>
-        <p className="text-muted-foreground text-[15px] leading-relaxed max-w-2xl">
+        <p className="text-muted-foreground text-[15px] leading-relaxed">
           Upload audio files with reference transcriptions to evaluate STT
           performance. Get metrics like WER, CER, and detailed analysis.
         </p>
