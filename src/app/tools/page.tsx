@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { ParameterCard, Parameter } from "@/components/ParameterCard";
+import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 
 type ToolData = {
   uuid: string;
@@ -30,6 +31,11 @@ export default function ToolsPage() {
   const [isLoadingTool, setIsLoadingTool] = useState(false);
   const [validationAttempted, setValidationAttempted] = useState(false);
   const sidebarContentRef = useRef<HTMLDivElement>(null);
+
+  // Delete confirmation state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [toolToDelete, setToolToDelete] = useState<ToolData | null>(null);
+  const [isToolDeleting, setIsToolDeleting] = useState(false);
 
   // Scroll to bottom when parameters change (new parameter added)
   const scrollToBottom = () => {
@@ -460,14 +466,31 @@ export default function ToolsPage() {
   }, []);
 
   // Delete tool from backend
-  const deleteTool = async (uuid: string) => {
+  // Open delete confirmation dialog
+  const openDeleteDialog = (tool: ToolData) => {
+    setToolToDelete(tool);
+    setDeleteDialogOpen(true);
+  };
+
+  // Close delete confirmation dialog
+  const closeDeleteDialog = () => {
+    if (!isToolDeleting) {
+      setDeleteDialogOpen(false);
+      setToolToDelete(null);
+    }
+  };
+
+  const deleteTool = async () => {
+    if (!toolToDelete) return;
+
     try {
+      setIsToolDeleting(true);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
         throw new Error("BACKEND_URL environment variable is not set");
       }
 
-      const response = await fetch(`${backendUrl}/tools/${uuid}`, {
+      const response = await fetch(`${backendUrl}/tools/${toolToDelete.uuid}`, {
         method: "DELETE",
         headers: {
           accept: "application/json",
@@ -480,10 +503,12 @@ export default function ToolsPage() {
       }
 
       // Remove the tool from local state
-      setTools(tools.filter((tool) => tool.uuid !== uuid));
+      setTools(tools.filter((tool) => tool.uuid !== toolToDelete.uuid));
+      closeDeleteDialog();
     } catch (err) {
       console.error("Error deleting tool:", err);
-      alert(err instanceof Error ? err.message : "Failed to delete tool");
+    } finally {
+      setIsToolDeleting(false);
     }
   };
 
@@ -1000,11 +1025,7 @@ export default function ToolsPage() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (
-                      confirm(`Are you sure you want to delete "${tool.name}"?`)
-                    ) {
-                      deleteTool(tool.uuid);
-                    }
+                    openDeleteDialog(tool);
                   }}
                   className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                 >
@@ -1254,6 +1275,17 @@ export default function ToolsPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        isOpen={deleteDialogOpen}
+        onClose={closeDeleteDialog}
+        onConfirm={deleteTool}
+        title="Delete tool"
+        message={`Are you sure you want to delete "${toolToDelete?.name}"?`}
+        confirmText="Delete"
+        isDeleting={isToolDeleting}
+      />
     </AppLayout>
   );
 }

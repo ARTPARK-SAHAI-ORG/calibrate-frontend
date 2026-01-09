@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 
 type EvaluationCriteriaData = {
   uuid: string;
@@ -40,6 +41,39 @@ export function EvaluationTabContent({
   const [criteriaName, setCriteriaName] = useState("");
   const [criteriaInstructions, setCriteriaInstructions] = useState("");
   const [validationAttempted, setValidationAttempted] = useState(false);
+
+  // Delete confirmation state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [criteriaToDelete, setCriteriaToDelete] =
+    useState<EvaluationCriteriaData | null>(null);
+
+  // Open delete confirmation dialog
+  const openDeleteDialog = (criteria: EvaluationCriteriaData) => {
+    setCriteriaToDelete(criteria);
+    setDeleteDialogOpen(true);
+  };
+
+  // Close delete confirmation dialog
+  const closeDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setCriteriaToDelete(null);
+  };
+
+  // Handle delete criteria
+  const handleDeleteCriteria = () => {
+    if (!criteriaToDelete) return;
+
+    // Remove from local state
+    setEvaluationCriteria((prev) =>
+      prev.filter((c) => c.uuid !== criteriaToDelete.uuid)
+    );
+
+    // Save the updated agent config
+    setTimeout(() => {
+      saveRef.current();
+    }, 0);
+    closeDeleteDialog();
+  };
 
   // Check if the name already exists (excluding current criteria being edited)
   const isNameDuplicate = (name: string): boolean => {
@@ -195,22 +229,7 @@ export function EvaluationTabContent({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (
-                        !confirm(
-                          `Are you sure you want to delete "${criteria.name}"?`
-                        )
-                      )
-                        return;
-
-                      // Remove from local state
-                      setEvaluationCriteria((prev) =>
-                        prev.filter((c) => c.uuid !== criteria.uuid)
-                      );
-
-                      // Save the updated agent config
-                      setTimeout(() => {
-                        saveRef.current();
-                      }, 0);
+                      openDeleteDialog(criteria);
                     }}
                     className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                     title="Delete criteria"
@@ -400,6 +419,16 @@ export function EvaluationTabContent({
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        isOpen={deleteDialogOpen}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDeleteCriteria}
+        title="Delete criteria"
+        message={`Are you sure you want to delete "${criteriaToDelete?.name}"?`}
+        confirmText="Delete"
+      />
     </>
   );
 }

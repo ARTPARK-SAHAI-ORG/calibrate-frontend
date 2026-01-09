@@ -946,7 +946,51 @@ Lines added: 1, lines removed: undefined
 
 ---
 
+<think><details><summary>Thought Process</summary>
+Let me check for lint errors.</details></think>
 
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 2 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/tests/page.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/ToolPicker.tsx`
+
+Lint results
+
+Lint errors for `src/app/tests/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'getToolParams' is declared but its value is never read. | 9:3-9:16 | DIAGNOSTIC_SEVERITY_HINT |
+| 'Tool' is declared but never used. | 23:6-23:10 | DIAGNOSTIC_SEVERITY_HINT |
+| 'validationAttempted' is declared but its value is never read. | 91:3-91:22 | DIAGNOSTIC_SEVERITY_HINT |
+| 'newTestDescription' is declared but its value is never read. | 1561:10-1561:28 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+No lint errors. The changes are complete. The ToolPicker now:1. Accepts an optional `selectedToolIds` prop
+2. Filters out inbuilt tools whose `id` is in the selected list
+3. Filters out custom tools whose `uuid` is in the selected listAnd the tests page now passes `selectedTools.map((t) => t.id)` to the ToolPicker, which includes both inbuilt tool IDs (like "end_call") and custom tool UUIDs.</details></think>
+
+---
+
+Done! The ToolPicker now filters out already selected tools:
+
+1. **Added `selectedToolIds` prop** to ToolPicker component
+2. **Filters out inbuilt tools** that have already been selected (by matching `tool.id`)
+3. **Filters out custom tools** that have already been selected (by matching `tool.uuid`)
+4. **Passes selected tool IDs** from the tests page to the ToolPicker
 
 ---
 

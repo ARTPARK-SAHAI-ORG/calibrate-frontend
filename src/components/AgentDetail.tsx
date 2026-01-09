@@ -7,6 +7,7 @@ import {
   AgentTabContent,
   ToolsTabContent,
   DataExtractionTabContent,
+  TestsTabContent,
   EvaluationTabContent,
   SettingsTabContent,
   llmProviders,
@@ -41,15 +42,17 @@ type ToolData = {
 type TabType =
   | "agent"
   | "tools"
-  | "evaluation"
   | "data-extraction"
+  | "tests"
+  | "evaluation"
   | "settings";
 
 const validTabs: TabType[] = [
   "agent",
   "tools",
-  "evaluation",
   "data-extraction",
+  "tests",
+  "evaluation",
   "settings",
 ];
 
@@ -547,6 +550,16 @@ export function AgentDetail({ agentUuid, onHeaderUpdate }: AgentDetailProps) {
           Data extraction
         </button>
         <button
+          onClick={() => handleTabChange("tests")}
+          className={`pb-2 text-base font-medium transition-colors cursor-pointer ${
+            activeTab === "tests"
+              ? "text-foreground border-b-2 border-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Tests
+        </button>
+        <button
           onClick={() => handleTabChange("evaluation")}
           className={`pb-2 text-base font-medium transition-colors cursor-pointer ${
             activeTab === "evaluation"
@@ -608,6 +621,9 @@ export function AgentDetail({ agentUuid, onHeaderUpdate }: AgentDetailProps) {
           saveRef={saveRef}
         />
       )}
+
+      {/* Tests Tab Content */}
+      {activeTab === "tests" && <TestsTabContent agentUuid={agentUuid} />}
 
       {/* Evaluation Tab Content */}
       {activeTab === "evaluation" && (

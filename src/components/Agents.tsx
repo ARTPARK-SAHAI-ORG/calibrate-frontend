@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 
 type Agent = {
   uuid: string;
@@ -40,6 +41,10 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
   const [deletingAgentUuid, setDeletingAgentUuid] = useState<string | null>(
     null
   );
+
+  // Delete confirmation state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
 
   useEffect(() => {
     const fetchAgents = async () => {
@@ -106,20 +111,32 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
     return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
   });
 
-  const handleDeleteAgent = async (agentUuid: string) => {
-    if (!confirm("Are you sure you want to delete this agent?")) {
-      return;
+  // Open delete confirmation dialog
+  const openDeleteDialog = (agent: Agent) => {
+    setAgentToDelete(agent);
+    setDeleteDialogOpen(true);
+  };
+
+  // Close delete confirmation dialog
+  const closeDeleteDialog = () => {
+    if (!deletingAgentUuid) {
+      setDeleteDialogOpen(false);
+      setAgentToDelete(null);
     }
+  };
+
+  const handleDeleteAgent = async () => {
+    if (!agentToDelete) return;
 
     try {
-      setDeletingAgentUuid(agentUuid);
+      setDeletingAgentUuid(agentToDelete.uuid);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
         throw new Error("BACKEND_URL environment variable is not set");
       }
 
       // DELETE /agents/{agent_uuid} - agent_uuid is required in path
-      const response = await fetch(`${backendUrl}/agents/${agentUuid}`, {
+      const response = await fetch(`${backendUrl}/agents/${agentToDelete.uuid}`, {
         method: "DELETE",
         headers: {
           accept: "application/json",
@@ -133,15 +150,11 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
 
       // Remove the agent from the list
       setAgents((prevAgents) =>
-        prevAgents.filter((agent) => agent.uuid !== agentUuid)
+        prevAgents.filter((agent) => agent.uuid !== agentToDelete.uuid)
       );
+      closeDeleteDialog();
     } catch (err) {
       console.error("Error deleting agent:", err);
-      alert(
-        err instanceof Error
-          ? err.message
-          : "Failed to delete agent. Please try again."
-      );
     } finally {
       setDeletingAgentUuid(null);
     }
@@ -315,7 +328,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleDeleteAgent(agent.uuid);
+                    openDeleteDialog(agent);
                   }}
                   disabled={deletingAgentUuid === agent.uuid}
                   className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -370,6 +383,17 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
           onCreateAgent={onNavigateToAgent}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        isOpen={deleteDialogOpen}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDeleteAgent}
+        title="Delete agent"
+        message={`Are you sure you want to delete "${agentToDelete?.name}"?`}
+        confirmText="Delete"
+        isDeleting={!!deletingAgentUuid}
+      />
     </div>
   );
 }

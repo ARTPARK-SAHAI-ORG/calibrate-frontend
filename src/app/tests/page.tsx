@@ -9,6 +9,7 @@ import {
   getToolParams,
 } from "@/components/ToolPicker";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
+import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 
 type TestData = {
   uuid: string;
@@ -994,40 +995,63 @@ function AddTestDialog({
               >
                 Back
               </button>
-              <button
-                onClick={handleSubmit}
-                disabled={isCreating || isLoading}
-                className="h-10 px-5 rounded-lg text-base font-medium bg-white text-black hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {isCreating ? (
-                  <>
-                    <svg
-                      className="w-4 h-4 animate-spin"
-                      fill="none"
-                      viewBox="0 0 24 24"
+              {(() => {
+                const lastMessage = chatMessages[chatMessages.length - 1];
+                const isLastMessageAgent =
+                  lastMessage?.role === "agent" || chatMessages.length === 0;
+                const isButtonDisabled =
+                  isCreating || isLoading || isLastMessageAgent;
+
+                return (
+                  <div className="relative group">
+                    <button
+                      onClick={handleSubmit}
+                      disabled={isButtonDisabled}
+                      className="h-10 px-5 rounded-lg text-base font-medium bg-white text-black hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    {isEditing ? "Saving..." : "Creating..."}
-                  </>
-                ) : isEditing ? (
-                  "Save"
-                ) : (
-                  "Create"
-                )}
-              </button>
+                      {isCreating ? (
+                        <>
+                          <svg
+                            className="w-4 h-4 animate-spin"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            ></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            ></path>
+                          </svg>
+                          {isEditing ? "Saving..." : "Creating..."}
+                        </>
+                      ) : isEditing ? (
+                        "Save"
+                      ) : (
+                        "Create"
+                      )}
+                    </button>
+                    {/* Tooltip for disabled state */}
+                    {isLastMessageAgent && !isCreating && !isLoading && (
+                      <div className="absolute bottom-full mb-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                        <div className="px-3 py-2 text-sm text-gray-900 bg-white rounded-lg shadow-lg whitespace-nowrap max-w-[280px]">
+                          A test should end with a user message, or a tool. Not
+                          agent text message.
+                        </div>
+                        {/* Arrow */}
+                        <div className="absolute top-full right-4 -mt-1 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white"></div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -1574,6 +1598,11 @@ export default function LLMPage() {
     undefined
   );
 
+  // Delete confirmation state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [testToDelete, setTestToDelete] = useState<TestData | null>(null);
+  const [isTestDeleting, setIsTestDeleting] = useState(false);
+
   // Fetch tests from backend
   useEffect(() => {
     const fetchTests = async () => {
@@ -1612,15 +1641,32 @@ export default function LLMPage() {
     fetchTests();
   }, []);
 
+  // Open delete confirmation dialog
+  const openDeleteDialog = (test: TestData) => {
+    setTestToDelete(test);
+    setDeleteDialogOpen(true);
+  };
+
+  // Close delete confirmation dialog
+  const closeDeleteDialog = () => {
+    if (!isTestDeleting) {
+      setDeleteDialogOpen(false);
+      setTestToDelete(null);
+    }
+  };
+
   // Delete test from backend
-  const deleteTest = async (uuid: string) => {
+  const deleteTest = async () => {
+    if (!testToDelete) return;
+
     try {
+      setIsTestDeleting(true);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
         throw new Error("BACKEND_URL environment variable is not set");
       }
 
-      const response = await fetch(`${backendUrl}/tests/${uuid}`, {
+      const response = await fetch(`${backendUrl}/tests/${testToDelete.uuid}`, {
         method: "DELETE",
         headers: {
           accept: "application/json",
@@ -1633,10 +1679,12 @@ export default function LLMPage() {
       }
 
       // Remove the test from local state
-      setTests(tests.filter((test) => test.uuid !== uuid));
+      setTests(tests.filter((test) => test.uuid !== testToDelete.uuid));
+      closeDeleteDialog();
     } catch (err) {
       console.error("Error deleting test:", err);
-      alert(err instanceof Error ? err.message : "Failed to delete test");
+    } finally {
+      setIsTestDeleting(false);
     }
   };
 
@@ -1974,9 +2022,9 @@ export default function LLMPage() {
                 </div>
                 <p className="text-sm text-muted-foreground">
                   {test.type === "response"
-                    ? "Next Reply Test"
+                    ? "Next Reply"
                     : test.type === "tool_call"
-                    ? "Tool Invocation Test"
+                    ? "Tool Call"
                     : "—"}
                 </p>
                 <div className="flex items-center gap-1">
@@ -2008,13 +2056,7 @@ export default function LLMPage() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (
-                        confirm(
-                          `Are you sure you want to delete "${test.name}"?`
-                        )
-                      ) {
-                        deleteTest(test.uuid);
-                      }
+                      openDeleteDialog(test);
                     }}
                     className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                   >
@@ -2059,6 +2101,17 @@ export default function LLMPage() {
           initialConfig={initialConfig}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        isOpen={deleteDialogOpen}
+        onClose={closeDeleteDialog}
+        onConfirm={deleteTest}
+        title="Delete test"
+        message={`Are you sure you want to delete "${testToDelete?.name}"?`}
+        confirmText="Delete"
+        isDeleting={isTestDeleting}
+      />
     </AppLayout>
   );
 }

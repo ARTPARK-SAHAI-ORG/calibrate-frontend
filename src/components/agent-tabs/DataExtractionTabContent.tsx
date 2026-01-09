@@ -5,6 +5,7 @@ import {
   DataFieldPropertyCard,
   DataFieldProperty,
 } from "@/components/DataFieldPropertyCard";
+import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 
 type DataExtractionFieldData = {
   uuid: string;
@@ -51,6 +52,36 @@ export function DataExtractionTabContent({
   >(null);
   const [dataFieldValidationAttempted, setDataFieldValidationAttempted] =
     useState(false);
+
+  // Delete confirmation state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [fieldToDelete, setFieldToDelete] =
+    useState<DataExtractionFieldData | null>(null);
+
+  // Open delete confirmation dialog
+  const openDeleteDialog = (field: DataExtractionFieldData) => {
+    setFieldToDelete(field);
+    setDeleteDialogOpen(true);
+  };
+
+  // Close delete confirmation dialog
+  const closeDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setFieldToDelete(null);
+  };
+
+  // Handle delete field
+  const handleDeleteField = () => {
+    if (!fieldToDelete) return;
+
+    // Remove from local state - will be saved with agent config
+    setDataExtractionFields((prev) =>
+      prev.filter((f) => f.uuid !== fieldToDelete.uuid)
+    );
+    // Trigger save to persist the change
+    setTimeout(() => saveRef.current(), 0);
+    closeDeleteDialog();
+  };
 
   // State for data field properties
   const [dataFieldProperties, setDataFieldProperties] = useState<
@@ -680,19 +711,7 @@ export function DataExtractionTabContent({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (
-                        !confirm(
-                          `Are you sure you want to delete "${field.name}"?`
-                        )
-                      )
-                        return;
-
-                      // Remove from local state - will be saved with agent config
-                      setDataExtractionFields((prev) =>
-                        prev.filter((f) => f.uuid !== field.uuid)
-                      );
-                      // Trigger save to persist the change
-                      setTimeout(() => saveRef.current(), 0);
+                      openDeleteDialog(field);
                     }}
                     className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                     title="Delete field"
@@ -1134,6 +1153,16 @@ export function DataExtractionTabContent({
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        isOpen={deleteDialogOpen}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDeleteField}
+        title="Delete field"
+        message={`Are you sure you want to delete "${fieldToDelete?.name}"?`}
+        confirmText="Delete"
+      />
     </>
   );
 }

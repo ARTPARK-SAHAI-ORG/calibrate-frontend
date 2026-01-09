@@ -10,6 +10,8 @@ export type { DataExtractionFieldData } from "./DataExtractionTabContent";
 export { EvaluationTabContent } from "./EvaluationTabContent";
 export type { EvaluationCriteriaData } from "./EvaluationTabContent";
 
+export { TestsTabContent } from "./TestsTabContent";
+
 export { SettingsTabContent } from "./SettingsTabContent";
 
 // Sub-components
