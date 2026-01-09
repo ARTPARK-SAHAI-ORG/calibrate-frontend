@@ -29,6 +29,7 @@ export const getToolParams = (
     tool.config?.parameters?.properties ||
     tool.config?.function?.parameters?.properties ||
     tool.config?.properties ||
+    tool.config?.parameters ||
     {};
   return Object.keys(props).map((key) => ({ name: key, value: "" }));
 };
@@ -46,7 +47,9 @@ export function ToolPicker({
     (tool) =>
       tool.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (tool.config?.description &&
-        tool.config.description.toLowerCase().includes(searchQuery.toLowerCase()))
+        tool.config.description
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase()))
   );
 
   const filteredInbuiltTools = INBUILT_TOOLS.filter((tool) =>
@@ -160,7 +163,9 @@ export function ToolPicker({
                           ? tool.config.description.substring(0, 40) + "..."
                           : tool.config.description
                         : params.length > 0
-                        ? `${params.length} parameter${params.length > 1 ? "s" : ""}`
+                        ? `${params.length} parameter${
+                            params.length > 1 ? "s" : ""
+                          }`
                         : "No parameters"}
                     </p>
                   </div>
@@ -169,11 +174,14 @@ export function ToolPicker({
             })}
 
             {/* Empty state */}
-            {filteredTools.length === 0 && filteredInbuiltTools.length === 0 && (
-              <div className="py-6 text-center text-gray-400 text-sm">
-                {searchQuery ? "No tools match your search" : "No tools available"}
-              </div>
-            )}
+            {filteredTools.length === 0 &&
+              filteredInbuiltTools.length === 0 && (
+                <div className="py-6 text-center text-gray-400 text-sm">
+                  {searchQuery
+                    ? "No tools match your search"
+                    : "No tools available"}
+                </div>
+              )}
           </>
         )}
       </div>

@@ -13,6 +13,7 @@ type TestData = {
   uuid: string;
   name: string;
   description: string;
+  type: "response" | "tool_call";
   config: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -21,6 +22,32 @@ type TestData = {
 type Tool = {
   id: string;
   name: string;
+};
+
+type TestConfig = {
+  history: Array<{
+    role: "assistant" | "user" | "tool";
+    content?: string;
+    tool_calls?: Array<{
+      id: string;
+      function: {
+        name: string;
+        arguments: string;
+      };
+      type: "function";
+    }>;
+    tool_call_id?: string;
+  }>;
+  evaluation: {
+    type: "tool_call" | "response";
+    tool_calls?: Array<{
+      tool: string;
+      arguments: Record<string, any>;
+      is_called?: boolean;
+      accept_any_arguments?: boolean;
+    }>;
+    criteria?: string;
+  };
 };
 
 type AddTestDialogProps = {
@@ -33,7 +60,9 @@ type AddTestDialogProps = {
   testName: string;
   setTestName: (name: string) => void;
   validationAttempted: boolean;
-  onSubmit: () => void;
+  onSubmit: (config: TestConfig) => void;
+  initialTab?: "next-reply" | "tool-invocation";
+  initialConfig?: TestConfig;
 };
 
 function AddTestDialog({
@@ -47,12 +76,141 @@ function AddTestDialog({
   setTestName,
   validationAttempted,
   onSubmit,
+  initialTab,
+  initialConfig,
 }: AddTestDialogProps) {
   const [activeTab, setActiveTab] = useState<"next-reply" | "tool-invocation">(
-    "next-reply"
+    initialTab || "next-reply"
   );
+
+  // Update active tab when initialTab changes (when opening an existing test)
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  // Populate fields from initialConfig when editing an existing test
+  useEffect(() => {
+    if (initialConfig) {
+      // Parse history and convert to chatMessages format
+      if (initialConfig.history && initialConfig.history.length > 0) {
+        const messages: Array<{
+          id: string;
+          role: "agent" | "user" | "tool_call";
+          content: string;
+          toolName?: string;
+          toolId?: string;
+          toolParams?: Array<{ name: string; value: string }>;
+        }> = [];
+
+        initialConfig.history.forEach((historyItem, index) => {
+          if (historyItem.role === "assistant") {
+            if (historyItem.tool_calls && historyItem.tool_calls.length > 0) {
+              // This is a tool call message
+              const toolCall = historyItem.tool_calls[0];
+              let parsedArgs: Record<string, any> = {};
+              try {
+                parsedArgs = JSON.parse(toolCall.function.arguments);
+              } catch {
+                parsedArgs = {};
+              }
+              messages.push({
+                id: toolCall.id || `tool-${index}`,
+                role: "tool_call",
+                content: "",
+                toolId: toolCall.id,
+                toolName: toolCall.function.name,
+                toolParams: Object.entries(parsedArgs).map(([name, value]) => ({
+                  name,
+                  value: String(value),
+                })),
+              });
+            } else {
+              // Regular assistant message
+              messages.push({
+                id: `msg-${index}`,
+                role: "agent",
+                content: historyItem.content || "",
+              });
+            }
+          } else if (historyItem.role === "user") {
+            messages.push({
+              id: `msg-${index}`,
+              role: "user",
+              content: historyItem.content || "",
+            });
+          }
+          // Skip "tool" role messages as they are tool responses
+        });
+
+        if (messages.length > 0) {
+          setChatMessages(messages);
+        }
+      }
+
+      // Populate evaluation fields
+      if (initialConfig.evaluation) {
+        if (
+          initialConfig.evaluation.type === "response" &&
+          initialConfig.evaluation.criteria
+        ) {
+          setExpectedMessage(initialConfig.evaluation.criteria);
+        } else if (initialConfig.evaluation.type === "tool_call") {
+          const toolCalls = initialConfig.evaluation.tool_calls;
+
+          // Check if tool_calls is empty array
+          if (!toolCalls || toolCalls.length === 0) {
+            setToolCallExpectation("should-call");
+          } else {
+            const toolCall = toolCalls[0];
+            if (toolCall) {
+              // Set selected tool
+              setSelectedTool({
+                id: toolCall.tool,
+                name: toolCall.tool,
+              });
+
+              // Check is_called to determine expectation
+              if (toolCall.is_called === false) {
+                setToolCallExpectation("should-not-call");
+                setAcceptAnyParameterValues(false);
+              } else {
+                // Set tool call expectation to "should-call"
+                setToolCallExpectation("should-call");
+
+                // Set accept_any_arguments - only true if explicitly set to true
+                const acceptAny = toolCall.accept_any_arguments === true;
+                setAcceptAnyParameterValues(acceptAny);
+
+                // Load expected parameters if not accepting any
+                if (
+                  !acceptAny &&
+                  toolCall.arguments &&
+                  Object.keys(toolCall.arguments).length > 0
+                ) {
+                  setExpectedParameters(
+                    Object.entries(toolCall.arguments).map(
+                      ([name, value], idx) => ({
+                        id: `param-${idx}`,
+                        name,
+                        value: String(value),
+                      })
+                    )
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }, [initialConfig]);
+
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
   const [expectedMessage, setExpectedMessage] = useState("");
+  const [localValidationAttempted, setLocalValidationAttempted] =
+    useState(false);
   const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
   const [availableTools, setAvailableTools] = useState<AvailableTool[]>([]);
   const [availableToolsLoading, setAvailableToolsLoading] = useState(false);
@@ -229,6 +387,233 @@ function AddTestDialog({
     setExpectedParameters([]);
   };
 
+  // Helper function to populate parameters from the selected tool's config
+  const populateParametersFromTool = () => {
+    if (!selectedTool) return;
+
+    // Find the tool in availableTools
+    const tool = availableTools.find(
+      (t) => t.uuid === selectedTool.id || t.name === selectedTool.name
+    );
+    if (tool) {
+      // Extract parameters from tool config
+      const params =
+        tool.config?.parameters?.properties ||
+        tool.config?.function?.parameters?.properties ||
+        tool.config?.properties ||
+        tool.config?.parameters ||
+        {};
+      const paramList = Object.keys(params).map((name) => ({
+        id: Date.now().toString() + name,
+        name,
+        value: "",
+      }));
+      setExpectedParameters(paramList);
+    }
+  };
+
+  // Handle toggle for "Accept any values for parameters"
+  const handleAcceptAnyToggle = () => {
+    const newValue = !acceptAnyParameterValues;
+    setAcceptAnyParameterValues(newValue);
+
+    // When toggling OFF, populate parameters from the selected tool's config
+    if (!newValue && selectedTool) {
+      populateParametersFromTool();
+    }
+  };
+
+  // Handle "Should have been called" button click
+  const handleShouldCall = () => {
+    setToolCallExpectation("should-call");
+    // If toggle is off and parameters are empty, populate them
+    if (
+      !acceptAnyParameterValues &&
+      expectedParameters.length === 0 &&
+      selectedTool
+    ) {
+      populateParametersFromTool();
+    }
+  };
+
+  // Handle "Should not have been called" button click
+  const handleShouldNotCall = () => {
+    setToolCallExpectation("should-not-call");
+  };
+
+  // Check if selected tool has parameters in its original config
+  const selectedToolHasParams = (() => {
+    if (!selectedTool) return false;
+    const tool = availableTools.find(
+      (t) => t.uuid === selectedTool.id || t.name === selectedTool.name
+    );
+    if (!tool) return false;
+    const params =
+      tool.config?.parameters?.properties ||
+      tool.config?.function?.parameters?.properties ||
+      tool.config?.properties ||
+      tool.config?.parameters ||
+      {};
+    return Object.keys(params).length > 0;
+  })();
+
+  // Generate a UUID for tool calls
+  const generateUUID = () => {
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  };
+
+  // Build the config object for API submission
+  const buildConfig = (): TestConfig => {
+    const history: TestConfig["history"] = [];
+
+    // Convert chat messages to the API format
+    for (const message of chatMessages) {
+      if (message.role === "agent") {
+        history.push({
+          role: "assistant",
+          content: message.content,
+        });
+      } else if (message.role === "user") {
+        history.push({
+          role: "user",
+          content: message.content,
+        });
+      } else if (message.role === "tool_call") {
+        // Generate a unique ID for this tool call
+        const toolCallId = generateUUID();
+
+        // Build the arguments object from tool params
+        const argsObj: Record<string, string> = {};
+        if (message.toolParams) {
+          for (const param of message.toolParams) {
+            argsObj[param.name] = param.value;
+          }
+        }
+
+        // Add the assistant message with tool_calls
+        history.push({
+          role: "assistant",
+          tool_calls: [
+            {
+              id: toolCallId,
+              function: {
+                name: message.toolName || "",
+                arguments: JSON.stringify(argsObj),
+              },
+              type: "function",
+            },
+          ],
+        });
+
+        // Add the tool response message
+        history.push({
+          role: "tool",
+          content: '{"status": "received"}',
+          tool_call_id: toolCallId,
+        });
+      }
+    }
+
+    // Build the evaluation object based on the active tab
+    let evaluation: TestConfig["evaluation"];
+
+    if (activeTab === "tool-invocation") {
+      if (selectedTool && toolCallExpectation === "should-call") {
+        // Build the expected arguments
+        const expectedArgs: Record<string, any> = {};
+        if (!acceptAnyParameterValues) {
+          for (const param of expectedParameters) {
+            // Try to parse as JSON, otherwise use as string
+            try {
+              expectedArgs[param.name] = JSON.parse(param.value);
+            } catch {
+              expectedArgs[param.name] = param.value;
+            }
+          }
+        }
+
+        evaluation = {
+          type: "tool_call",
+          tool_calls: [
+            {
+              tool: selectedTool.name,
+              arguments: acceptAnyParameterValues ? {} : expectedArgs,
+              accept_any_arguments: acceptAnyParameterValues,
+            },
+          ],
+        };
+      } else if (selectedTool && toolCallExpectation === "should-not-call") {
+        evaluation = {
+          type: "tool_call",
+          tool_calls: [
+            {
+              tool: selectedTool.name,
+              arguments: {},
+              is_called: false,
+              accept_any_arguments: false,
+            },
+          ],
+        };
+      } else {
+        // No tool selected - test that no tool is called
+        evaluation = {
+          type: "tool_call",
+          tool_calls: [],
+        };
+      }
+    } else {
+      // next-reply test
+      evaluation = {
+        type: "response",
+        criteria: expectedMessage,
+      };
+    }
+
+    return { history, evaluation };
+  };
+
+  // Handle form submission
+  const handleSubmit = () => {
+    setLocalValidationAttempted(true);
+
+    // Auto-hide validation errors after 3 seconds
+    setTimeout(() => {
+      setLocalValidationAttempted(false);
+    }, 3000);
+
+    // Validate required fields based on test type
+    if (activeTab === "next-reply") {
+      if (!testName.trim() || !expectedMessage.trim()) {
+        return; // Don't submit if validation fails
+      }
+    } else {
+      // tool-invocation - name and tool are required
+      if (!testName.trim() || !selectedTool) {
+        return;
+      }
+      // If tool has parameters and "accept any" is off, all params must have values
+      if (
+        toolCallExpectation === "should-call" &&
+        expectedParameters.length > 0 &&
+        !acceptAnyParameterValues
+      ) {
+        const hasEmptyParams = expectedParameters.some(
+          (param) => !param.value.trim()
+        );
+        if (hasEmptyParams) {
+          return;
+        }
+      }
+    }
+
+    const config = buildConfig();
+    onSubmit(config);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -301,7 +686,9 @@ function AddTestDialog({
                     onChange={(e) => setTestName(e.target.value)}
                     placeholder="Your test name"
                     className={`w-full h-11 px-4 rounded-lg text-base bg-black text-white placeholder:text-gray-500 border focus:outline-none focus:ring-2 focus:ring-gray-600 ${
-                      validationAttempted && !testName.trim()
+                      localValidationAttempted &&
+                      activeTab === "next-reply" &&
+                      !testName.trim()
                         ? "border-red-500"
                         : "border-[#2a2a2a]"
                     }`}
@@ -318,7 +705,13 @@ function AddTestDialog({
                     onChange={(e) => setExpectedMessage(e.target.value)}
                     placeholder="Describe the ideal response or behavior the agent should exhibit to pass this test (e.g., provides a correct answer, uses a specific tone, includes key information)."
                     rows={4}
-                    className="w-full px-4 py-3 rounded-lg text-base bg-black text-white placeholder:text-gray-500 border border-[#2a2a2a] focus:outline-none focus:ring-2 focus:ring-gray-600 resize-none"
+                    className={`w-full px-4 py-3 rounded-lg text-base bg-black text-white placeholder:text-gray-500 border focus:outline-none focus:ring-2 focus:ring-gray-600 resize-none ${
+                      localValidationAttempted &&
+                      activeTab === "next-reply" &&
+                      !expectedMessage.trim()
+                        ? "border-red-500"
+                        : "border-[#2a2a2a]"
+                    }`}
                   />
                 </div>
               </div>
@@ -335,7 +728,9 @@ function AddTestDialog({
                     onChange={(e) => setTestName(e.target.value)}
                     placeholder="Your test name"
                     className={`w-full h-11 px-4 rounded-lg text-base bg-black text-white placeholder:text-gray-500 border focus:outline-none focus:ring-2 focus:ring-gray-600 ${
-                      validationAttempted && !testName.trim()
+                      localValidationAttempted &&
+                      activeTab === "tool-invocation" &&
+                      !testName.trim()
                         ? "border-red-500"
                         : "border-[#2a2a2a]"
                     }`}
@@ -350,7 +745,13 @@ function AddTestDialog({
                     </label>
                     <button
                       onClick={() => setToolDropdownOpen(!toolDropdownOpen)}
-                      className="px-3 py-1.5 text-sm font-medium bg-black text-white rounded-lg hover:bg-[#222] transition-colors cursor-pointer border border-[#2a2a2a]"
+                      className={`px-3 py-1.5 text-sm font-medium bg-black text-white rounded-lg hover:bg-[#222] transition-colors cursor-pointer border ${
+                        localValidationAttempted &&
+                        activeTab === "tool-invocation" &&
+                        !selectedTool
+                          ? "border-red-500 text-red-400"
+                          : "border-[#2a2a2a]"
+                      }`}
                     >
                       {selectedTool ? "Change tool" : "Add tool"}
                     </button>
@@ -418,9 +819,7 @@ function AddTestDialog({
                       <div className="mt-4">
                         <div className="flex rounded-lg overflow-hidden border border-[#2a2a2a]">
                           <button
-                            onClick={() =>
-                              setToolCallExpectation("should-call")
-                            }
+                            onClick={handleShouldCall}
                             className={`flex-1 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
                               toolCallExpectation === "should-call"
                                 ? "bg-white text-black"
@@ -430,9 +829,7 @@ function AddTestDialog({
                             Should have been called
                           </button>
                           <button
-                            onClick={() =>
-                              setToolCallExpectation("should-not-call")
-                            }
+                            onClick={handleShouldNotCall}
                             className={`flex-1 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
                               toolCallExpectation === "should-not-call"
                                 ? "bg-white text-black"
@@ -444,30 +841,28 @@ function AddTestDialog({
                         </div>
                       </div>
 
-                      {/* Accept any parameter values toggle - only show when "should call" is selected and has parameters */}
+                      {/* Accept any parameter values toggle - show when "should call" is selected and tool has parameters */}
                       {toolCallExpectation === "should-call" &&
-                        expectedParameters.length > 0 && (
+                        selectedTool &&
+                        selectedToolHasParams && (
                           <div className="mt-4 flex items-center gap-3">
                             <button
-                              onClick={() =>
-                                setAcceptAnyParameterValues(
-                                  !acceptAnyParameterValues
-                                )
-                              }
+                              onClick={handleAcceptAnyToggle}
                               className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${
                                 acceptAnyParameterValues
-                                  ? "bg-white"
-                                  : "bg-[#333]"
+                                  ? "bg-foreground"
+                                  : "bg-muted"
                               }`}
                             >
                               <div
-                                className={`absolute top-0.5 w-5 h-5 rounded-full transition-transform ${
+                                className={`absolute top-0.5 w-5 h-5 rounded-full bg-background transition-transform ${
                                   acceptAnyParameterValues
-                                    ? "translate-x-5 bg-black"
-                                    : "translate-x-0.5 bg-gray-500"
+                                    ? "translate-x-5"
+                                    : "translate-x-0.5"
                                 }`}
                               />
                             </button>
+
                             <span className="text-sm text-gray-300">
                               Accept any values for the parameters
                             </span>
@@ -505,7 +900,13 @@ function AddTestDialog({
                                       )
                                     }
                                     placeholder="Expected value"
-                                    className="w-full h-10 px-4 rounded-lg text-sm bg-black text-white placeholder:text-gray-500 border border-[#2a2a2a] focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                    className={`w-full h-10 px-4 rounded-lg text-sm bg-black text-white placeholder:text-gray-500 border focus:outline-none focus:ring-2 focus:ring-gray-500 ${
+                                      localValidationAttempted &&
+                                      activeTab === "tool-invocation" &&
+                                      !param.value.trim()
+                                        ? "border-red-500"
+                                        : "border-[#2a2a2a]"
+                                    }`}
                                   />
                                 </div>
                               ))}
@@ -533,7 +934,7 @@ function AddTestDialog({
                 Back
               </button>
               <button
-                onClick={onSubmit}
+                onClick={handleSubmit}
                 disabled={isCreating || isLoading}
                 className="h-10 px-5 rounded-lg text-base font-medium bg-white text-black hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
@@ -706,43 +1107,6 @@ function AddTestDialog({
                     {(message.role === "agent" ||
                       message.role === "tool_call") && (
                       <div className="flex items-center gap-2">
-                        <div
-                          className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                            message.role === "tool_call"
-                              ? "bg-orange-500/20"
-                              : "bg-white/10"
-                          }`}
-                        >
-                          {message.role === "tool_call" ? (
-                            <svg
-                              className="w-3.5 h-3.5 text-orange-400"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
-                              />
-                            </svg>
-                          ) : (
-                            <svg
-                              className="w-3.5 h-3.5 text-white"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                              />
-                            </svg>
-                          )}
-                        </div>
                         <span className="text-sm font-medium text-white">
                           {message.role === "tool_call"
                             ? "Agent Tool Call"
@@ -753,11 +1117,7 @@ function AddTestDialog({
 
                     {/* Message Bubble - for agent and user messages */}
                     {(message.role === "agent" || message.role === "user") && (
-                      <div
-                        className={`${
-                          message.role === "agent" ? "ml-8 w-1/2" : "w-1/2"
-                        }`}
-                      >
+                      <div className="w-1/2">
                         <input
                           type="text"
                           value={message.content}
@@ -775,11 +1135,11 @@ function AddTestDialog({
 
                     {/* Tool Call Display */}
                     {message.role === "tool_call" && (
-                      <div className="ml-8 w-1/2">
+                      <div className="w-1/2">
                         <div className="bg-[#1a1a1a] border border-[#333] rounded-2xl p-4">
                           <div className="flex items-center gap-2 mb-2">
                             <svg
-                              className="w-4 h-4 text-orange-400"
+                              className="w-4 h-4 text-gray-400"
                               fill="none"
                               viewBox="0 0 24 24"
                               stroke="currentColor"
@@ -791,54 +1151,41 @@ function AddTestDialog({
                                 d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
                               />
                             </svg>
-                            <span className="text-sm font-medium text-orange-400">
+                            <span className="text-sm font-medium text-white">
                               {message.toolName}
                             </span>
                           </div>
                           {message.toolParams &&
-                          message.toolParams.length > 0 ? (
-                            <div className="space-y-2 mt-3">
-                              {message.toolParams.map((param, idx) => (
-                                <div
-                                  key={idx}
-                                  className="flex items-center gap-2"
-                                >
-                                  <span className="text-xs text-gray-400 min-w-[80px]">
-                                    {param.name}:
-                                  </span>
-                                  <input
-                                    type="text"
-                                    value={param.value}
-                                    onChange={(e) =>
-                                      updateToolCallParam(
-                                        message.id,
-                                        param.name,
-                                        e.target.value
-                                      )
-                                    }
-                                    placeholder={`Enter ${param.name}`}
-                                    className="flex-1 h-8 px-3 rounded-lg text-xs bg-black text-white placeholder:text-gray-500 border border-[#2a2a2a] focus:outline-none focus:ring-1 focus:ring-gray-500"
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-xs text-gray-500">
-                              No parameters
-                            </p>
-                          )}
+                            message.toolParams.length > 0 && (
+                              <div className="space-y-3 mt-3">
+                                {message.toolParams.map((param, idx) => (
+                                  <div key={idx}>
+                                    <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                                      {param.name}
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={param.value}
+                                      onChange={(e) =>
+                                        updateToolCallParam(
+                                          message.id,
+                                          param.name,
+                                          e.target.value
+                                        )
+                                      }
+                                      placeholder={`Enter ${param.name}`}
+                                      className="w-full h-10 px-4 rounded-lg text-sm bg-black text-white placeholder:text-gray-500 border border-[#2a2a2a] focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                         </div>
                       </div>
                     )}
 
                     {/* Message Actions - Delete button for all messages, Add button only for last */}
-                    <div
-                      className={`flex items-center gap-2 relative ${
-                        message.role === "agent" || message.role === "tool_call"
-                          ? "ml-8"
-                          : ""
-                      }`}
-                    >
+                    <div className="flex items-center gap-2 relative">
                       {/* Delete and Add Message Buttons - only for last message */}
                       {index === chatMessages.length - 1 && (
                         <>
@@ -1018,19 +1365,15 @@ function AddTestDialog({
                                         );
                                       }}
                                       onSelectCustomTool={(tool, params) => {
-                                        if (params.length === 0) {
-                                          addToolCallMessage(
-                                            tool.uuid,
-                                            tool.name,
-                                            []
-                                          );
-                                        } else {
-                                          setPendingToolCall({
-                                            toolId: tool.uuid,
-                                            toolName: tool.name,
-                                            params,
-                                          });
-                                        }
+                                        // Always add tool call directly with params (empty values if has params)
+                                        addToolCallMessage(
+                                          tool.uuid,
+                                          tool.name,
+                                          params.map((p) => ({
+                                            name: p.name,
+                                            value: "",
+                                          }))
+                                        );
                                       }}
                                     />
                                   ) : (
@@ -1163,6 +1506,12 @@ export default function LLMPage() {
   const [editingTestUuid, setEditingTestUuid] = useState<string | null>(null);
   const [isLoadingTest, setIsLoadingTest] = useState(false);
   const [validationAttempted, setValidationAttempted] = useState(false);
+  const [initialTab, setInitialTab] = useState<
+    "next-reply" | "tool-invocation" | undefined
+  >(undefined);
+  const [initialConfig, setInitialConfig] = useState<TestConfig | undefined>(
+    undefined
+  );
 
   // Fetch tests from backend
   useEffect(() => {
@@ -1231,9 +1580,9 @@ export default function LLMPage() {
   };
 
   // Create test via POST API
-  const createTest = async () => {
+  const createTest = async (config: TestConfig) => {
     setValidationAttempted(true);
-    if (!newTestName.trim() || !newTestDescription.trim()) return;
+    if (!newTestName.trim()) return;
 
     try {
       setIsCreating(true);
@@ -1252,10 +1601,8 @@ export default function LLMPage() {
         },
         body: JSON.stringify({
           name: newTestName.trim(),
-          description: newTestDescription.trim(),
-          config: {
-            description: newTestDescription.trim(),
-          },
+          type: config.evaluation.type,
+          config: config,
         }),
       });
 
@@ -1325,6 +1672,14 @@ export default function LLMPage() {
       setNewTestDescription(
         testData.config?.description || testData.description || ""
       );
+      // Set initial tab based on test type
+      setInitialTab(
+        testData.type === "tool_call" ? "tool-invocation" : "next-reply"
+      );
+      // Set initial config to populate dialog fields
+      if (testData.config) {
+        setInitialConfig(testData.config as TestConfig);
+      }
     } catch (err) {
       console.error("Error fetching test:", err);
       setCreateError(
@@ -1336,10 +1691,9 @@ export default function LLMPage() {
   };
 
   // Update existing test via PUT API
-  const updateTest = async () => {
+  const updateTest = async (config: TestConfig) => {
     setValidationAttempted(true);
-    if (!newTestName.trim() || !newTestDescription.trim() || !editingTestUuid)
-      return;
+    if (!newTestName.trim() || !editingTestUuid) return;
 
     try {
       setIsCreating(true);
@@ -1358,10 +1712,8 @@ export default function LLMPage() {
         },
         body: JSON.stringify({
           name: newTestName.trim(),
-          description: newTestDescription.trim(),
-          config: {
-            description: newTestDescription.trim(),
-          },
+          type: config.evaluation.type,
+          config: config,
         }),
       });
 
@@ -1403,6 +1755,8 @@ export default function LLMPage() {
     setEditingTestUuid(null);
     setCreateError(null);
     setValidationAttempted(false);
+    setInitialTab(undefined);
+    setInitialConfig(undefined);
   };
 
   // Filter tests based on search query
@@ -1536,55 +1890,88 @@ export default function LLMPage() {
         ) : (
           <div className="border border-border rounded-xl overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-[1fr_2fr_auto] gap-4 px-4 py-3 border-b border-border bg-muted/30">
+            <div className="grid grid-cols-[1fr_1fr_auto] gap-4 px-4 py-3 border-b border-border bg-muted/30">
               <div className="text-sm font-medium text-muted-foreground">
                 Name
               </div>
               <div className="text-sm font-medium text-muted-foreground">
-                Description
+                Type
               </div>
-              <div className="w-10"></div>
+              <div className="w-20"></div>
             </div>
             {/* Table Rows */}
             {filteredTests.map((test) => (
               <div
                 key={test.uuid}
                 onClick={() => openEditTest(test.uuid)}
-                className="grid grid-cols-[1fr_2fr_auto] gap-4 px-4 py-4 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                className="grid grid-cols-[1fr_1fr_auto] gap-4 px-4 py-4 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
               >
                 <div className="min-w-0">
                   <p className="text-base font-medium text-foreground truncate">
                     {test.name}
                   </p>
                 </div>
-                <p className="text-sm text-muted-foreground line-clamp-2">
-                  {test.config?.description || test.description || "—"}
+                <p className="text-sm text-muted-foreground">
+                  {test.type === "response"
+                    ? "Next Reply Test"
+                    : test.type === "tool_call"
+                    ? "Tool Invocation Test"
+                    : "—"}
                 </p>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (
-                      confirm(`Are you sure you want to delete "${test.name}"?`)
-                    ) {
-                      deleteTest(test.uuid);
-                    }
-                  }}
-                  className="w-10 h-10 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
+                <div className="flex items-center gap-1">
+                  {/* Play Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // TODO: Implement run test functionality
+                    }}
+                    className="group relative w-10 h-10 flex items-center justify-center rounded-lg bg-transparent text-white hover:bg-[#444] transition-colors cursor-pointer"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                    />
-                  </svg>
-                </button>
+                    <svg
+                      className="w-4 h-4"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                      <span className="px-3 py-1.5 text-sm font-medium text-gray-900 bg-white rounded-full whitespace-nowrap shadow-lg">
+                        Run this test
+                      </span>
+                      {/* Arrow */}
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white"></div>
+                    </div>
+                  </button>
+                  {/* Delete Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (
+                        confirm(
+                          `Are you sure you want to delete "${test.name}"?`
+                        )
+                      ) {
+                        deleteTest(test.uuid);
+                      }
+                    }}
+                    className="w-10 h-10 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                      />
+                    </svg>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -1607,6 +1994,8 @@ export default function LLMPage() {
           setTestName={setNewTestName}
           validationAttempted={validationAttempted}
           onSubmit={editingTestUuid ? updateTest : createTest}
+          initialTab={initialTab}
+          initialConfig={initialConfig}
         />
       )}
     </AppLayout>
