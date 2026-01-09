@@ -18,6 +18,7 @@ type ParameterCardProps = {
   validationAttempted: boolean;
   isProperty?: boolean;
   isArrayItem?: boolean;
+  siblingNames?: string[]; // Names of sibling parameters (excluding this one)
 };
 
 // Recursive component for rendering parameter/property cards
@@ -31,9 +32,17 @@ export const ParameterCard = ({
   validationAttempted,
   isProperty = false,
   isArrayItem = false,
+  siblingNames = [],
 }: ParameterCardProps) => {
   const currentPath = [...path, param.id];
   const parentPath = path;
+
+  // Check if the current name is a duplicate
+  const isDuplicateName =
+    param.name.trim() !== "" &&
+    siblingNames.some(
+      (name) => name.toLowerCase() === param.name.trim().toLowerCase()
+    );
 
   return (
     <div className="border border-border rounded-xl p-5 space-y-5 bg-background">
@@ -90,11 +99,16 @@ export const ParameterCard = ({
               value={param.name}
               onChange={(e) => onUpdate(currentPath, { name: e.target.value })}
               className={`w-full h-10 px-4 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
-                validationAttempted && !param.name.trim()
+                validationAttempted && (!param.name.trim() || isDuplicateName)
                   ? "border-red-500"
                   : "border-border"
               }`}
             />
+            {validationAttempted && isDuplicateName && (
+              <p className="text-sm text-red-500 mt-1">
+                A parameter with this name already exists
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -175,6 +189,11 @@ export const ParameterCard = ({
                     onSetItems={onSetItems}
                     validationAttempted={validationAttempted}
                     isProperty={true}
+                    siblingNames={
+                      param.properties
+                        ?.filter((p) => p.id !== prop.id)
+                        .map((p) => p.name) ?? []
+                    }
                   />
                 ))}
               </div>

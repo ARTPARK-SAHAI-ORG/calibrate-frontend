@@ -1675,11 +1675,37 @@ All the tables have been updated. Let me check for linting errors in all the fil
 
 ---
 
-<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
 <details>
-<summary>Tool use: **read_lints**</summary>
+          <summary>Tool use: **read_lints** • Read lints for 5 files</summary>
+      
+Lint paths:
 
-Status: **loading**
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/EvaluationTabContent.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/ToolsTabContent.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/Agents.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/tools/page.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/tests/page.tsx`
+
+Lint results
+
+Lint errors for `src/app/tests/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'getToolParams' is declared but its value is never read. | 9:3-9:16 | DIAGNOSTIC_SEVERITY_HINT |
+| 'validationAttempted' is declared but its value is never read. | 77:3-77:22 | DIAGNOSTIC_SEVERITY_HINT |
+| 'newTestDescription' is declared but its value is never read. | 1500:10-1500:28 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+Lint errors for `src/app/tools/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'removeParameter' is declared but its value is never read. | 61:9-61:24 | DIAGNOSTIC_SEVERITY_HINT |
+| 'updateParameter' is declared but its value is never read. | 65:9-65:24 | DIAGNOSTIC_SEVERITY_HINT |
 
 
 </details>
@@ -1687,11 +1713,1291 @@ Status: **loading**
 
 ---
 
-
+<think><details><summary>Thought Process</summary>
+All the tables have been updated successfully with no linting errors.</details></think>
 
 ---
 
+Done! All tables across the app are now more compact. Here's a summary of the changes made to each:
 
+| Table | File | Changes |
+|-------|------|---------|
+| **Evaluation Criteria** | `EvaluationTabContent.tsx` | `py-3`→`py-2`, `py-4`→`py-2`, `text-base`→`text-sm`, `line-clamp-2`→`line-clamp-1`, button `w-10 h-10`→`w-8 h-8`, icon `w-5 h-5`→`w-4 h-4` |
+| **Agent Tools** | `ToolsTabContent.tsx` | Same changes |
+| **Agents List** | `Agents.tsx` | Same changes |
+| **All Tools** | `tools/page.tsx` | Same changes |
+| **All Tests** | `tests/page.tsx` | Same changes, plus play button `w-10 h-10`→`w-8 h-8`, actions column `w-20`→`w-16` |
+
+---
+
+_**User (2026-01-09 03:30Z)**_
+
+support for clicking on a data extraction field should open the field form and let one update it
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to be able to click on a data extraction field in the table and have it open the form in the sidebar for editing, similar to how tools work in the tools page.
+
+Let me look at the DataExtractionTabContent.tsx to understand the current implementation and add editing support.
+
+Key things I need to do:
+1. Add state for tracking the editing field (similar to `editingToolUuid`)
+2. Make the table rows clickable
+3. When clicking a row, populate the form with the field's data
+4. Update the sidebar header to show "Edit data field" when editing
+5. Update the submit button to update instead of create when editing
+6. Handle the update logic</details></think>
+
+---
+
+I'll add support for clicking on a data extraction field to edit it. Let me read the current implementation and add the editing functionality:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/DataExtractionTabContent.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to add:
+1. A state for tracking the editing field UUID
+2. A function to open the edit form with the field data
+3. Update the sidebar header based on editing state
+4. Update the submit handler to handle both create and update
+5. Make the table rows clickable
+
+Let me continue reading to see the current reset function and submit logic.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/DataExtractionTabContent.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to read more of the file to see the sidebar header and submit button.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/DataExtractionTabContent.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me also see the submit button section to understand the current submit logic.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/DataExtractionTabContent.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I have a complete understanding of the file. I need to:1. Add `editingFieldUuid` state to track which field is being edited2. Update `resetDataFieldForm` to also reset `editingFieldUuid`3. Create a function `openEditField` that loads a field's data into the form4. Make table rows clickable to open edit mode5. Update the sidebar header to show "Edit data field" when editing6. Update the submit button logic to handle both create and update
+
+Let me make these changes:</details></think>
+
+---
+
+Now I'll add editing support. I need to:
+1. Add state for tracking the editing field UUID
+2. Add a function to open a field for editing
+3. Make table rows clickable
+4. Update sidebar header and submit button to handle edit mode
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/DataExtractionTabContent.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -41,4 +41,5 @@
+    // Data extraction sidebar state
+    const [addDataFieldSidebarOpen, setAddDataFieldSidebarOpen] = useState(false);
++   const [editingFieldUuid, setEditingFieldUuid] = useState&lt;string | null&gt;(null);
+    const [dataFieldDataType, setDataFieldDataType] = useState("string");
+    const [dataFieldIdentifier, setDataFieldIdentifier] = useState("");
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the reset function to also reset the editing UUID.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/DataExtractionTabContent.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -76,4 +76,5 @@
+    // Reset data field form
+    const resetDataFieldForm = () =&gt; {
++     setEditingFieldUuid(null);
+      setDataFieldDataType("string");
+      setDataFieldIdentifier("");
+```
+
+**Chunk 2**
+Lines added: 24, lines removed: undefined
+
+```diff
+@@ -85,4 +86,28 @@
+      setDataFieldValidationAttempted(false);
+    };
++ 
++   // Open a field for editing
++   const openEditField = (field: DataExtractionFieldData) =&gt; {
++     setEditingFieldUuid(field.uuid);
++     setDataFieldDataType(field.type);
++     setDataFieldIdentifier(field.name);
++     setDataFieldDescription(field.description);
++     setDataFieldRequired(field.required);
++     // TODO: If we store properties/items in the field, we'd need to load them here
++     setDataFieldProperties([]);
++     setDataFieldItems(
++       field.type === "array"
++         ? {
++             id: crypto.randomUUID(),
++             dataType: "string",
++             name: "",
++             description: "",
++           }
++         : undefined
++     );
++     setCreateDataFieldError(null);
++     setDataFieldValidationAttempted(false);
++     setAddDataFieldSidebarOpen(true);
++   };
+  
+    // Helper function to convert DataFieldProperty to JSON Schema format
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to:
+1. Make the table rows clickable2. Update the sidebar header to show "Edit data field" when editing3. Update the submit button to handle both create and update</details></think>
+
+---
+
+Now let me make the table rows clickable:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/DataExtractionTabContent.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 1
+
+```diff
+@@ -635,5 +635,6 @@
+                &lt;div
+                  key={field.uuid}
+-                 className="grid grid-cols-[80px_1fr_2fr_70px_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
++                 onClick={() =&gt; openEditField(field)}
++                 className="grid grid-cols-[80px_1fr_2fr_70px_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer"
+                &gt;
+                  {/* Type Column */}
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the delete button to stop propagation so it doesn't trigger the row click.</details></think>
+
+---
+
+Now update the delete button to stop propagation:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/DataExtractionTabContent.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 1
+
+```diff
+@@ -665,5 +665,6 @@
+                  &lt;div className="flex items-center"&gt;
+                    &lt;button
+-                     onClick={async () =&gt; {
++                     onClick={(e) =&gt; {
++                       e.stopPropagation();
+                        if (
+                          !confirm(
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the sidebar header to show "Edit data field" when editing.</details></think>
+
+---
+
+Now update the sidebar header:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/DataExtractionTabContent.tsx</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: 1
+
+```diff
+@@ -734,5 +734,7 @@
+                    /&gt;
+                  &lt;/svg&gt;
+-                 &lt;h2 className="text-lg font-semibold"&gt;Add data field&lt;/h2&gt;
++                 &lt;h2 className="text-lg font-semibold"&gt;
++                   {editingFieldUuid ? "Edit data field" : "Add data field"}
++                 &lt;/h2&gt;
+                &lt;/div&gt;
+                &lt;button
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the submit button to handle both create and update. Let me find and update that section.</details></think>
+
+---
+
+Now update the submit button to handle both create and update:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/DataExtractionTabContent.tsx</summary>
+
+**Chunk 1**
+Lines added: 31, lines removed: 13
+
+```diff
+@@ -1037,18 +1037,36 @@
+                      if (!isDataFieldFormValid()) return;
+  
+-                     // Construct the field object using form data
+-                     const newField: DataExtractionFieldData = {
+-                       uuid: crypto.randomUUID(),
+-                       type: dataFieldDataType,
+-                       name: dataFieldIdentifier.trim(),
+-                       description: dataFieldDescription.trim(),
+-                       required: dataFieldRequired,
+-                       agent_id: agentUuid,
+-                       created_at: new Date().toISOString(),
+-                       updated_at: new Date().toISOString(),
+-                     };
++                     if (editingFieldUuid) {
++                       // Update existing field
++                       setDataExtractionFields((prev) =&gt;
++                         prev.map((f) =&gt;
++                           f.uuid === editingFieldUuid
++                             ? {
++                                 ...f,
++                                 type: dataFieldDataType,
++                                 name: dataFieldIdentifier.trim(),
++                                 description: dataFieldDescription.trim(),
++                                 required: dataFieldRequired,
++                                 updated_at: new Date().toISOString(),
++                               }
++                             : f
++                         )
++                       );
++                     } else {
++                       // Construct the field object using form data
++                       const newField: DataExtractionFieldData = {
++                         uuid: crypto.randomUUID(),
++                         type: dataFieldDataType,
++                         name: dataFieldIdentifier.trim(),
++                         description: dataFieldDescription.trim(),
++                         required: dataFieldRequired,
++                         agent_id: agentUuid,
++                         created_at: new Date().toISOString(),
++                         updated_at: new Date().toISOString(),
++                       };
+  
+-                     // Add the new field to the list
+-                     setDataExtractionFields((prev) =&gt; [...prev, newField]);
++                       // Add the new field to the list
++                       setDataExtractionFields((prev) =&gt; [...prev, newField]);
++                     }
+  
+                      // Reset and close
+```
+
+**Chunk 2**
+Lines added: 3, lines removed: 1
+
+```diff
+@@ -1083,6 +1101,8 @@
+                          &gt;&lt;/path&gt;
+                        &lt;/svg&gt;
+-                       Creating...
++                       {editingFieldUuid ? "Saving..." : "Creating..."}
+                      &lt;/&gt;
++                   ) : editingFieldUuid ? (
++                     "Save"
+                    ) : (
+                      "Add field"
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me check for linting errors.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/DataExtractionTabContent.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done! Now clicking on a data extraction field row will open the edit form with the field's data pre-filled, and the user can update it. The sidebar header will show "Edit data field" when editing, and the submit button will show "Save" instead of "Add field".</details></think>
+
+---
+
+Done! Now you can click on any data extraction field row to edit it. Here's what was added:
+
+1. **Edit state tracking** - Added `editingFieldUuid` state to track which field is being edited
+
+2. **Open edit function** - `openEditField()` loads the field's data into the form (type, name, description, required)
+
+3. **Clickable rows** - Table rows are now clickable with `cursor-pointer` and call `openEditField(field)`
+
+4. **Stop propagation on delete** - Delete button now has `e.stopPropagation()` to prevent opening edit when deleting
+
+5. **Dynamic header** - Sidebar shows "Edit data field" when editing, "Add data field" when creating
+
+6. **Update logic** - Submit button:
+   - When editing: Updates the existing field in the list
+   - When creating: Adds a new field to the list
+   - Button text shows "Save" when editing, "Add field" when creating
+
+---
+
+_**User (2026-01-09 03:30Z)**_
+
+don't allow setting the name of a parameter or evaluation criteria or data field  that already exists for @src/components/AgentDetail.tsx or for the parameters of a tool
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to add validation to prevent duplicate names for:
+1. Data extraction fields - in DataExtractionTabContent.tsx
+2. Evaluation criteria - in EvaluationTabContent.tsx
+3. Parameters in tools - in tools/page.tsx (and possibly ParameterCard.tsx)
+
+I need to add validation that checks if the name already exists (excluding the current item being edited) before allowing create/update.
+
+Let me start by reading the relevant files to understand the current validation logic and add duplicate name checks.</details></think>
+
+---
+
+I'll add duplicate name validation for data extraction fields, evaluation criteria, and tool parameters. Let me update each file:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/DataExtractionTabContent.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/EvaluationTabContent.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/tools/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I understand the current structure. I need to:
+
+1. **DataExtractionTabContent.tsx**: Add validation in `isDataFieldFormValid()` to check for duplicate names, and also add an error state for displaying duplicate name errors.
+
+2. **EvaluationTabContent.tsx**: Add validation before creating a new criteria to check for duplicate names. I need to add an editing state similar to data fields and also add duplicate name validation.
+
+3. **tools/page.tsx**: Add validation in the parameter validation to check for duplicate parameter names at the same level.
+
+Let me start with each file:</details></think>
+
+---
+
+Now I'll add duplicate name validation to each component. Let me update them:
+
+**1. First, update DataExtractionTabContent.tsx:**
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/DataExtractionTabContent.tsx</summary>
+
+**Chunk 1**
+Lines added: 10, lines removed: undefined
+
+```diff
+@@ -207,4 +207,14 @@
+      return false;
+    };
++ 
++   // Check if the name already exists (excluding current field being edited)
++   const isNameDuplicate = (name: string): boolean =&gt; {
++     const trimmedName = name.trim().toLowerCase();
++     return dataExtractionFields.some(
++       (field) =&gt;
++         field.name.toLowerCase() === trimmedName &amp;&amp;
++         field.uuid !== editingFieldUuid
++     );
++   };
+  
+    // Check if the entire data field form is valid
+```
+
+**Chunk 2**
+Lines added: 4, lines removed: undefined
+
+```diff
+@@ -213,4 +223,8 @@
+        return false;
+      }
++     // Check for duplicate name
++     if (isNameDuplicate(dataFieldIdentifier)) {
++       return false;
++     }
+      // Object type must have at least one property
+      if (dataFieldDataType === "object") {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to add UI feedback to show the duplicate name error. Let me find the Name input field in DataExtractionTabContent.tsx and add validation styling.</details></think>
+
+---
+
+Now add validation styling to the Name input in DataExtractionTabContent:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/DataExtractionTabContent.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I can see the Name input field. I need to update it to also show red border when there's a duplicate name, and add a helper text to show the error message.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/DataExtractionTabContent.tsx</summary>
+
+**Chunk 1**
+Lines added: 8, lines removed: 1
+
+```diff
+@@ -845,9 +845,16 @@
+                      className={&#96;w-full h-10 px-4 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
+                        dataFieldValidationAttempted &amp;&amp;
+-                       !dataFieldIdentifier.trim()
++                       (!dataFieldIdentifier.trim() ||
++                         isNameDuplicate(dataFieldIdentifier))
+                          ? "border-red-500"
+                          : "border-border"
+                      }&#96;}
+                    /&gt;
++                   {dataFieldValidationAttempted &amp;&amp;
++                     isNameDuplicate(dataFieldIdentifier) &amp;&amp; (
++                       &lt;p className="text-sm text-red-500 mt-1"&gt;
++                         A field with this name already exists
++                       &lt;/p&gt;
++                     )}
+                  &lt;/div&gt;
+                &lt;/div&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update EvaluationTabContent.tsx to add duplicate name validation. First, I need to read more of the file to see the submit logic and add the validation there.</details></think>
+
+---
+
+**2. Now update EvaluationTabContent.tsx:**
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/EvaluationTabContent.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The EvaluationTabContent doesn't have editing support yet. I should add:1. A state for tracking the editing criteria UUID2. Duplicate name validation
+3. Validation state
+4. Update the form submit logic to handle both create and updateLet me add these to EvaluationTabContent.tsx</details></think>
+
+---
+
+I need to add editing support and duplicate validation to EvaluationTabContent. Let me update it:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/EvaluationTabContent.tsx</summary>
+
+**Chunk 1**
+Lines added: 24, lines removed: undefined
+
+```diff
+@@ -35,11 +35,35 @@
+    // Evaluation criteria sidebar state
+    const [addCriteriaSidebarOpen, setAddCriteriaSidebarOpen] = useState(false);
++   const [editingCriteriaUuid, setEditingCriteriaUuid] = useState&lt;string | null&gt;(
++     null
++   );
+    const [criteriaName, setCriteriaName] = useState("");
+    const [criteriaInstructions, setCriteriaInstructions] = useState("");
++   const [validationAttempted, setValidationAttempted] = useState(false);
++ 
++   // Check if the name already exists (excluding current criteria being edited)
++   const isNameDuplicate = (name: string): boolean =&gt; {
++     const trimmedName = name.trim().toLowerCase();
++     return evaluationCriteria.some(
++       (c) =&gt;
++         c.name.toLowerCase() === trimmedName &amp;&amp; c.uuid !== editingCriteriaUuid
++     );
++   };
+  
+    // Reset criteria form
+    const resetCriteriaForm = () =&gt; {
++     setEditingCriteriaUuid(null);
+      setCriteriaName("");
+      setCriteriaInstructions("");
++     setValidationAttempted(false);
++   };
++ 
++   // Open a criteria for editing
++   const openEditCriteria = (criteria: EvaluationCriteriaData) =&gt; {
++     setEditingCriteriaUuid(criteria.uuid);
++     setCriteriaName(criteria.name);
++     setCriteriaInstructions(criteria.description);
++     setValidationAttempted(false);
++     setAddCriteriaSidebarOpen(true);
+    };
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to:1. Make the table rows clickable to edit2. Update the delete button to stop propagation3. Update the sidebar header to show "Edit" vs "Add"4. Update the submit logic with validation and edit support5. Update the input field with validation styling</details></think>
+
+---
+
+Now update the table rows to be clickable:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/EvaluationTabContent.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 1
+
+```diff
+@@ -176,5 +176,6 @@
+                &lt;div
+                  key={criteria.uuid}
+-                 className="grid grid-cols-[1fr_2fr_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
++                 onClick={() =&gt; openEditCriteria(criteria)}
++                 className="grid grid-cols-[1fr_2fr_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer"
+                &gt;
+                  {/* Name Column */}
+```
+
+**Chunk 2**
+Lines added: 2, lines removed: 1
+
+```diff
+@@ -193,5 +194,6 @@
+                  &lt;div className="flex items-center"&gt;
+                    &lt;button
+-                     onClick={() =&gt; {
++                     onClick={(e) =&gt; {
++                       e.stopPropagation();
+                        if (
+                          !confirm(
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the sidebar header and the form input with validation, and the submit button logic.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/EvaluationTabContent.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to update:
+1. The header title to be dynamic
+2. The criteria name input with validation styling
+3. The submit button logic to handle both create and updateLet me do each one.</details></think>
+
+---
+
+Update the sidebar header:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/EvaluationTabContent.tsx</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: 1
+
+```diff
+@@ -267,5 +267,7 @@
+                  &lt;/svg&gt;
+                  &lt;h2 className="text-lg font-semibold"&gt;
+-                   Add evaluation criteria
++                   {editingCriteriaUuid
++                     ? "Edit evaluation criteria"
++                     : "Add evaluation criteria"}
+                  &lt;/h2&gt;
+                &lt;/div&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now update the criteria name input with validation styling.</details></think>
+
+---
+
+Update the criteria name input with validation:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/EvaluationTabContent.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -300,5 +300,5 @@
+                &lt;div&gt;
+                  &lt;label className="block text-sm font-medium mb-2"&gt;
+-                   Criteria name
++                   Criteria name &lt;span className="text-red-500"&gt;*&lt;/span&gt;
+                  &lt;/label&gt;
+                  &lt;input
+```
+
+**Chunk 2**
+Lines added: 12, lines removed: 2
+
+```diff
+@@ -307,6 +307,16 @@
+                    placeholder="Enter the name of the criteria"
+                    onChange={(e) =&gt; setCriteriaName(e.target.value)}
+-                   className="w-full h-10 px-4 rounded-md text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+-                 /&gt;
++                   className={&#96;w-full h-10 px-4 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
++                     validationAttempted &amp;&amp;
++                     (!criteriaName.trim() || isNameDuplicate(criteriaName))
++                       ? "border-red-500"
++                       : "border-border"
++                   }&#96;}
++                 /&gt;
++                 {validationAttempted &amp;&amp; isNameDuplicate(criteriaName) &amp;&amp; (
++                   &lt;p className="text-sm text-red-500 mt-1"&gt;
++                     A criteria with this name already exists
++                   &lt;/p&gt;
++                 )}
+                &lt;/div&gt;
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now update the submit button logic to handle both create and update with validation.</details></think>
+
+---
+
+Now update the submit button with validation and edit support:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/EvaluationTabContent.tsx</summary>
+
+**Chunk 1**
+Lines added: 31, lines removed: 13
+
+```diff
+@@ -350,18 +350,36 @@
+                  &lt;button
+                    onClick={() =&gt; {
+-                     if (!criteriaName.trim()) return;
+- 
+-                     // Create a new criteria object with generated UUID
+-                     const newCriteria: EvaluationCriteriaData = {
+-                       uuid: crypto.randomUUID(),
+-                       name: criteriaName.trim(),
+-                       description: criteriaInstructions.trim(),
+-                       agent_id: agentUuid,
+-                       created_at: new Date().toISOString(),
+-                       updated_at: new Date().toISOString(),
+-                     };
++                     setValidationAttempted(true);
++                     if (!criteriaName.trim() || isNameDuplicate(criteriaName))
++                       return;
++ 
++                     if (editingCriteriaUuid) {
++                       // Update existing criteria
++                       setEvaluationCriteria((prev) =&gt;
++                         prev.map((c) =&gt;
++                           c.uuid === editingCriteriaUuid
++                             ? {
++                                 ...c,
++                                 name: criteriaName.trim(),
++                                 description: criteriaInstructions.trim(),
++                                 updated_at: new Date().toISOString(),
++                               }
++                             : c
++                         )
++                       );
++                     } else {
++                       // Create a new criteria object with generated UUID
++                       const newCriteria: EvaluationCriteriaData = {
++                         uuid: crypto.randomUUID(),
++                         name: criteriaName.trim(),
++                         description: criteriaInstructions.trim(),
++                         agent_id: agentUuid,
++                         created_at: new Date().toISOString(),
++                         updated_at: new Date().toISOString(),
++                       };
+  
+-                     // Add the new criteria to the list
+-                     setEvaluationCriteria((prev) =&gt; [...prev, newCriteria]);
++                       // Add the new criteria to the list
++                       setEvaluationCriteria((prev) =&gt; [...prev, newCriteria]);
++                     }
+  
+                      // Reset and close
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: 2
+
+```diff
+@@ -374,8 +392,7 @@
+                      }, 0);
+                    }}
+-                   disabled={!criteriaName.trim()}
+                    className="h-10 px-4 rounded-md text-base font-medium bg-white text-gray-900 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  &gt;
+-                   Add criteria
++                   {editingCriteriaUuid ? "Save" : "Add criteria"}
+                  &lt;/button&gt;
+                &lt;/div&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the tools/page.tsx to add duplicate parameter name validation. Let me read the relevant validation code.</details></think>
+
+---
+
+**3. Now update tools/page.tsx for duplicate parameter names:**
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/tools/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to add a function to check for duplicate parameter names at the same level and update the validation logic. I also need to update the ParameterCard component to show the validation error.Let me add the duplicate name check function to tools/page.tsx.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/tools/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 10, lines removed: undefined
+
+```diff
+@@ -363,7 +363,17 @@
+      setParameters((prev) =&gt; setItemsAtPath(prev, path, items));
+    };
++ 
++   // Check for duplicate parameter names at the same level
++   const hasDuplicateNames = (params: Parameter[]): boolean =&gt; {
++     const names = params.map((p) =&gt; p.name.trim().toLowerCase()).filter(Boolean);
++     return new Set(names).size !== names.length;
++   };
+  
+    // Recursive validation helper for parameters, nested properties, and array items
+    const hasInvalidParameters = (params: Parameter[]): boolean =&gt; {
++     // Check for duplicate names at this level
++     if (hasDuplicateNames(params)) {
++       return true;
++     }
+      for (const p of params) {
+        if (!p.name.trim() || !p.description.trim()) {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the ParameterCard component to show the duplicate name validation. I need to pass down a function to check for duplicate names at the same level.
+
+Let me read the ParameterCard to understand its structure and how to add the validation display.</details></think>
+
+---
+
+Now let me update the ParameterCard to show duplicate name validation. First, let me read it:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/ParameterCard.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+To add duplicate name validation to ParameterCard, I need to:
+1. Pass a `siblingNames` prop or a function to check for duplicates2. Update the name input validation to show the error
+
+The cleanest approach is to pass a list of sibling parameter names or a function that can check if a name is duplicateActually, looking at this more carefully, the best approach is to pass an optional `siblingNames` prop (excluding the current parameter's name) so the card can check if its name conflicts with siblings. But this would require passing this prop through the entire chain.An alternative is to let the validation happen at the parent level (which we already do with `hasInvalidParameters`) and just show a general error, but the user wouldn't know which specific parameter has the duplicate.
+
+Let me add a `siblingNames` prop to the ParameterCard to enable the duplicate check at each level.</details></think>
+
+---
+
+Let me update ParameterCard to support duplicate name validation:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/ParameterCard.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -19,4 +19,5 @@
+    isProperty?: boolean;
+    isArrayItem?: boolean;
++   siblingNames?: string[]; // Names of sibling parameters (excluding this one)
+  };
+  
+```
+
+**Chunk 2**
+Lines added: 8, lines removed: undefined
+
+```diff
+@@ -32,8 +33,16 @@
+    isProperty = false,
+    isArrayItem = false,
++   siblingNames = [],
+  }: ParameterCardProps) =&gt; {
+    const currentPath = [...path, param.id];
+    const parentPath = path;
+  
++   // Check if the current name is a duplicate
++   const isDuplicateName =
++     param.name.trim() !== "" &amp;&amp;
++     siblingNames.some(
++       (name) =&gt; name.toLowerCase() === param.name.trim().toLowerCase()
++     );
++ 
+    return (
+      &lt;div className="border border-border rounded-xl p-5 space-y-5 bg-background"&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now update the name input to show the duplicate name error:</details></think>
+
+---
+
+Now update the name input to show duplicate validation:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/ParameterCard.tsx</summary>
+
+**Chunk 1**
+Lines added: 6, lines removed: 1
+
+```diff
+@@ -100,9 +100,14 @@
+                onChange={(e) =&gt; onUpdate(currentPath, { name: e.target.value })}
+                className={&#96;w-full h-10 px-4 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
+-                 validationAttempted &amp;&amp; !param.name.trim()
++                 validationAttempted &amp;&amp; (!param.name.trim() || isDuplicateName)
+                    ? "border-red-500"
+                    : "border-border"
+                }&#96;}
+              /&gt;
++             {validationAttempted &amp;&amp; isDuplicateName &amp;&amp; (
++               &lt;p className="text-sm text-red-500 mt-1"&gt;
++                 A parameter with this name already exists
++               &lt;/p&gt;
++             )}
+            &lt;/div&gt;
+          )}
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the nested ParameterCard usages within the component to pass siblingNames. Let me update the properties rendering section.</details></think>
+
+---
+
+Now update the nested ParameterCard calls to pass siblingNames:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/ParameterCard.tsx</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: undefined
+
+```diff
+@@ -190,4 +190,7 @@
+                      validationAttempted={validationAttempted}
+                      isProperty={true}
++                     siblingNames={param.properties
++                       ?.filter((p) =&gt; p.id !== prop.id)
++                       .map((p) =&gt; p.name) ?? []}
+                    /&gt;
+                  ))}
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the tools/page.tsx to pass siblingNames to the top-level ParameterCard components.</details></think>
+
+---
+
+Now update tools/page.tsx to pass siblingNames to the top-level ParameterCards:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/tools/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to update the ParameterCard call to pass siblingNames.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/tools/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: undefined
+
+```diff
+@@ -1188,4 +1188,7 @@
+                          onSetItems={handleSetItemsAtPath}
+                          validationAttempted={validationAttempted}
++                         siblingNames={parameters
++                           .filter((p) =&gt; p.id !== param.id)
++                           .map((p) =&gt; p.name)}
+                        /&gt;
+                      ))}
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me check for linting errors in all the files I modified.</details></think>
+
+---
+
+Let me check for linting errors:
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 4 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/DataExtractionTabContent.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/EvaluationTabContent.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/tools/page.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/ParameterCard.tsx`
+
+Lint results
+
+Lint errors for `src/app/tools/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'removeParameter' is declared but its value is never read. | 61:9-61:24 | DIAGNOSTIC_SEVERITY_HINT |
+| 'updateParameter' is declared but its value is never read. | 65:9-65:24 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+Lint errors for `src/components/ParameterCard.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'isProperty' is declared but its value is never read. | 33:3-33:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+All changes are complete with no linting errors. Let me summarize what was done:
+
+1. **DataExtractionTabContent.tsx**:
+   - Added `isNameDuplicate()` function that checks if a name already exists (excluding the current field being edited)
+   - Updated `isDataFieldFormValid()` to include duplicate name check
+   - Updated the Name input with validation styling and error message for duplicates
+
+2. **EvaluationTabContent.tsx**:
+   - Added `editingCriteriaUuid` state for tracking which criteria is being edited
+   - Added `isNameDuplicate()` function
+   - Added `validationAttempted` state
+   - Added `openEditCriteria()` function to load criteria for editing
+   - Updated table rows to be clickable for editing
+   - Updated delete button to stop propagation
+   - Updated sidebar header to show "Edit" vs "Add"
+   - Updated criteria name input with validation styling and duplicate error message
+   - Updated submit logic to handle both create and update with validation
+
+3. **tools/page.tsx**:
+   - Added `hasDuplicateNames()` function to check for duplicate parameter names at the same level
+   - Updated `hasInvalidParameters()` to check for duplicates
+   - Updated ParameterCard usage to pass `siblingNames`
+
+4. **ParameterCard.tsx**:
+   - Added `siblingNames` prop
+   - Added `isDuplicateName` check
+   - Updated name input with validation styling and duplicate error message
+   - Updated nested ParameterCard calls to pass `siblingNames`</details></think>
+
+---
+
+Done! I've added duplicate name validation to all components. Here's a summary:
+
+**1. Data Extraction Fields (`DataExtractionTabContent.tsx`):**
+- Added `isNameDuplicate()` function that excludes the current field being edited
+- Updated form validation to check for duplicates
+- Shows "A field with this name already exists" error message
+
+**2. Evaluation Criteria (`EvaluationTabContent.tsx`):**
+- Added editing support (was missing) with `editingCriteriaUuid` state
+- Added `isNameDuplicate()` function
+- Made table rows clickable to edit existing criteria
+- Updated sidebar header to show "Edit" vs "Add"
+- Shows "A criteria with this name already exists" error message
+
+**3. Tool Parameters (`tools/page.tsx` + `ParameterCard.tsx`):**
+- Added `hasDuplicateNames()` function to check for duplicates at the same level
+- Added `siblingNames` prop to ParameterCard
+- Validates at both top-level and nested property levels
+- Shows "A parameter with this name already exists" error message
+
+All validations:
+- Are case-insensitive (comparing lowercase names)
+- Exclude the current item being edited
+- Show red border on the input field
+- Display an error message below the input
+- Block form submission until resolved
 
 ---
 

@@ -34,13 +34,37 @@ export function EvaluationTabContent({
 }: EvaluationTabContentProps) {
   // Evaluation criteria sidebar state
   const [addCriteriaSidebarOpen, setAddCriteriaSidebarOpen] = useState(false);
+  const [editingCriteriaUuid, setEditingCriteriaUuid] = useState<string | null>(
+    null
+  );
   const [criteriaName, setCriteriaName] = useState("");
   const [criteriaInstructions, setCriteriaInstructions] = useState("");
+  const [validationAttempted, setValidationAttempted] = useState(false);
+
+  // Check if the name already exists (excluding current criteria being edited)
+  const isNameDuplicate = (name: string): boolean => {
+    const trimmedName = name.trim().toLowerCase();
+    return evaluationCriteria.some(
+      (c) =>
+        c.name.toLowerCase() === trimmedName && c.uuid !== editingCriteriaUuid
+    );
+  };
 
   // Reset criteria form
   const resetCriteriaForm = () => {
+    setEditingCriteriaUuid(null);
     setCriteriaName("");
     setCriteriaInstructions("");
+    setValidationAttempted(false);
+  };
+
+  // Open a criteria for editing
+  const openEditCriteria = (criteria: EvaluationCriteriaData) => {
+    setEditingCriteriaUuid(criteria.uuid);
+    setCriteriaName(criteria.name);
+    setCriteriaInstructions(criteria.description);
+    setValidationAttempted(false);
+    setAddCriteriaSidebarOpen(true);
   };
 
   return (
@@ -151,7 +175,8 @@ export function EvaluationTabContent({
             {evaluationCriteria.map((criteria) => (
               <div
                 key={criteria.uuid}
-                className="grid grid-cols-[1fr_2fr_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
+                onClick={() => openEditCriteria(criteria)}
+                className="grid grid-cols-[1fr_2fr_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer"
               >
                 {/* Name Column */}
                 <div className="flex items-center">
@@ -168,7 +193,8 @@ export function EvaluationTabContent({
                 {/* Delete Button */}
                 <div className="flex items-center">
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       if (
                         !confirm(
                           `Are you sure you want to delete "${criteria.name}"?`
@@ -240,7 +266,9 @@ export function EvaluationTabContent({
                   />
                 </svg>
                 <h2 className="text-lg font-semibold">
-                  Add evaluation criteria
+                  {editingCriteriaUuid
+                    ? "Edit evaluation criteria"
+                    : "Add evaluation criteria"}
                 </h2>
               </div>
               <button
@@ -271,15 +299,25 @@ export function EvaluationTabContent({
               {/* Criteria name */}
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Criteria name
+                  Criteria name <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={criteriaName}
                   placeholder="Enter the name of the criteria"
                   onChange={(e) => setCriteriaName(e.target.value)}
-                  className="w-full h-10 px-4 rounded-md text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                  className={`w-full h-10 px-4 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
+                    validationAttempted &&
+                    (!criteriaName.trim() || isNameDuplicate(criteriaName))
+                      ? "border-red-500"
+                      : "border-border"
+                  }`}
                 />
+                {validationAttempted && isNameDuplicate(criteriaName) && (
+                  <p className="text-sm text-red-500 mt-1">
+                    A criteria with this name already exists
+                  </p>
+                )}
               </div>
 
               {/* Evaluation instructions */}
@@ -311,20 +349,38 @@ export function EvaluationTabContent({
                 </button>
                 <button
                   onClick={() => {
-                    if (!criteriaName.trim()) return;
+                    setValidationAttempted(true);
+                    if (!criteriaName.trim() || isNameDuplicate(criteriaName))
+                      return;
 
-                    // Create a new criteria object with generated UUID
-                    const newCriteria: EvaluationCriteriaData = {
-                      uuid: crypto.randomUUID(),
-                      name: criteriaName.trim(),
-                      description: criteriaInstructions.trim(),
-                      agent_id: agentUuid,
-                      created_at: new Date().toISOString(),
-                      updated_at: new Date().toISOString(),
-                    };
+                    if (editingCriteriaUuid) {
+                      // Update existing criteria
+                      setEvaluationCriteria((prev) =>
+                        prev.map((c) =>
+                          c.uuid === editingCriteriaUuid
+                            ? {
+                                ...c,
+                                name: criteriaName.trim(),
+                                description: criteriaInstructions.trim(),
+                                updated_at: new Date().toISOString(),
+                              }
+                            : c
+                        )
+                      );
+                    } else {
+                      // Create a new criteria object with generated UUID
+                      const newCriteria: EvaluationCriteriaData = {
+                        uuid: crypto.randomUUID(),
+                        name: criteriaName.trim(),
+                        description: criteriaInstructions.trim(),
+                        agent_id: agentUuid,
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                      };
 
-                    // Add the new criteria to the list
-                    setEvaluationCriteria((prev) => [...prev, newCriteria]);
+                      // Add the new criteria to the list
+                      setEvaluationCriteria((prev) => [...prev, newCriteria]);
+                    }
 
                     // Reset and close
                     resetCriteriaForm();
@@ -335,10 +391,9 @@ export function EvaluationTabContent({
                       saveRef.current();
                     }, 0);
                   }}
-                  disabled={!criteriaName.trim()}
                   className="h-10 px-4 rounded-md text-base font-medium bg-white text-gray-900 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  Add criteria
+                  {editingCriteriaUuid ? "Save" : "Add criteria"}
                 </button>
               </div>
             </div>

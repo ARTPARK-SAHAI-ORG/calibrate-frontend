@@ -363,8 +363,20 @@ export default function ToolsPage() {
     setParameters((prev) => setItemsAtPath(prev, path, items));
   };
 
+  // Check for duplicate parameter names at the same level
+  const hasDuplicateNames = (params: Parameter[]): boolean => {
+    const names = params
+      .map((p) => p.name.trim().toLowerCase())
+      .filter(Boolean);
+    return new Set(names).size !== names.length;
+  };
+
   // Recursive validation helper for parameters, nested properties, and array items
   const hasInvalidParameters = (params: Parameter[]): boolean => {
+    // Check for duplicate names at this level
+    if (hasDuplicateNames(params)) {
+      return true;
+    }
     for (const p of params) {
       if (!p.name.trim() || !p.description.trim()) {
         return true;
@@ -1177,6 +1189,9 @@ export default function ToolsPage() {
                         onAddProperty={handleAddPropertyAtPath}
                         onSetItems={handleSetItemsAtPath}
                         validationAttempted={validationAttempted}
+                        siblingNames={parameters
+                          .filter((p) => p.id !== param.id)
+                          .map((p) => p.name)}
                       />
                     ))}
                   </div>

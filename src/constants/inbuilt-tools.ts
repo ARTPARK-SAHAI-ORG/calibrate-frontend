@@ -1,5 +1,6 @@
 export type InbuiltTool = {
   id: string;
+  description: string;
   name: string;
   icon: "end-call" | "wrench";
 };
@@ -8,6 +9,7 @@ export const INBUILT_TOOLS: InbuiltTool[] = [
   {
     id: "end_call",
     name: "End conversation",
+    description: "End the conversation with the user when the agent thinks the conversation is over",
     icon: "end-call",
   },
 ];

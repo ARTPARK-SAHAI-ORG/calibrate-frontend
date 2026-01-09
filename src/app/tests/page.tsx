@@ -8,6 +8,7 @@ import {
   AvailableTool,
   getToolParams,
 } from "@/components/ToolPicker";
+import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
 
 type TestData = {
   uuid: string;
@@ -22,6 +23,19 @@ type TestData = {
 type Tool = {
   id: string;
   name: string;
+};
+
+type SelectedToolConfig = {
+  id: string;
+  name: string;
+  expectation: "should-call" | "should-not-call";
+  acceptAnyParameterValues: boolean;
+  isInbuilt: boolean;
+  expectedParameters: Array<{
+    id: string;
+    name: string;
+    value: string;
+  }>;
 };
 
 type TestConfig = {
@@ -161,71 +175,58 @@ function AddTestDialog({
 
           // Check if tool_calls is empty array
           if (!toolCalls || toolCalls.length === 0) {
-            setToolCallExpectation("should-call");
+            setSelectedTools([]);
           } else {
-            const toolCall = toolCalls[0];
-            if (toolCall) {
-              // Set selected tool
-              setSelectedTool({
-                id: toolCall.tool,
-                name: toolCall.tool,
-              });
-
-              // Check is_called to determine expectation
-              if (toolCall.is_called === false) {
-                setToolCallExpectation("should-not-call");
-                setAcceptAnyParameterValues(false);
-              } else {
-                // Set tool call expectation to "should-call"
-                setToolCallExpectation("should-call");
-
-                // Set accept_any_arguments - only true if explicitly set to true
+            // Populate all tool calls
+            const tools: SelectedToolConfig[] = toolCalls.map(
+              (toolCall, idx) => {
+                const expectation: "should-call" | "should-not-call" =
+                  toolCall.is_called === false
+                    ? "should-not-call"
+                    : "should-call";
                 const acceptAny = toolCall.accept_any_arguments === true;
-                setAcceptAnyParameterValues(acceptAny);
-
-                // Load expected parameters if not accepting any
-                if (
+                const params =
                   !acceptAny &&
                   toolCall.arguments &&
                   Object.keys(toolCall.arguments).length > 0
-                ) {
-                  setExpectedParameters(
-                    Object.entries(toolCall.arguments).map(
-                      ([name, value], idx) => ({
-                        id: `param-${idx}`,
-                        name,
-                        value: String(value),
-                      })
-                    )
-                  );
-                }
+                    ? Object.entries(toolCall.arguments).map(
+                        ([name, value], paramIdx) => ({
+                          id: `param-${idx}-${paramIdx}`,
+                          name,
+                          value: String(value),
+                        })
+                      )
+                    : [];
+
+                // Check if this is an inbuilt tool by matching tool id or name
+                const inbuiltTool = INBUILT_TOOLS.find(
+                  (t) => t.id === toolCall.tool || t.name === toolCall.tool
+                );
+
+                return {
+                  id: inbuiltTool ? inbuiltTool.id : toolCall.tool,
+                  name: inbuiltTool ? inbuiltTool.name : toolCall.tool,
+                  expectation,
+                  acceptAnyParameterValues: acceptAny,
+                  isInbuilt: !!inbuiltTool,
+                  expectedParameters: params,
+                };
               }
-            }
+            );
+            setSelectedTools(tools);
           }
         }
       }
     }
   }, [initialConfig]);
 
-  const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
+  const [selectedTools, setSelectedTools] = useState<SelectedToolConfig[]>([]);
   const [expectedMessage, setExpectedMessage] = useState("");
   const [localValidationAttempted, setLocalValidationAttempted] =
     useState(false);
   const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
   const [availableTools, setAvailableTools] = useState<AvailableTool[]>([]);
   const [availableToolsLoading, setAvailableToolsLoading] = useState(false);
-  const [toolCallExpectation, setToolCallExpectation] = useState<
-    "should-call" | "should-not-call"
-  >("should-call");
-  const [acceptAnyParameterValues, setAcceptAnyParameterValues] =
-    useState(false);
-  const [expectedParameters, setExpectedParameters] = useState<
-    Array<{
-      id: string;
-      name: string;
-      value: string;
-    }>
-  >([]);
   const [chatMessages, setChatMessages] = useState<
     Array<{
       id: string;
@@ -312,14 +313,6 @@ function AddTestDialog({
     }
   }, [chatMessages.length]);
 
-  const updateParameterValue = (id: string, value: string) => {
-    setExpectedParameters(
-      expectedParameters.map((param) =>
-        param.id === id ? { ...param, value } : param
-      )
-    );
-  };
-
   // Fetch available tools when dialog opens
   useEffect(() => {
     const fetchTools = async () => {
@@ -357,9 +350,6 @@ function AddTestDialog({
   }, [isOpen]);
 
   const addToolFromSelection = (tool: AvailableTool) => {
-    setSelectedTool({ id: tool.uuid, name: tool.name });
-    setToolDropdownOpen(false);
-
     // Extract parameters from tool config - handle different possible structures
     const params =
       tool.config?.parameters?.properties ||
@@ -372,80 +362,119 @@ function AddTestDialog({
       name,
       value: "",
     }));
-    setExpectedParameters(paramList);
+
+    const newTool: SelectedToolConfig = {
+      id: tool.uuid,
+      name: tool.name,
+      expectation: "should-call",
+      acceptAnyParameterValues: false,
+      isInbuilt: false,
+      expectedParameters: paramList,
+    };
+
+    setSelectedTools([...selectedTools, newTool]);
+    setToolDropdownOpen(false);
   };
 
   const selectInbuiltTool = (toolId: string, toolName: string) => {
-    setSelectedTool({ id: toolId, name: toolName });
+    const newTool: SelectedToolConfig = {
+      id: toolId,
+      name: toolName,
+      expectation: "should-call",
+      acceptAnyParameterValues: false,
+      isInbuilt: true,
+      expectedParameters: [],
+    };
+    setSelectedTools([...selectedTools, newTool]);
     setToolDropdownOpen(false);
-    // In-built tools don't have configurable parameters
-    setExpectedParameters([]);
   };
 
-  const removeTool = () => {
-    setSelectedTool(null);
-    setExpectedParameters([]);
+  const removeTool = (toolId: string) => {
+    setSelectedTools(selectedTools.filter((t) => t.id !== toolId));
   };
 
-  // Helper function to populate parameters from the selected tool's config
-  const populateParametersFromTool = () => {
-    if (!selectedTool) return;
-
-    // Find the tool in availableTools
+  // Helper function to get parameters from tool config for selected tool
+  const getToolParamsForSelectedTool = (toolId: string, toolName: string) => {
     const tool = availableTools.find(
-      (t) => t.uuid === selectedTool.id || t.name === selectedTool.name
+      (t) => t.uuid === toolId || t.name === toolName
     );
-    if (tool) {
-      // Extract parameters from tool config
-      const params =
-        tool.config?.parameters?.properties ||
-        tool.config?.function?.parameters?.properties ||
-        tool.config?.properties ||
-        tool.config?.parameters ||
-        {};
-      const paramList = Object.keys(params).map((name) => ({
-        id: Date.now().toString() + name,
-        name,
-        value: "",
-      }));
-      setExpectedParameters(paramList);
-    }
+    if (!tool) return [];
+    const params =
+      tool.config?.parameters?.properties ||
+      tool.config?.function?.parameters?.properties ||
+      tool.config?.properties ||
+      tool.config?.parameters ||
+      {};
+    return Object.keys(params).map((name) => ({
+      id: Date.now().toString() + name,
+      name,
+      value: "",
+    }));
   };
 
-  // Handle toggle for "Accept any values for parameters"
-  const handleAcceptAnyToggle = () => {
-    const newValue = !acceptAnyParameterValues;
-    setAcceptAnyParameterValues(newValue);
+  // Update a specific tool's configuration
+  const updateToolConfig = (
+    toolId: string,
+    updates: Partial<SelectedToolConfig>
+  ) => {
+    setSelectedTools(
+      selectedTools.map((tool) => {
+        if (tool.id !== toolId) return tool;
 
-    // When toggling OFF, populate parameters from the selected tool's config
-    if (!newValue && selectedTool) {
-      populateParametersFromTool();
-    }
+        const updatedTool = { ...tool, ...updates };
+
+        // If toggling acceptAnyParameterValues off, populate parameters
+        if (
+          updates.acceptAnyParameterValues === false &&
+          tool.acceptAnyParameterValues === true
+        ) {
+          updatedTool.expectedParameters = getToolParamsForSelectedTool(
+            tool.id,
+            tool.name
+          );
+        }
+
+        // If changing to should-call and params are empty and acceptAny is false
+        if (
+          updates.expectation === "should-call" &&
+          tool.expectation !== "should-call" &&
+          !updatedTool.acceptAnyParameterValues &&
+          updatedTool.expectedParameters.length === 0
+        ) {
+          updatedTool.expectedParameters = getToolParamsForSelectedTool(
+            tool.id,
+            tool.name
+          );
+        }
+
+        return updatedTool;
+      })
+    );
   };
 
-  // Handle "Should have been called" button click
-  const handleShouldCall = () => {
-    setToolCallExpectation("should-call");
-    // If toggle is off and parameters are empty, populate them
-    if (
-      !acceptAnyParameterValues &&
-      expectedParameters.length === 0 &&
-      selectedTool
-    ) {
-      populateParametersFromTool();
-    }
+  // Update a parameter value for a specific tool
+  const updateToolParameterValue = (
+    toolId: string,
+    paramId: string,
+    value: string
+  ) => {
+    setSelectedTools(
+      selectedTools.map((tool) => {
+        if (tool.id !== toolId) return tool;
+        return {
+          ...tool,
+          expectedParameters: tool.expectedParameters.map((param) =>
+            param.id === paramId ? { ...param, value } : param
+          ),
+        };
+      })
+    );
   };
 
-  // Handle "Should not have been called" button click
-  const handleShouldNotCall = () => {
-    setToolCallExpectation("should-not-call");
-  };
-
-  // Check if selected tool has parameters in its original config
-  const selectedToolHasParams = (() => {
-    if (!selectedTool) return false;
+  // Check if a tool has parameters in its original config
+  const toolHasParams = (toolId: string, toolName: string) => {
     const tool = availableTools.find(
-      (t) => t.uuid === selectedTool.id || t.name === selectedTool.name
+      (t) => t.uuid === toolId || t.name === toolName
     );
     if (!tool) return false;
     const params =
@@ -455,7 +484,7 @@ function AddTestDialog({
       tool.config?.parameters ||
       {};
     return Object.keys(params).length > 0;
-  })();
+  };
 
   // Generate a UUID for tool calls
   const generateUUID = () => {
@@ -522,41 +551,45 @@ function AddTestDialog({
     let evaluation: TestConfig["evaluation"];
 
     if (activeTab === "tool-invocation") {
-      if (selectedTool && toolCallExpectation === "should-call") {
-        // Build the expected arguments
-        const expectedArgs: Record<string, any> = {};
-        if (!acceptAnyParameterValues) {
-          for (const param of expectedParameters) {
-            // Try to parse as JSON, otherwise use as string
-            try {
-              expectedArgs[param.name] = JSON.parse(param.value);
-            } catch {
-              expectedArgs[param.name] = param.value;
-            }
-          }
-        }
+      if (selectedTools.length > 0) {
+        // Build tool_calls array from all selected tools
+        const toolCalls = selectedTools.map((tool) => {
+          // Use tool.id for inbuilt tools, tool.name for custom tools
+          const toolIdentifier = tool.isInbuilt ? tool.id : tool.name;
 
-        evaluation = {
-          type: "tool_call",
-          tool_calls: [
-            {
-              tool: selectedTool.name,
-              arguments: acceptAnyParameterValues ? {} : expectedArgs,
-              accept_any_arguments: acceptAnyParameterValues,
-            },
-          ],
-        };
-      } else if (selectedTool && toolCallExpectation === "should-not-call") {
-        evaluation = {
-          type: "tool_call",
-          tool_calls: [
-            {
-              tool: selectedTool.name,
+          if (tool.expectation === "should-call") {
+            // Build the expected arguments
+            const expectedArgs: Record<string, any> = {};
+            if (!tool.acceptAnyParameterValues) {
+              for (const param of tool.expectedParameters) {
+                // Try to parse as JSON, otherwise use as string
+                try {
+                  expectedArgs[param.name] = JSON.parse(param.value);
+                } catch {
+                  expectedArgs[param.name] = param.value;
+                }
+              }
+            }
+
+            return {
+              tool: toolIdentifier,
+              arguments: tool.acceptAnyParameterValues ? {} : expectedArgs,
+              accept_any_arguments: tool.acceptAnyParameterValues,
+            };
+          } else {
+            // should-not-call
+            return {
+              tool: toolIdentifier,
               arguments: {},
               is_called: false,
               accept_any_arguments: false,
-            },
-          ],
+            };
+          }
+        });
+
+        evaluation = {
+          type: "tool_call",
+          tool_calls: toolCalls,
         };
       } else {
         // No tool selected - test that no tool is called
@@ -591,21 +624,23 @@ function AddTestDialog({
         return; // Don't submit if validation fails
       }
     } else {
-      // tool-invocation - name and tool are required
-      if (!testName.trim() || !selectedTool) {
+      // tool-invocation - name and at least one tool are required
+      if (!testName.trim() || selectedTools.length === 0) {
         return;
       }
-      // If tool has parameters and "accept any" is off, all params must have values
-      if (
-        toolCallExpectation === "should-call" &&
-        expectedParameters.length > 0 &&
-        !acceptAnyParameterValues
-      ) {
-        const hasEmptyParams = expectedParameters.some(
-          (param) => !param.value.trim()
-        );
-        if (hasEmptyParams) {
-          return;
+      // For each tool that should be called with specific params, all params must have values
+      for (const tool of selectedTools) {
+        if (
+          tool.expectation === "should-call" &&
+          tool.expectedParameters.length > 0 &&
+          !tool.acceptAnyParameterValues
+        ) {
+          const hasEmptyParams = tool.expectedParameters.some(
+            (param) => !param.value.trim()
+          );
+          if (hasEmptyParams) {
+            return;
+          }
         }
       }
     }
@@ -737,23 +772,23 @@ function AddTestDialog({
                   />
                 </div>
 
-                {/* Tool to test */}
+                {/* Tools to test */}
                 <div className="relative">
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-base font-medium text-white">
-                      Tool to test
+                      Tools to test
                     </label>
                     <button
                       onClick={() => setToolDropdownOpen(!toolDropdownOpen)}
                       className={`px-3 py-1.5 text-sm font-medium bg-black text-white rounded-lg hover:bg-[#222] transition-colors cursor-pointer border ${
                         localValidationAttempted &&
                         activeTab === "tool-invocation" &&
-                        !selectedTool
+                        selectedTools.length === 0
                           ? "border-red-500 text-red-400"
                           : "border-[#2a2a2a]"
                       }`}
                     >
-                      {selectedTool ? "Change tool" : "Add tool"}
+                      Add tool
                     </button>
                   </div>
 
@@ -766,7 +801,7 @@ function AddTestDialog({
                           setToolDropdownOpen(false);
                         }}
                       />
-                      <div className="absolute right-0 top-8 mt-2 w-full bg-[#1a1a1a] border border-[#333] rounded-xl shadow-2xl z-[100] overflow-hidden">
+                      <div className="absolute right-0 top-8 mt-2 w-72 bg-[#1a1a1a] border border-[#333] rounded-xl shadow-2xl z-[100] overflow-hidden">
                         <ToolPicker
                           availableTools={availableTools}
                           isLoading={availableToolsLoading}
@@ -776,12 +811,13 @@ function AddTestDialog({
                           onSelectCustomTool={(tool) => {
                             addToolFromSelection(tool);
                           }}
+                          selectedToolIds={selectedTools.map((t) => t.id)}
                         />
                       </div>
                     </>
                   )}
 
-                  {!selectedTool ? (
+                  {selectedTools.length === 0 ? (
                     <div className="bg-[#161616] rounded-lg p-8 text-center ">
                       <p className="text-gray-400 text-sm">
                         If you leave this empty, the test will check that no
@@ -789,131 +825,156 @@ function AddTestDialog({
                       </p>
                     </div>
                   ) : (
-                    <>
-                      {/* Selected tool display */}
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-10 px-4 rounded-lg text-base bg-[#161616] text-white border border-[#2a2a2a] flex items-center">
-                          {selectedTool.name}
-                        </div>
-                        <button
-                          onClick={() => removeTool()}
-                          className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-[#222] transition-colors cursor-pointer"
+                    <div className="space-y-4">
+                      {selectedTools.map((tool) => (
+                        <div
+                          key={tool.id}
+                          className="bg-[#121212] rounded-lg p-4 border border-[#2a2a2a]"
                         >
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                            />
-                          </svg>
-                        </button>
-                      </div>
-
-                      {/* Should have been called / Should not have been called tabs */}
-                      <div className="mt-4">
-                        <div className="flex rounded-lg overflow-hidden border border-[#2a2a2a]">
-                          <button
-                            onClick={handleShouldCall}
-                            className={`flex-1 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
-                              toolCallExpectation === "should-call"
-                                ? "bg-white text-black"
-                                : "bg-transparent text-gray-400 hover:text-white"
-                            }`}
-                          >
-                            Should have been called
-                          </button>
-                          <button
-                            onClick={handleShouldNotCall}
-                            className={`flex-1 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
-                              toolCallExpectation === "should-not-call"
-                                ? "bg-white text-black"
-                                : "bg-transparent text-gray-400 hover:text-white"
-                            }`}
-                          >
-                            Should not have been called
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Accept any parameter values toggle - show when "should call" is selected and tool has parameters */}
-                      {toolCallExpectation === "should-call" &&
-                        selectedTool &&
-                        selectedToolHasParams && (
-                          <div className="mt-4 flex items-center gap-3">
+                          {/* Tool header with name and delete button */}
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="flex-1 h-10 px-4 rounded-lg text-base bg-black text-white border border-[#2a2a2a] flex items-center">
+                              {tool.name}
+                            </div>
                             <button
-                              onClick={handleAcceptAnyToggle}
-                              className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${
-                                acceptAnyParameterValues
-                                  ? "bg-foreground"
-                                  : "bg-muted"
+                              onClick={() => removeTool(tool.id)}
+                              className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-[#222] transition-colors cursor-pointer"
+                            >
+                              <svg
+                                className="w-5 h-5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                                />
+                              </svg>
+                            </button>
+                          </div>
+
+                          {/* Should have been called / Should not have been called tabs */}
+                          <div className="flex rounded-lg overflow-hidden border border-[#2a2a2a]">
+                            <button
+                              onClick={() =>
+                                updateToolConfig(tool.id, {
+                                  expectation: "should-call",
+                                })
+                              }
+                              className={`flex-1 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
+                                tool.expectation === "should-call"
+                                  ? "bg-white text-black"
+                                  : "bg-gray-600/20 text-gray-400 hover:text-white"
                               }`}
                             >
-                              <div
-                                className={`absolute top-0.5 w-5 h-5 rounded-full bg-background transition-transform ${
-                                  acceptAnyParameterValues
-                                    ? "translate-x-5"
-                                    : "translate-x-0.5"
-                                }`}
-                              />
+                              Should have been called
                             </button>
-
-                            <span className="text-sm text-gray-300">
-                              Accept any values for the parameters
-                            </span>
+                            <button
+                              onClick={() =>
+                                updateToolConfig(tool.id, {
+                                  expectation: "should-not-call",
+                                })
+                              }
+                              className={`flex-1 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
+                                tool.expectation === "should-not-call"
+                                  ? "bg-white text-black"
+                                  : "bg-gray-600/20 text-gray-400 hover:text-white"
+                              }`}
+                            >
+                              Should not have been called
+                            </button>
                           </div>
-                        )}
 
-                      {/* Expected parameters section - only show when "should call" is selected and toggle is off */}
-                      {toolCallExpectation === "should-call" &&
-                        expectedParameters.length > 0 &&
-                        !acceptAnyParameterValues && (
-                          <div className="mt-4">
-                            <div className="mb-3">
-                              <h4 className="text-base font-medium text-white">
-                                Expected extracted parameters
-                              </h4>
-                              <p className="text-sm text-gray-400 mt-1">
-                                Configure how each parameter should be evaluated
-                                when the agent calls this tool.
-                              </p>
-                            </div>
+                          {/* Accept any parameter values checkbox - show when "should call" is selected and tool has parameters */}
+                          {tool.expectation === "should-call" &&
+                            toolHasParams(tool.id, tool.name) && (
+                              <div className="mt-4 flex items-center gap-3">
+                                <button
+                                  onClick={() =>
+                                    updateToolConfig(tool.id, {
+                                      acceptAnyParameterValues:
+                                        !tool.acceptAnyParameterValues,
+                                    })
+                                  }
+                                  className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
+                                    tool.acceptAnyParameterValues
+                                      ? "bg-foreground border-foreground"
+                                      : "border-border hover:border-muted-foreground"
+                                  }`}
+                                >
+                                  {tool.acceptAnyParameterValues && (
+                                    <svg
+                                      className="w-3 h-3 text-background"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      strokeWidth={3}
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M4.5 12.75l6 6 9-13.5"
+                                      />
+                                    </svg>
+                                  )}
+                                </button>
+                                <span className="text-sm font-medium">
+                                  Accept any values for the parameters
+                                </span>
+                              </div>
+                            )}
 
-                            <div className="space-y-3">
-                              {expectedParameters.map((param) => (
-                                <div key={param.id}>
-                                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                                    {param.name}
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={param.value}
-                                    onChange={(e) =>
-                                      updateParameterValue(
-                                        param.id,
-                                        e.target.value
-                                      )
-                                    }
-                                    placeholder="Expected value"
-                                    className={`w-full h-10 px-4 rounded-lg text-sm bg-black text-white placeholder:text-gray-500 border focus:outline-none focus:ring-2 focus:ring-gray-500 ${
-                                      localValidationAttempted &&
-                                      activeTab === "tool-invocation" &&
-                                      !param.value.trim()
-                                        ? "border-red-500"
-                                        : "border-[#2a2a2a]"
-                                    }`}
-                                  />
+                          {/* Expected parameters section - only show when "should call" is selected and toggle is off */}
+                          {tool.expectation === "should-call" &&
+                            tool.expectedParameters.length > 0 &&
+                            !tool.acceptAnyParameterValues && (
+                              <div className="mt-4">
+                                <div className="mb-3">
+                                  <h4 className="text-sm font-medium text-white">
+                                    Expected extracted parameters
+                                  </h4>
+                                  <p className="text-xs text-gray-400 mt-1">
+                                    Configure how each parameter should be
+                                    evaluated when the agent calls this tool
+                                  </p>
                                 </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                    </>
+
+                                <div className="space-y-3">
+                                  {tool.expectedParameters.map((param) => (
+                                    <div key={param.id}>
+                                      <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                                        {param.name}
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={param.value}
+                                        onChange={(e) =>
+                                          updateToolParameterValue(
+                                            tool.id,
+                                            param.id,
+                                            e.target.value
+                                          )
+                                        }
+                                        placeholder="Expected value"
+                                        className={`w-full h-10 px-4 rounded-lg text-sm bg-black text-white placeholder:text-gray-500 border focus:outline-none focus:ring-2 focus:ring-gray-500 ${
+                                          localValidationAttempted &&
+                                          activeTab === "tool-invocation" &&
+                                          !param.value.trim()
+                                            ? "border-red-500"
+                                            : "border-[#2a2a2a]"
+                                        }`}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>

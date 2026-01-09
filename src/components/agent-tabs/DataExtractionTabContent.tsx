@@ -40,6 +40,7 @@ export function DataExtractionTabContent({
 }: DataExtractionTabContentProps) {
   // Data extraction sidebar state
   const [addDataFieldSidebarOpen, setAddDataFieldSidebarOpen] = useState(false);
+  const [editingFieldUuid, setEditingFieldUuid] = useState<string | null>(null);
   const [dataFieldDataType, setDataFieldDataType] = useState("string");
   const [dataFieldIdentifier, setDataFieldIdentifier] = useState("");
   const [dataFieldDescription, setDataFieldDescription] = useState("");
@@ -74,6 +75,7 @@ export function DataExtractionTabContent({
 
   // Reset data field form
   const resetDataFieldForm = () => {
+    setEditingFieldUuid(null);
     setDataFieldDataType("string");
     setDataFieldIdentifier("");
     setDataFieldDescription("");
@@ -82,6 +84,30 @@ export function DataExtractionTabContent({
     setDataFieldItems(undefined);
     setCreateDataFieldError(null);
     setDataFieldValidationAttempted(false);
+  };
+
+  // Open a field for editing
+  const openEditField = (field: DataExtractionFieldData) => {
+    setEditingFieldUuid(field.uuid);
+    setDataFieldDataType(field.type);
+    setDataFieldIdentifier(field.name);
+    setDataFieldDescription(field.description);
+    setDataFieldRequired(field.required);
+    // TODO: If we store properties/items in the field, we'd need to load them here
+    setDataFieldProperties([]);
+    setDataFieldItems(
+      field.type === "array"
+        ? {
+            id: crypto.randomUUID(),
+            dataType: "string",
+            name: "",
+            description: "",
+          }
+        : undefined
+    );
+    setCreateDataFieldError(null);
+    setDataFieldValidationAttempted(false);
+    setAddDataFieldSidebarOpen(true);
   };
 
   // Helper function to convert DataFieldProperty to JSON Schema format
@@ -181,9 +207,23 @@ export function DataExtractionTabContent({
     return false;
   };
 
+  // Check if the name already exists (excluding current field being edited)
+  const isNameDuplicate = (name: string): boolean => {
+    const trimmedName = name.trim().toLowerCase();
+    return dataExtractionFields.some(
+      (field) =>
+        field.name.toLowerCase() === trimmedName &&
+        field.uuid !== editingFieldUuid
+    );
+  };
+
   // Check if the entire data field form is valid
   const isDataFieldFormValid = (): boolean => {
     if (!dataFieldIdentifier.trim() || !dataFieldDescription.trim()) {
+      return false;
+    }
+    // Check for duplicate name
+    if (isNameDuplicate(dataFieldIdentifier)) {
       return false;
     }
     // Object type must have at least one property
@@ -608,7 +648,8 @@ export function DataExtractionTabContent({
             {dataExtractionFields.map((field) => (
               <div
                 key={field.uuid}
-                className="grid grid-cols-[80px_1fr_2fr_70px_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
+                onClick={() => openEditField(field)}
+                className="grid grid-cols-[80px_1fr_2fr_70px_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer"
               >
                 {/* Type Column */}
                 <div className="flex items-center">
@@ -637,7 +678,8 @@ export function DataExtractionTabContent({
                 {/* Delete Button */}
                 <div className="flex items-center">
                   <button
-                    onClick={async () => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       if (
                         !confirm(
                           `Are you sure you want to delete "${field.name}"?`
@@ -705,7 +747,9 @@ export function DataExtractionTabContent({
                     d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0112 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M13.125 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M20.625 12c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5M12 14.625v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 14.625c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m0 0v1.5c0 .621-.504 1.125-1.125 1.125M12 18.375h-7.5"
                   />
                 </svg>
-                <h2 className="text-lg font-semibold">Add data field</h2>
+                <h2 className="text-lg font-semibold">
+                  {editingFieldUuid ? "Edit data field" : "Add data field"}
+                </h2>
               </div>
               <button
                 onClick={() => {
@@ -800,11 +844,18 @@ export function DataExtractionTabContent({
                     onChange={(e) => setDataFieldIdentifier(e.target.value)}
                     className={`w-full h-10 px-4 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
                       dataFieldValidationAttempted &&
-                      !dataFieldIdentifier.trim()
+                      (!dataFieldIdentifier.trim() ||
+                        isNameDuplicate(dataFieldIdentifier))
                         ? "border-red-500"
                         : "border-border"
                     }`}
                   />
+                  {dataFieldValidationAttempted &&
+                    isNameDuplicate(dataFieldIdentifier) && (
+                      <p className="text-sm text-red-500 mt-1">
+                        A field with this name already exists
+                      </p>
+                    )}
                 </div>
               </div>
 
@@ -1006,20 +1057,38 @@ export function DataExtractionTabContent({
                     setDataFieldValidationAttempted(true);
                     if (!isDataFieldFormValid()) return;
 
-                    // Construct the field object using form data
-                    const newField: DataExtractionFieldData = {
-                      uuid: crypto.randomUUID(),
-                      type: dataFieldDataType,
-                      name: dataFieldIdentifier.trim(),
-                      description: dataFieldDescription.trim(),
-                      required: dataFieldRequired,
-                      agent_id: agentUuid,
-                      created_at: new Date().toISOString(),
-                      updated_at: new Date().toISOString(),
-                    };
+                    if (editingFieldUuid) {
+                      // Update existing field
+                      setDataExtractionFields((prev) =>
+                        prev.map((f) =>
+                          f.uuid === editingFieldUuid
+                            ? {
+                                ...f,
+                                type: dataFieldDataType,
+                                name: dataFieldIdentifier.trim(),
+                                description: dataFieldDescription.trim(),
+                                required: dataFieldRequired,
+                                updated_at: new Date().toISOString(),
+                              }
+                            : f
+                        )
+                      );
+                    } else {
+                      // Construct the field object using form data
+                      const newField: DataExtractionFieldData = {
+                        uuid: crypto.randomUUID(),
+                        type: dataFieldDataType,
+                        name: dataFieldIdentifier.trim(),
+                        description: dataFieldDescription.trim(),
+                        required: dataFieldRequired,
+                        agent_id: agentUuid,
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                      };
 
-                    // Add the new field to the list
-                    setDataExtractionFields((prev) => [...prev, newField]);
+                      // Add the new field to the list
+                      setDataExtractionFields((prev) => [...prev, newField]);
+                    }
 
                     // Reset and close
                     resetDataFieldForm();
@@ -1052,8 +1121,10 @@ export function DataExtractionTabContent({
                           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                         ></path>
                       </svg>
-                      Creating...
+                      {editingFieldUuid ? "Saving..." : "Creating..."}
                     </>
+                  ) : editingFieldUuid ? (
+                    "Save"
                   ) : (
                     "Add field"
                   )}
