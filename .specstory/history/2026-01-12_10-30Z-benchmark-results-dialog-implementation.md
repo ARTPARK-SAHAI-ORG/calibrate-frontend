@@ -2091,3 +2091,1852 @@ Now both components use the centralized provider definitions from `providers.ts`
 
 ---
 
+_**User (2026-01-11 09:21Z)**_
+
+in the @src/components/evaluations/SpeechToTextEvaluation.tsx and @src/components/evaluations/TextToSpeechEvaluation.tsx leaderboard and output areas map the provider name back to their labels using the mapping before
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to map the provider names (values like "groq") back to their labels (like "orpheus" for TTS and "whisper" for STT) when displaying results in the leaderboard and outputs areas.
+
+Let me look at the code to find where the provider names are displayed in the leaderboard and outputs sections.
+
+I need to:
+1. Create a helper function to map values back to labels
+2. Use this mapping in the leaderboard summary display
+3. Use this mapping in the outputs/provider dropdown display
+
+Let me read the current files to understand the structure better.</details></think>
+
+---
+
+I'll add helper functions to map provider values back to labels in both files.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to add a helper function to map provider values back to labels. Let me add this after the providerLabels definition in both files. Then I need to find where the provider names are displayed in the leaderboard and outputs sections and update them.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 6, lines removed: undefined
+
+```diff
+@@ -61,4 +61,10 @@
+  // Use provider labels for display
+  const providerLabels = ttsProviders.map((p) =&gt; p.label);
++ 
++ // Helper function to map provider value back to label
++ const getProviderLabel = (value: string): string =&gt; {
++   const provider = ttsProviders.find((p) =&gt; p.value === value);
++   return provider ? provider.label : value;
++ };
+  
+  // Pastel color palette for providers
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 6, lines removed: undefined
+
+```diff
+@@ -70,4 +70,10 @@
+  // Use provider labels for display
+  const providerLabels = sttProviders.map((p) =&gt; p.label);
++ 
++ // Helper function to map provider value back to label
++ const getProviderLabel = (value: string): string =&gt; {
++   const provider = sttProviders.find((p) =&gt; p.value === value);
++   return provider ? provider.label : value;
++ };
+  
+  // Pastel color palette for providers
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to find where the provider names are displayed in the leaderboard and outputs sections. Let me search for where `summary.run` and `providerResult.provider` are used.</details></think>
+
+---
+
+Now let me find and update the leaderboard and outputs sections. Let me search for where provider names are displayed:
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "summary\.run" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations" • 2 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `\{summary.run\}` | L941 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `\{summary.run\}` | L701 |
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "providerResult\.provider" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations" • 8 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `key=\{providerResult.provider\}` | L1290 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `value=\{providerResult.provider\}` | L1291 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `\{providerResult.provider\}` | L1293 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `<div key=\{providerResult.provider\} className="space-y-6">` | L1329 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `key=\{providerResult.provider\}` | L935 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `value=\{providerResult.provider\}` | L936 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `\{providerResult.provider\}` | L938 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `<div key=\{providerResult.provider\} className="space-y-6">` | L974 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update:
+1. The leaderboard table where `summary.run` is displayed
+2. The provider dropdown where `providerResult.provider` is displayed
+3. Also need to update the chart data where `s.run` is used
+
+Let me update these one by one in both files.</details></think>
+
+---
+
+Now let me update the leaderboard and outputs sections in both files:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -699,5 +699,5 @@
+                                  &gt;
+                                    &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
+-                                     {summary.run}
++                                     {getProviderLabel(summary.run)}
+                                    &lt;/td&gt;
+                                    &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -939,5 +939,5 @@
+                                &gt;
+                                  &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
+-                                   {summary.run}
++                                   {getProviderLabel(summary.run)}
+                                  &lt;/td&gt;
+                                  &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the provider dropdown options in both files.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -936,5 +936,5 @@
+                          value={providerResult.provider}
+                        &gt;
+-                         {providerResult.provider}
++                         {getProviderLabel(providerResult.provider)}
+                        &lt;/option&gt;
+                      ))}
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1291,5 +1291,5 @@
+                          value={providerResult.provider}
+                        &gt;
+-                         {providerResult.provider}
++                         {getProviderLabel(providerResult.provider)}
+                        &lt;/option&gt;
+                      ))}
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the charts as well. The charts use `s.run` for the provider name. Let me search for where this is used in the chart data.</details></think>
+
+---
+
+Now let me update the chart data in both files where provider names are displayed:
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "provider: s\.run" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations" • 8 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `provider: s.run,` | L989 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `provider: s.run,` | L1045 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `provider: s.run,` | L1104 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `provider: s.run,` | L1160 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | `provider: s.run,` | L1219 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `provider: s.run,` | L741 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `provider: s.run,` | L799 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | `provider: s.run,` | L860 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to update all these chart data mappings to use getProviderLabel. Let me do them for both files.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -739,5 +739,5 @@
+                                    data={evaluationResult.leaderboard_summary.map(
+                                      (s) =&gt; ({
+-                                       provider: s.run,
++                                       provider: getProviderLabel(s.run),
+                                        value: s.llm_judge_score,
+                                      })
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -797,5 +797,5 @@
+                                    data={evaluationResult.leaderboard_summary.map(
+                                      (s) =&gt; ({
+-                                       provider: s.run,
++                                       provider: getProviderLabel(s.run),
+                                        value: s.ttfb,
+                                      })
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -858,5 +858,5 @@
+                                    data={evaluationResult.leaderboard_summary.map(
+                                      (s) =&gt; ({
+-                                       provider: s.run,
++                                       provider: getProviderLabel(s.run),
+                                        value: s.processing_time,
+                                      })
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me do the same for the SpeechToTextEvaluation.tsx file.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -987,5 +987,5 @@
+                                data={evaluationResult.leaderboard_summary.map(
+                                  (s) =&gt; ({
+-                                   provider: s.run,
++                                   provider: getProviderLabel(s.run),
+                                    value: s.wer,
+                                  })
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1043,5 +1043,5 @@
+                                data={evaluationResult.leaderboard_summary.map(
+                                  (s) =&gt; ({
+-                                   provider: s.run,
++                                   provider: getProviderLabel(s.run),
+                                    value: s.string_similarity,
+                                  })
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1102,5 +1102,5 @@
+                                data={evaluationResult.leaderboard_summary.map(
+                                  (s) =&gt; ({
+-                                   provider: s.run,
++                                   provider: getProviderLabel(s.run),
+                                    value: s.llm_judge_score,
+                                  })
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1158,5 +1158,5 @@
+                                data={evaluationResult.leaderboard_summary.map(
+                                  (s) =&gt; ({
+-                                   provider: s.run,
++                                   provider: getProviderLabel(s.run),
+                                    value: s.ttfb,
+                                  })
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1217,5 +1217,5 @@
+                                data={evaluationResult.leaderboard_summary.map(
+                                  (s) =&gt; ({
+-                                   provider: s.run,
++                                   provider: getProviderLabel(s.run),
+                                    value: s.processing_time,
+                                  })
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me check for lint errors in both files.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 2 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+All lints pass. The changes are complete. Now the leaderboard and outputs sections will display the provider labels (like "orpheus" and "whisper") instead of the API values (like "groq").</details></think>
+
+---
+
+Done! Both files now map provider values back to labels in the leaderboard and outputs sections:
+
+**Changes made:**
+
+1. **Added `getProviderLabel` helper function** in both files to map API values back to display labels
+
+2. **Updated leaderboard table** - The "Run" column now shows labels instead of values
+
+3. **Updated provider dropdown** - Options show labels (e.g., "orpheus", "whisper") instead of values (e.g., "groq")
+
+4. **Updated all chart data** - X-axis labels in bar charts show provider labels
+
+Now when the API returns "groq", it will display:
+- **TTS**: "orpheus" 
+- **STT**: "whisper"
+
+---
+
+_**User (2026-01-11 09:21Z)**_
+
+reuse the chart components across the leaderboards for @src/components/evaluations/TextToSpeechEvaluation.tsx @src/components/evaluations/SpeechToTextEvaluation.tsx @src/components/BenchmarkResultsDialog.tsx 
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to extract the chart components that are being used across the three files (TextToSpeechEvaluation.tsx, SpeechToTextEvaluation.tsx, and BenchmarkResultsDialog.tsx) into a reusable component.
+
+Let me first look at the chart implementations in these files to understand the common patterns.
+
+Looking at the files:
+1. All three use BarChart from recharts
+2. They all have similar structure with ResponsiveContainer, CartesianGrid, XAxis, YAxis, Tooltip, Bar, and Cell
+3. The main differences are the data being passed and the title
+
+I should create a shared chart component that can be reused across all three files. Let me check the exact implementations to understand the structure better.</details></think>
+
+---
+
+I'll create a shared chart component and update all three files to use it. Let me first examine the chart implementations:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I understand the chart patterns. I'll create a shared component that handles:
+1. The LeaderboardBarChart component with configurable props for title, data, xAxisKey, colors, height, yDomain, and tooltip formatter
+2. The pastel color palette and color map generation
+
+Let me create the shared component file.</details></think>
+
+---
+
+Now I'll create a shared chart component and update all three files:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="write">
+
+<details><summary>Tool use: **write** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/charts/LeaderboardBarChart.tsx</summary>
+
+**Chunk 1**
+Lines added: 117, lines removed: 1
+
+```diff
+@@ -1,1 +1,117 @@
+- 
++ "use client";
++ 
++ import {
++   BarChart,
++   Bar,
++   XAxis,
++   YAxis,
++   CartesianGrid,
++   Tooltip,
++   ResponsiveContainer,
++   Cell,
++ } from "recharts";
++ 
++ // Pastel color palette for chart bars
++ export const pastelColors = [
++   "#A8D5E2", // Light blue
++   "#F4A5AE", // Light pink
++   "#B5E5CF", // Light green
++   "#FFD3A5", // Light orange
++   "#C7B9FF", // Light purple
++   "#FFE5B4", // Light peach
++   "#B8E6B8", // Light mint
++   "#E6B8E6", // Light lavender
++   "#B8D4E6", // Light sky blue
++   "#FFB8D4", // Light rose
++ ];
++ 
++ // Generate color mapping for items
++ export const getColorMap = (items: string[]): Map&lt;string, string&gt; =&gt; {
++   const colorMap = new Map&lt;string, string&gt;();
++   items.forEach((item, index) =&gt; {
++     colorMap.set(item, pastelColors[index % pastelColors.length]);
++   });
++   return colorMap;
++ };
++ 
++ type ChartDataItem = {
++   label: string;
++   value: number;
++   colorKey?: string;
++ };
++ 
++ type LeaderboardBarChartProps = {
++   title: string;
++   data: ChartDataItem[];
++   height?: number;
++   yDomain?: [number, number];
++   formatTooltip?: (value: number) =&gt; string;
++   colorMap?: Map&lt;string, string&gt;;
++ };
++ 
++ export function LeaderboardBarChart({
++   title,
++   data,
++   height = 300,
++   yDomain,
++   formatTooltip,
++   colorMap,
++ }: LeaderboardBarChartProps) {
++   // Generate color map from data if not provided
++   const colors =
++     colorMap ||
++     getColorMap(data.map((d) =&gt; d.colorKey || d.label));
++ 
++   const defaultTooltipFormatter = (value: number) =&gt;
++     parseFloat(value.toFixed(5)).toString();
++ 
++   return (
++     &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
++       &lt;h3 className="text-[15px] font-semibold mb-4"&gt;{title}&lt;/h3&gt;
++       &lt;ResponsiveContainer width="100%" height={height}&gt;
++         &lt;BarChart
++           data={data.map((d) =&gt; ({
++             label: d.label,
++             value: d.value,
++           }))}
++           margin={{
++             top: 5,
++             right: 30,
++             left: 20,
++             bottom: 40,
++           }}
++         &gt;
++           &lt;CartesianGrid strokeDasharray="3 3" /&gt;
++           &lt;XAxis
++             dataKey="label"
++             tick={{
++               fontSize: 13,
++               fill: "currentColor",
++               fontWeight: 500,
++             }}
++             angle={-45}
++             textAnchor="end"
++             height={60}
++           /&gt;
++           &lt;YAxis tick={{ fontSize: 12 }} domain={yDomain} /&gt;
++           &lt;Tooltip
++             formatter={(value: any) =&gt;
++               typeof value === "number"
++                 ? (formatTooltip || defaultTooltipFormatter)(value)
++                 : value
++             }
++           /&gt;
++           &lt;Bar dataKey="value"&gt;
++             {data.map((entry, index) =&gt; (
++               &lt;Cell
++                 key={&#96;cell-${index}&#96;}
++                 fill={colors.get(entry.colorKey || entry.label) || "#A8D5E2"}
++               /&gt;
++             ))}
++           &lt;/Bar&gt;
++         &lt;/BarChart&gt;
++       &lt;/ResponsiveContainer&gt;
++     &lt;/div&gt;
++   );
++ }
++ 
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update all three files to use the shared component. Let me start with the TextToSpeechEvaluation.tsx file.</details></think>
+
+---
+
+Now let me update `TextToSpeechEvaluation.tsx`:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 4, lines removed: 10
+
+```diff
+@@ -2,15 +2,9 @@
+  
+  import { useState, useRef, useEffect } from "react";
+- import {
+-   BarChart,
+-   Bar,
+-   XAxis,
+-   YAxis,
+-   CartesianGrid,
+-   Tooltip,
+-   ResponsiveContainer,
+-   Cell,
+- } from "recharts";
+  import { ttsProviders } from "../agent-tabs/constants/providers";
++ import {
++   LeaderboardBarChart,
++   getColorMap,
++ } from "../charts/LeaderboardBarChart";
+  
+  type TextRow = {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to remove the pastel colors and getProviderColorMap function from the file since they're now imported from the shared component.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: undefined, lines removed: 22
+
+```diff
+@@ -62,26 +62,4 @@
+  };
+  
+- // Pastel color palette for providers
+- const pastelColors = [
+-   "#A8D5E2", // Light blue
+-   "#F4A5AE", // Light pink
+-   "#B5E5CF", // Light green
+-   "#FFD3A5", // Light orange
+-   "#C7B9FF", // Light purple
+-   "#FFE5B4", // Light peach
+-   "#B8E6B8", // Light mint
+-   "#E6B8E6", // Light lavender
+-   "#B8D4E6", // Light sky blue
+-   "#FFB8D4", // Light rose
+- ];
+- 
+- // Generate color mapping for providers
+- const getProviderColorMap = (providerNames: string[]): Map&lt;string, string&gt; =&gt; {
+-   const colorMap = new Map&lt;string, string&gt;();
+-   providerNames.forEach((provider, index) =&gt; {
+-     colorMap.set(provider, pastelColors[index % pastelColors.length]);
+-   });
+-   return colorMap;
+- };
+  
+  export function TextToSpeechEvaluation() {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to replace the chart code in the file. Let me first read the current state to find the exact location.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to replace the charts section with the new LeaderboardBarChart component.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 34, lines removed: 173
+
+```diff
+@@ -697,185 +697,46 @@
+                        const providerNames =
+                          evaluationResult.leaderboard_summary.map((s) =&gt; s.run);
+-                       const colorMap = getProviderColorMap(providerNames);
++                       const colorMap = getColorMap(providerNames);
+                        return (
+                          &lt;div className="space-y-6"&gt;
+                            {/* Row 1: LLM Judge Score and TTFB */}
+                            &lt;div className="grid grid-cols-2 gap-6"&gt;
+-                             {/* LLM Judge Score Chart */}
+-                             &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
+-                               &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
+-                                 LLM Judge Score
+-                               &lt;/h3&gt;
+-                               &lt;ResponsiveContainer width="100%" height={300}&gt;
+-                                 &lt;BarChart
+-                                   data={evaluationResult.leaderboard_summary.map(
+-                                     (s) =&gt; ({
+-                                       provider: getProviderLabel(s.run),
+-                                       value: s.llm_judge_score,
+-                                     })
+-                                   )}
+-                                   margin={{
+-                                     top: 5,
+-                                     right: 30,
+-                                     left: 20,
+-                                     bottom: 40,
+-                                   }}
+-                                 &gt;
+-                                   &lt;CartesianGrid strokeDasharray="3 3" /&gt;
+-                                   &lt;XAxis
+-                                     dataKey="provider"
+-                                     tick={{
+-                                       fontSize: 13,
+-                                       fill: "currentColor",
+-                                       fontWeight: 500,
+-                                     }}
+-                                     angle={-45}
+-                                     textAnchor="end"
+-                                     height={60}
+-                                   /&gt;
+-                                   &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+-                                   &lt;Tooltip
+-                                     formatter={(value: any) =&gt;
+-                                       typeof value === "number"
+-                                         ? parseFloat(
+-                                             value.toFixed(5)
+-                                           ).toString()
+-                                         : value
+-                                     }
+-                                   /&gt;
+-                                   &lt;Bar dataKey="value"&gt;
+-                                     {evaluationResult.leaderboard_summary.map(
+-                                       (entry, index) =&gt; (
+-                                         &lt;Cell
+-                                           key={&#96;cell-${index}&#96;}
+-                                           fill={
+-                                             colorMap.get(entry.run) || "#A8D5E2"
+-                                           }
+-                                         /&gt;
+-                                       )
+-                                     )}
+-                                   &lt;/Bar&gt;
+-                                 &lt;/BarChart&gt;
+-                               &lt;/ResponsiveContainer&gt;
+-                             &lt;/div&gt;
+- 
+-                             {/* TTFB Chart */}
+-                             &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
+-                               &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
+-                                 TTFB (s)
+-                               &lt;/h3&gt;
+-                               &lt;ResponsiveContainer width="100%" height={300}&gt;
+-                                 &lt;BarChart
+-                                   data={evaluationResult.leaderboard_summary.map(
+-                                     (s) =&gt; ({
+-                                       provider: getProviderLabel(s.run),
+-                                       value: s.ttfb,
+-                                     })
+-                                   )}
+-                                   margin={{
+-                                     top: 5,
+-                                     right: 30,
+-                                     left: 20,
+-                                     bottom: 40,
+-                                   }}
+-                                 &gt;
+-                                   &lt;CartesianGrid strokeDasharray="3 3" /&gt;
+-                                   &lt;XAxis
+-                                     dataKey="provider"
+-                                     tick={{
+-                                       fontSize: 13,
+-                                       fill: "currentColor",
+-                                       fontWeight: 500,
+-                                     }}
+-                                     angle={-45}
+-                                     textAnchor="end"
+-                                     height={60}
+-                                   /&gt;
+-                                   &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+-                                   &lt;Tooltip
+-                                     formatter={(value: any) =&gt;
+-                                       typeof value === "number"
+-                                         ? parseFloat(
+-                                             value.toFixed(5)
+-                                           ).toString()
+-                                         : value
+-                                     }
+-                                   /&gt;
+-                                   &lt;Bar dataKey="value"&gt;
+-                                     {evaluationResult.leaderboard_summary.map(
+-                                       (entry, index) =&gt; (
+-                                         &lt;Cell
+-                                           key={&#96;cell-${index}&#96;}
+-                                           fill={
+-                                             colorMap.get(entry.run) || "#A8D5E2"
+-                                           }
+-                                         /&gt;
+-                                       )
+-                                     )}
+-                                   &lt;/Bar&gt;
+-                                 &lt;/BarChart&gt;
+-                               &lt;/ResponsiveContainer&gt;
+-                             &lt;/div&gt;
++                             &lt;LeaderboardBarChart
++                               title="LLM Judge Score"
++                               data={evaluationResult.leaderboard_summary.map(
++                                 (s) =&gt; ({
++                                   label: getProviderLabel(s.run),
++                                   value: s.llm_judge_score,
++                                   colorKey: s.run,
++                                 })
++                               )}
++                               colorMap={colorMap}
++                             /&gt;
++                             &lt;LeaderboardBarChart
++                               title="TTFB (s)"
++                               data={evaluationResult.leaderboard_summary.map(
++                                 (s) =&gt; ({
++                                   label: getProviderLabel(s.run),
++                                   value: s.ttfb,
++                                   colorKey: s.run,
++                                 })
++                               )}
++                               colorMap={colorMap}
++                             /&gt;
+                            &lt;/div&gt;
+  
+                            {/* Row 2: Processing Time */}
+                            &lt;div className="grid grid-cols-2 gap-6"&gt;
+-                             {/* Processing Time Chart */}
+-                             &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
+-                               &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
+-                                 Processing Time (s)
+-                               &lt;/h3&gt;
+-                               &lt;ResponsiveContainer width="100%" height={300}&gt;
+-                                 &lt;BarChart
+-                                   data={evaluationResult.leaderboard_summary.map(
+-                                     (s) =&gt; ({
+-                                       provider: getProviderLabel(s.run),
+-                                       value: s.processing_time,
+-                                     })
+-                                   )}
+-                                   margin={{
+-                                     top: 5,
+-                                     right: 30,
+-                                     left: 20,
+-                                     bottom: 40,
+-                                   }}
+-                                 &gt;
+-                                   &lt;CartesianGrid strokeDasharray="3 3" /&gt;
+-                                   &lt;XAxis
+-                                     dataKey="provider"
+-                                     tick={{
+-                                       fontSize: 13,
+-                                       fill: "currentColor",
+-                                       fontWeight: 500,
+-                                     }}
+-                                     angle={-45}
+-                                     textAnchor="end"
+-                                     height={60}
+-                                   /&gt;
+-                                   &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+-                                   &lt;Tooltip
+-                                     formatter={(value: any) =&gt;
+-                                       typeof value === "number"
+-                                         ? parseFloat(
+-                                             value.toFixed(5)
+-                                           ).toString()
+-                                         : value
+-                                     }
+-                                   /&gt;
+-                                   &lt;Bar dataKey="value"&gt;
+-                                     {evaluationResult.leaderboard_summary.map(
+-                                       (entry, index) =&gt; (
+-                                         &lt;Cell
+-                                           key={&#96;cell-${index}&#96;}
+-                                           fill={
+-                                             colorMap.get(entry.run) || "#A8D5E2"
+-                                           }
+-                                         /&gt;
+-                                       )
+-                                     )}
+-                                   &lt;/Bar&gt;
+-                                 &lt;/BarChart&gt;
+-                               &lt;/ResponsiveContainer&gt;
+-                             &lt;/div&gt;
++                             &lt;LeaderboardBarChart
++                               title="Processing Time (s)"
++                               data={evaluationResult.leaderboard_summary.map(
++                                 (s) =&gt; ({
++                                   label: getProviderLabel(s.run),
++                                   value: s.processing_time,
++                                   colorKey: s.run,
++                                 })
++                               )}
++                               colorMap={colorMap}
++                             /&gt;
+                            &lt;/div&gt;
+                          &lt;/div&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update SpeechToTextEvaluation.tsx with similar changes.</details></think>
+
+---
+
+Now let's update `SpeechToTextEvaluation.tsx`:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 4, lines removed: 10
+
+```diff
+@@ -2,15 +2,9 @@
+  
+  import { useState, useRef, useEffect } from "react";
+- import {
+-   BarChart,
+-   Bar,
+-   XAxis,
+-   YAxis,
+-   CartesianGrid,
+-   Tooltip,
+-   ResponsiveContainer,
+-   Cell,
+- } from "recharts";
+  import { sttProviders } from "../agent-tabs/constants/providers";
++ import {
++   LeaderboardBarChart,
++   getColorMap,
++ } from "../charts/LeaderboardBarChart";
+  
+  type AudioTextRow = {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now remove the pastel colors and getProviderColorMap from SpeechToTextEvaluation.tsx.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: undefined, lines removed: 22
+
+```diff
+@@ -71,26 +71,4 @@
+  };
+  
+- // Pastel color palette for providers
+- const pastelColors = [
+-   "#A8D5E2", // Light blue
+-   "#F4A5AE", // Light pink
+-   "#B5E5CF", // Light green
+-   "#FFD3A5", // Light orange
+-   "#C7B9FF", // Light purple
+-   "#FFE5B4", // Light peach
+-   "#B8E6B8", // Light mint
+-   "#E6B8E6", // Light lavender
+-   "#B8D4E6", // Light sky blue
+-   "#FFB8D4", // Light rose
+- ];
+- 
+- // Generate color mapping for providers
+- const getProviderColorMap = (providerNames: string[]): Map&lt;string, string&gt; =&gt; {
+-   const colorMap = new Map&lt;string, string&gt;();
+-   providerNames.forEach((provider, index) =&gt; {
+-     colorMap.set(provider, pastelColors[index % pastelColors.length]);
+-   });
+-   return colorMap;
+- };
+  
+  export function SpeechToTextEvaluation() {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to replace the charts section in SpeechToTextEvaluation.tsx. Let me read the file to find the exact content.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me search for the charts section and replace it with the new component.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 56, lines removed: 278
+
+```diff
+@@ -945,294 +945,72 @@
+                    const providerNames =
+                      evaluationResult.leaderboard_summary.map((s) =&gt; s.run);
+-                   const colorMap = getProviderColorMap(providerNames);
++                   const colorMap = getColorMap(providerNames);
+                    return (
+                      &lt;div className="space-y-6"&gt;
+                        {/* Row 1: WER and String Similarity */}
+                        &lt;div className="grid grid-cols-2 gap-6"&gt;
+-                         {/* WER Chart */}
+-                         &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
+-                           &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
+-                             WER
+-                           &lt;/h3&gt;
+-                           &lt;ResponsiveContainer width="100%" height={300}&gt;
+-                             &lt;BarChart
+-                               data={evaluationResult.leaderboard_summary.map(
+-                                 (s) =&gt; ({
+-                                   provider: getProviderLabel(s.run),
+-                                   value: s.wer,
+-                                 })
+-                               )}
+-                               margin={{
+-                                 top: 5,
+-                                 right: 30,
+-                                 left: 20,
+-                                 bottom: 40,
+-                               }}
+-                             &gt;
+-                               &lt;CartesianGrid strokeDasharray="3 3" /&gt;
+-                               &lt;XAxis
+-                                 dataKey="provider"
+-                                 tick={{
+-                                   fontSize: 13,
+-                                   fill: "currentColor",
+-                                   fontWeight: 500,
+-                                 }}
+-                                 angle={-45}
+-                                 textAnchor="end"
+-                                 height={60}
+-                               /&gt;
+-                               &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+-                               &lt;Tooltip
+-                                 formatter={(value: any) =&gt;
+-                                   typeof value === "number"
+-                                     ? parseFloat(value.toFixed(5)).toString()
+-                                     : value
+-                                 }
+-                               /&gt;
+-                               &lt;Bar dataKey="value"&gt;
+-                                 {evaluationResult.leaderboard_summary.map(
+-                                   (entry, index) =&gt; (
+-                                     &lt;Cell
+-                                       key={&#96;cell-${index}&#96;}
+-                                       fill={
+-                                         colorMap.get(entry.run) || "#A8D5E2"
+-                                       }
+-                                     /&gt;
+-                                   )
+-                                 )}
+-                               &lt;/Bar&gt;
+-                             &lt;/BarChart&gt;
+-                           &lt;/ResponsiveContainer&gt;
+-                         &lt;/div&gt;
+- 
+-                         {/* String Similarity Chart */}
+-                         &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
+-                           &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
+-                             String Similarity
+-                           &lt;/h3&gt;
+-                           &lt;ResponsiveContainer width="100%" height={300}&gt;
+-                             &lt;BarChart
+-                               data={evaluationResult.leaderboard_summary.map(
+-                                 (s) =&gt; ({
+-                                   provider: getProviderLabel(s.run),
+-                                   value: s.string_similarity,
+-                                 })
+-                               )}
+-                               margin={{
+-                                 top: 5,
+-                                 right: 30,
+-                                 left: 20,
+-                                 bottom: 40,
+-                               }}
+-                             &gt;
+-                               &lt;CartesianGrid strokeDasharray="3 3" /&gt;
+-                               &lt;XAxis
+-                                 dataKey="provider"
+-                                 tick={{
+-                                   fontSize: 13,
+-                                   fill: "currentColor",
+-                                   fontWeight: 500,
+-                                 }}
+-                                 angle={-45}
+-                                 textAnchor="end"
+-                                 height={60}
+-                               /&gt;
+-                               &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+-                               &lt;Tooltip
+-                                 formatter={(value: any) =&gt;
+-                                   typeof value === "number"
+-                                     ? parseFloat(value.toFixed(5)).toString()
+-                                     : value
+-                                 }
+-                               /&gt;
+-                               &lt;Bar dataKey="value"&gt;
+-                                 {evaluationResult.leaderboard_summary.map(
+-                                   (entry, index) =&gt; (
+-                                     &lt;Cell
+-                                       key={&#96;cell-${index}&#96;}
+-                                       fill={
+-                                         colorMap.get(entry.run) || "#A8D5E2"
+-                                       }
+-                                     /&gt;
+-                                   )
+-                                 )}
+-                               &lt;/Bar&gt;
+-                             &lt;/BarChart&gt;
+-                           &lt;/ResponsiveContainer&gt;
+-                         &lt;/div&gt;
++                         &lt;LeaderboardBarChart
++                           title="WER"
++                           data={evaluationResult.leaderboard_summary.map(
++                             (s) =&gt; ({
++                               label: getProviderLabel(s.run),
++                               value: s.wer,
++                               colorKey: s.run,
++                             })
++                           )}
++                           colorMap={colorMap}
++                         /&gt;
++                         &lt;LeaderboardBarChart
++                           title="String Similarity"
++                           data={evaluationResult.leaderboard_summary.map(
++                             (s) =&gt; ({
++                               label: getProviderLabel(s.run),
++                               value: s.string_similarity,
++                               colorKey: s.run,
++                             })
++                           )}
++                           colorMap={colorMap}
++                         /&gt;
+                        &lt;/div&gt;
+  
+                        {/* Row 2: LLM Judge Score and TTFB */}
+                        &lt;div className="grid grid-cols-2 gap-6"&gt;
+-                         {/* LLM Judge Score Chart */}
+-                         &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
+-                           &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
+-                             LLM Judge Score
+-                           &lt;/h3&gt;
+-                           &lt;ResponsiveContainer width="100%" height={300}&gt;
+-                             &lt;BarChart
+-                               data={evaluationResult.leaderboard_summary.map(
+-                                 (s) =&gt; ({
+-                                   provider: getProviderLabel(s.run),
+-                                   value: s.llm_judge_score,
+-                                 })
+-                               )}
+-                               margin={{
+-                                 top: 5,
+-                                 right: 30,
+-                                 left: 20,
+-                                 bottom: 40,
+-                               }}
+-                             &gt;
+-                               &lt;CartesianGrid strokeDasharray="3 3" /&gt;
+-                               &lt;XAxis
+-                                 dataKey="provider"
+-                                 tick={{
+-                                   fontSize: 13,
+-                                   fill: "currentColor",
+-                                   fontWeight: 500,
+-                                 }}
+-                                 angle={-45}
+-                                 textAnchor="end"
+-                                 height={60}
+-                               /&gt;
+-                               &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+-                               &lt;Tooltip
+-                                 formatter={(value: any) =&gt;
+-                                   typeof value === "number"
+-                                     ? parseFloat(value.toFixed(5)).toString()
+-                                     : value
+-                                 }
+-                               /&gt;
+-                               &lt;Bar dataKey="value"&gt;
+-                                 {evaluationResult.leaderboard_summary.map(
+-                                   (entry, index) =&gt; (
+-                                     &lt;Cell
+-                                       key={&#96;cell-${index}&#96;}
+-                                       fill={
+-                                         colorMap.get(entry.run) || "#A8D5E2"
+-                                       }
+-                                     /&gt;
+-                                   )
+-                                 )}
+-                               &lt;/Bar&gt;
+-                             &lt;/BarChart&gt;
+-                           &lt;/ResponsiveContainer&gt;
+-                         &lt;/div&gt;
+- 
+-                         {/* TTFB Chart */}
+-                         &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
+-                           &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
+-                             TTFB (s)
+-                           &lt;/h3&gt;
+-                           &lt;ResponsiveContainer width="100%" height={300}&gt;
+-                             &lt;BarChart
+-                               data={evaluationResult.leaderboard_summary.map(
+-                                 (s) =&gt; ({
+-                                   provider: getProviderLabel(s.run),
+-                                   value: s.ttfb,
+-                                 })
+-                               )}
+-                               margin={{
+-                                 top: 5,
+-                                 right: 30,
+-                                 left: 20,
+-                                 bottom: 40,
+-                               }}
+-                             &gt;
+-                               &lt;CartesianGrid strokeDasharray="3 3" /&gt;
+-                               &lt;XAxis
+-                                 dataKey="provider"
+-                                 tick={{
+-                                   fontSize: 13,
+-                                   fill: "currentColor",
+-                                   fontWeight: 500,
+-                                 }}
+-                                 angle={-45}
+-                                 textAnchor="end"
+-                                 height={60}
+-                               /&gt;
+-                               &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+-                               &lt;Tooltip
+-                                 formatter={(value: any) =&gt;
+-                                   typeof value === "number"
+-                                     ? parseFloat(value.toFixed(5)).toString()
+-                                     : value
+-                                 }
+-                               /&gt;
+-                               &lt;Bar dataKey="value"&gt;
+-                                 {evaluationResult.leaderboard_summary.map(
+-                                   (entry, index) =&gt; (
+-                                     &lt;Cell
+-                                       key={&#96;cell-${index}&#96;}
+-                                       fill={
+-                                         colorMap.get(entry.run) || "#A8D5E2"
+-                                       }
+-                                     /&gt;
+-                                   )
+-                                 )}
+-                               &lt;/Bar&gt;
+-                             &lt;/BarChart&gt;
+-                           &lt;/ResponsiveContainer&gt;
+-                         &lt;/div&gt;
++                         &lt;LeaderboardBarChart
++                           title="LLM Judge Score"
++                           data={evaluationResult.leaderboard_summary.map(
++                             (s) =&gt; ({
++                               label: getProviderLabel(s.run),
++                               value: s.llm_judge_score,
++                               colorKey: s.run,
++                             })
++                           )}
++                           colorMap={colorMap}
++                         /&gt;
++                         &lt;LeaderboardBarChart
++                           title="TTFB (s)"
++                           data={evaluationResult.leaderboard_summary.map(
++                             (s) =&gt; ({
++                               label: getProviderLabel(s.run),
++                               value: s.ttfb,
++                               colorKey: s.run,
++                             })
++                           )}
++                           colorMap={colorMap}
++                         /&gt;
+                        &lt;/div&gt;
+  
+                        {/* Row 3: Processing Time */}
+                        &lt;div className="grid grid-cols-2 gap-6"&gt;
+-                         {/* Processing Time Chart */}
+-                         &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
+-                           &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
+-                             Processing Time (s)
+-                           &lt;/h3&gt;
+-                           &lt;ResponsiveContainer width="100%" height={300}&gt;
+-                             &lt;BarChart
+-                               data={evaluationResult.leaderboard_summary.map(
+-                                 (s) =&gt; ({
+-                                   provider: getProviderLabel(s.run),
+-                                   value: s.processing_time,
+-                                 })
+-                               )}
+-                               margin={{
+-                                 top: 5,
+-                                 right: 30,
+-                                 left: 20,
+-                                 bottom: 40,
+-                               }}
+-                             &gt;
+-                               &lt;CartesianGrid strokeDasharray="3 3" /&gt;
+-                               &lt;XAxis
+-                                 dataKey="provider"
+-                                 tick={{
+-                                   fontSize: 13,
+-                                   fill: "currentColor",
+-                                   fontWeight: 500,
+-                                 }}
+-                                 angle={-45}
+-                                 textAnchor="end"
+-                                 height={60}
+-                               /&gt;
+-                               &lt;YAxis tick={{ fontSize: 12 }} /&gt;
+-                               &lt;Tooltip
+-                                 formatter={(value: any) =&gt;
+-                                   typeof value === "number"
+-                                     ? parseFloat(value.toFixed(5)).toString()
+-                                     : value
+-                                 }
+-                               /&gt;
+-                               &lt;Bar dataKey="value"&gt;
+-                                 {evaluationResult.leaderboard_summary.map(
+-                                   (entry, index) =&gt; (
+-                                     &lt;Cell
+-                                       key={&#96;cell-${index}&#96;}
+-                                       fill={
+-                                         colorMap.get(entry.run) || "#A8D5E2"
+-                                       }
+-                                     /&gt;
+-                                   )
+-                                 )}
+-                               &lt;/Bar&gt;
+-                             &lt;/BarChart&gt;
+-                           &lt;/ResponsiveContainer&gt;
+-                         &lt;/div&gt;
++                         &lt;LeaderboardBarChart
++                           title="Processing Time (s)"
++                           data={evaluationResult.leaderboard_summary.map(
++                             (s) =&gt; ({
++                               label: getProviderLabel(s.run),
++                               value: s.processing_time,
++                               colorKey: s.run,
++                             })
++                           )}
++                           colorMap={colorMap}
++                         /&gt;
+                        &lt;/div&gt;
+                      &lt;/div&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the BenchmarkResultsDialog.tsx file.</details></think>
+
+---
+
+Now let's update `BenchmarkResultsDialog.tsx`:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: undefined, lines removed: 10
+
+```diff
+@@ -2,14 +2,4 @@
+  
+  import React, { useState, useEffect, useRef } from "react";
+- import {
+-   BarChart,
+-   Bar,
+-   XAxis,
+-   YAxis,
+-   CartesianGrid,
+-   Tooltip,
+-   ResponsiveContainer,
+-   Cell,
+- } from "recharts";
+  import {
+    TestCaseOutput,
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: 23
+
+```diff
+@@ -21,27 +11,5 @@
+    EmptyStateView,
+  } from "./test-results/shared";
+- 
+- // Pastel color palette for models
+- const pastelColors = [
+-   "#A8D5E2", // Light blue
+-   "#F4A5AE", // Light pink
+-   "#B5E5CF", // Light green
+-   "#FFD3A5", // Light orange
+-   "#C7B9FF", // Light purple
+-   "#FFE5B4", // Light peach
+-   "#B8E6B8", // Light mint
+-   "#E6B8E6", // Light lavender
+-   "#B8D4E6", // Light sky blue
+-   "#FFB8D4", // Light rose
+- ];
+- 
+- // Generate color mapping for models
+- const getModelColorMap = (modelNames: string[]): Map&lt;string, string&gt; =&gt; {
+-   const colorMap = new Map&lt;string, string&gt;();
+-   modelNames.forEach((model, index) =&gt; {
+-     colorMap.set(model, pastelColors[index % pastelColors.length]);
+-   });
+-   return colorMap;
+- };
++ import { LeaderboardBarChart, getColorMap } from "./charts/LeaderboardBarChart";
+  
+  type BenchmarkTestResult = {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the chart section in BenchmarkResultsDialog.tsx. Let me find and replace it.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to update the colorMap line and the chart section. Let me search for the exact content.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -228,5 +228,5 @@
+    // Get color map for charts
+    const modelNames = leaderboardSummary?.map((s) =&gt; s.model) || [];
+-   const colorMap = getModelColorMap(modelNames);
++   const colorMap = getColorMap(modelNames);
+  
+    return (
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to replace the chart section in BenchmarkResultsDialog.tsx. Let me read the relevant part of the file.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me replace the chart section with the LeaderboardBarChart component.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 11, lines removed: 48
+
+```diff
+@@ -352,52 +352,15 @@
+                  {/* Charts Section */}
+                  {leaderboardSummary &amp;&amp; leaderboardSummary.length &gt; 0 &amp;&amp; (
+-                   &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
+-                     &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
+-                       Test pass rate (%)
+-                     &lt;/h3&gt;
+-                     &lt;ResponsiveContainer width="100%" height={300}&gt;
+-                       &lt;BarChart
+-                         data={leaderboardSummary.map((s) =&gt; ({
+-                           model: s.model.replace("__", "/"),
+-                           value: parseFloat(s.overall),
+-                         }))}
+-                         margin={{
+-                           top: 5,
+-                           right: 30,
+-                           left: 20,
+-                           bottom: 60,
+-                         }}
+-                       &gt;
+-                         &lt;CartesianGrid strokeDasharray="3 3" /&gt;
+-                         &lt;XAxis
+-                           dataKey="model"
+-                           tick={{
+-                             fontSize: 12,
+-                             fill: "currentColor",
+-                             fontWeight: 500,
+-                           }}
+-                           angle={-45}
+-                           textAnchor="end"
+-                           height={80}
+-                         /&gt;
+-                         &lt;YAxis tick={{ fontSize: 12 }} domain={[0, 100]} /&gt;
+-                         &lt;Tooltip
+-                           formatter={(value: any) =&gt;
+-                             typeof value === "number"
+-                               ? &#96;${value.toFixed(1)}%&#96;
+-                               : value
+-                           }
+-                         /&gt;
+-                         &lt;Bar dataKey="value"&gt;
+-                           {leaderboardSummary.map((entry, index) =&gt; (
+-                             &lt;Cell
+-                               key={&#96;cell-${index}&#96;}
+-                               fill={colorMap.get(entry.model) || "#A8D5E2"}
+-                             /&gt;
+-                           ))}
+-                         &lt;/Bar&gt;
+-                       &lt;/BarChart&gt;
+-                     &lt;/ResponsiveContainer&gt;
+-                   &lt;/div&gt;
++                   &lt;LeaderboardBarChart
++                     title="Test pass rate (%)"
++                     data={leaderboardSummary.map((s) =&gt; ({
++                       label: s.model.replace("__", "/"),
++                       value: parseFloat(s.overall),
++                       colorKey: s.model,
++                     }))}
++                     yDomain={[0, 100]}
++                     formatTooltip={(value) =&gt; &#96;${value.toFixed(1)}%&#96;}
++                     colorMap={colorMap}
++                   /&gt;
+                  )}
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me check for lint errors in all the files.</details></think>
+
+---
+
+Now let's check for linting errors:
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 4 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/charts/LeaderboardBarChart.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx`
+
+Lint results
+
+Lint errors for `src/components/BenchmarkResultsDialog.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+All lint checks pass. Let me verify the changes by reading snippets from each file to confirm everything is properly integrated.</details></think>
+
+---
+
+All files are updated successfully. Let me verify the changes by reading a snippet from each file:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/charts/LeaderboardBarChart.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The shared component looks good. Let me verify the updated files are using it correctly by reading snippets.</details></think>
+
+---
+
+Done! I've created a shared `LeaderboardBarChart` component and updated all three files to use it. Here's a summary of the changes:
+
+**Created new file:**
+- `src/components/charts/LeaderboardBarChart.tsx` - A reusable chart component with:
+  - `pastelColors` - Exported color palette
+  - `getColorMap` - Exported helper function to generate color mappings
+  - `LeaderboardBarChart` - The main component with configurable props:
+    - `title` - Chart title
+    - `data` - Array of `{ label, value, colorKey? }` items
+    - `height` - Optional chart height (default: 300)
+    - `yDomain` - Optional Y-axis domain (e.g., `[0, 100]`)
+    - `formatTooltip` - Optional custom tooltip formatter
+    - `colorMap` - Optional pre-computed color map for consistent colors
+
+**Updated files:**
+1. **`TextToSpeechEvaluation.tsx`** - Removed recharts imports, pastel colors, and `getProviderColorMap`. Now uses `LeaderboardBarChart` for 3 charts (LLM Judge Score, TTFB, Processing Time).
+
+2. **`SpeechToTextEvaluation.tsx`** - Same changes, now uses `LeaderboardBarChart` for 5 charts (WER, String Similarity, LLM Judge Score, TTFB, Processing Time).
+
+3. **`BenchmarkResultsDialog.tsx`** - Removed recharts imports, pastel colors, and `getModelColorMap`. Now uses `LeaderboardBarChart` for the Test pass rate chart with `yDomain={[0, 100]}` and percentage tooltip formatting.
+
+---
+

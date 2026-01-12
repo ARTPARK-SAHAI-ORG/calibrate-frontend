@@ -1,17 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
 import { sttProviders } from "../agent-tabs/constants/providers";
+import {
+  LeaderboardBarChart,
+  getColorMap,
+} from "../charts/LeaderboardBarChart";
 
 type AudioTextRow = {
   id: string;
@@ -70,27 +64,10 @@ type EvaluationResult = {
 // Use provider labels for display
 const providerLabels = sttProviders.map((p) => p.label);
 
-// Pastel color palette for providers
-const pastelColors = [
-  "#A8D5E2", // Light blue
-  "#F4A5AE", // Light pink
-  "#B5E5CF", // Light green
-  "#FFD3A5", // Light orange
-  "#C7B9FF", // Light purple
-  "#FFE5B4", // Light peach
-  "#B8E6B8", // Light mint
-  "#E6B8E6", // Light lavender
-  "#B8D4E6", // Light sky blue
-  "#FFB8D4", // Light rose
-];
-
-// Generate color mapping for providers
-const getProviderColorMap = (providerNames: string[]): Map<string, string> => {
-  const colorMap = new Map<string, string>();
-  providerNames.forEach((provider, index) => {
-    colorMap.set(provider, pastelColors[index % pastelColors.length]);
-  });
-  return colorMap;
+// Helper function to map provider value back to label
+const getProviderLabel = (value: string): string => {
+  const provider = sttProviders.find((p) => p.value === value);
+  return provider ? provider.label : value;
 };
 
 export function SpeechToTextEvaluation() {
@@ -932,7 +909,7 @@ export function SpeechToTextEvaluation() {
                                 className="border-b border-border last:border-b-0"
                               >
                                 <td className="px-4 py-3 text-[13px] text-foreground">
-                                  {summary.run}
+                                  {getProviderLabel(summary.run)}
                                 </td>
                                 <td className="px-4 py-3 text-[13px] text-foreground">
                                   {summary.count}
@@ -966,296 +943,74 @@ export function SpeechToTextEvaluation() {
                 (() => {
                   const providerNames =
                     evaluationResult.leaderboard_summary.map((s) => s.run);
-                  const colorMap = getProviderColorMap(providerNames);
+                  const colorMap = getColorMap(providerNames);
                   return (
                     <div className="space-y-6">
                       {/* Row 1: WER and String Similarity */}
                       <div className="grid grid-cols-2 gap-6">
-                        {/* WER Chart */}
-                        <div className="border rounded-xl p-4 bg-muted/10">
-                          <h3 className="text-[15px] font-semibold mb-4">
-                            WER
-                          </h3>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart
-                              data={evaluationResult.leaderboard_summary.map(
-                                (s) => ({
-                                  provider: s.run,
-                                  value: s.wer,
-                                })
-                              )}
-                              margin={{
-                                top: 5,
-                                right: 30,
-                                left: 20,
-                                bottom: 40,
-                              }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis
-                                dataKey="provider"
-                                tick={{
-                                  fontSize: 13,
-                                  fill: "currentColor",
-                                  fontWeight: 500,
-                                }}
-                                angle={-45}
-                                textAnchor="end"
-                                height={60}
-                              />
-                              <YAxis tick={{ fontSize: 12 }} />
-                              <Tooltip
-                                formatter={(value: any) =>
-                                  typeof value === "number"
-                                    ? parseFloat(value.toFixed(5)).toString()
-                                    : value
-                                }
-                              />
-                              <Bar dataKey="value">
-                                {evaluationResult.leaderboard_summary.map(
-                                  (entry, index) => (
-                                    <Cell
-                                      key={`cell-${index}`}
-                                      fill={
-                                        colorMap.get(entry.run) || "#A8D5E2"
-                                      }
-                                    />
-                                  )
-                                )}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-
-                        {/* String Similarity Chart */}
-                        <div className="border rounded-xl p-4 bg-muted/10">
-                          <h3 className="text-[15px] font-semibold mb-4">
-                            String Similarity
-                          </h3>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart
-                              data={evaluationResult.leaderboard_summary.map(
-                                (s) => ({
-                                  provider: s.run,
-                                  value: s.string_similarity,
-                                })
-                              )}
-                              margin={{
-                                top: 5,
-                                right: 30,
-                                left: 20,
-                                bottom: 40,
-                              }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis
-                                dataKey="provider"
-                                tick={{
-                                  fontSize: 13,
-                                  fill: "currentColor",
-                                  fontWeight: 500,
-                                }}
-                                angle={-45}
-                                textAnchor="end"
-                                height={60}
-                              />
-                              <YAxis tick={{ fontSize: 12 }} />
-                              <Tooltip
-                                formatter={(value: any) =>
-                                  typeof value === "number"
-                                    ? parseFloat(value.toFixed(5)).toString()
-                                    : value
-                                }
-                              />
-                              <Bar dataKey="value">
-                                {evaluationResult.leaderboard_summary.map(
-                                  (entry, index) => (
-                                    <Cell
-                                      key={`cell-${index}`}
-                                      fill={
-                                        colorMap.get(entry.run) || "#A8D5E2"
-                                      }
-                                    />
-                                  )
-                                )}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
+                        <LeaderboardBarChart
+                          title="WER"
+                          data={evaluationResult.leaderboard_summary.map(
+                            (s) => ({
+                              label: getProviderLabel(s.run),
+                              value: s.wer,
+                              colorKey: s.run,
+                            })
+                          )}
+                          colorMap={colorMap}
+                        />
+                        <LeaderboardBarChart
+                          title="String Similarity"
+                          data={evaluationResult.leaderboard_summary.map(
+                            (s) => ({
+                              label: getProviderLabel(s.run),
+                              value: s.string_similarity,
+                              colorKey: s.run,
+                            })
+                          )}
+                          colorMap={colorMap}
+                        />
                       </div>
 
                       {/* Row 2: LLM Judge Score and TTFB */}
                       <div className="grid grid-cols-2 gap-6">
-                        {/* LLM Judge Score Chart */}
-                        <div className="border rounded-xl p-4 bg-muted/10">
-                          <h3 className="text-[15px] font-semibold mb-4">
-                            LLM Judge Score
-                          </h3>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart
-                              data={evaluationResult.leaderboard_summary.map(
-                                (s) => ({
-                                  provider: s.run,
-                                  value: s.llm_judge_score,
-                                })
-                              )}
-                              margin={{
-                                top: 5,
-                                right: 30,
-                                left: 20,
-                                bottom: 40,
-                              }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis
-                                dataKey="provider"
-                                tick={{
-                                  fontSize: 13,
-                                  fill: "currentColor",
-                                  fontWeight: 500,
-                                }}
-                                angle={-45}
-                                textAnchor="end"
-                                height={60}
-                              />
-                              <YAxis tick={{ fontSize: 12 }} />
-                              <Tooltip
-                                formatter={(value: any) =>
-                                  typeof value === "number"
-                                    ? parseFloat(value.toFixed(5)).toString()
-                                    : value
-                                }
-                              />
-                              <Bar dataKey="value">
-                                {evaluationResult.leaderboard_summary.map(
-                                  (entry, index) => (
-                                    <Cell
-                                      key={`cell-${index}`}
-                                      fill={
-                                        colorMap.get(entry.run) || "#A8D5E2"
-                                      }
-                                    />
-                                  )
-                                )}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-
-                        {/* TTFB Chart */}
-                        <div className="border rounded-xl p-4 bg-muted/10">
-                          <h3 className="text-[15px] font-semibold mb-4">
-                            TTFB (s)
-                          </h3>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart
-                              data={evaluationResult.leaderboard_summary.map(
-                                (s) => ({
-                                  provider: s.run,
-                                  value: s.ttfb,
-                                })
-                              )}
-                              margin={{
-                                top: 5,
-                                right: 30,
-                                left: 20,
-                                bottom: 40,
-                              }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis
-                                dataKey="provider"
-                                tick={{
-                                  fontSize: 13,
-                                  fill: "currentColor",
-                                  fontWeight: 500,
-                                }}
-                                angle={-45}
-                                textAnchor="end"
-                                height={60}
-                              />
-                              <YAxis tick={{ fontSize: 12 }} />
-                              <Tooltip
-                                formatter={(value: any) =>
-                                  typeof value === "number"
-                                    ? parseFloat(value.toFixed(5)).toString()
-                                    : value
-                                }
-                              />
-                              <Bar dataKey="value">
-                                {evaluationResult.leaderboard_summary.map(
-                                  (entry, index) => (
-                                    <Cell
-                                      key={`cell-${index}`}
-                                      fill={
-                                        colorMap.get(entry.run) || "#A8D5E2"
-                                      }
-                                    />
-                                  )
-                                )}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
+                        <LeaderboardBarChart
+                          title="LLM Judge Score"
+                          data={evaluationResult.leaderboard_summary.map(
+                            (s) => ({
+                              label: getProviderLabel(s.run),
+                              value: s.llm_judge_score,
+                              colorKey: s.run,
+                            })
+                          )}
+                          colorMap={colorMap}
+                        />
+                        <LeaderboardBarChart
+                          title="TTFB (s)"
+                          data={evaluationResult.leaderboard_summary.map(
+                            (s) => ({
+                              label: getProviderLabel(s.run),
+                              value: s.ttfb,
+                              colorKey: s.run,
+                            })
+                          )}
+                          colorMap={colorMap}
+                        />
                       </div>
 
                       {/* Row 3: Processing Time */}
                       <div className="grid grid-cols-2 gap-6">
-                        {/* Processing Time Chart */}
-                        <div className="border rounded-xl p-4 bg-muted/10">
-                          <h3 className="text-[15px] font-semibold mb-4">
-                            Processing Time (s)
-                          </h3>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart
-                              data={evaluationResult.leaderboard_summary.map(
-                                (s) => ({
-                                  provider: s.run,
-                                  value: s.processing_time,
-                                })
-                              )}
-                              margin={{
-                                top: 5,
-                                right: 30,
-                                left: 20,
-                                bottom: 40,
-                              }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis
-                                dataKey="provider"
-                                tick={{
-                                  fontSize: 13,
-                                  fill: "currentColor",
-                                  fontWeight: 500,
-                                }}
-                                angle={-45}
-                                textAnchor="end"
-                                height={60}
-                              />
-                              <YAxis tick={{ fontSize: 12 }} />
-                              <Tooltip
-                                formatter={(value: any) =>
-                                  typeof value === "number"
-                                    ? parseFloat(value.toFixed(5)).toString()
-                                    : value
-                                }
-                              />
-                              <Bar dataKey="value">
-                                {evaluationResult.leaderboard_summary.map(
-                                  (entry, index) => (
-                                    <Cell
-                                      key={`cell-${index}`}
-                                      fill={
-                                        colorMap.get(entry.run) || "#A8D5E2"
-                                      }
-                                    />
-                                  )
-                                )}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
+                        <LeaderboardBarChart
+                          title="Processing Time (s)"
+                          data={evaluationResult.leaderboard_summary.map(
+                            (s) => ({
+                              label: getProviderLabel(s.run),
+                              value: s.processing_time,
+                              colorKey: s.run,
+                            })
+                          )}
+                          colorMap={colorMap}
+                        />
                       </div>
                     </div>
                   );
@@ -1284,7 +1039,7 @@ export function SpeechToTextEvaluation() {
                         key={providerResult.provider}
                         value={providerResult.provider}
                       >
-                        {providerResult.provider}
+                        {getProviderLabel(providerResult.provider)}
                       </option>
                     ))}
                   </select>

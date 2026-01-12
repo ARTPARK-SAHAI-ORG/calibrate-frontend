@@ -2,16 +2,6 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
-import {
   TestCaseOutput,
   TestCaseData,
   StatusIcon,
@@ -20,29 +10,7 @@ import {
   TestDetailView,
   EmptyStateView,
 } from "./test-results/shared";
-
-// Pastel color palette for models
-const pastelColors = [
-  "#A8D5E2", // Light blue
-  "#F4A5AE", // Light pink
-  "#B5E5CF", // Light green
-  "#FFD3A5", // Light orange
-  "#C7B9FF", // Light purple
-  "#FFE5B4", // Light peach
-  "#B8E6B8", // Light mint
-  "#E6B8E6", // Light lavender
-  "#B8D4E6", // Light sky blue
-  "#FFB8D4", // Light rose
-];
-
-// Generate color mapping for models
-const getModelColorMap = (modelNames: string[]): Map<string, string> => {
-  const colorMap = new Map<string, string>();
-  modelNames.forEach((model, index) => {
-    colorMap.set(model, pastelColors[index % pastelColors.length]);
-  });
-  return colorMap;
-};
+import { LeaderboardBarChart, getColorMap } from "./charts/LeaderboardBarChart";
 
 type BenchmarkTestResult = {
   passed: boolean;
@@ -259,7 +227,7 @@ export function BenchmarkResultsDialog({
 
   // Get color map for charts
   const modelNames = leaderboardSummary?.map((s) => s.model) || [];
-  const colorMap = getModelColorMap(modelNames);
+  const colorMap = getColorMap(modelNames);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -383,54 +351,17 @@ export function BenchmarkResultsDialog({
 
                 {/* Charts Section */}
                 {leaderboardSummary && leaderboardSummary.length > 0 && (
-                  <div className="border rounded-xl p-4 bg-muted/10">
-                    <h3 className="text-[15px] font-semibold mb-4">
-                      Test pass rate (%)
-                    </h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart
-                        data={leaderboardSummary.map((s) => ({
-                          model: s.model.replace("__", "/"),
-                          value: parseFloat(s.overall),
-                        }))}
-                        margin={{
-                          top: 5,
-                          right: 30,
-                          left: 20,
-                          bottom: 60,
-                        }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey="model"
-                          tick={{
-                            fontSize: 12,
-                            fill: "currentColor",
-                            fontWeight: 500,
-                          }}
-                          angle={-45}
-                          textAnchor="end"
-                          height={80}
-                        />
-                        <YAxis tick={{ fontSize: 12 }} domain={[0, 100]} />
-                        <Tooltip
-                          formatter={(value: any) =>
-                            typeof value === "number"
-                              ? `${value.toFixed(1)}%`
-                              : value
-                          }
-                        />
-                        <Bar dataKey="value">
-                          {leaderboardSummary.map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={colorMap.get(entry.model) || "#A8D5E2"}
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                  <LeaderboardBarChart
+                    title="Test pass rate (%)"
+                    data={leaderboardSummary.map((s) => ({
+                      label: s.model.replace("__", "/"),
+                      value: parseFloat(s.overall),
+                      colorKey: s.model,
+                    }))}
+                    yDomain={[0, 100]}
+                    formatTooltip={(value) => `${value.toFixed(1)}%`}
+                    colorMap={colorMap}
+                  />
                 )}
 
                 {/* Empty State */}
