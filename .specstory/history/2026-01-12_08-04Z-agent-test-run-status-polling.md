@@ -4764,7 +4764,4175 @@ The user wants me to remove the "Retry All" and "Retry Failed" buttons from the 
 
 ---
 
+<think><details><summary>Thought Process</summary>
+I need to remove the two retry buttons from the header. Let me update the search_replace to remove them.</details></think>
 
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -610,5 +610,5 @@
+                testResults.length &gt; 0 &amp;&amp;
+                (passedTests.length &gt; 0 || failedTests.length &gt; 0) &amp;&amp; (
+-                 &lt;div className="flex items-center gap-3 text-sm mr-2"&gt;
++                 &lt;div className="flex items-center gap-3 text-sm"&gt;
+                    &lt;div className="flex items-center gap-1.5"&gt;
+                      &lt;div className="w-2 h-2 rounded-full bg-green-500"&gt;&lt;/div&gt;
+```
+
+**Chunk 2**
+Lines added: undefined, lines removed: 14
+
+```diff
+@@ -625,18 +625,4 @@
+                  &lt;/div&gt;
+                )}
+-             &lt;button
+-               onClick={retryAllFailed}
+-               disabled={isRunning || failedTests.length === 0}
+-               className="h-9 px-4 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+-             &gt;
+-               Retry Failed
+-             &lt;/button&gt;
+-             &lt;button
+-               onClick={retryAll}
+-               disabled={isRunning}
+-               className="h-9 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+-             &gt;
+-               Retry All
+-             &lt;/button&gt;
+              &lt;button
+                onClick={onClose}
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now the retry buttons are removed. Let me check for lint errors - there might be unused functions now (retryAllFailed, retryAll, retryTest).</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx`
+
+Lint results
+
+Lint errors for `src/components/TestRunnerDialog.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+| 'currentTaskId' is declared but its value is never read. | 117:10-117:23 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryTest' is declared but its value is never read. | 313:9-313:18 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryAllFailed' is declared but its value is never read. | 475:9-475:23 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryAll' is declared but its value is never read. | 574:9-574:17 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+No lint errors - the functions might still be used elsewhere or TypeScript/ESLint doesn't flag unused functions in this configuration. The buttons have been removed successfully.</details></think>
+
+---
+
+Done! I've removed the "Retry Failed" and "Retry All" buttons from the header. Only the passed/failed counts and the close button remain.
+
+---
+
+_**User (2026-01-11 09:21Z)**_
+
+now, create another component that opens upon clicking Run benchmark from the dialog box after selecting the llms to run the benchmark on @src/components/agent-tabs/TestsTabContent.tsx  - it should look almost the same as @src/components/TestRunnerDialog.tsx but it should say "benchmark for <agent name>" and have a dropdown to select different model names and for each it should show different values for the failed/passed tests count and the chat history - you will receive the data appropriately.
+
+  "model_results": [
+    {
+      "model": "openai/gpt-4.1",
+      "success": true,
+      "message": "Benchmark completed successfully for openai/gpt-4.1",
+      "total_tests": 2,
+      "passed": 1,
+      "failed": 1,
+      "test_results": [
+        {
+          "passed": true,
+          "output": {
+            "response": "",
+            "tool_calls": [
+              {
+                "tool": "plan_next_question",
+                "arguments": {
+                  "next_unanswered_question_index": 2,
+                  "questions_answered": [
+                    1
+                  ]
+                }
+              }
+            ]
+          },
+          "test_case": {
+            "history": [
+              {
+                "role": "assistant",
+                "content": "What is your name?"
+              },
+              {
+                "role": "user",
+                "content": "Aman Dalmia"
+              }
+            ],
+            "evaluation": {
+              "type": "tool_call",
+              "tool_calls": [
+                {
+                  "tool": "plan_next_question",
+                  "arguments": null
+                }
+              ]
+            }
+          }
+        },
+        {
+          "passed": false,
+          "output": {
+            "response": "I'm glad to hear that! Let's get started with your antenatal visit form. \n\nCan I have your full name, please?",
+            "tool_calls": []
+          },
+          "test_case": {
+            "history": [
+              {
+                "role": "assistant",
+                "content": "Hello, how can I help you today?"
+              },
+              {
+                "role": "user",
+                "content": "i am good"
+              }
+            ],
+            "evaluation": {
+              "type": "response",
+              "criteria": "response contains a funny joke"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "model": "openai/gpt-5.1",
+      "success": true,
+      "message": "Benchmark completed successfully for openai/gpt-5.1",
+      "total_tests": 2,
+      "passed": 1,
+      "failed": 1,
+      "test_results": [
+        {
+          "passed": true,
+          "output": {
+            "response": "",
+            "tool_calls": [
+              {
+                "tool": "plan_next_question",
+                "arguments": {
+                  "next_unanswered_question_index": 2,
+                  "questions_answered": [
+                    1
+                  ]
+                }
+              }
+            ]
+          },
+          "test_case": {
+            "history": [
+              {
+                "role": "assistant",
+                "content": "What is your name?"
+              },
+              {
+                "role": "user",
+                "content": "Aman Dalmia"
+              }
+            ],
+            "evaluation": {
+              "type": "tool_call",
+              "tool_calls": [
+                {
+                  "tool": "plan_next_question",
+                  "arguments": null
+                }
+              ]
+            }
+          }
+        },
+        {
+          "passed": false,
+          "output": {
+            "response": "I'm glad to hear that! Let's get started with your antenatal visit form. \n\nCan I have your full name, please?",
+            "tool_calls": []
+          },
+          "test_case": {
+            "history": [
+              {
+                "role": "assistant",
+                "content": "Hello, how can I help you today?"
+              },
+              {
+                "role": "user",
+                "content": "i am good"
+              }
+            ],
+            "evaluation": {
+              "type": "response",
+              "criteria": "response contains a funny joke"
+            }
+          }
+        }
+      ]
+    }
+  ]
+
+similar to this structure.
+
+and move the summary for n passed and n failed from the header to beside the dropdown 
+
+open this dialog box immediately upon clicking run benchmark and use the dummy values above for it
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to create a new component called `BenchmarkResultsDialog` that:
+1. Opens when clicking "Run benchmark" from the BenchmarkDialog
+2. Looks similar to TestRunnerDialog
+3. Has title "Benchmark for {agentName}"
+4. Has a dropdown to select different models
+5. Shows passed/failed counts next to the dropdown
+6. Shows test results with chat history for the selected model
+7. For now, use dummy data provided
+
+Let me first look at the BenchmarkDialog to understand how it works currently.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to:
+1. Create a new `BenchmarkResultsDialog` component that shows the benchmark results
+2. Modify the `BenchmarkDialog` to open `BenchmarkResultsDialog` when "Run Benchmark" is clicked
+
+Let me create the `BenchmarkResultsDialog` component based on the `TestRunnerDialog` structure but adapted for benchmark results with model selection dropdown.</details></think>
+
+---
+
+Let me create the `BenchmarkResultsDialog` component:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="write">
+
+<details><summary>Tool use: **write** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 638, lines removed: 1
+
+```diff
+@@ -1,1 +1,638 @@
+- 
++ "use client";
++ 
++ import React, { useState } from "react";
++ 
++ type ToolCallOutput = {
++   tool: string;
++   arguments: Record&lt;string, any&gt;;
++ };
++ 
++ type TestCaseOutput = {
++   response?: string;
++   tool_calls?: ToolCallOutput[];
++ };
++ 
++ type TestCaseHistory = {
++   role: "assistant" | "user" | "tool";
++   content?: string;
++   tool_calls?: Array&lt;{
++     id: string;
++     function: {
++       name: string;
++       arguments: string;
++     };
++     type: string;
++   }&gt;;
++   tool_call_id?: string;
++ };
++ 
++ type TestCaseEvaluation = {
++   type: string;
++   tool_calls?: Array&lt;{
++     tool: string;
++     arguments: Record&lt;string, any&gt; | null;
++   }&gt;;
++   criteria?: string;
++ };
++ 
++ type TestCaseData = {
++   history?: TestCaseHistory[];
++   evaluation?: TestCaseEvaluation;
++ };
++ 
++ type BenchmarkTestResult = {
++   passed: boolean;
++   output?: TestCaseOutput;
++   test_case?: TestCaseData;
++ };
++ 
++ type ModelResult = {
++   model: string;
++   success: boolean;
++   message: string;
++   total_tests: number;
++   passed: number;
++   failed: number;
++   test_results: BenchmarkTestResult[];
++ };
++ 
++ type BenchmarkResultsDialogProps = {
++   isOpen: boolean;
++   onClose: () =&gt; void;
++   agentName: string;
++   modelResults: ModelResult[];
++ };
++ 
++ export function BenchmarkResultsDialog({
++   isOpen,
++   onClose,
++   agentName,
++   modelResults,
++ }: BenchmarkResultsDialogProps) {
++   const [selectedModelIndex, setSelectedModelIndex] = useState(0);
++   const [selectedTestIndex, setSelectedTestIndex] = useState&lt;number | null&gt;(
++     null
++   );
++   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
++ 
++   if (!isOpen) return null;
++ 
++   const currentModel = modelResults[selectedModelIndex];
++   const passedTests = currentModel?.test_results.filter((t) =&gt; t.passed) || [];
++   const failedTests = currentModel?.test_results.filter((t) =&gt; !t.passed) || [];
++ 
++   const selectedTest =
++     selectedTestIndex !== null
++       ? currentModel?.test_results[selectedTestIndex]
++       : null;
++ 
++   const handleModelChange = (index: number) =&gt; {
++     setSelectedModelIndex(index);
++     setSelectedTestIndex(null);
++     setModelDropdownOpen(false);
++   };
++ 
++   return (
++     &lt;div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"&gt;
++       &lt;div className="bg-background rounded-xl w-full max-w-5xl h-[80vh] flex flex-col shadow-2xl"&gt;
++         {/* Header */}
++         &lt;div className="flex items-center justify-between px-6 py-4 border-b border-border"&gt;
++           &lt;h2 className="text-lg font-semibold text-foreground"&gt;
++             Benchmark for {agentName}
++           &lt;/h2&gt;
++           &lt;div className="flex items-center gap-3"&gt;
++             &lt;button
++               onClick={onClose}
++               className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
++             &gt;
++               &lt;svg
++                 className="w-5 h-5"
++                 fill="none"
++                 viewBox="0 0 24 24"
++                 stroke="currentColor"
++                 strokeWidth={2}
++               &gt;
++                 &lt;path
++                   strokeLinecap="round"
++                   strokeLinejoin="round"
++                   d="M6 18L18 6M6 6l12 12"
++                 /&gt;
++               &lt;/svg&gt;
++             &lt;/button&gt;
++           &lt;/div&gt;
++         &lt;/div&gt;
++ 
++         {/* Content */}
++         &lt;div className="flex-1 flex overflow-hidden"&gt;
++           {/* Left Panel - Test List */}
++           &lt;div className="w-80 border-r border-border flex flex-col overflow-hidden"&gt;
++             {/* Model Dropdown and Stats */}
++             &lt;div className="p-4 border-b border-border"&gt;
++               &lt;div className="relative"&gt;
++                 &lt;button
++                   onClick={() =&gt; setModelDropdownOpen(!modelDropdownOpen)}
++                   className="w-full h-10 px-4 rounded-md text-sm border border-border bg-background hover:bg-muted/50 flex items-center justify-between cursor-pointer transition-colors"
++                 &gt;
++                   &lt;span className="text-foreground truncate"&gt;
++                     {currentModel?.model || "Select model"}
++                   &lt;/span&gt;
++                   &lt;svg
++                     className={&#96;w-4 h-4 text-muted-foreground transition-transform ${
++                       modelDropdownOpen ? "rotate-180" : ""
++                     }&#96;}
++                     fill="none"
++                     viewBox="0 0 24 24"
++                     stroke="currentColor"
++                     strokeWidth={2}
++                   &gt;
++                     &lt;path
++                       strokeLinecap="round"
++                       strokeLinejoin="round"
++                       d="M19.5 8.25l-7.5 7.5-7.5-7.5"
++                     /&gt;
++                   &lt;/svg&gt;
++                 &lt;/button&gt;
++ 
++                 {/* Dropdown Menu */}
++                 {modelDropdownOpen &amp;&amp; (
++                   &lt;div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-10 max-h-48 overflow-y-auto"&gt;
++                     {modelResults.map((model, index) =&gt; (
++                       &lt;button
++                         key={model.model}
++                         onClick={() =&gt; handleModelChange(index)}
++                         className={&#96;w-full px-4 py-2 text-left text-sm hover:bg-muted/50 transition-colors cursor-pointer ${
++                           index === selectedModelIndex ? "bg-muted/50" : ""
++                         }&#96;}
++                       &gt;
++                         &lt;span className="text-foreground"&gt;{model.model}&lt;/span&gt;
++                       &lt;/button&gt;
++                     ))}
++                   &lt;/div&gt;
++                 )}
++               &lt;/div&gt;
++ 
++               {/* Passed/Failed Stats */}
++               {currentModel &amp;&amp; (
++                 &lt;div className="flex items-center gap-3 mt-3 text-sm"&gt;
++                   &lt;div className="flex items-center gap-1.5"&gt;
++                     &lt;div className="w-2 h-2 rounded-full bg-green-500"&gt;&lt;/div&gt;
++                     &lt;span className="text-muted-foreground"&gt;
++                       {currentModel.passed} passed
++                     &lt;/span&gt;
++                   &lt;/div&gt;
++                   &lt;div className="flex items-center gap-1.5"&gt;
++                     &lt;div className="w-2 h-2 rounded-full bg-red-500"&gt;&lt;/div&gt;
++                     &lt;span className="text-muted-foreground"&gt;
++                       {currentModel.failed} failed
++                     &lt;/span&gt;
++                   &lt;/div&gt;
++                 &lt;/div&gt;
++               )}
++             &lt;/div&gt;
++ 
++             {/* Test List */}
++             &lt;div className="flex-1 overflow-y-auto"&gt;
++               {/* Failed Tests - Always shown first */}
++               {failedTests.length &gt; 0 &amp;&amp; (
++                 &lt;div className="p-4"&gt;
++                   &lt;h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2"&gt;
++                     &lt;div className="w-2 h-2 rounded-full bg-red-500"&gt;&lt;/div&gt;
++                     Failed ({failedTests.length})
++                   &lt;/h3&gt;
++                   &lt;div className="space-y-1"&gt;
++                     {failedTests.map((result) =&gt; {
++                       const originalIndex =
++                         currentModel.test_results.indexOf(result);
++                       return (
++                         &lt;BenchmarkTestListItem
++                           key={originalIndex}
++                           result={result}
++                           index={originalIndex}
++                           isSelected={selectedTestIndex === originalIndex}
++                           onSelect={() =&gt; setSelectedTestIndex(originalIndex)}
++                         /&gt;
++                       );
++                     })}
++                   &lt;/div&gt;
++                 &lt;/div&gt;
++               )}
++ 
++               {/* Passed Tests */}
++               {passedTests.length &gt; 0 &amp;&amp; (
++                 &lt;div className="p-4"&gt;
++                   &lt;h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2"&gt;
++                     &lt;div className="w-2 h-2 rounded-full bg-green-500"&gt;&lt;/div&gt;
++                     Passed ({passedTests.length})
++                   &lt;/h3&gt;
++                   &lt;div className="space-y-1"&gt;
++                     {passedTests.map((result) =&gt; {
++                       const originalIndex =
++                         currentModel.test_results.indexOf(result);
++                       return (
++                         &lt;BenchmarkTestListItem
++                           key={originalIndex}
++                           result={result}
++                           index={originalIndex}
++                           isSelected={selectedTestIndex === originalIndex}
++                           onSelect={() =&gt; setSelectedTestIndex(originalIndex)}
++                         /&gt;
++                       );
++                     })}
++                   &lt;/div&gt;
++                 &lt;/div&gt;
++               )}
++             &lt;/div&gt;
++           &lt;/div&gt;
++ 
++           {/* Right Panel - Test Details */}
++           &lt;div className="flex-1 overflow-y-auto"&gt;
++             {selectedTest ? (
++               &lt;BenchmarkTestDetailView result={selectedTest} /&gt;
++             ) : (
++               &lt;div className="flex items-center justify-center h-full"&gt;
++                 &lt;div className="text-center"&gt;
++                   &lt;div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3"&gt;
++                     &lt;svg
++                       className="w-6 h-6 text-muted-foreground"
++                       fill="none"
++                       viewBox="0 0 24 24"
++                       stroke="currentColor"
++                       strokeWidth={1.5}
++                     &gt;
++                       &lt;path
++                         strokeLinecap="round"
++                         strokeLinejoin="round"
++                         d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"
++                       /&gt;
++                     &lt;/svg&gt;
++                   &lt;/div&gt;
++                   &lt;p className="text-muted-foreground text-sm"&gt;
++                     Select a test to view details
++                   &lt;/p&gt;
++                 &lt;/div&gt;
++               &lt;/div&gt;
++             )}
++           &lt;/div&gt;
++         &lt;/div&gt;
++       &lt;/div&gt;
++     &lt;/div&gt;
++   );
++ }
++ 
++ // Benchmark Test List Item Component
++ function BenchmarkTestListItem({
++   result,
++   index,
++   isSelected,
++   onSelect,
++ }: {
++   result: BenchmarkTestResult;
++   index: number;
++   isSelected: boolean;
++   onSelect: () =&gt; void;
++ }) {
++   // Generate a test name from the test case or use a default
++   const testName =
++     result.test_case?.evaluation?.type === "tool_call"
++       ? &#96;Tool Call Test ${index + 1}&#96;
++       : &#96;Response Test ${index + 1}&#96;;
++ 
++   return (
++     &lt;div
++       onClick={onSelect}
++       className={&#96;flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
++         isSelected ? "bg-muted" : "hover:bg-muted/50"
++       }&#96;}
++     &gt;
++       {/* Status Icon */}
++       {result.passed ? (
++         &lt;div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0"&gt;
++           &lt;svg
++             className="w-3 h-3 text-green-500"
++             fill="none"
++             viewBox="0 0 24 24"
++             stroke="currentColor"
++             strokeWidth={3}
++           &gt;
++             &lt;path
++               strokeLinecap="round"
++               strokeLinejoin="round"
++               d="M5 13l4 4L19 7"
++             /&gt;
++           &lt;/svg&gt;
++         &lt;/div&gt;
++       ) : (
++         &lt;div className="w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0"&gt;
++           &lt;svg
++             className="w-3 h-3 text-red-500"
++             fill="none"
++             viewBox="0 0 24 24"
++             stroke="currentColor"
++             strokeWidth={3}
++           &gt;
++             &lt;path
++               strokeLinecap="round"
++               strokeLinejoin="round"
++               d="M6 18L18 6M6 6l12 12"
++             /&gt;
++           &lt;/svg&gt;
++         &lt;/div&gt;
++       )}
++ 
++       &lt;span className="text-sm text-foreground truncate"&gt;{testName}&lt;/span&gt;
++     &lt;/div&gt;
++   );
++ }
++ 
++ // Benchmark Test Detail View Component
++ function BenchmarkTestDetailView({ result }: { result: BenchmarkTestResult }) {
++   const history = result.test_case?.history || [];
++   const output = result.output;
++ 
++   return (
++     &lt;div className="p-6 space-y-6"&gt;
++       {/* Chat History from test_case.history */}
++       {history.length &gt; 0 &amp;&amp; (
++         &lt;div className="space-y-4"&gt;
++           &lt;div className="space-y-4"&gt;
++             {history.map((message, index) =&gt; (
++               &lt;div
++                 key={index}
++                 className={&#96;space-y-1 ${
++                   message.role === "user" ? "flex flex-col items-end" : ""
++                 }&#96;}
++               &gt;
++                 {/* User Message */}
++                 {message.role === "user" &amp;&amp; (
++                   &lt;div className="max-w-[80%]"&gt;
++                     &lt;div className="px-4 py-3 rounded-2xl bg-[#242426] border border-[#444]"&gt;
++                       &lt;p className="text-sm text-foreground whitespace-pre-wrap"&gt;
++                         {message.content}
++                       &lt;/p&gt;
++                     &lt;/div&gt;
++                   &lt;/div&gt;
++                 )}
++ 
++                 {/* Agent Message (text response) */}
++                 {message.role === "assistant" &amp;&amp; !message.tool_calls &amp;&amp; (
++                   &lt;&gt;
++                     &lt;div className="flex items-center gap-2"&gt;
++                       &lt;span className="text-sm font-medium text-foreground"&gt;
++                         Agent
++                       &lt;/span&gt;
++                     &lt;/div&gt;
++                     &lt;div className="max-w-[80%]"&gt;
++                       &lt;div className="px-4 py-3 rounded-2xl bg-muted/30 border border-border"&gt;
++                         &lt;p className="text-sm text-foreground whitespace-pre-wrap"&gt;
++                           {message.content}
++                         &lt;/p&gt;
++                       &lt;/div&gt;
++                     &lt;/div&gt;
++                   &lt;/&gt;
++                 )}
++ 
++                 {/* Agent Tool Call from history */}
++                 {message.role === "assistant" &amp;&amp;
++                   message.tool_calls &amp;&amp;
++                   message.tool_calls.length &gt; 0 &amp;&amp; (
++                     &lt;&gt;
++                       &lt;div className="flex items-center gap-2"&gt;
++                         &lt;span className="text-sm font-medium text-foreground"&gt;
++                           Agent Tool Call
++                         &lt;/span&gt;
++                       &lt;/div&gt;
++                       &lt;div className="max-w-[80%]"&gt;
++                         {message.tool_calls.map((toolCall, tcIndex) =&gt; {
++                           let parsedArgs: Record&lt;string, any&gt; = {};
++                           try {
++                             parsedArgs = JSON.parse(toolCall.function.arguments);
++                           } catch {
++                             parsedArgs = {};
++                           }
++                           return (
++                             &lt;div
++                               key={tcIndex}
++                               className="bg-muted/20 border border-border rounded-2xl p-4"
++                             &gt;
++                               &lt;div className="flex items-center gap-2 mb-2"&gt;
++                                 &lt;svg
++                                   className="w-4 h-4 text-muted-foreground"
++                                   fill="none"
++                                   viewBox="0 0 24 24"
++                                   stroke="currentColor"
++                                   strokeWidth={1.5}
++                                 &gt;
++                                   &lt;path
++                                     strokeLinecap="round"
++                                     strokeLinejoin="round"
++                                     d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
++                                   /&gt;
++                                 &lt;/svg&gt;
++                                 &lt;span className="text-sm font-medium text-foreground"&gt;
++                                   {toolCall.function.name}
++                                 &lt;/span&gt;
++                               &lt;/div&gt;
++                               {Object.keys(parsedArgs).length &gt; 0 &amp;&amp; (
++                                 &lt;div className="space-y-2 mt-3"&gt;
++                                   {Object.entries(parsedArgs).map(
++                                     ([paramName, paramValue]) =&gt; (
++                                       &lt;div key={paramName}&gt;
++                                         &lt;label className="block text-xs font-medium text-muted-foreground mb-1"&gt;
++                                           {paramName}
++                                         &lt;/label&gt;
++                                         &lt;div className="px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground"&gt;
++                                           {typeof paramValue === "object"
++                                             ? JSON.stringify(paramValue)
++                                             : String(paramValue)}
++                                         &lt;/div&gt;
++                                       &lt;/div&gt;
++                                     )
++                                   )}
++                                 &lt;/div&gt;
++                               )}
++                             &lt;/div&gt;
++                           );
++                         })}
++                       &lt;/div&gt;
++                     &lt;/&gt;
++                   )}
++               &lt;/div&gt;
++             ))}
++           &lt;/div&gt;
++         &lt;/div&gt;
++       )}
++ 
++       {/* Output Section - Agent's Response/Tool Call */}
++       {output &amp;&amp; (
++         &lt;div className="space-y-4"&gt;
++           {/* Text Response */}
++           {output.response &amp;&amp; (
++             &lt;div
++               className={&#96;${
++                 result.passed
++                   ? "border-l-4 border-l-green-500 pl-3"
++                   : "border-l-4 border-l-red-500 pl-3"
++               }&#96;}
++             &gt;
++               &lt;div className="flex items-center gap-2 mb-1"&gt;
++                 &lt;span className="text-sm font-medium text-foreground"&gt;
++                   Agent
++                 &lt;/span&gt;
++                 &lt;div
++                   className={&#96;w-4 h-4 rounded-full flex items-center justify-center ${
++                     result.passed ? "bg-green-500/20" : "bg-red-500/20"
++                   }&#96;}
++                 &gt;
++                   {result.passed ? (
++                     &lt;svg
++                       className="w-2.5 h-2.5 text-green-500"
++                       fill="none"
++                       viewBox="0 0 24 24"
++                       stroke="currentColor"
++                       strokeWidth={3}
++                     &gt;
++                       &lt;path
++                         strokeLinecap="round"
++                         strokeLinejoin="round"
++                         d="M5 13l4 4L19 7"
++                       /&gt;
++                     &lt;/svg&gt;
++                   ) : (
++                     &lt;svg
++                       className="w-2.5 h-2.5 text-red-500"
++                       fill="none"
++                       viewBox="0 0 24 24"
++                       stroke="currentColor"
++                       strokeWidth={3}
++                     &gt;
++                       &lt;path
++                         strokeLinecap="round"
++                         strokeLinejoin="round"
++                         d="M6 18L18 6M6 6l12 12"
++                       /&gt;
++                     &lt;/svg&gt;
++                   )}
++                 &lt;/div&gt;
++               &lt;/div&gt;
++               &lt;div className="max-w-[80%]"&gt;
++                 &lt;div className="px-4 py-3 rounded-2xl bg-muted/30 border border-border"&gt;
++                   &lt;p className="text-sm text-foreground whitespace-pre-wrap"&gt;
++                     {output.response}
++                   &lt;/p&gt;
++                 &lt;/div&gt;
++               &lt;/div&gt;
++             &lt;/div&gt;
++           )}
++ 
++           {/* Tool Calls Output */}
++           {output.tool_calls &amp;&amp; output.tool_calls.length &gt; 0 &amp;&amp; (
++             &lt;div
++               className={&#96;${
++                 result.passed
++                   ? "border-l-4 border-l-green-500 pl-3"
++                   : "border-l-4 border-l-red-500 pl-3"
++               }&#96;}
++             &gt;
++               &lt;div className="flex items-center gap-2 mb-2"&gt;
++                 &lt;span className="text-sm font-medium text-foreground"&gt;
++                   Agent Tool Call
++                 &lt;/span&gt;
++                 &lt;div
++                   className={&#96;w-4 h-4 rounded-full flex items-center justify-center ${
++                     result.passed ? "bg-green-500/20" : "bg-red-500/20"
++                   }&#96;}
++                 &gt;
++                   {result.passed ? (
++                     &lt;svg
++                       className="w-2.5 h-2.5 text-green-500"
++                       fill="none"
++                       viewBox="0 0 24 24"
++                       stroke="currentColor"
++                       strokeWidth={3}
++                     &gt;
++                       &lt;path
++                         strokeLinecap="round"
++                         strokeLinejoin="round"
++                         d="M5 13l4 4L19 7"
++                       /&gt;
++                     &lt;/svg&gt;
++                   ) : (
++                     &lt;svg
++                       className="w-2.5 h-2.5 text-red-500"
++                       fill="none"
++                       viewBox="0 0 24 24"
++                       stroke="currentColor"
++                       strokeWidth={3}
++                     &gt;
++                       &lt;path
++                         strokeLinecap="round"
++                         strokeLinejoin="round"
++                         d="M6 18L18 6M6 6l12 12"
++                       /&gt;
++                     &lt;/svg&gt;
++                   )}
++                 &lt;/div&gt;
++               &lt;/div&gt;
++               &lt;div className="space-y-3"&gt;
++                 {output.tool_calls.map((toolCall, index) =&gt; (
++                   &lt;div
++                     key={index}
++                     className="max-w-[80%] bg-muted/20 border border-border rounded-2xl p-4"
++                   &gt;
++                     &lt;div className="flex items-center gap-2 mb-2"&gt;
++                       &lt;svg
++                         className="w-4 h-4 text-muted-foreground"
++                         fill="none"
++                         viewBox="0 0 24 24"
++                         stroke="currentColor"
++                         strokeWidth={1.5}
++                       &gt;
++                         &lt;path
++                           strokeLinecap="round"
++                           strokeLinejoin="round"
++                           d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
++                         /&gt;
++                       &lt;/svg&gt;
++                       &lt;span className="text-sm font-medium text-foreground"&gt;
++                         {toolCall.tool}
++                       &lt;/span&gt;
++                     &lt;/div&gt;
++                     {toolCall.arguments &amp;&amp;
++                       Object.keys(toolCall.arguments).length &gt; 0 &amp;&amp; (
++                         &lt;div className="space-y-2 mt-3"&gt;
++                           {Object.entries(toolCall.arguments).map(
++                             ([paramName, paramValue]) =&gt; (
++                               &lt;div key={paramName}&gt;
++                                 &lt;label className="block text-xs font-medium text-muted-foreground mb-1"&gt;
++                                   {paramName}
++                                 &lt;/label&gt;
++                                 &lt;div className="px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground"&gt;
++                                   {typeof paramValue === "object"
++                                     ? JSON.stringify(paramValue)
++                                     : String(paramValue)}
++                                 &lt;/div&gt;
++                               &lt;/div&gt;
++                             )
++                           )}
++                         &lt;/div&gt;
++                       )}
++                   &lt;/div&gt;
++                 ))}
++               &lt;/div&gt;
++             &lt;/div&gt;
++           )}
++         &lt;/div&gt;
++       )}
++ 
++       {/* Show empty state if no history and no output */}
++       {history.length === 0 &amp;&amp; !output &amp;&amp; (
++         &lt;div className="text-center py-8"&gt;
++           &lt;p className="text-sm text-muted-foreground"&gt;
++             No conversation history available for this test
++           &lt;/p&gt;
++         &lt;/div&gt;
++       )}
++     &lt;/div&gt;
++   );
++ }
++ 
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the BenchmarkDialog to open the BenchmarkResultsDialog when "Run Benchmark" is clicked, passing the dummy data.</details></think>
+
+---
+
+Now let me update the `BenchmarkDialog` to open the results dialog with dummy data:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 147, lines removed: undefined
+
+```diff
+@@ -3,4 +3,151 @@
+  import React, { useState } from "react";
+  import { llmProviders, type LLMModel } from "./agent-tabs/constants/providers";
++ import { BenchmarkResultsDialog } from "./BenchmarkResultsDialog";
++ 
++ // Dummy benchmark results data
++ const DUMMY_BENCHMARK_RESULTS = {
++   model_results: [
++     {
++       model: "openai/gpt-4.1",
++       success: true,
++       message: "Benchmark completed successfully for openai/gpt-4.1",
++       total_tests: 2,
++       passed: 1,
++       failed: 1,
++       test_results: [
++         {
++           passed: true,
++           output: {
++             response: "",
++             tool_calls: [
++               {
++                 tool: "plan_next_question",
++                 arguments: {
++                   next_unanswered_question_index: 2,
++                   questions_answered: [1],
++                 },
++               },
++             ],
++           },
++           test_case: {
++             history: [
++               {
++                 role: "assistant" as const,
++                 content: "What is your name?",
++               },
++               {
++                 role: "user" as const,
++                 content: "Aman Dalmia",
++               },
++             ],
++             evaluation: {
++               type: "tool_call",
++               tool_calls: [
++                 {
++                   tool: "plan_next_question",
++                   arguments: null,
++                 },
++               ],
++             },
++           },
++         },
++         {
++           passed: false,
++           output: {
++             response:
++               "I'm glad to hear that! Let's get started with your antenatal visit form. \n\nCan I have your full name, please?",
++             tool_calls: [],
++           },
++           test_case: {
++             history: [
++               {
++                 role: "assistant" as const,
++                 content: "Hello, how can I help you today?",
++               },
++               {
++                 role: "user" as const,
++                 content: "i am good",
++               },
++             ],
++             evaluation: {
++               type: "response",
++               criteria: "response contains a funny joke",
++             },
++           },
++         },
++       ],
++     },
++     {
++       model: "openai/gpt-5.1",
++       success: true,
++       message: "Benchmark completed successfully for openai/gpt-5.1",
++       total_tests: 2,
++       passed: 1,
++       failed: 1,
++       test_results: [
++         {
++           passed: true,
++           output: {
++             response: "",
++             tool_calls: [
++               {
++                 tool: "plan_next_question",
++                 arguments: {
++                   next_unanswered_question_index: 2,
++                   questions_answered: [1],
++                 },
++               },
++             ],
++           },
++           test_case: {
++             history: [
++               {
++                 role: "assistant" as const,
++                 content: "What is your name?",
++               },
++               {
++                 role: "user" as const,
++                 content: "Aman Dalmia",
++               },
++             ],
++             evaluation: {
++               type: "tool_call",
++               tool_calls: [
++                 {
++                   tool: "plan_next_question",
++                   arguments: null,
++                 },
++               ],
++             },
++           },
++         },
++         {
++           passed: false,
++           output: {
++             response:
++               "I'm glad to hear that! Let's get started with your antenatal visit form. \n\nCan I have your full name, please?",
++             tool_calls: [],
++           },
++           test_case: {
++             history: [
++               {
++                 role: "assistant" as const,
++                 content: "Hello, how can I help you today?",
++               },
++               {
++                 role: "user" as const,
++                 content: "i am good",
++               },
++             ],
++             evaluation: {
++               type: "response",
++               criteria: "response contains a funny joke",
++             },
++           },
++         },
++       ],
++     },
++   ],
++ };
+  
+  type BenchmarkDialogProps = {
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -20,4 +167,5 @@
+    const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
+    const [editingIndex, setEditingIndex] = useState&lt;number | null&gt;(null);
++   const [showResults, setShowResults] = useState(false);
+  
+    if (!isOpen) return null;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the handleClose function to also reset the showResults state, and update the "Run Benchmark" button to show the results dialog.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 10, lines removed: undefined
+
+```diff
+@@ -173,6 +173,16 @@
+    const handleClose = () =&gt; {
+      setSelectedModels([null]);
++     setShowResults(false);
+      onClose();
+    };
++ 
++   const handleRunBenchmark = () =&gt; {
++     setShowResults(true);
++   };
++ 
++   const handleCloseResults = () =&gt; {
++     setShowResults(false);
++     handleClose();
++   };
+  
+    const handleAddModel = () =&gt; {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the "Run Benchmark" button onClick handler and add the BenchmarkResultsDialog component at the end of the return.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 5
+
+```diff
+@@ -370,9 +370,5 @@
+            &lt;/button&gt;
+            &lt;button
+-             onClick={() =&gt; {
+-               // TODO: Implement benchmark run
+-               console.log("Running benchmark with models:", selectedModels);
+-               handleClose();
+-             }}
++             onClick={handleRunBenchmark}
+              disabled={!canRunBenchmark}
+              className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+```
+
+**Chunk 2**
+Lines added: 8, lines removed: undefined
+
+```diff
+@@ -409,4 +405,12 @@
+          /&gt;
+        )}
++ 
++       {/* Benchmark Results Dialog */}
++       &lt;BenchmarkResultsDialog
++         isOpen={showResults}
++         onClose={handleCloseResults}
++         agentName={agentName}
++         modelResults={DUMMY_BENCHMARK_RESULTS.model_results}
++       /&gt;
+      &lt;/div&gt;
+    );
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me check for lint errors in both files.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 2 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkDialog.tsx`
+
+Lint results
+
+Lint errors for `src/components/BenchmarkDialog.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+All done. Let me summarize what I did:1. Created a new `BenchmarkResultsDialog` component that:   - Has a title "Benchmark for {agentName}"
+   - Has a dropdown to select different models
+   - Shows passed/failed counts next to the dropdown
+   - Shows test results with chat history for the selected model
+   - Failed tests are shown first in the list
+   - The UI is very similar to TestRunnerDialog2. Updated `BenchmarkDialog` to:
+   - Import the new BenchmarkResultsDialog
+   - Include dummy benchmark results data
+   - Open the BenchmarkResultsDialog when "Run Benchmark" is clicked</details></think>
+
+---
+
+Done! I've created the `BenchmarkResultsDialog` component and updated `BenchmarkDialog` to open it when clicking "Run Benchmark". 
+
+The new component:
+- Shows "Benchmark for {agentName}" as the title
+- Has a dropdown to select different models in the left panel
+- Shows passed/failed counts beside the dropdown
+- Displays the test list with failed tests first
+- Shows chat history and output details when clicking on a test
+- Uses the dummy data you provided for testing
+
+---
+
+_**User (2026-01-11 09:21Z)**_
+
+share the components between this new component and @src/components/TestRunnerDialog.tsx 
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to share common components between `BenchmarkResultsDialog` and `TestRunnerDialog`. Looking at both files, there are several components and types that are duplicated:
+
+1. Types like `ToolCallOutput`, `TestCaseOutput`, `TestCaseHistory`, `TestCaseData`
+2. `TestListItem` / `BenchmarkTestListItem` - very similar
+3. `TestDetailView` / `BenchmarkTestDetailView` - almost identical
+
+I should:
+1. Create a shared file for common types and components
+2. Update both `TestRunnerDialog` and `BenchmarkResultsDialog` to use the shared components
+
+Let me first read both files to understand the exact differences and what can be shared.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me create a shared components file for the types and UI components that are common between TestRunnerDialog and BenchmarkResultsDialog.</details></think>
+
+---
+
+Let me create a shared components file:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="write">
+
+<details><summary>Tool use: **write** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx</summary>
+
+**Chunk 1**
+Lines added: 425, lines removed: 1
+
+```diff
+@@ -1,1 +1,425 @@
+- 
++ "use client";
++ 
++ import React from "react";
++ 
++ // Shared Types
++ export type ToolCallOutput = {
++   tool: string;
++   arguments: Record&lt;string, any&gt;;
++ };
++ 
++ export type TestCaseOutput = {
++   response?: string;
++   tool_calls?: ToolCallOutput[];
++ };
++ 
++ export type TestCaseHistory = {
++   role: "assistant" | "user" | "tool";
++   content?: string;
++   tool_calls?: Array&lt;{
++     id: string;
++     function: {
++       name: string;
++       arguments: string;
++     };
++     type: string;
++   }&gt;;
++   tool_call_id?: string;
++ };
++ 
++ export type TestCaseEvaluation = {
++   type: string;
++   tool_calls?: Array&lt;{
++     tool: string;
++     arguments: Record&lt;string, any&gt; | null;
++   }&gt;;
++   criteria?: string;
++ };
++ 
++ export type TestCaseData = {
++   history?: TestCaseHistory[];
++   evaluation?: TestCaseEvaluation;
++ };
++ 
++ // Shared Icons
++ export function CheckIcon({ className }: { className?: string }) {
++   return (
++     &lt;svg
++       className={className}
++       fill="none"
++       viewBox="0 0 24 24"
++       stroke="currentColor"
++       strokeWidth={3}
++     &gt;
++       &lt;path
++         strokeLinecap="round"
++         strokeLinejoin="round"
++         d="M5 13l4 4L19 7"
++       /&gt;
++     &lt;/svg&gt;
++   );
++ }
++ 
++ export function XIcon({ className }: { className?: string }) {
++   return (
++     &lt;svg
++       className={className}
++       fill="none"
++       viewBox="0 0 24 24"
++       stroke="currentColor"
++       strokeWidth={3}
++     &gt;
++       &lt;path
++         strokeLinecap="round"
++         strokeLinejoin="round"
++         d="M6 18L18 6M6 6l12 12"
++       /&gt;
++     &lt;/svg&gt;
++   );
++ }
++ 
++ export function SpinnerIcon({ className }: { className?: string }) {
++   return (
++     &lt;svg className={className} fill="none" viewBox="0 0 24 24"&gt;
++       &lt;circle
++         className="opacity-25"
++         cx="12"
++         cy="12"
++         r="10"
++         stroke="currentColor"
++         strokeWidth="4"
++       &gt;&lt;/circle&gt;
++       &lt;path
++         className="opacity-75"
++         fill="currentColor"
++         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
++       &gt;&lt;/path&gt;
++     &lt;/svg&gt;
++   );
++ }
++ 
++ export function ToolIcon({ className }: { className?: string }) {
++   return (
++     &lt;svg
++       className={className}
++       fill="none"
++       viewBox="0 0 24 24"
++       stroke="currentColor"
++       strokeWidth={1.5}
++     &gt;
++       &lt;path
++         strokeLinecap="round"
++         strokeLinejoin="round"
++         d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
++       /&gt;
++     &lt;/svg&gt;
++   );
++ }
++ 
++ export function CloseIcon({ className }: { className?: string }) {
++   return (
++     &lt;svg
++       className={className}
++       fill="none"
++       viewBox="0 0 24 24"
++       stroke="currentColor"
++       strokeWidth={2}
++     &gt;
++       &lt;path
++         strokeLinecap="round"
++         strokeLinejoin="round"
++         d="M6 18L18 6M6 6l12 12"
++       /&gt;
++     &lt;/svg&gt;
++   );
++ }
++ 
++ export function DocumentIcon({ className }: { className?: string }) {
++   return (
++     &lt;svg
++       className={className}
++       fill="none"
++       viewBox="0 0 24 24"
++       stroke="currentColor"
++       strokeWidth={1.5}
++     &gt;
++       &lt;path
++         strokeLinecap="round"
++         strokeLinejoin="round"
++         d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"
++       /&gt;
++     &lt;/svg&gt;
++   );
++ }
++ 
++ // Shared Status Icon Component
++ export function StatusIcon({
++   status,
++ }: {
++   status: "passed" | "failed" | "running" | "pending";
++ }) {
++   if (status === "passed") {
++     return (
++       &lt;div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0"&gt;
++         &lt;CheckIcon className="w-3 h-3 text-green-500" /&gt;
++       &lt;/div&gt;
++     );
++   }
++   if (status === "failed") {
++     return (
++       &lt;div className="w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0"&gt;
++         &lt;XIcon className="w-3 h-3 text-red-500" /&gt;
++       &lt;/div&gt;
++     );
++   }
++   return (
++     &lt;div className="w-5 h-5 flex items-center justify-center flex-shrink-0"&gt;
++       &lt;SpinnerIcon className="w-4 h-4 animate-spin text-muted-foreground" /&gt;
++     &lt;/div&gt;
++   );
++ }
++ 
++ // Shared Small Status Badge Component
++ export function SmallStatusBadge({ passed }: { passed: boolean }) {
++   return (
++     &lt;div
++       className={&#96;w-4 h-4 rounded-full flex items-center justify-center ${
++         passed ? "bg-green-500/20" : "bg-red-500/20"
++       }&#96;}
++     &gt;
++       {passed ? (
++         &lt;CheckIcon className="w-2.5 h-2.5 text-green-500" /&gt;
++       ) : (
++         &lt;XIcon className="w-2.5 h-2.5 text-red-500" /&gt;
++       )}
++     &lt;/div&gt;
++   );
++ }
++ 
++ // Shared Tool Call Card Component
++ export function ToolCallCard({
++   toolName,
++   args,
++ }: {
++   toolName: string;
++   args: Record&lt;string, any&gt;;
++ }) {
++   return (
++     &lt;div className="bg-muted/20 border border-border rounded-2xl p-4"&gt;
++       &lt;div className="flex items-center gap-2 mb-2"&gt;
++         &lt;ToolIcon className="w-4 h-4 text-muted-foreground" /&gt;
++         &lt;span className="text-sm font-medium text-foreground"&gt;{toolName}&lt;/span&gt;
++       &lt;/div&gt;
++       {Object.keys(args).length &gt; 0 &amp;&amp; (
++         &lt;div className="space-y-2 mt-3"&gt;
++           {Object.entries(args).map(([paramName, paramValue]) =&gt; (
++             &lt;div key={paramName}&gt;
++               &lt;label className="block text-xs font-medium text-muted-foreground mb-1"&gt;
++                 {paramName}
++               &lt;/label&gt;
++               &lt;div className="px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground"&gt;
++                 {typeof paramValue === "object"
++                   ? JSON.stringify(paramValue)
++                   : String(paramValue)}
++               &lt;/div&gt;
++             &lt;/div&gt;
++           ))}
++         &lt;/div&gt;
++       )}
++     &lt;/div&gt;
++   );
++ }
++ 
++ // Shared Test Detail View Component
++ export function TestDetailView({
++   history,
++   output,
++   passed,
++ }: {
++   history: TestCaseHistory[];
++   output?: TestCaseOutput;
++   passed: boolean;
++ }) {
++   return (
++     &lt;div className="p-6 space-y-6"&gt;
++       {/* Chat History from test_case.history */}
++       {history.length &gt; 0 &amp;&amp; (
++         &lt;div className="space-y-4"&gt;
++           &lt;div className="space-y-4"&gt;
++             {history.map((message, index) =&gt; (
++               &lt;div
++                 key={index}
++                 className={&#96;space-y-1 ${
++                   message.role === "user" ? "flex flex-col items-end" : ""
++                 }&#96;}
++               &gt;
++                 {/* User Message */}
++                 {message.role === "user" &amp;&amp; (
++                   &lt;div className="max-w-[80%]"&gt;
++                     &lt;div className="px-4 py-3 rounded-2xl bg-[#242426] border border-[#444]"&gt;
++                       &lt;p className="text-sm text-foreground whitespace-pre-wrap"&gt;
++                         {message.content}
++                       &lt;/p&gt;
++                     &lt;/div&gt;
++                   &lt;/div&gt;
++                 )}
++ 
++                 {/* Agent Message (text response) */}
++                 {message.role === "assistant" &amp;&amp; !message.tool_calls &amp;&amp; (
++                   &lt;&gt;
++                     &lt;div className="flex items-center gap-2"&gt;
++                       &lt;span className="text-sm font-medium text-foreground"&gt;
++                         Agent
++                       &lt;/span&gt;
++                     &lt;/div&gt;
++                     &lt;div className="max-w-[80%]"&gt;
++                       &lt;div className="px-4 py-3 rounded-2xl bg-muted/30 border border-border"&gt;
++                         &lt;p className="text-sm text-foreground whitespace-pre-wrap"&gt;
++                           {message.content}
++                         &lt;/p&gt;
++                       &lt;/div&gt;
++                     &lt;/div&gt;
++                   &lt;/&gt;
++                 )}
++ 
++                 {/* Agent Tool Call from history */}
++                 {message.role === "assistant" &amp;&amp;
++                   message.tool_calls &amp;&amp;
++                   message.tool_calls.length &gt; 0 &amp;&amp; (
++                     &lt;&gt;
++                       &lt;div className="flex items-center gap-2"&gt;
++                         &lt;span className="text-sm font-medium text-foreground"&gt;
++                           Agent Tool Call
++                         &lt;/span&gt;
++                       &lt;/div&gt;
++                       &lt;div className="max-w-[80%]"&gt;
++                         {message.tool_calls.map((toolCall, tcIndex) =&gt; {
++                           let parsedArgs: Record&lt;string, any&gt; = {};
++                           try {
++                             parsedArgs = JSON.parse(toolCall.function.arguments);
++                           } catch {
++                             parsedArgs = {};
++                           }
++                           return (
++                             &lt;ToolCallCard
++                               key={tcIndex}
++                               toolName={toolCall.function.name}
++                               args={parsedArgs}
++                             /&gt;
++                           );
++                         })}
++                       &lt;/div&gt;
++                     &lt;/&gt;
++                   )}
++               &lt;/div&gt;
++             ))}
++           &lt;/div&gt;
++         &lt;/div&gt;
++       )}
++ 
++       {/* Output Section - Agent's Response/Tool Call */}
++       {output &amp;&amp; (
++         &lt;div className="space-y-4"&gt;
++           {/* Text Response */}
++           {output.response &amp;&amp; (
++             &lt;div
++               className={&#96;${
++                 passed
++                   ? "border-l-4 border-l-green-500 pl-3"
++                   : "border-l-4 border-l-red-500 pl-3"
++               }&#96;}
++             &gt;
++               &lt;div className="flex items-center gap-2 mb-1"&gt;
++                 &lt;span className="text-sm font-medium text-foreground"&gt;
++                   Agent
++                 &lt;/span&gt;
++                 &lt;SmallStatusBadge passed={passed} /&gt;
++               &lt;/div&gt;
++               &lt;div className="max-w-[80%]"&gt;
++                 &lt;div className="px-4 py-3 rounded-2xl bg-muted/30 border border-border"&gt;
++                   &lt;p className="text-sm text-foreground whitespace-pre-wrap"&gt;
++                     {output.response}
++                   &lt;/p&gt;
++                 &lt;/div&gt;
++               &lt;/div&gt;
++             &lt;/div&gt;
++           )}
++ 
++           {/* Tool Calls Output */}
++           {output.tool_calls &amp;&amp; output.tool_calls.length &gt; 0 &amp;&amp; (
++             &lt;div
++               className={&#96;${
++                 passed
++                   ? "border-l-4 border-l-green-500 pl-3"
++                   : "border-l-4 border-l-red-500 pl-3"
++               }&#96;}
++             &gt;
++               &lt;div className="flex items-center gap-2 mb-2"&gt;
++                 &lt;span className="text-sm font-medium text-foreground"&gt;
++                   Agent Tool Call
++                 &lt;/span&gt;
++                 &lt;SmallStatusBadge passed={passed} /&gt;
++               &lt;/div&gt;
++               &lt;div className="space-y-3"&gt;
++                 {output.tool_calls.map((toolCall, index) =&gt; (
++                   &lt;div key={index} className="max-w-[80%]"&gt;
++                     &lt;ToolCallCard
++                       toolName={toolCall.tool}
++                       args={toolCall.arguments}
++                     /&gt;
++                   &lt;/div&gt;
++                 ))}
++               &lt;/div&gt;
++             &lt;/div&gt;
++           )}
++         &lt;/div&gt;
++       )}
++ 
++       {/* Show empty state if no history and no output */}
++       {history.length === 0 &amp;&amp; !output &amp;&amp; (
++         &lt;div className="text-center py-8"&gt;
++           &lt;p className="text-sm text-muted-foreground"&gt;
++             No conversation history available for this test
++           &lt;/p&gt;
++         &lt;/div&gt;
++       )}
++     &lt;/div&gt;
++   );
++ }
++ 
++ // Shared Empty State Component
++ export function EmptyStateView({ message }: { message: string }) {
++   return (
++     &lt;div className="flex items-center justify-center h-full"&gt;
++       &lt;div className="text-center"&gt;
++         &lt;div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3"&gt;
++           &lt;DocumentIcon className="w-6 h-6 text-muted-foreground" /&gt;
++         &lt;/div&gt;
++         &lt;p className="text-muted-foreground text-sm"&gt;{message}&lt;/p&gt;
++       &lt;/div&gt;
++     &lt;/div&gt;
++   );
++ }
++ 
++ // Shared Stats Display Component
++ export function TestStats({
++   passedCount,
++   failedCount,
++ }: {
++   passedCount: number;
++   failedCount: number;
++ }) {
++   return (
++     &lt;div className="flex items-center gap-3 text-sm"&gt;
++       &lt;div className="flex items-center gap-1.5"&gt;
++         &lt;div className="w-2 h-2 rounded-full bg-green-500"&gt;&lt;/div&gt;
++         &lt;span className="text-muted-foreground"&gt;{passedCount} passed&lt;/span&gt;
++       &lt;/div&gt;
++       &lt;div className="flex items-center gap-1.5"&gt;
++         &lt;div className="w-2 h-2 rounded-full bg-red-500"&gt;&lt;/div&gt;
++         &lt;span className="text-muted-foreground"&gt;{failedCount} failed&lt;/span&gt;
++       &lt;/div&gt;
++     &lt;/div&gt;
++   );
++ }
++ 
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the BenchmarkResultsDialog to use the shared components.</details></think>
+
+---
+
+Now let me update `BenchmarkResultsDialog` to use the shared components:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="write">
+
+<details><summary>Tool use: **write** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 9, lines removed: 38
+
+```diff
+@@ -2,42 +2,13 @@
+  
+  import React, { useState } from "react";
+- 
+- type ToolCallOutput = {
+-   tool: string;
+-   arguments: Record&lt;string, any&gt;;
+- };
+- 
+- type TestCaseOutput = {
+-   response?: string;
+-   tool_calls?: ToolCallOutput[];
+- };
+- 
+- type TestCaseHistory = {
+-   role: "assistant" | "user" | "tool";
+-   content?: string;
+-   tool_calls?: Array&lt;{
+-     id: string;
+-     function: {
+-       name: string;
+-       arguments: string;
+-     };
+-     type: string;
+-   }&gt;;
+-   tool_call_id?: string;
+- };
+- 
+- type TestCaseEvaluation = {
+-   type: string;
+-   tool_calls?: Array&lt;{
+-     tool: string;
+-     arguments: Record&lt;string, any&gt; | null;
+-   }&gt;;
+-   criteria?: string;
+- };
+- 
+- type TestCaseData = {
+-   history?: TestCaseHistory[];
+-   evaluation?: TestCaseEvaluation;
+- };
++ import {
++   TestCaseOutput,
++   TestCaseData,
++   StatusIcon,
++   CloseIcon,
++   TestDetailView,
++   EmptyStateView,
++   TestStats,
++ } from "./test-results/shared";
+  
+  type BenchmarkTestResult = {
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: 13
+
+```diff
+@@ -106,17 +77,5 @@
+                className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
+              &gt;
+-               &lt;svg
+-                 className="w-5 h-5"
+-                 fill="none"
+-                 viewBox="0 0 24 24"
+-                 stroke="currentColor"
+-                 strokeWidth={2}
+-               &gt;
+-                 &lt;path
+-                   strokeLinecap="round"
+-                   strokeLinejoin="round"
+-                   d="M6 18L18 6M6 6l12 12"
+-                 /&gt;
+-               &lt;/svg&gt;
++               &lt;CloseIcon className="w-5 h-5" /&gt;
+              &lt;/button&gt;
+            &lt;/div&gt;
+```
+
+**Chunk 3**
+Lines added: 5, lines removed: 13
+
+```diff
+@@ -174,17 +133,9 @@
+                {/* Passed/Failed Stats */}
+                {currentModel &amp;&amp; (
+-                 &lt;div className="flex items-center gap-3 mt-3 text-sm"&gt;
+-                   &lt;div className="flex items-center gap-1.5"&gt;
+-                     &lt;div className="w-2 h-2 rounded-full bg-green-500"&gt;&lt;/div&gt;
+-                     &lt;span className="text-muted-foreground"&gt;
+-                       {currentModel.passed} passed
+-                     &lt;/span&gt;
+-                   &lt;/div&gt;
+-                   &lt;div className="flex items-center gap-1.5"&gt;
+-                     &lt;div className="w-2 h-2 rounded-full bg-red-500"&gt;&lt;/div&gt;
+-                     &lt;span className="text-muted-foreground"&gt;
+-                       {currentModel.failed} failed
+-                     &lt;/span&gt;
+-                   &lt;/div&gt;
++                 &lt;div className="mt-3"&gt;
++                   &lt;TestStats
++                     passedCount={currentModel.passed}
++                     failedCount={currentModel.failed}
++                   /&gt;
+                  &lt;/div&gt;
+                )}
+```
+
+**Chunk 4**
+Lines added: 7, lines removed: 24
+
+```diff
+@@ -248,28 +199,11 @@
+            &lt;div className="flex-1 overflow-y-auto"&gt;
+              {selectedTest ? (
+-               &lt;BenchmarkTestDetailView result={selectedTest} /&gt;
+-             ) : (
+-               &lt;div className="flex items-center justify-center h-full"&gt;
+-                 &lt;div className="text-center"&gt;
+-                   &lt;div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3"&gt;
+-                     &lt;svg
+-                       className="w-6 h-6 text-muted-foreground"
+-                       fill="none"
+-                       viewBox="0 0 24 24"
+-                       stroke="currentColor"
+-                       strokeWidth={1.5}
+-                     &gt;
+-                       &lt;path
+-                         strokeLinecap="round"
+-                         strokeLinejoin="round"
+-                         d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"
+-                       /&gt;
+-                     &lt;/svg&gt;
+-                   &lt;/div&gt;
+-                   &lt;p className="text-muted-foreground text-sm"&gt;
+-                     Select a test to view details
+-                   &lt;/p&gt;
+-                 &lt;/div&gt;
+-               &lt;/div&gt;
++               &lt;TestDetailView
++                 history={selectedTest.test_case?.history || []}
++                 output={selectedTest.output}
++                 passed={selectedTest.passed}
++               /&gt;
++             ) : (
++               &lt;EmptyStateView message="Select a test to view details" /&gt;
+              )}
+            &lt;/div&gt;
+```
+
+**Chunk 5**
+Lines added: 1, lines removed: 327
+
+```diff
+@@ -305,334 +239,8 @@
+        }&#96;}
+      &gt;
+-       {/* Status Icon */}
+-       {result.passed ? (
+-         &lt;div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0"&gt;
+-           &lt;svg
+-             className="w-3 h-3 text-green-500"
+-             fill="none"
+-             viewBox="0 0 24 24"
+-             stroke="currentColor"
+-             strokeWidth={3}
+-           &gt;
+-             &lt;path
+-               strokeLinecap="round"
+-               strokeLinejoin="round"
+-               d="M5 13l4 4L19 7"
+-             /&gt;
+-           &lt;/svg&gt;
+-         &lt;/div&gt;
+-       ) : (
+-         &lt;div className="w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0"&gt;
+-           &lt;svg
+-             className="w-3 h-3 text-red-500"
+-             fill="none"
+-             viewBox="0 0 24 24"
+-             stroke="currentColor"
+-             strokeWidth={3}
+-           &gt;
+-             &lt;path
+-               strokeLinecap="round"
+-               strokeLinejoin="round"
+-               d="M6 18L18 6M6 6l12 12"
+-             /&gt;
+-           &lt;/svg&gt;
+-         &lt;/div&gt;
+-       )}
+- 
++       &lt;StatusIcon status={result.passed ? "passed" : "failed"} /&gt;
+        &lt;span className="text-sm text-foreground truncate"&gt;{testName}&lt;/span&gt;
+      &lt;/div&gt;
+    );
+  }
+- 
+- // Benchmark Test Detail View Component
+- function BenchmarkTestDetailView({ result }: { result: BenchmarkTestResult }) {
+-   const history = result.test_case?.history || [];
+-   const output = result.output;
+- 
+-   return (
+-     &lt;div className="p-6 space-y-6"&gt;
+-       {/* Chat History from test_case.history */}
+-       {history.length &gt; 0 &amp;&amp; (
+-         &lt;div className="space-y-4"&gt;
+-           &lt;div className="space-y-4"&gt;
+-             {history.map((message, index) =&gt; (
+-               &lt;div
+-                 key={index}
+-                 className={&#96;space-y-1 ${
+-                   message.role === "user" ? "flex flex-col items-end" : ""
+-                 }&#96;}
+-               &gt;
+-                 {/* User Message */}
+-                 {message.role === "user" &amp;&amp; (
+-                   &lt;div className="max-w-[80%]"&gt;
+-                     &lt;div className="px-4 py-3 rounded-2xl bg-[#242426] border border-[#444]"&gt;
+-                       &lt;p className="text-sm text-foreground whitespace-pre-wrap"&gt;
+-                         {message.content}
+-                       &lt;/p&gt;
+-                     &lt;/div&gt;
+-                   &lt;/div&gt;
+-                 )}
+- 
+-                 {/* Agent Message (text response) */}
+-                 {message.role === "assistant" &amp;&amp; !message.tool_calls &amp;&amp; (
+-                   &lt;&gt;
+-                     &lt;div className="flex items-center gap-2"&gt;
+-                       &lt;span className="text-sm font-medium text-foreground"&gt;
+-                         Agent
+-                       &lt;/span&gt;
+-                     &lt;/div&gt;
+-                     &lt;div className="max-w-[80%]"&gt;
+-                       &lt;div className="px-4 py-3 rounded-2xl bg-muted/30 border border-border"&gt;
+-                         &lt;p className="text-sm text-foreground whitespace-pre-wrap"&gt;
+-                           {message.content}
+-                         &lt;/p&gt;
+-                       &lt;/div&gt;
+-                     &lt;/div&gt;
+-                   &lt;/&gt;
+-                 )}
+- 
+-                 {/* Agent Tool Call from history */}
+-                 {message.role === "assistant" &amp;&amp;
+-                   message.tool_calls &amp;&amp;
+-                   message.tool_calls.length &gt; 0 &amp;&amp; (
+-                     &lt;&gt;
+-                       &lt;div className="flex items-center gap-2"&gt;
+-                         &lt;span className="text-sm font-medium text-foreground"&gt;
+-                           Agent Tool Call
+-                         &lt;/span&gt;
+-                       &lt;/div&gt;
+-                       &lt;div className="max-w-[80%]"&gt;
+-                         {message.tool_calls.map((toolCall, tcIndex) =&gt; {
+-                           let parsedArgs: Record&lt;string, any&gt; = {};
+-                           try {
+-                             parsedArgs = JSON.parse(toolCall.function.arguments);
+-                           } catch {
+-                             parsedArgs = {};
+-                           }
+-                           return (
+-                             &lt;div
+-                               key={tcIndex}
+-                               className="bg-muted/20 border border-border rounded-2xl p-4"
+-                             &gt;
+-                               &lt;div className="flex items-center gap-2 mb-2"&gt;
+-                                 &lt;svg
+-                                   className="w-4 h-4 text-muted-foreground"
+-                                   fill="none"
+-                                   viewBox="0 0 24 24"
+-                                   stroke="currentColor"
+-                                   strokeWidth={1.5}
+-                                 &gt;
+-                                   &lt;path
+-                                     strokeLinecap="round"
+-                                     strokeLinejoin="round"
+-                                     d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
+-                                   /&gt;
+-                                 &lt;/svg&gt;
+-                                 &lt;span className="text-sm font-medium text-foreground"&gt;
+-                                   {toolCall.function.name}
+-                                 &lt;/span&gt;
+-                               &lt;/div&gt;
+-                               {Object.keys(parsedArgs).length &gt; 0 &amp;&amp; (
+-                                 &lt;div className="space-y-2 mt-3"&gt;
+-                                   {Object.entries(parsedArgs).map(
+-                                     ([paramName, paramValue]) =&gt; (
+-                                       &lt;div key={paramName}&gt;
+-                                         &lt;label className="block text-xs font-medium text-muted-foreground mb-1"&gt;
+-                                           {paramName}
+-                                         &lt;/label&gt;
+-                                         &lt;div className="px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground"&gt;
+-                                           {typeof paramValue === "object"
+-                                             ? JSON.stringify(paramValue)
+-                                             : String(paramValue)}
+-                                         &lt;/div&gt;
+-                                       &lt;/div&gt;
+-                                     )
+-                                   )}
+-                                 &lt;/div&gt;
+-                               )}
+-                             &lt;/div&gt;
+-                           );
+-                         })}
+-                       &lt;/div&gt;
+-                     &lt;/&gt;
+-                   )}
+-               &lt;/div&gt;
+-             ))}
+-           &lt;/div&gt;
+-         &lt;/div&gt;
+-       )}
+- 
+-       {/* Output Section - Agent's Response/Tool Call */}
+-       {output &amp;&amp; (
+-         &lt;div className="space-y-4"&gt;
+-           {/* Text Response */}
+-           {output.response &amp;&amp; (
+-             &lt;div
+-               className={&#96;${
+-                 result.passed
+-                   ? "border-l-4 border-l-green-500 pl-3"
+-                   : "border-l-4 border-l-red-500 pl-3"
+-               }&#96;}
+-             &gt;
+-               &lt;div className="flex items-center gap-2 mb-1"&gt;
+-                 &lt;span className="text-sm font-medium text-foreground"&gt;
+-                   Agent
+-                 &lt;/span&gt;
+-                 &lt;div
+-                   className={&#96;w-4 h-4 rounded-full flex items-center justify-center ${
+-                     result.passed ? "bg-green-500/20" : "bg-red-500/20"
+-                   }&#96;}
+-                 &gt;
+-                   {result.passed ? (
+-                     &lt;svg
+-                       className="w-2.5 h-2.5 text-green-500"
+-                       fill="none"
+-                       viewBox="0 0 24 24"
+-                       stroke="currentColor"
+-                       strokeWidth={3}
+-                     &gt;
+-                       &lt;path
+-                         strokeLinecap="round"
+-                         strokeLinejoin="round"
+-                         d="M5 13l4 4L19 7"
+-                       /&gt;
+-                     &lt;/svg&gt;
+-                   ) : (
+-                     &lt;svg
+-                       className="w-2.5 h-2.5 text-red-500"
+-                       fill="none"
+-                       viewBox="0 0 24 24"
+-                       stroke="currentColor"
+-                       strokeWidth={3}
+-                     &gt;
+-                       &lt;path
+-                         strokeLinecap="round"
+-                         strokeLinejoin="round"
+-                         d="M6 18L18 6M6 6l12 12"
+-                       /&gt;
+-                     &lt;/svg&gt;
+-                   )}
+-                 &lt;/div&gt;
+-               &lt;/div&gt;
+-               &lt;div className="max-w-[80%]"&gt;
+-                 &lt;div className="px-4 py-3 rounded-2xl bg-muted/30 border border-border"&gt;
+-                   &lt;p className="text-sm text-foreground whitespace-pre-wrap"&gt;
+-                     {output.response}
+-                   &lt;/p&gt;
+-                 &lt;/div&gt;
+-               &lt;/div&gt;
+-             &lt;/div&gt;
+-           )}
+- 
+-           {/* Tool Calls Output */}
+-           {output.tool_calls &amp;&amp; output.tool_calls.length &gt; 0 &amp;&amp; (
+-             &lt;div
+-               className={&#96;${
+-                 result.passed
+-                   ? "border-l-4 border-l-green-500 pl-3"
+-                   : "border-l-4 border-l-red-500 pl-3"
+-               }&#96;}
+-             &gt;
+-               &lt;div className="flex items-center gap-2 mb-2"&gt;
+-                 &lt;span className="text-sm font-medium text-foreground"&gt;
+-                   Agent Tool Call
+-                 &lt;/span&gt;
+-                 &lt;div
+-                   className={&#96;w-4 h-4 rounded-full flex items-center justify-center ${
+-                     result.passed ? "bg-green-500/20" : "bg-red-500/20"
+-                   }&#96;}
+-                 &gt;
+-                   {result.passed ? (
+-                     &lt;svg
+-                       className="w-2.5 h-2.5 text-green-500"
+-                       fill="none"
+-                       viewBox="0 0 24 24"
+-                       stroke="currentColor"
+-                       strokeWidth={3}
+-                     &gt;
+-                       &lt;path
+-                         strokeLinecap="round"
+-                         strokeLinejoin="round"
+-                         d="M5 13l4 4L19 7"
+-                       /&gt;
+-                     &lt;/svg&gt;
+-                   ) : (
+-                     &lt;svg
+-                       className="w-2.5 h-2.5 text-red-500"
+-                       fill="none"
+-                       viewBox="0 0 24 24"
+-                       stroke="currentColor"
+-                       strokeWidth={3}
+-                     &gt;
+-                       &lt;path
+-                         strokeLinecap="round"
+-                         strokeLinejoin="round"
+-                         d="M6 18L18 6M6 6l12 12"
+-                       /&gt;
+-                     &lt;/svg&gt;
+-                   )}
+-                 &lt;/div&gt;
+-               &lt;/div&gt;
+-               &lt;div className="space-y-3"&gt;
+-                 {output.tool_calls.map((toolCall, index) =&gt; (
+-                   &lt;div
+-                     key={index}
+-                     className="max-w-[80%] bg-muted/20 border border-border rounded-2xl p-4"
+-                   &gt;
+-                     &lt;div className="flex items-center gap-2 mb-2"&gt;
+-                       &lt;svg
+-                         className="w-4 h-4 text-muted-foreground"
+-                         fill="none"
+-                         viewBox="0 0 24 24"
+-                         stroke="currentColor"
+-                         strokeWidth={1.5}
+-                       &gt;
+-                         &lt;path
+-                           strokeLinecap="round"
+-                           strokeLinejoin="round"
+-                           d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
+-                         /&gt;
+-                       &lt;/svg&gt;
+-                       &lt;span className="text-sm font-medium text-foreground"&gt;
+-                         {toolCall.tool}
+-                       &lt;/span&gt;
+-                     &lt;/div&gt;
+-                     {toolCall.arguments &amp;&amp;
+-                       Object.keys(toolCall.arguments).length &gt; 0 &amp;&amp; (
+-                         &lt;div className="space-y-2 mt-3"&gt;
+-                           {Object.entries(toolCall.arguments).map(
+-                             ([paramName, paramValue]) =&gt; (
+-                               &lt;div key={paramName}&gt;
+-                                 &lt;label className="block text-xs font-medium text-muted-foreground mb-1"&gt;
+-                                   {paramName}
+-                                 &lt;/label&gt;
+-                                 &lt;div className="px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground"&gt;
+-                                   {typeof paramValue === "object"
+-                                     ? JSON.stringify(paramValue)
+-                                     : String(paramValue)}
+-                                 &lt;/div&gt;
+-                               &lt;/div&gt;
+-                             )
+-                           )}
+-                         &lt;/div&gt;
+-                       )}
+-                   &lt;/div&gt;
+-                 ))}
+-               &lt;/div&gt;
+-             &lt;/div&gt;
+-           )}
+-         &lt;/div&gt;
+-       )}
+- 
+-       {/* Show empty state if no history and no output */}
+-       {history.length === 0 &amp;&amp; !output &amp;&amp; (
+-         &lt;div className="text-center py-8"&gt;
+-           &lt;p className="text-sm text-muted-foreground"&gt;
+-             No conversation history available for this test
+-           &lt;/p&gt;
+-         &lt;/div&gt;
+-       )}
+-     &lt;/div&gt;
+-   );
+- }
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the TestRunnerDialog to use the shared components as well.</details></think>
+
+---
+
+Now let me update `TestRunnerDialog` to use the shared components:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me rewrite the TestRunnerDialog to use the shared components. This is a larger file, so I need to be careful about replacing only the relevant parts. Let me first update the imports and types at the top.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 10, lines removed: undefined
+
+```diff
+@@ -2,4 +2,14 @@
+  
+  import React, { useState, useEffect, useRef } from "react";
++ import {
++   TestCaseOutput,
++   TestCaseData,
++   StatusIcon,
++   CloseIcon,
++   SpinnerIcon,
++   TestDetailView,
++   EmptyStateView,
++   TestStats,
++ } from "./test-results/shared";
+  
+  type TestData = {
+```
+
+**Chunk 2**
+Lines added: undefined, lines removed: 36
+
+```diff
+@@ -33,40 +43,4 @@
+    error?: string;
+  };
+- 
+- type ToolCallOutput = {
+-   tool: string;
+-   arguments: Record&lt;string, any&gt;;
+- };
+- 
+- type TestCaseOutput = {
+-   response?: string;
+-   tool_calls?: ToolCallOutput[];
+- };
+- 
+- type TestCaseHistory = {
+-   role: "assistant" | "user" | "tool";
+-   content?: string;
+-   tool_calls?: Array&lt;{
+-     id: string;
+-     function: {
+-       name: string;
+-       arguments: string;
+-     };
+-     type: string;
+-   }&gt;;
+-   tool_call_id?: string;
+- };
+- 
+- type TestCaseData = {
+-   history?: TestCaseHistory[];
+-   evaluation?: {
+-     type: string;
+-     tool_calls?: Array&lt;{
+-       tool: string;
+-       arguments: Record&lt;string, any&gt; | null;
+-     }&gt;;
+-     criteria?: string;
+-   };
+- };
+  
+  type TestCaseResult = {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the header section to use the shared CloseIcon and TestStats components. Let me first read the relevant section.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me update the header section to use TestStats and CloseIcon.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 5, lines removed: 27
+
+```diff
+@@ -584,36 +584,14 @@
+                testResults.length &gt; 0 &amp;&amp;
+                (passedTests.length &gt; 0 || failedTests.length &gt; 0) &amp;&amp; (
+-                 &lt;div className="flex items-center gap-3 text-sm"&gt;
+-                   &lt;div className="flex items-center gap-1.5"&gt;
+-                     &lt;div className="w-2 h-2 rounded-full bg-green-500"&gt;&lt;/div&gt;
+-                     &lt;span className="text-muted-foreground"&gt;
+-                       {passedTests.length} passed
+-                     &lt;/span&gt;
+-                   &lt;/div&gt;
+-                   &lt;div className="flex items-center gap-1.5"&gt;
+-                     &lt;div className="w-2 h-2 rounded-full bg-red-500"&gt;&lt;/div&gt;
+-                     &lt;span className="text-muted-foreground"&gt;
+-                       {failedTests.length} failed
+-                     &lt;/span&gt;
+-                   &lt;/div&gt;
+-                 &lt;/div&gt;
++                 &lt;TestStats
++                   passedCount={passedTests.length}
++                   failedCount={failedTests.length}
++                 /&gt;
+                )}
+              &lt;button
+                onClick={onClose}
+                className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
+              &gt;
+-               &lt;svg
+-                 className="w-5 h-5"
+-                 fill="none"
+-                 viewBox="0 0 24 24"
+-                 stroke="currentColor"
+-                 strokeWidth={2}
+-               &gt;
+-                 &lt;path
+-                   strokeLinecap="round"
+-                   strokeLinejoin="round"
+-                   d="M6 18L18 6M6 6l12 12"
+-                 /&gt;
+-               &lt;/svg&gt;
++               &lt;CloseIcon className="w-5 h-5" /&gt;
+              &lt;/button&gt;
+            &lt;/div&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the right panel to use the shared EmptyStateView and TestDetailView. Let me find that section.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Since TestDetailView from the shared file has a different signature than the local TestDetailView, I need to:
+1. Rename the local TestDetailView to LocalTestDetailView or remove it and create a wrapper
+2. Update the right panel to pass the correct props
+
+Actually, looking at the shared TestDetailView, it takes `history`, `output`, and `passed` directly. But the local TestDetailView in TestRunnerDialog takes a `result` object and handles error states etc.
+
+I should keep the local component for error handling but have it call the shared TestDetailView for the main content. Let me look at the full local TestDetailView component first.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I understand - the local TestDetailView has additional logic for pending, running, and error states. Instead of fully replacing it, I should:
+
+1. Rename the import from shared to `TestDetailViewContent` to avoid conflict
+2. Update the local TestDetailView to use the shared component for the main content
+3. Also update the TestListItem to use the shared StatusIcon
+
+Let me update the imports first to rename the shared component.</details></think>
+
+---
+
+Let me update the imports to rename the shared TestDetailView:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -8,5 +8,5 @@
+    CloseIcon,
+    SpinnerIcon,
+-   TestDetailView,
++   TestDetailView as SharedTestDetailView,
+    EmptyStateView,
+    TestStats,
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the right panel to use the EmptyStateView component.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 23
+
+```diff
+@@ -668,28 +668,7 @@
+            &lt;div className="flex-1 overflow-y-auto"&gt;
+              {selectedResult ? (
+-               &lt;TestDetailView result={selectedResult} /&gt;
++               &lt;LocalTestDetailView result={selectedResult} /&gt;
+              ) : (
+-               &lt;div className="flex items-center justify-center h-full"&gt;
+-                 &lt;div className="text-center"&gt;
+-                   &lt;div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3"&gt;
+-                     &lt;svg
+-                       className="w-6 h-6 text-muted-foreground"
+-                       fill="none"
+-                       viewBox="0 0 24 24"
+-                       stroke="currentColor"
+-                       strokeWidth={1.5}
+-                     &gt;
+-                       &lt;path
+-                         strokeLinecap="round"
+-                         strokeLinejoin="round"
+-                         d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"
+-                       /&gt;
+-                     &lt;/svg&gt;
+-                   &lt;/div&gt;
+-                   &lt;p className="text-muted-foreground text-sm"&gt;
+-                     Select a test to view details
+-                   &lt;/p&gt;
+-                 &lt;/div&gt;
+-               &lt;/div&gt;
++               &lt;EmptyStateView message="Select a test to view details" /&gt;
+              )}
+            &lt;/div&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the TestListItem component to use the shared StatusIcon and update the local TestDetailView to use the shared component for the main content. Let me first update TestListItem.</details></think>
+
+---
+
+Now let me update the TestListItem component:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me find the start of the TestListItem function and replace the whole thing.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me replace the TestListItem component with a simpler version that uses StatusIcon.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 82
+
+```diff
+@@ -696,86 +696,5 @@
+        }&#96;}
+      &gt;
+-       {/* Status Icon */}
+-       {result.status === "passed" &amp;&amp; (
+-         &lt;div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0"&gt;
+-           &lt;svg
+-             className="w-3 h-3 text-green-500"
+-             fill="none"
+-             viewBox="0 0 24 24"
+-             stroke="currentColor"
+-             strokeWidth={3}
+-           &gt;
+-             &lt;path
+-               strokeLinecap="round"
+-               strokeLinejoin="round"
+-               d="M5 13l4 4L19 7"
+-             /&gt;
+-           &lt;/svg&gt;
+-         &lt;/div&gt;
+-       )}
+-       {result.status === "failed" &amp;&amp; (
+-         &lt;div className="w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0"&gt;
+-           &lt;svg
+-             className="w-3 h-3 text-red-500"
+-             fill="none"
+-             viewBox="0 0 24 24"
+-             stroke="currentColor"
+-             strokeWidth={3}
+-           &gt;
+-             &lt;path
+-               strokeLinecap="round"
+-               strokeLinejoin="round"
+-               d="M6 18L18 6M6 6l12 12"
+-             /&gt;
+-           &lt;/svg&gt;
+-         &lt;/div&gt;
+-       )}
+-       {result.status === "running" &amp;&amp; (
+-         &lt;div className="w-5 h-5 flex items-center justify-center flex-shrink-0"&gt;
+-           &lt;svg
+-             className="w-4 h-4 animate-spin text-muted-foreground"
+-             fill="none"
+-             viewBox="0 0 24 24"
+-           &gt;
+-             &lt;circle
+-               className="opacity-25"
+-               cx="12"
+-               cy="12"
+-               r="10"
+-               stroke="currentColor"
+-               strokeWidth="4"
+-             &gt;&lt;/circle&gt;
+-             &lt;path
+-               className="opacity-75"
+-               fill="currentColor"
+-               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+-             &gt;&lt;/path&gt;
+-           &lt;/svg&gt;
+-         &lt;/div&gt;
+-       )}
+-       {result.status === "pending" &amp;&amp; (
+-         &lt;div className="w-5 h-5 flex items-center justify-center flex-shrink-0"&gt;
+-           &lt;svg
+-             className="w-4 h-4 animate-spin text-muted-foreground"
+-             fill="none"
+-             viewBox="0 0 24 24"
+-           &gt;
+-             &lt;circle
+-               className="opacity-25"
+-               cx="12"
+-               cy="12"
+-               r="10"
+-               stroke="currentColor"
+-               strokeWidth="4"
+-             &gt;&lt;/circle&gt;
+-             &lt;path
+-               className="opacity-75"
+-               fill="currentColor"
+-               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+-             &gt;&lt;/path&gt;
+-           &lt;/svg&gt;
+-         &lt;/div&gt;
+-       )}
+- 
++       &lt;StatusIcon status={result.status} /&gt;
+        &lt;span className="text-sm text-foreground truncate"&gt;
+          {result.test.name}
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the local TestDetailView to use the shared component for the main content. I need to:
+1. Rename it to LocalTestDetailView
+2. Use SharedTestDetailView for the content part</details></think>
+
+---
+
+Now let me update the LocalTestDetailView:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me replace the entire TestDetailView function with a simpler version that uses the shared component. I need to:
+1. Rename it to LocalTestDetailView
+2. Keep the error/pending/running state handling
+3. Use SharedTestDetailView for the main content</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 2
+
+```diff
+@@ -704,6 +704,6 @@
+  }
+  
+- // Test Detail View Component
+- function TestDetailView({ result }: { result: TestResult }) {
++ // Local Test Detail View Component with error/pending/running state handling
++ function LocalTestDetailView({ result }: { result: TestResult }) {
+    if (result.status === "pending") {
+      return (
+```
+
+**Chunk 2**
+Lines added: 43, lines removed: 348
+
+```diff
+@@ -718,350 +718,45 @@
+        &lt;div className="flex items-center justify-center h-full"&gt;
+          &lt;div className="flex items-center gap-3"&gt;
+-           &lt;svg
+-             className="w-5 h-5 animate-spin text-muted-foreground"
+-             fill="none"
+-             viewBox="0 0 24 24"
+-           &gt;
+-             &lt;circle
+-               className="opacity-25"
+-               cx="12"
+-               cy="12"
+-               r="10"
+-               stroke="currentColor"
+-               strokeWidth="4"
+-             &gt;&lt;/circle&gt;
+-             &lt;path
+-               className="opacity-75"
+-               fill="currentColor"
+-               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+-             &gt;&lt;/path&gt;
+-           &lt;/svg&gt;
+-           &lt;p className="text-muted-foreground"&gt;Running test...&lt;/p&gt;
+-         &lt;/div&gt;
+-       &lt;/div&gt;
+-     );
+-   }
+- 
+-   if (result.error) {
+-     return (
+-       &lt;div className="p-6"&gt;
+-         &lt;div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4"&gt;
+-           &lt;div className="flex items-center gap-2 mb-2"&gt;
+-             &lt;svg
+-               className="w-5 h-5 text-red-500"
+-               fill="none"
+-               viewBox="0 0 24 24"
+-               stroke="currentColor"
+-               strokeWidth={2}
+-             &gt;
+-               &lt;path
+-                 strokeLinecap="round"
+-                 strokeLinejoin="round"
+-                 d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+-               /&gt;
+-             &lt;/svg&gt;
+-             &lt;span className="font-medium text-red-500"&gt;Error&lt;/span&gt;
+-           &lt;/div&gt;
+-           &lt;p className="text-sm text-red-400"&gt;{result.error}&lt;/p&gt;
+-         &lt;/div&gt;
+-       &lt;/div&gt;
+-     );
+-   }
+- 
+-   // Get history from testCase
+-   const history = result.testCase?.history || [];
+-   const output = result.output;
+- 
+-   return (
+-     &lt;div className="p-6 space-y-6"&gt;
+-       {/* Chat History from test_case.history */}
+-       {history.length &gt; 0 &amp;&amp; (
+-         &lt;div className="space-y-4"&gt;
+-           &lt;div className="space-y-4"&gt;
+-             {history.map((message, index) =&gt; (
+-               &lt;div
+-                 key={index}
+-                 className={&#96;space-y-1 ${
+-                   message.role === "user" ? "flex flex-col items-end" : ""
+-                 }&#96;}
+-               &gt;
+-                 {/* User Message */}
+-                 {message.role === "user" &amp;&amp; (
+-                   &lt;div className="max-w-[80%]"&gt;
+-                     &lt;div className="px-4 py-3 rounded-2xl bg-[#242426] border border-[#444]"&gt;
+-                       &lt;p className="text-sm text-foreground whitespace-pre-wrap"&gt;
+-                         {message.content}
+-                       &lt;/p&gt;
+-                     &lt;/div&gt;
+-                   &lt;/div&gt;
+-                 )}
+- 
+-                 {/* Agent Message (text response) */}
+-                 {message.role === "assistant" &amp;&amp; !message.tool_calls &amp;&amp; (
+-                   &lt;&gt;
+-                     &lt;div className="flex items-center gap-2"&gt;
+-                       &lt;span className="text-sm font-medium text-foreground"&gt;
+-                         Agent
+-                       &lt;/span&gt;
+-                     &lt;/div&gt;
+-                     &lt;div className="max-w-[80%]"&gt;
+-                       &lt;div className="px-4 py-3 rounded-2xl bg-muted/30 border border-border"&gt;
+-                         &lt;p className="text-sm text-foreground whitespace-pre-wrap"&gt;
+-                           {message.content}
+-                         &lt;/p&gt;
+-                       &lt;/div&gt;
+-                     &lt;/div&gt;
+-                   &lt;/&gt;
+-                 )}
+- 
+-                 {/* Agent Tool Call from history */}
+-                 {message.role === "assistant" &amp;&amp;
+-                   message.tool_calls &amp;&amp;
+-                   message.tool_calls.length &gt; 0 &amp;&amp; (
+-                     &lt;&gt;
+-                       &lt;div className="flex items-center gap-2"&gt;
+-                         &lt;span className="text-sm font-medium text-foreground"&gt;
+-                           Agent Tool Call
+-                         &lt;/span&gt;
+-                       &lt;/div&gt;
+-                       &lt;div className="max-w-[80%]"&gt;
+-                         {message.tool_calls.map((toolCall, tcIndex) =&gt; {
+-                           let parsedArgs: Record&lt;string, any&gt; = {};
+-                           try {
+-                             parsedArgs = JSON.parse(
+-                               toolCall.function.arguments
+-                             );
+-                           } catch {
+-                             parsedArgs = {};
+-                           }
+-                           return (
+-                             &lt;div
+-                               key={tcIndex}
+-                               className="bg-muted/20 border border-border rounded-2xl p-4"
+-                             &gt;
+-                               &lt;div className="flex items-center gap-2 mb-2"&gt;
+-                                 &lt;svg
+-                                   className="w-4 h-4 text-muted-foreground"
+-                                   fill="none"
+-                                   viewBox="0 0 24 24"
+-                                   stroke="currentColor"
+-                                   strokeWidth={1.5}
+-                                 &gt;
+-                                   &lt;path
+-                                     strokeLinecap="round"
+-                                     strokeLinejoin="round"
+-                                     d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
+-                                   /&gt;
+-                                 &lt;/svg&gt;
+-                                 &lt;span className="text-sm font-medium text-foreground"&gt;
+-                                   {toolCall.function.name}
+-                                 &lt;/span&gt;
+-                               &lt;/div&gt;
+-                               {Object.keys(parsedArgs).length &gt; 0 &amp;&amp; (
+-                                 &lt;div className="space-y-2 mt-3"&gt;
+-                                   {Object.entries(parsedArgs).map(
+-                                     ([paramName, paramValue]) =&gt; (
+-                                       &lt;div key={paramName}&gt;
+-                                         &lt;label className="block text-xs font-medium text-muted-foreground mb-1"&gt;
+-                                           {paramName}
+-                                         &lt;/label&gt;
+-                                         &lt;div className="px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground"&gt;
+-                                           {typeof paramValue === "object"
+-                                             ? JSON.stringify(paramValue)
+-                                             : String(paramValue)}
+-                                         &lt;/div&gt;
+-                                       &lt;/div&gt;
+-                                     )
+-                                   )}
+-                                 &lt;/div&gt;
+-                               )}
+-                             &lt;/div&gt;
+-                           );
+-                         })}
+-                       &lt;/div&gt;
+-                     &lt;/&gt;
+-                   )}
+-               &lt;/div&gt;
+-             ))}
+-           &lt;/div&gt;
+-         &lt;/div&gt;
+-       )}
+- 
+-       {/* Output Section - Agent's Response/Tool Call */}
+-       {output &amp;&amp; (
+-         &lt;div className="space-y-4"&gt;
+-           {/* Text Response */}
+-           {output.response &amp;&amp; (
+-             &lt;div
+-               className={&#96;${
+-                 result.evaluation?.passed
+-                   ? "border-l-4 border-l-green-500 pl-3"
+-                   : "border-l-4 border-l-red-500 pl-3"
+-               }&#96;}
+-             &gt;
+-               &lt;div className="flex items-center gap-2 mb-1"&gt;
+-                 &lt;span className="text-sm font-medium text-foreground"&gt;
+-                   Agent
+-                 &lt;/span&gt;
+-                 &lt;div
+-                   className={&#96;w-4 h-4 rounded-full flex items-center justify-center ${
+-                     result.evaluation?.passed
+-                       ? "bg-green-500/20"
+-                       : "bg-red-500/20"
+-                   }&#96;}
+-                 &gt;
+-                   {result.evaluation?.passed ? (
+-                     &lt;svg
+-                       className="w-2.5 h-2.5 text-green-500"
+-                       fill="none"
+-                       viewBox="0 0 24 24"
+-                       stroke="currentColor"
+-                       strokeWidth={3}
+-                     &gt;
+-                       &lt;path
+-                         strokeLinecap="round"
+-                         strokeLinejoin="round"
+-                         d="M5 13l4 4L19 7"
+-                       /&gt;
+-                     &lt;/svg&gt;
+-                   ) : (
+-                     &lt;svg
+-                       className="w-2.5 h-2.5 text-red-500"
+-                       fill="none"
+-                       viewBox="0 0 24 24"
+-                       stroke="currentColor"
+-                       strokeWidth={3}
+-                     &gt;
+-                       &lt;path
+-                         strokeLinecap="round"
+-                         strokeLinejoin="round"
+-                         d="M6 18L18 6M6 6l12 12"
+-                       /&gt;
+-                     &lt;/svg&gt;
+-                   )}
+-                 &lt;/div&gt;
+-               &lt;/div&gt;
+-               &lt;div className="max-w-[80%]"&gt;
+-                 &lt;div className="px-4 py-3 rounded-2xl bg-muted/30 border border-border"&gt;
+-                   &lt;p className="text-sm text-foreground whitespace-pre-wrap"&gt;
+-                     {output.response}
+-                   &lt;/p&gt;
+-                 &lt;/div&gt;
+-               &lt;/div&gt;
+-             &lt;/div&gt;
+-           )}
+- 
+-           {/* Tool Calls Output */}
+-           {output.tool_calls &amp;&amp; output.tool_calls.length &gt; 0 &amp;&amp; (
+-             &lt;div
+-               className={&#96;${
+-                 result.evaluation?.passed
+-                   ? "border-l-4 border-l-green-500 pl-3"
+-                   : "border-l-4 border-l-red-500 pl-3"
+-               }&#96;}
+-             &gt;
+-               &lt;div className="flex items-center gap-2 mb-2"&gt;
+-                 &lt;span className="text-sm font-medium text-foreground"&gt;
+-                   Agent Tool Call
+-                 &lt;/span&gt;
+-                 &lt;div
+-                   className={&#96;w-4 h-4 rounded-full flex items-center justify-center ${
+-                     result.evaluation?.passed
+-                       ? "bg-green-500/20"
+-                       : "bg-red-500/20"
+-                   }&#96;}
+-                 &gt;
+-                   {result.evaluation?.passed ? (
+-                     &lt;svg
+-                       className="w-2.5 h-2.5 text-green-500"
+-                       fill="none"
+-                       viewBox="0 0 24 24"
+-                       stroke="currentColor"
+-                       strokeWidth={3}
+-                     &gt;
+-                       &lt;path
+-                         strokeLinecap="round"
+-                         strokeLinejoin="round"
+-                         d="M5 13l4 4L19 7"
+-                       /&gt;
+-                     &lt;/svg&gt;
+-                   ) : (
+-                     &lt;svg
+-                       className="w-2.5 h-2.5 text-red-500"
+-                       fill="none"
+-                       viewBox="0 0 24 24"
+-                       stroke="currentColor"
+-                       strokeWidth={3}
+-                     &gt;
+-                       &lt;path
+-                         strokeLinecap="round"
+-                         strokeLinejoin="round"
+-                         d="M6 18L18 6M6 6l12 12"
+-                       /&gt;
+-                     &lt;/svg&gt;
+-                   )}
+-                 &lt;/div&gt;
+-               &lt;/div&gt;
+-               &lt;div className="space-y-3"&gt;
+-                 {output.tool_calls.map((toolCall, index) =&gt; (
+-                   &lt;div
+-                     key={index}
+-                     className="max-w-[80%] bg-muted/20 border border-border rounded-2xl p-4"
+-                   &gt;
+-                     &lt;div className="flex items-center gap-2 mb-2"&gt;
+-                       &lt;svg
+-                         className="w-4 h-4 text-muted-foreground"
+-                         fill="none"
+-                         viewBox="0 0 24 24"
+-                         stroke="currentColor"
+-                         strokeWidth={1.5}
+-                       &gt;
+-                         &lt;path
+-                           strokeLinecap="round"
+-                           strokeLinejoin="round"
+-                           d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
+-                         /&gt;
+-                       &lt;/svg&gt;
+-                       &lt;span className="text-sm font-medium text-foreground"&gt;
+-                         {toolCall.tool}
+-                       &lt;/span&gt;
+-                     &lt;/div&gt;
+-                     {toolCall.arguments &amp;&amp;
+-                       Object.keys(toolCall.arguments).length &gt; 0 &amp;&amp; (
+-                         &lt;div className="space-y-2 mt-3"&gt;
+-                           {Object.entries(toolCall.arguments).map(
+-                             ([paramName, paramValue]) =&gt; (
+-                               &lt;div key={paramName}&gt;
+-                                 &lt;label className="block text-xs font-medium text-muted-foreground mb-1"&gt;
+-                                   {paramName}
+-                                 &lt;/label&gt;
+-                                 &lt;div className="px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground"&gt;
+-                                   {typeof paramValue === "object"
+-                                     ? JSON.stringify(paramValue)
+-                                     : String(paramValue)}
+-                                 &lt;/div&gt;
+-                               &lt;/div&gt;
+-                             )
+-                           )}
+-                         &lt;/div&gt;
+-                       )}
+-                   &lt;/div&gt;
+-                 ))}
+-               &lt;/div&gt;
+-             &lt;/div&gt;
+-           )}
+-         &lt;/div&gt;
+-       )}
+- 
+-       {/* Show empty state if no history and no output */}
+-       {history.length === 0 &amp;&amp; !output &amp;&amp; (
+-         &lt;div className="text-center py-8"&gt;
+-           &lt;p className="text-sm text-muted-foreground"&gt;
+-             No conversation history available for this test
+-           &lt;/p&gt;
+-         &lt;/div&gt;
+-       )}
+-     &lt;/div&gt;
+-   );
+- }
+- 
++           &lt;SpinnerIcon className="w-5 h-5 animate-spin text-muted-foreground" /&gt;
++           &lt;p className="text-muted-foreground"&gt;Running test...&lt;/p&gt;
++         &lt;/div&gt;
++       &lt;/div&gt;
++     );
++   }
++ 
++   if (result.error) {
++     return (
++       &lt;div className="p-6"&gt;
++         &lt;div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4"&gt;
++           &lt;div className="flex items-center gap-2 mb-2"&gt;
++             &lt;svg
++               className="w-5 h-5 text-red-500"
++               fill="none"
++               viewBox="0 0 24 24"
++               stroke="currentColor"
++               strokeWidth={2}
++             &gt;
++               &lt;path
++                 strokeLinecap="round"
++                 strokeLinejoin="round"
++                 d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
++               /&gt;
++             &lt;/svg&gt;
++             &lt;span className="font-medium text-red-500"&gt;Error&lt;/span&gt;
++           &lt;/div&gt;
++           &lt;p className="text-sm text-red-400"&gt;{result.error}&lt;/p&gt;
++         &lt;/div&gt;
++       &lt;/div&gt;
++     );
++   }
++ 
++   // Use shared component for main content
++   return (
++     &lt;SharedTestDetailView
++       history={result.testCase?.history || []}
++       output={result.output}
++       passed={result.evaluation?.passed ?? false}
++     /&gt;
++   );
++ }
++ 
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me check for lint errors in all the affected files.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 3 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx`
+
+Lint results
+
+Lint errors for `src/components/TestRunnerDialog.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+| 'currentTaskId' is declared but its value is never read. | 91:10-91:23 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryTest' is declared but its value is never read. | 287:9-287:18 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryAllFailed' is declared but its value is never read. | 449:9-449:23 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryAll' is declared but its value is never read. | 548:9-548:17 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+Lint errors for `src/components/test-results/shared.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:1-3:27 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+All done. Let me summarize what I did.</details></think>
+
+---
+
+Done! I've created a shared components file and updated both dialogs to use it. Here's what was created:
+
+**New file: `src/components/test-results/shared.tsx`**
+Contains shared types and components:
+- **Types**: `ToolCallOutput`, `TestCaseOutput`, `TestCaseHistory`, `TestCaseEvaluation`, `TestCaseData`
+- **Icon Components**: `CheckIcon`, `XIcon`, `SpinnerIcon`, `ToolIcon`, `CloseIcon`, `DocumentIcon`
+- **UI Components**: 
+  - `StatusIcon` - displays passed/failed/running/pending status
+  - `SmallStatusBadge` - smaller pass/fail indicator
+  - `ToolCallCard` - renders tool call with arguments
+  - `TestDetailView` - shared test detail view with history and output
+  - `EmptyStateView` - empty state message
+  - `TestStats` - passed/failed count display
+
+**Updated `TestRunnerDialog.tsx`** to use:
+- `StatusIcon` in TestListItem
+- `TestStats`, `CloseIcon` in header
+- `EmptyStateView` for empty state
+- `SharedTestDetailView` for main test detail content
+
+**Updated `BenchmarkResultsDialog.tsx`** to use:
+- `StatusIcon`, `CloseIcon`, `TestDetailView`, `EmptyStateView`, `TestStats` from shared
+
+---
+
+_**User (2026-01-11 09:21Z)**_
+
+now add a leaderboard/outputs tab similar to @src/components/evaluations/SpeechToTextEvaluation.tsx to this component and show these tests results with dropdown under the outputs tab and for the leaderboard tab show the leaderboard table and the leaderboard visualisation below it similar to @src/components/evaluations/SpeechToTextEvaluation.tsx 
+
+use this sample data for the whole component
+
+{
+  "task_id": "8618b579-f9e4-4b86-99b1-bf425a613add",
+  "status": "done",
+  "model_results": [
+    {
+      "model": "openai/gpt-4.1",
+      "success": true,
+      "message": "Benchmark completed successfully for openai/gpt-4.1",
+      "total_tests": 2,
+      "passed": 1,
+      "failed": 1,
+      "test_results": [
+        {
+          "passed": true,
+          "output": {
+            "response": "",
+            "tool_calls": [
+              {
+                "tool": "plan_next_question",
+                "arguments": {
+                  "next_unanswered_question_index": 2,
+                  "questions_answered": [
+                    1
+                  ]
+                }
+              }
+            ]
+          },
+          "test_case": {
+            "history": [
+              {
+                "role": "assistant",
+                "content": "What is your name?"
+              },
+              {
+                "role": "user",
+                "content": "Aman Dalmia"
+              }
+            ],
+            "evaluation": {
+              "type": "tool_call",
+              "tool_calls": [
+                {
+                  "tool": "plan_next_question",
+                  "arguments": null
+                }
+              ]
+            }
+          }
+        },
+        {
+          "passed": false,
+          "output": {
+            "response": "I'm glad to hear that! Let's get started with your antenatal visit form. \n\nCan I have your full name, please?",
+            "tool_calls": []
+          },
+          "test_case": {
+            "history": [
+              {
+                "role": "assistant",
+                "content": "Hello, how can I help you today?"
+              },
+              {
+                "role": "user",
+                "content": "i am good"
+              }
+            ],
+            "evaluation": {
+              "type": "response",
+              "criteria": "response contains a funny joke"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "model": "openai/gpt-5.1",
+      "success": true,
+      "message": "Benchmark completed successfully for openai/gpt-5.1",
+      "total_tests": 2,
+      "passed": 1,
+      "failed": 1,
+      "test_results": [
+        {
+          "passed": true,
+          "output": {
+            "response": "",
+            "tool_calls": [
+              {
+                "tool": "plan_next_question",
+                "arguments": {
+                  "next_unanswered_question_index": 2,
+                  "questions_answered": [
+                    1
+                  ]
+                }
+              }
+            ]
+          },
+          "test_case": {
+            "history": [
+              {
+                "role": "assistant",
+                "content": "What is your name?"
+              },
+              {
+                "role": "user",
+                "content": "Aman Dalmia"
+              }
+            ],
+            "evaluation": {
+              "type": "tool_call",
+              "tool_calls": [
+                {
+                  "tool": "plan_next_question",
+                  "arguments": null
+                }
+              ]
+            }
+          }
+        },
+        {
+          "passed": false,
+          "output": {
+            "response": "I'm glad to hear that! Let's get started with your antenatal visit form. \n\nCan I have your full name, please?",
+            "tool_calls": []
+          },
+          "test_case": {
+            "history": [
+              {
+                "role": "assistant",
+                "content": "Hello, how can I help you today?"
+              },
+              {
+                "role": "user",
+                "content": "i am good"
+              }
+            ],
+            "evaluation": {
+              "type": "response",
+              "criteria": "response contains a funny joke"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "leaderboard_summary": [
+    {
+      "model": "openai__gpt-4.1",
+      "test_config": "50.0",
+      "overall": "50.0"
+    },
+    {
+      "model": "openai__gpt-5.1",
+      "test_config": "50.0",
+      "overall": "50.0"
+    }
+  ],
+  "results_s3_prefix": "agent-tests/benchmarks/8618b579-f9e4-4b86-99b1-bf425a613add",
+  "error": null
+}
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+
+
+---
+
+<think><details><summary>Thought Process</summary>
+The user wants me to update the BenchmarkResultsDialog to have:
+1. A leaderboard tab - showing a leaderboard table and visualizations similar to SpeechToTextEvaluation
+2. An outputs tab - showing the test results with a dropdown to select models
+
+Let me update the BenchmarkResultsDialog component with tabs similar to SpeechToTextEvaluation.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="write">
+
+<details><summary>Tool use: **write** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 490, lines removed: 242
+
+```diff
+@@ -3,244 +3,492 @@
+  import React, { useState } from "react";
+  import {
+-   TestCaseOutput,
+-   TestCaseData,
+-   StatusIcon,
+-   CloseIcon,
+-   TestDetailView,
+-   EmptyStateView,
+-   TestStats,
+- } from "./test-results/shared";
+- 
+- type BenchmarkTestResult = {
+-   passed: boolean;
+-   output?: TestCaseOutput;
+-   test_case?: TestCaseData;
+- };
+- 
+- type ModelResult = {
+-   model: string;
+-   success: boolean;
+-   message: string;
+-   total_tests: number;
+-   passed: number;
+-   failed: number;
+-   test_results: BenchmarkTestResult[];
+- };
+- 
+- type BenchmarkResultsDialogProps = {
+-   isOpen: boolean;
+-   onClose: () =&gt; void;
+-   agentName: string;
+-   modelResults: ModelResult[];
+- };
+- 
+- export function BenchmarkResultsDialog({
+-   isOpen,
+-   onClose,
+-   agentName,
+-   modelResults,
+- }: BenchmarkResultsDialogProps) {
+-   const [selectedModelIndex, setSelectedModelIndex] = useState(0);
+-   const [selectedTestIndex, setSelectedTestIndex] = useState&lt;number | null&gt;(
+-     null
+-   );
+-   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+- 
+-   if (!isOpen) return null;
+- 
+-   const currentModel = modelResults[selectedModelIndex];
+-   const passedTests = currentModel?.test_results.filter((t) =&gt; t.passed) || [];
+-   const failedTests = currentModel?.test_results.filter((t) =&gt; !t.passed) || [];
+- 
+-   const selectedTest =
+-     selectedTestIndex !== null
+-       ? currentModel?.test_results[selectedTestIndex]
+-       : null;
+- 
+-   const handleModelChange = (index: number) =&gt; {
+-     setSelectedModelIndex(index);
+-     setSelectedTestIndex(null);
+-     setModelDropdownOpen(false);
+-   };
+- 
+-   return (
+-     &lt;div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"&gt;
+-       &lt;div className="bg-background rounded-xl w-full max-w-5xl h-[80vh] flex flex-col shadow-2xl"&gt;
+-         {/* Header */}
+-         &lt;div className="flex items-center justify-between px-6 py-4 border-b border-border"&gt;
+-           &lt;h2 className="text-lg font-semibold text-foreground"&gt;
+-             Benchmark for {agentName}
+-           &lt;/h2&gt;
+-           &lt;div className="flex items-center gap-3"&gt;
+-             &lt;button
+-               onClick={onClose}
+-               className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
+-             &gt;
+-               &lt;CloseIcon className="w-5 h-5" /&gt;
+-             &lt;/button&gt;
+-           &lt;/div&gt;
+-         &lt;/div&gt;
+- 
+-         {/* Content */}
+-         &lt;div className="flex-1 flex overflow-hidden"&gt;
+-           {/* Left Panel - Test List */}
+-           &lt;div className="w-80 border-r border-border flex flex-col overflow-hidden"&gt;
+-             {/* Model Dropdown and Stats */}
+-             &lt;div className="p-4 border-b border-border"&gt;
+-               &lt;div className="relative"&gt;
+-                 &lt;button
+-                   onClick={() =&gt; setModelDropdownOpen(!modelDropdownOpen)}
+-                   className="w-full h-10 px-4 rounded-md text-sm border border-border bg-background hover:bg-muted/50 flex items-center justify-between cursor-pointer transition-colors"
+-                 &gt;
+-                   &lt;span className="text-foreground truncate"&gt;
+-                     {currentModel?.model || "Select model"}
+-                   &lt;/span&gt;
+-                   &lt;svg
+-                     className={&#96;w-4 h-4 text-muted-foreground transition-transform ${
+-                       modelDropdownOpen ? "rotate-180" : ""
+-                     }&#96;}
+-                     fill="none"
+-                     viewBox="0 0 24 24"
+-                     stroke="currentColor"
+-                     strokeWidth={2}
+-                   &gt;
+-                     &lt;path
+-                       strokeLinecap="round"
+-                       strokeLinejoin="round"
+-                       d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+-                     /&gt;
+-                   &lt;/svg&gt;
+-                 &lt;/button&gt;
+- 
+-                 {/* Dropdown Menu */}
+-                 {modelDropdownOpen &amp;&amp; (
+-                   &lt;div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-10 max-h-48 overflow-y-auto"&gt;
+-                     {modelResults.map((model, index) =&gt; (
+-                       &lt;button
+-                         key={model.model}
+-                         onClick={() =&gt; handleModelChange(index)}
+-                         className={&#96;w-full px-4 py-2 text-left text-sm hover:bg-muted/50 transition-colors cursor-pointer ${
+-                           index === selectedModelIndex ? "bg-muted/50" : ""
+-                         }&#96;}
+-                       &gt;
+-                         &lt;span className="text-foreground"&gt;{model.model}&lt;/span&gt;
+-                       &lt;/button&gt;
+-                     ))}
+-                   &lt;/div&gt;
+-                 )}
+-               &lt;/div&gt;
+- 
+-               {/* Passed/Failed Stats */}
+-               {currentModel &amp;&amp; (
+-                 &lt;div className="mt-3"&gt;
+-                   &lt;TestStats
+-                     passedCount={currentModel.passed}
+-                     failedCount={currentModel.failed}
+-                   /&gt;
+-                 &lt;/div&gt;
+-               )}
+-             &lt;/div&gt;
+- 
+-             {/* Test List */}
+-             &lt;div className="flex-1 overflow-y-auto"&gt;
+-               {/* Failed Tests - Always shown first */}
+-               {failedTests.length &gt; 0 &amp;&amp; (
+-                 &lt;div className="p-4"&gt;
+-                   &lt;h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2"&gt;
+-                     &lt;div className="w-2 h-2 rounded-full bg-red-500"&gt;&lt;/div&gt;
+-                     Failed ({failedTests.length})
+-                   &lt;/h3&gt;
+-                   &lt;div className="space-y-1"&gt;
+-                     {failedTests.map((result) =&gt; {
+-                       const originalIndex =
+-                         currentModel.test_results.indexOf(result);
+-                       return (
+-                         &lt;BenchmarkTestListItem
+-                           key={originalIndex}
+-                           result={result}
+-                           index={originalIndex}
+-                           isSelected={selectedTestIndex === originalIndex}
+-                           onSelect={() =&gt; setSelectedTestIndex(originalIndex)}
+-                         /&gt;
+-                       );
+-                     })}
+-                   &lt;/div&gt;
+-                 &lt;/div&gt;
+-               )}
+- 
+-               {/* Passed Tests */}
+-               {passedTests.length &gt; 0 &amp;&amp; (
+-                 &lt;div className="p-4"&gt;
+-                   &lt;h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2"&gt;
+-                     &lt;div className="w-2 h-2 rounded-full bg-green-500"&gt;&lt;/div&gt;
+-                     Passed ({passedTests.length})
+-                   &lt;/h3&gt;
+-                   &lt;div className="space-y-1"&gt;
+-                     {passedTests.map((result) =&gt; {
+-                       const originalIndex =
+-                         currentModel.test_results.indexOf(result);
+-                       return (
+-                         &lt;BenchmarkTestListItem
+-                           key={originalIndex}
+-                           result={result}
+-                           index={originalIndex}
+-                           isSelected={selectedTestIndex === originalIndex}
+-                           onSelect={() =&gt; setSelectedTestIndex(originalIndex)}
+-                         /&gt;
+-                       );
+-                     })}
+-                   &lt;/div&gt;
+-                 &lt;/div&gt;
+-               )}
+-             &lt;/div&gt;
+-           &lt;/div&gt;
+- 
+-           {/* Right Panel - Test Details */}
+-           &lt;div className="flex-1 overflow-y-auto"&gt;
+-             {selectedTest ? (
+-               &lt;TestDetailView
+-                 history={selectedTest.test_case?.history || []}
+-                 output={selectedTest.output}
+-                 passed={selectedTest.passed}
+-               /&gt;
+-             ) : (
+-               &lt;EmptyStateView message="Select a test to view details" /&gt;
+-             )}
+-           &lt;/div&gt;
+-         &lt;/div&gt;
+-       &lt;/div&gt;
+-     &lt;/div&gt;
+-   );
+- }
+- 
+- // Benchmark Test List Item Component
+- function BenchmarkTestListItem({
+-   result,
+-   index,
+-   isSelected,
+-   onSelect,
+- }: {
+-   result: BenchmarkTestResult;
+-   index: number;
+-   isSelected: boolean;
+-   onSelect: () =&gt; void;
+- }) {
+-   // Generate a test name from the test case or use a default
+-   const testName =
+-     result.test_case?.evaluation?.type === "tool_call"
+-       ? &#96;Tool Call Test ${index + 1}&#96;
+-       : &#96;Response Test ${index + 1}&#96;;
+- 
+-   return (
+-     &lt;div
+-       onClick={onSelect}
+-       className={&#96;flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+-         isSelected ? "bg-muted" : "hover:bg-muted/50"
+-       }&#96;}
+-     &gt;
+-       &lt;StatusIcon status={result.passed ? "passed" : "failed"} /&gt;
+-       &lt;span className="text-sm text-foreground truncate"&gt;{testName}&lt;/span&gt;
+-     &lt;/div&gt;
+-   );
+- }
+- 
++   BarChart,
++   Bar,
++   XAxis,
++   YAxis,
++   CartesianGrid,
++   Tooltip,
++   ResponsiveContainer,
++   Cell,
++ } from "recharts";
++ import {
++   TestCaseOutput,
++   TestCaseData,
++   StatusIcon,
++   CloseIcon,
++   TestDetailView,
++   EmptyStateView,
++ } from "./test-results/shared";
++ 
++ // Pastel color palette for models
++ const pastelColors = [
++   "#A8D5E2", // Light blue
++   "#F4A5AE", // Light pink
++   "#B5E5CF", // Light green
++   "#FFD3A5", // Light orange
++   "#C7B9FF", // Light purple
++   "#FFE5B4", // Light peach
++   "#B8E6B8", // Light mint
++   "#E6B8E6", // Light lavender
++   "#B8D4E6", // Light sky blue
++   "#FFB8D4", // Light rose
++ ];
++ 
++ // Generate color mapping for models
++ const getModelColorMap = (modelNames: string[]): Map&lt;string, string&gt; =&gt; {
++   const colorMap = new Map&lt;string, string&gt;();
++   modelNames.forEach((model, index) =&gt; {
++     colorMap.set(model, pastelColors[index % pastelColors.length]);
++   });
++   return colorMap;
++ };
++ 
++ type BenchmarkTestResult = {
++   passed: boolean;
++   output?: TestCaseOutput;
++   test_case?: TestCaseData;
++ };
++ 
++ type ModelResult = {
++   model: string;
++   success: boolean;
++   message: string;
++   total_tests: number;
++   passed: number;
++   failed: number;
++   test_results: BenchmarkTestResult[];
++ };
++ 
++ type LeaderboardSummary = {
++   model: string;
++   test_config: string;
++   overall: string;
++ };
++ 
++ type BenchmarkResultsDialogProps = {
++   isOpen: boolean;
++   onClose: () =&gt; void;
++   agentName: string;
++   modelResults: ModelResult[];
++   leaderboardSummary?: LeaderboardSummary[];
++ };
++ 
++ export function BenchmarkResultsDialog({
++   isOpen,
++   onClose,
++   agentName,
++   modelResults,
++   leaderboardSummary,
++ }: BenchmarkResultsDialogProps) {
++   const [activeTab, setActiveTab] = useState&lt;"leaderboard" | "outputs"&gt;(
++     "leaderboard"
++   );
++   const [selectedModelIndex, setSelectedModelIndex] = useState(0);
++   const [selectedTestIndex, setSelectedTestIndex] = useState&lt;number | null&gt;(
++     null
++   );
++   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
++ 
++   if (!isOpen) return null;
++ 
++   const currentModel = modelResults[selectedModelIndex];
++   const passedTests = currentModel?.test_results.filter((t) =&gt; t.passed) || [];
++   const failedTests = currentModel?.test_results.filter((t) =&gt; !t.passed) || [];
++ 
++   const selectedTest =
++     selectedTestIndex !== null
++       ? currentModel?.test_results[selectedTestIndex]
++       : null;
++ 
++   const handleModelChange = (index: number) =&gt; {
++     setSelectedModelIndex(index);
++     setSelectedTestIndex(null);
++     setModelDropdownOpen(false);
++   };
++ 
++   // Get color map for charts
++   const modelNames = leaderboardSummary?.map((s) =&gt; s.model) || [];
++   const colorMap = getModelColorMap(modelNames);
++ 
++   return (
++     &lt;div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"&gt;
++       &lt;div className="bg-background rounded-xl w-full max-w-5xl h-[80vh] flex flex-col shadow-2xl"&gt;
++         {/* Header */}
++         &lt;div className="flex items-center justify-between px-6 py-4 border-b border-border"&gt;
++           &lt;h2 className="text-lg font-semibold text-foreground"&gt;
++             Benchmark for {agentName}
++           &lt;/h2&gt;
++           &lt;button
++             onClick={onClose}
++             className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
++           &gt;
++             &lt;CloseIcon className="w-5 h-5" /&gt;
++           &lt;/button&gt;
++         &lt;/div&gt;
++ 
++         {/* Tab Navigation */}
++         &lt;div className="px-6 border-b border-border"&gt;
++           &lt;div className="flex gap-2"&gt;
++             &lt;button
++               onClick={() =&gt; setActiveTab("leaderboard")}
++               className={&#96;px-4 py-3 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
++                 activeTab === "leaderboard"
++                   ? "border-foreground text-foreground"
++                   : "border-transparent text-muted-foreground hover:text-foreground"
++               }&#96;}
++             &gt;
++               Leaderboard
++             &lt;/button&gt;
++             &lt;button
++               onClick={() =&gt; setActiveTab("outputs")}
++               className={&#96;px-4 py-3 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
++                 activeTab === "outputs"
++                   ? "border-foreground text-foreground"
++                   : "border-transparent text-muted-foreground hover:text-foreground"
++               }&#96;}
++             &gt;
++               Outputs
++             &lt;/button&gt;
++           &lt;/div&gt;
++         &lt;/div&gt;
++ 
++         {/* Content */}
++         &lt;div className="flex-1 overflow-y-auto"&gt;
++           {/* Leaderboard Tab */}
++           {activeTab === "leaderboard" &amp;&amp; (
++             &lt;div className="p-6 space-y-6"&gt;
++               {/* Leaderboard Table */}
++               {leaderboardSummary &amp;&amp; leaderboardSummary.length &gt; 0 &amp;&amp; (
++                 &lt;div className="border rounded-xl overflow-hidden"&gt;
++                   &lt;table className="w-full"&gt;
++                     &lt;thead className="bg-muted/50 border-b border-border"&gt;
++                       &lt;tr&gt;
++                         &lt;th className="px-4 py-3 text-left text-sm font-medium text-foreground"&gt;
++                           Model
++                         &lt;/th&gt;
++                         &lt;th className="px-4 py-3 text-left text-sm font-medium text-foreground"&gt;
++                           Pass Rate (%)
++                         &lt;/th&gt;
++                         &lt;th className="px-4 py-3 text-left text-sm font-medium text-foreground"&gt;
++                           Overall (%)
++                         &lt;/th&gt;
++                       &lt;/tr&gt;
++                     &lt;/thead&gt;
++                     &lt;tbody&gt;
++                       {leaderboardSummary.map((summary, index) =&gt; (
++                         &lt;tr
++                           key={index}
++                           className="border-b border-border last:border-b-0"
++                         &gt;
++                           &lt;td className="px-4 py-3 text-sm text-foreground"&gt;
++                             {summary.model.replace("__", "/")}
++                           &lt;/td&gt;
++                           &lt;td className="px-4 py-3 text-sm text-foreground"&gt;
++                             {summary.test_config}
++                           &lt;/td&gt;
++                           &lt;td className="px-4 py-3 text-sm text-foreground"&gt;
++                             {summary.overall}
++                           &lt;/td&gt;
++                         &lt;/tr&gt;
++                       ))}
++                     &lt;/tbody&gt;
++                   &lt;/table&gt;
++                 &lt;/div&gt;
++               )}
++ 
++               {/* Charts Section */}
++               {leaderboardSummary &amp;&amp; leaderboardSummary.length &gt; 0 &amp;&amp; (
++                 &lt;div className="grid grid-cols-2 gap-6"&gt;
++                   {/* Pass Rate Chart */}
++                   &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
++                     &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
++                       Pass Rate (%)
++                     &lt;/h3&gt;
++                     &lt;ResponsiveContainer width="100%" height={300}&gt;
++                       &lt;BarChart
++                         data={leaderboardSummary.map((s) =&gt; ({
++                           model: s.model.replace("__", "/"),
++                           value: parseFloat(s.test_config),
++                         }))}
++                         margin={{
++                           top: 5,
++                           right: 30,
++                           left: 20,
++                           bottom: 60,
++                         }}
++                       &gt;
++                         &lt;CartesianGrid strokeDasharray="3 3" /&gt;
++                         &lt;XAxis
++                           dataKey="model"
++                           tick={{
++                             fontSize: 12,
++                             fill: "currentColor",
++                             fontWeight: 500,
++                           }}
++                           angle={-45}
++                           textAnchor="end"
++                           height={80}
++                         /&gt;
++                         &lt;YAxis tick={{ fontSize: 12 }} domain={[0, 100]} /&gt;
++                         &lt;Tooltip
++                           formatter={(value: any) =&gt;
++                             typeof value === "number"
++                               ? &#96;${value.toFixed(1)}%&#96;
++                               : value
++                           }
++                         /&gt;
++                         &lt;Bar dataKey="value"&gt;
++                           {leaderboardSummary.map((entry, index) =&gt; (
++                             &lt;Cell
++                               key={&#96;cell-${index}&#96;}
++                               fill={colorMap.get(entry.model) || "#A8D5E2"}
++                             /&gt;
++                           ))}
++                         &lt;/Bar&gt;
++                       &lt;/BarChart&gt;
++                     &lt;/ResponsiveContainer&gt;
++                   &lt;/div&gt;
++ 
++                   {/* Overall Score Chart */}
++                   &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
++                     &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
++                       Overall Score (%)
++                     &lt;/h3&gt;
++                     &lt;ResponsiveContainer width="100%" height={300}&gt;
++                       &lt;BarChart
++                         data={leaderboardSummary.map((s) =&gt; ({
++                           model: s.model.replace("__", "/"),
++                           value: parseFloat(s.overall),
++                         }))}
++                         margin={{
++                           top: 5,
++                           right: 30,
++                           left: 20,
++                           bottom: 60,
++                         }}
++                       &gt;
++                         &lt;CartesianGrid strokeDasharray="3 3" /&gt;
++                         &lt;XAxis
++                           dataKey="model"
++                           tick={{
++                             fontSize: 12,
++                             fill: "currentColor",
++                             fontWeight: 500,
++                           }}
++                           angle={-45}
++                           textAnchor="end"
++                           height={80}
++                         /&gt;
++                         &lt;YAxis tick={{ fontSize: 12 }} domain={[0, 100]} /&gt;
++                         &lt;Tooltip
++                           formatter={(value: any) =&gt;
++                             typeof value === "number"
++                               ? &#96;${value.toFixed(1)}%&#96;
++                               : value
++                           }
++                         /&gt;
++                         &lt;Bar dataKey="value"&gt;
++                           {leaderboardSummary.map((entry, index) =&gt; (
++                             &lt;Cell
++                               key={&#96;cell-${index}&#96;}
++                               fill={colorMap.get(entry.model) || "#A8D5E2"}
++                             /&gt;
++                           ))}
++                         &lt;/Bar&gt;
++                       &lt;/BarChart&gt;
++                     &lt;/ResponsiveContainer&gt;
++                   &lt;/div&gt;
++                 &lt;/div&gt;
++               )}
++ 
++               {/* Empty State */}
++               {(!leaderboardSummary || leaderboardSummary.length === 0) &amp;&amp; (
++                 &lt;div className="text-center py-12"&gt;
++                   &lt;p className="text-sm text-muted-foreground"&gt;
++                     No leaderboard data available
++                   &lt;/p&gt;
++                 &lt;/div&gt;
++               )}
++             &lt;/div&gt;
++           )}
++ 
++           {/* Outputs Tab */}
++           {activeTab === "outputs" &amp;&amp; (
++             &lt;div className="flex-1 flex overflow-hidden h-full"&gt;
++               {/* Left Panel - Test List */}
++               &lt;div className="w-80 border-r border-border flex flex-col overflow-hidden"&gt;
++                 {/* Model Dropdown and Stats */}
++                 &lt;div className="p-4 border-b border-border"&gt;
++                   &lt;div className="relative"&gt;
++                     &lt;button
++                       onClick={() =&gt; setModelDropdownOpen(!modelDropdownOpen)}
++                       className="w-full h-10 px-4 rounded-md text-sm border border-border bg-background hover:bg-muted/50 flex items-center justify-between cursor-pointer transition-colors"
++                     &gt;
++                       &lt;span className="text-foreground truncate"&gt;
++                         {currentModel?.model || "Select model"}
++                       &lt;/span&gt;
++                       &lt;svg
++                         className={&#96;w-4 h-4 text-muted-foreground transition-transform ${
++                           modelDropdownOpen ? "rotate-180" : ""
++                         }&#96;}
++                         fill="none"
++                         viewBox="0 0 24 24"
++                         stroke="currentColor"
++                         strokeWidth={2}
++                       &gt;
++                         &lt;path
++                           strokeLinecap="round"
++                           strokeLinejoin="round"
++                           d="M19.5 8.25l-7.5 7.5-7.5-7.5"
++                         /&gt;
++                       &lt;/svg&gt;
++                     &lt;/button&gt;
++ 
++                     {/* Dropdown Menu */}
++                     {modelDropdownOpen &amp;&amp; (
++                       &lt;div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-10 max-h-48 overflow-y-auto"&gt;
++                         {modelResults.map((model, index) =&gt; (
++                           &lt;button
++                             key={model.model}
++                             onClick={() =&gt; handleModelChange(index)}
++                             className={&#96;w-full px-4 py-2 text-left text-sm hover:bg-muted/50 transition-colors cursor-pointer ${
++                               index === selectedModelIndex ? "bg-muted/50" : ""
++                             }&#96;}
++                           &gt;
++                             &lt;span className="text-foreground"&gt;
++                               {model.model}
++                             &lt;/span&gt;
++                           &lt;/button&gt;
++                         ))}
++                       &lt;/div&gt;
++                     )}
++                   &lt;/div&gt;
++ 
++                   {/* Passed/Failed Stats */}
++                   {currentModel &amp;&amp; (
++                     &lt;div className="flex items-center gap-3 mt-3 text-sm"&gt;
++                       &lt;div className="flex items-center gap-1.5"&gt;
++                         &lt;div className="w-2 h-2 rounded-full bg-green-500"&gt;&lt;/div&gt;
++                         &lt;span className="text-muted-foreground"&gt;
++                           {currentModel.passed} passed
++                         &lt;/span&gt;
++                       &lt;/div&gt;
++                       &lt;div className="flex items-center gap-1.5"&gt;
++                         &lt;div className="w-2 h-2 rounded-full bg-red-500"&gt;&lt;/div&gt;
++                         &lt;span className="text-muted-foreground"&gt;
++                           {currentModel.failed} failed
++                         &lt;/span&gt;
++                       &lt;/div&gt;
++                     &lt;/div&gt;
++                   )}
++                 &lt;/div&gt;
++ 
++                 {/* Test List */}
++                 &lt;div className="flex-1 overflow-y-auto"&gt;
++                   {/* Failed Tests - Always shown first */}
++                   {failedTests.length &gt; 0 &amp;&amp; (
++                     &lt;div className="p-4"&gt;
++                       &lt;h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2"&gt;
++                         &lt;div className="w-2 h-2 rounded-full bg-red-500"&gt;&lt;/div&gt;
++                         Failed ({failedTests.length})
++                       &lt;/h3&gt;
++                       &lt;div className="space-y-1"&gt;
++                         {failedTests.map((result) =&gt; {
++                           const originalIndex =
++                             currentModel.test_results.indexOf(result);
++                           return (
++                             &lt;BenchmarkTestListItem
++                               key={originalIndex}
++                               result={result}
++                               index={originalIndex}
++                               isSelected={selectedTestIndex === originalIndex}
++                               onSelect={() =&gt;
++                                 setSelectedTestIndex(originalIndex)
++                               }
++                             /&gt;
++                           );
++                         })}
++                       &lt;/div&gt;
++                     &lt;/div&gt;
++                   )}
++ 
++                   {/* Passed Tests */}
++                   {passedTests.length &gt; 0 &amp;&amp; (
++                     &lt;div className="p-4"&gt;
++                       &lt;h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2"&gt;
++                         &lt;div className="w-2 h-2 rounded-full bg-green-500"&gt;&lt;/div&gt;
++                         Passed ({passedTests.length})
++                       &lt;/h3&gt;
++                       &lt;div className="space-y-1"&gt;
++                         {passedTests.map((result) =&gt; {
++                           const originalIndex =
++                             currentModel.test_results.indexOf(result);
++                           return (
++                             &lt;BenchmarkTestListItem
++                               key={originalIndex}
++                               result={result}
++                               index={originalIndex}
++                               isSelected={selectedTestIndex === originalIndex}
++                               onSelect={() =&gt;
++                                 setSelectedTestIndex(originalIndex)
++                               }
++                             /&gt;
++                           );
++                         })}
++                       &lt;/div&gt;
++                     &lt;/div&gt;
++                   )}
++                 &lt;/div&gt;
++               &lt;/div&gt;
++ 
++               {/* Right Panel - Test Details */}
++               &lt;div className="flex-1 overflow-y-auto"&gt;
++                 {selectedTest ? (
++                   &lt;TestDetailView
++                     history={selectedTest.test_case?.history || []}
++                     output={selectedTest.output}
++                     passed={selectedTest.passed}
++                   /&gt;
++                 ) : (
++                   &lt;EmptyStateView message="Select a test to view details" /&gt;
++                 )}
++               &lt;/div&gt;
++             &lt;/div&gt;
++           )}
++         &lt;/div&gt;
++       &lt;/div&gt;
++     &lt;/div&gt;
++   );
++ }
++ 
++ // Benchmark Test List Item Component
++ function BenchmarkTestListItem({
++   result,
++   index,
++   isSelected,
++   onSelect,
++ }: {
++   result: BenchmarkTestResult;
++   index: number;
++   isSelected: boolean;
++   onSelect: () =&gt; void;
++ }) {
++   // Generate a test name from the test case or use a default
++   const testName =
++     result.test_case?.evaluation?.type === "tool_call"
++       ? &#96;Tool Call Test ${index + 1}&#96;
++       : &#96;Response Test ${index + 1}&#96;;
++ 
++   return (
++     &lt;div
++       onClick={onSelect}
++       className={&#96;flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
++         isSelected ? "bg-muted" : "hover:bg-muted/50"
++       }&#96;}
++     &gt;
++       &lt;StatusIcon status={result.passed ? "passed" : "failed"} /&gt;
++       &lt;span className="text-sm text-foreground truncate"&gt;{testName}&lt;/span&gt;
++     &lt;/div&gt;
++   );
++ }
++ 
+```
+
+</details>
+
+</tool-use>
 
 ---
 
@@ -4772,19 +8940,449 @@ The user wants me to remove the "Retry All" and "Retry Failed" buttons from the 
 
 ---
 
+<think><details><summary>Thought Process</summary>
+Now I need to update the BenchmarkDialog to pass the leaderboardSummary to the BenchmarkResultsDialog. Let me read the BenchmarkDialog first.</details></think>
+
+---
+
+Now let me update the `BenchmarkDialog` to pass the new `leaderboardSummary` prop with the dummy data:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to add the leaderboardSummary to the DUMMY_BENCHMARK_RESULTS and pass it to BenchmarkResultsDialog.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: undefined
+
+```diff
+@@ -7,4 +7,6 @@
+  // Dummy benchmark results data
+  const DUMMY_BENCHMARK_RESULTS = {
++   task_id: "8618b579-f9e4-4b86-99b1-bf425a613add",
++   status: "done",
+    model_results: [
+      {
+```
+
+**Chunk 2**
+Lines added: 15, lines removed: undefined
+
+```diff
+@@ -149,4 +151,19 @@
+      },
+    ],
++   leaderboard_summary: [
++     {
++       model: "openai__gpt-4.1",
++       test_config: "50.0",
++       overall: "50.0",
++     },
++     {
++       model: "openai__gpt-5.1",
++       test_config: "50.0",
++       overall: "50.0",
++     },
++   ],
++   results_s3_prefix:
++     "agent-tests/benchmarks/8618b579-f9e4-4b86-99b1-bf425a613add",
++   error: null,
+  };
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the BenchmarkResultsDialog invocation to pass the leaderboardSummary prop.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -429,4 +429,5 @@
+          agentName={agentName}
+          modelResults={DUMMY_BENCHMARK_RESULTS.model_results}
++         leaderboardSummary={DUMMY_BENCHMARK_RESULTS.leaderboard_summary}
+        /&gt;
+      &lt;/div&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me check for lint errors in both files.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 2 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkDialog.tsx`
+
+Lint results
+
+Lint errors for `src/components/BenchmarkDialog.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+Lint errors for `src/components/BenchmarkResultsDialog.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+All lint errors are resolved. Let me summarize what I've done.</details></think>
+
+---
+
+Done! I've updated the `BenchmarkResultsDialog` to have two tabs similar to the `SpeechToTextEvaluation` component:
+
+**Leaderboard Tab:**
+- Shows a table with model name, pass rate (%), and overall score (%)
+- Includes two bar charts visualizing the pass rate and overall score for each model
+- Uses pastel colors to distinguish between different models
+
+**Outputs Tab:**
+- Shows a dropdown to select the model to view
+- Displays passed/failed counts for the selected model
+- Lists failed tests first, then passed tests
+- Shows the test detail view with chat history and output when a test is selected
+
+**Changes made:**
+
+1. **`BenchmarkResultsDialog.tsx`:**
+   - Added recharts imports for bar charts
+   - Added tabs navigation (Leaderboard / Outputs)
+   - Added leaderboard table and bar chart visualizations
+   - Kept the existing outputs view with model dropdown and test list
+
+2. **`BenchmarkDialog.tsx`:**
+   - Added `leaderboard_summary` to the dummy data
+   - Added `task_id`, `status`, `results_s3_prefix`, and `error` fields to match the full API response structure
+   - Updated the `BenchmarkResultsDialog` invocation to pass the `leaderboardSummary` prop
+
+---
+
+_**User (2026-01-11 09:21Z)**_
+
+only show overall score % in the leaderboard tab and table as well
+
+label it as Test pass rate
 
 
 ---
 
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
 
+<think><details><summary>Thought Process</summary>
+The user wants me to:
+1. Only show "overall" score in the leaderboard tab
+2. Remove "test_config" / "Pass Rate (%)" column
+3. Rename "Overall (%)" to "Test pass rate"
+
+Let me update the BenchmarkResultsDialog.tsx file.</details></think>
 
 ---
 
+<tool-use data-tool-type="write" data-tool-name="search_replace">
 
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 4
+
+```diff
+@@ -168,8 +168,5 @@
+                          &lt;/th&gt;
+                          &lt;th className="px-4 py-3 text-left text-sm font-medium text-foreground"&gt;
+-                           Pass Rate (%)
+-                         &lt;/th&gt;
+-                         &lt;th className="px-4 py-3 text-left text-sm font-medium text-foreground"&gt;
+-                           Overall (%)
++                           Test pass rate (%)
+                          &lt;/th&gt;
+                        &lt;/tr&gt;
+```
+
+**Chunk 2**
+Lines added: undefined, lines removed: 3
+
+```diff
+@@ -184,7 +181,4 @@
+                              {summary.model.replace("__", "/")}
+                            &lt;/td&gt;
+-                           &lt;td className="px-4 py-3 text-sm text-foreground"&gt;
+-                             {summary.test_config}
+-                           &lt;/td&gt;
+                            &lt;td className="px-4 py-3 text-sm text-foreground"&gt;
+                              {summary.overall}
+```
+
+</details>
+
+</tool-use>
 
 ---
 
+<think><details><summary>Thought Process</summary>
+Now I need to update the charts section to only show the "Test pass rate" chart and remove the "Pass Rate" chart.</details></think>
 
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 47, lines removed: 100
+
+```diff
+@@ -193,104 +193,51 @@
+                {/* Charts Section */}
+                {leaderboardSummary &amp;&amp; leaderboardSummary.length &gt; 0 &amp;&amp; (
+-                 &lt;div className="grid grid-cols-2 gap-6"&gt;
+-                   {/* Pass Rate Chart */}
+-                   &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
+-                     &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
+-                       Pass Rate (%)
+-                     &lt;/h3&gt;
+-                     &lt;ResponsiveContainer width="100%" height={300}&gt;
+-                       &lt;BarChart
+-                         data={leaderboardSummary.map((s) =&gt; ({
+-                           model: s.model.replace("__", "/"),
+-                           value: parseFloat(s.test_config),
+-                         }))}
+-                         margin={{
+-                           top: 5,
+-                           right: 30,
+-                           left: 20,
+-                           bottom: 60,
+-                         }}
+-                       &gt;
+-                         &lt;CartesianGrid strokeDasharray="3 3" /&gt;
+-                         &lt;XAxis
+-                           dataKey="model"
+-                           tick={{
+-                             fontSize: 12,
+-                             fill: "currentColor",
+-                             fontWeight: 500,
+-                           }}
+-                           angle={-45}
+-                           textAnchor="end"
+-                           height={80}
+-                         /&gt;
+-                         &lt;YAxis tick={{ fontSize: 12 }} domain={[0, 100]} /&gt;
+-                         &lt;Tooltip
+-                           formatter={(value: any) =&gt;
+-                             typeof value === "number"
+-                               ? &#96;${value.toFixed(1)}%&#96;
+-                               : value
+-                           }
+-                         /&gt;
+-                         &lt;Bar dataKey="value"&gt;
+-                           {leaderboardSummary.map((entry, index) =&gt; (
+-                             &lt;Cell
+-                               key={&#96;cell-${index}&#96;}
+-                               fill={colorMap.get(entry.model) || "#A8D5E2"}
+-                             /&gt;
+-                           ))}
+-                         &lt;/Bar&gt;
+-                       &lt;/BarChart&gt;
+-                     &lt;/ResponsiveContainer&gt;
+-                   &lt;/div&gt;
+- 
+-                   {/* Overall Score Chart */}
+-                   &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
+-                     &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
+-                       Overall Score (%)
+-                     &lt;/h3&gt;
+-                     &lt;ResponsiveContainer width="100%" height={300}&gt;
+-                       &lt;BarChart
+-                         data={leaderboardSummary.map((s) =&gt; ({
+-                           model: s.model.replace("__", "/"),
+-                           value: parseFloat(s.overall),
+-                         }))}
+-                         margin={{
+-                           top: 5,
+-                           right: 30,
+-                           left: 20,
+-                           bottom: 60,
+-                         }}
+-                       &gt;
+-                         &lt;CartesianGrid strokeDasharray="3 3" /&gt;
+-                         &lt;XAxis
+-                           dataKey="model"
+-                           tick={{
+-                             fontSize: 12,
+-                             fill: "currentColor",
+-                             fontWeight: 500,
+-                           }}
+-                           angle={-45}
+-                           textAnchor="end"
+-                           height={80}
+-                         /&gt;
+-                         &lt;YAxis tick={{ fontSize: 12 }} domain={[0, 100]} /&gt;
+-                         &lt;Tooltip
+-                           formatter={(value: any) =&gt;
+-                             typeof value === "number"
+-                               ? &#96;${value.toFixed(1)}%&#96;
+-                               : value
+-                           }
+-                         /&gt;
+-                         &lt;Bar dataKey="value"&gt;
+-                           {leaderboardSummary.map((entry, index) =&gt; (
+-                             &lt;Cell
+-                               key={&#96;cell-${index}&#96;}
+-                               fill={colorMap.get(entry.model) || "#A8D5E2"}
+-                             /&gt;
+-                           ))}
+-                         &lt;/Bar&gt;
+-                       &lt;/BarChart&gt;
+-                     &lt;/ResponsiveContainer&gt;
+-                   &lt;/div&gt;
++                 &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
++                   &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
++                     Test pass rate (%)
++                   &lt;/h3&gt;
++                   &lt;ResponsiveContainer width="100%" height={300}&gt;
++                     &lt;BarChart
++                       data={leaderboardSummary.map((s) =&gt; ({
++                         model: s.model.replace("__", "/"),
++                         value: parseFloat(s.overall),
++                       }))}
++                       margin={{
++                         top: 5,
++                         right: 30,
++                         left: 20,
++                         bottom: 60,
++                       }}
++                     &gt;
++                       &lt;CartesianGrid strokeDasharray="3 3" /&gt;
++                       &lt;XAxis
++                         dataKey="model"
++                         tick={{
++                           fontSize: 12,
++                           fill: "currentColor",
++                           fontWeight: 500,
++                         }}
++                         angle={-45}
++                         textAnchor="end"
++                         height={80}
++                       /&gt;
++                       &lt;YAxis tick={{ fontSize: 12 }} domain={[0, 100]} /&gt;
++                       &lt;Tooltip
++                         formatter={(value: any) =&gt;
++                           typeof value === "number"
++                             ? &#96;${value.toFixed(1)}%&#96;
++                             : value
++                         }
++                       /&gt;
++                       &lt;Bar dataKey="value"&gt;
++                         {leaderboardSummary.map((entry, index) =&gt; (
++                           &lt;Cell
++                             key={&#96;cell-${index}&#96;}
++                             fill={colorMap.get(entry.model) || "#A8D5E2"}
++                           /&gt;
++                         ))}
++                       &lt;/Bar&gt;
++                     &lt;/BarChart&gt;
++                   &lt;/ResponsiveContainer&gt;
+                  &lt;/div&gt;
+                )}
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me check for lint errors.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx`
+
+Lint results
+
+Lint errors for `src/components/BenchmarkResultsDialog.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no lint errors. The changes are:
+1. Removed the "Pass Rate (%)" column from the table
+2. Renamed "Overall (%)" to "Test pass rate (%)"
+3. Removed the "Pass Rate" bar chart
+4. Renamed the "Overall Score" chart to "Test pass rate" and made it full-width (not in a grid anymore)</details></think>
+
+---
+
+Done! I've updated the leaderboard tab to:
+
+1. **Table**: Removed the "Pass Rate (%)" column, now only shows "Model" and "Test pass rate (%)"
+2. **Chart**: Removed the duplicate chart, now shows only one "Test pass rate (%)" chart using the overall score values
 
 ---
 

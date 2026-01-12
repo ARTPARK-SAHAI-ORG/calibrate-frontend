@@ -1,6 +1,16 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import {
+  TestCaseOutput,
+  TestCaseData,
+  StatusIcon,
+  CloseIcon,
+  SpinnerIcon,
+  TestDetailView as SharedTestDetailView,
+  EmptyStateView,
+  TestStats,
+} from "./test-results/shared";
 
 type TestData = {
   uuid: string;
@@ -31,42 +41,6 @@ type TestResult = {
     details?: Record<string, any>;
   };
   error?: string;
-};
-
-type ToolCallOutput = {
-  tool: string;
-  arguments: Record<string, any>;
-};
-
-type TestCaseOutput = {
-  response?: string;
-  tool_calls?: ToolCallOutput[];
-};
-
-type TestCaseHistory = {
-  role: "assistant" | "user" | "tool";
-  content?: string;
-  tool_calls?: Array<{
-    id: string;
-    function: {
-      name: string;
-      arguments: string;
-    };
-    type: string;
-  }>;
-  tool_call_id?: string;
-};
-
-type TestCaseData = {
-  history?: TestCaseHistory[];
-  evaluation?: {
-    type: string;
-    tool_calls?: Array<{
-      tool: string;
-      arguments: Record<string, any> | null;
-    }>;
-    criteria?: string;
-  };
 };
 
 type TestCaseResult = {
@@ -609,38 +583,16 @@ export function TestRunnerDialog({
             {!isRunning &&
               testResults.length > 0 &&
               (passedTests.length > 0 || failedTests.length > 0) && (
-                <div className="flex items-center gap-3 text-sm">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                    <span className="text-muted-foreground">
-                      {passedTests.length} passed
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                    <span className="text-muted-foreground">
-                      {failedTests.length} failed
-                    </span>
-                  </div>
-                </div>
+                <TestStats
+                  passedCount={passedTests.length}
+                  failedCount={failedTests.length}
+                />
               )}
             <button
               onClick={onClose}
               className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
             >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
+              <CloseIcon className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -715,30 +667,9 @@ export function TestRunnerDialog({
           {/* Right Panel - Test Details */}
           <div className="flex-1 overflow-y-auto">
             {selectedResult ? (
-              <TestDetailView result={selectedResult} />
+              <LocalTestDetailView result={selectedResult} />
             ) : (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
-                    <svg
-                      className="w-6 h-6 text-muted-foreground"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={1.5}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"
-                      />
-                    </svg>
-                  </div>
-                  <p className="text-muted-foreground text-sm">
-                    Select a test to view details
-                  </p>
-                </div>
-              </div>
+              <EmptyStateView message="Select a test to view details" />
             )}
           </div>
         </div>
@@ -764,88 +695,7 @@ function TestListItem({
         isSelected ? "bg-muted" : "hover:bg-muted/50"
       }`}
     >
-      {/* Status Icon */}
-      {result.status === "passed" && (
-        <div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
-          <svg
-            className="w-3 h-3 text-green-500"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={3}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
-        </div>
-      )}
-      {result.status === "failed" && (
-        <div className="w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
-          <svg
-            className="w-3 h-3 text-red-500"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={3}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </div>
-      )}
-      {result.status === "running" && (
-        <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-          <svg
-            className="w-4 h-4 animate-spin text-muted-foreground"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-        </div>
-      )}
-      {result.status === "pending" && (
-        <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-          <svg
-            className="w-4 h-4 animate-spin text-muted-foreground"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-        </div>
-      )}
-
+      <StatusIcon status={result.status} />
       <span className="text-sm text-foreground truncate">
         {result.test.name}
       </span>
@@ -853,8 +703,8 @@ function TestListItem({
   );
 }
 
-// Test Detail View Component
-function TestDetailView({ result }: { result: TestResult }) {
+// Local Test Detail View Component with error/pending/running state handling
+function LocalTestDetailView({ result }: { result: TestResult }) {
   if (result.status === "pending") {
     return (
       <div className="flex items-center justify-center h-full">
@@ -867,25 +717,7 @@ function TestDetailView({ result }: { result: TestResult }) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="flex items-center gap-3">
-          <svg
-            className="w-5 h-5 animate-spin text-muted-foreground"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
+          <SpinnerIcon className="w-5 h-5 animate-spin text-muted-foreground" />
           <p className="text-muted-foreground">Running test...</p>
         </div>
       </div>
@@ -918,299 +750,12 @@ function TestDetailView({ result }: { result: TestResult }) {
     );
   }
 
-  // Get history from testCase
-  const history = result.testCase?.history || [];
-  const output = result.output;
-
+  // Use shared component for main content
   return (
-    <div className="p-6 space-y-6">
-      {/* Chat History from test_case.history */}
-      {history.length > 0 && (
-        <div className="space-y-4">
-          <div className="space-y-4">
-            {history.map((message, index) => (
-              <div
-                key={index}
-                className={`space-y-1 ${
-                  message.role === "user" ? "flex flex-col items-end" : ""
-                }`}
-              >
-                {/* User Message */}
-                {message.role === "user" && (
-                  <div className="max-w-[80%]">
-                    <div className="px-4 py-3 rounded-2xl bg-[#242426] border border-[#444]">
-                      <p className="text-sm text-foreground whitespace-pre-wrap">
-                        {message.content}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Agent Message (text response) */}
-                {message.role === "assistant" && !message.tool_calls && (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-foreground">
-                        Agent
-                      </span>
-                    </div>
-                    <div className="max-w-[80%]">
-                      <div className="px-4 py-3 rounded-2xl bg-muted/30 border border-border">
-                        <p className="text-sm text-foreground whitespace-pre-wrap">
-                          {message.content}
-                        </p>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {/* Agent Tool Call from history */}
-                {message.role === "assistant" &&
-                  message.tool_calls &&
-                  message.tool_calls.length > 0 && (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-foreground">
-                          Agent Tool Call
-                        </span>
-                      </div>
-                      <div className="max-w-[80%]">
-                        {message.tool_calls.map((toolCall, tcIndex) => {
-                          let parsedArgs: Record<string, any> = {};
-                          try {
-                            parsedArgs = JSON.parse(
-                              toolCall.function.arguments
-                            );
-                          } catch {
-                            parsedArgs = {};
-                          }
-                          return (
-                            <div
-                              key={tcIndex}
-                              className="bg-muted/20 border border-border rounded-2xl p-4"
-                            >
-                              <div className="flex items-center gap-2 mb-2">
-                                <svg
-                                  className="w-4 h-4 text-muted-foreground"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={1.5}
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
-                                  />
-                                </svg>
-                                <span className="text-sm font-medium text-foreground">
-                                  {toolCall.function.name}
-                                </span>
-                              </div>
-                              {Object.keys(parsedArgs).length > 0 && (
-                                <div className="space-y-2 mt-3">
-                                  {Object.entries(parsedArgs).map(
-                                    ([paramName, paramValue]) => (
-                                      <div key={paramName}>
-                                        <label className="block text-xs font-medium text-muted-foreground mb-1">
-                                          {paramName}
-                                        </label>
-                                        <div className="px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground">
-                                          {typeof paramValue === "object"
-                                            ? JSON.stringify(paramValue)
-                                            : String(paramValue)}
-                                        </div>
-                                      </div>
-                                    )
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Output Section - Agent's Response/Tool Call */}
-      {output && (
-        <div className="space-y-4">
-          {/* Text Response */}
-          {output.response && (
-            <div
-              className={`${
-                result.evaluation?.passed
-                  ? "border-l-4 border-l-green-500 pl-3"
-                  : "border-l-4 border-l-red-500 pl-3"
-              }`}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-medium text-foreground">
-                  Agent
-                </span>
-                <div
-                  className={`w-4 h-4 rounded-full flex items-center justify-center ${
-                    result.evaluation?.passed
-                      ? "bg-green-500/20"
-                      : "bg-red-500/20"
-                  }`}
-                >
-                  {result.evaluation?.passed ? (
-                    <svg
-                      className="w-2.5 h-2.5 text-green-500"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  ) : (
-                    <svg
-                      className="w-2.5 h-2.5 text-red-500"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  )}
-                </div>
-              </div>
-              <div className="max-w-[80%]">
-                <div className="px-4 py-3 rounded-2xl bg-muted/30 border border-border">
-                  <p className="text-sm text-foreground whitespace-pre-wrap">
-                    {output.response}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Tool Calls Output */}
-          {output.tool_calls && output.tool_calls.length > 0 && (
-            <div
-              className={`${
-                result.evaluation?.passed
-                  ? "border-l-4 border-l-green-500 pl-3"
-                  : "border-l-4 border-l-red-500 pl-3"
-              }`}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm font-medium text-foreground">
-                  Agent Tool Call
-                </span>
-                <div
-                  className={`w-4 h-4 rounded-full flex items-center justify-center ${
-                    result.evaluation?.passed
-                      ? "bg-green-500/20"
-                      : "bg-red-500/20"
-                  }`}
-                >
-                  {result.evaluation?.passed ? (
-                    <svg
-                      className="w-2.5 h-2.5 text-green-500"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  ) : (
-                    <svg
-                      className="w-2.5 h-2.5 text-red-500"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  )}
-                </div>
-              </div>
-              <div className="space-y-3">
-                {output.tool_calls.map((toolCall, index) => (
-                  <div
-                    key={index}
-                    className="max-w-[80%] bg-muted/20 border border-border rounded-2xl p-4"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <svg
-                        className="w-4 h-4 text-muted-foreground"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={1.5}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
-                        />
-                      </svg>
-                      <span className="text-sm font-medium text-foreground">
-                        {toolCall.tool}
-                      </span>
-                    </div>
-                    {toolCall.arguments &&
-                      Object.keys(toolCall.arguments).length > 0 && (
-                        <div className="space-y-2 mt-3">
-                          {Object.entries(toolCall.arguments).map(
-                            ([paramName, paramValue]) => (
-                              <div key={paramName}>
-                                <label className="block text-xs font-medium text-muted-foreground mb-1">
-                                  {paramName}
-                                </label>
-                                <div className="px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground">
-                                  {typeof paramValue === "object"
-                                    ? JSON.stringify(paramValue)
-                                    : String(paramValue)}
-                                </div>
-                              </div>
-                            )
-                          )}
-                        </div>
-                      )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Show empty state if no history and no output */}
-      {history.length === 0 && !output && (
-        <div className="text-center py-8">
-          <p className="text-sm text-muted-foreground">
-            No conversation history available for this test
-          </p>
-        </div>
-      )}
-    </div>
+    <SharedTestDetailView
+      history={result.testCase?.history || []}
+      output={result.output}
+      passed={result.evaluation?.passed ?? false}
+    />
   );
 }

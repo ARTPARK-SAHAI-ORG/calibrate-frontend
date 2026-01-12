@@ -681,7 +681,9 @@ export function TestsTabContent({
       <BenchmarkDialog
         isOpen={benchmarkDialogOpen}
         onClose={() => setBenchmarkDialogOpen(false)}
+        agentUuid={agentUuid}
         agentName={agentName}
+        tests={agentTests}
       />
     </div>
   );

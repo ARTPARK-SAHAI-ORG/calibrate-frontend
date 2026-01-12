@@ -2,29 +2,55 @@
 
 import React, { useState } from "react";
 import { llmProviders, type LLMModel } from "./agent-tabs/constants/providers";
+import { BenchmarkResultsDialog } from "./BenchmarkResultsDialog";
+
+type TestData = {
+  uuid: string;
+  name: string;
+  description: string;
+  type: "response" | "tool_call";
+  config: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+};
 
 type BenchmarkDialogProps = {
   isOpen: boolean;
   onClose: () => void;
+  agentUuid: string;
   agentName: string;
+  tests: TestData[];
 };
 
 export function BenchmarkDialog({
   isOpen,
   onClose,
+  agentUuid,
   agentName,
+  tests,
 }: BenchmarkDialogProps) {
   const [selectedModels, setSelectedModels] = useState<(LLMModel | null)[]>([
     null,
   ]);
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [showResults, setShowResults] = useState(false);
 
   if (!isOpen) return null;
 
   const handleClose = () => {
     setSelectedModels([null]);
+    setShowResults(false);
     onClose();
+  };
+
+  const handleRunBenchmark = () => {
+    setShowResults(true);
+  };
+
+  const handleCloseResults = () => {
+    setShowResults(false);
+    handleClose();
   };
 
   const handleAddModel = () => {
@@ -211,11 +237,7 @@ export function BenchmarkDialog({
             Cancel
           </button>
           <button
-            onClick={() => {
-              // TODO: Implement benchmark run
-              console.log("Running benchmark with models:", selectedModels);
-              handleClose();
-            }}
+            onClick={handleRunBenchmark}
             disabled={!canRunBenchmark}
             className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
@@ -250,6 +272,17 @@ export function BenchmarkDialog({
           availableProviders={getAvailableProviders(editingIndex)}
         />
       )}
+
+      {/* Benchmark Results Dialog */}
+      <BenchmarkResultsDialog
+        isOpen={showResults}
+        onClose={handleCloseResults}
+        agentUuid={agentUuid}
+        agentName={agentName}
+        testUuids={tests.map((t) => t.uuid)}
+        testNames={tests.map((t) => t.name)}
+        models={selectedModels.filter((m) => m !== null).map((m) => m!.id)}
+      />
     </div>
   );
 }
