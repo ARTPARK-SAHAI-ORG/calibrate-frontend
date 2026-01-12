@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
+import { sttProviders } from "../agent-tabs/constants/providers";
 
 type AudioTextRow = {
   id: string;
@@ -66,15 +67,8 @@ type EvaluationResult = {
   error?: string | null;
 };
 
-const providers = [
-  "deepgram",
-  "openai",
-  "cartesia",
-  "elevenlabs",
-  "whisper",
-  "google",
-  "sarvam",
-];
+// Use provider labels for display
+const providerLabels = sttProviders.map((p) => p.label);
 
 // Pastel color palette for providers
 const pastelColors = [
@@ -106,7 +100,7 @@ export function SpeechToTextEvaluation() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<string | null>(null);
   const [invalidRowIds, setInvalidRowIds] = useState<Set<string>>(new Set());
   const [selectedProviders, setSelectedProviders] = useState<Set<string>>(
-    new Set(providers)
+    new Set(providerLabels)
   );
   const [language, setLanguage] = useState<"english" | "hindi">("english");
   const [uploadStatus, setUploadStatus] = useState<{
@@ -288,12 +282,12 @@ export function SpeechToTextEvaluation() {
   };
 
   const toggleAllProviders = () => {
-    if (selectedProviders.size === providers.length) {
+    if (selectedProviders.size === providerLabels.length) {
       // Deselect all
       setSelectedProviders(new Set());
     } else {
       // Select all
-      setSelectedProviders(new Set(providers));
+      setSelectedProviders(new Set(providerLabels));
     }
   };
 
@@ -375,10 +369,11 @@ export function SpeechToTextEvaluation() {
       const audioPaths = rows.map((row) => row.s3Path!);
       const texts = rows.map((row) => row.text.trim());
 
-      // Map providers: whisper -> groq, others stay the same
-      const providers = Array.from(selectedProviders).map((provider) =>
-        provider === "whisper" ? "groq" : provider
-      );
+      // Map provider labels to their actual values
+      const providers = Array.from(selectedProviders).map((label) => {
+        const provider = sttProviders.find((p) => p.label === label);
+        return provider ? provider.value : label;
+      });
 
       // Make API call
       const response = await fetch(`${backendUrl}/stt/evaluate`, {
@@ -619,18 +614,18 @@ export function SpeechToTextEvaluation() {
             onClick={toggleAllProviders}
             className="ml-auto text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           >
-            {selectedProviders.size === providers.length
+            {selectedProviders.size === providerLabels.length
               ? "Deselect all"
               : "Select all"}
           </button>
         </div>
         <div className="flex flex-wrap gap-3">
-          {providers.map((provider) => {
-            const isSelected = selectedProviders.has(provider);
+          {providerLabels.map((providerLabel) => {
+            const isSelected = selectedProviders.has(providerLabel);
             return (
               <button
-                key={provider}
-                onClick={() => toggleProvider(provider)}
+                key={providerLabel}
+                onClick={() => toggleProvider(providerLabel)}
                 className={`h-9 px-4 rounded-md text-[13px] font-medium border transition-colors cursor-pointer flex items-center gap-2 ${
                   isSelected
                     ? "bg-foreground text-background border-foreground"
@@ -652,7 +647,7 @@ export function SpeechToTextEvaluation() {
                     />
                   </svg>
                 )}
-                {provider}
+                {providerLabel}
               </button>
             );
           })}

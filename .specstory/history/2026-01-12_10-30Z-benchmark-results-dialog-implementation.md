@@ -1532,3 +1532,562 @@ Now the benchmark results will show the actual test names (like "Check greeting 
 
 ---
 
+_**User (2026-01-11 09:21Z)**_
+
+for @src/components/evaluations/TextToSpeechEvaluation.tsx map orpheus as a provider label to groq as the value as done in @src/components/agent-tabs/constants/providers.ts 
+
+actually read the tts and stt providers from this file - for both tts and @src/components/evaluations/SpeechToTextEvaluation.tsx 
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to:
+1. For TextToSpeechEvaluation.tsx, map "orpheus" provider label to "groq" value (similar to how it's done in providers.ts)
+2. Read the tts and stt providers from the constants/providers.ts file for both TTS and STT evaluation components
+
+Looking at the providers.ts file:
+- sttProviders has whisper mapped to groq
+- ttsProviders has orpheus mapped to groq
+
+Currently in the evaluation components, providers are hardcoded. I need to:
+1. Import sttProviders and ttsProviders from the constants file
+2. Use the label for display and value for API calls
+3. Update both SpeechToTextEvaluation.tsx and TextToSpeechEvaluation.tsx</details></think>
+
+---
+
+I'll update both evaluation components to import and use the providers from the constants file.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -12,4 +12,5 @@
+    Cell,
+  } from "recharts";
++ import { ttsProviders } from "../agent-tabs/constants/providers";
+  
+  type TextRow = {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to remove the hardcoded providers array and update the component to use ttsProviders.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 8
+
+```diff
+@@ -59,12 +59,6 @@
+  };
+  
+- const providers = [
+-   "cartesia",
+-   "openai",
+-   "orpheus",
+-   "google",
+-   "elevenlabs",
+-   "sarvam",
+- ];
++ // Use provider labels for display
++ const providerLabels = ttsProviders.map((p) =&gt; p.label);
+  
+  // Pastel color palette for providers
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update all references to `providers` to use `providerLabels` for display, and also update the API call to use the actual values (mapping labels to values).</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -90,5 +90,5 @@
+    const [invalidRowIds, setInvalidRowIds] = useState&lt;Set&lt;string&gt;&gt;(new Set());
+    const [selectedProviders, setSelectedProviders] = useState&lt;Set&lt;string&gt;&gt;(
+-     new Set(providers)
++     new Set(providerLabels)
+    );
+    const [language, setLanguage] = useState&lt;"english" | "hindi"&gt;("english");
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the toggleAllProviders function to use providerLabels.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 2
+
+```diff
+@@ -178,10 +178,10 @@
+  
+    const toggleAllProviders = () =&gt; {
+-     if (selectedProviders.size === providers.length) {
++     if (selectedProviders.size === providerLabels.length) {
+        // Deselect all
+        setSelectedProviders(new Set());
+      } else {
+        // Select all
+-       setSelectedProviders(new Set(providers));
++       setSelectedProviders(new Set(providerLabels));
+      }
+    };
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the API call to map provider labels to their values.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 5, lines removed: 1
+
+```diff
+@@ -274,5 +274,9 @@
+          body: JSON.stringify({
+            texts: texts,
+-           providers: Array.from(selectedProviders),
++           // Map provider labels to their actual values
++           providers: Array.from(selectedProviders).map((label) =&gt; {
++             const provider = ttsProviders.find((p) =&gt; p.label === label);
++             return provider ? provider.value : label;
++           }),
+            language: language,
+          }),
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the provider selection section in the JSX to use providerLabels.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -446,5 +446,5 @@
+              className="ml-auto text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            &gt;
+-             {selectedProviders.size === providers.length
++             {selectedProviders.size === providerLabels.length
+                ? "Deselect all"
+                : "Select all"}
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the providers.map section in the JSX.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 4, lines removed: 4
+
+```diff
+@@ -452,10 +452,10 @@
+          &lt;/div&gt;
+          &lt;div className="flex flex-wrap gap-3"&gt;
+-           {providers.map((provider) =&gt; {
+-             const isSelected = selectedProviders.has(provider);
++           {providerLabels.map((providerLabel) =&gt; {
++             const isSelected = selectedProviders.has(providerLabel);
+              return (
+                &lt;button
+-                 key={provider}
+-                 onClick={() =&gt; toggleProvider(provider)}
++                 key={providerLabel}
++                 onClick={() =&gt; toggleProvider(providerLabel)}
+                  className={&#96;h-9 px-4 rounded-md text-[13px] font-medium border transition-colors cursor-pointer flex items-center gap-2 ${
+                    isSelected
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -479,5 +479,5 @@
+                    &lt;/svg&gt;
+                  )}
+-                 {provider}
++                 {providerLabel}
+                &lt;/button&gt;
+              );
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me do the same for SpeechToTextEvaluation.tsx. I'll import sttProviders and update it similarly.</details></think>
+
+---
+
+Now let me update the SpeechToTextEvaluation.tsx file:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -12,4 +12,5 @@
+    Cell,
+  } from "recharts";
++ import { sttProviders } from "../agent-tabs/constants/providers";
+  
+  type AudioTextRow = {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I'll update the providers array and all references in SpeechToTextEvaluation.tsx.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 9
+
+```diff
+@@ -68,13 +68,6 @@
+  };
+  
+- const providers = [
+-   "deepgram",
+-   "openai",
+-   "cartesia",
+-   "elevenlabs",
+-   "whisper",
+-   "google",
+-   "sarvam",
+- ];
++ // Use provider labels for display
++ const providerLabels = sttProviders.map((p) =&gt; p.label);
+  
+  // Pastel color palette for providers
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update all the references in SpeechToTextEvaluation.tsx. Let me update them one by one.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -101,5 +101,5 @@
+    const [invalidRowIds, setInvalidRowIds] = useState&lt;Set&lt;string&gt;&gt;(new Set());
+    const [selectedProviders, setSelectedProviders] = useState&lt;Set&lt;string&gt;&gt;(
+-     new Set(providers)
++     new Set(providerLabels)
+    );
+    const [language, setLanguage] = useState&lt;"english" | "hindi"&gt;("english");
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update toggleAllProviders.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 2
+
+```diff
+@@ -283,10 +283,10 @@
+  
+    const toggleAllProviders = () =&gt; {
+-     if (selectedProviders.size === providers.length) {
++     if (selectedProviders.size === providerLabels.length) {
+        // Deselect all
+        setSelectedProviders(new Set());
+      } else {
+        // Select all
+-       setSelectedProviders(new Set(providers));
++       setSelectedProviders(new Set(providerLabels));
+      }
+    };
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the API call in SpeechToTextEvaluation.tsx to map labels to values using the sttProviders array. I need to find the existing code that does the mapping for whisper -> groq and update it.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 5, lines removed: 4
+
+```diff
+@@ -370,8 +370,9 @@
+        const texts = rows.map((row) =&gt; row.text.trim());
+  
+-       // Map providers: whisper -&gt; groq, others stay the same
+-       const providers = Array.from(selectedProviders).map((provider) =&gt;
+-         provider === "whisper" ? "groq" : provider
+-       );
++       // Map provider labels to their actual values
++       const providers = Array.from(selectedProviders).map((label) =&gt; {
++         const provider = sttProviders.find((p) =&gt; p.label === label);
++         return provider ? provider.value : label;
++       });
+  
+        // Make API call
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the JSX for the "Select all" / "Deselect all" button and the provider list.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -615,5 +615,5 @@
+              className="ml-auto text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            &gt;
+-             {selectedProviders.size === providers.length
++             {selectedProviders.size === providerLabels.length
+                ? "Deselect all"
+                : "Select all"}
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the providers.map in the JSX for the provider buttons.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 4, lines removed: 4
+
+```diff
+@@ -621,10 +621,10 @@
+          &lt;/div&gt;
+          &lt;div className="flex flex-wrap gap-3"&gt;
+-           {providers.map((provider) =&gt; {
+-             const isSelected = selectedProviders.has(provider);
++           {providerLabels.map((providerLabel) =&gt; {
++             const isSelected = selectedProviders.has(providerLabel);
+              return (
+                &lt;button
+-                 key={provider}
+-                 onClick={() =&gt; toggleProvider(provider)}
++                 key={providerLabel}
++                 onClick={() =&gt; toggleProvider(providerLabel)}
+                  className={&#96;h-9 px-4 rounded-md text-[13px] font-medium border transition-colors cursor-pointer flex items-center gap-2 ${
+                    isSelected
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -648,5 +648,5 @@
+                    &lt;/svg&gt;
+                  )}
+-                 {provider}
++                 {providerLabel}
+                &lt;/button&gt;
+              );
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me check for lint errors in both files.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 2 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+All lints pass. The changes are complete. Let me summarize what was done:
+
+1. **TextToSpeechEvaluation.tsx**:
+   - Imported `ttsProviders` from constants/providers.ts
+   - Replaced hardcoded providers array with `providerLabels` derived from ttsProviders
+   - Updated the API call to map provider labels to their actual values (e.g., "orpheus" → "groq")
+
+2. **SpeechToTextEvaluation.tsx**:
+   - Imported `sttProviders` from constants/providers.ts
+   - Replaced hardcoded providers array with `providerLabels` derived from sttProviders
+   - Updated the API call to map provider labels to their actual values (e.g., "whisper" → "groq")</details></think>
+
+---
+
+Done! Both evaluation components now read providers from the constants file:
+
+**Changes made:**
+
+1. **TextToSpeechEvaluation.tsx**:
+   - Imported `ttsProviders` from `../agent-tabs/constants/providers`
+   - Uses `providerLabels` (derived from ttsProviders) for display
+   - Maps labels to values in API call (e.g., "orpheus" → "groq")
+
+2. **SpeechToTextEvaluation.tsx**:
+   - Imported `sttProviders` from `../agent-tabs/constants/providers`
+   - Uses `providerLabels` (derived from sttProviders) for display
+   - Maps labels to values in API call (e.g., "whisper" → "groq")
+
+Now both components use the centralized provider definitions from `providers.ts`, where:
+- STT: `whisper` label maps to `groq` value
+- TTS: `orpheus` label maps to `groq` value
+
+---
+
