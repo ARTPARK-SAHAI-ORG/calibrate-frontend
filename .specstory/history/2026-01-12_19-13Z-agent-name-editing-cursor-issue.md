@@ -12283,15 +12283,27 @@ _**Agent (model composer-1, mode Agent)**_
 ---
 
 
+Adding a segmented tab component to separate performance and latency metrics. Checking for existing tab/segmented control components:
+
 
 ---
 
-<tool-use data-tool-type="unknown" data-tool-name="codebase_search">
+<tool-use data-tool-type="search" data-tool-name="codebase_search">
 <details>
-<summary>Tool use: **codebase_search**</summary>
-
-Status: **loading**
-
+                <summary>Tool use: **codebase_search** • Searched codebase "How are tabs or segmented controls implemented in this codebase?" • **10** results</summary>
+            
+| File | Lines |
+|------|-------|
+| `src/components/AgentDetail.tsx` | L37-743 |
+| `src/components/AgentDetail.tsx` | L41-743 |
+| `src/components/evaluations/TextToSpeechEvaluation.tsx` | L61-948 |
+| `src/components/evaluations/SpeechToTextEvaluation.tsx` | L70-1251 |
+| `src/app/simulations/[uuid]/page.tsx` | L57-694 |
+| `src/components/AddTestDialog.tsx` | L61-1635 |
+| `src/components/BenchmarkResultsDialog.tsx` | L53-529 |
+| `src/components/simulation-tabs/SimulationConfigTab.tsx` | L6-149 |
+| `src/components/agent-tabs/SettingsTabContent.tsx` | L4-44 |
+| `src/app/simulations/[uuid]/page.tsx` | L46-694 |
 
 </details>
 </tool-use>
@@ -12303,15 +12315,13 @@ Status: **loading**
 ---
 
 
+Updating the overall metrics section to use tabs:
+
 
 ---
 
-<tool-use data-tool-type="unknown" data-tool-name="read_file">
-<details>
-<summary>Tool use: **read_file**</summary>
-
-Status: **loading**
-
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: src/app/simulations/[uuid]/runs/[runId]/page.tsx</summary>
 
 </details>
 </tool-use>
@@ -12322,15 +12332,27 @@ Status: **loading**
 
 ---
 
+
+Adding tab state and updating the metrics section:
 
 
 ---
 
 <tool-use data-tool-type="write" data-tool-name="search_replace">
 
-<details><summary>Tool use: **search_replace**</summary>
+<details><summary>Tool use: **search_replace** • Edit file: src/app/simulations/[uuid]/runs/[runId]/page.tsx</summary>
 
-Status: **loading**
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -76,4 +76,5 @@
+    const [selectedSimulation, setSelectedSimulation] =
+      useState&lt;SimulationResult | null&gt;(null);
++   const [activeMetricsTab, setActiveMetricsTab] = useState&lt;"performance" | "latency"&gt;("performance");
+  
+    useEffect(() =&gt; {
+```
 
 </details>
 
@@ -12339,6 +12361,837 @@ Status: **loading**
 ---
 
 
+
+---
+
+
+Updating the overall metrics section to use tabs:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: src/app/simulations/[uuid]/runs/[runId]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Replacing the metrics section with a tabbed interface:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: src/app/simulations/[uuid]/runs/[runId]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 161, lines removed: 140
+
+```diff
+@@ -421,151 +421,172 @@
+  
+              {/* Overall Metrics */}
+-             {runData.metrics &amp;&amp; (
+-               &lt;div&gt;
+-                 &lt;h2 className="text-lg font-semibold mb-4"&gt;Overall Metrics&lt;/h2&gt;
+-                 {(() =&gt; {
+-                   // Separate metrics into regular and latency metrics
+-                   const latencyKeys = [
+-                     "stt/ttft",
+-                     "llm/ttft",
+-                     "tts/ttft",
+-                     "stt/processing_time",
+-                     "llm/processing_time",
+-                     "tts/processing_time",
+-                   ];
++             {runData.metrics &amp;&amp; (() =&gt; {
++               // Separate metrics into regular and latency metrics
++               const latencyKeys = [
++                 "stt/ttft",
++                 "llm/ttft",
++                 "tts/ttft",
++                 "stt/processing_time",
++                 "llm/processing_time",
++                 "tts/processing_time",
++               ];
+  
+-                   const regularMetrics: Array&lt;[string, MetricData]&gt; = [];
+-                   const latencyMetrics: Array&lt;[string, MetricData]&gt; = [];
++               const regularMetrics: Array&lt;[string, MetricData]&gt; = [];
++               const latencyMetrics: Array&lt;[string, MetricData]&gt; = [];
+  
+-                   Object.entries(runData.metrics).forEach(([key, metric]) =&gt; {
+-                     if (latencyKeys.includes(key)) {
+-                       latencyMetrics.push([key, metric as MetricData]);
+-                     } else {
+-                       regularMetrics.push([key, metric as MetricData]);
+-                     }
+-                   });
++               Object.entries(runData.metrics).forEach(([key, metric]) =&gt; {
++                 if (latencyKeys.includes(key)) {
++                   latencyMetrics.push([key, metric as MetricData]);
++                 } else {
++                   regularMetrics.push([key, metric as MetricData]);
++                 }
++               });
+  
+-                   // Calculate latency metrics from evaluation_results if not in metrics
+-                   if (
+-                     runData.simulation_results &amp;&amp;
+-                     latencyMetrics.length === 0
+-                   ) {
+-                     const latencyValues: Record&lt;string, number[]&gt; = {};
+-                     latencyKeys.forEach((key) =&gt; {
+-                       latencyValues[key] = [];
+-                     });
++               // Calculate latency metrics from evaluation_results if not in metrics
++               if (
++                 runData.simulation_results &amp;&amp;
++                 latencyMetrics.length === 0
++               ) {
++                 const latencyValues: Record&lt;string, number[]&gt; = {};
++                 latencyKeys.forEach((key) =&gt; {
++                   latencyValues[key] = [];
++                 });
+  
+-                     runData.simulation_results.forEach((simulation) =&gt; {
+-                       latencyKeys.forEach((key) =&gt; {
+-                         const result = simulation.evaluation_results.find(
+-                           (r) =&gt; r.name === key
+-                         );
+-                         if (result &amp;&amp; typeof result.value === "number") {
+-                           latencyValues[key].push(result.value);
+-                         }
+-                       });
+-                     });
++                 runData.simulation_results.forEach((simulation) =&gt; {
++                   latencyKeys.forEach((key) =&gt; {
++                     const result = simulation.evaluation_results.find(
++                       (r) =&gt; r.name === key
++                     );
++                     if (result &amp;&amp; typeof result.value === "number") {
++                       latencyValues[key].push(result.value);
++                     }
++                   });
++                 });
+  
+-                     latencyKeys.forEach((key) =&gt; {
+-                       if (latencyValues[key].length &gt; 0) {
+-                         const mean =
+-                           latencyValues[key].reduce((a, b) =&gt; a + b, 0) /
+-                           latencyValues[key].length;
+-                         latencyMetrics.push([
+-                           key,
+-                           {
+-                             mean,
+-                             std: 0,
+-                             values: latencyValues[key],
+-                           },
+-                         ]);
+-                       }
+-                     });
+-                   }
++                 latencyKeys.forEach((key) =&gt; {
++                   if (latencyValues[key].length &gt; 0) {
++                     const mean =
++                       latencyValues[key].reduce((a, b) =&gt; a + b, 0) /
++                       latencyValues[key].length;
++                     latencyMetrics.push([
++                       key,
++                       {
++                         mean,
++                         std: 0,
++                         values: latencyValues[key],
++                       },
++                     ]);
++                   }
++                 });
++               }
+  
+-                   return (
+-                     &lt;&gt;
+-                       {/* Regular Metrics Row */}
+-                       {regularMetrics.length &gt; 0 &amp;&amp; (
+-                         &lt;div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4"&gt;
+-                           {regularMetrics.map(([key, metric]) =&gt; {
+-                             const mean = metric.mean;
+-                             const isSttLlmJudge =
+-                               key === "stt_llm_judge" ||
+-                               key === "stt_llm_judge_score";
+-                             return (
+-                               &lt;div key={key}&gt;
+-                                 &lt;div className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5"&gt;
+-                                   {key}
+-                                   {isSttLlmJudge &amp;&amp; (
+-                                     &lt;Tooltip content="This is the speech to text accuracy for the text spoken by the simulated user calculated by comparing it with the transcribed text by the agent"&gt;
+-                                       &lt;svg
+-                                         className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+-                                         fill="none"
+-                                         viewBox="0 0 24 24"
+-                                         stroke="currentColor"
+-                                         strokeWidth={2}
+-                                       &gt;
+-                                         &lt;path
+-                                           strokeLinecap="round"
+-                                           strokeLinejoin="round"
+-                                           d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+-                                         /&gt;
+-                                       &lt;/svg&gt;
+-                                     &lt;/Tooltip&gt;
+-                                   )}
+-                                 &lt;/div&gt;
+-                                 &lt;div className="text-base font-medium text-foreground"&gt;
+-                                   {Math.round(mean * 100)}%
+-                                 &lt;/div&gt;
+-                               &lt;/div&gt;
+-                             );
+-                           })}
+-                         &lt;/div&gt;
+-                       )}
++               return (
++                 &lt;div&gt;
++                   &lt;h2 className="text-lg font-semibold mb-4"&gt;Overall Metrics&lt;/h2&gt;
++                   
++                   {/* Tab Navigation */}
++                   &lt;div className="flex gap-2 border-b border-border mb-4"&gt;
++                     &lt;button
++                       onClick={() =&gt; setActiveMetricsTab("performance")}
++                       className={&#96;px-4 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
++                         activeMetricsTab === "performance"
++                           ? "border-foreground text-foreground"
++                           : "border-transparent text-muted-foreground hover:text-foreground"
++                       }&#96;}
++                     &gt;
++                       Performance
++                     &lt;/button&gt;
++                     &lt;button
++                       onClick={() =&gt; setActiveMetricsTab("latency")}
++                       className={&#96;px-4 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
++                         activeMetricsTab === "latency"
++                           ? "border-foreground text-foreground"
++                           : "border-transparent text-muted-foreground hover:text-foreground"
++                       }&#96;}
++                     &gt;
++                       Latency
++                     &lt;/button&gt;
++                   &lt;/div&gt;
++ 
++                   {/* Performance Tab Content */}
++                   {activeMetricsTab === "performance" &amp;&amp; regularMetrics.length &gt; 0 &amp;&amp; (
++                     &lt;div className="grid grid-cols-2 md:grid-cols-4 gap-4"&gt;
++                       {regularMetrics.map(([key, metric]) =&gt; {
++                         const mean = metric.mean;
++                         const isSttLlmJudge =
++                           key === "stt_llm_judge" ||
++                           key === "stt_llm_judge_score";
++                         return (
++                           &lt;div key={key}&gt;
++                             &lt;div className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5"&gt;
++                               {key}
++                               {isSttLlmJudge &amp;&amp; (
++                                 &lt;Tooltip content="This is the speech to text accuracy for the text spoken by the simulated user calculated by comparing it with the transcribed text by the agent"&gt;
++                                   &lt;svg
++                                     className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
++                                     fill="none"
++                                     viewBox="0 0 24 24"
++                                     stroke="currentColor"
++                                     strokeWidth={2}
++                                   &gt;
++                                     &lt;path
++                                       strokeLinecap="round"
++                                       strokeLinejoin="round"
++                                       d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
++                                     /&gt;
++                                   &lt;/svg&gt;
++                                 &lt;/Tooltip&gt;
++                               )}
++                             &lt;/div&gt;
++                             &lt;div className="text-base font-medium text-foreground"&gt;
++                               {Math.round(mean * 100)}%
++                             &lt;/div&gt;
++                           &lt;/div&gt;
++                         );
++                       })}
++                     &lt;/div&gt;
++                   )}
+  
+-                       {/* Latency Metrics Row */}
+-                       {latencyMetrics.length &gt; 0 &amp;&amp; (
+-                         &lt;div className="grid grid-cols-2 md:grid-cols-6 gap-4"&gt;
+-                           {latencyMetrics.map(([key, metric]) =&gt; {
+-                             const mean = metric.mean;
+-                             const tooltipContent = getLatencyMetricTooltip(key);
+-                             return (
+-                               &lt;div key={key}&gt;
+-                                 &lt;div className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5"&gt;
+-                                   {key}
+-                                   {tooltipContent &amp;&amp; (
+-                                     &lt;Tooltip content={tooltipContent}&gt;
+-                                       &lt;svg
+-                                         className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+-                                         fill="none"
+-                                         viewBox="0 0 24 24"
+-                                         stroke="currentColor"
+-                                         strokeWidth={2}
+-                                       &gt;
+-                                         &lt;path
+-                                           strokeLinecap="round"
+-                                           strokeLinejoin="round"
+-                                           d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+-                                         /&gt;
+-                                       &lt;/svg&gt;
+-                                     &lt;/Tooltip&gt;
+-                                   )}
+-                                 &lt;/div&gt;
+-                                 &lt;div className="text-base font-medium text-foreground"&gt;
+-                                   {mean &lt; 1
+-                                     ? &#96;${(mean * 1000).toFixed(2)}ms&#96;
+-                                     : &#96;${mean.toFixed(2)}s&#96;}
+-                                 &lt;/div&gt;
+-                               &lt;/div&gt;
+-                             );
+-                           })}
+-                         &lt;/div&gt;
+-                       )}
+-                     &lt;/&gt;
+-                   );
+-                 })()}
+-               &lt;/div&gt;
+-             )}
++                   {/* Latency Tab Content */}
++                   {activeMetricsTab === "latency" &amp;&amp; latencyMetrics.length &gt; 0 &amp;&amp; (
++                     &lt;div className="grid grid-cols-2 md:grid-cols-4 gap-4"&gt;
++                       {latencyMetrics.map(([key, metric]) =&gt; {
++                         const mean = metric.mean;
++                         const tooltipContent = getLatencyMetricTooltip(key);
++                         return (
++                           &lt;div key={key}&gt;
++                             &lt;div className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5"&gt;
++                               {key}
++                               {tooltipContent &amp;&amp; (
++                                 &lt;Tooltip content={tooltipContent}&gt;
++                                   &lt;svg
++                                     className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
++                                     fill="none"
++                                     viewBox="0 0 24 24"
++                                     stroke="currentColor"
++                                     strokeWidth={2}
++                                   &gt;
++                                     &lt;path
++                                       strokeLinecap="round"
++                                       strokeLinejoin="round"
++                                       d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
++                                     /&gt;
++                                   &lt;/svg&gt;
++                                 &lt;/Tooltip&gt;
++                               )}
++                             &lt;/div&gt;
++                             &lt;div className="text-base font-medium text-foreground"&gt;
++                               {mean &lt; 1
++                                 ? &#96;${(mean * 1000).toFixed(2)}ms&#96;
++                                 : &#96;${mean.toFixed(2)}s&#96;}
++                             &lt;/div&gt;
++                           &lt;/div&gt;
++                         );
++                       })}
++                     &lt;/div&gt;
++                   )}
++                 &lt;/div&gt;
++               );
++             })()}
+  
+              {/* Simulation Results Table */}
+```
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `src/app/simulations/[uuid]/runs/[runId]/page.tsx`
+
+Lint results
+
+Lint errors for `src/app/simulations/[uuid]/runs/[runId]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+| 'getPassFailStatus' is declared but its value is never read. | 184:9-184:26 | DIAGNOSTIC_SEVERITY_HINT |
+| 'getPassFailClass' is declared but its value is never read. | 188:9-188:25 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Added a segmented tab interface for the metrics section:
+
+1. **Tab navigation**: Two tabs — "Performance" and "Latency" — with active state styling
+2. **Performance tab**: Shows all non-latency metrics in a 4-column grid (including `stt_llm_judge` with its info icon)
+3. **Latency tab**: Shows all latency metrics in a 4-column grid (with info icons and tooltips)
+
+The tabs use the same styling pattern as other tabs in the codebase. Metrics are separated into performance and latency, and each tab displays its metrics in a 4-column grid.
+
+---
+
+_**User (2026-01-15 01:14Z)**_
+
+don't show the performance and latency tabs for chat type simulation run
+
+---
+
+_**Agent (model composer-1, mode Agent)**_
+
+
+
+---
+
+
+Updating the code to hide the tabs for chat-type simulation runs:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: src/app/simulations/[uuid]/runs/[runId]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: src/app/simulations/[uuid]/runs/[runId]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Updating the code to conditionally show tabs only for non-chat runs:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: src/app/simulations/[uuid]/runs/[runId]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: undefined
+
+```diff
+@@ -480,4 +480,6 @@
+                    });
+                  }
++ 
++                 const isChatType = runData.type === "chat";
+  
+                  return (
+```
+
+**Chunk 2**
+Lines added: 69, lines removed: 64
+
+```diff
+@@ -487,70 +489,75 @@
+                      &lt;/h2&gt;
+  
+-                     {/* Tab Navigation */}
+-                     &lt;div className="flex gap-2 border-b border-border mb-4"&gt;
+-                       &lt;button
+-                         onClick={() =&gt; setActiveMetricsTab("performance")}
+-                         className={&#96;px-4 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+-                           activeMetricsTab === "performance"
+-                             ? "border-foreground text-foreground"
+-                             : "border-transparent text-muted-foreground hover:text-foreground"
+-                         }&#96;}
+-                       &gt;
+-                         Performance
+-                       &lt;/button&gt;
+-                       &lt;button
+-                         onClick={() =&gt; setActiveMetricsTab("latency")}
+-                         className={&#96;px-4 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+-                           activeMetricsTab === "latency"
+-                             ? "border-foreground text-foreground"
+-                             : "border-transparent text-muted-foreground hover:text-foreground"
+-                         }&#96;}
+-                       &gt;
+-                         Latency
+-                       &lt;/button&gt;
+-                     &lt;/div&gt;
++                     {/* Tab Navigation - only show for non-chat types */}
++                     {!isChatType &amp;&amp; (
++                       &lt;div className="flex gap-2 border-b border-border mb-4"&gt;
++                         &lt;button
++                           onClick={() =&gt; setActiveMetricsTab("performance")}
++                           className={&#96;px-4 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
++                             activeMetricsTab === "performance"
++                               ? "border-foreground text-foreground"
++                               : "border-transparent text-muted-foreground hover:text-foreground"
++                           }&#96;}
++                         &gt;
++                           Performance
++                         &lt;/button&gt;
++                         &lt;button
++                           onClick={() =&gt; setActiveMetricsTab("latency")}
++                           className={&#96;px-4 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
++                             activeMetricsTab === "latency"
++                               ? "border-foreground text-foreground"
++                               : "border-transparent text-muted-foreground hover:text-foreground"
++                           }&#96;}
++                         &gt;
++                           Latency
++                         &lt;/button&gt;
++                       &lt;/div&gt;
++                     )}
+  
+-                     {/* Performance Tab Content */}
+-                     {activeMetricsTab === "performance" &amp;&amp;
+-                       regularMetrics.length &gt; 0 &amp;&amp; (
+-                         &lt;div className="grid grid-cols-2 md:grid-cols-4 gap-4"&gt;
+-                           {regularMetrics.map(([key, metric]) =&gt; {
+-                             const mean = metric.mean;
+-                             const isSttLlmJudge =
+-                               key === "stt_llm_judge" ||
+-                               key === "stt_llm_judge_score";
+-                             return (
+-                               &lt;div key={key}&gt;
+-                                 &lt;div className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5"&gt;
+-                                   {key}
+-                                   {isSttLlmJudge &amp;&amp; (
+-                                     &lt;Tooltip content="This is the speech to text accuracy for the text spoken by the simulated user calculated by comparing it with the transcribed text by the agent"&gt;
+-                                       &lt;svg
+-                                         className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+-                                         fill="none"
+-                                         viewBox="0 0 24 24"
+-                                         stroke="currentColor"
+-                                         strokeWidth={2}
+-                                       &gt;
+-                                         &lt;path
+-                                           strokeLinecap="round"
+-                                           strokeLinejoin="round"
+-                                           d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+-                                         /&gt;
+-                                       &lt;/svg&gt;
+-                                     &lt;/Tooltip&gt;
+-                                   )}
+-                                 &lt;/div&gt;
+-                                 &lt;div className="text-base font-medium text-foreground"&gt;
+-                                   {Math.round(mean * 100)}%
+-                                 &lt;/div&gt;
+-                               &lt;/div&gt;
+-                             );
+-                           })}
+-                         &lt;/div&gt;
+-                       )}
++                     {/* Performance Tab Content - show for chat type or when performance tab is active */}
++                     {((isChatType &amp;&amp; regularMetrics.length &gt; 0) ||
++                       (!isChatType &amp;&amp;
++                         activeMetricsTab === "performance" &amp;&amp;
++                         regularMetrics.length &gt; 0)) &amp;&amp; (
++                       &lt;div className="grid grid-cols-2 md:grid-cols-4 gap-4"&gt;
++                         {regularMetrics.map(([key, metric]) =&gt; {
++                           const mean = metric.mean;
++                           const isSttLlmJudge =
++                             key === "stt_llm_judge" ||
++                             key === "stt_llm_judge_score";
++                           return (
++                             &lt;div key={key}&gt;
++                               &lt;div className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5"&gt;
++                                 {key}
++                                 {isSttLlmJudge &amp;&amp; (
++                                   &lt;Tooltip content="This is the speech to text accuracy for the text spoken by the simulated user calculated by comparing it with the transcribed text by the agent"&gt;
++                                     &lt;svg
++                                       className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
++                                       fill="none"
++                                       viewBox="0 0 24 24"
++                                       stroke="currentColor"
++                                       strokeWidth={2}
++                                     &gt;
++                                       &lt;path
++                                         strokeLinecap="round"
++                                         strokeLinejoin="round"
++                                         d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
++                                       /&gt;
++                                     &lt;/svg&gt;
++                                   &lt;/Tooltip&gt;
++                                 )}
++                               &lt;/div&gt;
++                               &lt;div className="text-base font-medium text-foreground"&gt;
++                                 {Math.round(mean * 100)}%
++                               &lt;/div&gt;
++                             &lt;/div&gt;
++                           );
++                         })}
++                       &lt;/div&gt;
++                     )}
+  
+-                     {/* Latency Tab Content */}
+-                     {activeMetricsTab === "latency" &amp;&amp;
++                     {/* Latency Tab Content - only show for non-chat types */}
++                     {!isChatType &amp;&amp;
++                       activeMetricsTab === "latency" &amp;&amp;
+                        latencyMetrics.length &gt; 0 &amp;&amp; (
+                          &lt;div className="grid grid-cols-2 md:grid-cols-4 gap-4"&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `src/app/simulations/[uuid]/runs/[runId]/page.tsx`
+
+Lint results
+
+Lint errors for `src/app/simulations/[uuid]/runs/[runId]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+| 'getPassFailStatus' is declared but its value is never read. | 186:9-186:26 | DIAGNOSTIC_SEVERITY_HINT |
+| 'getPassFailClass' is declared but its value is never read. | 190:9-190:25 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Updated the code to hide the Performance and Latency tabs for chat-type simulation runs.
+
+1. **For chat type runs**: Tabs are hidden, and all regular metrics are shown directly in a 4-column grid.
+2. **For voice/audio type runs**: Tabs are shown, allowing switching between Performance and Latency metrics.
+
+The code checks `runData.type === "chat"` and conditionally renders the tabs and content accordingly.
+
+---
+
+_**User (2026-01-15 01:14Z)**_
+
+add the audio file to play in the transcript window below the Agent header
+
+---
+
+_**Agent (model composer-1, mode Agent)**_
+
+
+
+---
+
+
+Updating the transcript rendering to show the audio player below the "Agent" header. Checking the current implementation:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: src/app/simulations/[uuid]/runs/[runId]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: src/app/simulations/[uuid]/runs/[runId]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Moving the audio player to appear below the "Agent" header for assistant messages:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: src/app/simulations/[uuid]/runs/[runId]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 10, lines removed: 1
+
+```diff
+@@ -831,5 +831,14 @@
+                          }&#96;}
+                        &gt;
+-                         {/* Audio Player - show for voice runs */}
++                         {/* Message Header - show for assistant messages */}
++                         {entry.role === "assistant" &amp;&amp; (
++                           &lt;div className="flex items-center gap-2"&gt;
++                             &lt;span className="text-sm font-medium text-white"&gt;
++                               {entry.tool_calls ? "Agent Tool Call" : "Agent"}
++                             &lt;/span&gt;
++                           &lt;/div&gt;
++                         )}
++ 
++                         {/* Audio Player - show for voice runs, below Agent header for assistant messages */}
+                          {audioUrl &amp;&amp; (
+                            &lt;div
+```
+
+**Chunk 2**
+Lines added: undefined, lines removed: 9
+
+```diff
+@@ -847,13 +856,4 @@
+                            &lt;/div&gt;
+                          )}
+- 
+-                         {/* Message Header - show for assistant messages */}
+-                         {entry.role === "assistant" &amp;&amp; (
+-                           &lt;div className="flex items-center gap-2"&gt;
+-                             &lt;span className="text-sm font-medium text-white"&gt;
+-                               {entry.tool_calls ? "Agent Tool Call" : "Agent"}
+-                             &lt;/span&gt;
+-                           &lt;/div&gt;
+-                         )}
+  
+                          {/* User Message */}
+```
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `src/app/simulations/[uuid]/runs/[runId]/page.tsx`
+
+Lint results
+
+Lint errors for `src/app/simulations/[uuid]/runs/[runId]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+| 'getPassFailStatus' is declared but its value is never read. | 186:9-186:26 | DIAGNOSTIC_SEVERITY_HINT |
+| 'getPassFailClass' is declared but its value is never read. | 190:9-190:25 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Moved the audio player to appear below the "Agent" header for assistant messages. Order:
+
+1. "Agent" header
+2. Audio player (if available for voice runs)
+3. Message content
+
+For user messages, the audio player remains above the message content. The audio player now appears directly below the "Agent" header for assistant messages.
 
 ---
 

@@ -480,78 +480,85 @@ export default function SimulationRunPage() {
                   });
                 }
 
+                const isChatType = runData.type === "chat";
+
                 return (
                   <div>
                     <h2 className="text-lg font-semibold mb-4">
                       Overall Metrics
                     </h2>
 
-                    {/* Tab Navigation */}
-                    <div className="flex gap-2 border-b border-border mb-4">
-                      <button
-                        onClick={() => setActiveMetricsTab("performance")}
-                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
-                          activeMetricsTab === "performance"
-                            ? "border-foreground text-foreground"
-                            : "border-transparent text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        Performance
-                      </button>
-                      <button
-                        onClick={() => setActiveMetricsTab("latency")}
-                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
-                          activeMetricsTab === "latency"
-                            ? "border-foreground text-foreground"
-                            : "border-transparent text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        Latency
-                      </button>
-                    </div>
+                    {/* Tab Navigation - only show for non-chat types */}
+                    {!isChatType && (
+                      <div className="flex gap-2 border-b border-border mb-4">
+                        <button
+                          onClick={() => setActiveMetricsTab("performance")}
+                          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+                            activeMetricsTab === "performance"
+                              ? "border-foreground text-foreground"
+                              : "border-transparent text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          Performance
+                        </button>
+                        <button
+                          onClick={() => setActiveMetricsTab("latency")}
+                          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+                            activeMetricsTab === "latency"
+                              ? "border-foreground text-foreground"
+                              : "border-transparent text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          Latency
+                        </button>
+                      </div>
+                    )}
 
-                    {/* Performance Tab Content */}
-                    {activeMetricsTab === "performance" &&
-                      regularMetrics.length > 0 && (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          {regularMetrics.map(([key, metric]) => {
-                            const mean = metric.mean;
-                            const isSttLlmJudge =
-                              key === "stt_llm_judge" ||
-                              key === "stt_llm_judge_score";
-                            return (
-                              <div key={key}>
-                                <div className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5">
-                                  {key}
-                                  {isSttLlmJudge && (
-                                    <Tooltip content="This is the speech to text accuracy for the text spoken by the simulated user calculated by comparing it with the transcribed text by the agent">
-                                      <svg
-                                        className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                        strokeWidth={2}
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-                                        />
-                                      </svg>
-                                    </Tooltip>
-                                  )}
-                                </div>
-                                <div className="text-base font-medium text-foreground">
-                                  {Math.round(mean * 100)}%
-                                </div>
+                    {/* Performance Tab Content - show for chat type or when performance tab is active */}
+                    {((isChatType && regularMetrics.length > 0) ||
+                      (!isChatType &&
+                        activeMetricsTab === "performance" &&
+                        regularMetrics.length > 0)) && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {regularMetrics.map(([key, metric]) => {
+                          const mean = metric.mean;
+                          const isSttLlmJudge =
+                            key === "stt_llm_judge" ||
+                            key === "stt_llm_judge_score";
+                          return (
+                            <div key={key}>
+                              <div className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5">
+                                {key}
+                                {isSttLlmJudge && (
+                                  <Tooltip content="This is the speech to text accuracy for the text spoken by the simulated user calculated by comparing it with the transcribed text by the agent">
+                                    <svg
+                                      className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      strokeWidth={2}
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                                      />
+                                    </svg>
+                                  </Tooltip>
+                                )}
                               </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                              <div className="text-base font-medium text-foreground">
+                                {Math.round(mean * 100)}%
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
 
-                    {/* Latency Tab Content */}
-                    {activeMetricsTab === "latency" &&
+                    {/* Latency Tab Content - only show for non-chat types */}
+                    {!isChatType &&
+                      activeMetricsTab === "latency" &&
                       latencyMetrics.length > 0 && (
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           {latencyMetrics.map(([key, metric]) => {
@@ -823,7 +830,16 @@ export default function SimulationRunPage() {
                           entry.role === "user" ? "flex flex-col items-end" : ""
                         }`}
                       >
-                        {/* Audio Player - show for voice runs */}
+                        {/* Message Header - show for assistant messages */}
+                        {entry.role === "assistant" && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-white">
+                              {entry.tool_calls ? "Agent Tool Call" : "Agent"}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Audio Player - show for voice runs, below Agent header for assistant messages */}
                         {audioUrl && (
                           <div
                             className={
@@ -837,15 +853,6 @@ export default function SimulationRunPage() {
                             >
                               Your browser does not support the audio element.
                             </audio>
-                          </div>
-                        )}
-
-                        {/* Message Header - show for assistant messages */}
-                        {entry.role === "assistant" && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-white">
-                              {entry.tool_calls ? "Agent Tool Call" : "Agent"}
-                            </span>
                           </div>
                         )}
 
