@@ -410,7 +410,7 @@ export function EvaluationTabContent({
                       saveRef.current();
                     }, 0);
                   }}
-                  className="h-10 px-4 rounded-md text-base font-medium bg-white text-gray-900 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {editingCriteriaUuid ? "Save" : "Add criteria"}
                 </button>

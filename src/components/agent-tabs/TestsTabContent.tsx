@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useSession, signOut } from "next-auth/react";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { BenchmarkDialog } from "@/components/BenchmarkDialog";
@@ -24,6 +25,8 @@ export function TestsTabContent({
   agentUuid,
   agentName = "Agent",
 }: TestsTabContentProps) {
+  const { data: session } = useSession();
+  const backendAccessToken = (session as any)?.backendAccessToken;
   // Agent tests state (tests attached to the agent)
   const [agentTests, setAgentTests] = useState<TestData[]>([]);
   const [agentTestsLoading, setAgentTestsLoading] = useState(true);
@@ -53,6 +56,8 @@ export function TestsTabContent({
   // Fetch tests attached to this agent
   useEffect(() => {
     const fetchAgentTests = async () => {
+      if (!backendAccessToken) return;
+
       try {
         setAgentTestsLoading(true);
         setAgentTestsError(null);
@@ -68,9 +73,15 @@ export function TestsTabContent({
             headers: {
               accept: "application/json",
               "ngrok-skip-browser-warning": "true",
+              Authorization: `Bearer ${backendAccessToken}`,
             },
           }
         );
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
 
         if (!response.ok) {
           throw new Error("Failed to fetch agent tests");
@@ -88,14 +99,14 @@ export function TestsTabContent({
       }
     };
 
-    if (agentUuid) {
+    if (agentUuid && backendAccessToken) {
       fetchAgentTests();
     }
-  }, [agentUuid]);
+  }, [agentUuid, backendAccessToken]);
 
   // Fetch all available tests when dropdown opens
   useEffect(() => {
-    if (showTestDropdown) {
+    if (showTestDropdown && backendAccessToken) {
       const fetchTests = async () => {
         try {
           setAllTestsLoading(true);
@@ -109,8 +120,14 @@ export function TestsTabContent({
             headers: {
               accept: "application/json",
               "ngrok-skip-browser-warning": "true",
+              Authorization: `Bearer ${backendAccessToken}`,
             },
           });
+
+          if (response.status === 401) {
+            await signOut({ callbackUrl: "/login" });
+            return;
+          }
 
           if (!response.ok) {
             throw new Error("Failed to fetch tests");
@@ -127,7 +144,7 @@ export function TestsTabContent({
 
       fetchTests();
     }
-  }, [showTestDropdown]);
+  }, [showTestDropdown, backendAccessToken]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -186,12 +203,18 @@ export function TestsTabContent({
           accept: "application/json",
           "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
           agent_uuid: agentUuid,
           test_uuids: [test.uuid],
         }),
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to add test to agent");
@@ -237,12 +260,18 @@ export function TestsTabContent({
           accept: "application/json",
           "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
           agent_uuid: agentUuid,
           test_uuid: testToDelete.uuid,
         }),
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to remove test from agent");
@@ -403,7 +432,7 @@ export function TestsTabContent({
                   d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5m.75-9l3-3 2.148 2.148A12.061 12.061 0 0116.5 7.605"
                 />
               </svg>
-              Run benchmark
+              Compare models
             </button>
           </div>
         </div>

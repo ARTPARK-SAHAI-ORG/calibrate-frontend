@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 
@@ -22,6 +23,8 @@ const DEFAULT_CHARACTERISTICS = `You are Rajesh, a 45-year-old farmer from rural
 
 export default function PersonasPage() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const backendAccessToken = (session as any)?.backendAccessToken;
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [addPersonaSidebarOpen, setAddPersonaSidebarOpen] = useState(false);
@@ -58,6 +61,8 @@ export default function PersonasPage() {
   // Fetch personas from backend
   useEffect(() => {
     const fetchPersonas = async () => {
+      if (!backendAccessToken) return;
+      
       try {
         setPersonasLoading(true);
         setPersonasError(null);
@@ -71,8 +76,14 @@ export default function PersonasPage() {
           headers: {
             accept: "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
         });
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
 
         if (!response.ok) {
           throw new Error("Failed to fetch personas");
@@ -91,7 +102,7 @@ export default function PersonasPage() {
     };
 
     fetchPersonas();
-  }, []);
+  }, [backendAccessToken]);
 
   // Open delete confirmation dialog
   const openDeleteDialog = (persona: PersonaData) => {
@@ -125,9 +136,15 @@ export default function PersonasPage() {
           headers: {
             accept: "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
         }
       );
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to delete persona");
@@ -176,6 +193,7 @@ export default function PersonasPage() {
           accept: "application/json",
           "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
           name: personaLabel.trim(),
@@ -188,6 +206,11 @@ export default function PersonasPage() {
         }),
       });
 
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
       if (!response.ok) {
         throw new Error("Failed to create persona");
       }
@@ -198,6 +221,7 @@ export default function PersonasPage() {
         headers: {
           accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
       });
 
@@ -237,8 +261,14 @@ export default function PersonasPage() {
         headers: {
           accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to fetch persona details");
@@ -292,6 +322,7 @@ export default function PersonasPage() {
             accept: "application/json",
             "Content-Type": "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({
             name: personaLabel.trim(),
@@ -305,6 +336,11 @@ export default function PersonasPage() {
         }
       );
 
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
       if (!response.ok) {
         throw new Error("Failed to update persona");
       }
@@ -315,6 +351,7 @@ export default function PersonasPage() {
         headers: {
           accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
       });
 
@@ -793,7 +830,7 @@ export default function PersonasPage() {
                 <button
                   onClick={editingPersonaUuid ? updatePersona : createPersona}
                   disabled={isCreating || isLoadingPersona}
-                  className="h-10 px-4 rounded-md text-base font-medium bg-white text-gray-900 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {isCreating ? (
                     <>

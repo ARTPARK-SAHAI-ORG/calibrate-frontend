@@ -100,7 +100,7 @@ export function SimulationConfigTab({
             selectedPersonas.length === 0 ||
             selectedScenarios.length === 0
           }
-          className="h-10 px-5 rounded-md text-base font-medium bg-white text-gray-900 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="h-10 px-5 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           {isCreating ? (
             <>

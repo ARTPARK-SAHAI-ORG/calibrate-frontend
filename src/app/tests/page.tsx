@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { AppLayout } from "@/components/AppLayout";
 import {
   ToolPicker,
@@ -32,6 +33,8 @@ type Tool = {
 
 export default function LLMPage() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const backendAccessToken = (session as any)?.backendAccessToken;
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [addTestSidebarOpen, setAddTestSidebarOpen] = useState(false);
@@ -69,6 +72,8 @@ export default function LLMPage() {
   // Fetch tests from backend
   useEffect(() => {
     const fetchTests = async () => {
+      if (!backendAccessToken) return;
+      
       try {
         setTestsLoading(true);
         setTestsError(null);
@@ -82,8 +87,14 @@ export default function LLMPage() {
           headers: {
             accept: "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
         });
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
 
         if (!response.ok) {
           throw new Error("Failed to fetch tests");
@@ -102,7 +113,7 @@ export default function LLMPage() {
     };
 
     fetchTests();
-  }, []);
+  }, [backendAccessToken]);
 
   // Open delete confirmation dialog
   const openDeleteDialog = (test: TestData) => {
@@ -134,8 +145,14 @@ export default function LLMPage() {
         headers: {
           accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to delete test");
@@ -179,12 +196,18 @@ export default function LLMPage() {
             accept: "application/json",
             "Content-Type": "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({
             agent_uuid: agentUuid,
             test_uuids: [testToRun.uuid],
           }),
         });
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
 
         if (!response.ok) {
           console.error("Failed to attach test to agent");
@@ -224,6 +247,7 @@ export default function LLMPage() {
           accept: "application/json",
           "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
           name: newTestName.trim(),
@@ -231,6 +255,11 @@ export default function LLMPage() {
           config: config,
         }),
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to create test");
@@ -242,6 +271,7 @@ export default function LLMPage() {
         headers: {
           accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
       });
 
@@ -284,8 +314,14 @@ export default function LLMPage() {
         headers: {
           accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to fetch test details");
@@ -335,6 +371,7 @@ export default function LLMPage() {
           accept: "application/json",
           "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
           name: newTestName.trim(),
@@ -342,6 +379,11 @@ export default function LLMPage() {
           config: config,
         }),
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to update test");
@@ -353,6 +395,7 @@ export default function LLMPage() {
         headers: {
           accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
       });
 

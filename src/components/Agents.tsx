@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession, signOut } from "next-auth/react";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 
 type Agent = {
@@ -32,6 +33,7 @@ const formatDate = (dateString: string): string => {
 };
 
 export function Agents({ onNavigateToAgent }: AgentsProps) {
+  const { data: session } = useSession();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -50,8 +52,12 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const [agentToDuplicate, setAgentToDuplicate] = useState<Agent | null>(null);
 
+  const backendAccessToken = (session as any)?.backendAccessToken;
+
   useEffect(() => {
     const fetchAgents = async () => {
+      if (!backendAccessToken) return;
+      
       try {
         setIsLoading(true);
         setError(null);
@@ -65,8 +71,14 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
           headers: {
             accept: "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
         });
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
 
         if (!response.ok) {
           throw new Error("Failed to fetch agents");
@@ -96,7 +108,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
     };
 
     fetchAgents();
-  }, []);
+  }, [backendAccessToken]);
 
   const filteredAgents = agents.filter((agent) =>
     agent.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -164,9 +176,15 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
           headers: {
             accept: "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
         }
       );
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to delete agent");
@@ -431,6 +449,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
         <NewAgentDialog
           onClose={() => setDialogOpen(false)}
           onCreateAgent={onNavigateToAgent}
+          backendAccessToken={backendAccessToken}
         />
       )}
 
@@ -452,6 +471,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
           onClose={closeDuplicateDialog}
           onDuplicated={handleAgentDuplicated}
           onNavigateToAgent={onNavigateToAgent}
+          backendAccessToken={backendAccessToken}
         />
       )}
     </div>
@@ -461,9 +481,11 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
 function NewAgentDialog({
   onClose,
   onCreateAgent,
+  backendAccessToken,
 }: {
   onClose: () => void;
   onCreateAgent?: (agentUuid: string) => void;
+  backendAccessToken?: string;
 }) {
   const [agentName, setAgentName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
@@ -487,6 +509,7 @@ function NewAgentDialog({
           accept: "application/json",
           "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
           name: agentName.trim(),
@@ -500,6 +523,11 @@ function NewAgentDialog({
           },
         }),
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to create agent");
@@ -636,11 +664,13 @@ function DuplicateAgentDialog({
   onClose,
   onDuplicated,
   onNavigateToAgent,
+  backendAccessToken,
 }: {
   originalAgent: Agent;
   onClose: () => void;
   onDuplicated: (agent: Agent) => void;
   onNavigateToAgent?: (agentUuid: string) => void;
+  backendAccessToken?: string;
 }) {
   const [agentName, setAgentName] = useState(`Copy of ${originalAgent.name}`);
   const [isDuplicating, setIsDuplicating] = useState(false);
@@ -667,12 +697,18 @@ function DuplicateAgentDialog({
             accept: "application/json",
             "Content-Type": "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({
             name: agentName.trim(),
           }),
         }
       );
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to duplicate agent");

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useSession, signOut } from "next-auth/react";
 
 type NewSimulationDialogProps = {
   onClose: () => void;
@@ -11,6 +12,8 @@ export function NewSimulationDialog({
   onClose,
   onCreateSimulation,
 }: NewSimulationDialogProps) {
+  const { data: session } = useSession();
+  const backendAccessToken = (session as any)?.backendAccessToken;
   const [simulationName, setSimulationName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,12 +36,18 @@ export function NewSimulationDialog({
           accept: "application/json",
           "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
           name: simulationName.trim(),
           description: "",
         }),
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to create simulation");

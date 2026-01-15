@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { NewSimulationDialog } from "@/components/NewSimulationDialog";
@@ -17,6 +18,8 @@ type SimulationData = {
 
 export default function SimulationsPage() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const backendAccessToken = (session as any)?.backendAccessToken;
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -39,6 +42,8 @@ export default function SimulationsPage() {
   // Fetch simulations from backend
   useEffect(() => {
     const fetchSimulations = async () => {
+      if (!backendAccessToken) return;
+      
       try {
         setSimulationsLoading(true);
         setSimulationsError(null);
@@ -52,8 +57,14 @@ export default function SimulationsPage() {
           headers: {
             accept: "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
         });
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
 
         if (!response.ok) {
           throw new Error("Failed to fetch simulations");
@@ -72,7 +83,7 @@ export default function SimulationsPage() {
     };
 
     fetchSimulations();
-  }, []);
+  }, [backendAccessToken]);
 
   // Open delete confirmation dialog
   const openDeleteDialog = (simulation: SimulationData) => {
@@ -106,9 +117,15 @@ export default function SimulationsPage() {
           headers: {
             accept: "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
         }
       );
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to delete simulation");

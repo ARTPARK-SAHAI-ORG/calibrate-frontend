@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useSession, signOut } from "next-auth/react";
 
 type ToolData = {
   uuid: string;
@@ -30,6 +31,8 @@ export function AddToolDialog({
   allToolsLoading,
   onToolsAdded,
 }: AddToolDialogProps) {
+  const { data: session } = useSession();
+  const backendAccessToken = (session as any)?.backendAccessToken;
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTools, setSelectedTools] = useState<Set<string>>(new Set());
 
@@ -56,12 +59,18 @@ export function AddToolDialog({
           accept: "application/json",
           "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
           agent_uuid: agentUuid,
           tool_uuids: toolUuidsToAdd,
         }),
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to add tools to agent");
@@ -243,7 +252,7 @@ export function AddToolDialog({
           <div className="px-4 py-3 border-t border-border flex items-center justify-end">
             <button
               onClick={handleAdd}
-              className="h-10 px-4 rounded-md text-sm font-medium bg-white text-gray-900 hover:opacity-90 transition-opacity cursor-pointer"
+              className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
             >
               Add ({selectedTools.size})
             </button>

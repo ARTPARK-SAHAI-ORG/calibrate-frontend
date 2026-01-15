@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { AppLayout } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
 
@@ -66,6 +67,8 @@ type RunData = {
 export default function SimulationRunPage() {
   const router = useRouter();
   const params = useParams();
+  const { data: session } = useSession();
+  const backendAccessToken = (session as any)?.backendAccessToken;
   const uuid = params.uuid as string;
   const runId = params.runId as string;
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -80,6 +83,8 @@ export default function SimulationRunPage() {
   >("performance");
 
   useEffect(() => {
+    if (!backendAccessToken) return;
+
     let pollInterval: NodeJS.Timeout | null = null;
 
     const fetchRunData = async (isInitialLoad = false) => {
@@ -98,8 +103,14 @@ export default function SimulationRunPage() {
           headers: {
             accept: "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
         });
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
 
         if (!response.ok) {
           throw new Error("Failed to fetch run data");
@@ -139,7 +150,7 @@ export default function SimulationRunPage() {
         clearInterval(pollInterval);
       }
     };
-  }, [runId]);
+  }, [runId, backendAccessToken]);
 
   const formatStatus = (status: string) => {
     switch (status.toLowerCase()) {
@@ -156,30 +167,30 @@ export default function SimulationRunPage() {
     switch (status.toLowerCase()) {
       case "done":
       case "completed":
-        return "bg-green-500/20 text-green-400";
+        return "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400";
       case "running":
       case "in_progress":
-        return "bg-yellow-500/20 text-yellow-400";
+        return "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400";
       case "failed":
       case "error":
-        return "bg-red-500/20 text-red-400";
+        return "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400";
       case "pending":
       case "queued":
-        return "bg-gray-500/20 text-gray-400";
+        return "bg-gray-200 text-gray-700 dark:bg-gray-500/20 dark:text-gray-400";
       default:
-        return "bg-gray-500/20 text-gray-400";
+        return "bg-gray-200 text-gray-700 dark:bg-gray-500/20 dark:text-gray-400";
     }
   };
 
   const getTypeBadgeClass = (type: string) => {
     switch (type.toLowerCase()) {
       case "chat":
-        return "bg-purple-500/20 text-purple-400";
+        return "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400";
       case "audio":
       case "voice":
-        return "bg-orange-500/20 text-orange-400";
+        return "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400";
       default:
-        return "bg-gray-500/20 text-gray-400";
+        return "bg-gray-200 text-gray-700 dark:bg-gray-500/20 dark:text-gray-400";
     }
   };
 
@@ -833,7 +844,7 @@ export default function SimulationRunPage() {
                         {/* Message Header - show for assistant messages */}
                         {entry.role === "assistant" && (
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-white">
+                            <span className="text-sm font-medium text-foreground">
                               {entry.tool_calls ? "Agent Tool Call" : "Agent"}
                             </span>
                           </div>
@@ -859,7 +870,7 @@ export default function SimulationRunPage() {
                         {/* User Message */}
                         {entry.role === "user" && entry.content && (
                           <div className="w-1/2">
-                            <div className="px-4 py-3 rounded-xl text-sm text-white bg-[#242426] border border-[#444] whitespace-pre-wrap">
+                            <div className="px-4 py-3 rounded-xl text-sm text-foreground bg-muted border border-border whitespace-pre-wrap">
                               {entry.content}
                             </div>
                           </div>
@@ -870,7 +881,7 @@ export default function SimulationRunPage() {
                           entry.content &&
                           !entry.tool_calls && (
                             <div className="w-1/2">
-                              <div className="px-4 py-3 rounded-xl text-sm text-white bg-black border border-[#333] whitespace-pre-wrap">
+                              <div className="px-4 py-3 rounded-xl text-sm text-foreground bg-accent border border-border whitespace-pre-wrap">
                                 {entry.content}
                               </div>
                             </div>
@@ -891,11 +902,11 @@ export default function SimulationRunPage() {
                               return (
                                 <div
                                   key={toolIndex}
-                                  className="bg-[#1a1a1a] border border-[#333] rounded-2xl p-4 mb-2"
+                                  className="bg-muted border border-border rounded-2xl p-4 mb-2"
                                 >
                                   <div className="flex items-center gap-2 mb-2">
                                     <svg
-                                      className="w-4 h-4 text-gray-400"
+                                      className="w-4 h-4 text-muted-foreground"
                                       fill="none"
                                       viewBox="0 0 24 24"
                                       stroke="currentColor"
@@ -907,7 +918,7 @@ export default function SimulationRunPage() {
                                         d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
                                       />
                                     </svg>
-                                    <span className="text-sm font-medium text-white">
+                                    <span className="text-sm font-medium text-foreground">
                                       {toolCall.function.name}
                                     </span>
                                   </div>
@@ -916,10 +927,10 @@ export default function SimulationRunPage() {
                                       {Object.entries(parsedArgs).map(
                                         ([key, value], paramIndex) => (
                                           <div key={paramIndex}>
-                                            <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                                            <label className="block text-sm font-medium text-foreground mb-1.5">
                                               {key}
                                             </label>
-                                            <div className="px-3 py-2 bg-[#0a0a0a] border border-[#222] rounded-lg text-sm text-gray-400">
+                                            <div className="px-3 py-2 bg-background border border-border rounded-lg text-sm text-muted-foreground">
                                               {String(value)}
                                             </div>
                                           </div>

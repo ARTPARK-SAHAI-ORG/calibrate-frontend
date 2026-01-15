@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 
@@ -17,6 +18,8 @@ const DEFAULT_DESCRIPTION = `Call to inquire about crop insurance schemes availa
 
 export default function ScenariosPage() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const backendAccessToken = (session as any)?.backendAccessToken;
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [addScenarioSidebarOpen, setAddScenarioSidebarOpen] = useState(false);
@@ -46,6 +49,8 @@ export default function ScenariosPage() {
   // Fetch scenarios from backend
   useEffect(() => {
     const fetchScenarios = async () => {
+      if (!backendAccessToken) return;
+      
       try {
         setScenariosLoading(true);
         setScenariosError(null);
@@ -59,8 +64,14 @@ export default function ScenariosPage() {
           headers: {
             accept: "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
         });
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
 
         if (!response.ok) {
           throw new Error("Failed to fetch scenarios");
@@ -79,7 +90,7 @@ export default function ScenariosPage() {
     };
 
     fetchScenarios();
-  }, []);
+  }, [backendAccessToken]);
 
   // Open delete confirmation dialog
   const openDeleteDialog = (scenario: ScenarioData) => {
@@ -113,9 +124,15 @@ export default function ScenariosPage() {
           headers: {
             accept: "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
         }
       );
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to delete scenario");
@@ -161,12 +178,18 @@ export default function ScenariosPage() {
           accept: "application/json",
           "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
           name: scenarioLabel.trim(),
           description: scenarioDescription.trim(),
         }),
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to create scenario");
@@ -178,6 +201,7 @@ export default function ScenariosPage() {
         headers: {
           accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
       });
 
@@ -217,8 +241,14 @@ export default function ScenariosPage() {
         headers: {
           accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to fetch scenario details");
@@ -265,6 +295,7 @@ export default function ScenariosPage() {
             accept: "application/json",
             "Content-Type": "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({
             name: scenarioLabel.trim(),
@@ -272,6 +303,11 @@ export default function ScenariosPage() {
           }),
         }
       );
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to update scenario");
@@ -283,6 +319,7 @@ export default function ScenariosPage() {
         headers: {
           accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
       });
 
@@ -640,7 +677,7 @@ export default function ScenariosPage() {
                     editingScenarioUuid ? updateScenario : createScenario
                   }
                   disabled={isCreating || isLoadingScenario}
-                  className="h-10 px-4 rounded-md text-base font-medium bg-white text-gray-900 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {isCreating ? (
                     <>

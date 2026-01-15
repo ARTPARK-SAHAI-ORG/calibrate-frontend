@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useSession, signOut } from "next-auth/react";
 import { ttsProviders } from "../agent-tabs/constants/providers";
 import {
   LeaderboardBarChart,
@@ -62,6 +63,8 @@ const getProviderLabel = (value: string): string => {
 };
 
 export function TextToSpeechEvaluation() {
+  const { data: session } = useSession();
+  const backendAccessToken = (session as any)?.backendAccessToken;
   const [rows, setRows] = useState<TextRow[]>([{ id: "1", text: "" }]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<string | null>(null);
   const [invalidRowIds, setInvalidRowIds] = useState<Set<string>>(new Set());
@@ -170,8 +173,14 @@ export function TextToSpeechEvaluation() {
         headers: {
           accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to poll task status");
@@ -247,6 +256,7 @@ export function TextToSpeechEvaluation() {
           "Content-Type": "application/json",
           accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
           texts: texts,
@@ -258,6 +268,11 @@ export function TextToSpeechEvaluation() {
           language: language,
         }),
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to evaluate");

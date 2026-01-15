@@ -73,23 +73,23 @@ export function MultiSelectPicker({
   return (
     <div className={`space-y-1.5 ${className}`} ref={dropdownRef}>
       {label && (
-        <label className="block text-sm font-medium text-white">{label}</label>
+        <label className="block text-sm font-medium text-foreground">{label}</label>
       )}
       <div className="relative">
         <div
           onClick={() => !disabled && setDropdownOpen(!dropdownOpen)}
-          className={`w-full min-h-[44px] px-4 py-2 rounded-xl text-sm bg-transparent text-white border border-[#444] transition-colors flex items-center justify-between gap-2 ${
-            disabled ? "cursor-default" : "hover:border-[#666] cursor-pointer"
+          className={`w-full min-h-[44px] px-4 py-2 rounded-xl text-sm bg-transparent text-foreground border border-border transition-colors flex items-center justify-between gap-2 ${
+            disabled ? "cursor-default" : "hover:border-muted-foreground cursor-pointer"
           }`}
         >
           <div className="flex-1 flex flex-wrap gap-2 items-center">
             {selectedItems.length === 0 ? (
-              <span className="text-gray-500">{placeholder}</span>
+              <span className="text-muted-foreground">{placeholder}</span>
             ) : (
               selectedItems.map((item) => (
                 <span
                   key={item.uuid}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#333] text-white text-xs"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted text-foreground text-xs"
                 >
                   {item.name}
                   {!disabled && (
@@ -118,7 +118,7 @@ export function MultiSelectPicker({
           </div>
           {!disabled && (
             <svg
-              className={`w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ${
+              className={`w-5 h-5 text-muted-foreground transition-transform flex-shrink-0 ${
                 dropdownOpen ? "rotate-180" : ""
               }`}
               fill="none"
@@ -137,15 +137,15 @@ export function MultiSelectPicker({
 
         {/* Dropdown */}
         {dropdownOpen && !disabled && (
-          <div className="absolute left-0 right-0 top-full mt-2 bg-[#2a2a2a] border border-[#444] rounded-xl shadow-xl z-[100] overflow-hidden">
+          <div className="absolute left-0 right-0 top-full mt-2 bg-popover border border-border rounded-xl shadow-xl z-[100] overflow-hidden">
             {/* Search */}
-            <div className="p-3 border-b border-[#444]">
+            <div className="p-3 border-b border-border">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="w-full h-10 px-4 rounded-lg text-sm bg-[#1a1a1a] text-white placeholder:text-gray-500 border border-[#444] focus:outline-none focus:ring-1 focus:ring-gray-500"
+                className="w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-1 focus:ring-accent"
                 onClick={(e) => e.stopPropagation()}
               />
             </div>
@@ -153,7 +153,7 @@ export function MultiSelectPicker({
             {/* Options */}
             <div className="max-h-60 overflow-y-auto">
               {isLoading ? (
-                <div className="px-4 py-3 text-sm text-gray-400 flex items-center gap-2">
+                <div className="px-4 py-3 text-sm text-muted-foreground flex items-center gap-2">
                   <svg
                     className="w-4 h-4 animate-spin"
                     fill="none"
@@ -176,7 +176,7 @@ export function MultiSelectPicker({
                   Loading...
                 </div>
               ) : filteredItems.length === 0 ? (
-                <div className="px-4 py-3 text-sm text-gray-400">
+                <div className="px-4 py-3 text-sm text-muted-foreground">
                   No items found
                 </div>
               ) : (
@@ -186,21 +186,21 @@ export function MultiSelectPicker({
                     onClick={() => toggleItem(item)}
                     className={`w-full px-4 py-3 text-left text-sm transition-colors cursor-pointer flex items-center justify-between ${
                       isSelected(item.uuid)
-                        ? "bg-[#3a3a3a] text-white"
-                        : "text-white hover:bg-[#333]"
+                        ? "bg-accent text-foreground"
+                        : "text-foreground hover:bg-muted"
                     }`}
                   >
                     <div className="flex-1 min-w-0">
                       <span className="block truncate">{item.name}</span>
                       {item.description && (
-                        <span className="block text-xs text-gray-400 truncate mt-0.5">
+                        <span className="block text-xs text-muted-foreground truncate mt-0.5">
                           {item.description}
                         </span>
                       )}
                     </div>
                     {isSelected(item.uuid) && (
                       <svg
-                        className="w-5 h-5 text-white flex-shrink-0 ml-2"
+                        className="w-5 h-5 text-foreground flex-shrink-0 ml-2"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"

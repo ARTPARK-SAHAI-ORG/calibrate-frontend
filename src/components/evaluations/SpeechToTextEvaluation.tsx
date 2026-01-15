@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useSession, signOut } from "next-auth/react";
 import { sttProviders } from "../agent-tabs/constants/providers";
 import {
   LeaderboardBarChart,
@@ -71,6 +72,8 @@ const getProviderLabel = (value: string): string => {
 };
 
 export function SpeechToTextEvaluation() {
+  const { data: session } = useSession();
+  const backendAccessToken = (session as any)?.backendAccessToken;
   const [rows, setRows] = useState<AudioTextRow[]>([
     { id: "1", audioFile: null, text: "", s3Path: null },
   ]);
@@ -175,6 +178,7 @@ export function SpeechToTextEvaluation() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
           task_type: "stt",
@@ -182,6 +186,11 @@ export function SpeechToTextEvaluation() {
           extension: file.type.split("/")[1],
         }),
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to get presigned URL");
@@ -275,8 +284,14 @@ export function SpeechToTextEvaluation() {
         headers: {
           accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to poll task status");
@@ -359,6 +374,7 @@ export function SpeechToTextEvaluation() {
           "Content-Type": "application/json",
           accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
           audio_paths: audioPaths,
@@ -367,6 +383,11 @@ export function SpeechToTextEvaluation() {
           language: language,
         }),
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to evaluate");

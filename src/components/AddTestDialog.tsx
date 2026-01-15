@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useSession, signOut } from "next-auth/react";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
 
@@ -75,6 +76,8 @@ export function AddTestDialog({
   initialTab,
   initialConfig,
 }: AddTestDialogProps) {
+  const { data: session } = useSession();
+  const backendAccessToken = (session as any)?.backendAccessToken;
   const [activeTab, setActiveTab] = useState<"next-reply" | "tool-invocation">(
     initialTab || "next-reply"
   );
@@ -293,6 +296,7 @@ export function AddTestDialog({
     toolName: string;
     params: Array<{ name: string; value: string }>;
   } | null>(null);
+  const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -306,7 +310,7 @@ export function AddTestDialog({
   // Fetch available tools when dialog opens
   useEffect(() => {
     const fetchTools = async () => {
-      if (!isOpen) return;
+      if (!isOpen || !backendAccessToken) return;
 
       try {
         setAvailableToolsLoading(true);
@@ -320,8 +324,14 @@ export function AddTestDialog({
           headers: {
             accept: "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
         });
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
 
         if (!response.ok) {
           throw new Error("Failed to fetch tools");
@@ -337,7 +347,7 @@ export function AddTestDialog({
     };
 
     fetchTools();
-  }, [isOpen]);
+  }, [isOpen, backendAccessToken]);
 
   const addToolFromSelection = (tool: AvailableTool) => {
     // Extract parameters from tool config - handle both array (new) and object (legacy) formats
@@ -682,25 +692,74 @@ export function AddTestDialog({
     onSubmit(config);
   };
 
+  const handleBackdropClick = () => {
+    setShowCloseConfirmation(true);
+  };
+
+  const handleConfirmClose = () => {
+    setShowCloseConfirmation(false);
+    onClose();
+  };
+
+  const handleCancelClose = () => {
+    setShowCloseConfirmation(false);
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div
+        className="absolute inset-0 bg-black/50"
+        onClick={handleBackdropClick}
+      />
+
+      {/* Close Confirmation Dialog */}
+      {showCloseConfirmation && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/30"
+            onClick={handleCancelClose}
+          />
+          <div className="relative bg-background rounded-xl shadow-2xl border border-border p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              Discard changes?
+            </h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              You have unsaved changes. Are you sure you want to close this
+              dialog? Your changes will be lost.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={handleCancelClose}
+                className="h-10 px-4 rounded-lg text-sm font-medium bg-background text-foreground hover:bg-muted transition-colors cursor-pointer border border-border"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmClose}
+                className="h-10 px-4 rounded-lg text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors cursor-pointer"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Dialog */}
-      <div className="relative w-full max-w-7xl h-[85vh] bg-black rounded-2xl shadow-2xl flex overflow-hidden">
+      <div className="relative w-full max-w-7xl h-[85vh] bg-background rounded-2xl shadow-2xl flex overflow-hidden border border-border">
         {/* Left Column - Form */}
-        <div className="w-2/5 flex flex-col border-r border-[#222]">
+        <div className="w-2/5 flex flex-col border-r border-border">
           {/* Tabs */}
-          <div className="flex border-b border-[#222]">
+          <div className="flex border-b border-border">
             <button
               onClick={() => setActiveTab("next-reply")}
               className={`flex-1 py-4 text-base font-medium transition-colors cursor-pointer ${
                 activeTab === "next-reply"
-                  ? "text-white border-b-2 border-white"
-                  : "text-gray-400 hover:text-gray-300"
+                  ? "text-foreground border-b-2 border-foreground"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               Next reply test
@@ -709,8 +768,8 @@ export function AddTestDialog({
               onClick={() => setActiveTab("tool-invocation")}
               className={`flex-1 py-4 text-base font-medium transition-colors cursor-pointer ${
                 activeTab === "tool-invocation"
-                  ? "text-white border-b-2 border-white"
-                  : "text-gray-400 hover:text-gray-300"
+                  ? "text-foreground border-b-2 border-foreground"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               Tool invocation test
@@ -722,7 +781,7 @@ export function AddTestDialog({
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <svg
-                  className="w-6 h-6 animate-spin text-white"
+                  className="w-6 h-6 animate-spin text-foreground"
                   fill="none"
                   viewBox="0 0 24 24"
                 >
@@ -745,7 +804,7 @@ export function AddTestDialog({
               <div className="space-y-6">
                 {/* Test Name */}
                 <div>
-                  <label className="block text-base font-medium text-white mb-2">
+                  <label className="block text-base font-medium text-foreground mb-2">
                     Test name
                   </label>
                   <input
@@ -753,19 +812,19 @@ export function AddTestDialog({
                     value={testName}
                     onChange={(e) => setTestName(e.target.value)}
                     placeholder="Your test name"
-                    className={`w-full h-11 px-4 rounded-lg text-base bg-black text-white placeholder:text-gray-500 border focus:outline-none focus:ring-2 focus:ring-gray-600 ${
+                    className={`w-full h-11 px-4 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
                       localValidationAttempted &&
                       activeTab === "next-reply" &&
                       !testName.trim()
                         ? "border-red-500"
-                        : "border-[#2a2a2a]"
+                        : "border-border"
                     }`}
                   />
                 </div>
 
                 {/* Describe expected next message */}
                 <div>
-                  <label className="block text-base font-medium text-white mb-2">
+                  <label className="block text-base font-medium text-foreground mb-2">
                     Describe expected next message
                   </label>
                   <textarea
@@ -773,22 +832,22 @@ export function AddTestDialog({
                     onChange={(e) => setExpectedMessage(e.target.value)}
                     placeholder="Describe the ideal response or behavior the agent should exhibit to pass this test (e.g., provides a correct answer, uses a specific tone, includes key information)."
                     rows={4}
-                    className={`w-full px-4 py-3 rounded-lg text-base bg-black text-white placeholder:text-gray-500 border focus:outline-none focus:ring-2 focus:ring-gray-600 resize-none ${
+                    className={`w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent resize-none ${
                       localValidationAttempted &&
                       activeTab === "next-reply" &&
                       !expectedMessage.trim()
                         ? "border-red-500"
-                        : "border-[#2a2a2a]"
+                        : "border-border"
                     }`}
                   />
                 </div>
 
                 {/* Language */}
                 <div>
-                  <label className="block text-base font-medium text-white mb-2">
+                  <label className="block text-base font-medium text-foreground mb-2">
                     Language
                   </label>
-                  <div className="flex rounded-lg border border-[#2a2a2a] overflow-hidden w-fit">
+                  <div className="flex rounded-lg border border-border overflow-hidden w-fit">
                     {(["english", "hindi", "kannada"] as const).map(
                       (lang, index) => (
                         <button
@@ -796,11 +855,11 @@ export function AddTestDialog({
                           type="button"
                           onClick={() => setTestLanguage(lang)}
                           className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
-                            index > 0 ? "border-l border-[#2a2a2a]" : ""
+                            index > 0 ? "border-l border-border" : ""
                           } ${
                             testLanguage === lang
-                              ? "bg-white text-black"
-                              : "bg-black text-gray-400 hover:text-white hover:bg-[#222]"
+                              ? "bg-foreground text-background"
+                              : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted"
                           }`}
                         >
                           {lang.charAt(0).toUpperCase() + lang.slice(1)}
@@ -814,7 +873,7 @@ export function AddTestDialog({
               <div className="space-y-6">
                 {/* Test Name */}
                 <div>
-                  <label className="block text-base font-medium text-white mb-2">
+                  <label className="block text-base font-medium text-foreground mb-2">
                     Test name
                   </label>
                   <input
@@ -822,12 +881,12 @@ export function AddTestDialog({
                     value={testName}
                     onChange={(e) => setTestName(e.target.value)}
                     placeholder="Your test name"
-                    className={`w-full h-11 px-4 rounded-lg text-base bg-black text-white placeholder:text-gray-500 border focus:outline-none focus:ring-2 focus:ring-gray-600 ${
+                    className={`w-full h-11 px-4 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
                       localValidationAttempted &&
                       activeTab === "tool-invocation" &&
                       !testName.trim()
                         ? "border-red-500"
-                        : "border-[#2a2a2a]"
+                        : "border-border"
                     }`}
                   />
                 </div>
@@ -835,17 +894,17 @@ export function AddTestDialog({
                 {/* Tools to test */}
                 <div className="relative">
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-base font-medium text-white">
+                    <label className="text-base font-medium text-foreground">
                       Tools to test
                     </label>
                     <button
                       onClick={() => setToolDropdownOpen(!toolDropdownOpen)}
-                      className={`px-3 py-1.5 text-sm font-medium bg-black text-white rounded-lg hover:bg-[#222] transition-colors cursor-pointer border ${
+                      className={`px-3 py-1.5 text-sm font-medium bg-background text-foreground rounded-lg hover:bg-muted transition-colors cursor-pointer border ${
                         localValidationAttempted &&
                         activeTab === "tool-invocation" &&
                         selectedTools.length === 0
                           ? "border-red-500 text-red-400"
-                          : "border-[#2a2a2a]"
+                          : "border-border"
                       }`}
                     >
                       Add tool
@@ -861,7 +920,7 @@ export function AddTestDialog({
                           setToolDropdownOpen(false);
                         }}
                       />
-                      <div className="absolute right-0 top-8 mt-2 w-72 bg-[#1a1a1a] border border-[#333] rounded-xl shadow-2xl z-[100] overflow-hidden">
+                      <div className="absolute right-0 top-8 mt-2 w-72 bg-popover border border-border rounded-xl shadow-2xl z-[100] overflow-hidden">
                         <ToolPicker
                           availableTools={availableTools}
                           isLoading={availableToolsLoading}
@@ -878,8 +937,8 @@ export function AddTestDialog({
                   )}
 
                   {selectedTools.length === 0 ? (
-                    <div className="bg-[#161616] rounded-lg p-8 text-center ">
-                      <p className="text-gray-400 text-sm">
+                    <div className="bg-muted rounded-lg p-8 text-center ">
+                      <p className="text-muted-foreground text-sm">
                         If you leave this empty, the test will check that no
                         tool has been called.
                       </p>
@@ -889,16 +948,16 @@ export function AddTestDialog({
                       {selectedTools.map((tool) => (
                         <div
                           key={tool.id}
-                          className="bg-[#121212] rounded-lg p-4 border border-[#2a2a2a]"
+                          className="bg-muted rounded-lg p-4 border border-border"
                         >
                           {/* Tool header with name and delete button */}
                           <div className="flex items-center gap-2 mb-3">
-                            <div className="flex-1 h-10 px-4 rounded-lg text-base bg-black text-white border border-[#2a2a2a] flex items-center">
+                            <div className="flex-1 h-10 px-4 rounded-lg text-base bg-background text-foreground border border-border flex items-center">
                               {tool.name}
                             </div>
                             <button
                               onClick={() => removeTool(tool.id)}
-                              className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-[#222] transition-colors cursor-pointer"
+                              className="w-10 h-10 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
                             >
                               <svg
                                 className="w-5 h-5"
@@ -917,7 +976,7 @@ export function AddTestDialog({
                           </div>
 
                           {/* Should have been called / Should not have been called tabs */}
-                          <div className="flex rounded-lg overflow-hidden border border-[#2a2a2a]">
+                          <div className="flex rounded-lg overflow-hidden border border-border">
                             <button
                               onClick={() =>
                                 updateToolConfig(tool.id, {
@@ -926,8 +985,8 @@ export function AddTestDialog({
                               }
                               className={`flex-1 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
                                 tool.expectation === "should-call"
-                                  ? "bg-white text-black"
-                                  : "bg-gray-600/20 text-gray-400 hover:text-white"
+                                  ? "bg-foreground text-background"
+                                  : "bg-muted text-muted-foreground hover:text-foreground"
                               }`}
                             >
                               Should have been called
@@ -940,8 +999,8 @@ export function AddTestDialog({
                               }
                               className={`flex-1 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
                                 tool.expectation === "should-not-call"
-                                  ? "bg-white text-black"
-                                  : "bg-gray-600/20 text-gray-400 hover:text-white"
+                                  ? "bg-foreground text-background"
+                                  : "bg-muted text-muted-foreground hover:text-foreground"
                               }`}
                             >
                               Should not have been called
@@ -959,10 +1018,10 @@ export function AddTestDialog({
                                         !tool.acceptAnyParameterValues,
                                     })
                                   }
-                                  className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
+                                  className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
                                     tool.acceptAnyParameterValues
                                       ? "bg-foreground border-foreground"
-                                      : "border-border hover:border-muted-foreground"
+                                      : "bg-background border-muted-foreground hover:border-foreground"
                                   }`}
                                 >
                                   {tool.acceptAnyParameterValues && (
@@ -981,7 +1040,7 @@ export function AddTestDialog({
                                     </svg>
                                   )}
                                 </button>
-                                <span className="text-sm font-medium">
+                                <span className="text-sm font-medium text-foreground">
                                   Accept any values for the parameters
                                 </span>
                               </div>
@@ -993,10 +1052,10 @@ export function AddTestDialog({
                             !tool.acceptAnyParameterValues && (
                               <div className="mt-4">
                                 <div className="mb-3">
-                                  <h4 className="text-sm font-medium text-white">
+                                  <h4 className="text-sm font-medium text-foreground">
                                     Expected extracted parameters
                                   </h4>
-                                  <p className="text-xs text-gray-400 mt-1">
+                                  <p className="text-xs text-muted-foreground mt-1">
                                     Configure how each parameter should be
                                     evaluated when the agent calls this tool
                                   </p>
@@ -1005,7 +1064,7 @@ export function AddTestDialog({
                                 <div className="space-y-3">
                                   {tool.expectedParameters.map((param) => (
                                     <div key={param.id}>
-                                      <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                                      <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                                         {param.name}
                                       </label>
                                       <input
@@ -1019,12 +1078,12 @@ export function AddTestDialog({
                                           )
                                         }
                                         placeholder="Expected value"
-                                        className={`w-full h-10 px-4 rounded-lg text-sm bg-black text-white placeholder:text-gray-500 border focus:outline-none focus:ring-2 focus:ring-gray-500 ${
+                                        className={`w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
                                           localValidationAttempted &&
                                           activeTab === "tool-invocation" &&
                                           !param.value.trim()
                                             ? "border-red-500"
-                                            : "border-[#2a2a2a]"
+                                            : "border-border"
                                         }`}
                                       />
                                     </div>
@@ -1042,7 +1101,7 @@ export function AddTestDialog({
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4  bg-black">
+          <div className="px-6 py-4 bg-background">
             {createError && (
               <p className="text-sm text-red-500 mb-3">{createError}</p>
             )}
@@ -1050,7 +1109,7 @@ export function AddTestDialog({
               <button
                 onClick={onClose}
                 disabled={isCreating || isLoading}
-                className="h-10 px-5 rounded-lg text-base font-medium bg-black text-white hover:bg-[#222] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border border-[#2a2a2a]"
+                className="h-10 px-5 rounded-lg text-base font-medium bg-background text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border border-border"
               >
                 Back
               </button>
@@ -1066,7 +1125,7 @@ export function AddTestDialog({
                     <button
                       onClick={handleSubmit}
                       disabled={isButtonDisabled}
-                      className="h-10 px-5 rounded-lg text-base font-medium bg-white text-black hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="h-10 px-5 rounded-lg text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       {isCreating ? (
                         <>
@@ -1100,12 +1159,12 @@ export function AddTestDialog({
                     {/* Tooltip for disabled state */}
                     {isLastMessageAgent && !isCreating && !isLoading && (
                       <div className="absolute bottom-full mb-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                        <div className="px-3 py-2 text-sm text-gray-900 bg-white rounded-lg shadow-lg w-72">
+                        <div className="px-3 py-2 text-sm bg-popover text-foreground border border-border rounded-lg shadow-lg w-72">
                           A test should end with a user message, not an agent
                           message or agent tool call
                         </div>
                         {/* Arrow */}
-                        <div className="absolute top-full right-4 -mt-1 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white"></div>
+                        <div className="absolute top-full right-4 -mt-1 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-border"></div>
                       </div>
                     )}
                   </div>
@@ -1116,7 +1175,7 @@ export function AddTestDialog({
         </div>
 
         {/* Right Column - Chat Messages */}
-        <div className="w-3/5 flex flex-col bg-[#0a0a0a] overflow-visible">
+        <div className="w-3/5 flex flex-col bg-muted/30 overflow-visible">
           {/* Chat Messages Area */}
           <div className="flex-1 overflow-y-auto overflow-x-visible p-6">
             {chatMessages.length === 0 ? (
@@ -1125,7 +1184,7 @@ export function AddTestDialog({
                 {/* Globe with chat icon */}
                 <div className="mb-6">
                   <svg
-                    className="w-24 h-24 text-gray-600"
+                    className="w-24 h-24 text-muted-foreground"
                     viewBox="0 0 100 100"
                     fill="none"
                   >
@@ -1164,7 +1223,7 @@ export function AddTestDialog({
                       cx="70"
                       cy="30"
                       r="12"
-                      fill="#1a1a1a"
+                      className="fill-muted"
                       stroke="currentColor"
                       strokeWidth="2"
                     />
@@ -1183,27 +1242,27 @@ export function AddTestDialog({
                   </svg>
                 </div>
 
-                <h3 className="text-xl font-semibold text-white mb-3">
+                <h3 className="text-xl font-semibold text-foreground mb-3">
                   No conversation context
                 </h3>
 
-                <p className="text-gray-400 text-sm mb-6 max-w-md leading-relaxed">
+                <p className="text-muted-foreground text-sm mb-6 max-w-md leading-relaxed">
                   The agent&apos;s response to the last user message will be
                   evaluated against the success criteria using examples
                   provided. Previous messages will be passed as context.
                 </p>
 
-                <p className="text-gray-500 text-sm mb-4">
+                <p className="text-muted-foreground text-sm mb-4">
                   Create conversation context starting with
                 </p>
 
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => addChatMessage("agent")}
-                    className="px-4 py-2.5 rounded-xl border border-[#333] bg-transparent text-white hover:bg-[#1a1a1a] transition-colors cursor-pointer flex items-center gap-2"
+                    className="px-4 py-2.5 rounded-xl border border-border bg-transparent text-foreground hover:bg-muted transition-colors cursor-pointer flex items-center gap-2"
                   >
                     <svg
-                      className="w-5 h-5 text-gray-400"
+                      className="w-5 h-5 text-muted-foreground"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -1219,10 +1278,10 @@ export function AddTestDialog({
                   </button>
                   <button
                     onClick={() => addChatMessage("user")}
-                    className="px-4 py-2.5 rounded-xl border border-[#333] bg-transparent text-white hover:bg-[#1a1a1a] transition-colors cursor-pointer flex items-center gap-2"
+                    className="px-4 py-2.5 rounded-xl border border-border bg-transparent text-foreground hover:bg-muted transition-colors cursor-pointer flex items-center gap-2"
                   >
                     <svg
-                      className="w-5 h-5 text-gray-400"
+                      className="w-5 h-5 text-muted-foreground"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -1251,7 +1310,7 @@ export function AddTestDialog({
                     {(message.role === "agent" ||
                       message.role === "tool_call") && (
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-white">
+                        <span className="text-sm font-medium text-foreground">
                           {message.role === "tool_call"
                             ? "Agent Tool Call"
                             : "Agent"}
@@ -1268,10 +1327,10 @@ export function AddTestDialog({
                           onChange={(e) =>
                             updateChatMessage(message.id, e.target.value)
                           }
-                          className={`w-full px-4 py-2 rounded-xl text-sm text-white border focus:outline-none focus:ring-1 focus:ring-gray-500 ${
+                          className={`w-full px-4 py-2 rounded-xl text-sm text-foreground border focus:outline-none focus:ring-1 focus:ring-accent ${
                             message.role === "agent"
-                              ? "bg-black border-[#333]"
-                              : "bg-[#242426] border-[#444]"
+                              ? "bg-background border-border"
+                              : "bg-accent border-border"
                           }`}
                         />
                       </div>
@@ -1280,10 +1339,10 @@ export function AddTestDialog({
                     {/* Tool Call Display */}
                     {message.role === "tool_call" && (
                       <div className="w-1/2">
-                        <div className="bg-[#1a1a1a] border border-[#333] rounded-2xl p-4">
+                        <div className="bg-muted border border-border rounded-2xl p-4">
                           <div className="flex items-center gap-2 mb-2">
                             <svg
-                              className="w-4 h-4 text-gray-400"
+                              className="w-4 h-4 text-muted-foreground"
                               fill="none"
                               viewBox="0 0 24 24"
                               stroke="currentColor"
@@ -1295,7 +1354,7 @@ export function AddTestDialog({
                                 d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
                               />
                             </svg>
-                            <span className="text-sm font-medium text-white">
+                            <span className="text-sm font-medium text-foreground">
                               {message.toolName}
                             </span>
                           </div>
@@ -1304,7 +1363,7 @@ export function AddTestDialog({
                               <div className="space-y-3 mt-3">
                                 {message.toolParams.map((param, idx) => (
                                   <div key={idx}>
-                                    <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                                    <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                                       {param.name}
                                     </label>
                                     <input
@@ -1318,7 +1377,7 @@ export function AddTestDialog({
                                         )
                                       }
                                       placeholder={`Enter ${param.name}`}
-                                      className="w-full h-10 px-4 rounded-lg text-sm bg-black text-white placeholder:text-gray-500 border border-[#2a2a2a] focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                      className="w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent"
                                     />
                                   </div>
                                 ))}
@@ -1335,7 +1394,7 @@ export function AddTestDialog({
                         <>
                           <button
                             onClick={() => removeChatMessage(message.id)}
-                            className="w-8 h-8 rounded-lg border border-[#333] flex items-center justify-center text-gray-400 hover:text-red-400 hover:border-red-400/50 transition-colors cursor-pointer"
+                            className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-red-400 hover:border-red-400/50 transition-colors cursor-pointer"
                             title="Remove message"
                           >
                             <svg
@@ -1359,7 +1418,7 @@ export function AddTestDialog({
                                   !addMessageDropdownOpen
                                 )
                               }
-                              className="w-8 h-8 rounded-lg border border-[#333] flex items-center justify-center text-gray-400 hover:text-white hover:border-gray-500 transition-colors cursor-pointer"
+                              className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-muted-foreground transition-colors cursor-pointer"
                               title="Add message"
                             >
                               <svg
@@ -1387,7 +1446,7 @@ export function AddTestDialog({
                                   }
                                 />
                                 <div
-                                  className={`absolute bg-[#2a2a2a] rounded-lg shadow-xl z-[200] overflow-hidden py-1 whitespace-nowrap ${
+                                  className={`absolute bg-popover border border-border rounded-lg shadow-xl z-[200] overflow-hidden py-1 whitespace-nowrap ${
                                     message.role === "user"
                                       ? chatMessages.length <= 2
                                         ? "right-0 top-10"
@@ -1402,10 +1461,10 @@ export function AddTestDialog({
                                       addChatMessage("user");
                                       setAddMessageDropdownOpen(false);
                                     }}
-                                    className="w-full px-3 py-1.5 flex items-center gap-2 text-white hover:bg-[#3a3a3a] transition-colors cursor-pointer"
+                                    className="w-full px-3 py-1.5 flex items-center gap-2 text-foreground hover:bg-muted transition-colors cursor-pointer"
                                   >
                                     <svg
-                                      className="w-4 h-4 text-gray-400"
+                                      className="w-4 h-4 text-muted-foreground"
                                       fill="none"
                                       viewBox="0 0 24 24"
                                       stroke="currentColor"
@@ -1426,10 +1485,10 @@ export function AddTestDialog({
                                       addChatMessage("agent");
                                       setAddMessageDropdownOpen(false);
                                     }}
-                                    className="w-full px-3 py-1.5 flex items-center gap-2 text-white hover:bg-[#3a3a3a] transition-colors cursor-pointer"
+                                    className="w-full px-3 py-1.5 flex items-center gap-2 text-foreground hover:bg-muted transition-colors cursor-pointer"
                                   >
                                     <svg
-                                      className="w-4 h-4 text-gray-400"
+                                      className="w-4 h-4 text-muted-foreground"
                                       fill="none"
                                       viewBox="0 0 24 24"
                                       stroke="currentColor"
@@ -1450,10 +1509,10 @@ export function AddTestDialog({
                                       setAddMessageDropdownOpen(false);
                                       setToolCallDropdownOpen(true);
                                     }}
-                                    className="w-full px-3 py-1.5 flex items-center gap-2 text-white hover:bg-[#3a3a3a] transition-colors cursor-pointer"
+                                    className="w-full px-3 py-1.5 flex items-center gap-2 text-foreground hover:bg-muted transition-colors cursor-pointer"
                                   >
                                     <svg
-                                      className="w-4 h-4 text-gray-400"
+                                      className="w-4 h-4 text-muted-foreground"
                                       fill="none"
                                       viewBox="0 0 24 24"
                                       stroke="currentColor"
@@ -1484,7 +1543,7 @@ export function AddTestDialog({
                                   }}
                                 />
                                 <div
-                                  className={`absolute bg-[#1a1a1a] border border-[#333] rounded-xl shadow-xl z-[200] overflow-hidden min-w-[320px] ${
+                                  className={`absolute bg-popover border border-border rounded-xl shadow-xl z-[200] overflow-hidden min-w-[320px] ${
                                     message.role === "user"
                                       ? chatMessages.length <= 2
                                         ? "right-0 top-10"
@@ -1527,7 +1586,7 @@ export function AddTestDialog({
                                           onClick={() =>
                                             setPendingToolCall(null)
                                           }
-                                          className="text-gray-400 hover:text-white transition-colors"
+                                          className="text-muted-foreground hover:text-foreground transition-colors"
                                         >
                                           <svg
                                             className="w-4 h-4"
@@ -1543,18 +1602,18 @@ export function AddTestDialog({
                                             />
                                           </svg>
                                         </button>
-                                        <h4 className="text-sm font-medium text-white">
+                                        <h4 className="text-sm font-medium text-foreground">
                                           {pendingToolCall.toolName}
                                         </h4>
                                       </div>
-                                      <p className="text-xs text-gray-400 mb-3">
+                                      <p className="text-xs text-muted-foreground mb-3">
                                         Enter values for parameters:
                                       </p>
                                       <div className="space-y-2 max-h-[200px] overflow-y-auto">
                                         {pendingToolCall.params.map(
                                           (param, idx) => (
                                             <div key={idx}>
-                                              <label className="block text-xs text-gray-400 mb-1">
+                                              <label className="block text-xs text-muted-foreground mb-1">
                                                 {param.name}
                                               </label>
                                               <input
@@ -1572,7 +1631,7 @@ export function AddTestDialog({
                                                   });
                                                 }}
                                                 placeholder={`Enter ${param.name}`}
-                                                className="w-full h-9 px-3 rounded-lg text-sm bg-black text-white placeholder:text-gray-500 border border-[#2a2a2a] focus:outline-none focus:ring-1 focus:ring-gray-500"
+                                                className="w-full h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-1 focus:ring-accent"
                                               />
                                             </div>
                                           )
@@ -1586,7 +1645,7 @@ export function AddTestDialog({
                                             pendingToolCall.params
                                           )
                                         }
-                                        className="w-full mt-4 h-9 px-4 rounded-lg text-sm font-medium bg-white text-black hover:bg-gray-200 transition-colors cursor-pointer"
+                                        className="w-full mt-4 h-9 px-4 rounded-lg text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
                                       >
                                         Add tool call
                                       </button>
@@ -1607,10 +1666,10 @@ export function AddTestDialog({
           </div>
 
           {/* Info Footer */}
-          <div className="px-6 py-4 border-t border-[#222]">
+          <div className="px-6 py-4 border-t border-border">
             <div className="flex items-start gap-2">
               <svg
-                className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0"
+                className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -1622,7 +1681,7 @@ export function AddTestDialog({
                   d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
                 />
               </svg>
-              <p className="text-xs text-gray-500 leading-relaxed">
+              <p className="text-xs text-muted-foreground leading-relaxed">
                 The agent&apos;s response to the last user message will be
                 evaluated against the success criteria using examples provided.
                 Previous messages will be passed as context.

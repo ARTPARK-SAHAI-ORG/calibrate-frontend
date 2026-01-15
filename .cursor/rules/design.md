@@ -1,4 +1,7 @@
-# Design System & Guidelines
+---
+description: "Design guidelines and principles for the project"
+alwaysApply: true
+---
 
 ## General Principles
 

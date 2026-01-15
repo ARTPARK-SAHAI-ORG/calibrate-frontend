@@ -1,6 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useSession, signOut } from "next-auth/react";
+import { useState, useEffect, useRef } from "react";
+
+type Theme = "light" | "dark" | "device";
 
 type NavItem = {
   id: string;
@@ -198,6 +202,7 @@ type AppLayoutProps = {
   onSidebarToggle: () => void;
   children: React.ReactNode;
   customHeader?: React.ReactNode;
+  headerActions?: React.ReactNode;
 };
 
 export function AppLayout({
@@ -207,7 +212,77 @@ export function AppLayout({
   onSidebarToggle,
   children,
   customHeader,
+  headerActions,
 }: AppLayoutProps) {
+  const { data: session } = useSession();
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [theme, setTheme] = useState<Theme>("device");
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  // Apply theme to document
+  const applyTheme = (newTheme: Theme) => {
+    const root = document.documentElement;
+    root.classList.remove("light", "dark");
+
+    if (newTheme === "device") {
+      // Follow system preference
+      const prefersDark = window.matchMedia(
+        "(prefers-color-scheme: dark)"
+      ).matches;
+      root.classList.add(prefersDark ? "dark" : "light");
+    } else {
+      root.classList.add(newTheme);
+    }
+  };
+
+  // Load theme from localStorage on mount and listen for system changes
+  useEffect(() => {
+    const savedTheme = (localStorage.getItem("theme") as Theme) || "device";
+    setTheme(savedTheme);
+    applyTheme(savedTheme);
+
+    // Listen for system theme changes when in "device" mode
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleSystemThemeChange = () => {
+      if (
+        localStorage.getItem("theme") === "device" ||
+        !localStorage.getItem("theme")
+      ) {
+        applyTheme("device");
+      }
+    };
+
+    mediaQuery.addEventListener("change", handleSystemThemeChange);
+    return () =>
+      mediaQuery.removeEventListener("change", handleSystemThemeChange);
+  }, []);
+
+  const handleThemeChange = (newTheme: Theme) => {
+    setTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+    applyTheme(newTheme);
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        profileRef.current &&
+        !profileRef.current.contains(event.target as Node)
+      ) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Get first letter of first name for avatar placeholder
+  const getFirstLetter = (name?: string | null) => {
+    if (!name) return "U";
+    return name.trim()[0].toUpperCase();
+  };
+
   return (
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
@@ -338,16 +413,114 @@ export function AppLayout({
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Header - only shown when customHeader is provided (agent detail page) */}
-        {customHeader && (
-          <header className="h-14 flex items-center justify-between px-6">
-            {customHeader}
-          </header>
-        )}
+        {/* Header */}
+        <header className="h-14 flex items-center justify-between px-6">
+          <div>{customHeader}</div>
+
+          {/* Header Actions and User Profile */}
+          <div className="flex items-center gap-3">
+            {headerActions}
+
+            {/* User Profile */}
+            <div className="relative" ref={profileRef}>
+              <button
+                onClick={() => setProfileOpen(!profileOpen)}
+                className="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center text-white font-medium text-sm hover:bg-purple-700 transition-colors cursor-pointer overflow-hidden"
+              >
+                {session?.user?.image ? (
+                  <img
+                    src={session.user.image}
+                    alt={session.user.name || "User"}
+                    className="w-full h-full rounded-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  getFirstLetter(session?.user?.name)
+                )}
+              </button>
+
+              {/* Dropdown Menu */}
+              {profileOpen && (
+                <div className="absolute right-0 top-12 w-72 bg-popover border border-border rounded-xl shadow-lg z-50 overflow-hidden">
+                  {/* User Info */}
+                  <div className="p-4 flex items-center gap-3 border-b border-border">
+                    <div className="w-11 h-11 rounded-full bg-purple-600 flex items-center justify-center text-white font-medium text-base flex-shrink-0 overflow-hidden">
+                      {session?.user?.image ? (
+                        <img
+                          src={session.user.image}
+                          alt={session.user.name || "User"}
+                          className="w-full h-full rounded-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        getFirstLetter(session?.user?.name)
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-foreground truncate">
+                        {session?.user?.name || "User"}
+                      </p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {session?.user?.email || ""}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Theme Selector */}
+                  <div className="p-4 border-b border-border">
+                    <p className="text-sm font-medium text-foreground mb-3">
+                      Theme
+                    </p>
+                    <div className="flex bg-muted border border-border rounded-lg p-1">
+                      {(["light", "dark", "device"] as Theme[]).map((t) => (
+                        <button
+                          key={t}
+                          onClick={() => handleThemeChange(t)}
+                          className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer capitalize ${
+                            theme === t
+                              ? "bg-background text-foreground shadow-sm border border-border"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {t === "device"
+                            ? "Device"
+                            : t.charAt(0).toUpperCase() + t.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Logout */}
+                  <div className="p-2">
+                    <button
+                      onClick={() => signOut({ callbackUrl: "/login" })}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted rounded-lg transition-colors cursor-pointer"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={1.5}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"
+                        />
+                      </svg>
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto">
-          <div className="w-full p-8">{children}</div>
+          <div className="w-full px-8">{children}</div>
         </div>
       </main>
     </div>

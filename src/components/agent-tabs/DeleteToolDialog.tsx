@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useSession, signOut } from "next-auth/react";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 
 type ToolData = {
@@ -26,6 +27,8 @@ export function DeleteToolDialog({
   tool,
   onToolDeleted,
 }: DeleteToolDialogProps) {
+  const { data: session } = useSession();
+  const backendAccessToken = (session as any)?.backendAccessToken;
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleClose = () => {
@@ -50,12 +53,18 @@ export function DeleteToolDialog({
           accept: "application/json",
           "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
           agent_uuid: agentUuid,
           tool_uuid: tool.uuid,
         }),
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to remove tool from agent");

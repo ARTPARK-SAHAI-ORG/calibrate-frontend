@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useSession, signOut } from "next-auth/react";
 
 export type Agent = {
   uuid: string;
@@ -24,6 +25,8 @@ export function AgentPicker({
   className = "",
   disabled = false,
 }: AgentPickerProps) {
+  const { data: session } = useSession();
+  const backendAccessToken = (session as any)?.backendAccessToken;
   const [agents, setAgents] = useState<Agent[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -32,6 +35,8 @@ export function AgentPicker({
   // Fetch agents on mount
   useEffect(() => {
     const fetchAgents = async () => {
+      if (!backendAccessToken) return;
+      
       try {
         setAgentsLoading(true);
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -44,8 +49,14 @@ export function AgentPicker({
           headers: {
             accept: "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
         });
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
 
         if (!response.ok) {
           throw new Error("Failed to fetch agents");
@@ -67,7 +78,7 @@ export function AgentPicker({
     };
 
     fetchAgents();
-  }, []);
+  }, [backendAccessToken]);
 
   const filteredAgents = agents.filter((agent) =>
     agent.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -78,21 +89,21 @@ export function AgentPicker({
   return (
     <div className={`space-y-1.5 ${className}`}>
       {label && (
-        <label className="block text-sm font-medium text-white">{label}</label>
+        <label className="block text-sm font-medium text-foreground">{label}</label>
       )}
       <div className="relative">
         <div
           onClick={() => !disabled && setDropdownOpen(!dropdownOpen)}
-          className={`w-full h-11 px-4 rounded-xl text-sm bg-transparent text-white border border-[#444] transition-colors flex items-center justify-between ${
-            disabled ? "cursor-default" : "hover:border-[#666] cursor-pointer"
+          className={`w-full h-11 px-4 rounded-xl text-sm bg-transparent text-foreground border border-border transition-colors flex items-center justify-between ${
+            disabled ? "cursor-default" : "hover:border-muted-foreground cursor-pointer"
           }`}
         >
-          <span className={selectedAgent ? "text-white" : "text-gray-500"}>
+          <span className={selectedAgent ? "text-foreground" : "text-muted-foreground"}>
             {selectedAgent ? selectedAgent.name : placeholder}
           </span>
           {!disabled && (
             <svg
-              className={`w-5 h-5 text-gray-400 transition-transform ${
+              className={`w-5 h-5 text-muted-foreground transition-transform ${
                 dropdownOpen ? "rotate-180" : ""
               }`}
               fill="none"
@@ -116,15 +127,15 @@ export function AgentPicker({
               className="fixed inset-0 z-[99]"
               onClick={() => setDropdownOpen(false)}
             />
-            <div className="absolute left-0 right-0 top-full mt-2 bg-[#2a2a2a] border border-[#444] rounded-xl shadow-xl z-[100] overflow-hidden">
+            <div className="absolute left-0 right-0 top-full mt-2 bg-popover border border-border rounded-xl shadow-xl z-[100] overflow-hidden">
               {/* Search */}
-              <div className="p-3 border-b border-[#444]">
+              <div className="p-3 border-b border-border">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search agents"
-                  className="w-full h-10 px-4 rounded-lg text-sm bg-[#1a1a1a] text-white placeholder:text-gray-500 border border-[#444] focus:outline-none focus:ring-1 focus:ring-gray-500"
+                  className="w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-1 focus:ring-accent"
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
@@ -132,11 +143,11 @@ export function AgentPicker({
               {/* Options */}
               <div className="max-h-60 overflow-y-auto">
                 {agentsLoading ? (
-                  <div className="px-4 py-3 text-sm text-gray-400">
+                  <div className="px-4 py-3 text-sm text-muted-foreground">
                     Loading agents...
                   </div>
                 ) : filteredAgents.length === 0 ? (
-                  <div className="px-4 py-3 text-sm text-gray-400">
+                  <div className="px-4 py-3 text-sm text-muted-foreground">
                     No agents found
                   </div>
                 ) : (
@@ -149,14 +160,14 @@ export function AgentPicker({
                       }}
                       className={`w-full px-4 py-3 text-left text-sm transition-colors cursor-pointer flex items-center justify-between ${
                         selectedAgentUuid === agent.uuid
-                          ? "bg-[#3a3a3a] text-white"
-                          : "text-white hover:bg-[#333]"
+                          ? "bg-accent text-foreground"
+                          : "text-foreground hover:bg-muted"
                       }`}
                     >
                       <span>{agent.name}</span>
                       {selectedAgentUuid === agent.uuid && (
                         <svg
-                          className="w-5 h-5 text-white"
+                          className="w-5 h-5 text-foreground"
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"

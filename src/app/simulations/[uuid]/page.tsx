@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { AppLayout } from "@/components/AppLayout";
 import { Agent } from "@/components/AgentPicker";
 import { PickerItem } from "@/components/MultiSelectPicker";
@@ -61,6 +62,8 @@ export default function SimulationDetailPage() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
+  const { data: session } = useSession();
+  const backendAccessToken = (session as any)?.backendAccessToken;
   const uuid = params.uuid as string;
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [simulation, setSimulation] = useState<SimulationData | null>(null);
@@ -137,11 +140,17 @@ export default function SimulationDetailPage() {
           accept: "application/json",
           "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
           type: type === "voice" ? "voice" : "chat",
         }),
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to launch simulation");
@@ -187,9 +196,15 @@ export default function SimulationDetailPage() {
           accept: "application/json",
           "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify(payload),
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to update simulation");
@@ -207,6 +222,8 @@ export default function SimulationDetailPage() {
   // Fetch simulation
   useEffect(() => {
     const fetchSimulation = async () => {
+      if (!backendAccessToken) return;
+
       try {
         setIsLoading(true);
         setError(null);
@@ -220,8 +237,14 @@ export default function SimulationDetailPage() {
           headers: {
             accept: "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
         });
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
 
         if (!response.ok) {
           throw new Error("Failed to fetch simulation");
@@ -285,14 +308,16 @@ export default function SimulationDetailPage() {
       }
     };
 
-    if (uuid) {
+    if (uuid && backendAccessToken) {
       fetchSimulation();
     }
-  }, [uuid]);
+  }, [uuid, backendAccessToken]);
 
   // Fetch personas
   useEffect(() => {
     const fetchPersonas = async () => {
+      if (!backendAccessToken) return;
+
       try {
         setPersonasLoading(true);
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -303,8 +328,14 @@ export default function SimulationDetailPage() {
           headers: {
             accept: "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
         });
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
 
         if (!response.ok) {
           throw new Error("Failed to fetch personas");
@@ -327,11 +358,13 @@ export default function SimulationDetailPage() {
     };
 
     fetchPersonas();
-  }, []);
+  }, [backendAccessToken]);
 
   // Fetch scenarios
   useEffect(() => {
     const fetchScenarios = async () => {
+      if (!backendAccessToken) return;
+
       try {
         setScenariosLoading(true);
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -342,8 +375,14 @@ export default function SimulationDetailPage() {
           headers: {
             accept: "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
         });
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
 
         if (!response.ok) {
           throw new Error("Failed to fetch scenarios");
@@ -366,11 +405,13 @@ export default function SimulationDetailPage() {
     };
 
     fetchScenarios();
-  }, []);
+  }, [backendAccessToken]);
 
   // Fetch metrics
   useEffect(() => {
     const fetchMetrics = async () => {
+      if (!backendAccessToken) return;
+
       try {
         setMetricsLoading(true);
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -381,8 +422,14 @@ export default function SimulationDetailPage() {
           headers: {
             accept: "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
         });
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
 
         if (!response.ok) {
           throw new Error("Failed to fetch metrics");
@@ -405,170 +452,78 @@ export default function SimulationDetailPage() {
     };
 
     fetchMetrics();
-  }, []);
+  }, [backendAccessToken]);
 
-  // Custom header with back button, title, and launch button (when configured)
-  const customHeader = simulation ? (
-    <div className="flex items-center justify-between w-full">
-      <div className="flex items-center gap-4">
-        <button
-          onClick={() => router.push("/simulations")}
-          className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
+  // Header with back button and simulation name
+  const customHeader = (
+    <div className="flex items-center gap-3">
+      <button
+        onClick={() => router.push("/simulations")}
+        className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
+        title="Back to simulations"
+      >
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
         >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15.75 19.5L8.25 12l7.5-7.5"
-            />
-          </svg>
-        </button>
-        <div>
-          <h1 className="text-2xl font-semibold">{simulation.name}</h1>
-          {simulation.description && (
-            <p className="text-muted-foreground text-base leading-relaxed mt-1">
-              {simulation.description}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Launch Button in header - only when configured */}
-      {isConfigured && (
-        <div className="relative" ref={launchDropdownRef}>
-          <button
-            onClick={() => setLaunchDropdownOpen(!launchDropdownOpen)}
-            disabled={isLaunching}
-            className="h-9 px-5 rounded-md text-base font-medium bg-white text-gray-900 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {isLaunching ? (
-              <>
-                <svg
-                  className="w-4 h-4 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                Launching...
-              </>
-            ) : (
-              <>
-                <svg
-                  className="w-4 h-4"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                Launch
-                <svg
-                  className={`w-4 h-4 transition-transform ${
-                    launchDropdownOpen ? "rotate-180" : ""
-                  }`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                  />
-                </svg>
-              </>
-            )}
-          </button>
-
-          {/* Dropdown Menu */}
-          {launchDropdownOpen && (
-            <div className="absolute right-0 top-full mt-2 bg-[#2a2a2a] border border-[#444] rounded-xl shadow-xl z-50 overflow-hidden min-w-[180px]">
-              <button
-                onClick={() => handleLaunch("chat")}
-                disabled={isLaunching}
-                className="w-full px-4 py-3 text-left text-sm text-white hover:bg-[#333] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"
-                  />
-                </svg>
-                Chat Simulation
-              </button>
-              <button
-                onClick={() => handleLaunch("voice")}
-                disabled={isLaunching}
-                className="w-full px-4 py-3 text-left text-sm text-white hover:bg-[#333] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
-                  />
-                </svg>
-                Voice Simulation
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M15.75 19.5L8.25 12l7.5-7.5"
+          />
+        </svg>
+      </button>
+      <span className="text-base font-semibold text-foreground">
+        {isLoading ? "Loading..." : simulation?.name || "Simulation"}
+      </span>
     </div>
-  ) : null;
+  );
 
-  return (
-    <AppLayout
-      activeItem="simulations"
-      onItemChange={(itemId) => router.push(`/${itemId}`)}
-      sidebarOpen={sidebarOpen}
-      onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
-      customHeader={
-        !isLoading && !error && simulation ? customHeader : undefined
-      }
-    >
-      <div className="space-y-6">
-        {/* Back button and Header - shown only during loading */}
-        {(isLoading || error || !simulation) && (
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.push("/simulations")}
-              className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
-            >
+  // Launch button for header actions
+  const headerActions =
+    !isLoading && !error && simulation && isConfigured ? (
+      <div className="relative mr-2" ref={launchDropdownRef}>
+        <button
+          onClick={() => setLaunchDropdownOpen(!launchDropdownOpen)}
+          disabled={isLaunching}
+          className="h-8 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {isLaunching ? (
+            <>
               <svg
-                className="w-5 h-5"
+                className="w-4 h-4 animate-spin"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              <span>Launching...</span>
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              <span>Launch</span>
+              <svg
+                className={`w-4 h-4 transition-transform ${
+                  launchDropdownOpen ? "rotate-180" : ""
+                }`}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -577,18 +532,71 @@ export default function SimulationDetailPage() {
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  d="M15.75 19.5L8.25 12l7.5-7.5"
+                  d="M19.5 8.25l-7.5 7.5-7.5-7.5"
                 />
               </svg>
+            </>
+          )}
+        </button>
+
+        {/* Dropdown Menu */}
+        {launchDropdownOpen && (
+          <div className="absolute right-0 top-full mt-2 bg-popover border border-border rounded-xl shadow-xl z-50 overflow-hidden min-w-[180px]">
+            <button
+              onClick={() => handleLaunch("chat")}
+              disabled={isLaunching}
+              className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"
+                />
+              </svg>
+              Chat Simulation
             </button>
-            <div>
-              <h1 className="text-2xl font-semibold">
-                {isLoading ? "Loading..." : "Simulation"}
-              </h1>
-            </div>
+            <button
+              onClick={() => handleLaunch("voice")}
+              disabled={isLaunching}
+              className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
+                />
+              </svg>
+              Voice Simulation
+            </button>
           </div>
         )}
+      </div>
+    ) : null;
 
+  return (
+    <AppLayout
+      activeItem="simulations"
+      onItemChange={(itemId) => router.push(`/${itemId}`)}
+      sidebarOpen={sidebarOpen}
+      onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+      customHeader={customHeader}
+      headerActions={headerActions}
+    >
+      <div className="space-y-6">
         {/* Content */}
         {isLoading ? (
           <div className="flex items-center justify-center gap-3 py-8">

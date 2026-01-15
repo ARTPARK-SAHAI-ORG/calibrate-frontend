@@ -13195,3 +13195,19 @@ For user messages, the audio player remains above the message content. The audio
 
 ---
 
+_**User (2026-01-15 01:14Z)**_
+
+how to add ngrok http 8000 to ec2 instance so that it runs whenever the instance is up during startup
+
+---
+
+_**Agent (model composer-1, mode Agent)**_
+
+
+
+---
+
+
+
+---
+

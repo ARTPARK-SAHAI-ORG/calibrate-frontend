@@ -75,13 +75,13 @@ export function ToolPicker({
   return (
     <>
       {/* Search Input */}
-      <div className="p-3 border-b border-[#333]">
+      <div className="p-3 border-b border-border">
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search tools"
-          className="w-full h-9 px-3 rounded-lg text-sm bg-black text-white placeholder:text-gray-500 border border-[#2a2a2a] focus:outline-none focus:ring-1 focus:ring-gray-500"
+          className="w-full h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-1 focus:ring-border"
           autoFocus
         />
       </div>
@@ -91,7 +91,7 @@ export function ToolPicker({
         {isLoading ? (
           <div className="flex items-center justify-center py-6">
             <svg
-              className="w-5 h-5 animate-spin text-gray-400"
+              className="w-5 h-5 animate-spin text-muted-foreground"
               fill="none"
               viewBox="0 0 24 24"
             >
@@ -114,7 +114,7 @@ export function ToolPicker({
           <>
             {/* In-built tools section */}
             {filteredInbuiltTools.length > 0 && (
-              <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-[#333]">
+              <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-border">
                 In-built tools
               </div>
             )}
@@ -122,10 +122,10 @@ export function ToolPicker({
               <button
                 key={tool.id}
                 onClick={() => onSelectInbuiltTool(tool.id, tool.name)}
-                className="w-full px-3 py-2.5 flex items-center gap-3 text-white hover:bg-[#2a2a2a] transition-colors cursor-pointer border-b border-[#333] last:border-b-0"
+                className="w-full px-3 py-2.5 flex items-center gap-3 text-foreground hover:bg-muted transition-colors cursor-pointer border-b border-border last:border-b-0"
               >
                 <svg
-                  className="w-4 h-4 text-gray-400"
+                  className="w-4 h-4 text-muted-foreground"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -143,7 +143,7 @@ export function ToolPicker({
 
             {/* Custom tools section */}
             {filteredTools.length > 0 && (
-              <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-[#333]">
+              <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-border">
                 User defined tools
               </div>
             )}
@@ -153,10 +153,10 @@ export function ToolPicker({
                 <button
                   key={tool.uuid}
                   onClick={() => onSelectCustomTool(tool, params)}
-                  className="w-full px-3 py-2.5 flex items-center gap-3 text-white hover:bg-[#2a2a2a] transition-colors cursor-pointer border-b border-[#333] last:border-b-0"
+                  className="w-full px-3 py-2.5 flex items-center gap-3 text-foreground hover:bg-muted transition-colors cursor-pointer border-b border-border last:border-b-0"
                 >
                   <svg
-                    className="w-4 h-4 text-gray-400"
+                    className="w-4 h-4 text-muted-foreground"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -176,7 +176,7 @@ export function ToolPicker({
             {/* Empty state */}
             {filteredTools.length === 0 &&
               filteredInbuiltTools.length === 0 && (
-                <div className="py-6 text-center text-gray-400 text-sm">
+                <div className="py-6 text-center text-muted-foreground text-sm">
                   {searchQuery
                     ? "No tools match your search"
                     : "No tools available"}

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useSession, signOut } from "next-auth/react";
 import {
   TestCaseOutput,
   TestCaseData,
@@ -85,6 +86,8 @@ export function TestRunnerDialog({
   agentName,
   tests,
 }: TestRunnerDialogProps) {
+  const { data: session } = useSession();
+  const backendAccessToken = (session as any)?.backendAccessToken;
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [selectedTestUuid, setSelectedTestUuid] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
@@ -127,8 +130,14 @@ export function TestRunnerDialog({
         headers: {
           accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to poll task status");
@@ -248,12 +257,18 @@ export function TestRunnerDialog({
             accept: "application/json",
             "Content-Type": "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({
             test_uuids: testUuids,
           }),
         }
       );
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to start test run");
@@ -323,12 +338,18 @@ export function TestRunnerDialog({
             accept: "application/json",
             "Content-Type": "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({
             test_uuids: [testUuid],
           }),
         }
       );
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to retry test");
@@ -346,9 +367,15 @@ export function TestRunnerDialog({
               headers: {
                 accept: "application/json",
                 "ngrok-skip-browser-warning": "true",
+                Authorization: `Bearer ${backendAccessToken}`,
               },
             }
           );
+
+          if (pollResponse.status === 401) {
+            await signOut({ callbackUrl: "/login" });
+            return;
+          }
 
           if (!pollResponse.ok) {
             throw new Error("Failed to poll task status");

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { AppLayout } from "@/components/AppLayout";
 import { ParameterCard, Parameter } from "@/components/ParameterCard";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
@@ -17,6 +18,8 @@ type ToolData = {
 
 export default function ToolsPage() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const backendAccessToken = (session as any)?.backendAccessToken;
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [addToolSidebarOpen, setAddToolSidebarOpen] = useState(false);
@@ -431,6 +434,8 @@ export default function ToolsPage() {
   // Fetch tools from backend
   useEffect(() => {
     const fetchTools = async () => {
+      if (!backendAccessToken) return;
+      
       try {
         setToolsLoading(true);
         setToolsError(null);
@@ -444,8 +449,14 @@ export default function ToolsPage() {
           headers: {
             accept: "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
         });
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
 
         if (!response.ok) {
           throw new Error("Failed to fetch tools");
@@ -464,7 +475,7 @@ export default function ToolsPage() {
     };
 
     fetchTools();
-  }, []);
+  }, [backendAccessToken]);
 
   // Delete tool from backend
   // Open delete confirmation dialog
@@ -496,8 +507,14 @@ export default function ToolsPage() {
         headers: {
           accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to delete tool");
@@ -617,6 +634,7 @@ export default function ToolsPage() {
           accept: "application/json",
           "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
           name: newToolName.trim(),
@@ -626,6 +644,11 @@ export default function ToolsPage() {
           },
         }),
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to create tool");
@@ -637,6 +660,7 @@ export default function ToolsPage() {
         headers: {
           accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
       });
 
@@ -754,8 +778,14 @@ export default function ToolsPage() {
         headers: {
           accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to fetch tool details");
@@ -823,6 +853,7 @@ export default function ToolsPage() {
           accept: "application/json",
           "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
           name: newToolName.trim(),
@@ -832,6 +863,11 @@ export default function ToolsPage() {
           },
         }),
       });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to update tool");
@@ -843,6 +879,7 @@ export default function ToolsPage() {
         headers: {
           accept: "application/json",
           "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
         },
       });
 
@@ -1250,7 +1287,7 @@ export default function ToolsPage() {
                 <button
                   onClick={editingToolUuid ? updateTool : createTool}
                   disabled={isCreating || isLoadingTool}
-                  className="h-10 px-4 rounded-md text-base font-medium bg-white text-gray-900 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {isCreating ? (
                     <>
