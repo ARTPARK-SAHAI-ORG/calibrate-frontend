@@ -208,17 +208,25 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 
 **Simulation Run Results** (`/simulations/[uuid]/runs/[runId]`):
 
-- **Overall Metrics** (aggregated across all simulations):
+- **Polling & Intermediate Results**:
+  - Page polls API every 3 seconds while status is `in_progress`
+  - Simulation results appear incrementally as each simulation completes
+  - Overall metrics only shown after run completes (status === "done")
+
+- **Overall Metrics** (only shown when status is "done", aggregated across all simulations):
 
   - Tool calls accuracy (mean ± std)
   - Answer completeness
   - Assistant behavior
   - Question completeness
 
-- **Per-Simulation Results Table**:
+- **Per-Simulation Results Table** (shows intermediate results as each simulation completes):
 
   - Persona + Scenario combination
-  - Individual metric scores (Pass/Fail)
+  - Individual metric scores (Pass/Fail with tooltips showing reasoning)
+  - Metric columns derived from `runData.metrics` keys, or from `simulation_results[].evaluation_results` when metrics is null
+  - Latency metrics (stt/ttft, llm/ttft, etc.) are excluded from the table (shown in latency tab instead)
+  - `stt_llm_judge_score` displayed as percentage, other metrics as Pass/Fail
   - View transcript button
   - Audio playback (for voice simulations)
 
@@ -228,7 +236,7 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
   - Role-based message styling
   - Tool call details with arguments
 
-- **Latency Metrics** (for voice simulations):
+- **Latency Metrics** (for voice simulations, in Performance/Latency tabs):
   - STT latency (TTFB, processing time)
   - LLM latency
   - TTS latency
