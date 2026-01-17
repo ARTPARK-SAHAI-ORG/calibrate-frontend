@@ -7088,3 +7088,160 @@ Status: **completed**
 
 ---
 
+<think><details><summary>Thought Process</summary>
+I see the `LeaderboardBarChart` component is used in:1. BenchmarkResultsDialog
+2. TextToSpeechEvaluation
+3. SpeechToTextEvaluationThe component already wraps the chart in a card with a title. I need to:1. Add a download button to this component that allows downloading the chart as an image
+2. The button should be on the card itself (in the header area)For downloading a Recharts chart as an image, I'll need to:1. Use a ref to get the chart container2. Use html2canvas or similar to convert the chart to an image3. Download itActually, there's a simpler approach - I can use the browser's native canvas API since Recharts renders to SVG. I can convert the SVG to a canvas and then download it as PNG.
+
+Let me update the LeaderboardBarChart component to include a download button.</details></think>
+
+---
+
+I'll update the `LeaderboardBarChart` component to add a download button on the card itself:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/charts/LeaderboardBarChart.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I've updated the LeaderboardBarChart component to include a download button. The component now:1. Has a ref to the chart container
+2. Has a download function that:
+   - Gets the SVG element from the chart
+   - Clones it and adds a white background
+   - Converts it to a canvas at 2x resolution for better quality
+   - Downloads it as a PNG file3. Includes a "PNG" download button in the header next to the title4. Accepts an optional `filename` prop for custom file namesSince this component is already used in:- BenchmarkResultsDialog- TextToSpeechEvaluation- SpeechToTextEvaluation
+
+All these places will automatically get the download button without any additional changes needed.
+
+Let me check for linter errors.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/charts/LeaderboardBarChart.tsx"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/charts/LeaderboardBarChart.tsx"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+No linter errors. The component is now updated and since it's already used in all the chart locations (BenchmarkResultsDialog, TextToSpeechEvaluation, SpeechToTextEvaluation), all charts in the app will now have the download PNG button automatically.
+
+Let me provide a summary to the user.</details></think>
+
+---
+
+Done! I've updated the `LeaderboardBarChart` component to include a PNG download button directly on the chart card. The changes include:
+
+1. **Download button** - A "PNG" button in the top-right corner of each chart card
+2. **High-quality export** - Downloads at 2x resolution for better quality
+3. **White background** - Automatically adds a white background to the exported image
+4. **Optional filename prop** - Can customize the download filename via `filename` prop
+
+Since `LeaderboardBarChart` is already used in:
+- **BenchmarkResultsDialog** - Model comparison charts
+- **SpeechToTextEvaluation** - WER, String Similarity, LLM Judge Score, TTFB, Processing Time charts
+- **TextToSpeechEvaluation** - LLM Judge Score, TTFB, Processing Time charts
+
+All charts throughout the app will now have the download button automatically - no additional changes needed to the files that use this component.
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to the LeaderboardBarChart component to add PNG download functionality. This is a significant enhancement to an existing component. Let me update the app-details.md to document this.
+
+I should add information about:
+1. The LeaderboardBarChart component now has a built-in PNG download button
+2. The optional `filename` prop
+3. How the download works (SVG to PNG conversion)
+
+Let me find a good place to add this documentation.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see that point 7 for Downloadable Tables got mixed up with some content from point 6 (User Profile Dropdown). Let me add the chart component documentation and also fix that issue.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done. I've added documentation for the LeaderboardBarChart component's PNG export functionality.</details></think>
+
+---
+
+Done. I've added documentation for the `LeaderboardBarChart` component's PNG export functionality, including its props and usage locations.
+
+---
+

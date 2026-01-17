@@ -64,8 +64,7 @@ export function LeaderboardBarChart({
 
   // Generate color map from data if not provided
   const colors =
-    colorMap ||
-    getColorMap(data.map((d) => d.colorKey || d.label));
+    colorMap || getColorMap(data.map((d) => d.colorKey || d.label));
 
   const defaultTooltipFormatter = (value: number) =>
     parseFloat(value.toFixed(5)).toString();
@@ -78,14 +77,17 @@ export function LeaderboardBarChart({
 
     // Clone the SVG to avoid modifying the original
     const clonedSvg = svgElement.cloneNode(true) as SVGElement;
-    
+
     // Get computed styles and dimensions
     const svgRect = svgElement.getBoundingClientRect();
     clonedSvg.setAttribute("width", String(svgRect.width));
     clonedSvg.setAttribute("height", String(svgRect.height));
-    
+
     // Add white background
-    const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    const bgRect = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "rect"
+    );
     bgRect.setAttribute("width", "100%");
     bgRect.setAttribute("height", "100%");
     bgRect.setAttribute("fill", "white");
@@ -93,7 +95,9 @@ export function LeaderboardBarChart({
 
     // Convert SVG to data URL
     const svgData = new XMLSerializer().serializeToString(clonedSvg);
-    const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+    const svgBlob = new Blob([svgData], {
+      type: "image/svg+xml;charset=utf-8",
+    });
     const svgUrl = URL.createObjectURL(svgBlob);
 
     // Create canvas and draw image
@@ -112,7 +116,9 @@ export function LeaderboardBarChart({
       const pngUrl = canvas.toDataURL("image/png");
       const downloadLink = document.createElement("a");
       downloadLink.href = pngUrl;
-      downloadLink.download = `${filename || title.toLowerCase().replace(/\s+/g, "-")}.png`;
+      downloadLink.download = `${
+        filename || title.toLowerCase().replace(/\s+/g, "-")
+      }.png`;
       document.body.appendChild(downloadLink);
       downloadLink.click();
       document.body.removeChild(downloadLink);
@@ -178,7 +184,7 @@ export function LeaderboardBarChart({
                 typeof value === "number"
                   ? (formatTooltip || defaultTooltipFormatter)(value)
                   : value
-            }
+              }
             />
             <Bar dataKey="value">
               {data.map((entry, index) => (
