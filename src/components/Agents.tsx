@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 
@@ -347,25 +348,38 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
           {sortedAgents.map((agent) => (
             <div
               key={agent.uuid}
-              onClick={() => {
-                if (onNavigateToAgent) {
-                  onNavigateToAgent(agent.uuid);
-                }
-              }}
-              className="grid grid-cols-[1fr_1fr_auto_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer"
+              className="grid grid-cols-[1fr_1fr_auto_auto] gap-4 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
             >
               {/* Name Column */}
-              <div className="flex items-center">
+              <Link
+                href={`/agents/${agent.uuid}`}
+                onClick={(e) => {
+                  if (onNavigateToAgent) {
+                    e.preventDefault();
+                    onNavigateToAgent(agent.uuid);
+                  }
+                }}
+                className="flex items-center px-4 py-2"
+              >
                 <div className="text-sm font-medium text-foreground">
                   {agent.name}
                 </div>
-              </div>
+              </Link>
               {/* Last Updated At Column */}
-              <div className="flex items-center">
+              <Link
+                href={`/agents/${agent.uuid}`}
+                onClick={(e) => {
+                  if (onNavigateToAgent) {
+                    e.preventDefault();
+                    onNavigateToAgent(agent.uuid);
+                  }
+                }}
+                className="flex items-center px-4 py-2"
+              >
                 <span className="text-sm text-muted-foreground">
                   {agent.updatedAt}
                 </span>
-              </div>
+              </Link>
               {/* Duplicate Button */}
               <div className="flex items-center">
                 <button

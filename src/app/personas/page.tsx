@@ -521,7 +521,7 @@ export default function PersonasPage() {
         ) : (
           <div className="border border-border rounded-xl overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-[1fr_2fr_100px_120px_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+            <div className="grid grid-cols-[200px_1fr_100px_100px_120px_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
               <div className="text-sm font-medium text-muted-foreground">
                 Label
               </div>
@@ -529,9 +529,9 @@ export default function PersonasPage() {
                 Characteristics
               </div>
               {/* Gender column header - commented out to hide gender */}
-              {/* <div className="text-sm font-medium text-muted-foreground">
+              <div className="text-sm font-medium text-muted-foreground">
                 Gender
-              </div> */}
+              </div>
               <div className="text-sm font-medium text-muted-foreground">
                 Language
               </div>
@@ -545,10 +545,10 @@ export default function PersonasPage() {
               <div
                 key={persona.uuid}
                 onClick={() => openEditPersona(persona.uuid)}
-                className="grid grid-cols-[1fr_2fr_100px_120px_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                className="grid grid-cols-[200px_1fr_100px_100px_120px_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
               >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
+                <div className="overflow-x-auto max-w-full">
+                  <p className="text-sm font-medium text-foreground whitespace-nowrap">
                     {persona.name}
                   </p>
                 </div>
@@ -556,9 +556,9 @@ export default function PersonasPage() {
                   {persona.description || "—"}
                 </p>
                 {/* Gender column - commented out to hide gender */}
-                {/* <p className="text-sm text-muted-foreground capitalize">
+                <p className="text-sm text-muted-foreground capitalize">
                   {persona.config?.gender || "—"}
-                </p> */}
+                </p>
                 <p className="text-sm text-muted-foreground capitalize">
                   {persona.config?.language || "—"}
                 </p>
@@ -651,7 +651,7 @@ export default function PersonasPage() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {isLoadingPersona ? (
                 <div className="flex items-center justify-center py-12">
                   <svg
@@ -677,7 +677,7 @@ export default function PersonasPage() {
               ) : (
                 <>
                   {/* Configuration Section */}
-                  <div className="space-y-5">
+                  <div className="space-y-4">
                     {/* Label */}
                     <div>
                       <label className="block text-sm font-medium mb-2">
@@ -714,7 +714,7 @@ export default function PersonasPage() {
                         onChange={(e) =>
                           setPersonaCharacteristics(e.target.value)
                         }
-                        rows={8}
+                        rows={6}
                         className={`w-full px-4 py-3 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none ${
                           validationAttempted && !personaCharacteristics.trim()
                             ? "border-red-500"
@@ -724,7 +724,7 @@ export default function PersonasPage() {
                     </div>
 
                     {/* Gender - commented out to hide gender selection */}
-                    {/* <div>
+                    <div>
                       <label className="block text-sm font-medium mb-2">
                         Gender
                       </label>
@@ -752,7 +752,7 @@ export default function PersonasPage() {
                           Female
                         </button>
                       </div>
-                    </div> */}
+                    </div>
 
                     {/* Language */}
                     <div>

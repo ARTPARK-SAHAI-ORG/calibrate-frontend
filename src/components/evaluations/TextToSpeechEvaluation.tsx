@@ -282,7 +282,10 @@ export function TextToSpeechEvaluation() {
       const result: EvaluationResult = await response.json();
       setEvaluationResult(result);
 
-      if ((result.status === "queued" || result.status === "in_progress") && result.task_id) {
+      if (
+        (result.status === "queued" || result.status === "in_progress") &&
+        result.task_id
+      ) {
         // Start polling
         pollingIntervalRef.current = setInterval(() => {
           pollTaskStatus(result.task_id, backendUrl);
@@ -503,8 +506,8 @@ export function TextToSpeechEvaluation() {
             </svg>
             <span className="text-[14px] font-medium">
               {evaluationResult?.status === "queued"
-                ? "Evaluation queued..."
-                : "Evaluating..."}
+                ? "Evaluation queued"
+                : "Evaluating"}
             </span>
           </div>
         ) : (
