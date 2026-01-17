@@ -208,7 +208,7 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 
 - **Run types**: chat (text-based), audio, voice (full pipeline)
 - Runs are executed asynchronously with polling for status updates
-- Status: pending → in_progress → done (or failed)
+- Status flow: queued → in_progress → done (or failed)
 
 **Simulation Run Results** (`/simulations/[uuid]/runs/[runId]`):
 
@@ -1093,8 +1093,13 @@ import {
   TestStats,
 } from "@/components/test-results/shared";
 
-// Status indicator (passed/failed/running/pending)
+// Status indicator (passed/failed/running/queued/pending)
 <StatusIcon status="passed" />
+// Status visuals:
+// - passed: green checkmark
+// - failed: red X
+// - running: yellow spinner (animated)
+// - queued/pending: gray dot (no animation)
 
 // Small badge for inline status
 <SmallStatusBadge passed={true} />
@@ -1191,14 +1196,44 @@ import { SpinnerIcon, ToolIcon } from "@/components/icons";
 
 ### Polling for Async Tasks
 
+Async operations (simulations, tests, benchmarks, STT/TTS evaluations) follow this status flow:
+
+```
+queued → in_progress → done (or failed/completed)
+```
+
+**Status Display:**
+- `queued`: Gray badge, text "Queued" or "Evaluation queued...", header spinner shown
+- `in_progress`/`running`: Yellow spinner or badge, text "Running" or "Evaluating...", header spinner shown
+- `done`/`completed`: Green badge, text "Done"
+- `failed`: Red badge, text "Failed"
+
+**Note:** For simulation runs, the header spinner is shown for both `queued` and `in_progress` statuses to indicate the task is active.
+
+**Tracking Run Status:**
+
+For batch operations (e.g., running multiple tests), track both:
+- `runStatus`: Overall task status from backend (`queued` | `in_progress` | `done` | `failed`)
+- Individual item statuses: Updated based on `runStatus` and individual results
+
+```tsx
+// When overall status transitions to in_progress, update items from queued to running
+if (result.status === "in_progress" && item.status === "queued") {
+  return { ...item, status: "running" };
+}
+```
+
+**Polling Pattern:**
+
 ```tsx
 useEffect(() => {
   let pollInterval: NodeJS.Timeout | null = null;
 
   const fetchData = async (isInitial = false) => {
     // ... fetch
-    if (data.status === "done" && pollInterval) {
-      clearInterval(pollInterval);
+    // Continue polling for queued and in_progress
+    if (data.status === "done" || data.status === "completed" || data.status === "failed") {
+      if (pollInterval) clearInterval(pollInterval);
     }
   };
 

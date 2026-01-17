@@ -56,7 +56,7 @@ export type TestCaseData = {
 export function StatusIcon({
   status,
 }: {
-  status: "passed" | "failed" | "running" | "pending";
+  status: "passed" | "failed" | "running" | "pending" | "queued";
 }) {
   if (status === "passed") {
     return (
@@ -72,9 +72,17 @@ export function StatusIcon({
       </div>
     );
   }
+  if (status === "queued" || status === "pending") {
+    return (
+      <div className="w-5 h-5 rounded-full bg-gray-500/20 flex items-center justify-center flex-shrink-0">
+        <div className="w-2 h-2 rounded-full bg-gray-400" />
+      </div>
+    );
+  }
+  // running status - yellow spinner
   return (
     <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-      <SpinnerIcon className="w-4 h-4 animate-spin text-muted-foreground" />
+      <SpinnerIcon className="w-4 h-4 animate-spin text-yellow-500" />
     </div>
   );
 }

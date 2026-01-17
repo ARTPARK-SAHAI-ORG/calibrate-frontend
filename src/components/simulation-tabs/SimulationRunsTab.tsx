@@ -8,7 +8,7 @@ type Run = {
   uuid: string;
   name: string;
   status: string;
-  type: "chat" | "audio";
+  type: "text" | "audio";
   updated_at: string;
 };
 
@@ -103,7 +103,7 @@ export function SimulationRunsTab({ simulationUuid }: SimulationRunsTabProps) {
 
   const getTypeBadgeClass = (type: string) => {
     switch (type.toLowerCase()) {
-      case "chat":
+      case "text":
         return "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400";
       case "audio":
       case "voice":

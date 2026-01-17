@@ -50,7 +50,7 @@ type RunData = {
   task_id: string;
   name: string;
   status: string;
-  type: "chat" | "audio" | "voice";
+  type: "text" | "voice";
   updated_at: string;
   total_simulations: number;
   metrics: {
@@ -154,6 +154,8 @@ export default function SimulationRunPage() {
 
   const formatStatus = (status: string) => {
     switch (status.toLowerCase()) {
+      case "queued":
+        return "Queued";
       case "in_progress":
         return "Running";
       case "done":
@@ -184,9 +186,8 @@ export default function SimulationRunPage() {
 
   const getTypeBadgeClass = (type: string) => {
     switch (type.toLowerCase()) {
-      case "chat":
+      case "text":
         return "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400";
-      case "audio":
       case "voice":
         return "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400";
       default:
@@ -323,7 +324,8 @@ export default function SimulationRunPage() {
         <h1 className="text-2xl font-semibold">
           {runData?.name || "Loading..."}
         </h1>
-        {runData?.status.toLowerCase() === "in_progress" && (
+        {(runData?.status.toLowerCase() === "in_progress" ||
+          runData?.status.toLowerCase() === "queued") && (
           <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle
               className="opacity-25"
@@ -492,7 +494,7 @@ export default function SimulationRunPage() {
                   });
                 }
 
-                const isChatType = runData.type === "chat";
+                const isTextType = runData.type === "text";
 
                 return (
                   <div>
@@ -500,8 +502,8 @@ export default function SimulationRunPage() {
                       Overall Metrics
                     </h2>
 
-                    {/* Tab Navigation - only show for non-chat types */}
-                    {!isChatType && (
+                    {/* Tab Navigation - only show for non-text types */}
+                    {!isTextType && (
                       <div className="flex gap-2 border-b border-border mb-4">
                         <button
                           onClick={() => setActiveMetricsTab("performance")}
@@ -526,9 +528,9 @@ export default function SimulationRunPage() {
                       </div>
                     )}
 
-                    {/* Performance Tab Content - show for chat type or when performance tab is active */}
-                    {((isChatType && regularMetrics.length > 0) ||
-                      (!isChatType &&
+                    {/* Performance Tab Content - show for text type or when performance tab is active */}
+                    {((isTextType && regularMetrics.length > 0) ||
+                      (!isTextType &&
                         activeMetricsTab === "performance" &&
                         regularMetrics.length > 0)) && (
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -568,8 +570,8 @@ export default function SimulationRunPage() {
                       </div>
                     )}
 
-                    {/* Latency Tab Content - only show for non-chat types */}
-                    {!isChatType &&
+                    {/* Latency Tab Content - only show for non-text types */}
+                    {!isTextType &&
                       activeMetricsTab === "latency" &&
                       latencyMetrics.length > 0 && (
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

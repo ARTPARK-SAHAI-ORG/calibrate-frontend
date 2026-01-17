@@ -56,7 +56,7 @@ type LeaderboardSummary = {
 
 type EvaluationResult = {
   task_id: string;
-  status: "in_progress" | "done";
+  status: "queued" | "in_progress" | "done";
   provider_results?: ProviderResult[];
   leaderboard_metrics_path?: string;
   leaderboard_summary?: LeaderboardSummary[];
@@ -397,7 +397,7 @@ export function SpeechToTextEvaluation() {
       const result: EvaluationResult = await response.json();
       setEvaluationResult(result);
 
-      if (result.status === "in_progress" && result.task_id) {
+      if ((result.status === "queued" || result.status === "in_progress") && result.task_id) {
         // Start polling
         pollingIntervalRef.current = setInterval(() => {
           pollTaskStatus(result.task_id, backendUrl);
@@ -708,7 +708,11 @@ export function SpeechToTextEvaluation() {
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               ></path>
             </svg>
-            <span className="text-[14px] font-medium">Evaluating...</span>
+            <span className="text-[14px] font-medium">
+              {evaluationResult?.status === "queued"
+                ? "Evaluation queued..."
+                : "Evaluating..."}
+            </span>
           </div>
         ) : (
           <button

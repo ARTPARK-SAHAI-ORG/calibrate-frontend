@@ -76,6 +76,7 @@ export function BenchmarkResultsDialog({
 
   // Loading and data state
   const [isLoading, setIsLoading] = useState(true);
+  const [taskStatus, setTaskStatus] = useState<string>("queued");
   const [modelResults, setModelResults] = useState<ModelResult[]>([]);
   const [leaderboardSummary, setLeaderboardSummary] = useState<
     LeaderboardSummary[] | undefined
@@ -96,6 +97,7 @@ export function BenchmarkResultsDialog({
   useEffect(() => {
     if (isOpen && testUuids.length > 0 && models.length > 0) {
       setIsLoading(true);
+      setTaskStatus("queued");
       setModelResults([]);
       setLeaderboardSummary(undefined);
       setError(null);
@@ -126,6 +128,9 @@ export function BenchmarkResultsDialog({
       }
 
       const result: BenchmarkStatusResponse = await response.json();
+
+      // Update task status for display
+      setTaskStatus(result.status);
 
       // Check if polling should stop
       if (
@@ -278,7 +283,9 @@ export function BenchmarkResultsDialog({
             <div className="flex flex-col items-center gap-4">
               <SpinnerIcon className="w-8 h-8 animate-spin text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                Running benchmark...
+                {taskStatus === "queued"
+                  ? "Benchmark queued"
+                  : "Running benchmark"}
               </p>
             </div>
           </div>

@@ -32,7 +32,7 @@ type ChatMessage = {
 
 type TestResult = {
   test: TestData;
-  status: "pending" | "running" | "passed" | "failed";
+  status: "pending" | "queued" | "running" | "passed" | "failed";
   chatHistory?: ChatMessage[];
   output?: TestCaseOutput;
   testCase?: TestCaseData;
@@ -91,6 +91,9 @@ export function TestRunnerDialog({
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [selectedTestUuid, setSelectedTestUuid] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [runStatus, setRunStatus] = useState<
+    "queued" | "in_progress" | "done" | "failed"
+  >("queued");
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -145,50 +148,69 @@ export function TestRunnerDialog({
 
       const result: TestRunStatusResponse = await response.json();
 
-      // Update test results based on polling response
-      if (result.results && result.results.length > 0) {
-        setTestResults((prev) => {
-          // Try to match by test_uuid first, if no match found, update by index
-          const updatedResults: TestResult[] = prev.map((r, index) => {
-            // First try to find by UUID
-            let apiResult = result.results?.find(
-              (res) => res.test_uuid === r.test.uuid
-            );
-
-            // If no UUID match, try to find by test name
-            if (!apiResult) {
-              apiResult = result.results?.find(
-                (res) => res.test_name === r.test.name
-              );
-            }
-
-            // If still no match and index is within range, use index-based matching
-            if (!apiResult && result.results && index < result.results.length) {
-              apiResult = result.results[index];
-            }
-
-            if (apiResult) {
-              // Check both `passed` boolean and `status` string for compatibility
-              const isPassed =
-                apiResult.passed === true || apiResult.status === "passed";
-              const newStatus: "passed" | "failed" = isPassed
-                ? "passed"
-                : "failed";
-              return {
-                ...r,
-                status: newStatus,
-                chatHistory: apiResult.chat_history,
-                output: apiResult.output,
-                testCase: apiResult.test_case,
-                evaluation: apiResult.evaluation ?? { passed: isPassed },
-                error: apiResult.error,
-              };
-            }
-            return r;
-          });
-          return updatedResults;
-        });
+      // Update overall run status
+      if (
+        result.status === "queued" ||
+        result.status === "in_progress" ||
+        result.status === "done" ||
+        result.status === "completed" ||
+        result.status === "failed"
+      ) {
+        setRunStatus(
+          result.status === "completed"
+            ? "done"
+            : (result.status as "queued" | "in_progress" | "done" | "failed")
+        );
       }
+
+      // Update test results based on polling response
+      setTestResults((prev) => {
+        // Try to match by test_uuid first, if no match found, update by index
+        const updatedResults: TestResult[] = prev.map((r, index) => {
+          // First try to find by UUID in results
+          let apiResult = result.results?.find(
+            (res) => res.test_uuid === r.test.uuid
+          );
+
+          // If no UUID match, try to find by test name
+          if (!apiResult) {
+            apiResult = result.results?.find(
+              (res) => res.test_name === r.test.name
+            );
+          }
+
+          // If still no match and index is within range, use index-based matching
+          if (!apiResult && result.results && index < result.results.length) {
+            apiResult = result.results[index];
+          }
+
+          if (apiResult) {
+            // Check both `passed` boolean and `status` string for compatibility
+            const isPassed =
+              apiResult.passed === true || apiResult.status === "passed";
+            const newStatus: "passed" | "failed" = isPassed
+              ? "passed"
+              : "failed";
+            return {
+              ...r,
+              status: newStatus,
+              chatHistory: apiResult.chat_history,
+              output: apiResult.output,
+              testCase: apiResult.test_case,
+              evaluation: apiResult.evaluation ?? { passed: isPassed },
+              error: apiResult.error,
+            };
+          }
+
+          // If overall status is in_progress and test is still queued, mark as running
+          if (result.status === "in_progress" && r.status === "queued") {
+            return { ...r, status: "running" };
+          }
+
+          return r;
+        });
+        return updatedResults;
+      });
 
       // Check if polling should stop
       if (
@@ -241,8 +263,9 @@ export function TestRunnerDialog({
       return;
     }
 
-    // Set all tests to running
-    setTestResults((prev) => prev.map((r) => ({ ...r, status: "running" })));
+    // Set all tests to queued initially
+    setRunStatus("queued");
+    setTestResults((prev) => prev.map((r) => ({ ...r, status: "queued" })));
 
     try {
       // Collect all test UUIDs
@@ -436,7 +459,11 @@ export function TestRunnerDialog({
       };
 
       // Start polling for single test
-      if (result.status === "in_progress" || result.status === "pending") {
+      if (
+        result.status === "in_progress" ||
+        result.status === "pending" ||
+        result.status === "queued"
+      ) {
         setTimeout(pollSingleTest, 2000);
       } else if (result.status === "completed" || result.status === "done") {
         const apiResult = result.results?.find(
@@ -527,7 +554,11 @@ export function TestRunnerDialog({
       const result: TestRunStatusResponse = await response.json();
       setCurrentTaskId(result.task_id);
 
-      if (result.status === "in_progress" || result.status === "pending") {
+      if (
+        result.status === "in_progress" ||
+        result.status === "pending" ||
+        result.status === "queued"
+      ) {
         pollingIntervalRef.current = setInterval(() => {
           pollTaskStatus(result.task_id, backendUrl);
         }, 2000);
@@ -592,9 +623,9 @@ export function TestRunnerDialog({
 
   const passedTests = testResults.filter((r) => r.status === "passed");
   const failedTests = testResults.filter((r) => r.status === "failed");
-  const pendingTests = testResults.filter(
-    (r) => r.status === "pending" || r.status === "running"
-  );
+  const queuedTests = testResults.filter((r) => r.status === "queued");
+  const runningTests = testResults.filter((r) => r.status === "running");
+  const pendingTests = testResults.filter((r) => r.status === "pending");
 
   if (!isOpen) return null;
 
@@ -608,8 +639,7 @@ export function TestRunnerDialog({
           </h2>
           <div className="flex items-center gap-3">
             {/* Passed/Failed counts */}
-            {!isRunning &&
-              testResults.length > 0 &&
+            {testResults.length > 0 &&
               (passedTests.length > 0 || failedTests.length > 0) && (
                 <TestStats
                   passedCount={passedTests.length}
@@ -670,12 +700,52 @@ export function TestRunnerDialog({
                 </div>
               )}
 
-              {/* Pending/Running Tests */}
+              {/* Queued Tests */}
+              {queuedTests.length > 0 && (
+                <div className="p-4">
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                    Queued ({queuedTests.length})
+                  </h3>
+                  <div className="space-y-1">
+                    {queuedTests.map((result) => (
+                      <TestListItem
+                        key={result.test.uuid}
+                        result={result}
+                        isSelected={selectedTestUuid === result.test.uuid}
+                        onSelect={() => setSelectedTestUuid(result.test.uuid)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Running Tests */}
+              {runningTests.length > 0 && (
+                <div className="p-4">
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>
+                    Running ({runningTests.length})
+                  </h3>
+                  <div className="space-y-1">
+                    {runningTests.map((result) => (
+                      <TestListItem
+                        key={result.test.uuid}
+                        result={result}
+                        isSelected={selectedTestUuid === result.test.uuid}
+                        onSelect={() => setSelectedTestUuid(result.test.uuid)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Pending Tests */}
               {pendingTests.length > 0 && (
                 <div className="p-4">
                   <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
-                    {isRunning ? "Running" : "Pending"} ({pendingTests.length})
+                    <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                    Pending ({pendingTests.length})
                   </h3>
                   <div className="space-y-1">
                     {pendingTests.map((result) => (
@@ -737,6 +807,14 @@ function LocalTestDetailView({ result }: { result: TestResult }) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-muted-foreground">Test is pending</p>
+      </div>
+    );
+  }
+
+  if (result.status === "queued") {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-muted-foreground">Test is queued</p>
       </div>
     );
   }

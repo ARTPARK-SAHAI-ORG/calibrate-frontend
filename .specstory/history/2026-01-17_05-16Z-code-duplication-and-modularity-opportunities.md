@@ -3849,3 +3849,2549 @@ This was a minor bug fix (adding `onClose()` after selection) rather than a new 
 
 ---
 
+_**User (2026-01-16 23:46Z)**_
+
+where is @src/components/evaluations/ChatSimulationEvaluation.tsx being used?
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to know where the ChatSimulationEvaluation component is being used. Let me search for it in the codebase.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "ChatSimulationEvaluation" • 1 match</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `./src/components/evaluations/ChatSimulationEvaluation.tsx` | `export function ChatSimulationEvaluation() \{` | L3 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The grep search only found the component definition itself in `ChatSimulationEvaluation.tsx`. It's not being imported or used anywhere else in the codebase. This appears to be an unused/orphan component.</details></think>
+
+---
+
+`ChatSimulationEvaluation` is **not being used anywhere** in the codebase. The only reference is its own definition in `src/components/evaluations/ChatSimulationEvaluation.tsx`. 
+
+It appears to be an orphaned/unused placeholder component that was likely created for future use but never integrated into any page or other component.
+
+---
+
+_**User (2026-01-16 23:46Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user is asking me to update the app-details.md file, but only if I made code changes. In my last response, I only searched for where the ChatSimulationEvaluation component is being used - I didn't make any code changes. I just answered the user's question about where it's used.
+
+So I should skip updating the docs since no code changes were made.</details></think>
+
+---
+
+I didn't make any code changes - I only searched the codebase to answer your question about where `ChatSimulationEvaluation` is used. No updates to `app-details.md` are needed.
+
+---
+
+_**User (2026-01-16 23:46Z)**_
+
+and @src/components/evaluations/VoiceSimulationEvaluation.tsx ?
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to know where VoiceSimulationEvaluation is being used. Let me search for it.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "VoiceSimulationEvaluation" • 1 match</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `./src/components/evaluations/VoiceSimulationEvaluation.tsx` | `export function VoiceSimulationEvaluation() \{` | L3 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Same as ChatSimulationEvaluation - it's also not being used anywhere. Just defined but never imported.</details></think>
+
+---
+
+Same situation - `VoiceSimulationEvaluation` is also **not being used anywhere**. It's another orphaned placeholder component in the `evaluations` folder.
+
+Both `ChatSimulationEvaluation` and `VoiceSimulationEvaluation` appear to be unused placeholder components that were likely created in anticipation of future features but never integrated.
+
+---
+
+_**User (2026-01-16 23:46Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user is asking me to update the app-details.md file, but only if I made code changes. In my last response, I only searched for where the VoiceSimulationEvaluation component is being used - I didn't make any code changes. I just answered the user's question.
+
+So I should skip updating the docs since no code changes were made.</details></think>
+
+---
+
+I didn't make any code changes - I only searched the codebase to answer your question. No updates to `app-details.md` are needed.
+
+---
+
+_**User (2026-01-16 23:46Z)**_
+
+for @src/components/evaluations/SpeechToTextEvaluation.tsx and @src/components/evaluations/TextToSpeechEvaluation.tsx you might now receive the status as queued - so, if status is that say "Evaluation queued" and if in progress, then Evaluating
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to update the SpeechToTextEvaluation and TextToSpeechEvaluation components to handle a new status "queued" in addition to "in_progress" and "done". When the status is "queued", it should display "Evaluation queued", and when "in_progress", it should show "Evaluating".
+
+Let me update both files to:
+1. Update the EvaluationResult type to include "queued" as a possible status
+2. Continue polling when status is "queued" (same as "in_progress")
+3. Update the display text to show "Evaluation queued" when status is "queued" and "Evaluating..." when status is "in_progress"</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -57,5 +57,5 @@
+  type EvaluationResult = {
+    task_id: string;
+-   status: "in_progress" | "done";
++   status: "queued" | "in_progress" | "done";
+    provider_results?: ProviderResult[];
+    leaderboard_metrics_path?: string;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -49,5 +49,5 @@
+  type EvaluationResult = {
+    task_id: string;
+-   status: "in_progress" | "done";
++   status: "queued" | "in_progress" | "done";
+    provider_results?: ProviderResult[];
+    leaderboard_summary?: LeaderboardSummary[];
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the display text in both files to show "Evaluation queued" or "Evaluating..." based on the status. Let me find the evaluating spinner/status display section in both files and update them.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 5, lines removed: 1
+
+```diff
+@@ -709,5 +709,9 @@
+                &gt;&lt;/path&gt;
+              &lt;/svg&gt;
+-             &lt;span className="text-[14px] font-medium"&gt;Evaluating...&lt;/span&gt;
++             &lt;span className="text-[14px] font-medium"&gt;
++               {evaluationResult?.status === "queued"
++                 ? "Evaluation queued..."
++                 : "Evaluating..."}
++             &lt;/span&gt;
+            &lt;/div&gt;
+          ) : (
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 5, lines removed: 1
+
+```diff
+@@ -502,5 +502,9 @@
+                &gt;&lt;/path&gt;
+              &lt;/svg&gt;
+-             &lt;span className="text-[14px] font-medium"&gt;Evaluating...&lt;/span&gt;
++             &lt;span className="text-[14px] font-medium"&gt;
++               {evaluationResult?.status === "queued"
++                 ? "Evaluation queued..."
++                 : "Evaluating..."}
++             &lt;/span&gt;
+            &lt;/div&gt;
+          ) : (
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the logic for starting/continuing polling when status is "queued" or "in_progress" in both files. Let me check the handleEvaluate function to make sure it handles "queued" status.</details></think>
+
+---
+
+Now let me update the polling logic to also handle the "queued" status (it should continue polling just like "in_progress"):
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -398,5 +398,5 @@
+        setEvaluationResult(result);
+  
+-       if (result.status === "in_progress" &amp;&amp; result.task_id) {
++       if ((result.status === "queued" || result.status === "in_progress") &amp;&amp; result.task_id) {
+          // Start polling
+          pollingIntervalRef.current = setInterval(() =&gt; {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -283,5 +283,5 @@
+        setEvaluationResult(result);
+  
+-       if (result.status === "in_progress" &amp;&amp; result.task_id) {
++       if ((result.status === "queued" || result.status === "in_progress") &amp;&amp; result.task_id) {
+          // Start polling
+          pollingIntervalRef.current = setInterval(() =&gt; {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me check for lint errors in both files.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 2 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Both files have been updated successfully with no lint errors. The changes made:
+
+1. Updated the `EvaluationResult` type to include `"queued"` as a possible status value
+2. Updated the display text to show "Evaluation queued..." when status is "queued" and "Evaluating..." otherwise
+3. Updated the polling logic to continue polling when status is either "queued" or "in_progress"</details></think>
+
+---
+
+Done! I've updated both files to handle the "queued" status:
+
+1. **Updated the `EvaluationResult` type** to include `"queued"` as a possible status
+2. **Updated the display text** to show:
+   - "Evaluation queued..." when status is `"queued"`
+   - "Evaluating..." when status is `"in_progress"`
+3. **Updated the polling logic** to continue polling when status is either `"queued"` or `"in_progress"`
+
+---
+
+_**User (2026-01-16 23:46Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to SpeechToTextEvaluation.tsx and TextToSpeechEvaluation.tsx to handle the new "queued" status. This is a minor API change - the evaluation endpoints can now return "queued" status in addition to "in_progress" and "done".
+
+This is a small change to handle a new API response status. I should check if the app-details.md mentions the evaluation status values anywhere, and if so, update them to include "queued".
+
+Let me search the app-details.md for any mentions of evaluation status or the STT/TTS evaluation components.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "in_progress.*done|status.*evaluation" in "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md" • 1 match</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.cursor/rules/app-details.md` | `- Status: pending → in_progress → done (or failed)` | L211 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The app-details.md mentions the status flow for simulations (pending → in_progress → done), but not for the STT/TTS evaluations. The change I made is relatively minor - just adding support for a "queued" status in the evaluation components. This doesn't fundamentally change any documented patterns.
+
+Looking at the document, there's a section about STT and TTS evaluations that describes their features but doesn't go into detail about the status values. Since this is a small API response change and not a new pattern or convention, I don't think it warrants a documentation update. The existing documentation describes what the features do, not the internal implementation details of status polling.
+
+I'll skip updating the docs for this minor change.</details></think>
+
+---
+
+This was a minor API change (adding "queued" status handling) that doesn't introduce new patterns or conventions. The existing documentation describes STT/TTS evaluation features at a high level without detailing internal status values. No updates to `app-details.md` are needed for this change.
+
+---
+
+_**User (2026-01-16 23:46Z)**_
+
+similarly running tests simulation and benchmark 
+
+@src/components/TestRunnerDialog.tsx @src/components/BenchmarkResultsDialog.tsx and @src/app/simulations/[uuid]/runs/[runId]/ 
+
+all might received queued first as the status and then in progress and then running
+
+For tests, when queued show Queued instead of running use a gray color for the dot instead of yellow and don't show spinners for each of the tests
+
+update the spinner message in the case of benchmark
+
+and in the case of simulation run, update the done/is running pill to also show queued with gray color
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to update three files to handle a new "queued" status that comes before "in_progress" in the async task flow:
+
+1. `TestRunnerDialog.tsx` - for running tests
+2. `BenchmarkResultsDialog.tsx` - for benchmarks
+3. `/simulations/[uuid]/runs/[runId]/page.tsx` - for simulation runs
+
+Changes needed:
+1. TestRunnerDialog:
+   - Add "queued" status
+   - When queued, show "Queued" instead of "Running"
+   - Use gray color for the dot instead of yellow
+   - Don't show spinners for individual tests when queued
+
+2. BenchmarkResultsDialog:
+   - Update the spinner message to show "Queued" or similar when status is queued
+
+3. Simulation run page:
+   - Update the status pill to show "queued" with gray color
+
+Let me read the simulation run page first to understand its structure.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The simulation run page already has `queued` handled in the `getStatusBadgeClass` function. I just need to update the `formatStatus` function to also handle "queued" status. Let me check the full function:
+
+```javascript
+const formatStatus = (status: string) => {
+  switch (status.toLowerCase()) {
+    case "in_progress":
+      return "Running";
+    case "done":
+      return "Done";
+    default:
+      return status;
+  }
+};
+```
+
+I need to add a case for "queued" to return "Queued".
+
+Now let me update the files:
+
+1. **TestRunnerDialog.tsx**:
+   - Add "queued" to the TestResult status type
+   - Update the polling logic to handle "queued" status
+   - In the test list, show "Queued" with gray dot for queued tests
+   - Don't show spinner for queued tests
+
+2. **BenchmarkResultsDialog.tsx**:
+   - Update the loading/spinner message to show "Benchmark queued..." vs "Running benchmark..."
+
+3. **Simulation run page**:
+   - Update formatStatus to handle "queued"
+
+Let me make these changes.</details></think>
+
+---
+
+Let me update all three files to handle the "queued" status:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -33,5 +33,5 @@
+  type TestResult = {
+    test: TestData;
+-   status: "pending" | "running" | "passed" | "failed";
++   status: "pending" | "queued" | "running" | "passed" | "failed";
+    chatHistory?: ChatMessage[];
+    output?: TestCaseOutput;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 2
+
+```diff
+@@ -242,6 +242,6 @@
+      }
+  
+-     // Set all tests to running
+-     setTestResults((prev) =&gt; prev.map((r) =&gt; ({ ...r, status: "running" })));
++     // Set all tests to queued initially
++     setTestResults((prev) =&gt; prev.map((r) =&gt; ({ ...r, status: "queued" })));
+  
+      try {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 43, lines removed: 3
+
+```diff
+@@ -671,10 +671,50 @@
+                )}
+  
+-               {/* Pending/Running Tests */}
+-               {pendingTests.length &gt; 0 &amp;&amp; (
++               {/* Queued Tests */}
++               {queuedTests.length &gt; 0 &amp;&amp; (
++                 &lt;div className="p-4"&gt;
++                   &lt;h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2"&gt;
++                     &lt;div className="w-2 h-2 rounded-full bg-gray-400"&gt;&lt;/div&gt;
++                     Queued ({queuedTests.length})
++                   &lt;/h3&gt;
++                   &lt;div className="space-y-1"&gt;
++                     {queuedTests.map((result) =&gt; (
++                       &lt;TestListItem
++                         key={result.test.uuid}
++                         result={result}
++                         isSelected={selectedTestUuid === result.test.uuid}
++                         onSelect={() =&gt; setSelectedTestUuid(result.test.uuid)}
++                       /&gt;
++                     ))}
++                   &lt;/div&gt;
++                 &lt;/div&gt;
++               )}
++ 
++               {/* Running Tests */}
++               {runningTests.length &gt; 0 &amp;&amp; (
+                  &lt;div className="p-4"&gt;
+                    &lt;h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2"&gt;
+                      &lt;div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"&gt;&lt;/div&gt;
+-                     {isRunning ? "Running" : "Pending"} ({pendingTests.length})
++                     Running ({runningTests.length})
++                   &lt;/h3&gt;
++                   &lt;div className="space-y-1"&gt;
++                     {runningTests.map((result) =&gt; (
++                       &lt;TestListItem
++                         key={result.test.uuid}
++                         result={result}
++                         isSelected={selectedTestUuid === result.test.uuid}
++                         onSelect={() =&gt; setSelectedTestUuid(result.test.uuid)}
++                       /&gt;
++                     ))}
++                   &lt;/div&gt;
++                 &lt;/div&gt;
++               )}
++ 
++               {/* Pending Tests */}
++               {pendingTests.length &gt; 0 &amp;&amp; (
++                 &lt;div className="p-4"&gt;
++                   &lt;h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2"&gt;
++                     &lt;div className="w-2 h-2 rounded-full bg-gray-400"&gt;&lt;/div&gt;
++                     Pending ({pendingTests.length})
+                    &lt;/h3&gt;
+                    &lt;div className="space-y-1"&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: 3
+
+```diff
+@@ -593,7 +593,7 @@
+    const passedTests = testResults.filter((r) =&gt; r.status === "passed");
+    const failedTests = testResults.filter((r) =&gt; r.status === "failed");
+-   const pendingTests = testResults.filter(
+-     (r) =&gt; r.status === "pending" || r.status === "running"
+-   );
++   const queuedTests = testResults.filter((r) =&gt; r.status === "queued");
++   const runningTests = testResults.filter((r) =&gt; r.status === "running");
++   const pendingTests = testResults.filter((r) =&gt; r.status === "pending");
+  
+    if (!isOpen) return null;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the StatusIcon in shared.tsx to handle "queued" status, and update the LocalTestDetailView to handle queued status. Let me also update the test-results/shared.tsx to handle the queued status.</details></think>
+
+---
+
+Now let me update the StatusIcon in shared.tsx to handle "queued" status:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to update the StatusIcon to handle "queued" status. The current signature is:
+```
+status: "passed" | "failed" | "running" | "pending"
+```
+
+I need to add "queued" to this type and handle it appropriately (show a gray dot without spinner).</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -57,5 +57,5 @@
+    status,
+  }: {
+-   status: "passed" | "failed" | "running" | "pending";
++   status: "passed" | "failed" | "running" | "pending" | "queued";
+  }) {
+    if (status === "passed") {
+```
+
+**Chunk 2**
+Lines added: 8, lines removed: undefined
+
+```diff
+@@ -73,4 +73,12 @@
+      );
+    }
++   if (status === "queued" || status === "pending") {
++     return (
++       &lt;div className="w-5 h-5 rounded-full bg-gray-500/20 flex items-center justify-center flex-shrink-0"&gt;
++         &lt;div className="w-2 h-2 rounded-full bg-gray-400" /&gt;
++       &lt;/div&gt;
++     );
++   }
++   // running status
+    return (
+      &lt;div className="w-5 h-5 flex items-center justify-center flex-shrink-0"&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the LocalTestDetailView in TestRunnerDialog to handle the queued status:</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 8, lines removed: undefined
+
+```diff
+@@ -781,4 +781,12 @@
+      );
+    }
++ 
++   if (result.status === "queued") {
++     return (
++       &lt;div className="flex items-center justify-center h-full"&gt;
++         &lt;p className="text-muted-foreground"&gt;Test is queued&lt;/p&gt;
++       &lt;/div&gt;
++     );
++   }
+  
+    if (result.status === "running") {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the polling logic in TestRunnerDialog to handle the "queued" status. Let me check the polling function to see if it needs to be updated for handling "queued".</details></think>
+
+---
+
+Now let me update the BenchmarkResultsDialog to show the correct message based on status:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -77,4 +77,5 @@
+    // Loading and data state
+    const [isLoading, setIsLoading] = useState(true);
++   const [taskStatus, setTaskStatus] = useState&lt;string&gt;("queued");
+    const [modelResults, setModelResults] = useState&lt;ModelResult[]&gt;([]);
+    const [leaderboardSummary, setLeaderboardSummary] = useState&lt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -98,4 +98,5 @@
+      if (isOpen &amp;&amp; testUuids.length &gt; 0 &amp;&amp; models.length &gt; 0) {
+        setIsLoading(true);
++       setTaskStatus("queued");
+        setModelResults([]);
+        setLeaderboardSummary(undefined);
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 4, lines removed: 1
+
+```diff
+@@ -129,5 +129,8 @@
+  
+        const result: BenchmarkStatusResponse = await response.json();
+- 
++       
++       // Update task status for display
++       setTaskStatus(result.status);
++ 
+        // Check if polling should stop
+        if (
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: 1
+
+```diff
+@@ -284,5 +284,7 @@
+                &lt;SpinnerIcon className="w-8 h-8 animate-spin text-muted-foreground" /&gt;
+                &lt;p className="text-sm text-muted-foreground"&gt;
+-                 Running benchmark...
++                 {taskStatus === "queued"
++                   ? "Benchmark queued..."
++                   : "Running benchmark..."}
+                &lt;/p&gt;
+              &lt;/div&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the simulation run page to handle "queued" in formatStatus:</details></think>
+
+---
+
+Now let me update the simulation run page to handle "queued" in formatStatus:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: undefined
+
+```diff
+@@ -155,4 +155,6 @@
+    const formatStatus = (status: string) =&gt; {
+      switch (status.toLowerCase()) {
++       case "queued":
++         return "Queued";
+        case "in_progress":
+          return "Running";
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me also update the polling logic in TestRunnerDialog to handle "queued" status (it should continue polling when status is queued):</details></think>
+
+---
+
+Now let me update the polling logic in TestRunnerDialog to handle "queued" status:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -437,5 +437,5 @@
+  
+        // Start polling for single test
+-       if (result.status === "in_progress" || result.status === "pending") {
++       if (result.status === "in_progress" || result.status === "pending" || result.status === "queued") {
+          setTimeout(pollSingleTest, 2000);
+        } else if (result.status === "completed" || result.status === "done") {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -528,5 +528,5 @@
+        setCurrentTaskId(result.task_id);
+  
+-       if (result.status === "in_progress" || result.status === "pending") {
++       if (result.status === "in_progress" || result.status === "pending" || result.status === "queued") {
+          pollingIntervalRef.current = setInterval(() =&gt; {
+            pollTaskStatus(result.task_id, backendUrl);
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me also update the BenchmarkResultsDialog polling to handle "queued":</details></think>
+
+---
+
+Let me also update BenchmarkResultsDialog polling to handle "queued":
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "pollBenchmarkStatus|result\.status" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx" • 7 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/components/BenchmarkResultsDialog.tsx` | `const pollBenchmarkStatus = async (taskId: string, backendUrl: string) => \{` | L113 |
+| `src/components/BenchmarkResultsDialog.tsx` | `setTaskStatus(result.status);` | L133 |
+| `src/components/BenchmarkResultsDialog.tsx` | `result.status === "completed" \|\|` | L137 |
+| `src/components/BenchmarkResultsDialog.tsx` | `result.status === "failed" \|\|` | L138 |
+| `src/components/BenchmarkResultsDialog.tsx` | `result.status === "done"` | L139 |
+| `src/components/BenchmarkResultsDialog.tsx` | `pollBenchmarkStatus(taskId, backendUrl);` | L205 |
+| `src/components/BenchmarkResultsDialog.tsx` | `pollBenchmarkStatus(taskId, backendUrl);` | L209 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The BenchmarkResultsDialog polling logic looks fine - it continues polling as long as the status is not "completed", "failed", or "done". So "queued" and "in_progress" will both continue polling. The status message display has been updated.
+
+Let me check for lint errors in all the files I've updated.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 4 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx`
+
+Lint results
+
+Lint errors for `src/components/test-results/shared.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:1-3:27 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+Lint errors for `src/app/simulations/[uuid]/runs/[runId]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+| 'getPassFailStatus' is declared but its value is never read. | 198:9-198:26 | DIAGNOSTIC_SEVERITY_HINT |
+| 'getPassFailClass' is declared but its value is never read. | 202:9-202:25 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+All lint errors are resolved. Let me provide a summary of the changes made.</details></think>
+
+---
+
+Done! I've updated all three files to handle the "queued" status:
+
+### Changes Made:
+
+**1. `TestRunnerDialog.tsx`:**
+- Added "queued" to the `TestResult` status type
+- Tests now start as "queued" instead of "running"
+- Separated the test list into distinct sections: Failed, Passed, Queued (gray dot, no animation), Running (yellow dot with pulse), Pending (gray dot)
+- Added handler for "queued" status in the detail view (shows "Test is queued")
+- Updated polling logic to continue polling when status is "queued"
+
+**2. `BenchmarkResultsDialog.tsx`:**
+- Added `taskStatus` state to track current status
+- Loading spinner now shows "Benchmark queued..." when status is "queued" vs "Running benchmark..." for other states
+
+**3. `test-results/shared.tsx` (StatusIcon):**
+- Added "queued" to the status type
+- Queued and pending status now show a gray dot without spinner
+- Only "running" status shows the spinner
+
+**4. `simulations/[uuid]/runs/[runId]/page.tsx`:**
+- Updated `formatStatus` to return "Queued" for "queued" status
+- The `getStatusBadgeClass` already had "queued" handled with gray color
+
+---
+
+_**User (2026-01-16 23:46Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to handle the new "queued" status for tests, benchmarks, and simulations. This is a change to how async task statuses are handled across the app. Let me update the app-details.md to reflect this.
+
+The key change is that async tasks now follow this flow:
+- queued → in_progress → done (or failed)
+
+Instead of the previous:
+- pending → in_progress → done (or failed)
+
+I should update the documentation to reflect this new status flow.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "pending.*in_progress.*done|Status:.*pending" in "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md" • 1 match</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.cursor/rules/app-details.md` | `- Status: pending → in_progress → done (or failed)` | L211 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to update the status flow to include "queued" and clarify the different status flows for different types of async tasks.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -209,5 +209,5 @@
+  - **Run types**: chat (text-based), audio, voice (full pipeline)
+  - Runs are executed asynchronously with polling for status updates
+- - Status: pending → in_progress → done (or failed)
++ - Status flow: queued → in_progress → done (or failed)
+  
+  **Simulation Run Results** (&#96;/simulations/[uuid]/runs/[runId]&#96;):
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me also add documentation about the async task status handling pattern, since this is used across multiple components (tests, benchmarks, STT/TTS evaluations, simulations).</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "Polling for Async Tasks" in "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md" • 1 match</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.cursor/rules/app-details.md` | `### Polling for Async Tasks` | L1192 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me update the Polling for Async Tasks section to document the status flow and the different statuses.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 14, lines removed: undefined
+
+```diff
+@@ -1191,4 +1191,18 @@
+  
+  ### Polling for Async Tasks
++ 
++ Async operations (simulations, tests, benchmarks, STT/TTS evaluations) follow this status flow:
++ 
++ &#96;&#96;&#96;
++ queued → in_progress → done (or failed/completed)
++ &#96;&#96;&#96;
++ 
++ **Status Display:**
++ - &#96;queued&#96;: Gray badge/dot, text "Queued" or "Evaluation queued..."
++ - &#96;in_progress&#96;: Yellow badge/dot with pulse animation, text "Running" or "Evaluating..."
++ - &#96;done&#96;/&#96;completed&#96;: Green badge, text "Done"
++ - &#96;failed&#96;: Red badge, text "Failed"
++ 
++ **Polling Pattern:**
+  
+  &#96;&#96;&#96;tsx
+```
+
+**Chunk 2**
+Lines added: 3, lines removed: 2
+
+```diff
+@@ -1198,6 +1212,7 @@
+    const fetchData = async (isInitial = false) =&gt; {
+      // ... fetch
+-     if (data.status === "done" &amp;&amp; pollInterval) {
+-       clearInterval(pollInterval);
++     // Continue polling for queued and in_progress
++     if (data.status === "done" || data.status === "completed" || data.status === "failed") {
++       if (pollInterval) clearInterval(pollInterval);
+      }
+    };
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me also update the status badge styles section to include "queued" in the patterns if it's not already there.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "Neutral.*pending.*queued" in "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md" • 1 match</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.cursor/rules/app-details.md` | `// Neutral (pending, queued, default)` | L752 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, the status badge section already has "queued" mentioned. The documentation is now updated. Let me verify there are no issues with the updated file.</details></think>
+
+---
+
+The documentation already had "queued" in the status badge styles. I've updated:
+
+1. **Simulation status flow** - Changed from `pending → in_progress → done` to `queued → in_progress → done`
+
+2. **Polling for Async Tasks section** - Added:
+   - The status flow diagram: `queued → in_progress → done (or failed/completed)`
+   - Status display conventions (colors, text for each status)
+   - Updated the polling pattern to show checking for terminal states
+
+---
+
+_**User (2026-01-16 23:46Z)**_
+
+I meant show gray in test runner when status is queued and yellow when in progress
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to update the TestRunnerDialog so that when the task status is "queued" the tests show gray, and when "in_progress" they show yellow. Currently I've set up the test results to start as "queued" but I need to also update them to "running" when the task status changes to "in_progress".
+
+Let me check the current code to see how this is handled.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see. The issue is that I need to:
+1. When overall status is "queued", tests should show gray
+2. When overall status is "in_progress", tests should show yellow (running)
+
+Currently individual tests don't reflect the overall task status. Let me look at how we initialize and update the tests' status based on the overall run status.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see the issue now. The tests are set to "queued" initially, but when polling, we need to update them based on the overall run status:
+- When overall status is "queued" → tests should stay "queued" (gray)
+- When overall status is "in_progress" → tests should become "running" (yellow)
+- When a test has actual results → update to passed/failed
+
+Let me update the polling function to update tests to "running" when the overall status is "in_progress".</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I understand the structure. I need to update the polling to:
+1. When overall status is "in_progress", change tests that are still "queued" to "running"
+2. When individual test results come in, update those to passed/failed
+
+Let me update the polling function to transition tests from "queued" to "running" when the overall status is "in_progress".</details></think>
+
+---
+
+I need to update the polling function to transition tests from "queued" to "running" when the overall status changes to "in_progress":
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 44, lines removed: 40
+
+```diff
+@@ -147,47 +147,51 @@
+  
+        // Update test results based on polling response
+-       if (result.results &amp;&amp; result.results.length &gt; 0) {
+-         setTestResults((prev) =&gt; {
+-           // Try to match by test_uuid first, if no match found, update by index
+-           const updatedResults: TestResult[] = prev.map((r, index) =&gt; {
+-             // First try to find by UUID
+-             let apiResult = result.results?.find(
+-               (res) =&gt; res.test_uuid === r.test.uuid
+-             );
++       setTestResults((prev) =&gt; {
++         // Try to match by test_uuid first, if no match found, update by index
++         const updatedResults: TestResult[] = prev.map((r, index) =&gt; {
++           // First try to find by UUID in results
++           let apiResult = result.results?.find(
++             (res) =&gt; res.test_uuid === r.test.uuid
++           );
+  
+-             // If no UUID match, try to find by test name
+-             if (!apiResult) {
+-               apiResult = result.results?.find(
+-                 (res) =&gt; res.test_name === r.test.name
+-               );
+-             }
++           // If no UUID match, try to find by test name
++           if (!apiResult) {
++             apiResult = result.results?.find(
++               (res) =&gt; res.test_name === r.test.name
++             );
++           }
+  
+-             // If still no match and index is within range, use index-based matching
+-             if (!apiResult &amp;&amp; result.results &amp;&amp; index &lt; result.results.length) {
+-               apiResult = result.results[index];
+-             }
++           // If still no match and index is within range, use index-based matching
++           if (!apiResult &amp;&amp; result.results &amp;&amp; index &lt; result.results.length) {
++             apiResult = result.results[index];
++           }
+  
+-             if (apiResult) {
+-               // Check both &#96;passed&#96; boolean and &#96;status&#96; string for compatibility
+-               const isPassed =
+-                 apiResult.passed === true || apiResult.status === "passed";
+-               const newStatus: "passed" | "failed" = isPassed
+-                 ? "passed"
+-                 : "failed";
+-               return {
+-                 ...r,
+-                 status: newStatus,
+-                 chatHistory: apiResult.chat_history,
+-                 output: apiResult.output,
+-                 testCase: apiResult.test_case,
+-                 evaluation: apiResult.evaluation ?? { passed: isPassed },
+-                 error: apiResult.error,
+-               };
+-             }
+-             return r;
+-           });
+-           return updatedResults;
+-         });
+-       }
++           if (apiResult) {
++             // Check both &#96;passed&#96; boolean and &#96;status&#96; string for compatibility
++             const isPassed =
++               apiResult.passed === true || apiResult.status === "passed";
++             const newStatus: "passed" | "failed" = isPassed
++               ? "passed"
++               : "failed";
++             return {
++               ...r,
++               status: newStatus,
++               chatHistory: apiResult.chat_history,
++               output: apiResult.output,
++               testCase: apiResult.test_case,
++               evaluation: apiResult.evaluation ?? { passed: isPassed },
++               error: apiResult.error,
++             };
++           }
++ 
++           // If overall status is in_progress and test is still queued, mark as running
++           if (result.status === "in_progress" &amp;&amp; r.status === "queued") {
++             return { ...r, status: "running" };
++           }
++ 
++           return r;
++         });
++         return updatedResults;
++       });
+  
+        // Check if polling should stop
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me also add a `runStatus` state to track the overall run status and update the display accordingly. Let me also check what the current display looks like for the overall status.</details></think>
+
+---
+
+Now let me also track the overall run status to display "Queued" vs "Running" in the header:
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "runStatus" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx" • 0 matches</summary>
+
+Output mode: content
+
+
+_No matches found_
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to add a runStatus state to track the overall status. Let me look at how the overall status is currently displayed.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "isRunning.*Queued|Queued.*Running" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx" • 0 matches</summary>
+
+Output mode: content
+
+
+_No matches found_
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me search for where the running status is displayed in the dialog header.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "Running tests|Running\.\.\.|isRunning \?" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx" • 0 matches</summary>
+
+Output mode: content
+
+
+_No matches found_
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me search for where the overall status is displayed.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "Tests passed|passed.*failed" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx" • 7 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/components/TestRunnerDialog.tsx` | `status: "pending" \| "queued" \| "running" \| "passed" \| "failed";` | L35 |
+| `src/components/TestRunnerDialog.tsx` | `status?: "passed" \| "failed" \| "error";` | L50 |
+| `src/components/TestRunnerDialog.tsx` | `const newStatus: "passed" \| "failed" = isPassed` | L173 |
+| `src/components/TestRunnerDialog.tsx` | `apiResult.status === "passed" ? "passed" : "failed",` | L405 |
+| `src/components/TestRunnerDialog.tsx` | `status: apiResult.status === "passed" ? "passed" : "failed",` | L459 |
+| `src/components/TestRunnerDialog.tsx` | `status: apiResult.status === "passed" ? "passed" : "failed",` | L556 |
+| `src/components/TestRunnerDialog.tsx` | `(passedTests.length > 0 \|\| failedTests.length > 0) && (` | L625 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see. There's no explicit "Running" or "Queued" display in the header. The display shows test stats when tests are done. I need to add a status display when `isRunning` is true.
+
+Let me read the full header section to see what's there:</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see. I need to add a display when the tests are running. Let me add a status indicator that shows "Queued" or "Running" based on whether any tests are still queued or running. I'll also need to add state to track the overall run status.</details></think>
+
+---
+
+Now I need to add a state to track the overall run status and add status display in the header:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -92,4 +92,5 @@
+    const [selectedTestUuid, setSelectedTestUuid] = useState&lt;string | null&gt;(null);
+    const [isRunning, setIsRunning] = useState(false);
++   const [runStatus, setRunStatus] = useState&lt;"queued" | "in_progress" | "done" | "failed"&gt;("queued");
+    const [currentTaskId, setCurrentTaskId] = useState&lt;string | null&gt;(null);
+    const pollingIntervalRef = useRef&lt;NodeJS.Timeout | null&gt;(null);
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the run status when polling:</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 5, lines removed: undefined
+
+```diff
+@@ -146,4 +146,9 @@
+  
+        const result: TestRunStatusResponse = await response.json();
++ 
++       // Update overall run status
++       if (result.status === "queued" || result.status === "in_progress" || result.status === "done" || result.status === "completed" || result.status === "failed") {
++         setRunStatus(result.status === "completed" ? "done" : result.status as "queued" | "in_progress" | "done" | "failed");
++       }
+  
+        // Update test results based on polling response
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to add the status display in the header:</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 16, lines removed: undefined
+
+```diff
+@@ -626,4 +626,20 @@
+            &lt;/h2&gt;
+            &lt;div className="flex items-center gap-3"&gt;
++             {/* Running status indicator */}
++             {isRunning &amp;&amp; (
++               &lt;div className="flex items-center gap-2 text-sm text-muted-foreground"&gt;
++                 {runStatus === "queued" ? (
++                   &lt;&gt;
++                     &lt;div className="w-2 h-2 rounded-full bg-gray-500" /&gt;
++                     &lt;span&gt;Queued&lt;/span&gt;
++                   &lt;/&gt;
++                 ) : (
++                   &lt;&gt;
++                     &lt;SpinnerIcon className="w-4 h-4 animate-spin" /&gt;
++                     &lt;span&gt;Running&lt;/span&gt;
++                   &lt;/&gt;
++                 )}
++               &lt;/div&gt;
++             )}
+              {/* Passed/Failed counts */}
+              {!isRunning &amp;&amp;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me also reset the runStatus when starting a new run:</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -253,4 +253,5 @@
+  
+      // Set all tests to queued initially
++     setRunStatus("queued");
+      setTestResults((prev) =&gt; prev.map((r) =&gt; ({ ...r, status: "queued" })));
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me also check how the shared.tsx StatusIcon is used for the test list - we should use the same logic. The individual tests should show:
+- gray dot for queued
+- yellow dot with animation for running
+- green dot for passed
+- red dot for failedLet me check the StatusIcon in shared.tsx again:</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me see the complete StatusIcon implementation:</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good. The StatusIcon in shared.tsx is correctly showing:
+- queued/pending: gray dot (no spinner)
+- running: spinner (yellow-ish)
+- passed: green checkmark
+- failed: red X
+
+But the user mentioned they want yellow for running. Let me add a yellow dot with pulse animation for running status. Let me update the StatusIcon:</details></think>
+
+---
+
+Let me update the StatusIcon in `shared.tsx` to show a yellow dot with animation for running status instead of a spinner:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: 3
+
+```diff
+@@ -80,8 +80,8 @@
+      );
+    }
+-   // running status
++   // running status - yellow dot with pulse animation
+    return (
+-     &lt;div className="w-5 h-5 flex items-center justify-center flex-shrink-0"&gt;
+-       &lt;SpinnerIcon className="w-4 h-4 animate-spin text-muted-foreground" /&gt;
++     &lt;div className="w-5 h-5 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0"&gt;
++       &lt;div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" /&gt;
+      &lt;/div&gt;
+    );
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me also update the TestListItem in TestRunnerDialog to use the StatusIcon or similar styling. Let me find where TestListItem is defined:</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "function TestListItem" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx" • 1 match</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/components/TestRunnerDialog.tsx` | `function TestListItem(\{` | L785 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, the TestListItem already uses StatusIcon from shared.tsx. So the changes I made to StatusIcon should apply here. Let me also check the LocalTestDetailView for queued state:</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The code already handles the queued state. Now let me verify everything is working correctly by checking for lint errors:</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 2 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx`
+
+Lint results
+
+Lint errors for `src/components/test-results/shared.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:1-3:27 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+Lint errors for `src/components/TestRunnerDialog.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+| 'currentTaskId' is declared but its value is never read. | 95:10-95:23 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryTest' is declared but its value is never read. | 313:9-313:18 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryAllFailed' is declared but its value is never read. | 491:9-491:23 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryAll' is declared but its value is never read. | 595:9-595:17 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+No lint errors. Let me provide a summary of the changes made.</details></think>
+
+---
+
+Done! I've updated the test runner to show:
+
+**Individual Tests:**
+- **Gray dot** for `queued` status (no animation)
+- **Yellow dot with pulse animation** for `running` status
+- Green checkmark for `passed`
+- Red X for `failed`
+
+**Overall Run Status (in header):**
+- **Gray dot + "Queued"** when status is `queued`
+- **Spinner + "Running"** when status is `in_progress`
+
+**Changes made:**
+
+1. **`TestRunnerDialog.tsx`:**
+   - Added `runStatus` state to track overall task status
+   - Tests now transition from `queued` → `running` when overall status changes to `in_progress`
+   - Header shows "Queued" with gray dot or "Running" with spinner based on overall status
+
+2. **`test-results/shared.tsx` (StatusIcon):**
+   - `queued`/`pending`: Gray dot (no animation)
+   - `running`: Yellow dot with pulse animation (not a spinner)
+
+---
+
+_**User (2026-01-16 23:46Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to update the app-details.md file with information about the changes I just made. The changes were:
+
+1. Added `runStatus` state to `TestRunnerDialog.tsx` to track overall task status
+2. Updated tests to transition from "queued" to "running" when overall status changes to "in_progress"
+3. Updated `StatusIcon` in `shared.tsx` to show yellow dot with pulse animation for running status (instead of spinner)
+4. Header in TestRunnerDialog shows "Queued" with gray dot or "Running" with spinner based on overall status
+
+I already updated the async task polling section earlier. Let me check if there's anything else that needs updating.</details></think>
+
+---
+
+I made code changes to `TestRunnerDialog.tsx` and `test-results/shared.tsx`. Let me update the documentation:
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "StatusIcon|status.*queued.*running" in "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md" • 2 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.cursor/rules/app-details.md` | `StatusIcon,` | L1088 |
+| `.cursor/rules/app-details.md` | `<StatusIcon status="passed" />` | L1097 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I should update this section to mention the "queued" status as well, and document the visual differences between queued (gray dot) and running (yellow dot with pulse).</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 6, lines removed: 1
+
+```diff
+@@ -1094,6 +1094,11 @@
+  } from "@/components/test-results/shared";
+  
+- // Status indicator (passed/failed/running/pending)
++ // Status indicator (passed/failed/running/queued/pending)
+  &lt;StatusIcon status="passed" /&gt;
++ // Status visuals:
++ // - passed: green checkmark
++ // - failed: red X
++ // - running: yellow dot with pulse animation
++ // - queued/pending: gray dot (no animation)
+  
+  // Small badge for inline status
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me also add documentation about the test runner's runStatus state pattern if it's not already there. Let me search for test-related patterns:</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "TestRunnerDialog|Test.*Dialog" in "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md" • 4 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.cursor/rules/app-details.md` | `- Form dialogs with unsaved data: Backdrop click shows confirmation before closing (e.g., AddTestDialog)` | L523 |
+| `.cursor/rules/app-details.md` | `- **Large form dialogs** (like AddTestDialog): Use a header bar with name input and save button, flex-col layout with main content area below` | L525 |
+| `.cursor/rules/app-details.md` | `For complex form dialogs like `AddTestDialog`, use a flex-col layout with header, content area, and footer:` | L1236 |
+| `.cursor/rules/app-details.md` | `- **Unsaved changes confirmation**: Form dialogs (like AddTestDialog) should show a confirmation dialog when user clicks backdrop, asking "Discard changes?" with Cancel/Discard buttons` | L1345 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The TestRunnerDialog is mentioned but let me check if there's specific documentation about how it handles running state and polling. Let me also check if there's a section about async task status tracking:</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "runStatus|isRunning.*status" in "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md" • 0 matches</summary>
+
+Output mode: content
+
+
+_No matches found_
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The runStatus pattern is not documented. Let me add documentation about this pattern in the appropriate section, probably near the polling section.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The polling section already has documentation about the status flow. Let me add a bit more about tracking the overall run status separately from individual item statuses:</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 13, lines removed: undefined
+
+```diff
+@@ -1208,4 +1208,17 @@
+  - &#96;done&#96;/&#96;completed&#96;: Green badge, text "Done"
+  - &#96;failed&#96;: Red badge, text "Failed"
++ 
++ **Tracking Run Status:**
++ 
++ For batch operations (e.g., running multiple tests), track both:
++ - &#96;runStatus&#96;: Overall task status from backend (&#96;queued&#96; | &#96;in_progress&#96; | &#96;done&#96; | &#96;failed&#96;)
++ - Individual item statuses: Updated based on &#96;runStatus&#96; and individual results
++ 
++ &#96;&#96;&#96;tsx
++ // When overall status transitions to in_progress, update items from queued to running
++ if (result.status === "in_progress" &amp;&amp; item.status === "queued") {
++   return { ...item, status: "running" };
++ }
++ &#96;&#96;&#96;
+  
+  **Polling Pattern:**
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done updating the documentation. Let me also update the TODO list to mark things as completed.</details></think>
+
+---
+
+Updated the documentation with:
+
+1. **StatusIcon component** - Added visual documentation for all status states (queued/pending = gray dot, running = yellow dot with pulse)
+
+2. **Tracking Run Status** - Added new section explaining how to track both overall task status and individual item statuses for batch operations, including the pattern for transitioning items from "queued" to "running" when the overall status changes
+
+---
+
+_**User (2026-01-16 23:46Z)**_
+
+Remove the queued/running status that is shown in place of the N passed N failed status in @src/components/TestRunnerDialog.tsx 
+
+only show that status in the sidebar in the @src/components/TestRunnerDialog.tsx 
+
+when queued: gray dot, no spinner, says Queued
+when in_progress: yellow dot, spinners for the tests, says Running
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to:
+1. Remove the queued/running status indicator from the header (where it shows next to close button)
+2. Keep the status display only in the sidebar (left panel) - which already shows Queued/Running sections
+3. When queued: gray dot, no spinner, says "Queued"
+4. When in_progress: yellow dot, spinners for the tests, says "Running"
+
+Let me update the TestRunnerDialog.tsx to:
+1. Remove the header status indicator
+2. The sidebar already has sections for Queued and Running tests, so that should be fine
+3. Need to make sure the StatusIcon shows the right thing for each status
+
+Looking at the current code:
+- Lines 641-656 show the running status indicator in the header - this needs to be removed
+- The sidebar sections (lines 720-758) already show Queued and Running with appropriate styling
+
+Let me also check the StatusIcon in shared.tsx to make sure it shows the right visuals.</details></think>
+
+---
+
+I'll remove the status indicator from the header and keep only the sidebar sections:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 18
+
+```diff
+@@ -639,23 +639,6 @@
+            &lt;/h2&gt;
+            &lt;div className="flex items-center gap-3"&gt;
+-             {/* Running status indicator */}
+-             {isRunning &amp;&amp; (
+-               &lt;div className="flex items-center gap-2 text-sm text-muted-foreground"&gt;
+-                 {runStatus === "queued" ? (
+-                   &lt;&gt;
+-                     &lt;div className="w-2 h-2 rounded-full bg-gray-500" /&gt;
+-                     &lt;span&gt;Queued&lt;/span&gt;
+-                   &lt;/&gt;
+-                 ) : (
+-                   &lt;&gt;
+-                     &lt;SpinnerIcon className="w-4 h-4 animate-spin" /&gt;
+-                     &lt;span&gt;Running&lt;/span&gt;
+-                   &lt;/&gt;
+-                 )}
+-               &lt;/div&gt;
+-             )}
+              {/* Passed/Failed counts */}
+-             {!isRunning &amp;&amp;
+-               testResults.length &gt; 0 &amp;&amp;
++             {testResults.length &gt; 0 &amp;&amp;
+                (passedTests.length &gt; 0 || failedTests.length &gt; 0) &amp;&amp; (
+                  &lt;TestStats
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me also update the sidebar section headers to show the status text more prominently:</details></think>
+
+---
+
+Now let me verify the StatusIcon in shared.tsx shows the correct visuals (gray dot for queued, yellow with spinner for running):
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The StatusIcon currently shows:
+- queued/pending: gray dot (no animation)
+- running: yellow dot with pulse animation
+
+But the user wants spinners for running tests. Let me update the StatusIcon to show a spinner for running status instead of just a yellow dot with pulse.</details></think>
+
+---
+
+The user wants spinners for running tests. Let me update the StatusIcon to show a spinner for running:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: 3
+
+```diff
+@@ -80,8 +80,8 @@
+      );
+    }
+-   // running status - yellow dot with pulse animation
++   // running status - yellow spinner
+    return (
+-     &lt;div className="w-5 h-5 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0"&gt;
+-       &lt;div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" /&gt;
++     &lt;div className="w-5 h-5 flex items-center justify-center flex-shrink-0"&gt;
++       &lt;SpinnerIcon className="w-4 h-4 animate-spin text-yellow-500" /&gt;
+      &lt;/div&gt;
+    );
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me also update the sidebar section header for Running to show a yellow dot instead of amber:</details></think>
+
+---
+
+Now let me update the Running section header in TestRunnerDialog to use a yellow dot instead of amber:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -725,5 +725,5 @@
+                  &lt;div className="p-4"&gt;
+                    &lt;h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2"&gt;
+-                     &lt;div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"&gt;&lt;/div&gt;
++                     &lt;div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"&gt;&lt;/div&gt;
+                      Running ({runningTests.length})
+                    &lt;/h3&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I can remove the unused `runStatus` state since we're not using it in the header anymore. But wait, we're still using it to transition tests from queued to running in the polling function. Let me check if we still need it.
+
+Looking at the code, `runStatus` is used in:1. Line 159-163: Setting it from the polling response
+2. Line 206: Checking if status is in_progress to mark tests as running
+
+So we still need it for the state transition logic. The state variable is still necessary even though we removed the header display.
+
+Let me check for lint errors:</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 2 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx`
+
+Lint results
+
+Lint errors for `src/components/test-results/shared.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:1-3:27 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+Lint errors for `src/components/TestRunnerDialog.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+| 'isRunning' is declared but its value is never read. | 93:10-93:19 | DIAGNOSTIC_SEVERITY_HINT |
+| 'runStatus' is declared but its value is never read. | 94:10-94:19 | DIAGNOSTIC_SEVERITY_HINT |
+| 'currentTaskId' is declared but its value is never read. | 97:10-97:23 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryTest' is declared but its value is never read. | 325:9-325:18 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryAllFailed' is declared but its value is never read. | 503:9-503:23 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryAll' is declared but its value is never read. | 607:9-607:17 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no lint errors. Let me provide a summary of the changes.</details></think>
+
+---
+
+Done! Here's what changed:
+
+**Header:**
+- Removed the queued/running status indicator from the header
+- Now always shows the passed/failed counts (even while running)
+
+**Sidebar sections:**
+- **Queued**: Gray dot, no animation, says "Queued (N)"
+- **Running**: Yellow dot with pulse animation, says "Running (N)"
+
+**StatusIcon (individual test icons):**
+- **Queued/Pending**: Gray dot (no spinner)
+- **Running**: Yellow spinner (animated)
+- **Passed**: Green checkmark
+- **Failed**: Red X
+
+---
+
+_**User (2026-01-16 23:46Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to:
+1. `TestRunnerDialog.tsx` - Removed the queued/running status from the header, kept only the passed/failed counts
+2. `test-results/shared.tsx` - Changed StatusIcon for running status from yellow dot with pulse to yellow spinner
+
+Let me update the documentation to reflect these changes.</details></think>
+
+---
+
+I made code changes to `TestRunnerDialog.tsx` and `test-results/shared.tsx`. Let me update the documentation:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1099,5 +1099,5 @@
+  // - passed: green checkmark
+  // - failed: red X
+- // - running: yellow dot with pulse animation
++ // - running: yellow spinner (animated)
+  // - queued/pending: gray dot (no animation)
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I also need to update the "Status Display" section that I created earlier to reflect that running shows a spinner, not just a yellow dot with pulse.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 2
+
+```diff
+@@ -1204,6 +1204,6 @@
+  
+  **Status Display:**
+- - &#96;queued&#96;: Gray badge/dot, text "Queued" or "Evaluation queued..."
+- - &#96;in_progress&#96;: Yellow badge/dot with pulse animation, text "Running" or "Evaluating..."
++ - &#96;queued&#96;: Gray badge/dot (no animation), text "Queued" or "Evaluation queued..."
++ - &#96;in_progress&#96;/&#96;running&#96;: Yellow spinner or badge, text "Running" or "Evaluating..."
+  - &#96;done&#96;/&#96;completed&#96;: Green badge, text "Done"
+  - &#96;failed&#96;: Red badge, text "Failed"
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done. The documentation now correctly reflects that:- Running status shows a yellow spinner (not a yellow dot with pulse animation)
+- Queued/pending status shows a gray dot with no animation</details></think>
+
+---
+
+Updated the documentation to reflect that:
+- **Running status**: Changed from "yellow dot with pulse animation" to "yellow spinner (animated)"
+- **Queued status**: Clarified as "gray dot (no animation)"
+
+---
+
+_**User (2026-01-16 23:46Z)**_
+
+continue showing spinner in @src/app/simulations/[uuid]/runs/[runId]/page.tsx even if queued
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to continue showing the spinner in the simulation run page even when the status is "queued". Let me look at the current code to see where the spinner is shown.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "in_progress.*spinner|animate-spin" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx" • 2 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/app/simulations/[uuid]/runs/[runId]/page.tsx` | `<svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">` | L328 |
+| `src/app/simulations/[uuid]/runs/[runId]/page.tsx` | `className="w-5 h-5 animate-spin"` | L387 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see. The spinner in the header is only shown when status is "in_progress". I need to update it to also show when status is "queued".</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 1
+
+```diff
+@@ -325,5 +325,6 @@
+            {runData?.name || "Loading..."}
+          &lt;/h1&gt;
+-         {runData?.status.toLowerCase() === "in_progress" &amp;&amp; (
++         {(runData?.status.toLowerCase() === "in_progress" ||
++           runData?.status.toLowerCase() === "queued") &amp;&amp; (
+            &lt;svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"&gt;
+              &lt;circle
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I also need to update the polling logic to not stop polling when status is "queued". Let me check the current polling logic.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx`
+
+Lint results
+
+Lint errors for `src/app/simulations/[uuid]/runs/[runId]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+| 'getPassFailStatus' is declared but its value is never read. | 198:9-198:26 | DIAGNOSTIC_SEVERITY_HINT |
+| 'getPassFailClass' is declared but its value is never read. | 202:9-202:25 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+No lint errors. The change is complete - now the spinner will show for both "queued" and "in_progress" statuses.</details></think>
+
+---
+
+Done! The spinner in the header will now show for both "queued" and "in_progress" statuses.
+
+---
+
+_**User (2026-01-16 23:46Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made a code change to `src/app/simulations/[uuid]/runs/[runId]/page.tsx` to show the spinner for both "queued" and "in_progress" statuses. This is a small change that aligns with the pattern that we show spinners during any active async operation. Let me update the documentation.</details></think>
+
+---
+
+I made a code change to `src/app/simulations/[uuid]/runs/[runId]/page.tsx`. Let me update the documentation:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 4, lines removed: 2
+
+```diff
+@@ -1204,8 +1204,10 @@
+  
+  **Status Display:**
+- - &#96;queued&#96;: Gray badge/dot (no animation), text "Queued" or "Evaluation queued..."
+- - &#96;in_progress&#96;/&#96;running&#96;: Yellow spinner or badge, text "Running" or "Evaluating..."
++ - &#96;queued&#96;: Gray badge, text "Queued" or "Evaluation queued...", header spinner shown
++ - &#96;in_progress&#96;/&#96;running&#96;: Yellow spinner or badge, text "Running" or "Evaluating...", header spinner shown
+  - &#96;done&#96;/&#96;completed&#96;: Green badge, text "Done"
+  - &#96;failed&#96;: Red badge, text "Failed"
++ 
++ **Note:** For simulation runs, the header spinner is shown for both &#96;queued&#96; and &#96;in_progress&#96; statuses to indicate the task is active.
+  
+  **Tracking Run Status:**
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done. The documentation now reflects that the header spinner shows for both queued and in_progress statuses for simulation runs.</details></think>
+
+---
+
+Updated the documentation to note that:
+- Header spinners are shown for both `queued` and `in_progress` statuses
+- Added a specific note about simulation runs showing the header spinner during both states to indicate the task is active
+
+---
+
