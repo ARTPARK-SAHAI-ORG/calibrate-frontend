@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 
 type Run = {
@@ -17,7 +17,6 @@ type SimulationRunsTabProps = {
 };
 
 export function SimulationRunsTab({ simulationUuid }: SimulationRunsTabProps) {
-  const router = useRouter();
   const { data: session } = useSession();
   const backendAccessToken = (session as any)?.backendAccessToken;
   const [runs, setRuns] = useState<Run[]>([]);
@@ -210,78 +209,70 @@ export function SimulationRunsTab({ simulationUuid }: SimulationRunsTabProps) {
 
   return (
     <div className="border border-border rounded-xl overflow-hidden">
-      <table className="w-full table-fixed">
-        <thead>
-          <tr className="border-b border-border bg-muted/30">
-            <th className="w-1/4 px-6 py-4 text-left text-sm font-medium text-muted-foreground">
-              Name
-            </th>
-            <th className="w-1/4 px-6 py-4 text-left text-sm font-medium text-muted-foreground">
-              Status
-            </th>
-            <th className="w-1/4 px-6 py-4 text-left text-sm font-medium text-muted-foreground">
-              Type
-            </th>
-            <th className="w-1/4 px-6 py-4 text-left text-sm font-medium text-muted-foreground">
-              <button
-                onClick={toggleSort}
-                className="flex items-center gap-2 hover:text-foreground transition-colors cursor-pointer"
-              >
-                Updated At
-                <svg
-                  className={`w-4 h-4 transition-transform ${
-                    sortOrder === "asc" ? "rotate-180" : ""
-                  }`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3"
-                  />
-                </svg>
-              </button>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedRuns.map((run) => (
-            <tr
-              key={run.uuid}
-              onClick={() =>
-                router.push(`/simulations/${simulationUuid}/runs/${run.uuid}`)
-              }
-              className="border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer"
+      {/* Table Header */}
+      <div className="grid grid-cols-[1fr_1fr_1fr_1fr] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+        <div className="text-sm font-medium text-muted-foreground">Name</div>
+        <div className="text-sm font-medium text-muted-foreground">Status</div>
+        <div className="text-sm font-medium text-muted-foreground">Type</div>
+        <div className="text-sm font-medium text-muted-foreground">
+          <button
+            onClick={toggleSort}
+            className="flex items-center gap-2 hover:text-foreground transition-colors cursor-pointer"
+          >
+            Updated At
+            <svg
+              className={`w-4 h-4 transition-transform ${
+                sortOrder === "asc" ? "rotate-180" : ""
+              }`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
             >
-              <td className="px-6 py-4 text-sm text-foreground">{run.name}</td>
-              <td className="px-6 py-4">
-                <span
-                  className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${getStatusBadgeClass(
-                    run.status
-                  )}`}
-                >
-                  {formatStatus(run.status)}
-                </span>
-              </td>
-              <td className="px-6 py-4">
-                <span
-                  className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${getTypeBadgeClass(
-                    run.type
-                  )}`}
-                >
-                  {run.type}
-                </span>
-              </td>
-              <td className="px-6 py-4 text-sm text-muted-foreground">
-                {formatDate(run.updated_at)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+      {/* Table Rows */}
+      {sortedRuns.map((run) => (
+        <Link
+          key={run.uuid}
+          href={`/simulations/${simulationUuid}/runs/${run.uuid}`}
+          className="grid grid-cols-[1fr_1fr_1fr_1fr] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors items-center"
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">
+              {run.name}
+            </p>
+          </div>
+          <div>
+            <span
+              className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${getStatusBadgeClass(
+                run.status
+              )}`}
+            >
+              {formatStatus(run.status)}
+            </span>
+          </div>
+          <div>
+            <span
+              className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${getTypeBadgeClass(
+                run.type
+              )}`}
+            >
+              {run.type}
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {formatDate(run.updated_at)}
+          </p>
+        </Link>
+      ))}
     </div>
   );
 }

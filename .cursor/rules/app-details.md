@@ -71,6 +71,7 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 - **View all agents** in a searchable, sortable list (sorted by last updated)
 - **Duplicate agents** - clone existing agent configurations
 - **Delete agents**
+- **Right-click or Cmd/Ctrl+click** any agent row to open in a new browser tab (native browser support)
 
 **Agent Detail Page** (`/agents/[uuid]`) has 5 tabs:
 
@@ -196,13 +197,14 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 - **Create simulations** with a name
 - **View all simulations** in a searchable, sortable list
 - **Delete simulations**
+- **Right-click or Cmd/Ctrl+click** any simulation row to open in a new browser tab (native browser support)
 
 **Simulation Detail Page** (`/simulations/[uuid]`) has 2 tabs:
 
-| Tab        | Purpose                                              |
-| ---------- | ---------------------------------------------------- |
-| **Config** | Select agent, personas, scenarios for the simulation |
-| **Runs**   | View history of simulation runs and their results    |
+| Tab        | Purpose                                                                                      |
+| ---------- | -------------------------------------------------------------------------------------------- |
+| **Config** | Select agent, personas, scenarios for the simulation                                         |
+| **Runs**   | View history of simulation runs (right-click or Cmd/Ctrl+click to open run in new tab)       |
 
 **Running Simulations:**
 
@@ -548,6 +550,10 @@ Key styling:
    - Props: `isOpen`, `onClose`, `selectedLLM`, `onSelect`, `availableProviders?`
    - Optional `availableProviders` prop for filtering available models (used in BenchmarkDialog)
    - Used in: AgentTabContent (settings), BenchmarkDialog (model comparison)
+10. **Native Link Navigation**: List items use Next.js `<Link>` components for browser-native right-click support
+    - Enables "Open in new tab" via browser's native context menu
+    - Supports Cmd/Ctrl+click to open in new tab
+    - Applied to: Agents list, Simulations list, Simulation runs list
 
 ### Data Fetching Pattern
 
@@ -1194,6 +1200,40 @@ import { SpinnerIcon, ToolIcon } from "@/components/icons";
 </div>
 ```
 
+**Standard Grid Column Patterns:**
+
+| Page Type | Grid Columns | Description |
+|-----------|-------------|-------------|
+| **Agents, Simulations** | `[1fr_1fr_auto]` or `[1fr_1fr_auto_auto]` | Equal-width data columns, auto action buttons |
+| **Tools, Scenarios, Metrics** | `[200px_1fr_auto]` | Fixed 200px name column, flexible description, auto actions |
+| **Personas** | `[200px_1fr_100px_100px_120px_auto]` | Fixed name, flexible characteristics, fixed attribute columns |
+| **Simulation Runs** | `[1fr_1fr_1fr_1fr]` | Four equal columns (Name, Status, Type, Updated At) |
+| **Tests** | `[1fr_1fr_auto]` | Equal-width name and type columns |
+
+The pattern is: use fixed widths (e.g., `200px`) for short columns like Name/Label, `1fr` for flexible content columns like Description/Characteristics, and `auto` for action buttons.
+
+**Scrollable Text in Fixed-Width Columns:**
+
+For fixed-width columns (like the 200px name column), use horizontal scrolling instead of truncation to allow users to see the full content:
+
+```tsx
+// ✅ Preferred - horizontal scroll for overflow
+<div className="overflow-x-auto max-w-full">
+  <p className="text-sm font-medium text-foreground whitespace-nowrap">
+    {item.name}
+  </p>
+</div>
+
+// ❌ Avoid - truncates content, user can't see full text
+<div className="min-w-0">
+  <p className="text-sm font-medium text-foreground truncate">
+    {item.name}
+  </p>
+</div>
+```
+
+This pattern is used in: Tools, Personas, Scenarios, Metrics list pages, and Simulation Run results table.
+
 ### Polling for Async Tasks
 
 Async operations (simulations, tests, benchmarks, STT/TTS evaluations) follow this status flow:
@@ -1245,6 +1285,48 @@ useEffect(() => {
   };
 }, [dependency]);
 ```
+
+### Linkable Table Rows Pattern
+
+For list items that should support browser-native "Open in new tab" (right-click, Cmd/Ctrl+click):
+
+```tsx
+import Link from "next/link";
+
+// Use Link components for each clickable cell in the row
+<div className="grid grid-cols-[1fr_1fr_auto] gap-4 border-b border-border hover:bg-muted/20 transition-colors">
+  <Link href={`/items/${item.id}`} className="px-4 py-2">
+    <p className="text-sm font-medium text-foreground">{item.name}</p>
+  </Link>
+  <Link href={`/items/${item.id}`} className="px-4 py-2">
+    <p className="text-sm text-muted-foreground">{item.date}</p>
+  </Link>
+  {/* Action buttons remain as regular buttons */}
+  <button onClick={() => handleDelete(item)} className="...">
+    Delete
+  </button>
+</div>
+
+// If you need to intercept navigation (e.g., for callback-based navigation):
+<Link
+  href={`/items/${item.id}`}
+  onClick={(e) => {
+    if (onNavigateToItem) {
+      e.preventDefault();
+      onNavigateToItem(item.id);
+    }
+  }}
+  className="..."
+>
+  {item.name}
+</Link>
+```
+
+This pattern provides:
+- Browser-native right-click "Open in new tab"
+- Cmd/Ctrl+click support
+- Proper accessibility (keyboard navigation, screen readers)
+- No custom JavaScript context menu needed
 
 ### Large Form Dialog Structure
 

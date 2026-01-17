@@ -1046,7 +1046,7 @@ export default function ToolsPage() {
         ) : (
           <div className="border border-border rounded-xl overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-[1fr_2fr_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+            <div className="grid grid-cols-[200px_1fr_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
               <div className="text-sm font-medium text-muted-foreground">
                 Name
               </div>
@@ -1060,10 +1060,10 @@ export default function ToolsPage() {
               <div
                 key={tool.uuid}
                 onClick={() => openEditTool(tool.uuid)}
-                className="grid grid-cols-[1fr_2fr_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                className="grid grid-cols-[200px_1fr_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
               >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
+                <div className="overflow-x-auto max-w-full">
+                  <p className="text-sm font-medium text-foreground whitespace-nowrap">
                     {tool.name}
                   </p>
                 </div>

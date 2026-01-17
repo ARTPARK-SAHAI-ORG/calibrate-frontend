@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
@@ -338,25 +339,32 @@ export default function SimulationsPage() {
             {sortedSimulations.map((simulation) => (
               <div
                 key={simulation.uuid}
-                onClick={() => navigateToSimulation(simulation.uuid)}
-                className="grid grid-cols-[1fr_1fr_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                className="grid grid-cols-[1fr_1fr_auto] gap-4 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors items-center"
               >
-                <div className="min-w-0">
+                <Link
+                  href={`/simulations/${simulation.uuid}`}
+                  className="min-w-0 px-4 py-2"
+                >
                   <p className="text-sm font-medium text-foreground truncate">
                     {simulation.name}
                   </p>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {simulation.updated_at
-                    ? formatDate(simulation.updated_at)
-                    : "—"}
-                </p>
+                </Link>
+                <Link
+                  href={`/simulations/${simulation.uuid}`}
+                  className="px-4 py-2"
+                >
+                  <p className="text-sm text-muted-foreground">
+                    {simulation.updated_at
+                      ? formatDate(simulation.updated_at)
+                      : "—"}
+                  </p>
+                </Link>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     openDeleteDialog(simulation);
                   }}
-                  className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                  className="w-8 h-8 mr-4 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                 >
                   <svg
                     className="w-4 h-4"

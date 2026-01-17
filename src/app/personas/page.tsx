@@ -521,7 +521,7 @@ export default function PersonasPage() {
         ) : (
           <div className="border border-border rounded-xl overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-[1fr_2fr_100px_100px_120px_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+            <div className="grid grid-cols-[200px_1fr_100px_100px_120px_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
               <div className="text-sm font-medium text-muted-foreground">
                 Label
               </div>
@@ -544,10 +544,10 @@ export default function PersonasPage() {
               <div
                 key={persona.uuid}
                 onClick={() => openEditPersona(persona.uuid)}
-                className="grid grid-cols-[1fr_2fr_100px_100px_120px_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                className="grid grid-cols-[200px_1fr_100px_100px_120px_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
               >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
+                <div className="overflow-x-auto max-w-full">
+                  <p className="text-sm font-medium text-foreground whitespace-nowrap">
                     {persona.name}
                   </p>
                 </div>
