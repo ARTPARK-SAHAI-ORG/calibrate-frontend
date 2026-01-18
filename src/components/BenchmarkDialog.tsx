@@ -29,6 +29,7 @@ type BenchmarkDialogProps = {
   agentUuid: string;
   agentName: string;
   tests: TestData[];
+  onBenchmarkCreated?: (taskId: string) => void; // Called when a new benchmark is created
 };
 
 export function BenchmarkDialog({
@@ -37,6 +38,7 @@ export function BenchmarkDialog({
   agentUuid,
   agentName,
   tests,
+  onBenchmarkCreated,
 }: BenchmarkDialogProps) {
   const [selectedModels, setSelectedModels] = useState<(LLMModel | null)[]>([
     null,
@@ -237,6 +239,7 @@ export function BenchmarkDialog({
         testUuids={tests.map((t) => t.uuid)}
         testNames={tests.map((t) => t.name)}
         models={selectedModels.filter((m) => m !== null).map((m) => m!.id)}
+        onBenchmarkCreated={onBenchmarkCreated}
       />
     </div>
   );

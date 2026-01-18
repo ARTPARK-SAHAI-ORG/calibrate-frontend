@@ -135,7 +135,7 @@ export function AgentPicker({
               className="fixed inset-0 z-[99]"
               onClick={() => setDropdownOpen(false)}
             />
-            <div className="absolute left-0 right-0 top-full mt-2 bg-popover border border-border rounded-xl shadow-xl z-[100] overflow-hidden">
+            <div className="absolute left-0 right-0 top-full mt-2 bg-background border border-border rounded-xl shadow-xl z-[100] overflow-hidden">
               {/* Search */}
               <div className="p-3 border-b border-border">
                 <input

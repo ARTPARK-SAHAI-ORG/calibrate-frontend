@@ -7,3 +7,5 @@ export {
   EmptyState,
   ResourceState,
 } from "./LoadingState";
+export { BackHeader } from "./BackHeader";
+export { StatusBadge } from "./StatusBadge";

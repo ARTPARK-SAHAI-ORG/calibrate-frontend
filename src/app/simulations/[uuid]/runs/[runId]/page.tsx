@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { AppLayout } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
+import { formatStatus, getStatusBadgeClass } from "@/lib/status";
 
 type MetricData = {
   mean: number;
@@ -44,6 +45,7 @@ type SimulationResult = {
   evaluation_results: EvaluationResult[];
   transcript: TranscriptEntry[];
   audio_urls?: string[];
+  conversation_wav_url?: string;
 };
 
 type RunData = {
@@ -152,38 +154,6 @@ export default function SimulationRunPage() {
     };
   }, [runId, backendAccessToken]);
 
-  const formatStatus = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "queued":
-        return "Queued";
-      case "in_progress":
-        return "Running";
-      case "done":
-        return "Done";
-      default:
-        return status;
-    }
-  };
-
-  const getStatusBadgeClass = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "done":
-      case "completed":
-        return "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400";
-      case "running":
-      case "in_progress":
-        return "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400";
-      case "failed":
-      case "error":
-        return "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400";
-      case "pending":
-      case "queued":
-        return "bg-gray-200 text-gray-700 dark:bg-gray-500/20 dark:text-gray-400";
-      default:
-        return "bg-gray-200 text-gray-700 dark:bg-gray-500/20 dark:text-gray-400";
-    }
-  };
-
   const getTypeBadgeClass = (type: string) => {
     switch (type.toLowerCase()) {
       case "text":
@@ -282,11 +252,11 @@ export default function SimulationRunPage() {
       }
     }
 
-  // Determine audio pattern based on role
-  let audioPattern: string;
-  if (entry.role === "user") {
-    // User messages: 1_user, 2_user, 3_user, etc. (1-indexed)
-    audioPattern = `${userCount + 1}_user.wav`;
+    // Determine audio pattern based on role
+    let audioPattern: string;
+    if (entry.role === "user") {
+      // User messages: 1_user, 2_user, 3_user, etc. (1-indexed)
+      audioPattern = `${userCount + 1}_user.wav`;
     } else if (entry.role === "assistant") {
       // Assistant messages: 1_bot, 2_bot, 3_bot, etc. (1-indexed)
       audioPattern = `${assistantCount + 1}_bot.wav`;
@@ -821,7 +791,7 @@ export default function SimulationRunPage() {
           {/* Sidebar */}
           <div className="relative w-[40%] min-w-[500px] bg-background border-l border-border flex flex-col h-full shadow-2xl">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+            <div className="flex items-center justify-between px-6 py-4">
               <div className="flex items-center gap-3">
                 <svg
                   className="w-5 h-5 text-muted-foreground"
@@ -857,6 +827,24 @@ export default function SimulationRunPage() {
                 </svg>
               </button>
             </div>
+
+            {/* Full Conversation Audio Player - show for voice runs with conversation_wav_url */}
+            {selectedSimulation.conversation_wav_url && (
+              <div className="px-6 pb-4 border-b border-border">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm font-medium text-foreground">
+                    Hear the full conversation
+                  </span>
+                </div>
+                <audio
+                  controls
+                  className="w-full h-10"
+                  src={selectedSimulation.conversation_wav_url}
+                >
+                  Your browser does not support the audio element.
+                </audio>
+              </div>
+            )}
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6">

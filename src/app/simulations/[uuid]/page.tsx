@@ -541,7 +541,7 @@ export default function SimulationDetailPage() {
 
         {/* Dropdown Menu */}
         {launchDropdownOpen && (
-          <div className="absolute right-0 top-full mt-2 bg-popover border border-border rounded-xl shadow-xl z-50 overflow-hidden min-w-[180px]">
+          <div className="absolute right-0 top-full mt-2 bg-background border border-border rounded-xl shadow-xl z-50 overflow-hidden min-w-[180px]">
             <button
               onClick={() => handleLaunch("text")}
               disabled={isLaunching}

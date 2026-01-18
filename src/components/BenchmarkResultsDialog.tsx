@@ -53,6 +53,8 @@ type BenchmarkResultsDialogProps = {
   testUuids: string[];
   testNames: string[];
   models: string[];
+  taskId?: string; // If provided, view existing benchmark results instead of starting new
+  onBenchmarkCreated?: (taskId: string) => void; // Called when a new benchmark is created
 };
 
 export function BenchmarkResultsDialog({
@@ -64,6 +66,8 @@ export function BenchmarkResultsDialog({
   testUuids,
   testNames,
   models,
+  taskId,
+  onBenchmarkCreated,
 }: BenchmarkResultsDialogProps) {
   const [activeTab, setActiveTab] = useState<"leaderboard" | "outputs">(
     "leaderboard"
@@ -95,7 +99,7 @@ export function BenchmarkResultsDialog({
 
   // Start benchmark when dialog opens
   useEffect(() => {
-    if (isOpen && testUuids.length > 0 && models.length > 0) {
+    if (isOpen) {
       setIsLoading(true);
       setTaskStatus("queued");
       setModelResults([]);
@@ -104,11 +108,27 @@ export function BenchmarkResultsDialog({
       setSelectedModelIndex(0);
       setSelectedTestIndex(null);
 
-      // Start the benchmark
-      runBenchmark();
+      if (taskId) {
+        // View existing benchmark - poll the task immediately
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+        if (backendUrl) {
+          pollingIntervalRef.current = setInterval(() => {
+            pollBenchmarkStatus(taskId, backendUrl);
+          }, 2000);
+          pollBenchmarkStatus(taskId, backendUrl);
+        } else {
+          setIsLoading(false);
+          setError("BACKEND_URL environment variable is not set");
+        }
+      } else if (testUuids.length > 0 && models.length > 0) {
+        // Start a new benchmark
+        runBenchmark();
+      } else {
+        setIsLoading(false);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, taskId]);
 
   const pollBenchmarkStatus = async (taskId: string, backendUrl: string) => {
     try {
@@ -198,15 +218,20 @@ export function BenchmarkResultsDialog({
       }
 
       const result: BenchmarkStatusResponse = await response.json();
-      const taskId = result.task_id;
+      const newTaskId = result.task_id;
+
+      // Notify parent about the new benchmark
+      if (onBenchmarkCreated) {
+        onBenchmarkCreated(newTaskId);
+      }
 
       // Start polling
       pollingIntervalRef.current = setInterval(() => {
-        pollBenchmarkStatus(taskId, backendUrl);
+        pollBenchmarkStatus(newTaskId, backendUrl);
       }, 2000);
 
       // Also poll immediately
-      pollBenchmarkStatus(taskId, backendUrl);
+      pollBenchmarkStatus(newTaskId, backendUrl);
     } catch (err) {
       console.error("Error starting benchmark:", err);
       setIsLoading(false);

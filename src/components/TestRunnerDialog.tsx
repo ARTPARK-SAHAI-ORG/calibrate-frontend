@@ -77,6 +77,8 @@ type TestRunnerDialogProps = {
   agentUuid: string;
   agentName: string;
   tests: TestData[];
+  taskId?: string; // If provided, view existing run results instead of starting a new run
+  onRunCreated?: (taskId: string) => void; // Called when a new run is created
 };
 
 export function TestRunnerDialog({
@@ -85,6 +87,8 @@ export function TestRunnerDialog({
   agentUuid,
   agentName,
   tests,
+  taskId,
+  onRunCreated,
 }: TestRunnerDialogProps) {
   const { data: session } = useSession();
   const backendAccessToken = (session as any)?.backendAccessToken;
@@ -108,23 +112,42 @@ export function TestRunnerDialog({
 
   // Initialize test results and start running tests when dialog opens
   useEffect(() => {
-    if (isOpen && tests.length > 0) {
-      const initialResults: TestResult[] = tests.map((test) => ({
-        test,
-        status: "pending",
-      }));
-      setTestResults(initialResults);
+    if (isOpen) {
       setSelectedTestUuid(null);
-      setCurrentTaskId(null);
 
-      // Start running tests immediately after dialog opens
-      // Use setTimeout to ensure state is set before running
-      setTimeout(() => {
-        runAllTests(initialResults);
-      }, 0);
+      if (taskId) {
+        // View existing run - poll the task immediately
+        setIsRunning(true);
+        setCurrentTaskId(taskId);
+        setTestResults([]); // Will be populated from API response
+        setRunStatus("queued");
+
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+        if (backendUrl) {
+          // Start polling immediately for existing task
+          pollingIntervalRef.current = setInterval(() => {
+            pollTaskStatus(taskId, backendUrl);
+          }, 2000);
+          pollTaskStatus(taskId, backendUrl);
+        }
+      } else if (tests.length > 0) {
+        // Start a new run
+        const initialResults: TestResult[] = tests.map((test) => ({
+          test,
+          status: "pending",
+        }));
+        setTestResults(initialResults);
+        setCurrentTaskId(null);
+
+        // Start running tests immediately after dialog opens
+        // Use setTimeout to ensure state is set before running
+        setTimeout(() => {
+          runAllTests(initialResults);
+        }, 0);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, tests]);
+  }, [isOpen, tests, taskId]);
 
   const pollTaskStatus = async (taskId: string, backendUrl: string) => {
     try {
@@ -165,6 +188,36 @@ export function TestRunnerDialog({
 
       // Update test results based on polling response
       setTestResults((prev) => {
+        // If we're viewing a past run and have no previous results, build from API response
+        if (prev.length === 0 && result.results && result.results.length > 0) {
+          return result.results.map((apiResult) => {
+            const isPassed =
+              apiResult.passed === true || apiResult.status === "passed";
+            // Get test name from test_case.name (API response) or test_name field
+            const testName =
+              apiResult.test_case?.name ||
+              apiResult.test_name ||
+              "Unknown Test";
+            return {
+              test: {
+                uuid: apiResult.test_uuid || "",
+                name: testName,
+                description: "",
+                type: "response" as const,
+                config: {},
+                created_at: "",
+                updated_at: "",
+              },
+              status: isPassed ? ("passed" as const) : ("failed" as const),
+              chatHistory: apiResult.chat_history,
+              output: apiResult.output,
+              testCase: apiResult.test_case,
+              evaluation: apiResult.evaluation ?? { passed: isPassed },
+              error: apiResult.error,
+            };
+          });
+        }
+
         // Try to match by test_uuid first, if no match found, update by index
         const updatedResults: TestResult[] = prev.map((r, index) => {
           // First try to find by UUID in results
@@ -298,16 +351,21 @@ export function TestRunnerDialog({
       }
 
       const result: TestRunStatusResponse = await response.json();
-      const taskId = result.task_id;
-      setCurrentTaskId(taskId);
+      const newTaskId = result.task_id;
+      setCurrentTaskId(newTaskId);
+
+      // Notify parent about the new run
+      if (onRunCreated) {
+        onRunCreated(newTaskId);
+      }
 
       // Start polling immediately
       pollingIntervalRef.current = setInterval(() => {
-        pollTaskStatus(taskId, backendUrl);
+        pollTaskStatus(newTaskId, backendUrl);
       }, 2000);
 
       // Also poll immediately to get the first result
-      pollTaskStatus(taskId, backendUrl);
+      pollTaskStatus(newTaskId, backendUrl);
     } catch (error) {
       console.error("Error starting test run:", error);
       setTestResults((prev) =>
