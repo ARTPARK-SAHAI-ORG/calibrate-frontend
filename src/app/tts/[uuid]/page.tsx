@@ -77,6 +77,11 @@ export default function TTSEvaluationDetailPage() {
   );
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Set page title
+  useEffect(() => {
+    document.title = "TTS Evaluation | Pense";
+  }, []);
+
   // Cleanup polling interval on unmount
   useEffect(() => {
     return () => {

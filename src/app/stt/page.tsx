@@ -38,6 +38,11 @@ export default function STTPage() {
   const [error, setError] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
+  // Set page title
+  useEffect(() => {
+    document.title = "Speech to Text | Pense";
+  }, []);
+
   // Fetch STT jobs
   useEffect(() => {
     const fetchJobs = async () => {

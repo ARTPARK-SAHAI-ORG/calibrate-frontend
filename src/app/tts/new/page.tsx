@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { BackHeader } from "@/components/ui";
@@ -9,6 +9,11 @@ import { TextToSpeechEvaluation } from "@/components/evaluations/TextToSpeechEva
 export default function NewTTSEvaluationPage() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Set page title
+  useEffect(() => {
+    document.title = "New TTS Evaluation | Pense";
+  }, []);
 
   const customHeader = (
     <BackHeader

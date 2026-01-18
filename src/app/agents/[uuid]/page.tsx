@@ -1,9 +1,18 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { AgentDetail, AgentDetailHeaderState } from "@/components/AgentDetail";
+
+// Map tab IDs to display names for page title
+const tabDisplayNames: Record<string, string> = {
+  agent: "Agent",
+  tools: "Tools",
+  "data-extraction": "Data Extraction",
+  tests: "Tests",
+  settings: "Settings",
+};
 
 export default function AgentDetailPage() {
   const router = useRouter();
@@ -11,6 +20,16 @@ export default function AgentDetailPage() {
   const uuid = params.uuid as string;
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [headerState, setHeaderState] = useState<AgentDetailHeaderState | null>(null);
+
+  // Set page title when agent name or tab changes
+  useEffect(() => {
+    if (headerState?.agentName && headerState.agentName !== "Loading...") {
+      const tabName = tabDisplayNames[headerState.activeTab] || "Agent";
+      document.title = `${headerState.agentName} - ${tabName} | Pense`;
+    } else {
+      document.title = "Agent | Pense";
+    }
+  }, [headerState?.agentName, headerState?.activeTab]);
 
   const handleHeaderStateChange = useCallback((state: AgentDetailHeaderState) => {
     setHeaderState(state);

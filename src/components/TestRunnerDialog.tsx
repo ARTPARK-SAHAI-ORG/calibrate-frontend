@@ -132,18 +132,18 @@ export function TestRunnerDialog({
         }
       } else if (tests.length > 0) {
         // Start a new run
-        const initialResults: TestResult[] = tests.map((test) => ({
-          test,
-          status: "pending",
-        }));
-        setTestResults(initialResults);
-        setCurrentTaskId(null);
+      const initialResults: TestResult[] = tests.map((test) => ({
+        test,
+        status: "pending",
+      }));
+      setTestResults(initialResults);
+      setCurrentTaskId(null);
 
-        // Start running tests immediately after dialog opens
-        // Use setTimeout to ensure state is set before running
-        setTimeout(() => {
-          runAllTests(initialResults);
-        }, 0);
+      // Start running tests immediately after dialog opens
+      // Use setTimeout to ensure state is set before running
+      setTimeout(() => {
+        runAllTests(initialResults);
+      }, 0);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

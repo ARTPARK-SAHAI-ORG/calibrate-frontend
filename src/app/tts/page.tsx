@@ -37,6 +37,11 @@ export default function TTSPage() {
   const [error, setError] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
+  // Set page title
+  useEffect(() => {
+    document.title = "Text to Speech | Pense";
+  }, []);
+
   // Fetch TTS jobs
   useEffect(() => {
     const fetchJobs = async () => {

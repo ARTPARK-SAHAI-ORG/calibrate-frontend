@@ -371,22 +371,27 @@ This enables:
 ├── env.example            # Environment variables template
 ├── src/
 │   ├── app/                    # Next.js App Router pages
+│   │   ├── layout.tsx         # Root layout with default metadata
 │   │   ├── agents/            # Agent management (list + [uuid] detail)
-│   │   ├── tools/             # Tools management
+│   │   │   ├── layout.tsx     # Route-specific metadata for page title
+│   │   │   └── [uuid]/layout.tsx  # Detail page metadata
+│   │   ├── tools/             # Tools management (each route has layout.tsx)
 │   │   ├── stt/               # Speech-to-Text evaluation (list + new + [uuid] detail)
+│   │   │   ├── layout.tsx     # "Speech to Text | Pense"
 │   │   │   ├── page.tsx       # List of STT evaluation jobs
-│   │   │   ├── new/           # Create new STT evaluation
-│   │   │   └── [uuid]/        # View STT evaluation results
+│   │   │   ├── new/           # Create new STT evaluation (has layout.tsx)
+│   │   │   └── [uuid]/        # View STT evaluation results (has layout.tsx)
 │   │   ├── tts/               # Text-to-Speech evaluation (list + new + [uuid] detail)
+│   │   │   ├── layout.tsx     # "Text to Speech | Pense"
 │   │   │   ├── page.tsx       # List of TTS evaluation jobs
-│   │   │   ├── new/           # Create new TTS evaluation
-│   │   │   └── [uuid]/        # View TTS evaluation results
-│   │   ├── tests/             # Tests page
-│   │   ├── personas/          # User persona definitions
-│   │   ├── scenarios/         # Test scenario definitions
-│   │   ├── metrics/           # Evaluation metrics
-│   │   ├── simulations/       # End-to-end simulation testing
-│   │   ├── login/             # Authentication page
+│   │   │   ├── new/           # Create new TTS evaluation (has layout.tsx)
+│   │   │   └── [uuid]/        # View TTS evaluation results (has layout.tsx)
+│   │   ├── tests/             # Tests page (has layout.tsx)
+│   │   ├── personas/          # User persona definitions (has layout.tsx)
+│   │   ├── scenarios/         # Test scenario definitions (has layout.tsx)
+│   │   ├── metrics/           # Evaluation metrics (has layout.tsx)
+│   │   ├── simulations/       # End-to-end simulation testing (has layout.tsx)
+│   │   ├── login/             # Authentication page (has layout.tsx)
 │   │   └── api/auth/          # NextAuth.js route handlers
 │   ├── components/
 │   │   ├── agent-tabs/        # Agent detail tab components
@@ -652,7 +657,8 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
 
 1. **Tab Navigation**: Used in agent detail and simulation detail pages
    - Tabs sync with URL query param (`?tab=agent`, `?tab=tools`, etc.)
-   - Use `useSearchParams` to read and `router.push` to update
+   - Use `useSearchParams` to read initial tab value
+   - Use `window.history.replaceState` to update URL without navigation side effects (avoids title reset issues caused by `router.push`)
 2. **Sidebar Panels**: Slide-in panels for create/edit forms
    - **Preferred**: Use `SlidePanel` and `SlidePanelFooter` from `@/components/ui`
    - Width: 40% of viewport, min 500px (customizable via `width` prop)
@@ -1786,8 +1792,112 @@ GOOGLE_CLIENT_SECRET=                          # Google OAuth client secret
 ### Navigation
 
 - **Home redirect**: Root page (`/`) redirects to `/agents`
-- **Tab persistence**: Agent detail tabs persist in URL so refreshing maintains tab state
+- **Tab persistence**: Agent detail and simulation detail tabs persist in URL (`?tab=...`) so refreshing maintains tab state
 - **Back navigation**: Detail pages include back button to list view
+
+### Page Titles
+
+Page titles use a **two-layer approach** for correct display on both reload and client navigation:
+
+1. **Route-specific layouts** (server-side): Provide the correct title immediately on page load/reload
+2. **`useEffect` in pages** (client-side): Update titles for dynamic content and client navigation
+
+**Layout files provide base titles:**
+
+Each route has a `layout.tsx` file that exports metadata for server-side rendering:
+
+```tsx
+// src/app/tools/layout.tsx
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Tools | Pense",
+};
+
+export default function ToolsLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return children;
+}
+```
+
+**Route layout hierarchy:**
+
+| Route                      | Layout Title                  |
+| -------------------------- | ----------------------------- |
+| `/agents`                  | "Agents \| Pense"             |
+| `/agents/[uuid]`           | "Agent \| Pense"              |
+| `/tools`                   | "Tools \| Pense"              |
+| `/tests`                   | "Tests \| Pense"              |
+| `/personas`                | "Personas \| Pense"           |
+| `/scenarios`               | "Scenarios \| Pense"          |
+| `/metrics`                 | "Metrics \| Pense"            |
+| `/simulations`             | "Simulations \| Pense"        |
+| `/simulations/[uuid]`      | "Simulation \| Pense"         |
+| `/simulations/[uuid]/runs` | "Simulation Run \| Pense"     |
+| `/stt`                     | "Speech to Text \| Pense"     |
+| `/stt/[uuid]`              | "STT Evaluation \| Pense"     |
+| `/stt/new`                 | "New STT Evaluation \| Pense" |
+| `/tts`                     | "Text to Speech \| Pense"     |
+| `/tts/[uuid]`              | "TTS Evaluation \| Pense"     |
+| `/tts/new`                 | "New TTS Evaluation \| Pense" |
+| `/login`                   | "Login \| Pense"              |
+
+**useEffect for dynamic titles:**
+
+Detail pages use `useEffect` to update titles with actual data names after loading:
+
+```tsx
+useEffect(() => {
+  if (data?.name) {
+    document.title = `${data.name} | Pense`;
+  }
+}, [data?.name]);
+```
+
+**Tab-aware titles for detail pages with tabs:**
+
+Pages with tabs (agent detail, simulation detail) include the active tab name in the title:
+
+| Page                               | Title Format                                                                 |
+| ---------------------------------- | ---------------------------------------------------------------------------- |
+| `/agents/[uuid]`                   | `<Agent Name> - <Tab Name> \| Pense` (e.g., "My Agent - Tests \| Pense")     |
+| `/simulations/[uuid]`              | `<Simulation Name> - <Tab Name> \| Pense` (e.g., "My Sim - Config \| Pense") |
+| `/simulations/[uuid]/runs/[runId]` | `<Run Name> \| <Simulation Name> \| Pense`                                   |
+
+**Simulation run page fetches parent simulation name:**
+
+The simulation run page fetches the parent simulation's name via a separate API call to display the full hierarchical title:
+
+```tsx
+// Fetch simulation name for page title
+useEffect(() => {
+  const fetchSimulationName = async () => {
+    const response = await fetch(`${backendUrl}/simulations/${uuid}`, ...);
+    if (response.ok) {
+      const data = await response.json();
+      setSimulationName(data.name);
+    }
+  };
+  fetchSimulationName();
+}, [uuid, backendAccessToken]);
+```
+
+**Why both layout metadata and useEffect?**
+
+- **Layout metadata**: Ensures correct title on server render (page reload shows correct title immediately)
+- **useEffect**: Updates title with dynamic content (agent name, simulation name, active tab) after data loads
+
+**Tab switching uses replaceState:**
+
+For tab changes in `/agents/[uuid]` and `/simulations/[uuid]`, `window.history.replaceState` is used instead of `router.push` to update the URL without triggering navigation side effects that could reset the title:
+
+```tsx
+// In tab click handlers
+window.history.replaceState(null, "", `?tab=${tabName}`);
+```
 
 ### Authentication
 

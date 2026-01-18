@@ -83,6 +83,11 @@ export default function STTEvaluationDetailPage() {
   );
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Set page title
+  useEffect(() => {
+    document.title = "STT Evaluation | Pense";
+  }, []);
+
   // Cleanup polling interval on unmount
   useEffect(() => {
     return () => {

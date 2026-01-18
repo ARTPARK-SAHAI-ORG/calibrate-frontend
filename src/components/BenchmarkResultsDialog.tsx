@@ -122,7 +122,7 @@ export function BenchmarkResultsDialog({
         }
       } else if (testUuids.length > 0 && models.length > 0) {
         // Start a new benchmark
-        runBenchmark();
+      runBenchmark();
       } else {
         setIsLoading(false);
       }

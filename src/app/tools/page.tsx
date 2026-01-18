@@ -22,6 +22,11 @@ export default function ToolsPage() {
   const backendAccessToken = (session as any)?.backendAccessToken;
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Set page title
+  useEffect(() => {
+    document.title = "Tools | Pense";
+  }, []);
   const [addToolSidebarOpen, setAddToolSidebarOpen] = useState(false);
   const [newToolName, setNewToolName] = useState("");
   const [newToolDescription, setNewToolDescription] = useState("");

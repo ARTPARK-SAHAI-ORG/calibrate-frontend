@@ -1,8 +1,13 @@
 "use client";
 
+import { useEffect } from "react";
 import { signIn } from "next-auth/react";
 
 export default function LoginPage() {
+  // Set page title
+  useEffect(() => {
+    document.title = "Login | Pense";
+  }, []);
   const handleGoogleSignIn = () => {
     signIn("google", { callbackUrl: "/agents" });
   };

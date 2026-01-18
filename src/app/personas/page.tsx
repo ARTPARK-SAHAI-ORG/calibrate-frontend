@@ -23,6 +23,10 @@ type PersonaData = {
 const DEFAULT_CHARACTERISTICS = `You are Rajesh, a 45-year-old farmer from rural Karnataka who speaks primarily in Kannada with limited English proficiency. You are polite and friendly but speak slowly with natural pauses like "uhh" and "umm". You have a calm and patient demeanor but can become frustrated when technical jargon is used. You prefer simple, straightforward explanations and often ask for clarification. You tend to repeat important information to make sure you understood correctly.`;
 
 export default function PersonasPage() {
+  // Set page title
+  useEffect(() => {
+    document.title = "Personas | Pense";
+  }, []);
   const router = useRouter();
   const { data: session } = useSession();
   const backendAccessToken = (session as any)?.backendAccessToken;

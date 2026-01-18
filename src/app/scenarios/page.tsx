@@ -23,6 +23,11 @@ export default function ScenariosPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [addScenarioSidebarOpen, setAddScenarioSidebarOpen] = useState(false);
+
+  // Set page title
+  useEffect(() => {
+    document.title = "Scenarios | Pense";
+  }, []);
   const [scenarios, setScenarios] = useState<ScenarioData[]>([]);
   const [scenariosLoading, setScenariosLoading] = useState(true);
   const [scenariosError, setScenariosError] = useState<string | null>(null);

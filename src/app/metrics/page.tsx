@@ -23,6 +23,11 @@ export default function MetricsPage() {
   const [addMetricSidebarOpen, setAddMetricSidebarOpen] = useState(false);
   const [metrics, setMetrics] = useState<MetricData[]>([]);
   const [metricsLoading, setMetricsLoading] = useState(true);
+
+  // Set page title
+  useEffect(() => {
+    document.title = "Metrics | Pense";
+  }, []);
   const [metricsError, setMetricsError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);

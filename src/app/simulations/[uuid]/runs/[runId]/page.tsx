@@ -75,6 +75,7 @@ export default function SimulationRunPage() {
   const runId = params.runId as string;
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [runData, setRunData] = useState<RunData | null>(null);
+  const [simulationName, setSimulationName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [transcriptDialogOpen, setTranscriptDialogOpen] = useState(false);
@@ -83,6 +84,47 @@ export default function SimulationRunPage() {
   const [activeMetricsTab, setActiveMetricsTab] = useState<
     "performance" | "latency"
   >("performance");
+
+  // Fetch simulation name for page title
+  useEffect(() => {
+    const fetchSimulationName = async () => {
+      if (!backendAccessToken) return;
+
+      try {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+        if (!backendUrl) return;
+
+        const response = await fetch(`${backendUrl}/simulations/${uuid}`, {
+          method: "GET",
+          headers: {
+            accept: "application/json",
+            "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setSimulationName(data.name);
+        }
+      } catch (err) {
+        console.error("Error fetching simulation name:", err);
+      }
+    };
+
+    fetchSimulationName();
+  }, [uuid, backendAccessToken]);
+
+  // Set page title when run data and simulation name are loaded
+  useEffect(() => {
+    if (runData?.name && simulationName) {
+      document.title = `${runData.name} | ${simulationName} | Pense`;
+    } else if (runData?.name) {
+      document.title = `${runData.name} | Pense`;
+    } else {
+      document.title = "Simulation Run | Pense";
+    }
+  }, [runData?.name, simulationName]);
 
   useEffect(() => {
     if (!backendAccessToken) return;

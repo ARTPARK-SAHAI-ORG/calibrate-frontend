@@ -92,6 +92,22 @@ export default function SimulationDetailPage() {
   type TabType = "config" | "runs";
   const [activeTab, setActiveTab] = useState<TabType>("config");
 
+  // Tab display names for page title
+  const tabDisplayNames: Record<TabType, string> = {
+    config: "Config",
+    runs: "Runs",
+  };
+
+  // Set page title when simulation or tab changes
+  useEffect(() => {
+    if (simulation?.name) {
+      const tabName = tabDisplayNames[activeTab];
+      document.title = `${simulation.name} - ${tabName} | Pense`;
+    } else {
+      document.title = "Simulation | Pense";
+    }
+  }, [simulation?.name, activeTab]);
+
   // Configuration state (whether config has been saved/created)
   const [isConfigured, setIsConfigured] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -638,9 +654,11 @@ export default function SimulationDetailPage() {
                 <button
                   onClick={() => {
                     setActiveTab("config");
-                    router.push(`/simulations/${uuid}?tab=config`, {
-                      scroll: false,
-                    });
+                    window.history.replaceState(
+                      null,
+                      "",
+                      `/simulations/${uuid}?tab=config`
+                    );
                   }}
                   className={`pb-2 text-base font-medium transition-colors cursor-pointer ${
                     activeTab === "config"
@@ -653,9 +671,11 @@ export default function SimulationDetailPage() {
                 <button
                   onClick={() => {
                     setActiveTab("runs");
-                    router.push(`/simulations/${uuid}?tab=runs`, {
-                      scroll: false,
-                    });
+                    window.history.replaceState(
+                      null,
+                      "",
+                      `/simulations/${uuid}?tab=runs`
+                    );
                   }}
                   className={`pb-2 text-base font-medium transition-colors cursor-pointer ${
                     activeTab === "runs"

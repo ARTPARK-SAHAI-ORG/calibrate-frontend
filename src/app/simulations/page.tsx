@@ -23,6 +23,11 @@ export default function SimulationsPage() {
   const backendAccessToken = (session as any)?.backendAccessToken;
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Set page title
+  useEffect(() => {
+    document.title = "Simulations | Pense";
+  }, []);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [simulations, setSimulations] = useState<SimulationData[]>([]);

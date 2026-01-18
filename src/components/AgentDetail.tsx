@@ -19,6 +19,7 @@ import type {
 
 export type AgentDetailHeaderState = {
   agentName: string;
+  activeTab: string;
   isLoading: boolean;
   isSaving: boolean;
   onSave: () => void;
@@ -86,9 +87,10 @@ export function AgentDetail({
   // Update URL when tab changes
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
+    // Use replaceState to update URL without triggering navigation
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", tab);
-    router.push(`?${params.toString()}`, { scroll: false });
+    window.history.replaceState(null, "", `?${params.toString()}`);
   };
 
   // Agent tab state
@@ -474,13 +476,14 @@ export function AgentDetail({
     if (onHeaderStateChange) {
       onHeaderStateChange({
         agentName: agent?.name || "Loading...",
+        activeTab,
         isLoading,
         isSaving,
         onSave: () => saveRef.current(),
         onEditName: handleOpenEditNameDialog,
       });
     }
-  }, [agent?.name, isLoading, isSaving, onHeaderStateChange]);
+  }, [agent?.name, activeTab, isLoading, isSaving, onHeaderStateChange]);
 
   if (isLoading) {
     return (

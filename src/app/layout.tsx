@@ -15,7 +15,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pense - Voice Agent Evaluation",
+  title: {
+    default: "Pense",
+    template: "%s",
+  },
   description: "Evaluate and test voice agent components",
 };
 

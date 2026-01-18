@@ -37,6 +37,11 @@ export default function LLMPage() {
   const backendAccessToken = (session as any)?.backendAccessToken;
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Set page title
+  useEffect(() => {
+    document.title = "Tests | Pense";
+  }, []);
   const [addTestSidebarOpen, setAddTestSidebarOpen] = useState(false);
   const [newTestName, setNewTestName] = useState("");
   const [newTestDescription, setNewTestDescription] = useState("");
