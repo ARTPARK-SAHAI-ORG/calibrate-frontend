@@ -441,7 +441,7 @@ export function AppLayout({
 
               {/* Dropdown Menu */}
               {profileOpen && (
-                <div className="absolute right-0 top-12 w-72 bg-popover border border-border rounded-xl shadow-lg z-50 overflow-hidden">
+                <div className="absolute right-0 top-12 w-72 bg-background border border-border rounded-xl shadow-lg z-50 overflow-hidden">
                   {/* User Info */}
                   <div className="p-4 flex items-center gap-3 border-b border-border">
                     <div className="w-11 h-11 rounded-full bg-purple-600 flex items-center justify-center text-white font-medium text-base flex-shrink-0 overflow-hidden">

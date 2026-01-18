@@ -48,6 +48,7 @@ export type TestCaseEvaluation = {
 };
 
 export type TestCaseData = {
+  name?: string;
   history?: TestCaseHistory[];
   evaluation?: TestCaseEvaluation;
 };

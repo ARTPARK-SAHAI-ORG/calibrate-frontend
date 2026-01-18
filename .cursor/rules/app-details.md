@@ -75,13 +75,13 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 
 **Agent Detail Page** (`/agents/[uuid]`) has 5 tabs:
 
-| Tab                 | Purpose                                                                         |
-| ------------------- | ------------------------------------------------------------------------------- |
-| **Agent**           | Configure system prompt, STT/TTS providers, and LLM model                       |
-| **Tools**           | Attach/detach function calling tools + toggle built-in "End conversation" tool  |
-| **Data Extraction** | Define fields to extract from conversations (name, type, description, required) |
-| **Tests**           | Link test cases to agent, run benchmarks, view benchmark results                |
-| **Settings**        | Toggle "Agent speaks first" behavior                                            |
+| Tab                 | Purpose                                                                          |
+| ------------------- | -------------------------------------------------------------------------------- |
+| **Agent**           | Configure system prompt, STT/TTS providers, and LLM model                        |
+| **Tools**           | Attach/detach function calling tools + toggle built-in "End conversation" tool   |
+| **Data Extraction** | Define fields to extract from conversations (name, type, description, required)  |
+| **Tests**           | Link test cases to agent, run tests, view past runs with results, compare models |
+| **Settings**        | Toggle "Agent speaks first" behavior                                             |
 
 **Default Agent Configuration** (when creating new agent):
 
@@ -101,6 +101,28 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 - **STT**: deepgram, openai, cartesia, elevenlabs, whisper (groq), google, sarvam
 - **TTS**: cartesia, openai, orpheus (groq), google, elevenlabs, sarvam
 - **LLM**: 20+ providers including OpenAI, Google, Anthropic, DeepSeek, Meta, Mistral, Qwen, xAI, Perplexity, Cohere, Amazon, NVIDIA, Microsoft, and more
+
+**Tests Tab Features:**
+
+- **Two-column layout**: Tests table on left, Past runs panel (480px) on right
+- **Tests table**: Shows attached tests with name, type (Tool Call/Next Reply), run button, delete button
+- **Past runs panel**: 4-column table layout showing history of test runs:
+  | Column | Content |
+  | --- | --- |
+  | Name | "N tests" for unit tests (from `total_tests`), "N models" for benchmarks (from `model_results.length`) |
+  | Run Type | "Test" (blue pill) or "Benchmark" (purple pill) based on `type` field |
+  | Time | Relative time (e.g., "yesterday", "6 days ago", "3 months ago") |
+  | Result | "Running" (yellow, with spinner) for pending/queued/in_progress; "N Success" and/or "M Fail" badges for completed `llm-unit-test`; "Complete" for completed `llm-benchmark` |
+- **Clickable rows**: Clicking a past run row opens the appropriate results dialog:
+  - `llm-unit-test` → Opens `TestRunnerDialog` in view mode (with `taskId` prop)
+  - `llm-benchmark` → Opens `BenchmarkResultsDialog` in view mode (with `taskId` prop)
+- **Real-time updates**: When a new test/benchmark is started:
+  1. A new entry is immediately added to the top of the past runs table with "pending" status
+  2. The component polls the API to update the entry with results when complete
+  3. The "Running" badge with spinner is shown until the run completes
+- **Actions**: Add test, Run all tests, Compare models (benchmark)
+- **API**: Fetches runs from `GET /agent-tests/agent/{uuid}/runs`
+- **Run types**: `llm-unit-test` (has passed/failed counts) and `llm-benchmark` (results in model_results)
 
 ### 2. Tools Management (`/tools`)
 
@@ -279,9 +301,11 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 
 - **Transcript Dialog**:
 
+  - Full conversation audio player below header (from `conversation_wav_url`) for voice simulations
   - Full conversation history (user, assistant, tool calls)
   - Role-based message styling
   - Tool call details with arguments
+  - Per-message audio players for voice simulations (matching `audio_urls`)
 
 - **Latency Metrics** (for voice simulations, in Performance/Latency tabs):
   - STT latency (TTFB, processing time)
@@ -669,6 +693,12 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
     - Enables "Open in new tab" via browser's native context menu
     - Supports Cmd/Ctrl+click to open in new tab
     - Applied to: Agents list, Simulations list, Simulation runs list
+11. **View Mode Dialogs**: `TestRunnerDialog` and `BenchmarkResultsDialog` support dual modes:
+    - **Run mode** (default): Opens dialog and starts a new run/benchmark
+    - **View mode**: Pass `taskId` prop to view existing run results without starting a new run
+    - When `taskId` is provided, the dialog polls the existing task and displays results
+    - Callback props (`onRunCreated`, `onBenchmarkCreated`) notify parent when new runs are created
+    - Used for: clicking past run rows in Tests tab to view historical results
 
 ### Data Fetching Pattern
 
@@ -795,7 +825,7 @@ The app supports three theme modes (all add a class to `<html>`):
 // ✅ Preferred - uses CSS variables that auto-switch with theme
 <div className="bg-background text-foreground border-border">
 <div className="bg-muted text-muted-foreground">
-<div className="bg-popover"> {/* for dropdowns/dialogs */}
+<div className="bg-background"> {/* for dropdowns/dialogs - DO NOT use bg-popover, it causes transparent backgrounds */}
 
 // ⚠️ Alternative - explicit dark: variants (use sparingly)
 <div className="bg-white dark:bg-gray-900 text-black dark:text-white">
@@ -1006,23 +1036,23 @@ Unit test evaluations for:
 
 All endpoints are relative to `NEXT_PUBLIC_BACKEND_URL`:
 
-| Resource        | Endpoints                                                                               |
-| --------------- | --------------------------------------------------------------------------------------- |
-| Auth            | `POST /auth/google` (body: `{ id_token }`)                                              |
-| Agents          | `GET/POST /agents`, `GET/PUT/DELETE /agents/{uuid}`, `POST /agents/{uuid}/duplicate`    |
-| Agent Tools     | `GET /agent-tools/agent/{uuid}/tools`, `POST/DELETE /agent-tools`                       |
-| Tools           | `GET/POST /tools`, `GET/PUT/DELETE /tools/{uuid}`                                       |
-| Personas        | `GET/POST /personas`, `GET/PUT/DELETE /personas/{uuid}`                                 |
-| Scenarios       | `GET/POST /scenarios`, `GET/PUT/DELETE /scenarios/{uuid}`                               |
-| Metrics         | `GET/POST /metrics`, `GET/PUT/DELETE /metrics/{uuid}`, `POST /metrics/{uuid}/duplicate` |
-| Simulations     | `GET/POST /simulations`, `GET/DELETE /simulations/{uuid}`                               |
-| Simulation Runs | `GET /simulations/run/{runId}`, `POST /simulations/{uuid}/run`                          |
-| Tests           | `GET/POST /tests`, `GET/PUT/DELETE /tests/{uuid}`                                       |
-| Agent Tests     | `GET /agent-tests/agent/{uuid}/tests`, `POST/DELETE /agent-tests`                       |
-| STT Evaluation  | `POST /stt/evaluate`, `GET /stt/evaluate/{uuid}`                                        |
-| TTS Evaluation  | `POST /tts/evaluate`, `GET /tts/evaluate/{uuid}`                                        |
-| Jobs            | `GET /jobs` (optional `job_type` query param: `stt` or `tts`)                           |
-| Presigned URLs  | `POST /presigned-url`                                                                   |
+| Resource        | Endpoints                                                                                                                                                                                                                                                         |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth            | `POST /auth/google` (body: `{ id_token }`)                                                                                                                                                                                                                        |
+| Agents          | `GET/POST /agents`, `GET/PUT/DELETE /agents/{uuid}`, `POST /agents/{uuid}/duplicate`                                                                                                                                                                              |
+| Agent Tools     | `GET /agent-tools/agent/{uuid}/tools`, `POST/DELETE /agent-tools`                                                                                                                                                                                                 |
+| Tools           | `GET/POST /tools`, `GET/PUT/DELETE /tools/{uuid}`                                                                                                                                                                                                                 |
+| Personas        | `GET/POST /personas`, `GET/PUT/DELETE /personas/{uuid}`                                                                                                                                                                                                           |
+| Scenarios       | `GET/POST /scenarios`, `GET/PUT/DELETE /scenarios/{uuid}`                                                                                                                                                                                                         |
+| Metrics         | `GET/POST /metrics`, `GET/PUT/DELETE /metrics/{uuid}`, `POST /metrics/{uuid}/duplicate`                                                                                                                                                                           |
+| Simulations     | `GET/POST /simulations`, `GET/DELETE /simulations/{uuid}`                                                                                                                                                                                                         |
+| Simulation Runs | `GET /simulations/run/{runId}`, `POST /simulations/{uuid}/run`                                                                                                                                                                                                    |
+| Tests           | `GET/POST /tests`, `GET/PUT/DELETE /tests/{uuid}`                                                                                                                                                                                                                 |
+| Agent Tests     | `GET /agent-tests/agent/{uuid}/tests`, `GET /agent-tests/agent/{uuid}/runs`, `POST/DELETE /agent-tests`, `POST /agent-tests/agent/{uuid}/run`, `GET /agent-tests/run/{taskId}`, `POST /agent-tests/agent/{uuid}/benchmark`, `GET /agent-tests/benchmark/{taskId}` |
+| STT Evaluation  | `POST /stt/evaluate`, `GET /stt/evaluate/{uuid}`                                                                                                                                                                                                                  |
+| TTS Evaluation  | `POST /tts/evaluate`, `GET /tts/evaluate/{uuid}`                                                                                                                                                                                                                  |
+| Jobs            | `GET /jobs` (optional `job_type` query param: `stt` or `tts`)                                                                                                                                                                                                     |
+| Presigned URLs  | `POST /presigned-url`                                                                                                                                                                                                                                             |
 
 ### Jobs API Response Structure
 
@@ -1084,6 +1114,50 @@ The `/tts/evaluate/{uuid}` and `/stt/evaluate/{uuid}` endpoints return a **diffe
 | `GET /jobs`                | `uuid`    | `results.provider_results`     |
 | `GET /tts/evaluate/{uuid}` | `task_id` | `provider_results` (top-level) |
 | `GET /stt/evaluate/{uuid}` | `task_id` | `provider_results` (top-level) |
+
+### Agent Test Runs API Response Structure
+
+The `GET /agent-tests/agent/{uuid}/runs` endpoint returns test run history:
+
+```json
+{
+  "runs": [
+    {
+      "uuid": "f54adc70-53a1-486e-a4de-ce8078b47598",
+      "name": "Run 1",
+      "status": "done",
+      "type": "llm-unit-test",  // or "llm-benchmark"
+      "updated_at": "2026-01-17 06:30:55",
+      "total_tests": 2,
+      "passed": 1,
+      "failed": 1,
+      "results": [
+        {
+          "passed": true,
+          "output": { "response": "", "tool_calls": [...] },
+          "test_case": {
+            "name": "plans next question",  // Test name from original test
+            "history": [...],
+            "evaluation": { "type": "tool_call", ... }
+          }
+        }
+      ],
+      "model_results": null,  // Only for llm-benchmark
+      "leaderboard_summary": null,
+      "error": null
+    }
+  ]
+}
+```
+
+**Key fields:**
+
+- `name`: Run display name (e.g., "Run 1", "Benchmark 1") - not displayed in UI
+- `type`: `"llm-unit-test"` (regular test runs) or `"llm-benchmark"` (model comparison)
+- `total_tests`: Number of tests in the run (used to display "N tests" for unit tests)
+- `passed`/`failed`: Counts for `llm-unit-test` type; `null` for `llm-benchmark`
+- `model_results`: Array of per-model results for benchmarks (`.length` used to display "N models")
+- `results[].test_case.name`: The test name from the original test definition - used to display test names in `TestRunnerDialog` when viewing past runs
 
 ### JWT Authentication
 
@@ -1661,6 +1735,7 @@ GOOGLE_CLIENT_SECRET=                          # Google OAuth client secret
 - **ngrok header**: `"ngrok-skip-browser-warning": "true"` header is included automatically by API utilities
 - **Backend URL check**: API utilities will throw an error if `NEXT_PUBLIC_BACKEND_URL` is not set
 - **Date formatting**: API returns ISO dates; use `toLocaleString()` for display
+- **UTC timestamps**: Backend returns timestamps in UTC without timezone indicator (e.g., `"2026-01-18 10:00:00"`). When parsing for relative time calculations, append `"Z"` to explicitly mark as UTC: `new Date(dateString.replace(" ", "T") + "Z")`. Without this, JavaScript interprets the timestamp as local time, causing incorrect relative times (e.g., "5 hours ago" instead of "just now" for users in IST)
 - **Hooks need accessToken**: `useCrudResource` and `useFetchResource` require `accessToken` to be passed from the component (they don't call `useSession` internally)
 
 ### State Management
@@ -1688,7 +1763,8 @@ GOOGLE_CLIENT_SECRET=                          # Google OAuth client secret
 ### Styling
 
 - **Never use hardcoded colors** like `bg-black`, `bg-[#1a1a1a]`, `text-white`, `border-[#333]`, `text-gray-300`, `text-gray-400` - these break light mode
-- **Always use CSS variable classes**: `bg-background`, `text-foreground`, `border-border`, `bg-muted`, `text-muted-foreground`, `bg-accent`, `bg-popover`
+- **Always use CSS variable classes**: `bg-background`, `text-foreground`, `border-border`, `bg-muted`, `text-muted-foreground`, `bg-accent`
+- **Do NOT use `bg-popover`** - it causes transparent backgrounds due to Tailwind v4 theme mapping issues; use `bg-background` instead for dropdowns and popovers
 - **Checkboxes need visible borders**: Use `border-muted-foreground` (not `border-border`) and `border-2` for custom checkbox buttons to ensure visibility in both light and dark modes
 
 ### Forms
@@ -1704,6 +1780,7 @@ GOOGLE_CLIENT_SECRET=                          # Google OAuth client secret
   - Bot files: `1_bot.wav`, `2_bot.wav`, `3_bot.wav`, etc.
 - **Audio URL matching**: The `getAudioUrlForEntry` function in the simulation run page counts previous messages of the same role and adds 1 to get the correct file index
 - **Common mistake**: Don't use 0-based indexing for user audio files - they follow the same 1-indexed pattern as bot files
+- **Full conversation audio**: The API returns a `conversation_wav_url` field containing a combined audio file of the entire conversation. This is displayed below the Transcript header (before the messages) with a "Full Conversation" label and speaker icon
 
 ### Navigation
 

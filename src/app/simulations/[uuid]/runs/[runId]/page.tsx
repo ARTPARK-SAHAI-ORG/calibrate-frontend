@@ -45,6 +45,7 @@ type SimulationResult = {
   evaluation_results: EvaluationResult[];
   transcript: TranscriptEntry[];
   audio_urls?: string[];
+  conversation_wav_url?: string;
 };
 
 type RunData = {
@@ -251,11 +252,11 @@ export default function SimulationRunPage() {
       }
     }
 
-  // Determine audio pattern based on role
-  let audioPattern: string;
-  if (entry.role === "user") {
-    // User messages: 1_user, 2_user, 3_user, etc. (1-indexed)
-    audioPattern = `${userCount + 1}_user.wav`;
+    // Determine audio pattern based on role
+    let audioPattern: string;
+    if (entry.role === "user") {
+      // User messages: 1_user, 2_user, 3_user, etc. (1-indexed)
+      audioPattern = `${userCount + 1}_user.wav`;
     } else if (entry.role === "assistant") {
       // Assistant messages: 1_bot, 2_bot, 3_bot, etc. (1-indexed)
       audioPattern = `${assistantCount + 1}_bot.wav`;
@@ -790,7 +791,7 @@ export default function SimulationRunPage() {
           {/* Sidebar */}
           <div className="relative w-[40%] min-w-[500px] bg-background border-l border-border flex flex-col h-full shadow-2xl">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+            <div className="flex items-center justify-between px-6 py-4">
               <div className="flex items-center gap-3">
                 <svg
                   className="w-5 h-5 text-muted-foreground"
@@ -826,6 +827,24 @@ export default function SimulationRunPage() {
                 </svg>
               </button>
             </div>
+
+            {/* Full Conversation Audio Player - show for voice runs with conversation_wav_url */}
+            {selectedSimulation.conversation_wav_url && (
+              <div className="px-6 pb-4 border-b border-border">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm font-medium text-foreground">
+                    Hear the full conversation
+                  </span>
+                </div>
+                <audio
+                  controls
+                  className="w-full h-10"
+                  src={selectedSimulation.conversation_wav_url}
+                >
+                  Your browser does not support the audio element.
+                </audio>
+              </div>
+            )}
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6">

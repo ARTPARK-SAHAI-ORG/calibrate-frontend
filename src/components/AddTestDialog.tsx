@@ -920,7 +920,7 @@ export function AddTestDialog({
                           setToolDropdownOpen(false);
                         }}
                       />
-                      <div className="absolute right-0 top-8 mt-2 w-72 bg-popover border border-border rounded-xl shadow-2xl z-[100] overflow-hidden">
+                      <div className="absolute right-0 top-8 mt-2 w-72 bg-background border border-border rounded-xl shadow-2xl z-[100] overflow-hidden">
                         <ToolPicker
                           availableTools={availableTools}
                           isLoading={availableToolsLoading}
@@ -1159,7 +1159,7 @@ export function AddTestDialog({
                     {/* Tooltip for disabled state */}
                     {isLastMessageAgent && !isCreating && !isLoading && (
                       <div className="absolute bottom-full mb-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                        <div className="px-3 py-2 text-sm bg-popover text-foreground border border-border rounded-lg shadow-lg w-72">
+                        <div className="px-3 py-2 text-sm bg-background text-foreground border border-border rounded-lg shadow-lg w-72">
                           A test should end with a user message, not an agent
                           message or agent tool call
                         </div>
@@ -1446,7 +1446,7 @@ export function AddTestDialog({
                                   }
                                 />
                                 <div
-                                  className={`absolute bg-popover border border-border rounded-lg shadow-xl z-[200] overflow-hidden py-1 whitespace-nowrap ${
+                                  className={`absolute bg-background border border-border rounded-lg shadow-xl z-[200] overflow-hidden py-1 whitespace-nowrap ${
                                     message.role === "user"
                                       ? chatMessages.length <= 2
                                         ? "right-0 top-10"
@@ -1543,7 +1543,7 @@ export function AddTestDialog({
                                   }}
                                 />
                                 <div
-                                  className={`absolute bg-popover border border-border rounded-xl shadow-xl z-[200] overflow-hidden min-w-[320px] ${
+                                  className={`absolute bg-background border border-border rounded-xl shadow-xl z-[200] overflow-hidden min-w-[320px] ${
                                     message.role === "user"
                                       ? chatMessages.length <= 2
                                         ? "right-0 top-10"

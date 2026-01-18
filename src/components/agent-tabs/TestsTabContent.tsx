@@ -5,6 +5,7 @@ import { useSession, signOut } from "next-auth/react";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { BenchmarkDialog } from "@/components/BenchmarkDialog";
+import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
 
 type TestData = {
   uuid: string;
@@ -15,6 +16,61 @@ type TestData = {
   created_at: string;
   updated_at: string;
 };
+
+type TestRun = {
+  uuid: string;
+  name: string;
+  status: string;
+  type: "llm-unit-test" | "llm-benchmark";
+  updated_at: string;
+  total_tests: number | null;
+  passed: number | null;
+  failed: number | null;
+  model_results?: { model: string }[] | null;
+};
+
+// Helper function to format relative time
+function formatRelativeTime(dateString: string): string {
+  // Backend returns UTC timestamps without timezone indicator
+  // Append "Z" to parse as UTC, so comparison with local time is correct
+  const date = new Date(dateString.replace(" ", "T") + "Z");
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffInSeconds < 60) {
+    return "just now";
+  }
+
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) {
+    return diffInMinutes === 1
+      ? "1 minute ago"
+      : `${diffInMinutes} minutes ago`;
+  }
+
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) {
+    return diffInHours === 1 ? "1 hour ago" : `${diffInHours} hours ago`;
+  }
+
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays < 7) {
+    return diffInDays === 1 ? "yesterday" : `${diffInDays} days ago`;
+  }
+
+  const diffInWeeks = Math.floor(diffInDays / 7);
+  if (diffInWeeks < 4) {
+    return diffInWeeks === 1 ? "last week" : `${diffInWeeks} weeks ago`;
+  }
+
+  const diffInMonths = Math.floor(diffInDays / 30);
+  if (diffInMonths < 12) {
+    return diffInMonths === 1 ? "last month" : `${diffInMonths} months ago`;
+  }
+
+  const diffInYears = Math.floor(diffInDays / 365);
+  return diffInYears === 1 ? "last year" : `${diffInYears} years ago`;
+}
 
 type TestsTabContentProps = {
   agentUuid: string;
@@ -52,6 +108,15 @@ export function TestsTabContent({
 
   // Benchmark dialog state
   const [benchmarkDialogOpen, setBenchmarkDialogOpen] = useState(false);
+
+  // Past test runs state
+  const [pastRuns, setPastRuns] = useState<TestRun[]>([]);
+  const [pastRunsLoading, setPastRunsLoading] = useState(true);
+
+  // Viewing past run state
+  const [selectedPastRun, setSelectedPastRun] = useState<TestRun | null>(null);
+  const [viewingTestResults, setViewingTestResults] = useState(false);
+  const [viewingBenchmarkResults, setViewingBenchmarkResults] = useState(false);
 
   // Fetch tests attached to this agent
   useEffect(() => {
@@ -167,6 +232,55 @@ export function TestsTabContent({
     };
   }, [showTestDropdown]);
 
+  // Fetch past test runs
+  useEffect(() => {
+    const fetchPastRuns = async () => {
+      if (!backendAccessToken) return;
+
+      try {
+        setPastRunsLoading(true);
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+        if (!backendUrl) {
+          throw new Error("BACKEND_URL environment variable is not set");
+        }
+
+        const response = await fetch(
+          `${backendUrl}/agent-tests/agent/${agentUuid}/runs`,
+          {
+            method: "GET",
+            headers: {
+              accept: "application/json",
+              "ngrok-skip-browser-warning": "true",
+              Authorization: `Bearer ${backendAccessToken}`,
+            },
+          }
+        );
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
+
+        if (!response.ok) {
+          // Silently handle errors for past runs - it's not critical
+          console.error("Failed to fetch past runs");
+          return;
+        }
+
+        const data = await response.json();
+        setPastRuns(data.runs || []);
+      } catch (err) {
+        console.error("Error fetching past runs:", err);
+      } finally {
+        setPastRunsLoading(false);
+      }
+    };
+
+    if (agentUuid && backendAccessToken) {
+      fetchPastRuns();
+    }
+  }, [agentUuid, backendAccessToken]);
+
   // Filter out tests already attached to the agent
   const agentTestUuids = new Set(agentTests.map((t) => t.uuid));
   const availableTests = allTests.filter(
@@ -241,6 +355,123 @@ export function TestsTabContent({
       setDeleteDialogOpen(false);
       setTestToDelete(null);
     }
+  };
+
+  // Handle clicking on a past run row
+  const handlePastRunClick = (run: TestRun) => {
+    setSelectedPastRun(run);
+    if (run.type === "llm-unit-test") {
+      setViewingTestResults(true);
+    } else {
+      setViewingBenchmarkResults(true);
+    }
+  };
+
+  // Handle when a new test run is created
+  const handleTestRunCreated = (taskId: string) => {
+    const newRun: TestRun = {
+      uuid: taskId,
+      name: `${agentTests.length} test${agentTests.length !== 1 ? "s" : ""}`,
+      status: "pending",
+      type: "llm-unit-test",
+      updated_at: new Date().toISOString(),
+      total_tests: agentTests.length,
+      passed: null,
+      failed: null,
+    };
+    setPastRuns((prev) => [newRun, ...prev]);
+
+    // Start polling to update the run status
+    pollRunStatus(taskId, "llm-unit-test");
+  };
+
+  // Handle when a new benchmark is created
+  const handleBenchmarkCreated = (taskId: string) => {
+    const newRun: TestRun = {
+      uuid: taskId,
+      name: "Benchmark",
+      status: "pending",
+      type: "llm-benchmark",
+      updated_at: new Date().toISOString(),
+      total_tests: null,
+      passed: null,
+      failed: null,
+      model_results: [],
+    };
+    setPastRuns((prev) => [newRun, ...prev]);
+
+    // Start polling to update the run status
+    pollRunStatus(taskId, "llm-benchmark");
+  };
+
+  // Poll run status to update past runs table
+  const pollRunStatus = async (
+    taskId: string,
+    runType: "llm-unit-test" | "llm-benchmark"
+  ) => {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl || !backendAccessToken) return;
+
+    const endpoint =
+      runType === "llm-unit-test"
+        ? `${backendUrl}/agent-tests/run/${taskId}`
+        : `${backendUrl}/agent-tests/benchmark/${taskId}`;
+
+    const poll = async () => {
+      try {
+        const response = await fetch(endpoint, {
+          method: "GET",
+          headers: {
+            accept: "application/json",
+            "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
+          },
+        });
+
+        if (!response.ok) return;
+
+        const result = await response.json();
+
+        // Update the run in pastRuns
+        setPastRuns((prev) =>
+          prev.map((run) => {
+            if (run.uuid !== taskId) return run;
+
+            if (runType === "llm-unit-test") {
+              return {
+                ...run,
+                status: result.status,
+                total_tests: result.total_tests ?? run.total_tests,
+                passed: result.passed ?? run.passed,
+                failed: result.failed ?? run.failed,
+                updated_at: new Date().toISOString(),
+              };
+            } else {
+              return {
+                ...run,
+                status: result.status,
+                model_results: result.model_results ?? run.model_results,
+                updated_at: new Date().toISOString(),
+              };
+            }
+          })
+        );
+
+        // Continue polling if not complete
+        if (
+          result.status !== "completed" &&
+          result.status !== "done" &&
+          result.status !== "failed"
+        ) {
+          setTimeout(poll, 2000);
+        }
+      } catch (err) {
+        console.error("Error polling run status:", err);
+      }
+    };
+
+    // Start polling
+    setTimeout(poll, 2000);
   };
 
   // Remove test from agent
@@ -593,79 +824,65 @@ export function TestsTabContent({
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex flex-col">
-          {/* Search Input */}
-          <div className="relative mb-4">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <svg
-                className="w-5 h-5 text-muted-foreground"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                />
-              </svg>
-            </div>
-            <input
-              type="text"
-              value={testsSearchQuery}
-              onChange={(e) => setTestsSearchQuery(e.target.value)}
-              placeholder="Search tests"
-              className="w-full h-10 pl-10 pr-4 rounded-md text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-            />
-          </div>
-
-          {/* Tests Table */}
-          {filteredAgentTests.length === 0 ? (
-            <div className="flex-1 border border-border rounded-xl p-12 flex flex-col items-center justify-center bg-muted/20">
-              <p className="text-base text-muted-foreground">
-                No tests match your search
-              </p>
-            </div>
-          ) : (
-            <div className="border border-border rounded-xl overflow-hidden">
-              {/* Table Header */}
-              <div className="grid grid-cols-[1fr_1fr_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
-                <div className="text-sm font-medium text-muted-foreground">
-                  Name
-                </div>
-                <div className="text-sm font-medium text-muted-foreground">
-                  Type
-                </div>
-                <div className="w-8"></div>
-              </div>
-              {/* Table Body */}
-              {filteredAgentTests.map((test) => (
-                <div
-                  key={test.uuid}
-                  className="grid grid-cols-[1fr_1fr_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
+        <div className="flex-1 flex gap-6">
+          {/* Left Panel - Tests Table */}
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Search Input */}
+            <div className="relative mb-4">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <svg
+                  className="w-5 h-5 text-muted-foreground"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
                 >
-                  {/* Name Column */}
-                  <div className="flex items-center">
-                    <div className="text-sm font-medium text-foreground">
-                      {test.name}
-                    </div>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                  />
+                </svg>
+              </div>
+              <input
+                type="text"
+                value={testsSearchQuery}
+                onChange={(e) => setTestsSearchQuery(e.target.value)}
+                placeholder="Search tests"
+                className="w-full h-10 pl-10 pr-4 rounded-md text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              />
+            </div>
+
+            {/* Tests Table */}
+            {filteredAgentTests.length === 0 ? (
+              <div className="flex-1 border border-border rounded-xl p-12 flex flex-col items-center justify-center bg-muted/20">
+                <p className="text-base text-muted-foreground">
+                  No tests match your search
+                </p>
+              </div>
+            ) : (
+              <div className="border border-border rounded-xl overflow-hidden">
+                {/* Table Header */}
+                <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+                  <div className="text-sm font-medium text-muted-foreground">
+                    Name
                   </div>
-                  {/* Type Column */}
-                  <div className="flex items-center">
-                    <p className="text-sm text-muted-foreground">
-                      {test.type === "tool_call" ? "Tool Call" : "Next Reply"}
-                    </p>
+                  <div className="text-sm font-medium text-muted-foreground">
+                    Type
                   </div>
-                  {/* Delete Button */}
-                  <div className="flex items-center">
-                    <button
-                      onClick={() => openDeleteDialog(test)}
-                      className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                      title="Remove test from agent"
-                    >
+                  <div className="w-8"></div>
+                  <div className="w-8"></div>
+                </div>
+                {/* Table Body */}
+                {filteredAgentTests.map((test) => (
+                  <div
+                    key={test.uuid}
+                    className="grid grid-cols-[1fr_1fr_auto_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
+                  >
+                    {/* Name Column with Edit Icon */}
+                    <div className="flex items-center gap-2">
                       <svg
-                        className="w-4 h-4"
+                        className="w-4 h-4 text-muted-foreground flex-shrink-0"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -674,15 +891,227 @@ export function TestsTabContent({
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                          d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
                         />
                       </svg>
-                    </button>
+                      <span className="text-sm font-medium text-foreground truncate">
+                        {test.name}
+                      </span>
+                    </div>
+                    {/* Type Column with Icon */}
+                    <div className="flex items-center gap-2">
+                      {test.type === "tool_call" ? (
+                        <svg
+                          className="w-4 h-4 text-muted-foreground flex-shrink-0"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={1.5}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
+                          />
+                        </svg>
+                      ) : (
+                        <svg
+                          className="w-4 h-4 text-muted-foreground flex-shrink-0"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={1.5}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
+                        </svg>
+                      )}
+                      <span className="text-sm text-muted-foreground">
+                        {test.type === "tool_call" ? "Tool Call" : "Next Reply"}
+                      </span>
+                    </div>
+                    {/* Run Button */}
+                    <div className="flex items-center">
+                      <button
+                        onClick={() => {
+                          // Set tests to only this test and open runner
+                          setTestRunnerOpen(true);
+                        }}
+                        className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
+                        title="Run test"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={1.5}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                    {/* Delete Button */}
+                    <div className="flex items-center">
+                      <button
+                        onClick={() => openDeleteDialog(test)}
+                        className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                        title="Remove test from agent"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={1.5}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                          />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Right Panel - Past Runs */}
+          <div className="w-[480px] flex-shrink-0 border border-border rounded-xl overflow-hidden bg-muted/10">
+            {/* Past Runs Header */}
+            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+              <div className="text-sm font-medium text-muted-foreground">
+                Name
+              </div>
+              <div className="text-sm font-medium text-muted-foreground">
+                Run Type
+              </div>
+              <div className="text-sm font-medium text-muted-foreground w-24 text-right">
+                Time
+              </div>
+              <div className="text-sm font-medium text-muted-foreground w-32 text-right">
+                Result
+              </div>
             </div>
-          )}
+
+            {/* Past Runs List */}
+            <div className="overflow-y-auto max-h-[500px]">
+              {pastRunsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <svg
+                    className="w-5 h-5 animate-spin text-muted-foreground"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                </div>
+              ) : pastRuns.length === 0 ? (
+                <div className="py-8 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    No test runs yet
+                  </p>
+                </div>
+              ) : (
+                pastRuns.map((run) => (
+                  <div
+                    key={run.uuid}
+                    onClick={() => handlePastRunClick(run)}
+                    className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors items-center cursor-pointer"
+                  >
+                    <span className="text-sm font-medium text-foreground truncate">
+                      {run.type === "llm-unit-test"
+                        ? `${run.total_tests ?? 0} test${
+                            (run.total_tests ?? 0) !== 1 ? "s" : ""
+                          }`
+                        : `${run.model_results?.length ?? 0} model${
+                            (run.model_results?.length ?? 0) !== 1 ? "s" : ""
+                          }`}
+                    </span>
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        run.type === "llm-unit-test"
+                          ? "bg-blue-500/20 text-blue-400"
+                          : "bg-purple-500/20 text-purple-400"
+                      }`}
+                    >
+                      {run.type === "llm-unit-test" ? "Test" : "Benchmark"}
+                    </span>
+                    <span className="text-sm text-muted-foreground w-24 text-right">
+                      {formatRelativeTime(run.updated_at)}
+                    </span>
+                    <div className="flex items-center justify-end gap-2 w-32">
+                      {run.status === "pending" ||
+                      run.status === "queued" ||
+                      run.status === "in_progress" ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-500/20 text-yellow-500">
+                          <svg
+                            className="w-3 h-3 animate-spin mr-1"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            ></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            ></path>
+                          </svg>
+                          Running
+                        </span>
+                      ) : run.type === "llm-unit-test" ? (
+                        <>
+                          {run.passed !== null && run.passed > 0 && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-500">
+                              {run.passed} Success
+                            </span>
+                          )}
+                          {run.failed !== null && run.failed > 0 && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-500">
+                              {run.failed} Fail
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-500">
+                          Complete
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -704,6 +1133,7 @@ export function TestsTabContent({
         agentUuid={agentUuid}
         agentName={agentName}
         tests={agentTests}
+        onRunCreated={handleTestRunCreated}
       />
 
       {/* Benchmark Dialog */}
@@ -713,7 +1143,40 @@ export function TestsTabContent({
         agentUuid={agentUuid}
         agentName={agentName}
         tests={agentTests}
+        onBenchmarkCreated={handleBenchmarkCreated}
       />
+
+      {/* View Past Test Results Dialog */}
+      {selectedPastRun && selectedPastRun.type === "llm-unit-test" && (
+        <TestRunnerDialog
+          isOpen={viewingTestResults}
+          onClose={() => {
+            setViewingTestResults(false);
+            setSelectedPastRun(null);
+          }}
+          agentUuid={agentUuid}
+          agentName={agentName}
+          tests={[]}
+          taskId={selectedPastRun.uuid}
+        />
+      )}
+
+      {/* View Past Benchmark Results Dialog */}
+      {selectedPastRun && selectedPastRun.type === "llm-benchmark" && (
+        <BenchmarkResultsDialog
+          isOpen={viewingBenchmarkResults}
+          onClose={() => {
+            setViewingBenchmarkResults(false);
+            setSelectedPastRun(null);
+          }}
+          agentUuid={agentUuid}
+          agentName={agentName}
+          testUuids={[]}
+          testNames={[]}
+          models={[]}
+          taskId={selectedPastRun.uuid}
+        />
+      )}
     </div>
   );
 }
