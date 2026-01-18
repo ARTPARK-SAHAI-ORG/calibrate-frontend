@@ -11,6 +11,7 @@ import {
   getColorMap,
 } from "@/components/charts/LeaderboardBarChart";
 import { DownloadableTable } from "@/components/DownloadableTable";
+import { POLLING_INTERVAL_MS } from "@/constants/polling";
 
 type MetricItem =
   | { llm_judge_score: number }
@@ -134,7 +135,7 @@ export default function TTSEvaluationDetailPage() {
         if (result.status !== "done" && !pollingIntervalRef.current) {
           pollingIntervalRef.current = setInterval(() => {
             pollTaskStatus(taskId, backendUrl);
-          }, 2000);
+          }, POLLING_INTERVAL_MS);
         }
       } catch (err) {
         console.error("Error fetching evaluation result:", err);

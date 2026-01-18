@@ -1,16 +1,33 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 
+// Set MAINTENANCE_MODE=true in .env.local to show maintenance page at /
+const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === "true";
+
 export default auth((req) => {
-  const isLoggedIn = !!req.auth;
-  const isLoginPage = req.nextUrl.pathname === "/login";
+  const isHomePage = req.nextUrl.pathname === "/";
+  const isApiRoute = req.nextUrl.pathname.startsWith("/api/");
+
+  // Maintenance mode: redirect all non-API routes to /
+  if (MAINTENANCE_MODE) {
+    if (isHomePage || isApiRoute) {
+      return NextResponse.next();
+    }
+    return NextResponse.redirect(new URL("/", req.url));
+  }
+
   const isAuthRoute = req.nextUrl.pathname.startsWith("/api/auth");
-  const isDebugRoute = req.nextUrl.pathname.startsWith("/debug") || req.nextUrl.pathname.startsWith("/api/debug");
+  const isDebugRoute =
+    req.nextUrl.pathname.startsWith("/debug") ||
+    req.nextUrl.pathname.startsWith("/api/debug");
 
   // Allow auth API routes and debug routes
   if (isAuthRoute || isDebugRoute) {
     return NextResponse.next();
   }
+
+  const isLoggedIn = !!req.auth;
+  const isLoginPage = req.nextUrl.pathname === "/login";
 
   // Redirect logged-in users away from login page
   if (isLoginPage && isLoggedIn) {

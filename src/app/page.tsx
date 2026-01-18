@@ -1,14 +1,25 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === "true";
 
 export default function Home() {
-  const router = useRouter();
+  if (MAINTENANCE_MODE) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center p-8">
+        <div className="text-center max-w-md">
+          <div className="text-6xl mb-6">🔧</div>
 
-  useEffect(() => {
-    router.replace("/agents");
-  }, [router]);
+          <h1 className="text-3xl font-semibold text-white mb-3">
+            Under Maintenance
+          </h1>
 
-  return null;
+          <p className="text-gray-400">
+            We&apos;re making some improvements. Back shortly.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  redirect("/agents");
 }

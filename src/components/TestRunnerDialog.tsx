@@ -12,6 +12,7 @@ import {
   EmptyStateView,
   TestStats,
 } from "./test-results/shared";
+import { POLLING_INTERVAL_MS } from "@/constants/polling";
 
 type TestData = {
   uuid: string;
@@ -153,7 +154,7 @@ export function TestRunnerDialog({
     // Start polling - will stop itself when status is done/completed/failed
     pollingIntervalRef.current = setInterval(() => {
       pollTaskStatus(taskId, backendUrl);
-    }, 2000);
+    }, POLLING_INTERVAL_MS);
 
     return () => {
       if (pollingIntervalRef.current) {
@@ -431,7 +432,7 @@ export function TestRunnerDialog({
       // Start polling immediately
       pollingIntervalRef.current = setInterval(() => {
         pollTaskStatus(newTaskId, backendUrl);
-      }, 2000);
+      }, POLLING_INTERVAL_MS);
 
       // Also poll immediately to get the first result
       pollTaskStatus(newTaskId, backendUrl);
@@ -567,7 +568,7 @@ export function TestRunnerDialog({
             }
           } else {
             // Continue polling
-            setTimeout(pollSingleTest, 2000);
+            setTimeout(pollSingleTest, POLLING_INTERVAL_MS);
           }
         } catch (error) {
           setTestResults((prev) =>
@@ -591,7 +592,7 @@ export function TestRunnerDialog({
         result.status === "pending" ||
         result.status === "queued"
       ) {
-        setTimeout(pollSingleTest, 2000);
+        setTimeout(pollSingleTest, POLLING_INTERVAL_MS);
       } else if (result.status === "completed" || result.status === "done") {
         const apiResult = result.results?.find(
           (res) => res.test_uuid === testUuid
@@ -688,7 +689,7 @@ export function TestRunnerDialog({
       ) {
         pollingIntervalRef.current = setInterval(() => {
           pollTaskStatus(result.task_id, backendUrl);
-        }, 2000);
+        }, POLLING_INTERVAL_MS);
       } else if (result.status === "completed" || result.status === "done") {
         if (result.results && result.results.length > 0) {
           setTestResults((prev) =>
