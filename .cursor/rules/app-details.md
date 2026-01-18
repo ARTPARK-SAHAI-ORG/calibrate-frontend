@@ -104,23 +104,34 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 
 **Tests Tab Features:**
 
-- **Two-column layout**: Tests table on left, Past runs panel (480px) on right
+- **Two-column layout**: Tests table on left, Past runs panel (560px) on right
 - **Tests table**: Shows attached tests with name, type (Tool Call/Next Reply), run button, delete button
-- **Past runs panel**: 4-column table layout showing history of test runs:
-  | Column | Content |
-  | --- | --- |
-  | Name | "N tests" for unit tests (from `total_tests`), "N models" for benchmarks (from `model_results.length`) |
-  | Run Type | "Test" (blue pill) or "Benchmark" (purple pill) based on `type` field |
-  | Time | Relative time (e.g., "yesterday", "6 days ago", "3 months ago") |
-  | Result | "Running" (yellow, with spinner) for pending/queued/in_progress; "N Success" and/or "M Fail" badges for completed `llm-unit-test`; "Complete" for completed `llm-benchmark` |
+  - **Individual run button**: Play button on each test row runs only that specific test (not all tests)
+- **Past runs panel**: Has "Past runs" heading with `bg-muted/30` background, showing history of test runs (no column headers):
+  - **Row content**: Name/count, Run Type pill, Time, Result badges
+  - **Name display logic** (via `getTestRunDisplayName` helper):
+    - Single-test runs: Shows `results[0].name` (in-progress) or `results[0].test_case.name` (completed)
+    - Multi-test runs: Shows "N tests" (e.g., "2 tests")
+    - Benchmarks: Shows "N models" (e.g., "3 models")
+  - **Run Type**: "Test" (blue pill) or "Benchmark" (purple pill) based on `type` field
+  - **Time**: Short relative time format (e.g., "now", "5 min ago", "7h ago", "2d ago", "3w ago", "2m ago", "1y ago")
+  - **Result**: "Running" (yellow, with spinner) for pending/queued/in_progress; "N Success" and/or "M Fail" badges for completed `llm-unit-test`; "Complete" for completed `llm-benchmark`
 - **Clickable rows**: Clicking a past run row opens the appropriate results dialog:
-  - `llm-unit-test` → Opens `TestRunnerDialog` in view mode (with `taskId` prop)
+  - `llm-unit-test` → Opens `TestRunnerDialog` in view mode with `taskId`, `tests` (from `results`), and `initialRunStatus`
   - `llm-benchmark` → Opens `BenchmarkResultsDialog` in view mode (with `taskId` prop)
-- **Real-time updates**: When a new test/benchmark is started:
+  - For in-progress runs, dialog shows tests as "Running" until API returns results
+- **Real-time updates with coordinated polling**:
   1. A new entry is immediately added to the top of the past runs table with "pending" status
-  2. The component polls the API to update the entry with results when complete
-  3. The "Running" badge with spinner is shown until the run completes
-- **Actions**: Add test, Run all tests, Compare models (benchmark)
+  2. Optimistic `results` array is created from `testsToRun` with test names for immediate display
+  3. **Coordinated polling system** prevents duplicate polling:
+     - `TestsTabContent` uses a `useEffect` that polls all pending runs every 3 seconds
+     - When a run's dialog is open, that run is excluded from parent polling
+     - **Uses refs** (`viewingTestResultsRef`, `viewingBenchmarkResultsRef`, `selectedPastRunRef`) to track current viewing state inside polling callbacks, avoiding stale closure issues
+     - `TestRunnerDialog` polls its own task and notifies parent via `onStatusUpdate` callback
+     - When dialog closes, parent resumes polling for that run if still pending
+  4. The "Running" badge with spinner is shown until the run completes
+  5. Clicking on an in-progress run opens the dialog with the correct `taskId` for real-time polling
+- **Actions**: Add test, Run all tests (header button), Run single test (row button), Compare models (benchmark)
 - **API**: Fetches runs from `GET /agent-tests/agent/{uuid}/runs`
 - **Run types**: `llm-unit-test` (has passed/failed counts) and `llm-benchmark` (results in model_results)
 
@@ -702,8 +713,17 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
 11. **View Mode Dialogs**: `TestRunnerDialog` and `BenchmarkResultsDialog` support dual modes:
     - **Run mode** (default): Opens dialog and starts a new run/benchmark
     - **View mode**: Pass `taskId` prop to view existing run results without starting a new run
-    - When `taskId` is provided, the dialog polls the existing task and displays results
-    - Callback props (`onRunCreated`, `onBenchmarkCreated`) notify parent when new runs are created
+    - **Props for viewing past runs**:
+      - `taskId`: The run UUID to fetch results for
+      - `tests`: Array converted from `pastRun.results` to show test names while loading
+      - `initialRunStatus`: Determines initialization behavior (completed vs in-progress)
+    - **Callback props for coordinated updates**:
+      - `onRunCreated`: Notifies parent when a new run is created
+      - `onStatusUpdate`: Called during polling (only when `isRunning` is true) to sync status changes back to parent
+    - **Simple polling pattern** (TestRunnerDialog uses two separate focused effects):
+      1. **Viewing existing run** (`taskId` provided): Runs when `isOpen && taskId && backendAccessToken`. Fetches immediately, starts polling every 2 seconds, uses effect cleanup to stop on close. `pollTaskStatus` stops interval when status is done/completed/failed.
+      2. **Starting new run** (no `taskId`): Runs when `isOpen && !taskId && tests.length > 0`. Calls `runAllTests` to start the run.
+    - **Auth token guard**: Effect returns early if `backendAccessToken` is not available, re-runs when token becomes available
     - Used for: clicking past run rows in Tests tab to view historical results
 
 ### Data Fetching Pattern
@@ -1161,9 +1181,12 @@ The `GET /agent-tests/agent/{uuid}/runs` endpoint returns test run history:
 - `name`: Run display name (e.g., "Run 1", "Benchmark 1") - not displayed in UI
 - `type`: `"llm-unit-test"` (regular test runs) or `"llm-benchmark"` (model comparison)
 - `total_tests`: Number of tests in the run (used to display "N tests" for unit tests)
-- `passed`/`failed`: Counts for `llm-unit-test` type; `null` for `llm-benchmark`
+- `passed`/`failed`: Counts for `llm-unit-test` type; `null` for `llm-benchmark` or in-progress runs
 - `model_results`: Array of per-model results for benchmarks (`.length` used to display "N models")
-- `results[].test_case.name`: The test name from the original test definition - used to display test names in `TestRunnerDialog` when viewing past runs
+- `results[].name`: Test name (present in in-progress responses)
+- `results[].passed`: `true`/`false` when complete, `null` when test is still running
+- `results[].test_case.name`: Test name from completed test results
+- **Note**: For test names, check `results[].name` first (in-progress), then `results[].test_case.name` (completed)
 
 ### JWT Authentication
 
@@ -1748,6 +1771,11 @@ GOOGLE_CLIENT_SECRET=                          # Google OAuth client secret
 ### State Management
 
 - **Refs for callbacks**: Use `useRef` to hold mutable callback references (e.g., `saveRef`) when callbacks need latest state but shouldn't trigger re-renders
+- **Refs for polling callbacks (stale closure fix)**: When state values are checked inside `setInterval` callbacks, the callback captures stale state from when the interval was created. To get current values inside polling callbacks:
+  1. Create refs to mirror the state: `const stateRef = useRef(stateValue)`
+  2. Keep refs in sync with dedicated effects: `useEffect(() => { stateRef.current = stateValue }, [stateValue])`
+  3. Inside the polling callback, use `stateRef.current` instead of `stateValue`
+  - Example: `TestsTabContent` uses `viewingTestResultsRef`, `viewingBenchmarkResultsRef`, and `selectedPastRunRef` to check if a run is being viewed in a dialog, ensuring the polling callback sees the current viewing state even if the user just clicked on a run
 - **Polling cleanup**: Always clear intervals in useEffect cleanup to prevent memory leaks
 - **Dialog close prevention**: Disable dialog close while async operations (delete, save) are in progress
 - **Unsaved changes confirmation**: Form dialogs (like AddTestDialog) should show a confirmation dialog when user clicks backdrop, asking "Discard changes?" with Cancel/Discard buttons

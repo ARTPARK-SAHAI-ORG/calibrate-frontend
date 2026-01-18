@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
@@ -17,6 +17,17 @@ type TestData = {
   updated_at: string;
 };
 
+type TestRunResult = {
+  name?: string; // Test name (used in in-progress responses)
+  passed: boolean | null; // null means test is still running
+  output?: Record<string, any> | null;
+  test_case?: {
+    name?: string;
+    history?: { role: string; content: string }[];
+    evaluation?: Record<string, any>;
+  } | null;
+};
+
 type TestRun = {
   uuid: string;
   name: string;
@@ -26,10 +37,32 @@ type TestRun = {
   total_tests: number | null;
   passed: number | null;
   failed: number | null;
+  results?: TestRunResult[] | null;
   model_results?: { model: string }[] | null;
 };
 
-// Helper function to format relative time
+// Helper function to get display name for a test run
+function getTestRunDisplayName(run: TestRun): string {
+  if (run.type === "llm-benchmark") {
+    const modelCount = run.model_results?.length ?? 0;
+    return `${modelCount} model${modelCount !== 1 ? "s" : ""}`;
+  }
+
+  // For llm-unit-test: if only 1 test and it has a name, show the test name
+  const totalTests = run.total_tests ?? run.results?.length ?? 0;
+  if (totalTests === 1 && run.results?.[0]) {
+    // Check name field first (in-progress), then test_case.name (completed)
+    const testName = run.results[0].name || run.results[0].test_case?.name;
+    if (testName) {
+      return testName;
+    }
+  }
+
+  // Otherwise show "N tests"
+  return `${totalTests} test${totalTests !== 1 ? "s" : ""}`;
+}
+
+// Helper function to format relative time (short format)
 function formatRelativeTime(dateString: string): string {
   // Handle both formats:
   // - Backend format: "2026-01-18 09:30:00" (UTC without timezone indicator)
@@ -46,38 +79,36 @@ function formatRelativeTime(dateString: string): string {
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
   if (diffInSeconds < 60) {
-    return "just now";
+    return "now";
   }
 
   const diffInMinutes = Math.floor(diffInSeconds / 60);
   if (diffInMinutes < 60) {
-    return diffInMinutes === 1
-      ? "1 minute ago"
-      : `${diffInMinutes} minutes ago`;
+    return `${diffInMinutes} min ago`;
   }
 
   const diffInHours = Math.floor(diffInMinutes / 60);
   if (diffInHours < 24) {
-    return diffInHours === 1 ? "1 hour ago" : `${diffInHours} hours ago`;
+    return `${diffInHours}h ago`;
   }
 
   const diffInDays = Math.floor(diffInHours / 24);
   if (diffInDays < 7) {
-    return diffInDays === 1 ? "yesterday" : `${diffInDays} days ago`;
+    return diffInDays === 1 ? "yesterday" : `${diffInDays}d ago`;
   }
 
   const diffInWeeks = Math.floor(diffInDays / 7);
   if (diffInWeeks < 4) {
-    return diffInWeeks === 1 ? "last week" : `${diffInWeeks} weeks ago`;
+    return `${diffInWeeks}w ago`;
   }
 
   const diffInMonths = Math.floor(diffInDays / 30);
   if (diffInMonths < 12) {
-    return diffInMonths === 1 ? "last month" : `${diffInMonths} months ago`;
+    return `${diffInMonths}m ago`;
   }
 
   const diffInYears = Math.floor(diffInDays / 365);
-  return diffInYears === 1 ? "last year" : `${diffInYears} years ago`;
+  return `${diffInYears}y ago`;
 }
 
 type TestsTabContentProps = {
@@ -113,6 +144,7 @@ export function TestsTabContent({
 
   // Test runner dialog state
   const [testRunnerOpen, setTestRunnerOpen] = useState(false);
+  const [testsToRun, setTestsToRun] = useState<TestData[]>([]);
 
   // Benchmark dialog state
   const [benchmarkDialogOpen, setBenchmarkDialogOpen] = useState(false);
@@ -125,6 +157,27 @@ export function TestsTabContent({
   const [selectedPastRun, setSelectedPastRun] = useState<TestRun | null>(null);
   const [viewingTestResults, setViewingTestResults] = useState(false);
   const [viewingBenchmarkResults, setViewingBenchmarkResults] = useState(false);
+
+  // Track polling intervals for pending runs
+  const pendingRunsPollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Refs to track current viewing state for use in polling callbacks
+  const viewingTestResultsRef = useRef(false);
+  const viewingBenchmarkResultsRef = useRef(false);
+  const selectedPastRunRef = useRef<TestRun | null>(null);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    viewingTestResultsRef.current = viewingTestResults;
+  }, [viewingTestResults]);
+
+  useEffect(() => {
+    viewingBenchmarkResultsRef.current = viewingBenchmarkResults;
+  }, [viewingBenchmarkResults]);
+
+  useEffect(() => {
+    selectedPastRunRef.current = selectedPastRun;
+  }, [selectedPastRun]);
 
   // Fetch tests attached to this agent
   useEffect(() => {
@@ -289,6 +342,114 @@ export function TestsTabContent({
     }
   }, [agentUuid, backendAccessToken]);
 
+  // Poll pending runs (excluding the one being viewed in dialog)
+  useEffect(() => {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl || !backendAccessToken) return;
+
+    // Get the ID of the run currently being viewed in the dialog
+    const viewingRunId =
+      (viewingTestResults || viewingBenchmarkResults) && selectedPastRun
+        ? selectedPastRun.uuid
+        : null;
+
+    // Find pending runs that need polling (excluding the one being viewed)
+    const pendingRuns = pastRuns.filter(
+      (run) =>
+        (run.status === "pending" ||
+          run.status === "queued" ||
+          run.status === "in_progress") &&
+        run.uuid !== viewingRunId
+    );
+
+    // Clear existing polling interval
+    if (pendingRunsPollingRef.current) {
+      clearInterval(pendingRunsPollingRef.current);
+      pendingRunsPollingRef.current = null;
+    }
+
+    // If no pending runs to poll, return
+    if (pendingRuns.length === 0) return;
+
+    const pollPendingRuns = async () => {
+      for (const run of pendingRuns) {
+        // Skip if this run is now being viewed in dialog (use refs for current values)
+        if (
+          (viewingTestResultsRef.current ||
+            viewingBenchmarkResultsRef.current) &&
+          selectedPastRunRef.current?.uuid === run.uuid
+        ) {
+          continue;
+        }
+
+        try {
+          const endpoint =
+            run.type === "llm-unit-test"
+              ? `${backendUrl}/agent-tests/run/${run.uuid}`
+              : `${backendUrl}/agent-tests/benchmark/${run.uuid}`;
+
+          const response = await fetch(endpoint, {
+            method: "GET",
+            headers: {
+              accept: "application/json",
+              "ngrok-skip-browser-warning": "true",
+              Authorization: `Bearer ${backendAccessToken}`,
+            },
+          });
+
+          if (!response.ok) continue;
+
+          const result = await response.json();
+
+          // Update the run in pastRuns
+          setPastRuns((prev) =>
+            prev.map((r) => {
+              if (r.uuid !== run.uuid) return r;
+
+              if (run.type === "llm-unit-test") {
+                return {
+                  ...r,
+                  status: result.status,
+                  total_tests: result.total_tests ?? r.total_tests,
+                  passed: result.passed ?? r.passed,
+                  failed: result.failed ?? r.failed,
+                  results: result.results ?? r.results,
+                  updated_at: new Date().toISOString(),
+                };
+              } else {
+                return {
+                  ...r,
+                  status: result.status,
+                  model_results: result.model_results ?? r.model_results,
+                  updated_at: new Date().toISOString(),
+                };
+              }
+            })
+          );
+        } catch (err) {
+          console.error(`Error polling run ${run.uuid}:`, err);
+        }
+      }
+    };
+
+    // Start polling every 3 seconds
+    pollPendingRuns(); // Poll immediately
+    pendingRunsPollingRef.current = setInterval(pollPendingRuns, 3000);
+
+    return () => {
+      if (pendingRunsPollingRef.current) {
+        clearInterval(pendingRunsPollingRef.current);
+        pendingRunsPollingRef.current = null;
+      }
+    };
+  }, [
+    pastRuns,
+    backendAccessToken,
+    viewingTestResults,
+    viewingBenchmarkResults,
+    selectedPastRun,
+  ]);
+
   // Filter out tests already attached to the agent
   const agentTestUuids = new Set(agentTests.map((t) => t.uuid));
   const availableTests = allTests.filter(
@@ -376,21 +537,29 @@ export function TestsTabContent({
   };
 
   // Handle when a new test run is created
-  const handleTestRunCreated = (taskId: string) => {
+  const handleTestRunCreated = (taskId: string, testCount?: number) => {
+    const count = testCount ?? testsToRun.length;
+    // Create optimistic results array with test names for display
+    const optimisticResults: TestRunResult[] = testsToRun.map((test) => ({
+      name: test.name,
+      passed: null,
+      test_case: {
+        name: test.name,
+      },
+    }));
     const newRun: TestRun = {
       uuid: taskId,
-      name: `${agentTests.length} test${agentTests.length !== 1 ? "s" : ""}`,
+      name: "",
       status: "pending",
       type: "llm-unit-test",
       updated_at: new Date().toISOString(),
-      total_tests: agentTests.length,
+      total_tests: count,
       passed: null,
       failed: null,
+      results: optimisticResults,
     };
     setPastRuns((prev) => [newRun, ...prev]);
-
-    // Start polling to update the run status
-    pollRunStatus(taskId, "llm-unit-test");
+    // Polling is handled by the useEffect that watches pastRuns for pending items
   };
 
   // Handle when a new benchmark is created
@@ -407,80 +576,34 @@ export function TestsTabContent({
       model_results: [],
     };
     setPastRuns((prev) => [newRun, ...prev]);
-
-    // Start polling to update the run status
-    pollRunStatus(taskId, "llm-benchmark");
+    // Polling is handled by the useEffect that watches pastRuns for pending items
   };
 
-  // Poll run status to update past runs table
-  const pollRunStatus = async (
-    taskId: string,
-    runType: "llm-unit-test" | "llm-benchmark"
-  ) => {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!backendUrl || !backendAccessToken) return;
-
-    const endpoint =
-      runType === "llm-unit-test"
-        ? `${backendUrl}/agent-tests/run/${taskId}`
-        : `${backendUrl}/agent-tests/benchmark/${taskId}`;
-
-    const poll = async () => {
-      try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          headers: {
-            accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
-            Authorization: `Bearer ${backendAccessToken}`,
-          },
-        });
-
-        if (!response.ok) return;
-
-        const result = await response.json();
-
-        // Update the run in pastRuns
-        setPastRuns((prev) =>
-          prev.map((run) => {
-            if (run.uuid !== taskId) return run;
-
-            if (runType === "llm-unit-test") {
-              return {
-                ...run,
-                status: result.status,
-                total_tests: result.total_tests ?? run.total_tests,
-                passed: result.passed ?? run.passed,
-                failed: result.failed ?? run.failed,
-                updated_at: new Date().toISOString(),
-              };
-            } else {
-              return {
-                ...run,
-                status: result.status,
-                model_results: result.model_results ?? run.model_results,
-                updated_at: new Date().toISOString(),
-              };
-            }
-          })
-        );
-
-        // Continue polling if not complete
-        if (
-          result.status !== "completed" &&
-          result.status !== "done" &&
-          result.status !== "failed"
-        ) {
-          setTimeout(poll, 2000);
-        }
-      } catch (err) {
-        console.error("Error polling run status:", err);
-      }
-    };
-
-    // Start polling
-    setTimeout(poll, 2000);
-  };
+  // Callback when a run completes from the TestRunnerDialog
+  const handleRunStatusUpdate = useCallback(
+    (
+      taskId: string,
+      status: string,
+      results?: TestRunResult[],
+      passed?: number | null,
+      failed?: number | null
+    ) => {
+      setPastRuns((prev) =>
+        prev.map((run) => {
+          if (run.uuid !== taskId) return run;
+          return {
+            ...run,
+            status,
+            results: results ?? run.results,
+            passed: passed ?? run.passed,
+            failed: failed ?? run.failed,
+            updated_at: new Date().toISOString(),
+          };
+        })
+      );
+    },
+    []
+  );
 
   // Remove test from agent
   const handleRemoveTest = async () => {
@@ -636,7 +759,10 @@ export function TestsTabContent({
               )}
             </div>
             <button
-              onClick={() => setTestRunnerOpen(true)}
+              onClick={() => {
+                setTestsToRun(agentTests);
+                setTestRunnerOpen(true);
+              }}
               className="h-10 px-4 rounded-md text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex items-center gap-2"
             >
               <svg
@@ -945,7 +1071,7 @@ export function TestsTabContent({
                     <div className="flex items-center">
                       <button
                         onClick={() => {
-                          // Set tests to only this test and open runner
+                          setTestsToRun([test]);
                           setTestRunnerOpen(true);
                         }}
                         className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
@@ -995,21 +1121,12 @@ export function TestsTabContent({
           </div>
 
           {/* Right Panel - Past Runs */}
-          <div className="w-[480px] flex-shrink-0 border border-border rounded-xl overflow-hidden bg-muted/10">
-            {/* Past Runs Header */}
-            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
-              <div className="text-sm font-medium text-muted-foreground">
-                Name
-              </div>
-              <div className="text-sm font-medium text-muted-foreground">
-                Run Type
-              </div>
-              <div className="text-sm font-medium text-muted-foreground w-24 text-right">
-                Time
-              </div>
-              <div className="text-sm font-medium text-muted-foreground w-32 text-right">
-                Result
-              </div>
+          <div className="w-[560px] flex-shrink-0 border border-border rounded-xl overflow-hidden bg-muted/30">
+            {/* Past Runs Title */}
+            <div className="px-4 py-3">
+              <h3 className="text-base font-semibold text-foreground">
+                Past runs
+              </h3>
             </div>
 
             {/* Past Runs List */}
@@ -1050,13 +1167,7 @@ export function TestsTabContent({
                     className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors items-center cursor-pointer"
                   >
                     <span className="text-sm font-medium text-foreground truncate">
-                      {run.type === "llm-unit-test"
-                        ? `${run.total_tests ?? 0} test${
-                            (run.total_tests ?? 0) !== 1 ? "s" : ""
-                          }`
-                        : `${run.model_results?.length ?? 0} model${
-                            (run.model_results?.length ?? 0) !== 1 ? "s" : ""
-                          }`}
+                      {getTestRunDisplayName(run)}
                     </span>
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
@@ -1137,10 +1248,13 @@ export function TestsTabContent({
       {/* Test Runner Dialog */}
       <TestRunnerDialog
         isOpen={testRunnerOpen}
-        onClose={() => setTestRunnerOpen(false)}
+        onClose={() => {
+          setTestRunnerOpen(false);
+          setTestsToRun([]);
+        }}
         agentUuid={agentUuid}
         agentName={agentName}
-        tests={agentTests}
+        tests={testsToRun}
         onRunCreated={handleTestRunCreated}
       />
 
@@ -1164,8 +1278,21 @@ export function TestsTabContent({
           }}
           agentUuid={agentUuid}
           agentName={agentName}
-          tests={[]}
+          tests={
+            // Convert results to TestData format for in-progress runs
+            selectedPastRun.results?.map((r, i) => ({
+              uuid: `past-run-test-${i}`,
+              name: r.name || r.test_case?.name || `Test ${i + 1}`,
+              description: "",
+              type: "response" as const,
+              config: {},
+              created_at: "",
+              updated_at: "",
+            })) || []
+          }
           taskId={selectedPastRun.uuid}
+          initialRunStatus={selectedPastRun.status}
+          onStatusUpdate={handleRunStatusUpdate}
         />
       )}
 

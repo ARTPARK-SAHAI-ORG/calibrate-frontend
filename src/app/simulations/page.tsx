@@ -49,7 +49,7 @@ export default function SimulationsPage() {
   useEffect(() => {
     const fetchSimulations = async () => {
       if (!backendAccessToken) return;
-      
+
       try {
         setSimulationsLoading(true);
         setSimulationsError(null);

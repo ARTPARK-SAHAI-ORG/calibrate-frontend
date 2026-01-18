@@ -47,10 +47,11 @@ type TestResult = {
 type TestCaseResult = {
   test_uuid?: string;
   test_name?: string;
+  name?: string; // Test name from in-progress API response
   status?: "passed" | "failed" | "error";
-  passed?: boolean;
-  output?: TestCaseOutput;
-  test_case?: TestCaseData;
+  passed?: boolean | null; // null means test is still running
+  output?: TestCaseOutput | null;
+  test_case?: TestCaseData | null;
   chat_history?: ChatMessage[];
   evaluation?: {
     passed: boolean;
@@ -79,6 +80,18 @@ type TestRunnerDialogProps = {
   tests: TestData[];
   taskId?: string; // If provided, view existing run results instead of starting a new run
   onRunCreated?: (taskId: string) => void; // Called when a new run is created
+  initialRunStatus?: string; // Initial status of the run (for viewing past runs)
+  onStatusUpdate?: (
+    taskId: string,
+    status: string,
+    results?: {
+      name?: string;
+      passed: boolean | null;
+      test_case?: { name?: string } | null;
+    }[],
+    passed?: number | null,
+    failed?: number | null
+  ) => void; // Called when run status changes (for coordinated polling)
 };
 
 export function TestRunnerDialog({
@@ -89,6 +102,8 @@ export function TestRunnerDialog({
   tests,
   taskId,
   onRunCreated,
+  initialRunStatus,
+  onStatusUpdate,
 }: TestRunnerDialogProps) {
   const { data: session } = useSession();
   const backendAccessToken = (session as any)?.backendAccessToken;
@@ -101,53 +116,73 @@ export function TestRunnerDialog({
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Cleanup polling interval on unmount
+  // Start polling when dialog opens with a taskId (viewing existing run)
   useEffect(() => {
+    if (!isOpen || !taskId || !backendAccessToken) {
+      return;
+    }
+
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl) return;
+
+    // Initialize state for viewing existing run
+    setSelectedTestUuid(null);
+    setCurrentTaskId(taskId);
+
+    const isInProgress =
+      initialRunStatus === "pending" ||
+      initialRunStatus === "queued" ||
+      initialRunStatus === "in_progress";
+
+    setIsRunning(isInProgress);
+
+    if (initialRunStatus === "done" || initialRunStatus === "completed") {
+      setTestResults([]);
+      setRunStatus("done");
+    } else if (tests.length > 0) {
+      setTestResults(tests.map((test) => ({ test, status: "running" })));
+      setRunStatus("in_progress");
+    } else {
+      setTestResults([]);
+      setRunStatus("queued");
+    }
+
+    // Always fetch once immediately
+    pollTaskStatus(taskId, backendUrl);
+
+    // Start polling - will stop itself when status is done/completed/failed
+    pollingIntervalRef.current = setInterval(() => {
+      pollTaskStatus(taskId, backendUrl);
+    }, 2000);
+
     return () => {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
       }
     };
-  }, []);
-
-  // Initialize test results and start running tests when dialog opens
-  useEffect(() => {
-    if (isOpen) {
-      setSelectedTestUuid(null);
-
-      if (taskId) {
-        // View existing run - poll the task immediately
-        setIsRunning(true);
-        setCurrentTaskId(taskId);
-        setTestResults([]); // Will be populated from API response
-        setRunStatus("queued");
-
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-        if (backendUrl) {
-          // Start polling immediately for existing task
-          pollingIntervalRef.current = setInterval(() => {
-            pollTaskStatus(taskId, backendUrl);
-          }, 2000);
-          pollTaskStatus(taskId, backendUrl);
-        }
-      } else if (tests.length > 0) {
-        // Start a new run
-      const initialResults: TestResult[] = tests.map((test) => ({
-        test,
-        status: "pending",
-      }));
-      setTestResults(initialResults);
-      setCurrentTaskId(null);
-
-      // Start running tests immediately after dialog opens
-      // Use setTimeout to ensure state is set before running
-      setTimeout(() => {
-        runAllTests(initialResults);
-      }, 0);
-      }
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, tests, taskId]);
+  }, [isOpen, taskId, backendAccessToken]);
+
+  // Start new test run when dialog opens without taskId
+  useEffect(() => {
+    if (!isOpen || taskId || tests.length === 0) {
+      return;
+    }
+
+    setSelectedTestUuid(null);
+    setCurrentTaskId(null);
+    const initialResults: TestResult[] = tests.map((test) => ({
+      test,
+      status: "pending",
+    }));
+    setTestResults(initialResults);
+
+    setTimeout(() => {
+      runAllTests(initialResults);
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, taskId, tests]);
 
   const pollTaskStatus = async (taskId: string, backendUrl: string) => {
     try {
@@ -188,13 +223,26 @@ export function TestRunnerDialog({
 
       // Update test results based on polling response
       setTestResults((prev) => {
+        // Helper to determine test status from API result
+        const getTestStatus = (
+          apiResult: TestCaseResult
+        ): "passed" | "failed" | "running" => {
+          // If passed is null, the test is still running
+          if (apiResult.passed === null || apiResult.passed === undefined) {
+            return "running";
+          }
+          return apiResult.passed === true || apiResult.status === "passed"
+            ? "passed"
+            : "failed";
+        };
+
         // If we're viewing a past run and have no previous results, build from API response
         if (prev.length === 0 && result.results && result.results.length > 0) {
           return result.results.map((apiResult) => {
-            const isPassed =
-              apiResult.passed === true || apiResult.status === "passed";
-            // Get test name from test_case.name (API response) or test_name field
+            const testStatus = getTestStatus(apiResult);
+            // Get test name from name (in-progress), test_case.name, or test_name field
             const testName =
+              apiResult.name ||
               apiResult.test_case?.name ||
               apiResult.test_name ||
               "Unknown Test";
@@ -208,27 +256,30 @@ export function TestRunnerDialog({
                 created_at: "",
                 updated_at: "",
               },
-              status: isPassed ? ("passed" as const) : ("failed" as const),
+              status: testStatus,
               chatHistory: apiResult.chat_history,
-              output: apiResult.output,
-              testCase: apiResult.test_case,
-              evaluation: apiResult.evaluation ?? { passed: isPassed },
+              output: apiResult.output ?? undefined,
+              testCase: apiResult.test_case ?? undefined,
+              evaluation:
+                testStatus !== "running"
+                  ? apiResult.evaluation ?? { passed: testStatus === "passed" }
+                  : undefined,
               error: apiResult.error,
             };
           });
         }
 
-        // Try to match by test_uuid first, if no match found, update by index
+        // Try to match by test_uuid first, if no match found, update by index or name
         const updatedResults: TestResult[] = prev.map((r, index) => {
           // First try to find by UUID in results
           let apiResult = result.results?.find(
             (res) => res.test_uuid === r.test.uuid
           );
 
-          // If no UUID match, try to find by test name
+          // If no UUID match, try to find by test name (check both name and test_name)
           if (!apiResult) {
             apiResult = result.results?.find(
-              (res) => res.test_name === r.test.name
+              (res) => res.test_name === r.test.name || res.name === r.test.name
             );
           }
 
@@ -238,25 +289,26 @@ export function TestRunnerDialog({
           }
 
           if (apiResult) {
-            // Check both `passed` boolean and `status` string for compatibility
-            const isPassed =
-              apiResult.passed === true || apiResult.status === "passed";
-            const newStatus: "passed" | "failed" = isPassed
-              ? "passed"
-              : "failed";
+            const testStatus = getTestStatus(apiResult);
             return {
               ...r,
-              status: newStatus,
+              status: testStatus,
               chatHistory: apiResult.chat_history,
-              output: apiResult.output,
-              testCase: apiResult.test_case,
-              evaluation: apiResult.evaluation ?? { passed: isPassed },
+              output: apiResult.output ?? undefined,
+              testCase: apiResult.test_case ?? undefined,
+              evaluation:
+                testStatus !== "running"
+                  ? apiResult.evaluation ?? { passed: testStatus === "passed" }
+                  : undefined,
               error: apiResult.error,
             };
           }
 
-          // If overall status is in_progress and test is still queued, mark as running
-          if (result.status === "in_progress" && r.status === "queued") {
+          // If overall status is in_progress and test is still queued/pending, mark as running
+          if (
+            result.status === "in_progress" &&
+            (r.status === "queued" || r.status === "pending")
+          ) {
             return { ...r, status: "running" };
           }
 
@@ -264,6 +316,23 @@ export function TestRunnerDialog({
         });
         return updatedResults;
       });
+
+      // Notify parent of status update (for coordinated polling)
+      // Only notify if there's a status change worth reporting (not for initial fetch of completed runs)
+      if (onStatusUpdate && taskId && isRunning) {
+        const apiResults = result.results?.map((r: TestCaseResult) => ({
+          name: r.name || r.test_case?.name,
+          passed: r.passed ?? null,
+          test_case: r.test_case,
+        }));
+        onStatusUpdate(
+          taskId,
+          result.status,
+          apiResults,
+          result.passed,
+          result.failed
+        );
+      }
 
       // Check if polling should stop
       if (

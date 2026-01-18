@@ -78,7 +78,7 @@ export default function LLMPage() {
   useEffect(() => {
     const fetchTests = async () => {
       if (!backendAccessToken) return;
-      
+
       try {
         setTestsLoading(true);
         setTestsError(null);

@@ -73,13 +73,17 @@ export function MultiSelectPicker({
   return (
     <div className={`space-y-1.5 ${className}`} ref={dropdownRef}>
       {label && (
-        <label className="block text-sm font-medium text-foreground">{label}</label>
+        <label className="block text-sm font-medium text-foreground">
+          {label}
+        </label>
       )}
       <div className="relative">
         <div
           onClick={() => !disabled && setDropdownOpen(!dropdownOpen)}
           className={`w-full min-h-[44px] px-4 py-2 rounded-xl text-sm bg-transparent text-foreground border border-border transition-colors flex items-center justify-between gap-2 ${
-            disabled ? "cursor-default" : "hover:border-muted-foreground cursor-pointer"
+            disabled
+              ? "cursor-default"
+              : "hover:border-muted-foreground cursor-pointer"
           }`}
         >
           <div className="flex-1 flex flex-wrap gap-2 items-center">
