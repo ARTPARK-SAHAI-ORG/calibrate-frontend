@@ -403,6 +403,7 @@ This enables:
 │   │   ├── metrics/           # Evaluation metrics (has layout.tsx)
 │   │   ├── simulations/       # End-to-end simulation testing (has layout.tsx)
 │   │   ├── login/             # Authentication page (has layout.tsx)
+│   │   ├── maintenance/       # Public maintenance page (shown during deployments)
 │   │   └── api/auth/          # NextAuth.js route handlers
 │   ├── components/
 │   │   ├── agent-tabs/        # Agent detail tab components
@@ -414,6 +415,8 @@ This enables:
 │   │   ├── test-results/      # Shared test result components
 │   │   └── ui/                # Reusable UI components (Button, SearchInput, etc.)
 │   ├── constants/             # Static configuration data
+│   │   ├── inbuilt-tools.ts   # Built-in tool definitions
+│   │   └── polling.ts         # POLLING_INTERVAL_MS (3000ms) - shared polling interval
 │   ├── hooks/                 # Custom React hooks (useCrudResource, etc.)
 │   ├── lib/                   # Utility libraries (api.ts, status.ts, etc.)
 │   ├── auth.ts               # NextAuth.js configuration
@@ -648,7 +651,7 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
 **Detail Page:**
 
 - Fetches result from `GET /[tts|stt]/evaluate/{uuid}` (NOT from `/jobs`)
-- Polls every 2 seconds while status is `queued` or `in_progress`
+- Polls at `POLLING_INTERVAL_MS` (3 seconds) while status is `queued` or `in_progress`
 - Shows loading/in-progress states during polling
 - Uses `BackHeader` component for back navigation
 - Uses `StatusBadge` component with `showSpinner` for status display
@@ -713,6 +716,9 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
 11. **View Mode Dialogs**: `TestRunnerDialog` and `BenchmarkResultsDialog` support dual modes:
     - **Run mode** (default): Opens dialog and starts a new run/benchmark
     - **View mode**: Pass `taskId` prop to view existing run results without starting a new run
+    - **Behavior based on `initialRunStatus`**:
+      - **Completed runs** (`done`/`completed`): Clears test results initially, fetches fresh from API once (no polling), displays actual pass/fail status
+      - **In-progress runs** (`pending`/`queued`/`in_progress`): Initializes tests as "running" (yellow), polls API at `POLLING_INTERVAL_MS` until complete
     - **Props for viewing past runs**:
       - `taskId`: The run UUID to fetch results for
       - `tests`: Array converted from `pastRun.results` to show test names while loading
@@ -720,10 +726,23 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
     - **Callback props for coordinated updates**:
       - `onRunCreated`: Notifies parent when a new run is created
       - `onStatusUpdate`: Called during polling (only when `isRunning` is true) to sync status changes back to parent
-    - **Simple polling pattern** (TestRunnerDialog uses two separate focused effects):
-      1. **Viewing existing run** (`taskId` provided): Runs when `isOpen && taskId && backendAccessToken`. Fetches immediately, starts polling every 2 seconds, uses effect cleanup to stop on close. `pollTaskStatus` stops interval when status is done/completed/failed.
-      2. **Starting new run** (no `taskId`): Runs when `isOpen && !taskId && tests.length > 0`. Calls `runAllTests` to start the run.
-    - **Auth token guard**: Effect returns early if `backendAccessToken` is not available, re-runs when token becomes available
+      - Prevents duplicate polling and keeps table/dialog in sync
+    - **Re-initialization prevention** (prevents flickering while ensuring polling starts on reopen):
+      - Uses THREE refs: `wasOpenRef`, `initializedTaskIdRef`, and `pollingIntervalRef`
+      - **Skip condition**: Only skips if ALL THREE conditions are true:
+        1. `wasOpenRef.current` - dialog was already open (not transitioning from closed→open)
+        2. `initializedTaskIdRef.current === taskId` - already initialized for this exact taskId
+        3. `pollingIntervalRef.current` - polling is currently active
+      - `wasOpenRef` is updated at the end of the effect to track the previous open state
+      - This ensures fresh initialization when dialog reopens (even if other refs have stale values)
+      - Always clears existing polling interval before starting new one
+      - Refs and intervals are cleared when dialog closes or when starting a fresh run
+      - `onStatusUpdate` only called for in-progress runs (when `isRunning` is true)
+    - **Auth token guard**: The useEffect must wait for `backendAccessToken` before starting polling:
+      - Returns early if `backendAccessToken` is not available
+      - Includes `backendAccessToken` in useEffect dependency array
+      - This ensures polling re-attempts when session loads (token becomes available)
+      - Without this guard, API calls fail silently with `Authorization: Bearer undefined`
     - Used for: clicking past run rows in Tests tab to view historical results
 
 ### Data Fetching Pattern
@@ -1592,7 +1611,11 @@ if (result.status === "in_progress" && item.status === "queued") {
 
 **Polling Pattern:**
 
+All polling uses the shared `POLLING_INTERVAL_MS` constant from `@/constants/polling`:
+
 ```tsx
+import { POLLING_INTERVAL_MS } from "@/constants/polling";
+
 useEffect(() => {
   let pollInterval: NodeJS.Timeout | null = null;
 
@@ -1609,13 +1632,15 @@ useEffect(() => {
   };
 
   fetchData(true);
-  pollInterval = setInterval(() => fetchData(false), 3000);
+  pollInterval = setInterval(() => fetchData(false), POLLING_INTERVAL_MS);
 
   return () => {
     if (pollInterval) clearInterval(pollInterval);
   };
 }, [dependency]);
 ```
+
+**Files using `POLLING_INTERVAL_MS`:** TestRunnerDialog, BenchmarkResultsDialog, TestsTabContent, STT/TTS evaluation pages, simulation run page.
 
 ### Linkable Table Rows Pattern
 
@@ -1728,7 +1753,17 @@ NEXT_PUBLIC_BACKEND_URL=http://localhost:8000  # Backend API URL
 AUTH_SECRET=                                    # NextAuth secret
 GOOGLE_CLIENT_ID=                              # Google OAuth client ID
 GOOGLE_CLIENT_SECRET=                          # Google OAuth client secret
+MAINTENANCE_MODE=true                          # Show maintenance page at / (optional)
 ```
+
+### Maintenance Mode
+
+Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When enabled:
+
+- All page routes (`/login`, `/agents`, etc.) redirect to `/`
+- `/` displays the maintenance page (no auth required)
+- API routes (`/api/*`) are excluded to prevent NextAuth errors
+- Requires server restart after changing
 
 ---
 
@@ -1930,7 +1965,8 @@ window.history.replaceState(null, "", `?tab=${tabName}`);
 ### Authentication
 
 - **Middleware matcher**: Excludes static assets (`_next/static`, `_next/image`, `favicon.ico`, `*.svg`)
-- **Protected routes**: All routes except `/login` and `/api/auth/*` require authentication
+- **Protected routes**: All routes except public routes require authentication
+- **Public routes** (no auth required): `/login`, `/api/auth/*`, `/debug*`, `/maintenance`
 - **Session access**: Use `useSession()` in client components, `auth()` in server components
 - **Token expiration**: Backend returns 401 when JWT expires; always handle this by calling `signOut({ callbackUrl: "/login" })`
 - **Import pattern**: Always import both `useSession` and `signOut` from `next-auth/react` when making API calls

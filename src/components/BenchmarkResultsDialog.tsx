@@ -12,6 +12,7 @@ import {
 } from "./test-results/shared";
 import { LeaderboardBarChart, getColorMap } from "./charts/LeaderboardBarChart";
 import { DownloadableTable } from "./DownloadableTable";
+import { POLLING_INTERVAL_MS } from "@/constants/polling";
 
 type BenchmarkTestResult = {
   passed: boolean;
@@ -114,7 +115,7 @@ export function BenchmarkResultsDialog({
         if (backendUrl) {
           pollingIntervalRef.current = setInterval(() => {
             pollBenchmarkStatus(taskId, backendUrl);
-          }, 2000);
+          }, POLLING_INTERVAL_MS);
           pollBenchmarkStatus(taskId, backendUrl);
         } else {
           setIsLoading(false);
@@ -228,7 +229,7 @@ export function BenchmarkResultsDialog({
       // Start polling
       pollingIntervalRef.current = setInterval(() => {
         pollBenchmarkStatus(newTaskId, backendUrl);
-      }, 2000);
+      }, POLLING_INTERVAL_MS);
 
       // Also poll immediately
       pollBenchmarkStatus(newTaskId, backendUrl);

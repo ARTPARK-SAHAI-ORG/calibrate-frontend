@@ -1466,7 +1466,1840 @@ I'll rewrite the effect to be much simpler:</details></think>
 
 <details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
 
-Status: **loading**
+**Chunk 1**
+Lines added: 59, lines removed: 103
+
+```diff
+@@ -116,116 +116,72 @@
+    const [currentTaskId, setCurrentTaskId] = useState&lt;string | null&gt;(null);
+    const pollingIntervalRef = useRef&lt;NodeJS.Timeout | null&gt;(null);
+-   const initializedTaskIdRef = useRef&lt;string | null&gt;(null);
+  
+-   // Cleanup polling interval on unmount
++   // Start polling when dialog opens with a taskId (viewing existing run)
+    useEffect(() =&gt; {
+-     return () =&gt; {
+-       if (pollingIntervalRef.current) {
+-         clearInterval(pollingIntervalRef.current);
+-       }
+-     };
+-   }, []);
+- 
+-   // Initialize test results and start running tests when dialog opens
+-   useEffect(() =&gt; {
+-     if (isOpen) {
+-       setSelectedTestUuid(null);
+- 
+-       if (taskId) {
+-         // Wait for backendAccessToken before starting polling
+-         if (!backendAccessToken) {
+-           return;
+-         }
++     if (!isOpen || !taskId || !backendAccessToken) {
++       return;
++     }
+  
+-         // Skip re-initialization only if we're already polling this exact taskId
+-         // This prevents flickering from prop changes while allowing fresh initialization on reopen
+-         if (
+-           initializedTaskIdRef.current === taskId &amp;&amp;
+-           pollingIntervalRef.current
+-         ) {
+-           return;
+-         }
+- 
+-         // Clear any existing polling interval before starting new one
+-         if (pollingIntervalRef.current) {
+-           clearInterval(pollingIntervalRef.current);
+-           pollingIntervalRef.current = null;
+-         }
+- 
+-         initializedTaskIdRef.current = taskId;
+- 
+-         // View existing run - determine if it's still in progress
+-         const isInProgress =
+-           initialRunStatus === "pending" ||
+-           initialRunStatus === "queued" ||
+-           initialRunStatus === "in_progress";
+-         const isCompleted =
+-           initialRunStatus === "done" || initialRunStatus === "completed";
++     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
++     if (!backendUrl) return;
++ 
++     // Initialize state for viewing existing run
++     setSelectedTestUuid(null);
++     setCurrentTaskId(taskId);
++ 
++     const isInProgress =
++       initialRunStatus === "pending" ||
++       initialRunStatus === "queued" ||
++       initialRunStatus === "in_progress";
+  
+-         setIsRunning(isInProgress);
+-         setCurrentTaskId(taskId);
++     setIsRunning(isInProgress);
+  
+-         // For completed runs, don't initialize test results - let API response populate them
+-         // For in-progress runs, show tests as running
+-         if (isCompleted) {
+-           // Clear test results and fetch fresh from API
+-           setTestResults([]);
+-           setRunStatus("done");
+-         } else if (tests.length &gt; 0) {
+-           // Initialize test results from tests prop (shows tests as running for in-progress runs)
+-           const initialResults: TestResult[] = tests.map((test) =&gt; ({
+-             test,
+-             status: "running",
+-           }));
+-           setTestResults(initialResults);
+-           setRunStatus("in_progress");
+-         } else {
+-           setTestResults([]); // Will be populated from API response
+-           setRunStatus("queued");
+-         }
++     if (initialRunStatus === "done" || initialRunStatus === "completed") {
++       setTestResults([]);
++       setRunStatus("done");
++     } else if (tests.length &gt; 0) {
++       setTestResults(tests.map((test) =&gt; ({ test, status: "running" })));
++       setRunStatus("in_progress");
++     } else {
++       setTestResults([]);
++       setRunStatus("queued");
++     }
+  
+-         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+-         if (backendUrl) {
+-           // Fetch results immediately
+-           pollTaskStatus(taskId, backendUrl);
++     // Always fetch once immediately
++     pollTaskStatus(taskId, backendUrl);
+  
+-           // Only continue polling if in progress
+-           if (isInProgress) {
+-             pollingIntervalRef.current = setInterval(() =&gt; {
+-               pollTaskStatus(taskId, backendUrl);
+-             }, 2000);
+-           }
+-         }
+-       } else if (tests.length &gt; 0) {
+-         // Start a new run - clear any stale refs
+-         initializedTaskIdRef.current = null;
+-         if (pollingIntervalRef.current) {
+-           clearInterval(pollingIntervalRef.current);
+-           pollingIntervalRef.current = null;
+-         }
+- 
+-         const initialResults: TestResult[] = tests.map((test) =&gt; ({
+-           test,
+-           status: "pending",
+-         }));
+-         setTestResults(initialResults);
+-         setCurrentTaskId(null);
++     // Start polling - will stop itself when status is done/completed/failed
++     pollingIntervalRef.current = setInterval(() =&gt; {
++       pollTaskStatus(taskId, backendUrl);
++     }, 2000);
++ 
++     return () =&gt; {
++       if (pollingIntervalRef.current) {
++         clearInterval(pollingIntervalRef.current);
++         pollingIntervalRef.current = null;
++       }
++     };
++     // eslint-disable-next-line react-hooks/exhaustive-deps
++   }, [isOpen, taskId, backendAccessToken]);
++ 
++   // Start new test run when dialog opens without taskId
++   useEffect(() =&gt; {
++     if (!isOpen || taskId || tests.length === 0) {
++       return;
++     }
++ 
++     setSelectedTestUuid(null);
++     setCurrentTaskId(null);
++     const initialResults: TestResult[] = tests.map((test) =&gt; ({
++       test,
++       status: "pending",
++     }));
++     setTestResults(initialResults);
+  
+-         // Start running tests immediately after dialog opens
+-         // Use setTimeout to ensure state is set before running
+-         setTimeout(() =&gt; {
+-           runAllTests(initialResults);
+-         }, 0);
+-       }
+-     } else {
+-       // Dialog closed - clear polling and reset refs
+-       if (pollingIntervalRef.current) {
+-         clearInterval(pollingIntervalRef.current);
+-         pollingIntervalRef.current = null;
+-       }
+-       initializedTaskIdRef.current = null;
+-     }
++     setTimeout(() =&gt; {
++       runAllTests(initialResults);
++     }, 0);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+-   }, [isOpen, tests, taskId, initialRunStatus, backendAccessToken]);
++   }, [isOpen, taskId, tests]);
+  
+    const pollTaskStatus = async (taskId: string, backendUrl: string) =&gt; {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me check for linting errors:</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx`
+
+Lint results
+
+Lint errors for `src/components/TestRunnerDialog.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+| 'runStatus' is declared but its value is never read. | 113:10-113:19 | DIAGNOSTIC_SEVERITY_HINT |
+| 'currentTaskId' is declared but its value is never read. | 116:10-116:23 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryTest' is declared but its value is never read. | 452:9-452:18 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryAllFailed' is declared but its value is never read. | 630:9-630:23 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryAll' is declared but its value is never read. | 734:9-734:17 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no linting errors. Let me verify the changes look correct by reading the updated section:</details></think>
+
+---
+
+Let me verify the changes look correct:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The code is now much simpler. Let me also check that there was a cleanup effect for unmount that might have been removed. I should also make sure the old unmount cleanup effect was removed since we now have proper cleanup in the effect's return.</details></think>
+
+---
+
+The implementation is now much simpler with two separate effects:
+
+1. **Viewing existing run** (when `taskId` is provided):
+   - Runs when `isOpen && taskId && backendAccessToken` are all truthy
+   - Fetches immediately, then starts polling every 2 seconds
+   - Proper cleanup on close (via effect return)
+   - `pollTaskStatus` already stops the interval when status is done/completed/failed
+
+2. **Starting new run** (when no `taskId`):
+   - Runs when `isOpen && !taskId && tests.length > 0`
+   - Starts the test run via `runAllTests`
+
+The key simplification:
+- Removed complex skip logic and refs (`initializedTaskIdRef`, `wasOpenRef`)
+- Uses React's built-in effect cleanup pattern
+- Always starts polling when dialog opens with a taskId (polling stops itself when done)
+- Separate concerns into two focused effects
+
+---
+
+_**User (2026-01-17 12:52Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made significant changes to the TestRunnerDialog.tsx - I simplified the polling logic by removing the complex skip conditions and refs, and replaced it with two separate, focused useEffects. I need to update the app-details.md to reflect this simpler pattern.
+
+Let me read the relevant section in app-details.md that talks about the TestRunnerDialog's re-initialization prevention logic, as that's now obsolete.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to update the section about "Re-initialization prevention" (lines 727-742) since the implementation has been significantly simplified. The complex ref-based logic has been replaced with simple effect cleanup.
+
+Let me replace that section with the new simpler pattern.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: undefined, lines removed: 3
+
+```diff
+@@ -714,7 +714,4 @@
+      - **Run mode** (default): Opens dialog and starts a new run/benchmark
+      - **View mode**: Pass &#96;taskId&#96; prop to view existing run results without starting a new run
+-     - **Behavior based on &#96;initialRunStatus&#96;**:
+-       - **Completed runs** (&#96;done&#96;/&#96;completed&#96;): Clears test results initially, fetches fresh from API once (no polling), displays actual pass/fail status
+-       - **In-progress runs** (&#96;pending&#96;/&#96;queued&#96;/&#96;in_progress&#96;): Initializes tests as "running" (yellow), polls API every 2 seconds until complete
+      - **Props for viewing past runs**:
+        - &#96;taskId&#96;: The run UUID to fetch results for
+```
+
+**Chunk 2**
+Lines added: 4, lines removed: 17
+
+```diff
+@@ -724,21 +721,8 @@
+        - &#96;onRunCreated&#96;: Notifies parent when a new run is created
+        - &#96;onStatusUpdate&#96;: Called during polling (only when &#96;isRunning&#96; is true) to sync status changes back to parent
+-       - Prevents duplicate polling and keeps table/dialog in sync
+-     - **Re-initialization prevention** (prevents flickering while ensuring polling starts on reopen):
+-       - Uses THREE refs: &#96;wasOpenRef&#96;, &#96;initializedTaskIdRef&#96;, and &#96;pollingIntervalRef&#96;
+-       - **Skip condition**: Only skips if ALL THREE conditions are true:
+-         1. &#96;wasOpenRef.current&#96; - dialog was already open (not transitioning from closed→open)
+-         2. &#96;initializedTaskIdRef.current === taskId&#96; - already initialized for this exact taskId
+-         3. &#96;pollingIntervalRef.current&#96; - polling is currently active
+-       - &#96;wasOpenRef&#96; is updated at the end of the effect to track the previous open state
+-       - This ensures fresh initialization when dialog reopens (even if other refs have stale values)
+-       - Always clears existing polling interval before starting new one
+-       - Refs and intervals are cleared when dialog closes or when starting a fresh run
+-       - &#96;onStatusUpdate&#96; only called for in-progress runs (when &#96;isRunning&#96; is true)
+-     - **Auth token guard**: The useEffect must wait for &#96;backendAccessToken&#96; before starting polling:
+-       - Returns early if &#96;backendAccessToken&#96; is not available
+-       - Includes &#96;backendAccessToken&#96; in useEffect dependency array
+-       - This ensures polling re-attempts when session loads (token becomes available)
+-       - Without this guard, API calls fail silently with &#96;Authorization: Bearer undefined&#96;
++     - **Simple polling pattern** (TestRunnerDialog uses two separate focused effects):
++       1. **Viewing existing run** (&#96;taskId&#96; provided): Runs when &#96;isOpen &amp;&amp; taskId &amp;&amp; backendAccessToken&#96;. Fetches immediately, starts polling every 2 seconds, uses effect cleanup to stop on close. &#96;pollTaskStatus&#96; stops interval when status is done/completed/failed.
++       2. **Starting new run** (no &#96;taskId&#96;): Runs when &#96;isOpen &amp;&amp; !taskId &amp;&amp; tests.length &gt; 0&#96;. Calls &#96;runAllTests&#96; to start the run.
++     - **Auth token guard**: Effect returns early if &#96;backendAccessToken&#96; is not available, re-runs when token becomes available
+      - Used for: clicking past run rows in Tests tab to view historical results
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I've updated the documentation to reflect the simpler polling pattern. The key changes documented:
+1. Removed the complex re-initialization prevention logic with multiple refs
+2. Documented the new simple two-effect pattern
+3. Kept the essential information about props and callback props
+
+I should also update the State Management section in the gotchas since I removed the wasOpenRef pattern that was documented there earlier.</details></think>
+
+---
+
+Now let me also update the State Management gotchas section since the `wasOpenRef` pattern was documented there and is no longer used:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me find the State Management section I updated earlier with the stale closure fix pattern:</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "Refs for polling callbacks" in "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md" • 1 match</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.cursor/rules/app-details.md` | `- **Refs for polling callbacks (stale closure fix)**: When state values are checked inside `setInterval` callbacks, the callback captures stale state from when the interval was created. To get current values inside polling callbacks:` | L1774 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me read that section and update it. The stale closure fix using refs is still valid for the TestsTabContent polling (which uses refs for viewingTestResultsRef, etc.), but I should clarify that the TestRunnerDialog now uses a simpler pattern with effect cleanup.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The State Management section looks fine. The refs for polling callbacks pattern is still used in TestsTabContent, so that documentation is still valid. The TestRunnerDialog now uses a simpler approach with effect cleanup, which is already documented in the View Mode Dialogs section I just updated.
+
+I should also add a note about preferring effect cleanup over complex ref tracking where possible.</details></think>
+
+---
+
+Cancelled
+
+---
+
+_**User (2026-01-17 12:52Z)**_
+
+use a common polling interval of 3 seconds across all polls
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to standardize the polling interval to 3 seconds across all polling locations in the codebase. Let me search for all places where polling intervals are set.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "setInterval.*\d+\d\d\d" in "/Users/aman/Documents/repos/artpark/pense-frontend/src" • 1 match</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/components/agent-tabs/TestsTabContent.tsx` | `pendingRunsPollingRef.current = setInterval(pollPendingRuns, 3000);` | L437 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me search more broadly for polling intervals:</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for ", 2000\)" in "/Users/aman/Documents/repos/artpark/pense-frontend/src" • 9 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/components/TestRunnerDialog.tsx` | `\}, 2000);` | L156 |
+| `src/components/TestRunnerDialog.tsx` | `\}, 2000);` | L434 |
+| `src/components/TestRunnerDialog.tsx` | `setTimeout(pollSingleTest, 2000);` | L570 |
+| `src/components/TestRunnerDialog.tsx` | `setTimeout(pollSingleTest, 2000);` | L594 |
+| `src/components/TestRunnerDialog.tsx` | `\}, 2000);` | L691 |
+| `src/app/tts/[uuid]/page.tsx` | `\}, 2000);` | L137 |
+| `src/app/stt/[uuid]/page.tsx` | `\}, 2000);` | L143 |
+| `src/components/BenchmarkResultsDialog.tsx` | `\}, 2000);` | L117 |
+| `src/components/BenchmarkResultsDialog.tsx` | `\}, 2000);` | L231 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to change all polling intervals from 2000ms to 3000ms. Let me do this for each file:
+
+1. TestRunnerDialog.tsx - lines 156, 434, 570, 594, 691
+2. tts/[uuid]/page.tsx - line 137
+3. stt/[uuid]/page.tsx - line 143
+4. BenchmarkResultsDialog.tsx - lines 117, 231
+
+Let me make all these changes.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -154,5 +154,5 @@
+      pollingIntervalRef.current = setInterval(() =&gt; {
+        pollTaskStatus(taskId, backendUrl);
+-     }, 2000);
++     }, 3000);
+  
+      return () =&gt; {
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -432,5 +432,5 @@
+        pollingIntervalRef.current = setInterval(() =&gt; {
+          pollTaskStatus(newTaskId, backendUrl);
+-       }, 2000);
++       }, 3000);
+  
+        // Also poll immediately to get the first result
+```
+
+**Chunk 3**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -568,5 +568,5 @@
+            } else {
+              // Continue polling
+-             setTimeout(pollSingleTest, 2000);
++             setTimeout(pollSingleTest, 3000);
+            }
+          } catch (error) {
+```
+
+**Chunk 4**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -592,5 +592,5 @@
+          result.status === "queued"
+        ) {
+-         setTimeout(pollSingleTest, 2000);
++         setTimeout(pollSingleTest, 3000);
+        } else if (result.status === "completed" || result.status === "done") {
+          const apiResult = result.results?.find(
+```
+
+**Chunk 5**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -689,5 +689,5 @@
+          pollingIntervalRef.current = setInterval(() =&gt; {
+            pollTaskStatus(result.task_id, backendUrl);
+-         }, 2000);
++         }, 3000);
+        } else if (result.status === "completed" || result.status === "done") {
+          if (result.results &amp;&amp; result.results.length &gt; 0) {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/tts/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -135,5 +135,5 @@
+            pollingIntervalRef.current = setInterval(() =&gt; {
+              pollTaskStatus(taskId, backendUrl);
+-           }, 2000);
++           }, 3000);
+          }
+        } catch (err) {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -141,5 +141,5 @@
+            pollingIntervalRef.current = setInterval(() =&gt; {
+              pollTaskStatus(taskId, backendUrl);
+-           }, 2000);
++           }, 3000);
+          }
+        } catch (err) {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -115,5 +115,5 @@
+            pollingIntervalRef.current = setInterval(() =&gt; {
+              pollBenchmarkStatus(taskId, backendUrl);
+-           }, 2000);
++           }, 3000);
+            pollBenchmarkStatus(taskId, backendUrl);
+          } else {
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -229,5 +229,5 @@
+        pollingIntervalRef.current = setInterval(() =&gt; {
+          pollBenchmarkStatus(newTaskId, backendUrl);
+-       }, 2000);
++       }, 3000);
+  
+        // Also poll immediately
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I've changed all the polling intervals from 2000ms to 3000ms. Let me check for any linting errors:</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 4 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/tts/[uuid]/page.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx`
+
+Lint results
+
+Lint errors for `src/app/tts/[uuid]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+Lint errors for `src/app/stt/[uuid]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+Lint errors for `src/components/TestRunnerDialog.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+| 'runStatus' is declared but its value is never read. | 113:10-113:19 | DIAGNOSTIC_SEVERITY_HINT |
+| 'currentTaskId' is declared but its value is never read. | 116:10-116:23 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryTest' is declared but its value is never read. | 452:9-452:18 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryAllFailed' is declared but its value is never read. | 630:9-630:23 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryAll' is declared but its value is never read. | 734:9-734:17 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+All files updated with no linting errors. Now all polling across the app uses a consistent 3 second interval:- TestRunnerDialog.tsx - 5 locations
+- tts/[uuid]/page.tsx - 1 location  
+- stt/[uuid]/page.tsx - 1 location
+- BenchmarkResultsDialog.tsx - 2 locations
+- TestsTabContent.tsx - was already 3000ms</details></think>
+
+---
+
+Done! All polling intervals are now standardized to 3 seconds across the codebase:
+
+- **TestRunnerDialog.tsx** - 5 locations updated (interval for viewing runs, new runs, single test retry, retry all failed)
+- **tts/[uuid]/page.tsx** - 1 location updated (TTS evaluation polling)
+- **stt/[uuid]/page.tsx** - 1 location updated (STT evaluation polling)
+- **BenchmarkResultsDialog.tsx** - 2 locations updated (benchmark results polling)
+- **TestsTabContent.tsx** - was already at 3000ms ✓
+
+---
+
+_**User (2026-01-17 12:52Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to standardize polling intervals from 2000ms to 3000ms across multiple files. Let me find and update any references to polling intervals in the app-details.md file.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "2 seconds|every 2|2000" in "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md" • 2 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.cursor/rules/app-details.md` | `- Polls every 2 seconds while status is `queued` or `in_progress`` | L651 |
+| `.cursor/rules/app-details.md` | `- **In-progress runs** (`pending`/`queued`/`in_progress`): Initializes tests as "running" (yellow), polls API every 2 seconds until complete` | L718 |
+
+
+</details>
+</tool-use>
+
+---
+
+_**User (2026-01-17 12:52Z)**_
+
+use a shared variable 
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to use a shared variable/constant for the polling interval instead of hardcoding 3000ms in multiple places. Let me create a constant in a shared location and update all the polling locations to use it.
+
+I should create this constant in a shared location like `src/lib/` or `src/constants/`. Let me check what exists in those directories.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="list_dir">
+<details>
+            <summary>Tool use: **list_dir** • Listed directory, 0 results</summary>
+        
+No results found
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I'll create a new file for shared constants or add to an existing shared location. Let me create a simple constants file for polling and other app-wide constants.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="write">
+
+<details><summary>Tool use: **write** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/constants/polling.ts</summary>
+
+**Chunk 1**
+Lines added: 7, lines removed: 1
+
+```diff
+@@ -1,1 +1,7 @@
+- 
++ /**
++  * Polling interval in milliseconds for async task status checks.
++  * Used across: TestRunnerDialog, BenchmarkResultsDialog, TestsTabContent,
++  * STT evaluation, TTS evaluation, simulation runs.
++  */
++ export const POLLING_INTERVAL_MS = 3000;
++ 
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update all the files that use the polling interval to import and use this constant. Let me update each file:1. TestRunnerDialog.tsx
+2. BenchmarkResultsDialog.tsx
+3. TestsTabContent.tsx
+4. stt/[uuid]/page.tsx
+5. tts/[uuid]/page.tsx
+6. simulations/[uuid]/runs/[runId]/page.tsx (if it has polling)Let me first check the simulation runs page for polling:</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "setInterval|3000" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx" • 2 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/app/simulations/[uuid]/runs/[runId]/page.tsx` | `pollInterval = setInterval(() => \{` | L187 |
+| `src/app/simulations/[uuid]/runs/[runId]/page.tsx` | `\}, 3000);` | L189 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, the simulation runs page also uses 3000ms. Now let me update all files to use the shared constant.</details></think>
+
+---
+
+Now let me update all files to use this shared constant:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/TestsTabContent.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/tts/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I have the import sections of all files. Let me update each file to import and use the shared constant.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -13,4 +13,5 @@
+    TestStats,
+  } from "./test-results/shared";
++ import { POLLING_INTERVAL_MS } from "@/constants/polling";
+  
+  type TestData = {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -13,4 +13,5 @@
+  import { LeaderboardBarChart, getColorMap } from "./charts/LeaderboardBarChart";
+  import { DownloadableTable } from "./DownloadableTable";
++ import { POLLING_INTERVAL_MS } from "@/constants/polling";
+  
+  type BenchmarkTestResult = {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/TestsTabContent.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -7,4 +7,5 @@
+  import { BenchmarkDialog } from "@/components/BenchmarkDialog";
+  import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
++ import { POLLING_INTERVAL_MS } from "@/constants/polling";
+  
+  type TestData = {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -12,4 +12,5 @@
+  } from "@/components/charts/LeaderboardBarChart";
+  import { DownloadableTable } from "@/components/DownloadableTable";
++ import { POLLING_INTERVAL_MS } from "@/constants/polling";
+  
+  type MetricItem =
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/tts/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -12,4 +12,5 @@
+  } from "@/components/charts/LeaderboardBarChart";
+  import { DownloadableTable } from "@/components/DownloadableTable";
++ import { POLLING_INTERVAL_MS } from "@/constants/polling";
+  
+  type MetricItem =
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -7,4 +7,5 @@
+  import { Tooltip } from "@/components/Tooltip";
+  import { formatStatus, getStatusBadgeClass } from "@/lib/status";
++ import { POLLING_INTERVAL_MS } from "@/constants/polling";
+  
+  type MetricData = {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to replace all the hardcoded 3000 values with `POLLING_INTERVAL_MS`:</details></think>
+
+---
+
+Now let me replace the hardcoded `3000` values with `POLLING_INTERVAL_MS`:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -155,5 +155,5 @@
+      pollingIntervalRef.current = setInterval(() =&gt; {
+        pollTaskStatus(taskId, backendUrl);
+-     }, 3000);
++     }, POLLING_INTERVAL_MS);
+  
+      return () =&gt; {
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -433,5 +433,5 @@
+        pollingIntervalRef.current = setInterval(() =&gt; {
+          pollTaskStatus(newTaskId, backendUrl);
+-       }, 3000);
++       }, POLLING_INTERVAL_MS);
+  
+        // Also poll immediately to get the first result
+```
+
+**Chunk 3**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -569,5 +569,5 @@
+            } else {
+              // Continue polling
+-             setTimeout(pollSingleTest, 3000);
++             setTimeout(pollSingleTest, POLLING_INTERVAL_MS);
+            }
+          } catch (error) {
+```
+
+**Chunk 4**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -593,5 +593,5 @@
+          result.status === "queued"
+        ) {
+-         setTimeout(pollSingleTest, 3000);
++         setTimeout(pollSingleTest, POLLING_INTERVAL_MS);
+        } else if (result.status === "completed" || result.status === "done") {
+          const apiResult = result.results?.find(
+```
+
+**Chunk 5**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -690,5 +690,5 @@
+          pollingIntervalRef.current = setInterval(() =&gt; {
+            pollTaskStatus(result.task_id, backendUrl);
+-         }, 3000);
++         }, POLLING_INTERVAL_MS);
+        } else if (result.status === "completed" || result.status === "done") {
+          if (result.results &amp;&amp; result.results.length &gt; 0) {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -116,5 +116,5 @@
+            pollingIntervalRef.current = setInterval(() =&gt; {
+              pollBenchmarkStatus(taskId, backendUrl);
+-           }, 3000);
++           }, POLLING_INTERVAL_MS);
+            pollBenchmarkStatus(taskId, backendUrl);
+          } else {
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -230,5 +230,5 @@
+        pollingIntervalRef.current = setInterval(() =&gt; {
+          pollBenchmarkStatus(newTaskId, backendUrl);
+-       }, 3000);
++       }, POLLING_INTERVAL_MS);
+  
+        // Also poll immediately
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/TestsTabContent.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -436,5 +436,5 @@
+      // Start polling every 3 seconds
+      pollPendingRuns(); // Poll immediately
+-     pendingRunsPollingRef.current = setInterval(pollPendingRuns, 3000);
++     pendingRunsPollingRef.current = setInterval(pollPendingRuns, POLLING_INTERVAL_MS);
+  
+      return () =&gt; {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -142,5 +142,5 @@
+            pollingIntervalRef.current = setInterval(() =&gt; {
+              pollTaskStatus(taskId, backendUrl);
+-           }, 3000);
++           }, POLLING_INTERVAL_MS);
+          }
+        } catch (err) {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/tts/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -136,5 +136,5 @@
+            pollingIntervalRef.current = setInterval(() =&gt; {
+              pollTaskStatus(taskId, backendUrl);
+-           }, 3000);
++           }, POLLING_INTERVAL_MS);
+          }
+        } catch (err) {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -188,5 +188,5 @@
+      pollInterval = setInterval(() =&gt; {
+        fetchRunData(false);
+-     }, 3000);
++     }, POLLING_INTERVAL_MS);
+  
+      // Cleanup on unmount
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me check for any linting errors:</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 7 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/constants/polling.ts`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/BenchmarkResultsDialog.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/agent-tabs/TestsTabContent.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/tts/[uuid]/page.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx`
+
+Lint results
+
+Lint errors for `src/app/tts/[uuid]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+Lint errors for `src/app/stt/[uuid]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+Lint errors for `src/components/agent-tabs/TestsTabContent.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+Lint errors for `src/app/simulations/[uuid]/runs/[runId]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+| 'getPassFailStatus' is declared but its value is never read. | 211:9-211:26 | DIAGNOSTIC_SEVERITY_HINT |
+| 'getPassFailClass' is declared but its value is never read. | 215:9-215:25 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+Lint errors for `src/components/TestRunnerDialog.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+| 'runStatus' is declared but its value is never read. | 114:10-114:19 | DIAGNOSTIC_SEVERITY_HINT |
+| 'currentTaskId' is declared but its value is never read. | 117:10-117:23 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryTest' is declared but its value is never read. | 453:9-453:18 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryAllFailed' is declared but its value is never read. | 631:9-631:23 | DIAGNOSTIC_SEVERITY_HINT |
+| 'retryAll' is declared but its value is never read. | 735:9-735:17 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+All files updated successfully. Now let me verify by searching for any remaining hardcoded 3000 values related to polling:</details></think>
+
+---
+
+Let me verify all polling intervals now use the shared constant:
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "setInterval.*3000|setTimeout.*3000" in "/Users/aman/Documents/repos/artpark/pense-frontend/src" • 0 matches</summary>
+
+Output mode: content
+
+
+_No matches found_
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+All hardcoded values have been replaced. Let me verify by checking for POLLING_INTERVAL_MS usage:</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "POLLING_INTERVAL_MS" in "/Users/aman/Documents/repos/artpark/pense-frontend/src" • 18 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/app/simulations/[uuid]/runs/[runId]/page.tsx` | `import \{ POLLING_INTERVAL_MS \} from "@/constants/polling";` | L9 |
+| `src/app/simulations/[uuid]/runs/[runId]/page.tsx` | `\}, POLLING_INTERVAL_MS);` | L190 |
+| `src/app/tts/[uuid]/page.tsx` | `import \{ POLLING_INTERVAL_MS \} from "@/constants/polling";` | L14 |
+| `src/app/tts/[uuid]/page.tsx` | `\}, POLLING_INTERVAL_MS);` | L138 |
+| `src/app/stt/[uuid]/page.tsx` | `import \{ POLLING_INTERVAL_MS \} from "@/constants/polling";` | L14 |
+| `src/app/stt/[uuid]/page.tsx` | `\}, POLLING_INTERVAL_MS);` | L144 |
+| `src/components/agent-tabs/TestsTabContent.tsx` | `import \{ POLLING_INTERVAL_MS \} from "@/constants/polling";` | L9 |
+| `src/components/agent-tabs/TestsTabContent.tsx` | `pendingRunsPollingRef.current = setInterval(pollPendingRuns, POLLING_INTERVAL_MS);` | L438 |
+| `src/components/BenchmarkResultsDialog.tsx` | `import \{ POLLING_INTERVAL_MS \} from "@/constants/polling";` | L15 |
+| `src/components/BenchmarkResultsDialog.tsx` | `\}, POLLING_INTERVAL_MS);` | L118 |
+| `src/components/BenchmarkResultsDialog.tsx` | `\}, POLLING_INTERVAL_MS);` | L232 |
+| `src/components/TestRunnerDialog.tsx` | `import \{ POLLING_INTERVAL_MS \} from "@/constants/polling";` | L15 |
+| `src/components/TestRunnerDialog.tsx` | `\}, POLLING_INTERVAL_MS);` | L157 |
+| `src/components/TestRunnerDialog.tsx` | `\}, POLLING_INTERVAL_MS);` | L435 |
+| `src/components/TestRunnerDialog.tsx` | `setTimeout(pollSingleTest, POLLING_INTERVAL_MS);` | L571 |
+| `src/components/TestRunnerDialog.tsx` | `setTimeout(pollSingleTest, POLLING_INTERVAL_MS);` | L595 |
+| `src/components/TestRunnerDialog.tsx` | `\}, POLLING_INTERVAL_MS);` | L692 |
+| `src/constants/polling.ts` | `export const POLLING_INTERVAL_MS = 3000;` | L6 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+All polling intervals are now using the shared `POLLING_INTERVAL_MS` constant. The constant is defined in `src/constants/polling.ts` and is used in:1. TestRunnerDialog.tsx - 5 uses
+2. BenchmarkResultsDialog.tsx - 2 uses
+3. TestsTabContent.tsx - 1 use
+4. stt/[uuid]/page.tsx - 1 use
+5. tts/[uuid]/page.tsx - 1 use
+6. simulations/[uuid]/runs/[runId]/page.tsx - 1 use
+
+Total: 11 usages of the constant.</details></think>
+
+---
+
+Done! Created a shared constant `POLLING_INTERVAL_MS` in `src/constants/polling.ts` and updated all 6 files to use it:
+
+- **`src/constants/polling.ts`** - New file with `POLLING_INTERVAL_MS = 3000`
+- **`TestRunnerDialog.tsx`** - 5 polling locations
+- **`BenchmarkResultsDialog.tsx`** - 2 polling locations
+- **`TestsTabContent.tsx`** - 1 polling location
+- **`stt/[uuid]/page.tsx`** - 1 polling location
+- **`tts/[uuid]/page.tsx`** - 1 polling location
+- **`simulations/[uuid]/runs/[runId]/page.tsx`** - 1 polling location
+
+Now to change the polling interval across the entire app, you only need to update the single constant in `src/constants/polling.ts`.
+
+---
+
+_**User (2026-01-17 12:52Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to:
+1. Create a shared constant `POLLING_INTERVAL_MS` in `src/constants/polling.ts`
+2. Updated 6 files to use this shared constant instead of hardcoded values
+
+I need to update the app-details.md to reflect:
+1. The new constant and its location
+2. Update any references to "2 seconds" or "3 seconds" polling to reference the shared constant
+3. Document the pattern of using shared constants for configuration values
+
+Let me search for relevant sections to update.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "every [23] seconds|polls.*seconds|polling.*seconds" in "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md" • 4 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.cursor/rules/app-details.md` | `- `TestsTabContent` uses a `useEffect` that polls all pending runs every 3 seconds` | L127 |
+| `.cursor/rules/app-details.md` | `- Page polls API every 3 seconds while status is `in_progress`` | L292 |
+| `.cursor/rules/app-details.md` | `- Polls every 2 seconds while status is `queued` or `in_progress`` | L651 |
+| `.cursor/rules/app-details.md` | `- **In-progress runs** (`pending`/`queued`/`in_progress`): Initializes tests as "running" (yellow), polls API every 2 seconds until complete` | L718 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I found 4 references. Two say "2 seconds" (outdated) and two say "3 seconds". Let me update all of them to reference the shared constant and be consistent. I'll also add documentation about the new constant.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -649,5 +649,5 @@
+  
+  - Fetches result from &#96;GET /[tts|stt]/evaluate/{uuid}&#96; (NOT from &#96;/jobs&#96;)
+- - Polls every 2 seconds while status is &#96;queued&#96; or &#96;in_progress&#96;
++ - Polls at &#96;POLLING_INTERVAL_MS&#96; (3 seconds) while status is &#96;queued&#96; or &#96;in_progress&#96;
+  - Shows loading/in-progress states during polling
+  - Uses &#96;BackHeader&#96; component for back navigation
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -716,5 +716,5 @@
+      - **Behavior based on &#96;initialRunStatus&#96;**:
+        - **Completed runs** (&#96;done&#96;/&#96;completed&#96;): Clears test results initially, fetches fresh from API once (no polling), displays actual pass/fail status
+-       - **In-progress runs** (&#96;pending&#96;/&#96;queued&#96;/&#96;in_progress&#96;): Initializes tests as "running" (yellow), polls API every 2 seconds until complete
++       - **In-progress runs** (&#96;pending&#96;/&#96;queued&#96;/&#96;in_progress&#96;): Initializes tests as "running" (yellow), polls API at &#96;POLLING_INTERVAL_MS&#96; until complete
+      - **Props for viewing past runs**:
+        - &#96;taskId&#96;: The run UUID to fetch results for
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me add documentation about the shared constant. I should find the constants section or create one if it doesn't exist. Let me check the project structure section.</details></think>
+
+---
+
+Now let me add documentation about the shared polling constant in the project structure section:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me add a note about the constants directory and the shared polling constant. I'll update the project structure section to include more detail about the constants.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: undefined
+
+```diff
+@@ -415,4 +415,6 @@
+  │   │   └── ui/                # Reusable UI components (Button, SearchInput, etc.)
+  │   ├── constants/             # Static configuration data
++ │   │   ├── inbuilt-tools.ts   # Built-in tool definitions
++ │   │   └── polling.ts         # POLLING_INTERVAL_MS (3000ms) - shared polling interval
+  │   ├── hooks/                 # Custom React hooks (useCrudResource, etc.)
+  │   ├── lib/                   # Utility libraries (api.ts, status.ts, etc.)
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me find the Polling for Async Tasks section and update it to mention the shared constant:</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "Polling for Async Tasks" in "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md" • 1 match</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.cursor/rules/app-details.md` | `### Polling for Async Tasks` | L1580 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me read that section and update it:</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me update the polling pattern section to reference the shared constant:</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 4, lines removed: undefined
+
+```diff
+@@ -1610,6 +1610,10 @@
+  
+  **Polling Pattern:**
++ 
++ All polling uses the shared &#96;POLLING_INTERVAL_MS&#96; constant from &#96;@/constants/polling&#96;:
+  
+  &#96;&#96;&#96;tsx
++ import { POLLING_INTERVAL_MS } from "@/constants/polling";
++ 
+  useEffect(() =&gt; {
+    let pollInterval: NodeJS.Timeout | null = null;
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1628,5 +1632,5 @@
+  
+    fetchData(true);
+-   pollInterval = setInterval(() =&gt; fetchData(false), 3000);
++   pollInterval = setInterval(() =&gt; fetchData(false), POLLING_INTERVAL_MS);
+  
+    return () =&gt; {
+```
+
+**Chunk 3**
+Lines added: 2, lines removed: undefined
+
+```diff
+@@ -1635,4 +1639,6 @@
+  }, [dependency]);
+  &#96;&#96;&#96;
++ 
++ **Files using &#96;POLLING_INTERVAL_MS&#96;:** TestRunnerDialog, BenchmarkResultsDialog, TestsTabContent, STT/TTS evaluation pages, simulation run page.
+  
+  ### Linkable Table Rows Pattern
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I've updated the documentation to reflect:1. The new shared constant `POLLING_INTERVAL_MS` in `src/constants/polling.ts`
+2. Updated the project structure to show the constants directory contents
+3. Updated the polling pattern section to use the shared constant
+4. Updated references from "2 seconds" to reference the shared constant5. Listed all files that use the shared constant
+
+This documents the new pattern of using a shared constant for the polling interval.</details></think>
+
+---
+
+Updated the documentation with:
+
+1. **Project structure** - Added `polling.ts` under constants directory with description
+2. **Polling for Async Tasks section** - Updated the polling pattern to show importing and using `POLLING_INTERVAL_MS`
+3. **Fixed outdated references** - Changed "2 seconds" mentions to reference the shared constant
+4. **Added list of files** using the shared constant
+
+---
+
+_**User (2026-01-17 12:52Z)**_
+
+create a simple cool maintenance page that can be shown when shipping a change
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants a maintenance page that can be shown when deploying changes. This is typically a simple, visually appealing page that informs users the site is temporarily down for maintenance.
+
+I'll create a maintenance page in the Next.js app that:
+1. Has a clean, modern design
+2. Shows a maintenance message
+3. Has some visual appeal (maybe an icon or animation)
+4. Can be enabled/disabled easily
+
+Let me create a maintenance page at `/maintenance` and also think about how to enable it (maybe via an environment variable or a simple flag).</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="write">
+
+<details><summary>Tool use: **write** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/maintenance/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 121, lines removed: 1
+
+```diff
+@@ -1,1 +1,121 @@
+- 
++ "use client";
++ 
++ import { useEffect, useState } from "react";
++ 
++ export default function MaintenancePage() {
++   const [dots, setDots] = useState("");
++ 
++   useEffect(() =&gt; {
++     const interval = setInterval(() =&gt; {
++       setDots((prev) =&gt; (prev.length &gt;= 3 ? "" : prev + "."));
++     }, 500);
++     return () =&gt; clearInterval(interval);
++   }, []);
++ 
++   return (
++     &lt;div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center p-8 overflow-hidden relative"&gt;
++       {/* Animated background gradient */}
++       &lt;div className="absolute inset-0 overflow-hidden"&gt;
++         &lt;div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-violet-600/20 via-transparent to-transparent rounded-full blur-3xl animate-pulse" /&gt;
++         &lt;div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-to-tl from-cyan-600/20 via-transparent to-transparent rounded-full blur-3xl animate-pulse delay-1000" /&gt;
++       &lt;/div&gt;
++ 
++       {/* Grid pattern overlay */}
++       &lt;div
++         className="absolute inset-0 opacity-[0.03]"
++         style={{
++           backgroundImage: &#96;linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)&#96;,
++           backgroundSize: "50px 50px",
++         }}
++       /&gt;
++ 
++       {/* Content */}
++       &lt;div className="relative z-10 text-center max-w-lg"&gt;
++         {/* Animated gear icon */}
++         &lt;div className="mb-8 flex justify-center"&gt;
++           &lt;div className="relative"&gt;
++             &lt;svg
++               className="w-24 h-24 text-violet-400 animate-spin-slow"
++               viewBox="0 0 24 24"
++               fill="none"
++               stroke="currentColor"
++               strokeWidth="1.5"
++             &gt;
++               &lt;path
++                 strokeLinecap="round"
++                 strokeLinejoin="round"
++                 d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z"
++               /&gt;
++               &lt;path
++                 strokeLinecap="round"
++                 strokeLinejoin="round"
++                 d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
++               /&gt;
++             &lt;/svg&gt;
++             {/* Decorative ring */}
++             &lt;div className="absolute inset-0 rounded-full border border-violet-500/30 animate-ping" /&gt;
++           &lt;/div&gt;
++         &lt;/div&gt;
++ 
++         {/* Main heading */}
++         &lt;h1 className="text-4xl md:text-5xl font-bold text-white mb-4 tracking-tight"&gt;
++           Under Maintenance
++         &lt;/h1&gt;
++ 
++         {/* Subheading with animated dots */}
++         &lt;p className="text-xl text-gray-400 mb-8"&gt;
++           We&amp;apos;re upgrading our systems
++           &lt;span className="inline-block w-8 text-left"&gt;{dots}&lt;/span&gt;
++         &lt;/p&gt;
++ 
++         {/* Description */}
++         &lt;p className="text-gray-500 mb-10 leading-relaxed"&gt;
++           Pense is currently undergoing scheduled maintenance to bring you new
++           features and improvements. We&amp;apos;ll be back shortly.
++         &lt;/p&gt;
++ 
++         {/* Status indicator */}
++         &lt;div className="inline-flex items-center gap-3 px-5 py-3 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm"&gt;
++           &lt;span className="relative flex h-3 w-3"&gt;
++             &lt;span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"&gt;&lt;/span&gt;
++             &lt;span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"&gt;&lt;/span&gt;
++           &lt;/span&gt;
++           &lt;span className="text-sm text-gray-300 font-medium"&gt;
++             Maintenance in progress
++           &lt;/span&gt;
++         &lt;/div&gt;
++       &lt;/div&gt;
++ 
++       {/* Footer */}
++       &lt;div className="absolute bottom-8 text-center"&gt;
++         &lt;p className="text-gray-600 text-sm"&gt;
++           Questions?{" "}
++           &lt;a
++             href="mailto:support@pense.ai"
++             className="text-violet-400 hover:text-violet-300 transition-colors"
++           &gt;
++             Contact support
++           &lt;/a&gt;
++         &lt;/p&gt;
++       &lt;/div&gt;
++ 
++       &lt;style jsx&gt;{&#96;
++         @keyframes spin-slow {
++           from {
++             transform: rotate(0deg);
++           }
++           to {
++             transform: rotate(360deg);
++           }
++         }
++         .animate-spin-slow {
++           animation: spin-slow 8s linear infinite;
++         }
++         .delay-1000 {
++           animation-delay: 1s;
++         }
++       &#96;}&lt;/style&gt;
++     &lt;/div&gt;
++   );
++ }
++ 
+```
 
 </details>
 
@@ -1475,6 +3308,1224 @@ Status: **loading**
 ---
 
 
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me check for linting errors and also create a simple layout file if needed.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/maintenance/page.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+No linting errors. The maintenance page is ready. Let me test it in the browser to see how it looks.</details></think>
+
+---
+
+Let me check if the dev server is running and then preview the page:
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="list_dir">
+<details>
+            <summary>Tool use: **list_dir** • Listed directory, 0 results</summary>
+        
+No results found
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The dev server is running in terminal 1. Let me navigate to the maintenance page.</details></think>
+
+---
+
+The dev server is running. Let me navigate to the maintenance page to see how it looks:
+
+---
+
+<tool-use data-tool-type="mcp" data-tool-name="mcp_cursor-ide-browser_browser_navigate">
+<details>
+          <summary>Tool use: **mcp_cursor-ide-browser_browser_navigate**</summary>
+      
+*Called tool*: cursor-ide-browser - browser_navigate: Navigate to a URL
+
+*Parameters*:
+  * url: http://localhost:3000/maintenance
+
+*Result*:
+### Action: snapshot
+
+### Page state
+- Page URL: http://localhost:3000/login
+- Page Title: Login | Pense
+- Page Snapshot:
+```yaml
+- role: generic
+  ref: ref-1h50f34dd1d
+  children:
+    - role: generic
+      ref: ref-qgx8k99o27
+      children:
+        - role: generic
+          ref: ref-fku2cvro3y
+          children:
+            - role: generic
+              ref: ref-t38z0kp0eq
+              children:
+                - role: heading
+                  name: Sign in to continue
+                  ref: ref-rknmgzm5qgd
+                - role: button
+                  name: Continue with Google
+                  ref: ref-6tzf097sc7u
+                  children:
+                    - role: img
+                      ref: ref-swiz0g4wavg
+                - role: generic
+                  name: By  igning in, you agree to our Term  of Service and Privacy Policy
+                  ref: ref-1i4eazs21gjh
+                  children:
+                    - role: link
+                      name: Term  of Service
+                      ref: ref-6ufhenupfnf
+                    - role: link
+                      name: Privacy Policy
+                      ref: ref-j9wffmyjgd8
+            - role: generic
+              name: © 2026 Pen e. All right  re erved.
+              ref: ref-d2pzna7f9z9
+```
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see it redirected to login. The app has authentication. I should log in first or check if there's a way to bypass it for this page. Let me see if I can make the maintenance page bypass authentication.</details></think>
+
+---
+
+The app redirected to login because of authentication. Let me check the middleware to see how to make the maintenance page publicly accessible:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/middleware.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to add the maintenance page as a public route. Let me update the middleware to allow the maintenance page without authentication.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/middleware.ts</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: 2
+
+```diff
+@@ -7,7 +7,8 @@
+    const isAuthRoute = req.nextUrl.pathname.startsWith("/api/auth");
+    const isDebugRoute = req.nextUrl.pathname.startsWith("/debug") || req.nextUrl.pathname.startsWith("/api/debug");
++   const isMaintenancePage = req.nextUrl.pathname === "/maintenance";
+  
+-   // Allow auth API routes and debug routes
+-   if (isAuthRoute || isDebugRoute) {
++   // Allow auth API routes, debug routes, and maintenance page
++   if (isAuthRoute || isDebugRoute || isMaintenancePage) {
+      return NextResponse.next();
+    }
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I've updated the middleware. Let me check for linting errors and then navigate to the maintenance page again.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/middleware.ts`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me navigate to the maintenance page again now that it should be publicly accessible.</details></think>
+
+---
+
+<tool-use data-tool-type="mcp" data-tool-name="mcp_cursor-ide-browser_browser_navigate">
+<details>
+          <summary>Tool use: **mcp_cursor-ide-browser_browser_navigate**</summary>
+      
+*Called tool*: cursor-ide-browser - browser_navigate: Navigate to a URL
+
+*Parameters*:
+  * url: http://localhost:3000/maintenance
+
+*Result*:
+### Action: snapshot
+
+### Page state
+- Page URL: http://localhost:3000/maintenance
+- Page Title: Pense
+- Page Snapshot:
+```yaml
+- role: generic
+  ref: ref-j5z9xr1fad
+  children:
+    - role: generic
+      ref: ref-j66elcdpch
+      children:
+        - role: generic
+          ref: ref-452wxss8xlj
+          children:
+            - role: generic
+              name: Que tion ? Contact  upport
+              ref: ref-eofp87gf3fc
+              children:
+                - role: link
+                  name: Contact  upport
+                  ref: ref-mwumvkea89
+```
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The page is loading but the content seems minimal. Let me take a screenshot to see how it actually looks visually.</details></think>
+
+---
+
+<tool-use data-tool-type="mcp" data-tool-name="mcp_cursor-ide-browser_browser_take_screenshot">
+<details>
+          <summary>Tool use: **mcp_cursor-ide-browser_browser_take_screenshot**</summary>
+      
+*Called tool*: cursor-ide-browser - browser_take_screenshot: Take a screenshot of the current page. You can't perform actions based on the screenshot, use browser_snapshot for actions.
+
+*Parameters*:
+  * 
+
+*Result*:
+Screenshot captured successfully
+Filename: page-2026-01-18T16-08-43-607Z.png
+Saved to: file:///var/folders/1f/s3v3bppd0ws4v19bk0l0f8gw0000gn/T/cursor/screenshots/page-2026-01-18T16-08-43-607Z.png
+
+*Result (type image)*: {"type":"image","data":"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jAEAACShhgMAAGVp48YrA4FA/uMsWbLk4ovfaceMCuqmm2756U9/dtIXY7HY5s0ffeyxx4s0KQAAAJjholQAAFCW6urqLrvs0v/7f7+T5zjXXHO12+22aVKFMzw8/J73XHHlle99xzv+9swzzxwZGfnDH/7w9a9/46WXXi721AAAADA7ajgAAFCuPvCB6/Os4Vwu13XXXWvfjArtO9/57ne+811VVRVF4UJUAACAEsdFqQAAoFytXfuWtrbWfEa46KK3trQ02zcjAAAAICNqOAAAUMauvz6v3RVuuOF6++YCAAAAmKGGAwAAZeyqq97v8/lye+38+fM7O9fbPSMAAABgdtwbDgBQNlasWD5//vxMj05OTu3bt++kL4bD4U2brjr77LOampqampYtWbI0FosODQ0dPXr0V7/69WOPPf7kk79OJBL5zOqtb72wvX3tihXLly9fvmLFioaGhqGhocHBwWeeefaxxx772c8eGx+fyGd8K1atWvmud13c1LRs2bKmpqZlTU1N9fX1R44cOXjwwIEDB/fvP/DKK39+5JEfjoyMWB8zq3fb4/HccMN17e1rV69e3dp6SiqVOnz48Nat/+eLX7wj73BzmD9/fmfn3/3gB4/k8NpNm67yeh3/Xeiss9ZcfPE73/CGM+fNmzdv3rz58+fV19dPTEwMDg4ODh4/dmzw5ZdffvTRHz/11NOaplkcc8GCBcuXt0z/48x7wz399G9OfH5jY+OqVStNBvztb3930tE9Hs9ll2248MILm5qWNTc3NTU1qap6/PjQ8ePHn332uccf//kTT/wiEolkGrC6OnT66aef+BXzt3r+/HnnnXfuSV8cHBz8859fNXnVierq6jZsuGTVqpXGX4GlS5cuXrx4ZGTkwIEDBw4cPHDgwP79+x999MdZbWHh8/nOPvsskye8+GLvzDfhLW+54LLLLm1paTHeulCoenh4+Pjx4319fY8//sRjjz22f/8B63PIxInzqjS/xxpaW0+5+OJ3NjUtW7p06dKlS5ctWzZ//vzh4eEjR44cPnz4yJGjvb29Dz/8yMDA/vyPZXDijAIAQA2FwuLv6VsJ9y0mowxkFENV1XLPeN555z7xxGMmT/jyl7/yyU9+Op9DvPji88uWLc306IEDB1evPv2kL371q/993XXXZHrJs88+195+4fQ/traecvPNN23adFVVVZXJNA4ePPS5z3U/+ODWVCp10kPmn6PL5XrPey697bbN5v+WfuzYsY997BPf//7DJ35x+/ZH3va2izK9ZNu2HRs3Xm0y5jSPx/N3f/fuD33oHy666K3GXy4T8Xj8kUd+eO+93+rp+dX0F00yWn+33/72t33hC7evXr36pOf8+Mc/ufzy91kJMm3OE29WP//5E5dcclmmR00y/v73vzvllFOyPdyqVauPHDky59POOmvNjTd+6OKL37l48SIrww4NDf3kJz+9//4H9+zpmfPJN974wS1b/ivTo7quV1fXnfiV97//ynvv/brJgAsXLpmYmDT+XF9f/8EPfuDGGz+0ZMlik5dEo9E777zrjju+NGsZd+65b/rFLx6fM4i5b33r/ltv/UfjzyY/Ps49900f/OAHrrji8kAgYD6gruu7du3+5je/tW3bDivd0NKlS3p7XzB5whVXXPnooz82/uzxeN73vvfecstN5t8TdF3/wQ8e/vd//2xf30snPWTlR6Sj51UBvsdm+2tAIBC47LJLjZZ/zifruv7UU0995zvf/f73Hx4aGrJ4iJnyPKMq4VcdMspARhnIWHa4KBUAINCll2546qlf3XjjB83//dD41+z//u8v7979iyVLllgf/7zzzt2795kHHrjP/N+3jVVLDzxw3/e+9x2TzjE3/+N/fOiFF/740ENb3/a2i+bs4BRF8fv9V175vp/+9NFnnnnapATM1uWyWbuCAAAgAElEQVSXv2fbtodndnCF9Na3Xnji0jCL1q1rz6GDs2LhwoV33XXnnj2/vP76ay12JcaCtauu2viTn/zogQe+tXRpFmejvVavXv2rX+3+zGf+xbyDUxQlGAx+7GO3/fGPz61d+5ZCze5kF1647le/2v2LXzy+adPVczYmxu/xF17Ycf/93+rre+EjH7nFxpnU1NQ88sj377nna3N+T1BV9fLL//63v33q5ps/nNUhSuq8cvp7rFFr/su/fPqVV3rvvffrVjo44709//zzt2z5r+ef3/uBD9yQ1eEMpXNGAQCkooYDAEhz6603b916v9/vt/6SNWve8ItfPH7qqadaefJb33rhzp3bVqxYYX38d7/7Xb/73dPvfve7rL/ERCAQuPfer99xxxfnLEpmtXr16h/+8Acf/eht+c/kDW848+6778p/nDy5XK7rrrs221fdcENeeztkcvXVV/3hD89ee+0mlyvH37Iuv/zvn3vudx/84Afsntrc1q1rf+KJnzU3N1l/SUNDw44dP/z7v8+4GtE5t9xy0/btPzzrrDU5vHbevHm33/6fW7feHwrN0SJZsXTpkscf/+lFF73V+ks8Hs8XvtB9++2ftfj8kjqvnP4ea/wHjB/9aHtX18fD4XAOM6yurv7KV760bdvDWf33j9I5owAAglHDAQBE2bTp6u7uz+Xwb6pLly757ncfqqmpNn/aJZd0Pvzw9+ZcADJTdXX1Pfd8bdEiq2tYMlm6dMljj/3k/e+/Mp9BXC7Xv/3bv3772w9WV4dyHkRV1QcfvC8YDOYzk6z8/OdPZHpo06ar3W639aHq6+svu+zSTI/+7GdZXxhruOGG6++++6uhUO7vqqGqqurLX95S4Caura1t27aHc2g9fD7fvffes2bNG5yZ1ywCgcDXv37X5z9/e1Yf+kzvec9lv/zlE6ecsiqfQfx+/86d28444+SL6K34yEdutfIpl9R5lef32OrqOb7HKopywQXn/+pXu/NfZfn2t7/tN7/59TnnnD3nM0vqjAIAyEYNBwCQo7Gx8XOf+4+cX75y5co77viiyRPe8pYLvv3tB3Lel7O+vv5rX7sz19kpiqKsXLmip2eXlX+rtOKyyzY8+ujOnOO0t69tbW21ZSYWPfTQd/bte37Wh5YsWfyud11sfaiNG6/MtJbnRz969Kmnns5hetdff91XvvIlKxcIW/SlL92RZ99qnaqqX/nKl3I+GXw+3/33f7MwnazP5/vRj7ZfffVVtox22mmn7tr1xMqVWSxuPcnHP/7RfP4idHd/znyNWEmdV3Z8j/2C+XPe/e53PfroTutX3Zqrra39/ve/a77A0/Yz6pe//Hk+ZxQAQDZqOACAHLff/tmGhoZ8Rrjqqo1nnnnmrA+5XK4vfvHzea6VeMc7/vZDH/qH3F7rcrnuueduk30Mc3DOOWf/67/+c26vveYaS/tI2Oub3/xWpoeyusj0hhuuz3yI+7Kfl9LS0rxlyxdt7EqMauxrX/tqU9MyG8fMZNOmqy3efiuTtrY2h67zPck///On3vzm82wcMBwOf+MbX8/tr/bq1W15Xt8dCARM/g6W2nll0/fYMzI9unDhwrvv/qq9+xcvXLjgBz/4Xm1tbaYnOHFG3XPP3Xn+sAAASEUNBwAQYs2aN1x11cb8x7n11ptm/fr111+X2z2DTvK5z322ra0thxdu3vxP55//5jmfpuv6kSNHn332uYMHD2maNufz//Efb123rj3bySxduuQ97ynC7cAeeug7sVhs1ofe+c53WLwH/HnnnXv66afN+tCBAwd/+tOf5TCxz3zmX6wvJbPyuRi8Xs9tt23OYT7Zuv32/8x/kJtv/nDOdy6z6IILzv+nf/pHK88cHR3du/cPr7zySiKRnPPJb37zeR//+EdzmM///t//6vN5c3jhiTo7/y7THiMldV7Z9T32lltm/x6rqurdd3+1sbEx/0Oc5LTTTv2v//r8rA+V2hkFABDPzv/WBABAEc1cevDqq6/++c+vjoyMrFy58tRTV1vZ9k5RlCuvfN9tt31saip64hfD4fBnPmN11dj4+PhLL7386qv94XDtqlWrmpqWndhNBIPBHHZNPfPMMz/96U+aP+eFF/70la/c+b3vfW9ycsr4it/vv/TSS26++aZzz31TplcZi+zOO++CsbEx6/NZsGCB9SfbKBKJfO9739+0aZaFeG63+9prN91+++z/sn0ik6VwDzzwYDqdznZWZ5215r3vvcL8OXv29Hzta3fv2/fCwYMH4vFEc3PTypUrr7/+2jnbzOuuu6a7+wtHjhzJdlZZ8Xj+6nfCwcHBl1566dChw0uWLD711FPr6+utDLJixYp169p/+ctdiqIcP35869Zvn/joFVdcbvJ38OWXX37yyV+f9MVf//qpE/8xFKq6556vmTd9g4OD99xz7733fmv6HVNV9S1vueCmmz586aWXmLz2f/2vrp/97LHf/e6ZuVL+lZPet8nJyRdf7B0Y2F9dHTrttNMs7kzqcrmuuWbTv//7yds1lNp55ej3WEVRPvzhG9/xjr+d8+X79x+47777X3zxxVdf7V+4cOGpp65+4xv/5v9n767D26reOICfWC1tUnd397m7u8MYbMgY2xgMhvuQHzBsgzFhDBgTpjB3Zm3XWbe6ru7umuT3xx0hpMltkiZtmn4/D89DlnvuuefknqTN23POO2fObPo5gwsXLvj4409zc/Mkn9TCEQUAADoPYTgAANBBR48e++ab7+7dixM/w2Qyw8PDtm79vsud1PX09CIjI69duy755NNPr1BkjsbDhw+/+OKr/fsPdHR0iJ/09vZ6443X5s+f1501Slu2fEs/6Wbnzl2vvLJB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","mimeType":"image/png"}
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The maintenance page looks great! It has:
+- A spinning gear icon with a decorative ring
+- A nice gradient background
+- "Under Maintenance" heading
+- Animated dots on the "We're upgrading our systems" text
+- A description about the maintenance
+- A status indicator pill showing "Maintenance in progress" with an amber pulsing dot
+- A footer with "Questions? Contact support" link
+
+The page looks clean and professional. The task is complete - I've created a simple cool maintenance page that can be shown when shipping changes.</details></think>
+
+---
+
+The maintenance page is ready and looks great! Here's what was created:
+
+**Created files:**
+- `src/app/maintenance/page.tsx` - The maintenance page component
+
+**Updated files:**
+- `src/middleware.ts` - Added `/maintenance` as a public route (no auth required)
+
+**Features:**
+- 🎨 Dark theme with animated gradient background
+- ⚙️ Slowly spinning gear icon with a decorative ping ring
+- ✨ Animated dots on the "We're upgrading our systems..." text  
+- 🟡 Pulsing amber status indicator showing "Maintenance in progress"
+- 📧 Contact support link in the footer
+- 📱 Responsive design
+- 🚫 No authentication required (publicly accessible)
+
+**To use it:**
+1. Navigate to `/maintenance` directly, or
+2. To show it app-wide during deployment, you could temporarily modify the middleware to redirect all routes to `/maintenance`
+
+---
+
+_**User (2026-01-17 12:52Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to update the app-details.md file with information about the maintenance page I just created. Let me read the current file to see where this information would fit best.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me search for where public routes are documented, or where I could add the maintenance page information.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "middleware|public route|auth" in "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md" • 44 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.cursor/rules/app-details.md` | `- **Authentication**: NextAuth.js v5 (beta) with Google OAuth` | L372 |
+| `.cursor/rules/app-details.md` | `│   │   ├── login/             # Authentication page (has layout.tsx)` | L405 |
+| `.cursor/rules/app-details.md` | `│   │   └── api/auth/          # NextAuth.js route handlers` | L406 |
+| `.cursor/rules/app-details.md` | `│   ├── auth.ts               # NextAuth.js configuration` | L421 |
+| `.cursor/rules/app-details.md` | `│   └── middleware.ts         # Route protection middleware` | L422 |
+| `.cursor/rules/app-details.md` | `### Authentication Flow` | L429 |
+| `.cursor/rules/app-details.md` | `The app uses NextAuth.js v5 with middleware-based route protection and backend sync:` | L431 |
+| `.cursor/rules/app-details.md` | `1. **Middleware** (`src/middleware.ts`) protects all routes:` | L433 |
+| `.cursor/rules/app-details.md` | `- Unauthenticated users → redirected to `/login`` | L435 |
+| `.cursor/rules/app-details.md` | `- Authenticated users on `/login` → redirected to `/agents`` | L436 |
+| `.cursor/rules/app-details.md` | `- Auth API routes (`/api/auth/*`) are always accessible` | L437 |
+| `.cursor/rules/app-details.md` | `3. **Login page** (`/login`) shows Google OAuth button` | L441 |
+| `.cursor/rules/app-details.md` | `4. **Backend sync**: On successful Google login, the `jwt` callback sends the Google ID token to `POST /auth/google` on the backend to create/retrieve the user` | L443 |
+| `.cursor/rules/app-details.md` | `5. **Session persistence**: NextAuth uses HTTP-only cookies, sessions persist across reloads` | L445 |
+| `.cursor/rules/app-details.md` | `- `session.backendUser` - Full response from backend `/auth/google` endpoint` | L452 |
+| `.cursor/rules/app-details.md` | `- `session.backendAccessToken` - JWT access token from backend (used for API authentication)` | L453 |
+| `.cursor/rules/app-details.md` | `**Backend `/auth/google` response structure:**` | L455 |
+| `.cursor/rules/app-details.md` | `// Check auth in client components` | L478 |
+| `.cursor/rules/app-details.md` | `import \{ useSession, signOut \} from "next-auth/react";` | L479 |
+| `.cursor/rules/app-details.md` | `// status: "loading" \| "authenticated" \| "unauthenticated"` | L482 |
+| `.cursor/rules/app-details.md` | `// Get JWT token for API authentication` | L484 |
+| `.cursor/rules/app-details.md` | `// Server-side auth check` | L493 |
+| `.cursor/rules/app-details.md` | `import \{ auth \} from "@/auth";` | L494 |
+| `.cursor/rules/app-details.md` | `const session = await auth();` | L495 |
+| `.cursor/rules/app-details.md` | `- **Auth token guard**: The useEffect must wait for `backendAccessToken` before starting polling:` | L740 |
+| `.cursor/rules/app-details.md` | `- Without this guard, API calls fail silently with `Authorization: Bearer undefined`` | L744 |
+| `.cursor/rules/app-details.md` | `- **All API calls require JWT authentication** via `Authorization` header` | L751 |
+| `.cursor/rules/app-details.md` | `import \{ useSession \} from "next-auth/react";` | L758 |
+| `.cursor/rules/app-details.md` | `import \{ useSession, signOut \} from "next-auth/react";` | L803 |
+| `.cursor/rules/app-details.md` | `Authorization: `Bearer $\{backendAccessToken\}`,` | L814 |
+| `.cursor/rules/app-details.md` | `\| Auth            \| `POST /auth/google` (body: `\{ id_token \}`)                                                                                                                                                                                                                        \|` | L1085 |
+| `.cursor/rules/app-details.md` | `### JWT Authentication` | L1209 |
+| `.cursor/rules/app-details.md` | `All API endpoints require JWT authentication. Include the `Authorization: Bearer $\{token\}` header in every request.` | L1211 |
+| `.cursor/rules/app-details.md` | `- Adds required headers (Authorization, Content-Type, accept, ngrok-skip-browser-warning)` | L1385 |
+| `.cursor/rules/app-details.md` | `AUTH_SECRET=                                    # NextAuth secret` | L1752 |
+| `.cursor/rules/app-details.md` | `GOOGLE_CLIENT_ID=                              # Google OAuth client ID` | L1753 |
+| `.cursor/rules/app-details.md` | `GOOGLE_CLIENT_SECRET=                          # Google OAuth client secret` | L1754 |
+| `.cursor/rules/app-details.md` | `- **JWT authentication required**: All API calls must include `Authorization: Bearer $\{backendAccessToken\}` header (handled automatically by API utilities)` | L1785 |
+| `.cursor/rules/app-details.md` | `### Authentication` | L1954 |
+| `.cursor/rules/app-details.md` | `- **Middleware matcher**: Excludes static assets (`_next/static`, `_next/image`, `favicon.ico`, `*.svg`)` | L1956 |
+| `.cursor/rules/app-details.md` | `- **Protected routes**: All routes except `/login` and `/api/auth/*` require authentication` | L1957 |
+| `.cursor/rules/app-details.md` | `- **Session access**: Use `useSession()` in client components, `auth()` in server components` | L1958 |
+| `.cursor/rules/app-details.md` | `- **Import pattern**: Always import both `useSession` and `signOut` from `next-auth/react` when making API calls` | L1960 |
+| `.cursor/rules/app-details.md` | `- **Google OAuth forces account selection**: The Google provider is configured with `prompt: "select_account"` to always show the account picker, preventing auto-login with cached credentials. This ensures users consciously choose their account each login.` | L1962 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I found the relevant sections. Let me read around line 1954 to see the Authentication section and add the maintenance page info there.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to update the Authentication section to add the maintenance page as a public route. Let me update this section.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 1
+
+```diff
+@@ -1955,5 +1955,6 @@
+  
+  - **Middleware matcher**: Excludes static assets (&#96;_next/static&#96;, &#96;_next/image&#96;, &#96;favicon.ico&#96;, &#96;*.svg&#96;)
+- - **Protected routes**: All routes except &#96;/login&#96; and &#96;/api/auth/*&#96; require authentication
++ - **Protected routes**: All routes except public routes require authentication
++ - **Public routes** (no auth required): &#96;/login&#96;, &#96;/api/auth/*&#96;, &#96;/debug*&#96;, &#96;/maintenance&#96;
+  - **Session access**: Use &#96;useSession()&#96; in client components, &#96;auth()&#96; in server components
+  - **Token expiration**: Backend returns 401 when JWT expires; always handle this by calling &#96;signOut({ callbackUrl: "/login" })&#96;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me also add the maintenance page to the project structure section. Let me find that section.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see the project structure. Let me add the maintenance route there.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -404,4 +404,5 @@
+  │   │   ├── simulations/       # End-to-end simulation testing (has layout.tsx)
+  │   │   ├── login/             # Authentication page (has layout.tsx)
++ │   │   ├── maintenance/       # Public maintenance page (shown during deployments)
+  │   │   └── api/auth/          # NextAuth.js route handlers
+  │   ├── components/
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I've updated the app-details.md file with information about the maintenance page:
+
+1. Added `/maintenance` to the project structure under the app directory
+2. Updated the Authentication section to list all public routes including `/maintenance`
+
+The updates are minimal and focused on what was added.</details></think>
+
+---
+
+Updated `.cursor/rules/app-details.md` with:
+
+1. **Project structure** - Added `maintenance/` route entry with description "Public maintenance page (shown during deployments)"
+
+2. **Authentication section** - Updated public routes list to include `/maintenance` alongside `/login`, `/api/auth/*`, and `/debug*`
+
+---
+
+_**User (2026-01-17 12:52Z)**_
+
+too complex, make it simple and minimalistic
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants a simpler, more minimalistic maintenance page. Let me simplify it significantly - remove all the complex animations, gradients, and effects.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="write">
+
+<details><summary>Tool use: **write** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/maintenance/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 7, lines removed: 110
+
+```diff
+@@ -1,119 +1,16 @@
+- "use client";
+- 
+- import { useEffect, useState } from "react";
+- 
+  export default function MaintenancePage() {
+-   const [dots, setDots] = useState("");
+- 
+-   useEffect(() =&gt; {
+-     const interval = setInterval(() =&gt; {
+-       setDots((prev) =&gt; (prev.length &gt;= 3 ? "" : prev + "."));
+-     }, 500);
+-     return () =&gt; clearInterval(interval);
+-   }, []);
+- 
+    return (
+-     &lt;div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center p-8 overflow-hidden relative"&gt;
+-       {/* Animated background gradient */}
+-       &lt;div className="absolute inset-0 overflow-hidden"&gt;
+-         &lt;div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-violet-600/20 via-transparent to-transparent rounded-full blur-3xl animate-pulse" /&gt;
+-         &lt;div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-to-tl from-cyan-600/20 via-transparent to-transparent rounded-full blur-3xl animate-pulse delay-1000" /&gt;
+-       &lt;/div&gt;
+- 
+-       {/* Grid pattern overlay */}
+-       &lt;div
+-         className="absolute inset-0 opacity-[0.03]"
+-         style={{
+-           backgroundImage: &#96;linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)&#96;,
+-           backgroundSize: "50px 50px",
+-         }}
+-       /&gt;
+- 
+-       {/* Content */}
+-       &lt;div className="relative z-10 text-center max-w-lg"&gt;
+-         {/* Animated gear icon */}
+-         &lt;div className="mb-8 flex justify-center"&gt;
+-           &lt;div className="relative"&gt;
+-             &lt;svg
+-               className="w-24 h-24 text-violet-400 animate-spin-slow"
+-               viewBox="0 0 24 24"
+-               fill="none"
+-               stroke="currentColor"
+-               strokeWidth="1.5"
+-             &gt;
+-               &lt;path
+-                 strokeLinecap="round"
+-                 strokeLinejoin="round"
+-                 d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z"
+-               /&gt;
+-               &lt;path
+-                 strokeLinecap="round"
+-                 strokeLinejoin="round"
+-                 d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+-               /&gt;
+-             &lt;/svg&gt;
+-             {/* Decorative ring */}
+-             &lt;div className="absolute inset-0 rounded-full border border-violet-500/30 animate-ping" /&gt;
+-           &lt;/div&gt;
+-         &lt;/div&gt;
+- 
+-         {/* Main heading */}
+-         &lt;h1 className="text-4xl md:text-5xl font-bold text-white mb-4 tracking-tight"&gt;
++     &lt;div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center p-8"&gt;
++       &lt;div className="text-center max-w-md"&gt;
++         &lt;div className="text-6xl mb-6"&gt;🔧&lt;/div&gt;
++ 
++         &lt;h1 className="text-3xl font-semibold text-white mb-3"&gt;
+            Under Maintenance
+          &lt;/h1&gt;
+  
+-         {/* Subheading with animated dots */}
+-         &lt;p className="text-xl text-gray-400 mb-8"&gt;
+-           We&amp;apos;re upgrading our systems
+-           &lt;span className="inline-block w-8 text-left"&gt;{dots}&lt;/span&gt;
+-         &lt;/p&gt;
+- 
+-         {/* Description */}
+-         &lt;p className="text-gray-500 mb-10 leading-relaxed"&gt;
+-           Pense is currently undergoing scheduled maintenance to bring you new
+-           features and improvements. We&amp;apos;ll be back shortly.
+-         &lt;/p&gt;
+- 
+-         {/* Status indicator */}
+-         &lt;div className="inline-flex items-center gap-3 px-5 py-3 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm"&gt;
+-           &lt;span className="relative flex h-3 w-3"&gt;
+-             &lt;span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"&gt;&lt;/span&gt;
+-             &lt;span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"&gt;&lt;/span&gt;
+-           &lt;/span&gt;
+-           &lt;span className="text-sm text-gray-300 font-medium"&gt;
+-             Maintenance in progress
+-           &lt;/span&gt;
+-         &lt;/div&gt;
+-       &lt;/div&gt;
+- 
+-       {/* Footer */}
+-       &lt;div className="absolute bottom-8 text-center"&gt;
+-         &lt;p className="text-gray-600 text-sm"&gt;
+-           Questions?{" "}
+-           &lt;a
+-             href="mailto:support@pense.ai"
+-             className="text-violet-400 hover:text-violet-300 transition-colors"
+-           &gt;
+-             Contact support
+-           &lt;/a&gt;
++         &lt;p className="text-gray-400"&gt;
++           We&amp;apos;re making some improvements. Back shortly.
+          &lt;/p&gt;
+        &lt;/div&gt;
+- 
+-       &lt;style jsx&gt;{&#96;
+-         @keyframes spin-slow {
+-           from {
+-             transform: rotate(0deg);
+-           }
+-           to {
+-             transform: rotate(360deg);
+-           }
+-         }
+-         .animate-spin-slow {
+-           animation: spin-slow 8s linear infinite;
+-         }
+-         .delay-1000 {
+-           animation-delay: 1s;
+-         }
+-       &#96;}&lt;/style&gt;
+      &lt;/div&gt;
+    );
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me take a screenshot to show the simplified page.</details></think>
+
+---
+
+<tool-use data-tool-type="mcp" data-tool-name="mcp_cursor-ide-browser_browser_navigate">
+<details>
+          <summary>Tool use: **mcp_cursor-ide-browser_browser_navigate**</summary>
+      
+*Called tool*: cursor-ide-browser - browser_navigate: Navigate to a URL
+
+*Parameters*:
+  * url: http://localhost:3000/maintenance
+
+*Result*:
+### Action: snapshot
+
+### Page state
+- Page URL: http://localhost:3000/maintenance
+- Page Title: Pense
+- Page Snapshot:
+```yaml
+- role: generic
+  ref: ref-0ki8l8onr24
+```
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The page seems to be blank in the snapshot. Let me take a screenshot to see how it looks.</details></think>
+
+---
+
+<tool-use data-tool-type="mcp" data-tool-name="mcp_cursor-ide-browser_browser_take_screenshot">
+<details>
+          <summary>Tool use: **mcp_cursor-ide-browser_browser_take_screenshot**</summary>
+      
+*Called tool*: cursor-ide-browser - browser_take_screenshot: Take a screenshot of the current page. You can't perform actions based on the screenshot, use browser_snapshot for actions.
+
+*Parameters*:
+  * 
+
+*Result*:
+Screenshot captured successfully
+Filename: page-2026-01-18T16-10-27-238Z.png
+Saved to: file:///var/folders/1f/s3v3bppd0ws4v19bk0l0f8gw0000gn/T/cursor/screenshots/page-2026-01-18T16-10-27-238Z.png
+
+*Result (type image)*: {"type":"image","data":"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G172spfX6/Xf8BgAADggZsMBAPyaF7/4RbNnz968efN+nv/mN7+x5BE9vi984W++8IW/mZCPBgDgIJgNBwDwaw5oo4aFC4+76KLnljwiAAAmAxkOACa5GOPs2bNbWloO5SIzZ848xCs8Vnd318yZMw/XzgZZlh199FGdnR2H5WpvfOPr93Ng+3/mvnV3dx999FFtbW2Hfqn919XVOX369N/kJx72733MYbmRMr6CwzKwLMvmzJnT1dV56ONpbW2dM2dOpVI59EsBAAfBolQAOIKdeOKJ/+0DfzT+yN996Zof/eg/Qwjz5s19y1ve9PKXXz5//rEtLS2NRmPFigfvuefe6677xvXX/8v+XHzWrFlXXnnFi170wuOOO66rq3PsCnfdddfnPvf///KXvzq4Ac+ff+xb3/rmiy++aP78Y8fyxOjo6IYNG++8865rrvnyjTf+YB9blH7gA+876cQT9rzctn37H/7h+0II559/3tVXf2T58rPa2tqKojjvvAvuvvuegxveHmNz3J50o4YDmje3lxjjc55z4aWXvvC3n/dbxxx7THt7+9jx/v7+u+++54Yb/vXb375+1arVT/T217721ZdcfNH4I2+/4srx26c+0R9XlmUvfOHz3/a2t5x99lnTpk0LIWzZsuWee+697bbbP/3pz2zfvn2vD3r1q3/veb91SQhh5qyZe/3ossteeuIJx4/9fuu2be997/ufaLRlfO8HeiOPdYhfQXkDCyF0dLRffvllv/d7r1y8ePHcuUdXq9UQwsDAwNq1677znX/52te+vmLFiv25Tgihp6fnNa951eWXX7Zw4XFz5szOsizP802bHl65cuX//J9fve66b4yMjO7npQCAQxQ7O6dM9BgAYNJ6xzve/ulPf2L8kXe+893XXPPl/Xz7jTd+79xznzH+yJw58wYHh/a8fPazn/Xd794w/oQrrrjyH/7hn171qt/93Oc++0Tzer761a9dddX7+vr69vHRH/zgB/7wD9+zJ0yMVxTFF7/4t3/yJ382MDBw/fXfuOSSi/f8aPPmzQsXnvDYt4QQZsyY8Rd/8ZmXvOTSfczEWbly1Xve84dPFL+++91/efazL9jzcv36DSeddOrrX//av/qrvxx/2vnnP/uOO+7cx63tsWHD6rFKMmb16jULFx635+W3vnX9q1/9un1f4bLLXvqP//jotzk8PNLSUh0/bfAlL7nscW9n2bIzP/3pT5x33rn7uHiz2fyrv/rCxz728cHBwcf+9DOf+fTb3vaW8Udmz547NDS85+Xj/nHNmDHjK1/5x2c96/zH/cRHHnnkyivf/a//+t3xBz/1qT///d+/Yh/jHLNu3fqlS0977PGSvveDuJG9HPpXUNLAYozve9973/3ud06Zsq+/pX/969/4r//1vfuOepVK5cMf/tAVV7y9u7vric7ZuXPnJz7xqb/4i8/v4zoAwOFiUSoATDZXXPG2v/mbv97H2rrf/d1X/vjHN3V0PE5iG5vL87nPffZDH/rA4za4sROuuOJt1133z/u/tG3p0pN++MMbX/ay39n3WxYvXvStb339D/7g9/fzsmeccfpnP/v/7efJT+qjH/34wMDAnpeXXvrCOXPm7Pste23O8Pa3v2Mfs7r2+J3fefFNN/3HvgNQCKFarb7rXVf+4Af/PnXq1Ce95v7o7e296ab/eKJCFEKYM2fO17/+1QPdKHYfSvreD/1GSvoKDn1gvb29X//6Vz/84Q/tu8GFEP7Lf7n8F7/46dlnn/VEJ0yZMuWb3/xf733vVftocCGEqVOnfvzjH/vSl774RP+DAAAcRjIcAEwqJ5xw/Mc+9qdPetqiRQvf8553P+6P/viPP/jGN77+Sa/wrGed//73/9GTnhZCWLJk8Q9+8O/HHbdgf06uVCp//uf/77vedeX+nHzlle84jE+sGx4e+spXvrbn5ZMuOF20aOFzn/ucPS83b978ne/csI/zxzzrWedfe+01Y2sM98fJJy+97rqvZdlh+DvbJz/58UWLFj7paVdf/eHDEv7K+94P8UbK+woOcWCtra3f/e6/vOAFz9/Pgc2ZM+e66772uH/CbW1t//ZvN4yfqbpvr3zlK6699u/382QA4KB5NhwATCrvec+79vSCjRsfuuWWn8+ZM+eUU5Y+dnLNVVe958tfvvahhzaNP7hkyeL3vOddj73s4ODQrbfetmnTQ3PnzjvrrGVjOyF84AN/tHXr1n2PJ8uyv/7rz/f09Iw/ODo6+pOf/PQ//uPGjRs3PvvZF1x00XMXL140/oSPfOSPv/e979933337uPK0aVMvv/yyPS/7+/sHBgZnPeb5ZQfk7/7umvErPd/whtf9j//xmSea4LbX5gzXXvuPjUZj39ePMX7qU5/YKx1u3br1q1/9XytXrqzVagsXHnfZy1665Pgl408477xzX/rSl3zzm98+2NsKY88K3FMV6/X6z3/+y+3bty896cRFixftFZimT5/+wQ9+4H3v+8DYy7vuunssL06bNu2CC545/swHHnjg/vt3PaFsy5Yt439U3vd+0Dcypryv4BAHNlbAzzjj9L0Obt269frr/2XVqtUzZkw/+eSlv/3bzxv/T92sWbOuvfaaCy/cO7d96EMfOO20U8cfKYri9tvv+P73b/zVr24966xlF1303GXLzhw/sBe96AWve91rrr32H/dxjwDAIZLhAGBSGfv36m9+89tXX/1nK1Y8OHawvb39T/7kw+985zvG/wt8Z2fHZZe99POf/+vxb//oR/+0tbV1r2t+8Yt/e/XVH925c+fYy5kzZ370o1e/9rWvrlQqT7ps8x3veNv55583/sjq1Wsuuuh5e6rN17/+jRDC+9//Rx/+8If2nNPe3v75z3/2kkv2NS2ou7s7hDAyMnr11X96000/vPvue4qiOMRtLu+66+6bb75lz/P4Fi487uKLL/r+92987Jl7zZUriuJLX3ryyUQXXvjsvTrLt751/Zvf/LbR0Uefkf+xj/35Jz/58b2e+/aOd1xxiBlu7B+MoaHht7717f/+7/8xPDwydvzcc5/xt3/7hb3mcL3mNb+3JxJ9+cv/8OUv/8PYmTfe+L3xp/3zP1/38Y//2qMPxw24rO/9oG9kTHlfwSEObPnysx9bwL/2tX/+gz94z/hH/i1ffvaXvvQ34/Pl2Wef9fzn//a//dujX82yZWfudalarfbiF7/0Jz/52djLb3/7Ox/5yJ9eeOGzr7/+G+OL5Cc/+fEbbvjXbdu27eM2AYBDYVEqAEw2N930f970prfuaXBjs5A+8IEP/tM/fWWvMxcvXjz+ZU9Pzwte8Nt7nfPd7/7bVVf90Z4GNzY95/d//w9+8IOb9mcwV1zx9vEv+/r6Lr/8FXvNnAohfOITn/rKV746/sh555174okn7vvijUbjNa95/V/+5V/deeddRVGM5Ybxu4UehL/7u2vGv9zr6W97vOQll86aNWvPy+9//8a1a9c96cX3KlObNj38hje8eXwAGrup97//g2vWrB1/8LTTTtnvO3hCjUbjVa967be//Z09hSiEcPPNt7zsZS/fax7flClTZsyYcSifVfb3ftA3UupXcCgDe8tb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AAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOGAwAAAAAAAGRHDAcAAAAAAADIjhgOAAAAAAAAkB0xHAAAAAAAACA7YjgAAAAAAABAdsRwAAAAAAAAgOyI4QAAAAAAAADZEcMBAAAAAAAAsiOG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","mimeType":"image/png"}
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Perfect, the page looks much cleaner and more minimalistic now. Just:
+- A wrench emoji
+- "Under Maintenance" heading
+- Simple message
+
+The user should be happy with this simple design.</details></think>
+
+---
+
+Done! Simplified to just:
+- 🔧 emoji
+- "Under Maintenance" heading  
+- One line message
+
+Clean, minimal, ~15 lines of code.
+
+---
+
+_**User (2026-01-17 12:52Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user is asking me to update the app-details.md file with information about the code changes I just made. However, looking at my recent changes, I just simplified the maintenance page - I didn't add any new patterns, conventions, or architectural changes. The maintenance page was already documented in the previous update.
+
+The change was purely cosmetic/simplification - from a complex animated page to a minimal static page. This doesn't introduce any new patterns or conventions that need to be documented.
+
+I should not update the documentation since the maintenance page structure is already documented, and simplifying the implementation doesn't add any new information worth documenting.</details></think>
+
+---
+
+The change was purely cosmetic - simplifying the maintenance page's visual design. No new patterns, conventions, or architectural changes were introduced. The maintenance page was already documented in the previous update, so no documentation changes are needed.
+
+---
+
+_**User (2026-01-17 12:52Z)**_
+
+now give me a way to simply toggle a flag manually so that this is shown on the main page instead of the actual home or login page 
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants a simple way to toggle maintenance mode on/off so that when enabled, all users see the maintenance page instead of the normal app. I'll add an environment variable check in the middleware that redirects all routes to /maintenance when enabled.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/middleware.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I'll add a simple environment variable check at the top of the middleware. When `MAINTENANCE_MODE=true`, redirect all non-maintenance routes to `/maintenance`.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/middleware.ts</summary>
+
+**Chunk 1**
+Lines added: 10, lines removed: 1
+
+```diff
+@@ -1,11 +1,20 @@
+  import { auth } from "@/auth";
+  import { NextResponse } from "next/server";
++ 
++ // Set MAINTENANCE_MODE=true in .env.local to show maintenance page
++ const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === "true";
+  
+  export default auth((req) =&gt; {
++   const isMaintenancePage = req.nextUrl.pathname === "/maintenance";
++ 
++   // Maintenance mode: redirect all routes to /maintenance
++   if (MAINTENANCE_MODE &amp;&amp; !isMaintenancePage) {
++     return NextResponse.redirect(new URL("/maintenance", req.url));
++   }
++ 
+    const isLoggedIn = !!req.auth;
+    const isLoginPage = req.nextUrl.pathname === "/login";
+    const isAuthRoute = req.nextUrl.pathname.startsWith("/api/auth");
+    const isDebugRoute = req.nextUrl.pathname.startsWith("/debug") || req.nextUrl.pathname.startsWith("/api/debug");
+-   const isMaintenancePage = req.nextUrl.pathname === "/maintenance";
+  
+    // Allow auth API routes, debug routes, and maintenance page
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me also add this to the env.example file so it's documented there.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/env.example</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I'll add the MAINTENANCE_MODE flag to the env.example file.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/env.example</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: undefined
+
+```diff
+@@ -11,3 +11,6 @@
+  # Optional: Your app URL (required for production)
+  # AUTH_URL=https://yourdomain.com
++ 
++ # Maintenance Mode: Set to "true" to redirect all traffic to /maintenance
++ # MAINTENANCE_MODE=true
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Perfect. Let me check for any lint errors.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/middleware.ts`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no lint errors. Let me summarize the changes for the user.</details></think>
+
+---
+
+Done! To enable maintenance mode:
+
+**In `.env.local`:**
+```
+MAINTENANCE_MODE=true
+```
+
+**To disable:** Remove the line or set to `false`, then restart the dev server.
+
+When enabled, all routes redirect to `/maintenance`. The middleware checks this flag before any auth logic.
+
+---
+
+_**User (2026-01-17 12:52Z)**_
+
+i don't want to redirect to this page this should be shown in the "/" url itslef
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants the maintenance page content to be shown at "/" directly, not redirect to "/maintenance". I should modify the home page to check the MAINTENANCE_MODE flag and render the maintenance content if enabled.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see, the home page just redirects to /agents. I need to:
+1. Update the middleware to show maintenance page content at "/" when maintenance mode is on (not redirect)
+2. Or update the home page to show maintenance content when MAINTENANCE_MODE is true
+
+Actually, the cleanest approach is to:
+1. Revert the middleware redirect change
+2. Make the root page.tsx check for MAINTENANCE_MODE and render maintenance content instead of redirecting
+
+But wait, MAINTENANCE_MODE is a server-side env variable. In a client component, I can't access it directly. I need to either:
+1. Make it a NEXT_PUBLIC_ variable
+2. Or make the page a server component
+
+Let me make it a server component that checks the env var.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/middleware.ts</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 9
+
+```diff
+@@ -2,17 +2,10 @@
+  import { NextResponse } from "next/server";
+  
+- // Set MAINTENANCE_MODE=true in .env.local to show maintenance page
++ // Set MAINTENANCE_MODE=true in .env.local to show maintenance page at /
+  const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === "true";
+  
+  export default auth((req) =&gt; {
++   const isHomePage = req.nextUrl.pathname === "/";
+    const isMaintenancePage = req.nextUrl.pathname === "/maintenance";
+- 
+-   // Maintenance mode: redirect all routes to /maintenance
+-   if (MAINTENANCE_MODE &amp;&amp; !isMaintenancePage) {
+-     return NextResponse.redirect(new URL("/maintenance", req.url));
+-   }
+- 
+-   const isLoggedIn = !!req.auth;
+-   const isLoginPage = req.nextUrl.pathname === "/login";
+    const isAuthRoute = req.nextUrl.pathname.startsWith("/api/auth");
+    const isDebugRoute = req.nextUrl.pathname.startsWith("/debug") || req.nextUrl.pathname.startsWith("/api/debug");
+```
+
+**Chunk 2**
+Lines added: 8, lines removed: undefined
+
+```diff
+@@ -22,4 +15,12 @@
+      return NextResponse.next();
+    }
++ 
++   // Maintenance mode: allow home page without auth (it will show maintenance content)
++   if (MAINTENANCE_MODE &amp;&amp; isHomePage) {
++     return NextResponse.next();
++   }
++ 
++   const isLoggedIn = !!req.auth;
++   const isLoginPage = req.nextUrl.pathname === "/login";
+  
+    // Redirect logged-in users away from login page
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the home page to show maintenance content when MAINTENANCE_MODE is true. Since it needs to access server-side env vars, I'll make it a server component.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="write">
+
+<details><summary>Tool use: **write** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 21, lines removed: 10
+
+```diff
+@@ -1,15 +1,26 @@
+- "use client";
++ import { redirect } from "next/navigation";
+  
+- import { useEffect } from "react";
+- import { useRouter } from "next/navigation";
++ const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === "true";
+  
+  export default function Home() {
+-   const router = useRouter();
+- 
+-   useEffect(() =&gt; {
+-     router.replace("/agents");
+-   }, [router]);
+- 
+-   return null;
++   if (MAINTENANCE_MODE) {
++     return (
++       &lt;div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center p-8"&gt;
++         &lt;div className="text-center max-w-md"&gt;
++           &lt;div className="text-6xl mb-6"&gt;🔧&lt;/div&gt;
++ 
++           &lt;h1 className="text-3xl font-semibold text-white mb-3"&gt;
++             Under Maintenance
++           &lt;/h1&gt;
++ 
++           &lt;p className="text-gray-400"&gt;
++             We&amp;apos;re making some improvements. Back shortly.
++           &lt;/p&gt;
++         &lt;/div&gt;
++       &lt;/div&gt;
++     );
++   }
++ 
++   redirect("/agents");
+  }
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me check for lint errors.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 2 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/page.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/middleware.ts`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me test by navigating to the home page with MAINTENANCE_MODE enabled. Actually, I can't set env vars from here. Let me just show the user how it works.</details></think>
+
+---
+
+Done! Now when `MAINTENANCE_MODE=true`:
+
+- `/` shows the maintenance page directly (no redirect)
+- All other routes still require auth
+
+**To enable:**
+```bash
+# In .env.local
+MAINTENANCE_MODE=true
+```
+
+Then restart the dev server. Users visiting `/` will see the maintenance page.
+
+---
+
+_**User (2026-01-17 12:52Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to:
+1. `src/middleware.ts` - Added MAINTENANCE_MODE check
+2. `src/app/page.tsx` - Changed from client component to server component, shows maintenance content when MAINTENANCE_MODE=true
+3. `env.example` - Added MAINTENANCE_MODE documentation
+
+Let me update the app-details.md to document this maintenance mode feature.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "Environment Variables|env\.|\.env" in "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md" • 4 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.cursor/rules/app-details.md` | `├── env.example            # Environment variables template` | L382 |
+| `.cursor/rules/app-details.md` | `- Backend URL from `process.env.NEXT_PUBLIC_BACKEND_URL`` | L751 |
+| `.cursor/rules/app-details.md` | `## Environment Variables` | L1749 |
+| `.cursor/rules/app-details.md` | `- **`NEXT_PUBLIC_*` vars are build-time**: These environment variables are embedded into client-side JavaScript at build time, not runtime. Server-side code (API routes) reads them at runtime.` | L1968 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me read the Environment Variables section to add MAINTENANCE_MODE there.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I'll add MAINTENANCE_MODE to the Environment Variables section.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 9, lines removed: 1
+
+```diff
+@@ -1754,5 +1754,13 @@
+  GOOGLE_CLIENT_ID=                              # Google OAuth client ID
+  GOOGLE_CLIENT_SECRET=                          # Google OAuth client secret
+- &#96;&#96;&#96;
++ MAINTENANCE_MODE=true                          # Show maintenance page at / (optional)
++ &#96;&#96;&#96;
++ 
++ ### Maintenance Mode
++ 
++ Set &#96;MAINTENANCE_MODE=true&#96; in &#96;.env.local&#96; to show a maintenance page at &#96;/&#96; instead of the normal app. When enabled:
++ - &#96;/&#96; displays maintenance content (no auth required)
++ - All other routes still require authentication
++ - Requires server restart after changing
+  
+  ---
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I've added the MAINTENANCE_MODE documentation. I should also update the project structure section to note that page.tsx is a server component now. Let me check if that's worth documenting - actually it's a minor implementation detail that doesn't need to be documented. The maintenance mode feature is the main thing to document.</details></think>
+
+---
+
+Updated `.cursor/rules/app-details.md` with:
+
+1. **Environment Variables** - Added `MAINTENANCE_MODE=true` to the list
+2. **New "Maintenance Mode" subsection** - Explains how to enable it and what it does (shows maintenance page at `/`, other routes still require auth, needs server restart)
+
+---
+
+_**User (2026-01-17 12:52Z)**_
+
+take /login and any other route to / and hence mainenance if maintenance is ON
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants all routes (including /login) to redirect to "/" when maintenance mode is on, so everyone sees the maintenance page regardless of what URL they try to access.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/middleware.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to modify the middleware so that when MAINTENANCE_MODE is on, all routes (except "/" and static assets) redirect to "/". This way, "/login", "/agents", etc. will all go to "/" which shows the maintenance page.</details></think>
 
 ---
 

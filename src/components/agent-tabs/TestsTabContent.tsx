@@ -6,6 +6,7 @@ import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog"
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { BenchmarkDialog } from "@/components/BenchmarkDialog";
 import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
+import { POLLING_INTERVAL_MS } from "@/constants/polling";
 
 type TestData = {
   uuid: string;
@@ -434,7 +435,10 @@ export function TestsTabContent({
 
     // Start polling every 3 seconds
     pollPendingRuns(); // Poll immediately
-    pendingRunsPollingRef.current = setInterval(pollPendingRuns, 3000);
+    pendingRunsPollingRef.current = setInterval(
+      pollPendingRuns,
+      POLLING_INTERVAL_MS
+    );
 
     return () => {
       if (pendingRunsPollingRef.current) {

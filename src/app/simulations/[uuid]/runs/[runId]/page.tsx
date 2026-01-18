@@ -6,6 +6,7 @@ import { useSession, signOut } from "next-auth/react";
 import { AppLayout } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
 import { formatStatus, getStatusBadgeClass } from "@/lib/status";
+import { POLLING_INTERVAL_MS } from "@/constants/polling";
 
 type MetricData = {
   mean: number;
@@ -186,7 +187,7 @@ export default function SimulationRunPage() {
     // Start polling every 3 seconds
     pollInterval = setInterval(() => {
       fetchRunData(false);
-    }, 3000);
+    }, POLLING_INTERVAL_MS);
 
     // Cleanup on unmount
     return () => {
