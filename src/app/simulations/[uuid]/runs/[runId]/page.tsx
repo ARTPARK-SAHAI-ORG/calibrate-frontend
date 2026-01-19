@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { AppLayout } from "@/components/AppLayout";
@@ -45,7 +45,7 @@ type SimulationResult = {
   persona: Persona;
   scenario: Scenario;
   evaluation_results: EvaluationResult[] | null;
-  transcript: TranscriptEntry[];
+  transcript?: TranscriptEntry[] | null;
   audio_urls?: string[];
   conversation_wav_url?: string;
 };
@@ -82,11 +82,64 @@ export default function SimulationRunPage() {
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<401 | 403 | 404 | null>(null);
   const [transcriptDialogOpen, setTranscriptDialogOpen] = useState(false);
-  const [selectedSimulation, setSelectedSimulation] =
-    useState<SimulationResult | null>(null);
+  const [selectedSimulationKey, setSelectedSimulationKey] = useState<
+    string | null
+  >(null);
+  // Store a frozen copy of the simulation once it's complete to prevent re-renders
+  const frozenSimulationRef = useRef<SimulationResult | null>(null);
+
+  // Derive selectedSimulation from runData using the key
+  // Uses simulation_name as unique identifier to ensure correct simulation's transcript is shown
+  // Once the simulation is complete (has evaluation_results), freeze it to prevent audio reload
+  const selectedSimulation = useMemo(() => {
+    if (!selectedSimulationKey || !runData?.simulation_results) {
+      return null;
+    }
+
+    const currentSim = runData.simulation_results.find(
+      (sim) => sim.simulation_name === selectedSimulationKey
+    );
+
+    if (!currentSim) {
+      return frozenSimulationRef.current;
+    }
+
+    // If we have a frozen simulation that's complete, keep using it
+    if (frozenSimulationRef.current?.evaluation_results) {
+      return frozenSimulationRef.current;
+    }
+
+    // If current simulation is now complete, freeze it
+    if (currentSim.evaluation_results) {
+      frozenSimulationRef.current = currentSim;
+      return currentSim;
+    }
+
+    // Still in progress, return current (live updates)
+    return currentSim;
+  }, [selectedSimulationKey, runData?.simulation_results]);
+
   const [activeMetricsTab, setActiveMetricsTab] = useState<
     "performance" | "latency"
   >("performance");
+
+  // Ref for transcript container to auto-scroll
+  const transcriptContainerRef = useRef<HTMLDivElement>(null);
+  // Track previous transcript length to only scroll on new messages
+  const prevTranscriptLengthRef = useRef<number>(0);
+
+  // Auto-scroll transcript to bottom only when new messages are added
+  useEffect(() => {
+    const currentLength = selectedSimulation?.transcript?.length ?? 0;
+    if (
+      transcriptContainerRef.current &&
+      currentLength > prevTranscriptLengthRef.current
+    ) {
+      transcriptContainerRef.current.scrollTop =
+        transcriptContainerRef.current.scrollHeight;
+    }
+    prevTranscriptLengthRef.current = currentLength;
+  }, [selectedSimulation?.transcript?.length]);
 
   // Fetch simulation name for page title
   useEffect(() => {
@@ -260,12 +313,17 @@ export default function SimulationRunPage() {
 
   // Check if a simulation row is still processing (has transcript but no evaluation results) - yellow spinner
   const isSimulationProcessing = (simulation: SimulationResult) => {
-    return simulation.transcript.length > 0 && !simulation.evaluation_results;
+    return (
+      (simulation.transcript?.length ?? 0) > 0 && !simulation.evaluation_results
+    );
   };
 
   // Check if a simulation row is waiting (no transcript and no evaluation results) - gray spinner
   const isSimulationWaiting = (simulation: SimulationResult) => {
-    return simulation.transcript.length === 0 && !simulation.evaluation_results;
+    return (
+      (simulation.transcript?.length ?? 0) === 0 &&
+      !simulation.evaluation_results
+    );
   };
 
   const getLatencyMetricTooltip = (metricKey: string): string => {
@@ -288,13 +346,16 @@ export default function SimulationRunPage() {
   };
 
   const openTranscriptDialog = (simulation: SimulationResult) => {
-    setSelectedSimulation(simulation);
+    // Use simulation_name as unique key to keep dialog in sync with polling updates
+    // This ensures only this simulation's transcript updates, not another row's
+    setSelectedSimulationKey(simulation.simulation_name);
     setTranscriptDialogOpen(true);
   };
 
   const closeTranscriptDialog = () => {
     setTranscriptDialogOpen(false);
-    setSelectedSimulation(null);
+    setSelectedSimulationKey(null);
+    frozenSimulationRef.current = null; // Clear frozen data when dialog closes
   };
 
   const getAudioUrlForEntry = (
@@ -732,8 +793,33 @@ export default function SimulationRunPage() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-border">
-                            {runData.simulation_results.map(
-                              (simulation, index) => {
+                            {[...runData.simulation_results]
+                              .sort((a, b) => {
+                                // Sort order: 1) has transcript (completed or processing), 2) waiting (no transcript)
+                                // Within has transcript: completed first, then processing
+                                const aHasTranscript =
+                                  (a.transcript?.length ?? 0) > 0;
+                                const bHasTranscript =
+                                  (b.transcript?.length ?? 0) > 0;
+                                const aHasResults = !!a.evaluation_results;
+                                const bHasResults = !!b.evaluation_results;
+
+                                // Priority: completed (3) > processing (2) > waiting (1)
+                                const getPriority = (
+                                  hasTranscript: boolean,
+                                  hasResults: boolean
+                                ) => {
+                                  if (hasResults) return 3; // completed
+                                  if (hasTranscript) return 2; // processing (yellow spinner)
+                                  return 1; // waiting (gray spinner)
+                                };
+
+                                return (
+                                  getPriority(bHasTranscript, bHasResults) -
+                                  getPriority(aHasTranscript, aHasResults)
+                                );
+                              })
+                              .map((simulation, index) => {
                                 const isProcessing =
                                   isSimulationProcessing(simulation);
                                 const isWaiting =
@@ -743,31 +829,12 @@ export default function SimulationRunPage() {
                                     key={index}
                                     className="hover:bg-muted/30 transition-colors"
                                   >
-                                    <td className="px-2 py-4 whitespace-nowrap">
-                                      <div className="flex items-center gap-1">
-                                        <button
-                                          onClick={() =>
-                                            openTranscriptDialog(simulation)
-                                          }
-                                          className="flex items-center justify-center w-6 h-6 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
-                                        >
-                                          <svg
-                                            className="w-4 h-4 text-foreground"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            stroke="currentColor"
-                                            strokeWidth={2}
-                                          >
-                                            <path
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                              d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
-                                            />
-                                          </svg>
-                                        </button>
+                                    <td className="px-4 py-4 whitespace-nowrap">
+                                      <div className="relative w-6 h-6 flex items-center justify-center">
+                                        {/* Spinner ring around the play button */}
                                         {isProcessing && (
                                           <svg
-                                            className="w-3.5 h-3.5 animate-spin text-yellow-500"
+                                            className="absolute inset-0 w-6 h-6 animate-spin text-yellow-500"
                                             fill="none"
                                             viewBox="0 0 24 24"
                                           >
@@ -788,7 +855,7 @@ export default function SimulationRunPage() {
                                         )}
                                         {isWaiting && (
                                           <svg
-                                            className="w-3.5 h-3.5 animate-spin text-gray-500"
+                                            className="absolute inset-0 w-6 h-6 animate-spin text-gray-500"
                                             fill="none"
                                             viewBox="0 0 24 24"
                                           >
@@ -806,6 +873,30 @@ export default function SimulationRunPage() {
                                               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                                             ></path>
                                           </svg>
+                                        )}
+                                        {/* Play button in center */}
+                                        {(simulation.transcript?.length ?? 0) >
+                                          0 && (
+                                          <button
+                                            onClick={() =>
+                                              openTranscriptDialog(simulation)
+                                            }
+                                            className="relative z-10 flex items-center justify-center w-4 h-4 cursor-pointer"
+                                          >
+                                            <svg
+                                              className="w-4 h-4 text-foreground"
+                                              fill="none"
+                                              viewBox="0 0 24 24"
+                                              stroke="currentColor"
+                                              strokeWidth={2}
+                                            >
+                                              <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
+                                              />
+                                            </svg>
+                                          </button>
                                         )}
                                       </div>
                                     </td>
@@ -836,7 +927,7 @@ export default function SimulationRunPage() {
                                         metricKey
                                       );
 
-                                      // If evaluation_results is null, show dash
+                                      // If evaluation_results is null, show spinner (metrics still processing)
                                       if (value === null) {
                                         return (
                                           <td
@@ -844,9 +935,29 @@ export default function SimulationRunPage() {
                                             className="px-3 py-4 whitespace-nowrap"
                                           >
                                             <div className="flex justify-center">
-                                              <span className="text-muted-foreground">
-                                                —
-                                              </span>
+                                              <svg
+                                                className={`w-5 h-5 flex-shrink-0 animate-spin ${
+                                                  isProcessing
+                                                    ? "text-yellow-500"
+                                                    : "text-gray-500"
+                                                }`}
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                              >
+                                                <circle
+                                                  className="opacity-25"
+                                                  cx="12"
+                                                  cy="12"
+                                                  r="10"
+                                                  stroke="currentColor"
+                                                  strokeWidth="4"
+                                                ></circle>
+                                                <path
+                                                  className="opacity-75"
+                                                  fill="currentColor"
+                                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                                ></path>
+                                              </svg>
                                             </div>
                                           </td>
                                         );
@@ -917,8 +1028,7 @@ export default function SimulationRunPage() {
                                     })}
                                   </tr>
                                 );
-                              }
-                            )}
+                              })}
                           </tbody>
                         </table>
                       </div>
@@ -987,6 +1097,7 @@ export default function SimulationRunPage() {
                   </span>
                 </div>
                 <audio
+                  key={selectedSimulation.conversation_wav_url}
                   controls
                   className="w-full h-10"
                   src={selectedSimulation.conversation_wav_url}
@@ -997,13 +1108,24 @@ export default function SimulationRunPage() {
             )}
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div
+              ref={transcriptContainerRef}
+              className="flex-1 overflow-y-auto p-6"
+            >
               <div className="space-y-4">
                 {(() => {
-                  const filteredTranscript =
-                    selectedSimulation.transcript.filter(
-                      (entry) => entry.role !== "tool"
+                  const filteredTranscript = (
+                    selectedSimulation.transcript ?? []
+                  ).filter((entry) => entry.role !== "tool");
+                  if (filteredTranscript.length === 0) {
+                    return (
+                      <div className="flex items-center justify-center py-8">
+                        <p className="text-sm text-muted-foreground">
+                          No transcript available yet
+                        </p>
+                      </div>
                     );
+                  }
                   return filteredTranscript.map((entry, index) => {
                     const audioUrl = getAudioUrlForEntry(
                       entry,
@@ -1035,6 +1157,7 @@ export default function SimulationRunPage() {
                             }
                           >
                             <audio
+                              key={audioUrl}
                               controls
                               className="w-full h-8 mb-2"
                               src={audioUrl}
@@ -1124,6 +1247,31 @@ export default function SimulationRunPage() {
                     );
                   });
                 })()}
+                {/* Show spinner at bottom while metrics are being fetched */}
+                {!selectedSimulation.evaluation_results &&
+                  (selectedSimulation.transcript?.length ?? 0) > 0 && (
+                    <div className="flex items-center justify-center py-4">
+                      <svg
+                        className="w-5 h-5 animate-spin text-yellow-500"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                    </div>
+                  )}
               </div>
             </div>
           </div>

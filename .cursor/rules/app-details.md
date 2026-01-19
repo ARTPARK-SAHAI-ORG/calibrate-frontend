@@ -320,10 +320,12 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
   - Simulation results appear incrementally as each simulation completes
   - Overall metrics only shown after run completes (status === "done")
   - Individual simulation rows can have `evaluation_results: null` while still processing
-  - **Row spinner states** (beside play button):
-    - **No spinner**: Row has `evaluation_results` (metrics complete)
-    - **Yellow spinner**: Row has transcript but no `evaluation_results` (processing - simulation ran, metrics being computed)
-    - **Gray spinner**: Row has no transcript and no `evaluation_results` (waiting - simulation hasn't started yet)
+  - **Row spinner states**:
+    - **Play button only**: Row has `evaluation_results` (metrics complete)
+    - **Spinner around play button (yellow)**: Row has transcript but no `evaluation_results` (processing)
+    - **Spinner only (gray)**: Row has no transcript and no `evaluation_results` (waiting)
+    - **First column structure**: Uses `relative` container with spinner positioned `absolute inset-0`, play button centered with `relative z-10`. Spinner wraps around the play button visually.
+    - **Metric column spinners**: Each metric cell shows `w-5 h-5 flex-shrink-0` spinner when `evaluation_results` is null; yellow when processing, gray when waiting
 
 - **Overall Metrics** (only shown when status is "done", aggregated across all simulations):
 
@@ -339,12 +341,27 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
   - Metric columns derived from `runData.metrics` keys, or from `simulation_results[].evaluation_results` when metrics is null
   - Latency metrics (stt/ttft, llm/ttft, etc.) are excluded from the table (shown in latency tab instead)
   - `stt_llm_judge_score` displayed as percentage, other metrics as Pass/Fail
-  - View transcript button (available even while evaluation is pending)
+  - View transcript button (only shown for rows with transcript history; available even while evaluation is pending)
   - Audio playback (for voice simulations)
-  - **Processing state**: Rows with `evaluation_results: null` show a dash (—) for metric columns and a spinner beside the play button (yellow if has transcript, gray if no transcript)
+  - **Processing state**: Rows with `evaluation_results: null` show spinners in metric cells (yellow if has transcript/processing, gray if waiting) and a spinner beside the play button
+  - **Row sorting** (for intermediate results): Rows are sorted by processing state priority:
+    1. Completed rows (have transcript and evaluation_results) - at the top
+    2. Processing rows (have transcript but no evaluation_results - yellow spinner) - middle
+    3. Waiting rows (no transcript - gray spinner) - at the bottom
 
 - **Transcript Dialog**:
 
+  - **Live updates with freeze-on-complete**: Dialog stays in sync with polling while simulation is in progress, then freezes:
+    - Stores `selectedSimulationKey` using `simulation_name` (unique identifier)
+    - Uses `frozenSimulationRef` to store a stable copy once simulation has `evaluation_results`
+    - `useMemo` logic: if frozen and complete → use frozen data; if just completed → freeze it; if in progress → use live data
+    - Prevents audio reload when polling updates other rows while viewing a completed simulation
+    - `frozenSimulationRef` is cleared when dialog closes
+  - **Auto-scroll**: Transcript container scrolls to bottom only when new messages are added (tracks `prevTranscriptLengthRef` and only scrolls if `currentLength > previous`)
+  - **Empty state**: Shows "No transcript available yet" when transcript is empty or undefined
+  - **Processing indicator**: Shows a yellow spinner at the bottom of transcript while metrics are being fetched (when `evaluation_results` is null but transcript has content)
+  - **Graceful null handling**: All transcript accesses use optional chaining (`transcript?.length ?? 0`, `transcript ?? []`) since transcript can be undefined during intermediate results
+  - **Stable audio keys**: All audio elements use `key={audioUrl}` to prevent React from remounting them during polling re-renders (avoids audio restart/reload)
   - Full conversation audio player below header (from `conversation_wav_url`) for voice simulations
   - Full conversation history (user, assistant, tool calls)
   - Role-based message styling
@@ -1957,6 +1974,12 @@ Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When ena
   - **Gotcha**: Without clearing at the start of the effect, re-renders or dependency changes can create multiple concurrent intervals, causing excessive API requests
 - **Dialog close prevention**: Disable dialog close while async operations (delete, save) are in progress
 - **Unsaved changes confirmation**: Form dialogs (like AddTestDialog) should show a confirmation dialog when user clicks backdrop, asking "Discard changes?" with Cancel/Discard buttons
+- **Key-based lookup with freeze-on-complete for live-updating dialogs**: When a dialog shows data that can complete (e.g., transcript with audio):
+  1. Store a unique identifier (e.g., `selectedSimulationKey = simulation.simulation_name`)
+  2. Use a ref to store frozen data: `frozenSimulationRef = useRef<DataType | null>(null)`
+  3. Use `useMemo` to decide: if frozen and complete → return frozen; if just completed → freeze it; if in progress → return live data
+  4. Clear the frozen ref when dialog closes
+  5. This prevents re-renders and media reload for completed items while allowing live updates for in-progress items
 
 ### UI Patterns
 
@@ -1972,6 +1995,17 @@ Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When ena
   - `failed` → "Failed" (red badge)
   - Pass `showSpinner` prop to show spinner for active statuses (`queued`/`in_progress`)
   - Badge classes use dark mode variants: `dark:bg-{color}-500/20 dark:text-{color}-400`
+- **Stable keys for media elements**: When rendering audio/video in components that re-render during polling, use stable keys (`key={src}`) to prevent React from remounting the element and restarting playback
+- **Ref-based previous value tracking**: To only trigger effects when values actually change (not just when references change), use a ref to track the previous value:
+  ```tsx
+  const prevLengthRef = useRef(0);
+  useEffect(() => {
+    if (currentLength > prevLengthRef.current) {
+      // Only runs when length increases
+    }
+    prevLengthRef.current = currentLength;
+  }, [currentLength]);
+  ```
 
 ### Styling
 
@@ -1979,6 +2013,7 @@ Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When ena
 - **Always use CSS variable classes**: `bg-background`, `text-foreground`, `border-border`, `bg-muted`, `text-muted-foreground`, `bg-accent`
 - **Do NOT use `bg-popover`** - it causes transparent backgrounds due to Tailwind v4 theme mapping issues; use `bg-background` instead for dropdowns and popovers
 - **Checkboxes need visible borders**: Use `border-muted-foreground` (not `border-border`) and `border-2` for custom checkbox buttons to ensure visibility in both light and dark modes
+- **Spinners in flex containers**: Always add `flex-shrink-0` to spinner SVGs to prevent them from shrinking. Standard spinner class: `w-5 h-5 flex-shrink-0 animate-spin`
 
 ### Forms
 
