@@ -159,8 +159,8 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 
 **List Page (`/stt`):**
 
-- **View all STT evaluations** in a sortable table (sorted by updated date)
-- **Columns**: Providers (as pills), Language, Status, Samples count, Updated At
+- **View all STT evaluations** in a sortable table (sorted by created date)
+- **Columns**: Providers (as pills), Language, Status, Samples count, Created At
 - **Click to view details** - opens the evaluation detail page
 - **"New STT Evaluation" button** - navigates to the create page
 
@@ -205,8 +205,8 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 
 **List Page (`/tts`):**
 
-- **View all TTS evaluations** in a sortable table (sorted by updated date)
-- **Columns**: Task ID (truncated), Status, Providers, Updated At
+- **View all TTS evaluations** in a sortable table (sorted by created date)
+- **Columns**: Providers (as pills), Language, Status, Samples count, Created At
 - **Click to view details** - opens the evaluation detail page
 - **"New TTS Evaluation" button** - navigates to the create page
 
@@ -660,7 +660,7 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
 **List Page:**
 
 - Fetches jobs from `GET /jobs?job_type=tts` or `GET /jobs?job_type=stt`
-- Displays in sortable table with columns: Providers (as pills), Language, Status, Samples count, Updated At
+- Displays in sortable table with columns: Providers (as pills), Language, Status, Samples count, Created At
 - "New [TTS/STT] Evaluation" button navigates to `/[tts|stt]/new`
 - Clicking a row navigates to `/[tts|stt]/{uuid}`
 
@@ -690,8 +690,8 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
 - **TTS Input tab**: Text input field + CSV upload option with "OR" divider and sample CSV download
 - **STT metrics**: WER, String Similarity, LLM Judge Score, TTFB, Processing Time
 - **TTS metrics**: LLM Judge Score, TTFB, Processing Time
-- **STT Outputs tab**: Shows Ground Truth vs Prediction text with per-sample metrics
-- **TTS Outputs tab**: Shows text input with audio playback
+- **STT Outputs tab**: Shows Ground Truth vs Prediction text; metrics columns (WER, String Similarity, LLM Judge Score, LLM Judge Reasoning) only shown when status is "done"
+- **TTS Outputs tab**: Shows text input with audio playback; metrics columns (LLM Judge Score, LLM Judge Reasoning) only shown when status is "done"
 
 ### Component Patterns
 
@@ -1312,6 +1312,7 @@ import {
   LoadingState,
   ErrorState,
   EmptyState,
+  NotFoundState,
   ResourceState,
   BackHeader,
   StatusBadge,
@@ -1497,7 +1498,7 @@ import {
 **Preferred: Use shared components** from `@/components/ui`:
 
 ```tsx
-import { LoadingState, EmptyState, ErrorState, ResourceState } from "@/components/ui";
+import { LoadingState, EmptyState, ErrorState, NotFoundState, ResourceState } from "@/components/ui";
 import { SpinnerIcon, ToolIcon } from "@/components/icons";
 
 // Simple loading spinner
@@ -1513,6 +1514,9 @@ import { SpinnerIcon, ToolIcon } from "@/components/icons";
 
 // Error state with optional retry
 <ErrorState message="Failed to load data" onRetry={refetch} />
+
+// Not found state (for 404 errors) - displays simple "404" with "Not found" text
+<NotFoundState />
 
 // Combined component that handles all three states
 <ResourceState
@@ -1821,6 +1825,7 @@ Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When ena
 - **For CRUD pages**: Use `useCrudResource` hook from `@/hooks` for standardized list/create/update/delete patterns
 - **JWT authentication required**: All API calls must include `Authorization: Bearer ${backendAccessToken}` header (handled automatically by API utilities)
 - **401 error handling**: API utilities automatically call `signOut({ callbackUrl: "/login" })` on 401 responses. For manual fetch calls, check `response.status === 401`
+- **404 error handling**: Detail pages (STT, TTS, Simulation Run) use `NotFoundState` component for 404 responses. Pattern: add `notFound` state, check `response.status === 404` before `!response.ok`, render `NotFoundState`. For simulation runs, a special `notFoundHeader` is used that shows "Simulation Run" title and navigates back to `/simulations` (main page) instead of the specific simulation
 - **Wait for token**: In `useEffect` hooks, return early if `backendAccessToken` is not yet available; include it in the dependency array
 - **ngrok header**: `"ngrok-skip-browser-warning": "true"` header is included automatically by API utilities
 - **Backend URL check**: API utilities will throw an error if `NEXT_PUBLIC_BACKEND_URL` is not set

@@ -21,7 +21,11 @@ type ErrorStateProps = {
   className?: string;
 };
 
-export function ErrorState({ message, onRetry, className = "" }: ErrorStateProps) {
+export function ErrorState({
+  message,
+  onRetry,
+  className = "",
+}: ErrorStateProps) {
   return (
     <div
       className={`border border-border rounded-xl p-12 flex flex-col items-center justify-center bg-muted/20 ${className}`}
@@ -35,6 +39,21 @@ export function ErrorState({ message, onRetry, className = "" }: ErrorStateProps
           Retry
         </button>
       )}
+    </div>
+  );
+}
+
+type NotFoundStateProps = {
+  className?: string;
+};
+
+export function NotFoundState({ className = "" }: NotFoundStateProps) {
+  return (
+    <div
+      className={`flex flex-col items-center justify-center py-20 ${className}`}
+    >
+      <h1 className="text-8xl font-bold text-muted-foreground">404</h1>
+      <p className="text-lg text-muted-foreground mt-2">Not found</p>
     </div>
   );
 }

@@ -5,6 +5,7 @@ export {
   LoadingState,
   ErrorState,
   EmptyState,
+  NotFoundState,
   ResourceState,
 } from "./LoadingState";
 export { BackHeader } from "./BackHeader";

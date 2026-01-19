@@ -113,18 +113,18 @@ export default function TTSPage() {
     setSortOrder(sortOrder === "asc" ? "desc" : "asc");
   };
 
-  // Sort jobs by updated_at
+  // Sort jobs by created_at
   const sortedJobs = [...jobs].sort((a, b) => {
     const dateA = new Date(
-      (a.updated_at || a.created_at || "").replace(" ", "T")
+      (a.created_at || "").replace(" ", "T")
     ).getTime();
     const dateB = new Date(
-      (b.updated_at || b.created_at || "").replace(" ", "T")
+      (b.created_at || "").replace(" ", "T")
     ).getTime();
     if (isNaN(dateA) || isNaN(dateB)) {
       return sortOrder === "asc"
-        ? (a.updated_at || "").localeCompare(b.updated_at || "")
-        : (b.updated_at || "").localeCompare(a.updated_at || "");
+        ? (a.created_at || "").localeCompare(b.created_at || "")
+        : (b.created_at || "").localeCompare(a.created_at || "");
     }
     return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
   });
@@ -239,7 +239,7 @@ export default function TTSPage() {
                   onClick={toggleSort}
                   className="flex items-center gap-2 hover:text-foreground transition-colors cursor-pointer"
                 >
-                  Updated At
+                  Created At
                   <svg
                     className={`w-4 h-4 transition-transform ${
                       sortOrder === "asc" ? "rotate-180" : ""
@@ -302,11 +302,9 @@ export default function TTSPage() {
                     {job.details?.texts?.length || 0}
                   </span>
                 </div>
-                {/* Updated At */}
+                {/* Created At */}
                 <p className="text-sm text-muted-foreground">
-                  {job.updated_at || job.created_at
-                    ? formatDate(job.updated_at || job.created_at)
-                    : "—"}
+                  {job.created_at ? formatDate(job.created_at) : "—"}
                 </p>
               </Link>
             ))}

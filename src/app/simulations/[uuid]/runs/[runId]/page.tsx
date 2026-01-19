@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { AppLayout } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
+import { NotFoundState } from "@/components/ui";
 import { formatStatus, getStatusBadgeClass } from "@/lib/status";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 
@@ -79,6 +80,7 @@ export default function SimulationRunPage() {
   const [simulationName, setSimulationName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const [transcriptDialogOpen, setTranscriptDialogOpen] = useState(false);
   const [selectedSimulation, setSelectedSimulation] =
     useState<SimulationResult | null>(null);
@@ -154,6 +156,11 @@ export default function SimulationRunPage() {
 
         if (response.status === 401) {
           await signOut({ callbackUrl: "/login" });
+          return;
+        }
+
+        if (response.status === 404) {
+          setNotFound(true);
           return;
         }
 
@@ -386,13 +393,47 @@ export default function SimulationRunPage() {
     </div>
   );
 
+  // Not found header - back goes to main simulations page
+  const notFoundHeader = (
+    <div className="flex items-center gap-4">
+      <button
+        onClick={() => router.push("/simulations")}
+        className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
+      >
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M15.75 19.5L8.25 12l7.5-7.5"
+          />
+        </svg>
+      </button>
+      <div>
+        <h1 className="text-2xl font-semibold">Simulation Run</h1>
+      </div>
+    </div>
+  );
+
+  // Determine which header to show
+  const getHeader = () => {
+    if (isLoading) return loadingHeader;
+    if (notFound) return notFoundHeader;
+    return customHeader;
+  };
+
   return (
     <AppLayout
       activeItem="simulations"
       onItemChange={(itemId) => router.push(`/${itemId}`)}
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
-      customHeader={isLoading ? loadingHeader : customHeader}
+      customHeader={getHeader()}
     >
       <div className="space-y-6">
         {isLoading ? (
@@ -427,6 +468,8 @@ export default function SimulationRunPage() {
               Retry
             </button>
           </div>
+        ) : notFound ? (
+          <NotFoundState />
         ) : runData ? (
           <div className="space-y-6">
             {/* Status and Type Pills */}

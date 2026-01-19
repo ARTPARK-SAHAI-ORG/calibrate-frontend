@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { AppLayout } from "@/components/AppLayout";
-import { BackHeader, StatusBadge } from "@/components/ui";
+import { BackHeader, StatusBadge, NotFoundState } from "@/components/ui";
 import { sttProviders } from "@/components/agent-tabs/constants/providers";
 import {
   LeaderboardBarChart,
@@ -76,6 +76,7 @@ export default function STTEvaluationDetailPage() {
     useState<EvaluationResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "leaderboard" | "outputs" | "about"
   >("outputs");
@@ -122,6 +123,11 @@ export default function STTEvaluationDetailPage() {
 
         if (response.status === 401) {
           await signOut({ callbackUrl: "/login" });
+          return;
+        }
+
+        if (response.status === 404) {
+          setNotFound(true);
           return;
         }
 
@@ -257,8 +263,11 @@ export default function STTEvaluationDetailPage() {
           </div>
         )}
 
+        {/* Not Found State */}
+        {notFound && <NotFoundState />}
+
         {/* Evaluation Results */}
-        {!isLoading && !error && evaluationResult && (
+        {!isLoading && !error && !notFound && evaluationResult && (
           <div className="space-y-4">
             {/* Status Badge - show when evaluation is not done */}
             {evaluationResult.status !== "done" && (
@@ -763,18 +772,23 @@ export default function STTEvaluationDetailPage() {
                                             <th className="px-4 py-3 text-left text-[12px] font-medium text-foreground">
                                               Prediction
                                             </th>
-                                            <th className="px-4 py-3 text-left text-[12px] font-medium text-foreground">
-                                              WER
-                                            </th>
-                                            <th className="px-4 py-3 text-left text-[12px] font-medium text-foreground">
-                                              String Similarity
-                                            </th>
-                                            <th className="px-4 py-3 text-left text-[12px] font-medium text-foreground">
-                                              LLM Judge Score
-                                            </th>
-                                            <th className="px-4 py-3 text-left text-[12px] font-medium text-foreground">
-                                              LLM Judge Reasoning
-                                            </th>
+                                            {evaluationResult.status ===
+                                              "done" && (
+                                              <>
+                                                <th className="px-4 py-3 text-left text-[12px] font-medium text-foreground">
+                                                  WER
+                                                </th>
+                                                <th className="px-4 py-3 text-left text-[12px] font-medium text-foreground">
+                                                  String Similarity
+                                                </th>
+                                                <th className="px-4 py-3 text-left text-[12px] font-medium text-foreground">
+                                                  LLM Judge Score
+                                                </th>
+                                                <th className="px-4 py-3 text-left text-[12px] font-medium text-foreground">
+                                                  LLM Judge Reasoning
+                                                </th>
+                                              </>
+                                            )}
                                           </tr>
                                         </thead>
                                         <tbody>
@@ -793,20 +807,27 @@ export default function STTEvaluationDetailPage() {
                                                 <td className="px-4 py-3 text-[13px] text-foreground">
                                                   {result.pred}
                                                 </td>
-                                                <td className="px-4 py-3 text-[13px] text-foreground">
-                                                  {result.wer}
-                                                </td>
-                                                <td className="px-4 py-3 text-[13px] text-foreground">
-                                                  {parseFloat(
-                                                    result.string_similarity
-                                                  ).toFixed(5)}
-                                                </td>
-                                                <td className="px-4 py-3 text-[13px] text-foreground">
-                                                  {result.llm_judge_score}
-                                                </td>
-                                                <td className="px-4 py-3 text-[13px] text-muted-foreground max-w-md">
-                                                  {result.llm_judge_reasoning}
-                                                </td>
+                                                {evaluationResult.status ===
+                                                  "done" && (
+                                                  <>
+                                                    <td className="px-4 py-3 text-[13px] text-foreground">
+                                                      {result.wer}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-[13px] text-foreground">
+                                                      {parseFloat(
+                                                        result.string_similarity
+                                                      ).toFixed(5)}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-[13px] text-foreground">
+                                                      {result.llm_judge_score}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-[13px] text-muted-foreground max-w-md">
+                                                      {
+                                                        result.llm_judge_reasoning
+                                                      }
+                                                    </td>
+                                                  </>
+                                                )}
                                               </tr>
                                             )
                                           )}
