@@ -177,10 +177,19 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 **Detail Page (`/stt/[uuid]`):**
 
 - **Polls for results** while status is `queued` or `in_progress`
-- **Three tabs when done**:
-  - **Leaderboard**: Comparative table and charts
-  - **Outputs**: Per-provider results with ground truth vs predictions
+- **Shows intermediate results** as each provider completes (doesn't wait for all to finish)
+- **Default tab is "Outputs"** (not Leaderboard) to show results as they arrive
+- **Status badge**: Shows "Running" or "Queued" badge with spinner when evaluation is not done
+- **Tabs only appear when at least one provider result exists**:
+  - **Leaderboard**: Only visible when status is `done` (needs all providers to compare)
+  - **Outputs**: Two-panel layout similar to TestRunnerDialog
   - **About**: Metric descriptions
+- **Outputs tab layout** (two-panel, similar to TestRunnerDialog):
+  - **Left panel** (w-64): Provider list with status icons - green checkmark for success, red X for failure
+  - **Right panel**: Selected provider's overall metrics + results table (ground truth vs predictions)
+  - First provider is selected by default
+  - Clicking a provider shows its details on the right
+- **Provider error messages** (red ❌ with message): Only displayed when evaluation status is `done`, not during `in_progress`
 - **Metrics**: WER, String Similarity, LLM Judge Score, TTFB, Processing Time
 
 ### 4. Text-to-Speech Evaluation (`/tts`)
@@ -1812,6 +1821,7 @@ Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When ena
   2. Keep refs in sync with dedicated effects: `useEffect(() => { stateRef.current = stateValue }, [stateValue])`
   3. Inside the polling callback, use `stateRef.current` instead of `stateValue`
   - Example: `TestsTabContent` uses `viewingTestResultsRef`, `viewingBenchmarkResultsRef`, and `selectedPastRunRef` to check if a run is being viewed in a dialog, ensuring the polling callback sees the current viewing state even if the user just clicked on a run
+- **Functional setState for conditional updates in polling**: When you only need to conditionally set state (not read it for logic), use functional setState: `setState((current) => current || newValue)`. This avoids stale closures because React provides the current state value. Example: `setActiveProviderTab((current) => current || result.provider_results[0].provider)`
 - **Polling cleanup**: Always clear intervals in useEffect cleanup to prevent memory leaks
 - **Dialog close prevention**: Disable dialog close while async operations (delete, save) are in progress
 - **Unsaved changes confirmation**: Form dialogs (like AddTestDialog) should show a confirmation dialog when user clicks backdrop, asking "Discard changes?" with Cancel/Discard buttons

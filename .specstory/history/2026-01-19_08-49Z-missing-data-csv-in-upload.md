@@ -1009,7 +1009,2747 @@ Done. The code now directly checks expected locations instead of searching:
 2. If not found, finds top-level folders (ignoring `__MACOSX`) and checks for `data.csv` inside them
 3. Uses the discovered `basePath` for audio files: `{basePath}audios/{filename}`
 
-Much simpler and explicit
+Much simpler and explicit. Try your ZIP again.
+
+---
+
+_**User (2026-01-17 22:10Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to simplify the ZIP file parsing approach - instead of searching/iterating through all files, we now directly check expected locations. Let me update the app-details.md to reflect this simpler approach.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 4, lines removed: 3
+
+```diff
+@@ -1847,9 +1847,10 @@
+  ### ZIP and CSV File Parsing (STT/TTS Evaluations)
+  
+- - **macOS metadata files**: macOS creates hidden &#96;__MACOSX&#96; folders and &#96;._&#96; prefixed files (resource forks) in ZIPs. These contain extended attributes, not actual file content. Always skip files where path includes &#96;__MACOSX&#96;, starts with &#96;._&#96;, or contains &#96;/._&#96;.
+- - **Nested folder structures in ZIPs**: When users create a ZIP on macOS by right-clicking a folder and selecting "Compress", the ZIP wraps contents in a parent folder (e.g., &#96;my_folder/data.csv&#96; instead of &#96;data.csv&#96;). The code searches for &#96;data.csv&#96; anywhere in the ZIP and extracts the base path to find related files.
++ - **Direct path lookup, not search**: Instead of iterating through all ZIP entries, directly check expected locations. First try root (&#96;data.csv&#96;), then check top-level folders (&#96;folder/data.csv&#96;). This avoids accidentally matching macOS metadata files.
++ - **macOS metadata files**: macOS creates hidden &#96;__MACOSX&#96; folders and &#96;._&#96; prefixed files (resource forks) in ZIPs. Filter these out when listing top-level folders: &#96;!path.includes("__MACOSX") &amp;&amp; !path.startsWith("._")&#96;
++ - **Nested folder structures in ZIPs**: When users compress a folder on macOS, the ZIP wraps contents in a parent folder (e.g., &#96;my_folder/data.csv&#96; instead of &#96;data.csv&#96;). Store the discovered &#96;basePath&#96; and use it for all subsequent file lookups.
+  - **CSV BOM (Byte Order Mark)**: Excel-exported CSVs often include an invisible BOM character (&#96;\uFEFF&#96;) at the start. Strip it before parsing: &#96;if (csvContent.charCodeAt(0) === 0xFEFF) csvContent = csvContent.slice(1);&#96;
+  - **CSV line endings**: Handle all types - &#96;\r\n&#96; (Windows), &#96;\n&#96; (Unix), &#96;\r&#96; (old Mac). Use &#96;.split(/\r\n|\n|\r/)&#96; instead of &#96;.split(/\r?\n/)&#96;.
+- - **Audio file lookup with base path**: When looking for audio files in ZIPs, try both the base path prefix and root: &#96;zip.file(\&#96;${basePath}audios/${filename}\&#96;) || zip.file(\&#96;audios/${filename}\&#96;) || zip.file(filename)&#96;
++ - **Audio file lookup with base path**: Use the discovered basePath: &#96;zip.file(\&#96;${basePath}audios/${filename}\&#96;) || zip.file(\&#96;${basePath}${filename}\&#96;)&#96;
+  
+  ### Voice Simulation Audio
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done. I updated the ZIP and CSV file parsing section to reflect the simpler approach of directly checking expected locations rather than searching through all files.</details></think>
+
+---
+
+Done. Updated the ZIP parsing documentation to reflect the simpler "direct lookup" approach instead of searching/iterating through all entries.
+
+---
+
+_**User (2026-01-17 22:10Z)**_
+
+for stt you will receive intermediate results now 
+
+@src/components/evaluations/SpeechToTextEvaluation.tsx in the stt evaluation run
+
+Show the intermediate outputs for each provider and the outputs + About tab as you receive intermediate results and dont show the leaderboard until it is done
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to update the STT evaluation detail page (`/stt/[uuid]`) to show intermediate results as they come in. Currently, it probably waits until the evaluation is complete to show everything.
+
+The changes needed:
+1. Show intermediate outputs for each provider as results come in
+2. Show the Outputs tab and About tab while still processing
+3. Only show the Leaderboard tab when the evaluation is done
+
+Let me first look at the STT detail page to understand the current structure.</details></think>
+
+---
+
+Let me first look at the STT evaluation detail page to understand its current structure:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I understand the current structure. The page currently only shows content when `evaluationResult.status === "done"`. The user wants to:
+
+1. Show the Outputs tab and About tab while evaluation is still in progress (showing intermediate results as they come in)
+2. Only show the Leaderboard tab when the evaluation is done (since leaderboard needs all providers to complete)
+
+Let me modify the code to:
+1. Show the tabs (Outputs and About) even when status is not "done"
+2. Default to "outputs" tab when status is not "done" (since leaderboard won't be available)
+3. Disable/hide the Leaderboard tab until evaluation is done
+4. Show intermediate provider_results as they become available</details></think>
+
+---
+
+I understand. I need to modify the STT detail page to:
+1. Show Outputs and About tabs while evaluation is in progress (with intermediate results)
+2. Only show Leaderboard tab when done
+3. Default to Outputs tab when still processing
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -79,5 +79,5 @@
+    const [activeTab, setActiveTab] = useState&lt;
+      "leaderboard" | "outputs" | "about"
+-   &gt;("leaderboard");
++   &gt;("outputs");
+    const [activeProviderTab, setActiveProviderTab] = useState&lt;string | null&gt;(
+      null
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to modify the main content area to show tabs and content even when the status is not "done". I need to:
+
+1. Change the condition for showing the tabs/content from `status === "done"` to `evaluationResult` exists
+2. Only show Leaderboard tab when status is "done"
+3. Show intermediate provider_results in Outputs tab as they come in</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 27, lines removed: 23
+
+```diff
+@@ -255,30 +255,34 @@
+          )}
+  
+-         {/* Status Badge and Spinner - only show for queued/in_progress */}
+-         {!isLoading &amp;&amp;
+-           !error &amp;&amp;
+-           evaluationResult &amp;&amp;
+-           evaluationResult.status !== "done" &amp;&amp; (
+-             &lt;StatusBadge status={evaluationResult.status} showSpinner /&gt;
+-           )}
+- 
+-         {/* Evaluation Results */}
+-         {!isLoading &amp;&amp;
+-           !error &amp;&amp;
+-           evaluationResult &amp;&amp;
+-           evaluationResult.status === "done" &amp;&amp; (
++         {/* Evaluation Results - show tabs even during processing for intermediate results */}
++         {!isLoading &amp;&amp; !error &amp;&amp; evaluationResult &amp;&amp; (
+              &lt;div className="space-y-4"&gt;
++               {/* Status Badge and Spinner - show inline with tabs for queued/in_progress */}
++               {evaluationResult.status !== "done" &amp;&amp; (
++                 &lt;div className="flex items-center gap-3"&gt;
++                   &lt;StatusBadge status={evaluationResult.status} showSpinner /&gt;
++                   &lt;span className="text-[13px] text-muted-foreground"&gt;
++                     {evaluationResult.provider_results &amp;&amp; evaluationResult.provider_results.length &gt; 0
++                       ? &#96;${evaluationResult.provider_results.length} provider(s) completed&#96;
++                       : "Waiting for results..."}
++                   &lt;/span&gt;
++                 &lt;/div&gt;
++               )}
++ 
+                {/* Tab Navigation */}
+                &lt;div className="flex gap-2 border-b border-border"&gt;
+-                 &lt;button
+-                   onClick={() =&gt; setActiveTab("leaderboard")}
+-                   className={&#96;px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
+-                     activeTab === "leaderboard"
+-                       ? "border-foreground text-foreground"
+-                       : "border-transparent text-muted-foreground hover:text-foreground"
+-                   }&#96;}
+-                 &gt;
+-                   Leaderboard
+-                 &lt;/button&gt;
++                 {/* Only show Leaderboard tab when done */}
++                 {evaluationResult.status === "done" &amp;&amp; (
++                   &lt;button
++                     onClick={() =&gt; setActiveTab("leaderboard")}
++                     className={&#96;px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
++                       activeTab === "leaderboard"
++                         ? "border-foreground text-foreground"
++                         : "border-transparent text-muted-foreground hover:text-foreground"
++                     }&#96;}
++                   &gt;
++                     Leaderboard
++                   &lt;/button&gt;
++                 )}
+                  &lt;button
+                    onClick={() =&gt; {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, now I need to update the Outputs tab content to show even when there are no results yet (show a waiting state), and also update the closing bracket of the overall condition.</details></think>
+
+---
+
+Now I need to update the Outputs tab to show a waiting state when there are no results yet, and fix the closing bracket:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 30, lines removed: 2
+
+```diff
+@@ -551,7 +551,35 @@
+  
+                {/* Outputs Tab */}
+-               {activeTab === "outputs" &amp;&amp; evaluationResult.provider_results &amp;&amp; (
++               {activeTab === "outputs" &amp;&amp; (
+                  &lt;div className="space-y-4 -mx-8 px-8 w-[calc(100vw-260px)] ml-[calc((260px-100vw)/2+50%)] relative"&gt;
+-                   {/* Provider Dropdown */}
++                   {/* Show waiting state if no provider results yet */}
++                   {(!evaluationResult.provider_results || evaluationResult.provider_results.length === 0) &amp;&amp; (
++                     &lt;div className="border border-border rounded-xl p-12 flex flex-col items-center justify-center bg-muted/20"&gt;
++                       &lt;svg
++                         className="w-8 h-8 animate-spin text-muted-foreground mb-4"
++                         fill="none"
++                         viewBox="0 0 24 24"
++                       &gt;
++                         &lt;circle
++                           className="opacity-25"
++                           cx="12"
++                           cy="12"
++                           r="10"
++                           stroke="currentColor"
++                           strokeWidth="4"
++                         &gt;&lt;/circle&gt;
++                         &lt;path
++                           className="opacity-75"
++                           fill="currentColor"
++                           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
++                         &gt;&lt;/path&gt;
++                       &lt;/svg&gt;
++                       &lt;p className="text-[15px] text-muted-foreground"&gt;Waiting for provider results...&lt;/p&gt;
++                     &lt;/div&gt;
++                   )}
++ 
++                   {/* Provider Dropdown - only show when we have results */}
++                   {evaluationResult.provider_results &amp;&amp; evaluationResult.provider_results.length &gt; 0 &amp;&amp; (
++                     &lt;&gt;
+                    &lt;div className="flex items-center gap-3"&gt;
+                      &lt;div className="relative"&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to close the fragment I opened for the provider dropdown and close the outer condition. Let me read the current state and fix the closing brackets.</details></think>
+
+---
+
+Now I need to close the fragment and fix the closing brackets:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to close the fragment I opened. Let me find the section where the fragment ends and add the closing `</>`.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see the structure. The issue is that I added a fragment `<>` for the provider dropdown section, but the closing `</>` is already there at line 807. Actually, looking at the code flow:1. I added `{evaluationResult.provider_results && evaluationResult.provider_results.length > 0 && (` followed by `<>`
+2. The closing `</>` and `)}` should already be in the right place
+
+Let me check for lint errors to see if there's a problem.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx`
+
+Lint results
+
+Lint errors for `src/app/stt/[uuid]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| JSX element 'div' has no corresponding closing tag. | 217:8-217:11 | DIAGNOSTIC_SEVERITY_ERROR |
+| Expected corresponding closing tag for JSX fragment. | 809:19-809:22 | DIAGNOSTIC_SEVERITY_ERROR |
+| Unexpected token. Did you mean `\{'>'\}` or `&gt;`? | 809:22-809:23 | DIAGNOSTIC_SEVERITY_ERROR |
+| Unexpected token. Did you mean `\{'\}'\}` or `&rbrace;`? | 810:16-810:17 | DIAGNOSTIC_SEVERITY_ERROR |
+| ')' expected. | 814:5-814:7 | DIAGNOSTIC_SEVERITY_ERROR |
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+There are some issues with the JSX structure. Let me read the full section to understand the structure better and fix it properly.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see the issue. The Provider Content section also has a fragment `<>` that starts at line 629. I need to find where it closes and also add the closing fragment for the outer conditional I added. Let me look at the structure more carefully.
+
+The current structure should be:
+1. `{activeTab === "outputs" && (` - Outputs tab content
+2. `<div>` - container
+3. Waiting state `{(!evaluationResult.provider_results || ...)} && (...)`
+4. `{evaluationResult.provider_results && evaluationResult.provider_results.length > 0 && (` - I added this
+5. `<>` - fragment I added
+6. Provider dropdown div
+7. Provider Content `{(...) && (<>...`)` - this was existing
+8. Closing `</>`
+9. Closing `)}`
+10. Need to close my fragment `</>`
+11. Need to close my conditional `)}`
+12. Closing `</div>`
+13. Closing `)}`
+
+So I need to add `</>` and `)}` after the existing Provider Content closing.
+
+Let me look at lines 805-815 again.</details></think>
+
+---
+
+I see the issue - I need to close the fragment I opened. Let me look at where the Provider Content section ends and add the closing:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: undefined
+
+```diff
+@@ -807,4 +807,6 @@
+                      &lt;/&gt;
+                    )}
++                     &lt;/&gt;
++                   )}
+                  &lt;/div&gt;
+                )}
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me check the lint errors again.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx`
+
+Lint results
+
+Lint errors for `src/app/stt/[uuid]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+No more lint errors. Let me also ensure that when new provider results come in during polling, we automatically set the first provider as active if none is selected yet. Let me check if this is already handled in the pollTaskStatus function.</details></think>
+
+---
+
+Now let me also update the polling function to set the first provider as active when intermediate results come in:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to update the polling function to set the first provider as active when intermediate results come in (not just when done). Let me update this.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 5, lines removed: undefined
+
+```diff
+@@ -179,4 +179,9 @@
+        const result: EvaluationResult = await response.json();
+        setEvaluationResult(result);
++ 
++       // Set first provider as active tab when results first become available
++       if (result.provider_results &amp;&amp; result.provider_results.length &gt; 0 &amp;&amp; !activeProviderTab) {
++         setActiveProviderTab(result.provider_results[0].provider);
++       }
+  
+        if (result.status === "done") {
+```
+
+**Chunk 2**
+Lines added: undefined, lines removed: 4
+
+```diff
+@@ -185,8 +190,4 @@
+            pollingIntervalRef.current = null;
+          }
+-         // Set first provider as active tab if results exist
+-         if (result.provider_results &amp;&amp; result.provider_results.length &gt; 0) {
+-           setActiveProviderTab(result.provider_results[0].provider);
+-         }
+        }
+      } catch (error) {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, but I need to be careful - `activeProviderTab` is accessed in a closure, so it may have stale state. Let me use a ref to track this properly, or use a different approach. Actually, for simplicity, I'll use a functional check that doesn't depend on the closure.Let me reconsider - since we're using `setActiveProviderTab` which is a state setter, and the polling function is called via interval, the `activeProviderTab` in the closure will be stale. I should use `setActiveProviderTab` with a function form to check if it's already set.
+
+Actually, looking at this more carefully, a simpler approach is to just always set the first provider if it's not already set, using the callback form of setState:</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 2
+
+```diff
+@@ -181,6 +181,6 @@
+  
+        // Set first provider as active tab when results first become available
+-       if (result.provider_results &amp;&amp; result.provider_results.length &gt; 0 &amp;&amp; !activeProviderTab) {
+-         setActiveProviderTab(result.provider_results[0].provider);
++       if (result.provider_results &amp;&amp; result.provider_results.length &gt; 0) {
++         setActiveProviderTab((current) =&gt; current || result.provider_results![0].provider);
+        }
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, now I'm using the functional form of setState to avoid stale closure issues. The `!` is needed because TypeScript doesn't know that we already checked `result.provider_results` is truthy inside the conditional. Let me check for lint errors.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx`
+
+Lint results
+
+Lint errors for `src/app/stt/[uuid]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me also make sure that if the user is on the "leaderboard" tab when the status changes from "in_progress" to "done", they stay on that tab. But wait, the leaderboard tab only shows when status is "done", so this isn't an issue - before "done", the user can only be on "outputs" or "about".
+
+Actually, let me reconsider - if the user's current activeTab is "leaderboard" but the status becomes something other than "done" (which shouldn't happen, but for robustness), we should switch them to "outputs". But that's an edge case that shouldn't happen in normal operation.
+
+Let me verify everything is working by reading the file once more to confirm the structure is correct.</details></think>
+
+---
+
+Let me verify the overall structure is correct by checking a few key sections:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The structure looks good. Now I should also make sure the Leaderboard tab content only shows when status is "done". Let me check that section.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The Leaderboard tab content only shows when:1. `activeTab === "leaderboard"` - which can only be true when the tab button is visible (which only happens when status is "done")2. AND there's leaderboard_summary data
+
+So this is fine. The tab button is only visible when done, and the content only renders when the tab is active AND data exists.
+
+Let me make one more check - since I changed the default tab to "outputs", I should also make sure that if someone lands on the page when it's already done, they can see the Leaderboard tab. Actually, looking at it again, the default is "outputs" which is always visible, so that's fine.
+
+Let me verify there are no lint errors and summarize the changes.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx`
+
+Lint results
+
+Lint errors for `src/app/stt/[uuid]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+All lint errors are resolved. The changes are complete. Let me summarize what I did:
+
+1. Changed default tab from "leaderboard" to "outputs"
+2. Show tabs and content while evaluation is in progress (not just when done)
+3. Added status badge inline with tabs showing "N provider(s) completed" or "Waiting for results..."
+4. Leaderboard tab only appears when status is "done"
+5. Outputs tab shows a waiting spinner state when no provider results yet
+6. Polling now sets the first provider as active when intermediate results come in (using functional setState to avoid stale closures)</details></think>
+
+---
+
+Done! Here's what I changed:
+
+1. **Default tab is now "outputs"** instead of "leaderboard"
+
+2. **Tabs and content show during processing** - not just when done
+
+3. **Status badge with progress info** - Shows "N provider(s) completed" or "Waiting for results..." while in progress
+
+4. **Leaderboard tab only visible when done** - Since leaderboard needs all providers to complete
+
+5. **Outputs tab shows waiting state** - Spinner with "Waiting for provider results..." when no results yet
+
+6. **Polling updates active provider** - Automatically selects first provider when intermediate results arrive
+
+---
+
+_**User (2026-01-17 22:10Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to the STT evaluation detail page to show intermediate results. Let me update the app-details.md file with this new behavior.
+
+The changes I made:
+1. STT evaluation detail page now shows Outputs and About tabs while evaluation is in progress
+2. Leaderboard tab only shows when evaluation is done
+3. Default tab is "outputs" instead of "leaderboard"
+4. Shows progress indicator with "N provider(s) completed" message
+5. Outputs tab shows waiting state when no results yet
+
+I should update the STT section in the documentation to reflect this new behavior.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to update the STT Detail Page section to reflect the new intermediate results behavior. Let me update it.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 7, lines removed: 4
+
+```diff
+@@ -178,8 +178,11 @@
+  
+  - **Polls for results** while status is &#96;queued&#96; or &#96;in_progress&#96;
+- - **Three tabs when done**:
+-   - **Leaderboard**: Comparative table and charts
+-   - **Outputs**: Per-provider results with ground truth vs predictions
+-   - **About**: Metric descriptions
++ - **Shows intermediate results** as each provider completes (doesn't wait for all to finish)
++ - **Default tab is "Outputs"** (not Leaderboard) to show results as they arrive
++ - **Status indicator during processing**: Shows "N provider(s) completed" or "Waiting for results..."
++ - **Tabs**:
++   - **Leaderboard**: Only visible when status is &#96;done&#96; (needs all providers to compare)
++   - **Outputs**: Always visible, shows waiting spinner until first provider completes, then shows per-provider results with ground truth vs predictions
++   - **About**: Always visible, metric descriptions
+  - **Metrics**: WER, String Similarity, LLM Judge Score, TTFB, Processing Time
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I've updated the STT section. I should also add a note in the gotchas/patterns section about using functional setState in polling callbacks to avoid stale closures.</details></think>
+
+---
+
+Now let me add the pattern about functional setState in polling callbacks:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see there's already a section about refs for polling callbacks, but I should add a note about using functional setState as an alternative approach when you just need to conditionally set state (rather than read it).</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -1816,4 +1816,5 @@
+    3. Inside the polling callback, use &#96;stateRef.current&#96; instead of &#96;stateValue&#96;
+    - Example: &#96;TestsTabContent&#96; uses &#96;viewingTestResultsRef&#96;, &#96;viewingBenchmarkResultsRef&#96;, and &#96;selectedPastRunRef&#96; to check if a run is being viewed in a dialog, ensuring the polling callback sees the current viewing state even if the user just clicked on a run
++ - **Functional setState for conditional updates in polling**: When you only need to conditionally set state (not read it for logic), use functional setState: &#96;setState((current) =&gt; current || newValue)&#96;. This avoids stale closures because React provides the current state value. Example: &#96;setActiveProviderTab((current) =&gt; current || result.provider_results[0].provider)&#96;
+  - **Polling cleanup**: Always clear intervals in useEffect cleanup to prevent memory leaks
+  - **Dialog close prevention**: Disable dialog close while async operations (delete, save) are in progress
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I've updated the documentation with:1. Updated STT detail page section to describe intermediate results behavior2. Added the functional setState pattern for conditional updates in polling callbacksThis should be sufficient.</details></think>
+
+---
+
+Done. Updated the documentation with:
+
+1. **STT Detail Page section** - Documented the new intermediate results behavior (showing Outputs/About tabs during processing, Leaderboard only when done, status indicator showing provider count)
+
+2. **State Management section** - Added pattern for using functional `setState` as an alternative to refs when you only need to conditionally set state in polling callbacks
+
+---
+
+_**User (2026-01-17 22:10Z)**_
+
+don't show any of the tabs until at least one result is received for any provider and don't show this processing red color text when receiving data
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to:
+1. Don't show tabs until at least one provider result is received
+2. Remove the red "Processing..." text that appears when receiving data
+
+Let me look at the current code to understand the structure and make the changes.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see the issue now. The user wants:
+1. Don't show tabs until at least one provider result is received
+2. Don't show the red "Processing..." text (which comes from the upload/processing state, not the status badge)Looking at the first screenshot, there's a red X with "Processing..." text. This is likely from the ZIP upload processing state (the `isProcessingZip` state), not from the STT evaluation detail page. But looking at the second screenshot, it shows the "Running" badge and "Waiting for results..." text, which is from the detail page.
+
+Let me focus on the detail page changes:
+1. Only show tabs when `evaluationResult.provider_results && evaluationResult.provider_results.length > 0`
+2. Show a different waiting state when no results yet
+
+The "Processing..." red text in the first screenshot might be from a failed provider result. Let me check the Outputs tab content to see if there's error handling that shows this.
+
+Actually, looking at the structure, I think the first screenshot shows an error message from a provider result that failed (`!providerResult.success`). But that shouldn't show "Processing..." - it should show the error message.
+
+Let me just focus on what the user asked:
+1. Don't show tabs until at least one result - I need to wrap the tab navigation in a condition
+2. Don't show red "Processing..." text - I need to find where this is coming from
+
+Let me update the code to:
+1. Only show the tab navigation and content when there are provider results
+2. Show a centered waiting state when no results yet</details></think>
+
+---
+
+I'll update the code to only show tabs when at least one provider result is received, and show a cleaner waiting state otherwise:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 86, lines removed: 60
+
+```diff
+@@ -258,67 +258,93 @@
+          )}
+  
+-         {/* Evaluation Results - show tabs even during processing for intermediate results */}
++         {/* Evaluation Results */}
+          {!isLoading &amp;&amp; !error &amp;&amp; evaluationResult &amp;&amp; (
+            &lt;div className="space-y-4"&gt;
+-             {/* Status Badge and Spinner - show inline with tabs for queued/in_progress */}
+-             {evaluationResult.status !== "done" &amp;&amp; (
+-               &lt;div className="flex items-center gap-3"&gt;
+-                 &lt;StatusBadge status={evaluationResult.status} showSpinner /&gt;
+-                 &lt;span className="text-[13px] text-muted-foreground"&gt;
+-                   {evaluationResult.provider_results &amp;&amp;
+-                   evaluationResult.provider_results.length &gt; 0
+-                     ? &#96;${evaluationResult.provider_results.length} provider(s) completed&#96;
+-                     : "Waiting for results..."}
+-                 &lt;/span&gt;
+-               &lt;/div&gt;
+-             )}
++             {/* Waiting state - show when no provider results yet */}
++             {(!evaluationResult.provider_results || evaluationResult.provider_results.length === 0) &amp;&amp; (
++               &lt;div className="border border-border rounded-xl p-12 flex flex-col items-center justify-center bg-muted/20"&gt;
++                 &lt;svg
++                   className="w-8 h-8 animate-spin text-muted-foreground mb-4"
++                   fill="none"
++                   viewBox="0 0 24 24"
++                 &gt;
++                   &lt;circle
++                     className="opacity-25"
++                     cx="12"
++                     cy="12"
++                     r="10"
++                     stroke="currentColor"
++                     strokeWidth="4"
++                   &gt;&lt;/circle&gt;
++                   &lt;path
++                     className="opacity-75"
++                     fill="currentColor"
++                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
++                   &gt;&lt;/path&gt;
++                 &lt;/svg&gt;
++                 &lt;p className="text-[15px] text-muted-foreground"&gt;Evaluating providers...&lt;/p&gt;
++               &lt;/div&gt;
++             )}
++ 
++             {/* Only show tabs and content when we have at least one provider result */}
++             {evaluationResult.provider_results &amp;&amp; evaluationResult.provider_results.length &gt; 0 &amp;&amp; (
++               &lt;&gt;
++                 {/* Status Badge - show inline with tabs for in_progress */}
++                 {evaluationResult.status !== "done" &amp;&amp; (
++                   &lt;div className="flex items-center gap-3"&gt;
++                     &lt;StatusBadge status={evaluationResult.status} showSpinner /&gt;
++                     &lt;span className="text-[13px] text-muted-foreground"&gt;
++                       {evaluationResult.provider_results.length} provider(s) completed
++                     &lt;/span&gt;
++                   &lt;/div&gt;
++                 )}
+  
+-             {/* Tab Navigation */}
+-             &lt;div className="flex gap-2 border-b border-border"&gt;
+-               {/* Only show Leaderboard tab when done */}
+-               {evaluationResult.status === "done" &amp;&amp; (
+-                 &lt;button
+-                   onClick={() =&gt; setActiveTab("leaderboard")}
+-                   className={&#96;px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
+-                     activeTab === "leaderboard"
+-                       ? "border-foreground text-foreground"
+-                       : "border-transparent text-muted-foreground hover:text-foreground"
+-                   }&#96;}
+-                 &gt;
+-                   Leaderboard
+-                 &lt;/button&gt;
+-               )}
+-               &lt;button
+-                 onClick={() =&gt; {
+-                   setActiveTab("outputs");
+-                   if (
+-                     !activeProviderTab &amp;&amp;
+-                     evaluationResult?.provider_results &amp;&amp;
+-                     evaluationResult.provider_results.length &gt; 0
+-                   ) {
+-                     setActiveProviderTab(
+-                       evaluationResult.provider_results[0].provider
+-                     );
+-                   }
+-                 }}
+-                 className={&#96;px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
+-                   activeTab === "outputs"
+-                     ? "border-foreground text-foreground"
+-                     : "border-transparent text-muted-foreground hover:text-foreground"
+-                 }&#96;}
+-               &gt;
+-                 Outputs
+-               &lt;/button&gt;
+-               &lt;button
+-                 onClick={() =&gt; setActiveTab("about")}
+-                 className={&#96;px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
+-                   activeTab === "about"
+-                     ? "border-foreground text-foreground"
+-                     : "border-transparent text-muted-foreground hover:text-foreground"
+-                 }&#96;}
+-               &gt;
+-                 About
+-               &lt;/button&gt;
+-             &lt;/div&gt;
++                 {/* Tab Navigation */}
++                 &lt;div className="flex gap-2 border-b border-border"&gt;
++                   {/* Only show Leaderboard tab when done */}
++                   {evaluationResult.status === "done" &amp;&amp; (
++                     &lt;button
++                       onClick={() =&gt; setActiveTab("leaderboard")}
++                       className={&#96;px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
++                         activeTab === "leaderboard"
++                           ? "border-foreground text-foreground"
++                           : "border-transparent text-muted-foreground hover:text-foreground"
++                       }&#96;}
++                     &gt;
++                       Leaderboard
++                     &lt;/button&gt;
++                   )}
++                   &lt;button
++                     onClick={() =&gt; {
++                       setActiveTab("outputs");
++                       if (
++                         !activeProviderTab &amp;&amp;
++                         evaluationResult?.provider_results &amp;&amp;
++                         evaluationResult.provider_results.length &gt; 0
++                       ) {
++                         setActiveProviderTab(
++                           evaluationResult.provider_results[0].provider
++                         );
++                       }
++                     }}
++                     className={&#96;px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
++                       activeTab === "outputs"
++                         ? "border-foreground text-foreground"
++                         : "border-transparent text-muted-foreground hover:text-foreground"
++                     }&#96;}
++                   &gt;
++                     Outputs
++                   &lt;/button&gt;
++                   &lt;button
++                     onClick={() =&gt; setActiveTab("about")}
++                     className={&#96;px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
++                       activeTab === "about"
++                         ? "border-foreground text-foreground"
++                         : "border-transparent text-muted-foreground hover:text-foreground"
++                     }&#96;}
++                   &gt;
++                     About
++                   &lt;/button&gt;
++                 &lt;/div&gt;
+  
+              {/* About Tab */}
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to close the fragment I added around the tabs and content. Let me find where the content ends and add the closing tag.</details></think>
+
+---
+
+Now I need to close the fragment I added. Let me find where the content ends:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see - there's already a waiting state inside the Outputs tab which is redundant now since we're showing a waiting state at the top level. And I need to find where everything closes to add the fragment closing tag.
+
+Let me look at the end of the file:</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see the structure. Now I need to:
+1. Add a closing `</>` for the fragment I added around the tabs
+2. Remove the redundant waiting state inside the Outputs tab since we now show it at the top level
+
+The structure is:
+- Line 580: `{/* Outputs Tab */}` starts
+- The waiting state inside Outputs tab (lines 584-611) is now redundant - we should remove it
+- The closing `)}` at line 848 closes the Outputs tab condition
+- Line 849 closes the main div
+
+I need to add `</>` after line 848 to close my fragment, and remove the redundant waiting state.
+
+Let me do this in steps.</details></think>
+
+---
+
+I need to add the closing fragment tag after the Outputs tab and remove the redundant waiting state inside Outputs tab:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 34
+
+```diff
+@@ -582,38 +582,6 @@
+              {activeTab === "outputs" &amp;&amp; (
+                &lt;div className="space-y-4 -mx-8 px-8 w-[calc(100vw-260px)] ml-[calc((260px-100vw)/2+50%)] relative"&gt;
+-                 {/* Show waiting state if no provider results yet */}
+-                 {(!evaluationResult.provider_results ||
+-                   evaluationResult.provider_results.length === 0) &amp;&amp; (
+-                   &lt;div className="border border-border rounded-xl p-12 flex flex-col items-center justify-center bg-muted/20"&gt;
+-                     &lt;svg
+-                       className="w-8 h-8 animate-spin text-muted-foreground mb-4"
+-                       fill="none"
+-                       viewBox="0 0 24 24"
+-                     &gt;
+-                       &lt;circle
+-                         className="opacity-25"
+-                         cx="12"
+-                         cy="12"
+-                         r="10"
+-                         stroke="currentColor"
+-                         strokeWidth="4"
+-                       &gt;&lt;/circle&gt;
+-                       &lt;path
+-                         className="opacity-75"
+-                         fill="currentColor"
+-                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+-                       &gt;&lt;/path&gt;
+-                     &lt;/svg&gt;
+-                     &lt;p className="text-[15px] text-muted-foreground"&gt;
+-                       Waiting for provider results...
+-                     &lt;/p&gt;
+-                   &lt;/div&gt;
+-                 )}
+- 
+-                 {/* Provider Dropdown - only show when we have results */}
+-                 {evaluationResult.provider_results &amp;&amp;
+-                   evaluationResult.provider_results.length &gt; 0 &amp;&amp; (
+-                     &lt;&gt;
+-                       &lt;div className="flex items-center gap-3"&gt;
++                 {/* Provider Dropdown */}
++                 &lt;div className="flex items-center gap-3"&gt;
+                          &lt;div className="relative"&gt;
+                            &lt;select
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to also close the fragment properly. Since I removed the opening of the conditional and the fragment, I need to remove the closing too. Let me find and fix the closing tags.</details></think>
+
+---
+
+Now I need to remove the extra closing tags that were for the removed conditional:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see there are extra closing tags now. I need to:
+1. Remove the extra `</>` and `)}` that were closing the provider results conditional I removed
+2. Add a closing `</>` for the fragment I added around the tabs
+
+Let me trace through:
+- Line 811: `</>` closes a fragment inside Provider Content
+- Line 812: `)}` closes the Provider Content conditional
+- Line 813: `</>` - this was closing the fragment I deleted
+- Line 814: `)}` - this was closing the provider_results conditional I deleted
+- Line 815: `</div>` closes the Outputs tab div
+- Line 816: `)}` closes the Outputs tab conditional
+- Line 817: `</div>` closes the main content div
+- Line 818: `)}` closes the evaluationResult conditional
+
+I need to remove lines 813-814 (the extra fragment close and conditional close), and I need to add a `</>` before line 817 to close the fragment I added around the tabs.
+
+Wait, but I also need to understand the structure better. Let me check if there's a Provider Content section that still has the fragment.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 2
+
+```diff
+@@ -811,8 +811,8 @@
+                          &lt;/&gt;
+                        )}
+-                     &lt;/&gt;
+-                   )}
+                &lt;/div&gt;
+              )}
++               &lt;/&gt;
++             )}
+            &lt;/div&gt;
+          )}
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me check for lint errors to see if the structure is correct now.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx`
+
+Lint results
+
+Lint errors for `src/app/stt/[uuid]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+No lint errors. Now let me also check the first screenshot issue - there was a red "Processing..." text. This might be from:1. An error message from a failed provider result2. Or from the ZIP upload processing in SpeechToTextEvaluation.tsx
+
+Looking at the first screenshot again, it shows "X Processing..." in red, which looks like an error state. Let me check if there's any "Processing..." text in the codebase that could show up like that.Actually, looking at the screenshot more carefully, the X appears to be a close button or error icon. Let me search for "Processing" in the STT detail page.</details></think>
+
+---
+
+Let me also check if there's any "Processing..." text that could appear in red:
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "Processing" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx" • 6 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/app/stt/[uuid]/page.tsx` | `Processing Time` | L440 |
+| `src/app/stt/[uuid]/page.tsx` | `header: "Processing Time (s)",` | L490 |
+| `src/app/stt/[uuid]/page.tsx` | `\{/* Row 3: Processing Time */\}` | L559 |
+| `src/app/stt/[uuid]/page.tsx` | `title="Processing Time (s)"` | L562 |
+| `src/app/stt/[uuid]/page.tsx` | `\{/* Second Row: TTFB, Processing Time */\}` | L709 |
+| `src/app/stt/[uuid]/page.tsx` | `? "Processing Time (s)"` | L719 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+These are just metric labels, not the "Processing..." text the user saw. The red "Processing..." in the first screenshot might be from:1. The ZIP upload in SpeechToTextEvaluation.tsx (which is for the `/stt/new` page, not the detail page)2. Some browser devtools or external element
+
+Looking at the screenshot again, it shows "X Processing..." which could be from the ZIP upload processing state. But that's on the `/stt/new` page, not the detail page.
+
+Actually, wait - looking at the first screenshot, it shows a table header with "ID" and "Ground Truth" columns, which is from the Outputs tab on the detail page. So this is from the detail page.
+
+Let me search for "red" color usage in the STT detail page to see what might show as red.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "red" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx" • 9 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/app/stt/[uuid]/page.tsx` | `pred: string;` | L36 |
+| `src/app/stt/[uuid]/page.tsx` | `<p className="text-base text-red-500 mb-2">\{error\}</p>` | L250 |
+| `src/app/stt/[uuid]/page.tsx` | `predicted transcription.` | L379 |
+| `src/app/stt/[uuid]/page.tsx` | `predicted strings using string matching algorithms.` | L394 |
+| `src/app/stt/[uuid]/page.tsx` | `a transcript says "9" but the model predicts "nine",` | L410 |
+| `src/app/stt/[uuid]/page.tsx` | `both might be considered correct for the agent's` | L411 |
+| `src/app/stt/[uuid]/page.tsx` | `<div className="text-[13px] text-red-500 flex items-center gap-2">` | L650 |
+| `src/app/stt/[uuid]/page.tsx` | `Prediction` | L755 |
+| `src/app/stt/[uuid]/page.tsx` | `\{result.pred\}` | L785 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Line 650 shows an error message in red with an X icon. Let me check what that's about:</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see - the red text with ❌ is an error message that shows when a provider result has `success: false`. The `providerResult.message` would contain "Processing..." or similar if the provider is still being processed.But wait - if a provider result is in the `provider_results` array, it should be complete (either success or failure). The "Processing..." text might be the actual error message from the backend when something fails during processing.The user mentioned "don't show this processing red color text when receiving data" - I think they mean when intermediate results show a provider that had an error with message "Processing..." or similar. 
+
+Actually, looking at the first screenshot more carefully - it shows "Processing..." after an X icon, which matches the error message pattern at line 650-653. This means a provider result came back with `success: false` and `message: "Processing..."` or similar.
+
+The user wants to not show this error when the data is still being received (evaluation in progress). So I should only show error messages when the evaluation is done, OR change how we display errors for intermediate results.
+
+Actually, the user might want me to skip showing providers that have error messages during the in_progress state. Let me update the code to filter out providers with errors when the status is not "done".</details></think>
+
+---
+
+I see the issue - the red error message appears when a provider returns with `success: false` and a message (like "Processing..."). Let me update the code to not show error messages while evaluation is still in progress:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: 2
+
+```diff
+@@ -645,6 +645,7 @@
+                                  className="space-y-6"
+                                &gt;
+-                                 {/* Error Message */}
+-                                 {!providerResult.success &amp;&amp;
++                                 {/* Error Message - only show when evaluation is done */}
++                                 {evaluationResult.status === "done" &amp;&amp;
++                                   !providerResult.success &amp;&amp;
+                                    providerResult.message &amp;&amp; (
+                                      &lt;div className="text-[13px] text-red-500 flex items-center gap-2"&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, now let me also check for lint errors and verify the changes are complete.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx`
+
+Lint results
+
+Lint errors for `src/app/stt/[uuid]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me verify the overall structure is correct by reading the key sections:</details></think>
+
+---
+
+Let me verify the changes look correct:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The structure looks correct. The changes made are:1. When no provider results: Shows a waiting spinner with "Evaluating providers..." message
+2. When at least one provider result: Shows the status badge with count, tabs, and content
+3. Error messages (red X with text) only show when evaluation status is "done"
+
+This addresses both the user's requests:1. Don't show tabs until at least one result is received - ✅ Tabs only show inside the `provider_results.length > 0` conditional2. Don't show red "Processing..." text when receiving data - ✅ Error messages only show when `status === "done"`</details></think>
+
+---
+
+Done! Here's what I changed:
+
+1. **Tabs only show when at least one provider result exists** - Before any results arrive, shows a clean waiting spinner with "Evaluating providers..."
+
+2. **Red error messages only show when evaluation is done** - The `❌ Processing...` or other error messages will not appear during `in_progress` state, only after the evaluation completes
+
+---
+
+_**User (2026-01-17 22:10Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to the STT detail page. Let me update the app-details.md to reflect the updated behavior - specifically:
+
+1. Tabs only show when at least one provider result exists
+2. Error messages only show when evaluation is done
+
+I already updated the STT section earlier, but I should refine it to be more accurate about the current behavior.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to update the STT detail page section to reflect the current behavior more accurately:1. Tabs and content only show when at least one provider result exists2. Waiting state shows when no results yet
+3. Error messages only show when evaluation is done (not during in_progress)</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 6, lines removed: 4
+
+```diff
+@@ -180,9 +180,11 @@
+  - **Shows intermediate results** as each provider completes (doesn't wait for all to finish)
+  - **Default tab is "Outputs"** (not Leaderboard) to show results as they arrive
+- - **Status indicator during processing**: Shows "N provider(s) completed" or "Waiting for results..."
+- - **Tabs**:
++ - **Waiting state**: Shows centered spinner with "Evaluating providers..." when no results yet (no tabs shown)
++ - **Tabs only appear when at least one provider result exists**:
+    - **Leaderboard**: Only visible when status is &#96;done&#96; (needs all providers to compare)
+-   - **Outputs**: Always visible, shows waiting spinner until first provider completes, then shows per-provider results with ground truth vs predictions
+-   - **About**: Always visible, metric descriptions
++   - **Outputs**: Per-provider results with ground truth vs predictions
++   - **About**: Metric descriptions
++ - **Status indicator**: Shows "N provider(s) completed" above tabs while &#96;in_progress&#96;
++ - **Provider error messages** (red ❌ with message): Only displayed when evaluation status is &#96;done&#96;, not during &#96;in_progress&#96; (avoids showing misleading "Processing..." errors for in-flight providers)
+  - **Metrics**: WER, String Similarity, LLM Judge Score, TTFB, Processing Time
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I've updated the documentation to reflect the current behavior more accurately. The key changes documented:
+1. Waiting state shows when no results (no tabs shown)
+2. Tabs only appear when at least one provider result exists
+3. Provider error messages only shown when evaluation is done</details></think>
+
+---
+
+Done. Updated the STT Detail Page documentation to accurately reflect:
+- Waiting state shows when no results yet (tabs hidden)
+- Tabs only appear after first provider result
+- Error messages only shown when evaluation is complete (not during processing)
+
+---
+
+_**User (2026-01-17 22:10Z)**_
+
+similar to how in test runner the tests are shown on the left and upon clicking one test the whole test details are shown update the stt outputs tab layout so that the providers are shown on the left, and there's a spinner for each provider as it is in progress. Once every provider is done, there should be a green tick mark beside each provider, and remove the separate line or separate component that you've added that shows n providers remaining or n providers complete. To remove that line and remove the drop-down, just show all the providers on the left, select the first one by default, and show the view for that by default. For each of the providers, show a green dot similar to how we were showing for each of the tests in test runner, and when each of them are complete, show a green tick mark.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to update the STT outputs tab to have a layout similar to the TestRunnerDialog where:
+1. Providers are shown on the left as a list (not a dropdown)
+2. Each provider has a status indicator (spinner when in progress, green tick when done)
+3. First provider is selected by default
+4. Clicking a provider shows its details on the right
+5. Remove the "N providers completed" status line
+6. Remove the dropdown
+
+Let me first look at the TestRunnerDialog to understand the layout pattern:</details></think>
+
+---
+
+Let me first look at the TestRunnerDialog to understand the layout pattern:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me see more of the TestRunnerDialog to understand the layout with the left panel showing tests and right panel showing details:</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me see the layout part of the TestRunnerDialog to understand the two-column structure:</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me see the TestListItem component and the right panel:</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/TestRunnerDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I understand the pattern. Let me also look at the StatusIcon component from the shared components:</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I have a good understanding of the pattern. Let me now update the STT outputs tab to have this layout:
+
+1. Left panel with list of providers (similar to TestListItem)
+2. Each provider has a status icon (spinner when in progress, green check when done with success, gray dot when waiting)
+3. Right panel shows the selected provider's details
+4. Remove the dropdown and the "N providers completed" status line
+5. First provider is selected by defaultLet me now read the current STT detail page outputs tab and update it:</details></think>
+
+---
+
+Now let me read the current Outputs tab in the STT page and update it:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me see the Outputs tab content with the dropdown and the Provider Content:</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I have a clear picture. I need to:
+
+1. Replace the entire Outputs tab content with a two-panel layout (left: provider list, right: provider details)
+2. Remove the "N providers completed" status badge section
+3. Remove the dropdown and replace with a provider list on the left
+4. Show status icons (spinner for in-progress, green check for success, red x for failure, gray dot for pending)
+
+Let me also look at what providers are expected - I need to know all expected providers, not just the ones that have results. But actually, looking at the existing code, it seems like the API just returns `provider_results` as providers complete. I don't have a list of expected providers.
+
+Actually, looking at the sttProviders import, the providers are selected by the user during evaluation creation. But on this detail page, we only have access to the results, not the original configuration. So I'll work with what we have - show providers that have results, and show them as complete (green check for success, red X for failure).
+
+Let me update the Outputs tab to have the two-column layout. I'll:
+1. Remove the status badge section  
+2. Replace the dropdown with a left panel provider list
+3. Show provider details on the right panel
+4. Use status icons similar to TestRunnerDialog</details></think>
+
+---
+
+Now I understand the layout. Let me update the Outputs tab with a two-panel layout similar to TestRunnerDialog. First, let me update the code:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: undefined, lines removed: 14
+
+```diff
+@@ -294,18 +294,4 @@
+                evaluationResult.provider_results.length &gt; 0 &amp;&amp; (
+                  &lt;&gt;
+-                   {/* Status Badge - show inline with tabs for in_progress */}
+-                   {evaluationResult.status !== "done" &amp;&amp; (
+-                     &lt;div className="flex items-center gap-3"&gt;
+-                       &lt;StatusBadge
+-                         status={evaluationResult.status}
+-                         showSpinner
+-                       /&gt;
+-                       &lt;span className="text-[13px] text-muted-foreground"&gt;
+-                         {evaluationResult.provider_results.length} provider(s)
+-                         completed
+-                       &lt;/span&gt;
+-                     &lt;/div&gt;
+-                   )}
+- 
+                    {/* Tab Navigation */}
+                    &lt;div className="flex gap-2 border-b border-border"&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I removed the status badge section. Now I need to replace the Outputs tab content with the two-panel layout. Let me first read the current Outputs tab content to replace it:</details></think>
+
+---
+
+Now let me replace the Outputs tab content with the two-panel layout:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me see the rest of the Outputs tab content to understand the full structure I need to replace:</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I have the full picture. I need to replace the entire Outputs tab content (lines 577-811) with a two-panel layout. Let me create the new layout.
+
+The new layout should:1. Have a left panel (w-64 or w-72) with a list of providers
+2. Each provider shows a status icon (green check for success, red X for failure, spinner for in-progress)
+3. Right panel shows the selected provider's details (metrics + results table)
+4. First provider is selected by defaultLet me replace the entire Outputs tab:</details></think>
+
+---
+
+Now let me replace the entire Outputs tab with a two-panel layout:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 160, lines removed: 225
+
+```diff
+@@ -575,237 +575,172 @@
+                    )}
+  
+-                   {/* Outputs Tab */}
++                   {/* Outputs Tab - Two Panel Layout */}
+                    {activeTab === "outputs" &amp;&amp; (
+-                     &lt;div className="space-y-4 -mx-8 px-8 w-[calc(100vw-260px)] ml-[calc((260px-100vw)/2+50%)] relative"&gt;
+-                       {/* Provider Dropdown */}
+-                       &lt;div className="flex items-center gap-3"&gt;
+-                         &lt;div className="relative"&gt;
+-                           &lt;select
+-                             value={
+-                               activeProviderTab ||
+-                               (evaluationResult.provider_results.length &gt; 0
+-                                 ? evaluationResult.provider_results[0].provider
+-                                 : "")
+-                             }
+-                             onChange={(e) =&gt;
+-                               setActiveProviderTab(e.target.value)
+-                             }
+-                             className="h-10 px-4 pr-10 rounded-md text-[13px] border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer appearance-none min-w-[180px]"
+-                           &gt;
+-                             {evaluationResult.provider_results.map(
+-                               (providerResult) =&gt; (
+-                                 &lt;option
++                     &lt;div className="flex border border-border rounded-xl overflow-hidden h-[calc(100vh-220px)]"&gt;
++                       {/* Left Panel - Provider List */}
++                       &lt;div className="w-64 border-r border-border flex flex-col overflow-hidden bg-muted/10"&gt;
++                         &lt;div className="p-3 border-b border-border"&gt;
++                           &lt;h3 className="text-sm font-medium text-foreground"&gt;Providers&lt;/h3&gt;
++                         &lt;/div&gt;
++                         &lt;div className="flex-1 overflow-y-auto p-2"&gt;
++                           &lt;div className="space-y-1"&gt;
++                             {evaluationResult.provider_results.map((providerResult) =&gt; {
++                               const isSelected = (activeProviderTab || evaluationResult.provider_results[0]?.provider) === providerResult.provider;
++                               return (
++                                 &lt;div
+                                    key={providerResult.provider}
+-                                   value={providerResult.provider}
+-                                 &gt;
+-                                   {getProviderLabel(providerResult.provider)}
+-                                 &lt;/option&gt;
+-                               )
+-                             )}
+-                           &lt;/select&gt;
+-                           &lt;div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"&gt;
+-                             &lt;svg
+-                               className="w-4 h-4 text-muted-foreground"
+-                               fill="none"
+-                               viewBox="0 0 24 24"
+-                               stroke="currentColor"
+-                               strokeWidth={2}
+-                             &gt;
+-                               &lt;path
+-                                 strokeLinecap="round"
+-                                 strokeLinejoin="round"
+-                                 d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+-                               /&gt;
+-                             &lt;/svg&gt;
++                                   onClick={() =&gt; setActiveProviderTab(providerResult.provider)}
++                                   className={&#96;flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
++                                     isSelected ? "bg-muted" : "hover:bg-muted/50"
++                                   }&#96;}
++                                 &gt;
++                                   {/* Status Icon */}
++                                   {providerResult.success ? (
++                                     &lt;div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0"&gt;
++                                       &lt;svg className="w-3 h-3 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}&gt;
++                                         &lt;path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /&gt;
++                                       &lt;/svg&gt;
++                                     &lt;/div&gt;
++                                   ) : (
++                                     &lt;div className="w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0"&gt;
++                                       &lt;svg className="w-3 h-3 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}&gt;
++                                         &lt;path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /&gt;
++                                       &lt;/svg&gt;
++                                     &lt;/div&gt;
++                                   )}
++                                   &lt;span className="text-sm text-foreground truncate"&gt;
++                                     {getProviderLabel(providerResult.provider)}
++                                   &lt;/span&gt;
++                                 &lt;/div&gt;
++                               );
++                             })}
+                            &lt;/div&gt;
+                          &lt;/div&gt;
+                        &lt;/div&gt;
+  
+-                       {/* Provider Content */}
+-                       {(activeProviderTab ||
+-                         (evaluationResult.provider_results.length &gt; 0 &amp;&amp;
+-                           evaluationResult.provider_results[0].provider)) &amp;&amp; (
+-                         &lt;&gt;
+-                           {evaluationResult.provider_results
+-                             .filter(
+-                               (pr) =&gt;
+-                                 pr.provider ===
+-                                 (activeProviderTab ||
+-                                   (evaluationResult.provider_results &amp;&amp;
+-                                     evaluationResult.provider_results[0]
+-                                       ?.provider))
+-                             )
+-                             .map((providerResult) =&gt; (
+-                               &lt;div
+-                                 key={providerResult.provider}
+-                                 className="space-y-6"
+-                               &gt;
+-                                 {/* Error Message - only show when evaluation is done */}
+-                                 {evaluationResult.status === "done" &amp;&amp;
+-                                   !providerResult.success &amp;&amp;
+-                                   providerResult.message &amp;&amp; (
+-                                     &lt;div className="text-[13px] text-red-500 flex items-center gap-2"&gt;
+-                                       &lt;span&gt;❌&lt;/span&gt;
+-                                       &lt;span&gt;{providerResult.message}&lt;/span&gt;
+-                                     &lt;/div&gt;
+-                                   )}
++                       {/* Right Panel - Provider Details */}
++                       &lt;div className="flex-1 overflow-y-auto p-6"&gt;
++                         {(() =&gt; {
++                           const selectedProvider = activeProviderTab || evaluationResult.provider_results[0]?.provider;
++                           const providerResult = evaluationResult.provider_results.find(pr =&gt; pr.provider === selectedProvider);
++                           
++                           if (!providerResult) {
++                             return (
++                               &lt;div className="flex items-center justify-center h-full"&gt;
++                                 &lt;p className="text-muted-foreground"&gt;Select a provider to view details&lt;/p&gt;
++                               &lt;/div&gt;
++                             );
++                           }
++ 
++                           return (
++                             &lt;div className="space-y-6"&gt;
++                               {/* Error Message - only show when evaluation is done */}
++                               {evaluationResult.status === "done" &amp;&amp;
++                                 !providerResult.success &amp;&amp;
++                                 providerResult.message &amp;&amp; (
++                                   &lt;div className="text-[13px] text-red-500 flex items-center gap-2"&gt;
++                                     &lt;span&gt;❌&lt;/span&gt;
++                                     &lt;span&gt;{providerResult.message}&lt;/span&gt;
++                                   &lt;/div&gt;
++                                 )}
+  
+-                                 {/* Overall Metrics - Only show if success */}
+-                                 {providerResult.success &amp;&amp; (
+-                                   &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
+-                                     &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
+-                                       Overall Metrics
+-                                     &lt;/h3&gt;
+-                                     &lt;div className="space-y-4"&gt;
+-                                       {/* First Row: WER, String Similarity, LLM Judge Score */}
+-                                       &lt;div className="grid grid-cols-3 gap-4"&gt;
+-                                         {providerResult.metrics.map(
+-                                           (metric, index) =&gt; {
+-                                             if ("wer" in metric) {
+-                                               return (
+-                                                 &lt;div key={index}&gt;
+-                                                   &lt;div className="text-[12px] text-muted-foreground mb-1"&gt;
+-                                                     WER
+-                                                   &lt;/div&gt;
+-                                                   &lt;div className="text-[18px] font-semibold text-foreground"&gt;
+-                                                     {metric.wer}
+-                                                   &lt;/div&gt;
+-                                                 &lt;/div&gt;
+-                                               );
+-                                             }
+-                                             if ("string_similarity" in metric) {
+-                                               return (
+-                                                 &lt;div key={index}&gt;
+-                                                   &lt;div className="text-[12px] text-muted-foreground mb-1"&gt;
+-                                                     String Similarity
+-                                                   &lt;/div&gt;
+-                                                   &lt;div className="text-[18px] font-semibold text-foreground"&gt;
+-                                                     {metric.string_similarity.toFixed(
+-                                                       5
+-                                                     )}
+-                                                   &lt;/div&gt;
+-                                                 &lt;/div&gt;
+-                                               );
+-                                             }
+-                                             if ("llm_judge_score" in metric) {
+-                                               return (
+-                                                 &lt;div key={index}&gt;
+-                                                   &lt;div className="text-[12px] text-muted-foreground mb-1"&gt;
+-                                                     LLM Judge Score
+-                                                   &lt;/div&gt;
+-                                                   &lt;div className="text-[18px] font-semibold text-foreground"&gt;
+-                                                     {metric.llm_judge_score}
+-                                                   &lt;/div&gt;
+-                                                 &lt;/div&gt;
+-                                               );
+-                                             }
+-                                             return null;
+-                                           }
+-                                         )}
+-                                       &lt;/div&gt;
+-                                       {/* Second Row: TTFB, Processing Time */}
+-                                       &lt;div className="grid grid-cols-3 gap-4"&gt;
+-                                         {providerResult.metrics.map(
+-                                           (metric, index) =&gt; {
+-                                             if ("metric_name" in metric) {
+-                                               const displayName =
+-                                                 metric.metric_name === "ttfb"
+-                                                   ? "TTFB (s)"
+-                                                   : metric.metric_name ===
+-                                                     "processing_time"
+-                                                   ? "Processing Time (s)"
+-                                                   : metric.metric_name;
+-                                               return (
+-                                                 &lt;div key={index}&gt;
+-                                                   &lt;div className="text-[12px] text-muted-foreground mb-1"&gt;
+-                                                     {displayName}
+-                                                   &lt;/div&gt;
+-                                                   &lt;div className="text-[18px] font-semibold text-foreground"&gt;
+-                                                     {metric.mean.toFixed(5)}
+-                                                   &lt;/div&gt;
+-                                                 &lt;/div&gt;
+-                                               );
+-                                             }
+-                                             return null;
+-                                           }
+-                                         )}
+-                                       &lt;/div&gt;
+-                                     &lt;/div&gt;
+-                                   &lt;/div&gt;
+-                                 )}
++                               {/* Overall Metrics - Only show if success */}
++                               {providerResult.success &amp;&amp; (
++                                 &lt;div className="border rounded-xl p-4 bg-muted/10"&gt;
++                                   &lt;h3 className="text-[15px] font-semibold mb-4"&gt;
++                                     Overall Metrics
++                                   &lt;/h3&gt;
++                                   &lt;div className="space-y-4"&gt;
++                                     {/* First Row: WER, String Similarity, LLM Judge Score */}
++                                     &lt;div className="grid grid-cols-3 gap-4"&gt;
++                                       {providerResult.metrics.map((metric, index) =&gt; {
++                                         if ("wer" in metric) {
++                                           return (
++                                             &lt;div key={index}&gt;
++                                               &lt;div className="text-[12px] text-muted-foreground mb-1"&gt;WER&lt;/div&gt;
++                                               &lt;div className="text-[18px] font-semibold text-foreground"&gt;{metric.wer}&lt;/div&gt;
++                                             &lt;/div&gt;
++                                           );
++                                         }
++                                         if ("string_similarity" in metric) {
++                                           return (
++                                             &lt;div key={index}&gt;
++                                               &lt;div className="text-[12px] text-muted-foreground mb-1"&gt;String Similarity&lt;/div&gt;
++                                               &lt;div className="text-[18px] font-semibold text-foreground"&gt;{metric.string_similarity.toFixed(5)}&lt;/div&gt;
++                                             &lt;/div&gt;
++                                           );
++                                         }
++                                         if ("llm_judge_score" in metric) {
++                                           return (
++                                             &lt;div key={index}&gt;
++                                               &lt;div className="text-[12px] text-muted-foreground mb-1"&gt;LLM Judge Score&lt;/div&gt;
++                                               &lt;div className="text-[18px] font-semibold text-foreground"&gt;{metric.llm_judge_score}&lt;/div&gt;
++                                             &lt;/div&gt;
++                                           );
++                                         }
++                                         return null;
++                                       })}
++                                     &lt;/div&gt;
++                                     {/* Second Row: TTFB, Processing Time */}
++                                     &lt;div className="grid grid-cols-3 gap-4"&gt;
++                                       {providerResult.metrics.map((metric, index) =&gt; {
++                                         if ("metric_name" in metric) {
++                                           const displayName =
++                                             metric.metric_name === "ttfb"
++                                               ? "TTFB (s)"
++                                               : metric.metric_name === "processing_time"
++                                               ? "Processing Time (s)"
++                                               : metric.metric_name;
++                                           return (
++                                             &lt;div key={index}&gt;
++                                               &lt;div className="text-[12px] text-muted-foreground mb-1"&gt;{displayName}&lt;/div&gt;
++                                               &lt;div className="text-[18px] font-semibold text-foreground"&gt;{metric.mean.toFixed(5)}&lt;/div&gt;
++                                             &lt;/div&gt;
++                                           );
++                                         }
++                                         return null;
++                                       })}
++                                     &lt;/div&gt;
++                                   &lt;/div&gt;
++                                 &lt;/div&gt;
++                               )}
+  
+-                                 {/* Results Table */}
+-                                 {providerResult.results &amp;&amp;
+-                                   providerResult.results.length &gt; 0 &amp;&amp; (
+-                                     &lt;div className="border rounded-xl overflow-visible"&gt;
+-                                       &lt;div className="overflow-hidden rounded-xl"&gt;
+-                                         &lt;table className="w-full"&gt;
+-                                           &lt;thead className="bg-muted/50 border-b border-border"&gt;
+-                                             &lt;tr&gt;
+-                                               &lt;th className="px-4 py-3 text-left text-[12px] font-medium text-foreground"&gt;
+-                                                 ID
+-                                               &lt;/th&gt;
+-                                               &lt;th className="px-4 py-3 text-left text-[12px] font-medium text-foreground"&gt;
+-                                                 Ground Truth
+-                                               &lt;/th&gt;
+-                                               &lt;th className="px-4 py-3 text-left text-[12px] font-medium text-foreground"&gt;
+-                                                 Prediction
+-                                               &lt;/th&gt;
+-                                               &lt;th className="px-4 py-3 text-left text-[12px] font-medium text-foreground"&gt;
+-                                                 WER
+-                                               &lt;/th&gt;
+-                                               &lt;th className="px-4 py-3 text-left text-[12px] font-medium text-foreground"&gt;
+-                                                 String Similarity
+-                                               &lt;/th&gt;
+-                                               &lt;th className="px-4 py-3 text-left text-[12px] font-medium text-foreground"&gt;
+-                                                 LLM Judge Score
+-                                               &lt;/th&gt;
+-                                               &lt;th className="px-4 py-3 text-left text-[12px] font-medium text-foreground"&gt;
+-                                                 LLM Judge Reasoning
+-                                               &lt;/th&gt;
+-                                             &lt;/tr&gt;
+-                                           &lt;/thead&gt;
+-                                           &lt;tbody&gt;
+-                                             {providerResult.results.map(
+-                                               (result, index) =&gt; (
+-                                                 &lt;tr
+-                                                   key={index}
+-                                                   className="border-b border-border last:border-b-0"
+-                                                 &gt;
+-                                                   &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
+-                                                     {index + 1}
+-                                                   &lt;/td&gt;
+-                                                   &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
+-                                                     {result.gt}
+-                                                   &lt;/td&gt;
+-                                                   &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
+-                                                     {result.pred}
+-                                                   &lt;/td&gt;
+-                                                   &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
+-                                                     {result.wer}
+-                                                   &lt;/td&gt;
+-                                                   &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
+-                                                     {parseFloat(
+-                                                       result.string_similarity
+-                                                     ).toFixed(5)}
+-                                                   &lt;/td&gt;
+-                                                   &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;
+-                                                     {result.llm_judge_score}
+-                                                   &lt;/td&gt;
+-                                                   &lt;td className="px-4 py-3 text-[13px] text-muted-foreground max-w-md"&gt;
+-                                                     {result.llm_judge_reasoning}
+-                                                   &lt;/td&gt;
+-                                                 &lt;/tr&gt;
+-                                               )
+-                                             )}
+-                                           &lt;/tbody&gt;
+-                                         &lt;/table&gt;
+-                                       &lt;/div&gt;
+-                                     &lt;/div&gt;
+-                                   )}
+-                               &lt;/div&gt;
+-                             ))}
+-                         &lt;/&gt;
+-                       )}
++                               {/* Results Table */}
++                               {providerResult.results &amp;&amp; providerResult.results.length &gt; 0 &amp;&amp; (
++                                 &lt;div className="border rounded-xl overflow-visible"&gt;
++                                   &lt;div className="overflow-hidden rounded-xl"&gt;
++                                     &lt;table className="w-full"&gt;
++                                       &lt;thead className="bg-muted/50 border-b border-border"&gt;
++                                         &lt;tr&gt;
++                                           &lt;th className="px-4 py-3 text-left text-[12px] font-medium text-foreground"&gt;ID&lt;/th&gt;
++                                           &lt;th className="px-4 py-3 text-left text-[12px] font-medium text-foreground"&gt;Ground Truth&lt;/th&gt;
++                                           &lt;th className="px-4 py-3 text-left text-[12px] font-medium text-foreground"&gt;Prediction&lt;/th&gt;
++                                           &lt;th className="px-4 py-3 text-left text-[12px] font-medium text-foreground"&gt;WER&lt;/th&gt;
++                                           &lt;th className="px-4 py-3 text-left text-[12px] font-medium text-foreground"&gt;String Similarity&lt;/th&gt;
++                                           &lt;th className="px-4 py-3 text-left text-[12px] font-medium text-foreground"&gt;LLM Judge Score&lt;/th&gt;
++                                           &lt;th className="px-4 py-3 text-left text-[12px] font-medium text-foreground"&gt;LLM Judge Reasoning&lt;/th&gt;
++                                         &lt;/tr&gt;
++                                       &lt;/thead&gt;
++                                       &lt;tbody&gt;
++                                         {providerResult.results.map((result, index) =&gt; (
++                                           &lt;tr key={index} className="border-b border-border last:border-b-0"&gt;
++                                             &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;{index + 1}&lt;/td&gt;
++                                             &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;{result.gt}&lt;/td&gt;
++                                             &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;{result.pred}&lt;/td&gt;
++                                             &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;{result.wer}&lt;/td&gt;
++                                             &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;{parseFloat(result.string_similarity).toFixed(5)}&lt;/td&gt;
++                                             &lt;td className="px-4 py-3 text-[13px] text-foreground"&gt;{result.llm_judge_score}&lt;/td&gt;
++                                             &lt;td className="px-4 py-3 text-[13px] text-muted-foreground max-w-md"&gt;{result.llm_judge_reasoning}&lt;/td&gt;
++                                           &lt;/tr&gt;
++                                         ))}
++                                       &lt;/tbody&gt;
++                                     &lt;/table&gt;
++                                   &lt;/div&gt;
++                                 &lt;/div&gt;
++                               )}
++                             &lt;/div&gt;
++                           );
++                         })()}
++                       &lt;/div&gt;
+                      &lt;/div&gt;
+                    )}
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I've replaced the Outputs tab with a two-panel layout. Let me check for lint errors:</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx`
+
+Lint results
+
+Lint errors for `src/app/stt/[uuid]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'evaluationResult.provider_results' is possibly 'undefined'. | 588:72-588:105 | DIAGNOSTIC_SEVERITY_ERROR |
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+| 'StatusBadge' is declared but its value is never read. | 7:22-7:33 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to fix the TypeScript error. Since we're inside a conditional that checks `evaluationResult.provider_results && evaluationResult.provider_results.length > 0`, this should be fine, but TypeScript doesn't understand that. Let me fix the optional access.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 2
+
+```diff
+@@ -585,6 +585,6 @@
+                          &lt;div className="flex-1 overflow-y-auto p-2"&gt;
+                            &lt;div className="space-y-1"&gt;
+-                             {evaluationResult.provider_results.map((providerResult) =&gt; {
+-                               const isSelected = (activeProviderTab || evaluationResult.provider_results[0]?.provider) === providerResult.provider;
++                             {evaluationResult.provider_results!.map((providerResult) =&gt; {
++                               const isSelected = (activeProviderTab || evaluationResult.provider_results![0]?.provider) === providerResult.provider;
+                                return (
+                                  &lt;div
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me check for any more lint errors:</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx`
+
+Lint results
+
+Lint errors for `src/app/stt/[uuid]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+| 'StatusBadge' is declared but its value is never read. | 7:22-7:33 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I should also clean up the StatusBadge import since we removed its usage (the status badge section). Let me check if StatusBadge is still used elsewhere in the file:</details></think>
+
+---
+
+Let me check if StatusBadge is still needed in the file:
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "StatusBadge" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx" • 1 match</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/app/stt/[uuid]/page.tsx` | `import \{ BackHeader, StatusBadge \} from "@/components/ui";` | L7 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+StatusBadge is imported but not used anymore. Let me remove it from the import:</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -5,5 +5,5 @@
+  import { useSession, signOut } from "next-auth/react";
+  import { AppLayout } from "@/components/AppLayout";
+- import { BackHeader, StatusBadge } from "@/components/ui";
++ import { BackHeader } from "@/components/ui";
+  import { sttProviders } from "@/components/agent-tabs/constants/providers";
+  import {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me verify there are no more lint errors:</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx`
+
+Lint results
+
+Lint errors for `src/app/stt/[uuid]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me verify the changes by reading the relevant sections to make sure everything looks correct:</details></think>
+
+---
+
+Let me verify the structure looks correct:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The layout looks good. Let me summarize the changes:1. Removed the "N providers completed" status badge section
+2. Replaced the dropdown with a left panel showing all providers as a list3. Each provider shows a status icon:   - Green checkmark for success   - Red X for failure4. First provider is selected by default5. Clicking a provider shows its details on the right panelThe changes are complete. Let me provide a summary to the user.</details></think>
+
+---
+
+Done! I've updated the Outputs tab with a two-panel layout similar to TestRunnerDialog:
+
+**Changes made:**
+
+1. **Removed the "N providers completed" status line** - No more separate status indicator
+
+2. **Replaced dropdown with left panel provider list** - All providers shown in a scrollable list on the left (w-64)
+
+3. **Status icons for each provider:**
+   - ✅ Green checkmark in green circle for successful providers
+   - ❌ Red X in red circle for failed providers
+
+4. **First provider selected by default** - Automatically shows first provider's results
+
+5. **Two-panel layout** - Left panel (provider list) + Right panel (provider details with metrics and results table)
+
+6. **Cleaned up unused import** - Removed StatusBadge since it's no longer used
+
+---
+
+_**User (2026-01-17 22:10Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made significant code changes to the STT detail page Outputs tab. I need to update the app-details.md to reflect the new two-panel layout and remove the obsolete description of the dropdown.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 7, lines removed: 3
+
+```diff
+@@ -183,8 +183,12 @@
+  - **Tabs only appear when at least one provider result exists**:
+    - **Leaderboard**: Only visible when status is &#96;done&#96; (needs all providers to compare)
+-   - **Outputs**: Per-provider results with ground truth vs predictions
++   - **Outputs**: Two-panel layout similar to TestRunnerDialog
+    - **About**: Metric descriptions
+- - **Status indicator**: Shows "N provider(s) completed" above tabs while &#96;in_progress&#96;
+- - **Provider error messages** (red ❌ with message): Only displayed when evaluation status is &#96;done&#96;, not during &#96;in_progress&#96; (avoids showing misleading "Processing..." errors for in-flight providers)
++ - **Outputs tab layout** (two-panel, similar to TestRunnerDialog):
++   - **Left panel** (w-64): Provider list with status icons - green checkmark for success, red X for failure
++   - **Right panel**: Selected provider's overall metrics + results table (ground truth vs predictions)
++   - First provider is selected by default
++   - Clicking a provider shows its details on the right
++ - **Provider error messages** (red ❌ with message): Only displayed when evaluation status is &#96;done&#96;, not during &#96;in_progress&#96;
+  - **Metrics**: WER, String Similarity, LLM Judge Score, TTFB, Processing Time
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I've updated the documentation to reflect the new two-panel layout for the Outputs tab. The key changes documented:1. Outputs tab now has a two-panel layout similar to TestRunnerDialog
+2. Left panel shows provider list with status icons (green checkmark for success, red X for failure)
+3. Right panel shows selected provider's details
+4. First provider selected by default5. Removed mention of "Status indicator" since we removed the "N provider(s) completed" line</details></think>
+
+---
+
+Done. Updated the STT Detail Page documentation to describe the new two-panel Outputs tab layout with provider list on the left (with status icons) and provider details on the right.
+
+---
+
+_**User (2026-01-17 22:10Z)**_
+
+remove the Providers heading before showing the outputs for all providers
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to remove the "Providers" heading from the left panel of the Outputs tab in the STT detail page.</details></think>
+
+---
+
+The string to replace was not found in the file.
+
+---
+
+<think><details><summary>Thought Process</summary>
+The file has been auto-formatted. Let me read the current content and fix it:</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: undefined, lines removed: 5
+
+```diff
+@@ -580,9 +580,4 @@
+                        {/* Left Panel - Provider List */}
+                        &lt;div className="w-64 border-r border-border flex flex-col overflow-hidden bg-muted/10"&gt;
+-                         &lt;div className="p-3 border-b border-border"&gt;
+-                           &lt;h3 className="text-sm font-medium text-foreground"&gt;
+-                             Providers
+-                           &lt;/h3&gt;
+-                         &lt;/div&gt;
+                          &lt;div className="flex-1 overflow-y-auto p-2"&gt;
+                            &lt;div className="space-y-1"&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me verify there are no lint errors:</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx`
+
+Lint results
+
+Lint errors for `src/app/stt/[uuid]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done. The "Providers" heading has been removed from the left panel.</details></think>
+
+---
+
+Done. Removed the "Providers" heading from the left panel.
+
+---
+
+_**User (2026-01-17 22:10Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made a small code change - removed the "Providers" heading from the left panel. This is a minor UI change that doesn't really need to be documented in the app-details.md since it's just removing a heading. The existing documentation already says "Left panel (w-64): Provider list with status icons" which is still accurate - just without the heading now.
+
+I don't think this warrants an update to the documentation since it's such a minor change and the current description is still accurate.</details></think>
+
+---
+
+The change I made was very minor (just removing a "Providers" heading text from the left panel). The existing documentation already accurately describes the layout as "Left panel (w-64): Provider list with status icons" - this is still correct without the heading. No documentation update needed for this small UI tweak.
+
+---
+
+_**User (2026-01-17 22:10Z)**_
+
+remove Evaluating providers... and revert back to showing spinner beside the "Running" / "Queued"  pill
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to:
+1. Remove the "Evaluating providers..." waiting state
+2. Revert back to showing a status badge (like "Running" or "Queued") with a spinner
+
+Let me look at the current code to see what needs to be changed.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to:
+1. Replace the "Evaluating providers..." waiting state with a StatusBadge
+2. Add back the StatusBadge importLet me make these changes:</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -5,5 +5,5 @@
+  import { useSession, signOut } from "next-auth/react";
+  import { AppLayout } from "@/components/AppLayout";
+- import { BackHeader } from "@/components/ui";
++ import { BackHeader, StatusBadge } from "@/components/ui";
+  import { sttProviders } from "@/components/agent-tabs/constants/providers";
+  import {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me replace the "Evaluating providers..." waiting state with a StatusBadge:</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: 27
+
+```diff
+@@ -261,31 +261,7 @@
+          {!isLoading &amp;&amp; !error &amp;&amp; evaluationResult &amp;&amp; (
+            &lt;div className="space-y-4"&gt;
+-             {/* Waiting state - show when no provider results yet */}
+-             {(!evaluationResult.provider_results ||
+-               evaluationResult.provider_results.length === 0) &amp;&amp; (
+-               &lt;div className="border border-border rounded-xl p-12 flex flex-col items-center justify-center bg-muted/20"&gt;
+-                 &lt;svg
+-                   className="w-8 h-8 animate-spin text-muted-foreground mb-4"
+-                   fill="none"
+-                   viewBox="0 0 24 24"
+-                 &gt;
+-                   &lt;circle
+-                     className="opacity-25"
+-                     cx="12"
+-                     cy="12"
+-                     r="10"
+-                     stroke="currentColor"
+-                     strokeWidth="4"
+-                   &gt;&lt;/circle&gt;
+-                   &lt;path
+-                     className="opacity-75"
+-                     fill="currentColor"
+-                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+-                   &gt;&lt;/path&gt;
+-                 &lt;/svg&gt;
+-                 &lt;p className="text-[15px] text-muted-foreground"&gt;
+-                   Evaluating providers...
+-                 &lt;/p&gt;
+-               &lt;/div&gt;
++             {/* Status Badge - show when evaluation is not done */}
++             {evaluationResult.status !== "done" &amp;&amp; (
++               &lt;StatusBadge status={evaluationResult.status} showSpinner /&gt;
+              )}
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me check for lint errors:</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/app/stt/[uuid]/page.tsx`
+
+Lint results
+
+Lint errors for `src/app/stt/[uuid]/page.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| 'React' is declared but its value is never read. | 3:8-3:13 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no lint errors. The changes are complete. Now the page shows a status badge with a spinner (like "Running" or "Queued") instead of the "Evaluating providers..." centered message.</details></think>
+
+---
+
+Done. Replaced the "Evaluating providers..." centered message with a `StatusBadge` showing "Running" or "Queued" with a spinner.
+
+---
+
+_**User (2026-01-17 22:10Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes - removed the "Evaluating providers..." centered waiting state and replaced it with a StatusBadge showing "Running" or "Queued" with a spinner. I need to update the app-details.md to reflect this change.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -180,5 +180,5 @@
+  - **Shows intermediate results** as each provider completes (doesn't wait for all to finish)
+  - **Default tab is "Outputs"** (not Leaderboard) to show results as they arrive
+- - **Waiting state**: Shows centered spinner with "Evaluating providers..." when no results yet (no tabs shown)
++ - **Status badge**: Shows "Running" or "Queued" badge with spinner when evaluation is not done
+  - **Tabs only appear when at least one provider result exists**:
+    - **Leaderboard**: Only visible when status is &#96;done&#96; (needs all providers to compare)
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done. Updated the documentation to reflect the change from the centered "Evaluating providers..." waiting state to a simple StatusBadge showing "Running" or "Queued" with a spinner.</details></think>
+
+---
+
+Done. Updated documentation to reflect the StatusBadge replacing the centered "Evaluating providers..." message.
 
 ---
 
