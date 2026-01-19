@@ -179,7 +179,7 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 - **Polls for results** while status is `queued` or `in_progress`
 - **Shows intermediate results** as each provider completes (doesn't wait for all to finish)
 - **Default tab is "Outputs"** (not Leaderboard) to show results as they arrive
-- **Status badge**: Shows "Running" or "Queued" badge with spinner when evaluation is not done
+- **Status badge**: Shows "Running" or "Queued" badge with spinner when evaluation is not done (shown even before any provider results arrive)
 - **Tabs only appear when at least one provider result exists**:
   - **Leaderboard**: Only visible when status is `done` (needs all providers to compare)
   - **Outputs**: Two-panel layout similar to TestRunnerDialog
@@ -222,11 +222,24 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 **Detail Page (`/tts/[uuid]`):**
 
 - **Polls for results** while status is `queued` or `in_progress`
-- **Three tabs when done**:
-  - **Leaderboard**: Comparative table and charts
-  - **Outputs**: Per-provider results with audio playback
+- **Default active tab**: "outputs" (not "leaderboard")
+- **Intermediate results**: Shows Outputs and About tabs during `in_progress` status
+- **Status badge**: Shows "Running" or "Queued" badge with spinner when evaluation is not done (shown even before any provider results arrive)
+- **Tabs**:
+  - **Leaderboard**: Only visible when status is `done` - comparative table and charts
+  - **Outputs**: Two-panel layout similar to STT - provider list on left, details on right
   - **About**: Metric descriptions
+- **Outputs tab layout** (two-panel, similar to TestRunnerDialog):
+  - **Left panel** (w-64): Provider list with status icons based on `success` field:
+    - Yellow pulsing dot when `success === null` (in progress)
+    - Green checkmark when `success === true` (completed successfully)
+    - Red X when `success === false` (failed)
+  - **Right panel**: Selected provider's overall metrics + results table with audio playback
+  - First provider is selected by default
+  - Clicking a provider shows its details on the right
+- **Provider error messages** (red ❌ with message): Only displayed when evaluation status is `done`, not during `in_progress`
 - **Metrics**: LLM Judge Score, TTFB, Processing Time
+- **Intermediate results structure**: `results` array contains `id`, `text`, `audio_path`; `llm_judge_score` and `llm_judge_reasoning` are only present when complete
 
 ### 5. Tests Management (`/tests`)
 
