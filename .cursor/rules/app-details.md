@@ -668,10 +668,11 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
 
 - Contains the evaluation form component (`TextToSpeechEvaluation` or `SpeechToTextEvaluation`)
 - Both components use the same tab layout:
-  - **Settings tab**: Language selection dropdown + provider selection with toggle all
+  - **Settings tab**: Language selection dropdown + provider selection (max 3 providers, shows "X/3 selected")
   - **Input tab**: Sample rows + add sample button (TTS also has CSV upload with OR divider and sample download)
-- **Providers start unselected by default** - user must select at least one provider before evaluating
+- **Providers start unselected by default** - user must select 1-3 providers before evaluating
 - Evaluate button in header next to description, disabled when no providers selected
+- "Deselect all" button only shown when at least one provider is selected
 - On submit: calls `POST /[tts|stt]/evaluate`, then redirects to `/[tts|stt]/{uuid}` using the returned `task_id`
 - Uses `BackHeader` component for back navigation to list page
 

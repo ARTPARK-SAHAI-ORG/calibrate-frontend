@@ -205,26 +205,18 @@ export function SpeechToTextEvaluation() {
     }
   };
 
+  const MAX_PROVIDERS = 3;
+
   const toggleProvider = (provider: string) => {
     setSelectedProviders((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(provider)) {
         newSet.delete(provider);
-      } else {
+      } else if (newSet.size < MAX_PROVIDERS) {
         newSet.add(provider);
       }
       return newSet;
     });
-  };
-
-  const toggleAllProviders = () => {
-    if (selectedProviders.size === providerLabels.length) {
-      // Deselect all
-      setSelectedProviders(new Set());
-    } else {
-      // Select all
-      setSelectedProviders(new Set(providerLabels));
-    }
   };
 
   const handleDownloadSampleZip = async () => {
@@ -693,31 +685,36 @@ export function SpeechToTextEvaluation() {
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <h3 className="text-[13px] font-medium text-foreground">
-                Select providers to evaluate
+                Select up to 3 providers to evaluate
               </h3>
               <span className="text-[12px] text-muted-foreground">
-                ({selectedProviders.size} selected)
+                ({selectedProviders.size}/{MAX_PROVIDERS} selected)
               </span>
-              <button
-                onClick={toggleAllProviders}
-                className="ml-auto text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >
-                {selectedProviders.size === providerLabels.length
-                  ? "Deselect all"
-                  : "Select all"}
-              </button>
+              {selectedProviders.size > 0 && (
+                <button
+                  onClick={() => setSelectedProviders(new Set())}
+                  className="ml-auto text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                >
+                  Deselect all
+                </button>
+              )}
             </div>
             <div className="flex flex-wrap gap-3">
               {providerLabels.map((providerLabel) => {
                 const isSelected = selectedProviders.has(providerLabel);
+                const isDisabled =
+                  !isSelected && selectedProviders.size >= MAX_PROVIDERS;
                 return (
                   <button
                     key={providerLabel}
                     onClick={() => toggleProvider(providerLabel)}
-                    className={`h-9 px-4 rounded-md text-[13px] font-medium border transition-colors cursor-pointer flex items-center gap-2 ${
+                    disabled={isDisabled}
+                    className={`h-9 px-4 rounded-md text-[13px] font-medium border transition-colors flex items-center gap-2 ${
                       isSelected
-                        ? "bg-foreground text-background border-foreground"
-                        : "bg-background text-muted-foreground border-border hover:bg-accent/50 hover:text-foreground hover:border-border"
+                        ? "bg-foreground text-background border-foreground cursor-pointer"
+                        : isDisabled
+                        ? "bg-muted/50 text-muted-foreground/50 border-border/50 cursor-not-allowed"
+                        : "bg-background text-muted-foreground border-border hover:bg-accent/50 hover:text-foreground hover:border-border cursor-pointer"
                     }`}
                   >
                     {isSelected && (

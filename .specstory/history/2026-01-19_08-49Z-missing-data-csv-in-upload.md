@@ -9160,3 +9160,435 @@ Done. Updated documentation to note that providers start unselected by default f
 
 ---
 
+_**User (2026-01-17 22:10Z)**_
+
+only let people select up to 3 providers in @src/components/evaluations/SpeechToTextEvaluation.tsx and @src/components/evaluations/TextToSpeechEvaluation.tsx 
+
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to limit provider selection to a maximum of 3 providers in both STT and TTS evaluation components. I need to modify the `toggleProvider` function to prevent adding more than 3 providers, and potentially update the UI to indicate when the limit is reached.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: undefined
+
+```diff
+@@ -205,4 +205,6 @@
+      }
+    };
++ 
++   const MAX_PROVIDERS = 3;
+  
+    const toggleProvider = (provider: string) =&gt; {
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: 11
+
+```diff
+@@ -211,20 +213,10 @@
+        if (newSet.has(provider)) {
+          newSet.delete(provider);
+-       } else {
++       } else if (newSet.size &lt; MAX_PROVIDERS) {
+          newSet.add(provider);
+        }
+        return newSet;
+      });
+    };
+- 
+-   const toggleAllProviders = () =&gt; {
+-     if (selectedProviders.size === providerLabels.length) {
+-       // Deselect all
+-       setSelectedProviders(new Set());
+-     } else {
+-       // Select all
+-       setSelectedProviders(new Set(providerLabels));
+-     }
+-   };
+  
+    const handleDownloadSampleZip = async () =&gt; {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the UI to remove the "Select all" button or disable it when max is reached. Let me find and update the provider selection UI section.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 9, lines removed: 9
+
+```diff
+@@ -689,14 +689,14 @@
+                &lt;/h3&gt;
+                &lt;span className="text-[12px] text-muted-foreground"&gt;
+-                 ({selectedProviders.size} selected)
++                 ({selectedProviders.size}/{MAX_PROVIDERS} selected)
+                &lt;/span&gt;
+-               &lt;button
+-                 onClick={toggleAllProviders}
+-                 className="ml-auto text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+-               &gt;
+-                 {selectedProviders.size === providerLabels.length
+-                   ? "Deselect all"
+-                   : "Select all"}
+-               &lt;/button&gt;
++               {selectedProviders.size &gt; 0 &amp;&amp; (
++                 &lt;button
++                   onClick={() =&gt; setSelectedProviders(new Set())}
++                   className="ml-auto text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
++                 &gt;
++                   Deselect all
++                 &lt;/button&gt;
++               )}
+              &lt;/div&gt;
+              &lt;div className="flex flex-wrap gap-3"&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the provider buttons to show them as disabled when the max is reached and they're not selected.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 7, lines removed: 3
+
+```diff
+@@ -703,12 +703,16 @@
+                {providerLabels.map((providerLabel) =&gt; {
+                  const isSelected = selectedProviders.has(providerLabel);
++                 const isDisabled = !isSelected &amp;&amp; selectedProviders.size &gt;= MAX_PROVIDERS;
+                  return (
+                    &lt;button
+                      key={providerLabel}
+                      onClick={() =&gt; toggleProvider(providerLabel)}
+-                     className={&#96;h-9 px-4 rounded-md text-[13px] font-medium border transition-colors cursor-pointer flex items-center gap-2 ${
++                     disabled={isDisabled}
++                     className={&#96;h-9 px-4 rounded-md text-[13px] font-medium border transition-colors flex items-center gap-2 ${
+                        isSelected
+-                         ? "bg-foreground text-background border-foreground"
+-                         : "bg-background text-muted-foreground border-border hover:bg-accent/50 hover:text-foreground hover:border-border"
++                         ? "bg-foreground text-background border-foreground cursor-pointer"
++                         : isDisabled
++                         ? "bg-muted/50 text-muted-foreground/50 border-border/50 cursor-not-allowed"
++                         : "bg-background text-muted-foreground border-border hover:bg-accent/50 hover:text-foreground hover:border-border cursor-pointer"
+                      }&#96;}
+                    &gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me do the same changes for TTS evaluation component.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: undefined
+
+```diff
+@@ -136,4 +136,6 @@
+      }
+    };
++ 
++   const MAX_PROVIDERS = 3;
+  
+    const toggleProvider = (provider: string) =&gt; {
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: 11
+
+```diff
+@@ -142,20 +144,10 @@
+        if (newSet.has(provider)) {
+          newSet.delete(provider);
+-       } else {
++       } else if (newSet.size &lt; MAX_PROVIDERS) {
+          newSet.add(provider);
+        }
+        return newSet;
+      });
+    };
+- 
+-   const toggleAllProviders = () =&gt; {
+-     if (selectedProviders.size === providerLabels.length) {
+-       // Deselect all
+-       setSelectedProviders(new Set());
+-     } else {
+-       // Select all
+-       setSelectedProviders(new Set(providerLabels));
+-     }
+-   };
+  
+    const handleEvaluate = async () =&gt; {
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now update the UI for TTS as well.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 9, lines removed: 9
+
+```diff
+@@ -349,14 +349,14 @@
+                &lt;/h3&gt;
+                &lt;span className="text-[12px] text-muted-foreground"&gt;
+-                 ({selectedProviders.size} selected)
++                 ({selectedProviders.size}/{MAX_PROVIDERS} selected)
+                &lt;/span&gt;
+-               &lt;button
+-                 onClick={toggleAllProviders}
+-                 className="ml-auto text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+-               &gt;
+-                 {selectedProviders.size === providerLabels.length
+-                   ? "Deselect all"
+-                   : "Select all"}
+-               &lt;/button&gt;
++               {selectedProviders.size &gt; 0 &amp;&amp; (
++                 &lt;button
++                   onClick={() =&gt; setSelectedProviders(new Set())}
++                   className="ml-auto text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
++                 &gt;
++                   Deselect all
++                 &lt;/button&gt;
++               )}
+              &lt;/div&gt;
+              &lt;div className="flex flex-wrap gap-3"&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now update the provider buttons for TTS to show disabled state when max is reached.</details></think>
+
+---
+
+Error calling tool 'search_replace'.
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me try again with the proper parameters.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx</summary>
+
+**Chunk 1**
+Lines added: 7, lines removed: 3
+
+```diff
+@@ -363,12 +363,16 @@
+                {providerLabels.map((providerLabel) =&gt; {
+                  const isSelected = selectedProviders.has(providerLabel);
++                 const isDisabled = !isSelected &amp;&amp; selectedProviders.size &gt;= MAX_PROVIDERS;
+                  return (
+                    &lt;button
+                      key={providerLabel}
+                      onClick={() =&gt; toggleProvider(providerLabel)}
+-                     className={&#96;h-9 px-4 rounded-md text-[13px] font-medium border transition-colors cursor-pointer flex items-center gap-2 ${
++                     disabled={isDisabled}
++                     className={&#96;h-9 px-4 rounded-md text-[13px] font-medium border transition-colors flex items-center gap-2 ${
+                        isSelected
+-                         ? "bg-foreground text-background border-foreground"
+-                         : "bg-background text-muted-foreground border-border hover:bg-accent/50 hover:text-foreground hover:border-border"
++                         ? "bg-foreground text-background border-foreground cursor-pointer"
++                         : isDisabled
++                         ? "bg-muted/50 text-muted-foreground/50 border-border/50 cursor-not-allowed"
++                         : "bg-background text-muted-foreground border-border hover:bg-accent/50 hover:text-foreground hover:border-border cursor-pointer"
+                      }&#96;}
+                    &gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me check for lint errors in both files.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 2 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx`
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/TextToSpeechEvaluation.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Both files have been updated successfully. Now both STT and TTS evaluation components:
+1. Limit provider selection to a maximum of 3
+2. Show the count as "X/3 selected"
+3. Disable unselected provider buttons when 3 are already selected
+4. Only show "Deselect all" button when at least one provider is selected (removed "Select all" since we can't select all anymore due to the limit)</details></think>
+
+---
+
+Done. Both STT and TTS evaluation components now:
+- Limit provider selection to a maximum of 3
+- Show count as "X/3 selected"
+- Disable unselected provider buttons when 3 are already selected (with visual feedback)
+- Only show "Deselect all" button when providers are selected (removed "Select all" since we can't select all with the limit)
+
+---
+
+_**User (2026-01-17 22:10Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to both SpeechToTextEvaluation.tsx and TextToSpeechEvaluation.tsx to limit provider selection to 3 max. Let me update the app-details.md to reflect this.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "provider.*select|toggle all|MAX_PROVIDERS" in "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md" • 6 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.cursor/rules/app-details.md` | `- First provider is selected by default` | L193 |
+| `.cursor/rules/app-details.md` | `- First provider is selected by default` | L238 |
+| `.cursor/rules/app-details.md` | `- **Settings tab**: Language selection dropdown + provider selection with toggle all` | L671 |
+| `.cursor/rules/app-details.md` | `- **Providers start unselected by default** - user must select at least one provider before evaluating` | L673 |
+| `.cursor/rules/app-details.md` | `- Evaluate button in header next to description, disabled when no providers selected` | L674 |
+| `.cursor/rules/app-details.md` | `- **Google OAuth forces account selection**: The Google provider is configured with `prompt: "select_account"` to always show the account picker, preventing auto-login with cached credentials. This ensures users consciously choose their account each login.` | L2016 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I found the relevant section. I need to update line 671 to reflect that "toggle all" is no longer available (replaced with "Deselect all" only when providers are selected), and update lines 673-674 to mention the max 3 provider limit.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: 2
+
+```diff
+@@ -669,8 +669,9 @@
+  - Contains the evaluation form component (&#96;TextToSpeechEvaluation&#96; or &#96;SpeechToTextEvaluation&#96;)
+  - Both components use the same tab layout:
+-   - **Settings tab**: Language selection dropdown + provider selection with toggle all
++   - **Settings tab**: Language selection dropdown + provider selection (max 3 providers, shows "X/3 selected")
+    - **Input tab**: Sample rows + add sample button (TTS also has CSV upload with OR divider and sample download)
+- - **Providers start unselected by default** - user must select at least one provider before evaluating
++ - **Providers start unselected by default** - user must select 1-3 providers before evaluating
+  - Evaluate button in header next to description, disabled when no providers selected
++ - "Deselect all" button only shown when at least one provider is selected
+  - On submit: calls &#96;POST /[tts|stt]/evaluate&#96;, then redirects to &#96;/[tts|stt]/{uuid}&#96; using the returned &#96;task_id&#96;
+  - Uses &#96;BackHeader&#96; component for back navigation to list page
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done. Updated the documentation to reflect the new max 3 provider limit and the removal of "Select all" in favor of just "Deselect all".</details></think>
+
+---
+
+Done. Updated documentation to reflect:
+- Max 3 providers limit with "X/3 selected" display
+- "Deselect all" button only shown when providers are selected (removed "Select all" / "toggle all")
+
+---
+
