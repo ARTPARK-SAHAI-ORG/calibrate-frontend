@@ -294,8 +294,31 @@ export function SpeechToTextEvaluation() {
     try {
       const zip = await JSZip.loadAsync(file);
 
-      // Find data.csv
-      const csvFile = zip.file("data.csv");
+      // Look for data.csv at expected locations:
+      // 1. Root level: data.csv
+      // 2. Inside a wrapper folder: <folder>/data.csv (common when compressing a folder on macOS)
+      let csvFile = zip.file("data.csv");
+      let basePath = "";
+
+      if (!csvFile) {
+        // Check for a single wrapper folder containing data.csv
+        const topLevelEntries = Object.keys(zip.files).filter(
+          (path) => !path.includes("__MACOSX") && !path.startsWith("._")
+        );
+        const folders = topLevelEntries.filter(
+          (path) => path.endsWith("/") && path.split("/").length === 2
+        );
+
+        for (const folder of folders) {
+          const candidate = zip.file(`${folder}data.csv`);
+          if (candidate) {
+            csvFile = candidate;
+            basePath = folder;
+            break;
+          }
+        }
+      }
+
       if (!csvFile) {
         alert("ZIP must contain a data.csv file");
         setIsProcessingZip(false);
@@ -303,13 +326,28 @@ export function SpeechToTextEvaluation() {
       }
 
       // Parse CSV
-      const csvContent = await csvFile.async("string");
+      let csvContent = await csvFile.async("string");
+
+      // Remove BOM (Byte Order Mark) if present - common in Excel-exported CSVs
+      if (csvContent.charCodeAt(0) === 0xfeff) {
+        csvContent = csvContent.slice(1);
+      }
+
+      // Handle different line endings: \r\n (Windows), \n (Unix), \r (old Mac)
       const lines = csvContent
-        .split(/\r?\n/)
+        .split(/\r\n|\n|\r/)
         .filter((line: string) => line.trim());
 
       if (lines.length < 2) {
-        alert("data.csv must have a header and at least one data row");
+        console.error(
+          "CSV parsing failed. Raw content length:",
+          csvContent.length
+        );
+        console.error("Lines found:", lines.length);
+        console.error("First 500 chars of CSV:", csvContent.substring(0, 500));
+        alert(
+          `data.csv must have a header and at least one data row. Found ${lines.length} line(s).`
+        );
         setIsProcessingZip(false);
         return;
       }
@@ -380,9 +418,10 @@ export function SpeechToTextEvaluation() {
         const { audioFileName, text } = dataRows[i];
         const rowId = Date.now().toString() + i;
 
-        // Try to find the audio file in audios/ folder or root
-        let audioFileZip =
-          zip.file(`audios/${audioFileName}`) || zip.file(audioFileName);
+        // Look for audio file in audios/ folder (using basePath for nested ZIPs)
+        const audioFileZip =
+          zip.file(`${basePath}audios/${audioFileName}`) ||
+          zip.file(`${basePath}${audioFileName}`);
 
         if (!audioFileZip) {
           console.warn(`Audio file not found: ${audioFileName}`);

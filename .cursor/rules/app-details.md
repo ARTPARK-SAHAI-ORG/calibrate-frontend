@@ -168,6 +168,8 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 
 - **Upload audio files** (.wav format) with reference transcriptions
 - **Add multiple test samples** for batch evaluation
+- **ZIP upload option**: Upload a ZIP file containing an `audios/` folder with .wav files and a `data.csv` mapping audio files to transcriptions
+- **Download sample ZIP**: Button to download a template ZIP with correct structure
 - **Select providers to evaluate** (compare multiple simultaneously)
 - **Choose language** (English or Hindi)
 - **Run evaluation** - creates evaluation and redirects to detail page
@@ -1841,6 +1843,15 @@ Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When ena
 - **Character limits**: Implement maxLength on inputs AND display character count
 - **Required fields**: Mark with red asterisk, validate on submit, highlight invalid fields
 - **Nested parameters**: Tool parameters support arbitrary nesting (object → properties, array → items)
+
+### ZIP and CSV File Parsing (STT/TTS Evaluations)
+
+- **Direct path lookup, not search**: Instead of iterating through all ZIP entries, directly check expected locations. First try root (`data.csv`), then check top-level folders (`folder/data.csv`). This avoids accidentally matching macOS metadata files.
+- **macOS metadata files**: macOS creates hidden `__MACOSX` folders and `._` prefixed files (resource forks) in ZIPs. Filter these out when listing top-level folders: `!path.includes("__MACOSX") && !path.startsWith("._")`
+- **Nested folder structures in ZIPs**: When users compress a folder on macOS, the ZIP wraps contents in a parent folder (e.g., `my_folder/data.csv` instead of `data.csv`). Store the discovered `basePath` and use it for all subsequent file lookups.
+- **CSV BOM (Byte Order Mark)**: Excel-exported CSVs often include an invisible BOM character (`\uFEFF`) at the start. Strip it before parsing: `if (csvContent.charCodeAt(0) === 0xFEFF) csvContent = csvContent.slice(1);`
+- **CSV line endings**: Handle all types - `\r\n` (Windows), `\n` (Unix), `\r` (old Mac). Use `.split(/\r\n|\n|\r/)` instead of `.split(/\r?\n/)`.
+- **Audio file lookup with base path**: Use the discovered basePath: `zip.file(\`${basePath}audios/${filename}\`) || zip.file(\`${basePath}${filename}\`)`
 
 ### Voice Simulation Audio
 

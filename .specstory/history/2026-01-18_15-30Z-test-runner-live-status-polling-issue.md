@@ -4894,7 +4894,214 @@ Now I need to update the middleware to remove references to the maintenance page
 
 ---
 
+<think><details><summary>Thought Process</summary>
+I need to remove references to `isMaintenancePage` since that route no longer exists.</details></think>
 
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/middleware.ts</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 2
+
+```diff
+@@ -8,9 +8,8 @@
+    const isHomePage = req.nextUrl.pathname === "/";
+    const isApiRoute = req.nextUrl.pathname.startsWith("/api/");
+-   const isMaintenancePage = req.nextUrl.pathname === "/maintenance";
+  
+    // Maintenance mode: redirect all non-API routes to /
+    if (MAINTENANCE_MODE) {
+-     if (isHomePage || isApiRoute || isMaintenancePage) {
++     if (isHomePage || isApiRoute) {
+        return NextResponse.next();
+      }
+```
+
+**Chunk 2**
+Lines added: 2, lines removed: 2
+
+```diff
+@@ -23,6 +22,6 @@
+      req.nextUrl.pathname.startsWith("/api/debug");
+  
+-   // Allow auth API routes, debug routes, and maintenance page
+-   if (isAuthRoute || isDebugRoute || isMaintenancePage) {
++   // Allow auth API routes and debug routes
++   if (isAuthRoute || isDebugRoute) {
+      return NextResponse.next();
+    }
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good. Let me check for lint errors.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/middleware.ts`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no lint errors. The separate maintenance page is removed, and the middleware no longer references it.</details></think>
+
+---
+
+Done. Removed `src/app/maintenance/page.tsx` and cleaned up the middleware references. The maintenance content is only in `src/app/page.tsx` now.
+
+---
+
+_**User (2026-01-17 12:52Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I deleted the separate maintenance page and updated the middleware. I need to update the documentation to remove references to the `/maintenance` route since it no longer exists.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "/maintenance|maintenance/"" in "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md" • 1 match</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.cursor/rules/app-details.md` | `- **Public routes** (no auth required): `/login`, `/api/auth/*`, `/debug*`, `/maintenance`` | L1969 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to remove `/maintenance` from the public routes list since that page no longer exists. Let me also check if there are any references to the maintenance directory in the project structure.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "maintenance/" in "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md" • 1 match</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.cursor/rules/app-details.md` | `│   │   ├── maintenance/       # Public maintenance page (shown during deployments)` | L406 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to remove the maintenance/ directory from the project structure and update the public routes list.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: undefined, lines removed: 1
+
+```diff
+@@ -404,5 +404,4 @@
+  │   │   ├── simulations/       # End-to-end simulation testing (has layout.tsx)
+  │   │   ├── login/             # Authentication page (has layout.tsx)
+- │   │   ├── maintenance/       # Public maintenance page (shown during deployments)
+  │   │   └── api/auth/          # NextAuth.js route handlers
+  │   ├── components/
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the public routes list to remove `/maintenance`.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1966,5 +1966,5 @@
+  - **Middleware matcher**: Excludes static assets (&#96;_next/static&#96;, &#96;_next/image&#96;, &#96;favicon.ico&#96;, &#96;*.svg&#96;)
+  - **Protected routes**: All routes except public routes require authentication
+- - **Public routes** (no auth required): &#96;/login&#96;, &#96;/api/auth/*&#96;, &#96;/debug*&#96;, &#96;/maintenance&#96;
++ - **Public routes** (no auth required): &#96;/login&#96;, &#96;/api/auth/*&#96;, &#96;/debug*&#96;
+  - **Session access**: Use &#96;useSession()&#96; in client components, &#96;auth()&#96; in server components
+  - **Token expiration**: Backend returns 401 when JWT expires; always handle this by calling &#96;signOut({ callbackUrl: "/login" })&#96;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done. Removed the maintenance page references from:
+1. Project structure (removed the maintenance/ directory entry)
+2. Public routes list (removed /maintenance)
+
+The maintenance mode documentation in the Environment Variables section is still accurate - it describes that `/` shows maintenance content when MAINTENANCE_MODE=true, which is correct.</details></think>
+
+---
+
+Updated documentation:
+- Removed `maintenance/` from project structure
+- Removed `/maintenance` from public routes list
 
 ---
 
