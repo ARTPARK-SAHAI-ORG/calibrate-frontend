@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { AppLayout } from "@/components/AppLayout";
@@ -87,6 +93,39 @@ export default function SimulationRunPage() {
   >(null);
   // Store a frozen copy of the simulation once it's complete to prevent re-renders
   const frozenSimulationRef = useRef<SimulationResult | null>(null);
+
+  // Refresh run data to get fresh presigned URLs when audio fails to load
+  const refreshRunData = useCallback(async () => {
+    if (!backendAccessToken) return;
+
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) return;
+
+      const response = await fetch(`${backendUrl}/simulations/run/${runId}`, {
+        method: "GET",
+        headers: {
+          accept: "application/json",
+          "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
+        },
+      });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
+      if (!response.ok) return;
+
+      const data: RunData = await response.json();
+      // Clear frozen simulation to allow fresh URLs to be used
+      frozenSimulationRef.current = null;
+      setRunData(data);
+    } catch (err) {
+      console.error("Error refreshing run data for audio URLs:", err);
+    }
+  }, [runId, backendAccessToken]);
 
   // Derive selectedSimulation from runData using the key
   // Uses simulation_name as unique identifier to ensure correct simulation's transcript is shown
@@ -1101,6 +1140,7 @@ export default function SimulationRunPage() {
                   controls
                   className="w-full h-10"
                   src={selectedSimulation.conversation_wav_url}
+                  onError={refreshRunData}
                 >
                   Your browser does not support the audio element.
                 </audio>
@@ -1161,6 +1201,7 @@ export default function SimulationRunPage() {
                               controls
                               className="w-full h-8 mb-2"
                               src={audioUrl}
+                              onError={refreshRunData}
                             >
                               Your browser does not support the audio element.
                             </audio>

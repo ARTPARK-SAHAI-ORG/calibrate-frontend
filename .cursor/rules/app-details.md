@@ -362,6 +362,7 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
   - **Processing indicator**: Shows a yellow spinner at the bottom of transcript while metrics are being fetched (when `evaluation_results` is null but transcript has content)
   - **Graceful null handling**: All transcript accesses use optional chaining (`transcript?.length ?? 0`, `transcript ?? []`) since transcript can be undefined during intermediate results
   - **Stable audio keys**: All audio elements use `key={audioUrl}` to prevent React from remounting them during polling re-renders (avoids audio restart/reload)
+  - **Presigned URL refresh on error**: Audio elements include `onError={refreshRunData}` handler to automatically fetch fresh presigned URLs when they expire. The `refreshRunData` callback clears `frozenSimulationRef` before updating state so new URLs are used instead of stale frozen data
   - Full conversation audio player below header (from `conversation_wav_url`) for voice simulations
   - Full conversation history (user, assistant, tool calls)
   - Role-based message styling
@@ -2038,6 +2039,7 @@ Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When ena
 - **Audio URL matching**: The `getAudioUrlForEntry` function in the simulation run page counts previous messages of the same role and adds 1 to get the correct file index
 - **Common mistake**: Don't use 0-based indexing for user audio files - they follow the same 1-indexed pattern as bot files
 - **Full conversation audio**: The API returns a `conversation_wav_url` field containing a combined audio file of the entire conversation. This is displayed below the Transcript header (before the messages) with a "Full Conversation" label and speaker icon
+- **Presigned URL expiration handling**: S3 presigned URLs for audio files expire after a period. When audio fails to load (e.g., expired URL), the `onError` handler triggers a `refreshRunData` callback that fetches fresh run data from the API with new presigned URLs. The callback also clears any frozen simulation data to ensure the fresh URLs are used
 
 ### Navigation
 
