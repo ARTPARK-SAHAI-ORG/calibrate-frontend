@@ -1,0 +1,12 @@
+{
+    "rewrites": [
+      {
+        "source": "/docs",
+        "destination": "https://amandalmia.mintlify.dev/docs"
+      },
+      {
+        "source": "/docs/:match*",
+        "destination": "https://amandalmia.mintlify.dev/docs/:match*"
+      }
+    ]
+  }
