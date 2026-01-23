@@ -2056,6 +2056,7 @@ AUTH_SECRET=                                    # NextAuth secret
 GOOGLE_CLIENT_ID=                              # Google OAuth client ID
 GOOGLE_CLIENT_SECRET=                          # Google OAuth client secret
 MAINTENANCE_MODE=true                          # Show maintenance page at / (optional)
+NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX    # Google Analytics Measurement ID (optional)
 ```
 
 ### Maintenance Mode
@@ -2353,3 +2354,10 @@ window.history.replaceState(null, "", `?tab=${tabName}`);
 - **`NEXT_PUBLIC_*` vars are build-time**: These environment variables are embedded into client-side JavaScript at build time, not runtime. Server-side code (API routes) reads them at runtime.
 - **Changing env vars requires rebuild**: After adding/changing `NEXT_PUBLIC_*` vars in Vercel, you must redeploy **without build cache** to rebuild client JS with new values.
 - **Environment selection**: Vercel has Production, Preview, and Development environments. Set env vars for the correct environment (or "All").
+
+### Analytics
+
+- **Vercel Analytics**: Enabled via `@vercel/analytics/next` - automatically tracks page views on Vercel deployments
+- **Google Analytics**: Enabled via `@next/third-parties/google` - only loads when `NEXT_PUBLIC_GA_MEASUREMENT_ID` is set
+  - Both are added in the root layout (`src/app/layout.tsx`)
+  - Google Analytics component conditionally renders based on the environment variable
