@@ -546,3 +546,433 @@ Now I need to update the Environment Variables section to add the Sentry-related
 
 ---
 
+<think><details><summary>Thought Process</summary>
+Now I should also add a section about Sentry error tracking under the Analytics section or nearby, to explain how Sentry is configured in the codebase. Let me read that section to find the right place.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I should add a Sentry section after the Analytics section. This is the end of the file, so I'll add it there.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I should also update the directory structure section if it doesn't already include the Sentry config files. Let me check if those files are listed in the directory structure.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "instrumentation|global-error",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+  "context": 2,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "instrumentation|global-error",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": ".cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 2665,
+                  "content": "- **Sentry** is configured for error tracking across client, server, and edge runtimes",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2666,
+                  "content": "- Configuration files:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2667,
+                  "content": "  - &#96;src/instrumentation-client.ts&#96; - Client-side Sentry initialization (includes Replay integration)"
+                },
+                {
+                  "lineNumber": 2668,
+                  "content": "  - &#96;sentry.server.config.ts&#96; - Server-side Sentry initialization",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2669,
+                  "content": "  - &#96;sentry.edge.config.ts&#96; - Edge runtime Sentry initialization (middleware, edge routes)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2670,
+                  "content": "  - &#96;src/instrumentation.ts&#96; - Imports server config for Next.js instrumentation"
+                },
+                {
+                  "lineNumber": 2671,
+                  "content": "  - &#96;src/app/global-error.tsx&#96; - Global error boundary that reports to Sentry"
+                },
+                {
+                  "lineNumber": 2672,
+                  "content": "- Environment variables (both use &#96;NEXT_PUBLIC_&#96; prefix for client/server availability):",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2673,
+                  "content": "  - &#96;NEXT_PUBLIC_SENTRY_DSN&#96; - Sentry project DSN",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 9,
+          "totalMatchedLines": 3
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The Sentry section now exists with the relevant information. Let me also check the directory structure to see if I should add the Sentry config files there, but since the user said not to add unnecessary changes, I'll leave it as is. The main changes have been made - adding Sentry env vars to the Environment Variables section and adding a new Error Tracking (Sentry) section explaining the configuration.
+
+The updates I made:
+1. Added `NEXT_PUBLIC_SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_ENVIRONMENT` to the Environment Variables section
+2. Added a new "Error Tracking (Sentry)" subsection under the Gotchas section (after Analytics) explaining the Sentry configuration files and setup
+
+This should be sufficient documentation for the Sentry configuration changes.</details></think>
+
+---
+
+Updated `.cursor/rules/app-details.md` with:
+
+1. **Environment Variables section** - Added the two new Sentry env vars:
+   - `NEXT_PUBLIC_SENTRY_DSN`
+   - `NEXT_PUBLIC_SENTRY_ENVIRONMENT`
+
+2. **New "Error Tracking (Sentry)" section** - Added documentation covering:
+   - List of all Sentry configuration files and their purposes
+   - Environment variable usage with explanation of the `NEXT_PUBLIC_` prefix
+   - Enabled features (Replay, PII, logs)
+
+---
+
+_**User**_
+
+Sentry.replayIntegration({
+  // NOTE: This will disable built-in masking. Only use this if your site has no sensitive data, or if you've already set up other options for masking or blocking relevant data, such as 'ignore', 'block', 'mask' and 'maskFn'.
+  maskAllText: false,
+  blockAllMedia: false,
+});
+
+
+add this 
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to update the Sentry.replayIntegration() call in the instrumentation-client.ts file to include the maskAllText and blockAllMedia options set to false.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/instrumentation-client.ts</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to update the replayIntegration() call to include the maskAllText and blockAllMedia options.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/instrumentation-client.ts</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done. The replayIntegration now includes the maskAllText and blockAllMedia options set to false, which disables the built-in masking for session replays.</details></think>
+
+---
+
+Done. Updated the `replayIntegration()` to disable built-in masking with `maskAllText: false` and `blockAllMedia: false`.
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made a code change to the instrumentation-client.ts file - I added maskAllText: false and blockAllMedia: false to the replayIntegration. I should update the app-details.md to reflect this change in the Sentry section I added earlier.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "Error Tracking \\(Sentry\\)",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+  "context": 15,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "Error Tracking \\(Sentry\\)",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": ".cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 2648,
+                  "content": "- **Google OAuth forces account selection**: The Google provider is configured with &#96;prompt: \"select_account\"&#96; to always show the account picker, preventing auto-login with cached credentials. This ensures users consciously choose their account each login.",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2649,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2650,
+                  "content": "### Vercel Deployment",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2651,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2652,
+                  "content": "- **&#96;NEXT_PUBLIC_*&#96; vars are build-time**: These environment variables are embedded into client-side JavaScript at build time, not runtime. Server-side code (API routes) reads them at runtime.",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2653,
+                  "content": "- **Changing env vars requires rebuild**: After adding/changing &#96;NEXT_PUBLIC_*&#96; vars in Vercel, you must redeploy **without build cache** to rebuild client JS with new values.",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2654,
+                  "content": "- **Environment selection**: Vercel has Production, Preview, and Development environments. Set env vars for the correct environment (or \"All\").",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2655,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2656,
+                  "content": "### Analytics",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2657,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2658,
+                  "content": "- **Vercel Analytics**: Enabled via &#96;@vercel/analytics/next&#96; - automatically tracks page views on Vercel deployments",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2659,
+                  "content": "- **Google Analytics**: Enabled via &#96;@next/third-parties/google&#96; - only loads when &#96;NEXT_PUBLIC_GA_MEASUREMENT_ID&#96; is set",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2660,
+                  "content": "  - Both are added in the root layout (&#96;src/app/layout.tsx&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2661,
+                  "content": "  - Google Analytics component conditionally renders based on the environment variable",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2662,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2663,
+                  "content": "### Error Tracking (Sentry)"
+                },
+                {
+                  "lineNumber": 2664,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2665,
+                  "content": "- **Sentry** is configured for error tracking across client, server, and edge runtimes",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2666,
+                  "content": "- Configuration files:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2667,
+                  "content": "  - &#96;src/instrumentation-client.ts&#96; - Client-side Sentry initialization (includes Replay integration)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2668,
+                  "content": "  - &#96;sentry.server.config.ts&#96; - Server-side Sentry initialization",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2669,
+                  "content": "  - &#96;sentry.edge.config.ts&#96; - Edge runtime Sentry initialization (middleware, edge routes)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2670,
+                  "content": "  - &#96;src/instrumentation.ts&#96; - Imports server config for Next.js instrumentation",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2671,
+                  "content": "  - &#96;src/app/global-error.tsx&#96; - Global error boundary that reports to Sentry",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2672,
+                  "content": "- Environment variables (both use &#96;NEXT_PUBLIC_&#96; prefix for client/server availability):",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2673,
+                  "content": "  - &#96;NEXT_PUBLIC_SENTRY_DSN&#96; - Sentry project DSN",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2674,
+                  "content": "  - &#96;NEXT_PUBLIC_SENTRY_ENVIRONMENT&#96; - Environment name (development, staging, production)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2675,
+                  "content": "- Features enabled: Session Replay (10% session sample, 100% on error), PII sending, logs",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 28,
+          "totalMatchedLines": 1
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to update the last line about features enabled to include the fact that masking is disabled for Replay.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done. I've updated the Sentry section to note that masking is disabled for Session Replay. This reflects the change I made to add `maskAllText: false` and `blockAllMedia: false` to the replayIntegration configuration.</details></think>
+
+---
+
+Updated the Sentry section to note that masking is disabled for Session Replay.
+
+---
+

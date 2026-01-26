@@ -2672,4 +2672,4 @@ window.history.replaceState(null, "", `?tab=${tabName}`);
 - Environment variables (both use `NEXT_PUBLIC_` prefix for client/server availability):
   - `NEXT_PUBLIC_SENTRY_DSN` - Sentry project DSN
   - `NEXT_PUBLIC_SENTRY_ENVIRONMENT` - Environment name (development, staging, production)
-- Features enabled: Session Replay (10% session sample, 100% on error), PII sending, logs
+- Features enabled: Session Replay (10% session sample, 100% on error, masking disabled), PII sending, logs
