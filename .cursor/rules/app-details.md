@@ -399,6 +399,7 @@ type TTSProvider = {
   - Page polls API every 3 seconds while status is `in_progress`
   - Simulation results appear incrementally as each simulation completes
   - Overall metrics only shown after run completes (status === "done")
+  - **Failed state error banner**: When `runData.status === "failed"`, a red error banner is displayed below the status pills with a warning triangle icon and "Simulation Failed" text (styled with `border-red-500/30`, `bg-red-500/10`, `text-red-500`)
   - Individual simulation rows can have `evaluation_results: null` while still processing
   - **Row spinner states**:
     - **Play button only**: Row has `evaluation_results` (metrics complete)
