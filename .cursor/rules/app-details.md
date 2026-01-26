@@ -108,57 +108,63 @@ STT and TTS providers have typed definitions with the following fields:
 
 ```typescript
 type STTProvider = {
-  label: string;           // Provider name (e.g., "Deepgram")
-  value: string;           // API identifier (e.g., "deepgram")
-  model: string;           // Model name (e.g., "nova-3")
+  label: string; // Provider name (e.g., "Deepgram")
+  value: string; // API identifier (e.g., "deepgram")
+  model: string; // Default model name (e.g., "nova-3")
   supportedLanguages?: string[];
+  modelOverrides?: Record<string, string>; // Language-specific model overrides
 };
 
 type TTSProvider = {
-  label: string;           // Provider name (e.g., "Cartesia")
-  value: string;           // API identifier (e.g., "cartesia")
-  model: string;           // Model name (e.g., "sonic-2")
-  voiceId: string;         // Voice identifier (e.g., "638efaaa-4d0c-442e-b701-3fae16aad012")
+  label: string; // Provider name (e.g., "Cartesia")
+  value: string; // API identifier (e.g., "cartesia")
+  model: string; // Model name (e.g., "sonic-2")
+  voiceId: string; // Voice identifier (e.g., "638efaaa-4d0c-442e-b701-3fae16aad012")
   supportedLanguages?: string[];
+  modelOverrides?: Record<string, string>; // Language-specific model overrides
 };
 ```
 
 **STT Providers Table:**
-| Label | Model |
-|-------|-------|
-| Deepgram | nova-3 |
-| OpenAI | gpt-4o-transcribe |
-| Cartesia | ink |
-| ElevenLabs | scribe-v2 |
-| Groq | whisper-large-v3-turbo |
-| Google | chirp-3 |
-| Sarvam | saarika-v2.5 |
-| Smallest | pulse |
+| Label | Model | Model Overrides |
+|-------|-------|-----------------|
+| Deepgram | nova-3 | - |
+| OpenAI | gpt-4o-transcribe | - |
+| Cartesia | ink | - |
+| ElevenLabs | scribe-v2 | - |
+| Groq | whisper-large-v3-turbo | - |
+| Google | chirp-3 | Sindhi → chirp-2 |
+| Sarvam | saarika-v2.5 | - |
+| Smallest | pulse | - |
+
+**Model Overrides Pattern**: Some STT and TTS providers need different models for specific languages. Use `modelOverrides` to specify language-specific models. When selecting or displaying a model for a language, check `provider.modelOverrides?.[language]` first, then fall back to `provider.model`.
 
 **TTS Providers Table:**
-| Label | Model | Voice ID |
-|-------|-------|----------|
-| Cartesia | sonic-2 | 638efaaa-4d0c-442e-b701-3fae16aad012 |
-| OpenAI | gpt-4o-mini-tts | coral |
-| Groq | playai-tts | Arista-PlayAI |
-| Google | chirp-3 | Aoede |
-| ElevenLabs | eleven_multilingual_v2 | IbEzPPGLXlYUvxNGhJQp |
-| Sarvam | bulbul:v2 | meera |
-| Smallest | lightning | emily |
+| Label | Model | Voice ID | Model Overrides |
+|-------|-------|----------|-----------------|
+| Cartesia | sonic-3 | Riya | - |
+| OpenAI | gpt-4o-mini-tts | coral | - |
+| Groq | orpheus | troy | - |
+| Google | chirp_3 | Charon | Sindhi → gemini |
+| ElevenLabs | eleven_multilingual_v2 | Krishna | Sindhi → eleven_v3 |
+| Sarvam | bulbul:v3-beta | aditya | - |
+| Smallest | lightning | aditi | - |
 
 **STT Language Arrays** (`*STTSupportedLanguages`):
+
 - `cartesiaSTTSupportedLanguages`: 99 languages - STT only (TTS has separate list)
 - `deepgramSTTSupportedLanguages`: 44 languages - STT only provider
 - `elevenlabsSTTSupportedLanguages`: 94 languages - STT only (TTS has separate list)
-- `googleSTTSupportedLanguages`: 71 languages - STT only (TTS has separate list)
+- `googleSTTSupportedLanguages`: 72 languages (includes Sindhi) - STT only (TTS has separate list)
 - `openaiSTTSupportedLanguages`: 57 languages - used for both STT and TTS, also used by whisper/groq STT
 - `sarvamSTTSupportedLanguages`: 11 Indic languages - used for both STT and TTS
 - `smallestAiSTTSupportedLanguages`: 32 languages - used for both STT and TTS
 
 **TTS Language Arrays** (`*TTSSupportedLanguages`):
+
 - `cartesiaTTSSupportedLanguages`: 41 languages
-- `elevenlabsTTSSupportedLanguages`: 29 languages
-- `googleTTSSupportedLanguages`: 47 languages
+- `elevenlabsTTSSupportedLanguages`: 30 languages (includes Sindhi)
+- `googleTTSSupportedLanguages`: 48 languages (includes Sindhi)
 - `groqTTSSupportedLanguages`: 1 language (English only) - used by orpheus/groq TTS
 
 **Tests Tab Features:**
@@ -395,7 +401,6 @@ type TTSProvider = {
 **Simulation Run Results** (`/simulations/[uuid]/runs/[runId]`):
 
 - **Polling & Intermediate Results**:
-
   - Page polls API every 3 seconds while status is `in_progress`
   - Simulation results appear incrementally as each simulation completes
   - Overall metrics only shown after run completes (status === "done")
@@ -408,14 +413,12 @@ type TTSProvider = {
     - **Metric column spinners**: Each metric cell shows `w-5 h-5 flex-shrink-0` spinner when `evaluation_results` is null; yellow when processing, gray when waiting
 
 - **Overall Metrics** (only shown when status is "done", aggregated across all simulations):
-
   - Tool calls accuracy (mean ± std)
   - Answer completeness
   - Assistant behavior
   - Question completeness
 
 - **Per-Simulation Results Table** (shows intermediate results as each simulation completes):
-
   - Persona + Scenario combination
   - Individual metric scores (Pass/Fail with tooltips showing reasoning)
   - Metric columns derived from `runData.metrics` keys, or from `simulation_results[].evaluation_results` when metrics is null
@@ -430,7 +433,6 @@ type TTSProvider = {
     3. Waiting rows (no transcript - gray spinner) - at the bottom
 
 - **Transcript Dialog**:
-
   - **Live updates with freeze-on-complete**: Dialog stays in sync with polling while simulation is in progress, then freezes:
     - Stores `selectedSimulationKey` using `simulation_name` (unique identifier)
     - Uses `frozenSimulationRef` to store a stable copy once simulation has `evaluation_results`
@@ -500,10 +502,10 @@ This enables:
 - **Framework**: Next.js 16.1.1 with App Router
 - **React**: 19.2.3
 - **Styling**: Tailwind CSS 4 with CSS variables for theming
-- **Fonts**: 
+- **Fonts**:
   - **Geist** - Default app font (via `--font-geist-sans`)
   - **Geist Mono** - Monospace font (via `--font-geist-mono`)
-  - **Inter** - Available via `--font-inter` 
+  - **Inter** - Available via `--font-inter`
   - **DM Sans** - Used on landing page for Coval-style typography (via `--font-dm-sans`)
 - **Authentication**: NextAuth.js v5 (beta) with Google OAuth
 - **Charts**: Recharts 3.6.0
@@ -583,6 +585,7 @@ This enables:
 The login page serves as a marketing-style landing page with a consistent light theme throughout:
 
 **Layout (top to bottom):**
+
 1. **Navigation bar**: PENSE logo (left) + "Book a demo" button (right)
 2. **Hero section**: Large headline, subtitle, centered "Continue with Google" CTA
 3. **Feature Tabs section**: Tab switcher with feature previews
@@ -593,11 +596,13 @@ The login page serves as a marketing-style landing page with a consistent light 
 8. **Footer**: Three-column links (Company, Resources, Community) + copyright (`bg-gray-50`)
 
 **Feature Tabs:**
+
 - Tabs: "Speech to text", "Text to text", "Text to speech", "Simulations"
 - State managed via `useState` with `activeTab` (default: "stt")
 - Tab data defined as array: `{ id, label, headingBold, headingLight, description, images }` where `images` is an array of image paths
 
 **Two-Column Layout** (below tabs):
+
 - **Container**: Full width with `px-12` padding (no max-width constraint to maximize image space)
 - **Tabs**: Centered with `max-w-7xl mx-auto`
 - **Grid**: `grid-cols-[400px_1fr] gap-8 max-w-7xl` - text column (400px), images in constrained width
@@ -606,6 +611,7 @@ The login page serves as a marketing-style landing page with a consistent light 
 - Image files in `public/`: `stt_1.png` to `stt_4.png`, `tts_1.png` to `tts_4.png`, `llm-leaderboard.png`, `llm-output.png`, `simulation-all.png`, `simulation-run.png`
 
 **Integrations Section:**
+
 - **Background**: White (`bg-white`) with padding (`py-24 px-12`)
 - **Headline**: "Works with any voice agent stack" - same font as hero (`leading-[1.1] tracking-[-0.02em]`)
 - **Subtitle**: About Python SDK, CLI, and provider support
@@ -614,18 +620,21 @@ The login page serves as a marketing-style landing page with a consistent light 
 - **Grid styling**: `grid-cols-2 md:grid-cols-4`, `border border-gray-200 rounded-xl`, cells with `bg-gray-50 p-5`, `text-gray-900 text-sm font-medium` labels
 
 **Open Source Section:**
+
 - **Background**: Light gray (`bg-gray-50`) with padding (`py-24 px-12`)
 - **Headline**: "Proudly Open Source" - same font as hero
 - **Subtitle**: Links to run "locally" or "self-hosted" (underlined, `hover:text-gray-900`)
 - **GitHub button**: Dark button (`bg-gray-900`) linking to `ArtikiTech/pense` repo with GitHub logo and star icon
 
 **Community Section:**
+
 - **Background**: White (`bg-white`) with padding (`py-24 px-12`)
 - **Headline**: "Join the Community" - same font as hero
 - **Subtitle**: About teams using Pense
 - **Social links**: "Follow @artikiagents" (light bordered button) and "Connect on LinkedIn" (text link)
 
 **Get Started Section:**
+
 - **Background**: White (`bg-white`) with padding (`py-20 px-12`)
 - **Headline**: "Start testing with Pense today." with `tracking-[-0.02em]` for tight letter spacing
 - **Two-column grid**: "Evaluate your agent" (left) and "Learn more" (right)
@@ -635,6 +644,7 @@ The login page serves as a marketing-style landing page with a consistent light 
 - **Links**: Benchmark STT/TTS Providers, Run LLM Tests, Watch Demo, Read Documentation, Book a Demo
 
 **Footer:**
+
 - **Background**: Light gray (`bg-gray-50`) with top border (`border-t border-gray-200`)
 - **Three columns**: Company, Resources, Community - each with left border accent
 - **Column headers**: Uppercase, letter-spaced (`tracking-[0.2em]`), muted color (`text-gray-400`)
@@ -642,6 +652,7 @@ The login page serves as a marketing-style landing page with a consistent light 
 - **Copyright**: Right-aligned, muted
 
 **Styling Patterns:**
+
 - **Consistent light theme** throughout - alternating white (`bg-white`) and light gray (`bg-gray-50`) backgrounds
 - **DM Sans font** applied via inline style: `style={{ fontFamily: 'var(--font-dm-sans), system-ui, -apple-system, sans-serif' }}`
 - **All headlines**: `font-medium text-gray-900 leading-[1.1] tracking-[-0.02em]` for consistent typography
@@ -652,6 +663,7 @@ The login page serves as a marketing-style landing page with a consistent light 
 - **Grid borders**: `border-gray-200` for light theme consistency
 
 **CTA Buttons:**
+
 - "Continue with Google" - Main action, centered in hero section, triggers `signIn("google")`
 - "Book a demo" - Header button, opens external booking link
 
@@ -660,7 +672,6 @@ The login page serves as a marketing-style landing page with a consistent light 
 The app uses NextAuth.js v5 with middleware-based route protection and backend sync:
 
 1. **Middleware** (`src/middleware.ts`) protects all routes:
-
    - Unauthenticated users → redirected to `/login`
    - Authenticated users on `/login` → redirected to `/agents`
    - Auth API routes (`/api/auth/*`) are always accessible
@@ -963,14 +974,33 @@ Both TTS and STT evaluations filter available providers based on the selected la
 
 ```tsx
 type LanguageOption =
-  | "english" | "hindi" | "kannada" | "bengali" | "malayalam"
-  | "marathi" | "odia" | "punjabi" | "tamil" | "telugu" | "gujarati";
+  | "english"
+  | "hindi"
+  | "kannada"
+  | "bengali"
+  | "malayalam"
+  | "marathi"
+  | "odia"
+  | "punjabi"
+  | "sindhi"
+  | "tamil"
+  | "telugu"
+  | "gujarati";
 
 // Map language option to the format used in supportedLanguages arrays
 const languageDisplayName: Record<LanguageOption, string> = {
-  english: "English", hindi: "Hindi", kannada: "Kannada", bengali: "Bengali",
-  malayalam: "Malayalam", marathi: "Marathi", odia: "Odia", punjabi: "Punjabi",
-  tamil: "Tamil", telugu: "Telugu", gujarati: "Gujarati",
+  english: "English",
+  hindi: "Hindi",
+  kannada: "Kannada",
+  bengali: "Bengali",
+  malayalam: "Malayalam",
+  marathi: "Marathi",
+  odia: "Odia",
+  punjabi: "Punjabi",
+  sindhi: "Sindhi",
+  tamil: "Tamil",
+  telugu: "Telugu",
+  gujarati: "Gujarati",
 };
 
 // Filter providers based on selected language
@@ -979,20 +1009,23 @@ const getFilteredProviders = (language: LanguageOption) => {
   return providers.filter(
     (provider) =>
       !provider.supportedLanguages ||
-      provider.supportedLanguages.includes(langName)
+      provider.supportedLanguages.includes(langName),
   );
 };
 ```
 
 - Provider arrays (`sttProviders`, `ttsProviders`) have `label`, `value`, `model`, and optional `supportedLanguages` fields
+- Both STT and TTS providers have an optional `modelOverrides` field for language-specific models (e.g., Google STT uses `chirp-2` for Sindhi, Google TTS uses `gemini` for Sindhi, ElevenLabs TTS uses `eleven_v3` for Sindhi)
 - TTS providers additionally have a `voiceId` field
 - **Provider display varies by context**:
   - **New evaluation pages** (provider selection): Table format showing Label, Model (and Voice ID for TTS) in separate columns
+  - **Model column shows overrides**: When a language has a model override, the table displays the override instead of the default model
   - **List pages and detail pages**: Only label shown (e.g., "Deepgram" not "Deepgram (nova-3)")
   - `getProviderLabel()` helper returns just the label: `provider.label`
 - Providers without `supportedLanguages` are shown for all languages
 - When language changes, selected providers that don't support the new language are automatically deselected
 - Language arrays are defined in `providers.ts` (e.g., `deepgramSTTSupportedLanguages`, `googleTTSSupportedLanguages`)
+- **Sindhi support**: Available in both STT evaluation (Google with chirp-2 model) and TTS evaluation (Google with gemini model, ElevenLabs with eleven_v3 model)
 
 ### Component Patterns
 
@@ -1191,19 +1224,19 @@ docs/
 
 ### Navigation Groups (mint.json)
 
-| Group | Pages |
-|-------|-------|
-| **Get Started** | introduction |
-| **Guides** | stt, tts, llm-testing, simulations |
+| Group           | Pages                              |
+| --------------- | ---------------------------------- |
+| **Get Started** | introduction                       |
+| **Guides**      | stt, tts, llm-testing, simulations |
 
 ### Guide Content
 
-| Guide | Content Covered |
-|-------|-----------------|
-| **STT** | Upload audio, select providers, view WER/latency metrics, leaderboard |
-| **TTS** | Add text samples, select providers, listen to outputs, view metrics |
+| Guide           | Content Covered                                                                                                                                                                                  |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **STT**         | Upload audio, select providers, view WER/latency metrics, leaderboard                                                                                                                            |
+| **TTS**         | Add text samples, select providers, listen to outputs, view metrics                                                                                                                              |
 | **LLM Testing** | Complete workflow: create agent → create tool → attach tool → create Next Reply test → run test → create Tool Invocation test → run test → attach tests to agent → run all tests → run benchmark |
-| **Simulations** | Setup (agent, tool, personas, scenarios, metrics) → Text simulation section (per-row metrics, overall metrics, transcripts) → Voice simulation section (latency metrics, audio transcripts) |
+| **Simulations** | Setup (agent, tool, personas, scenarios, metrics) → Text simulation section (per-row metrics, overall metrics, transcripts) → Voice simulation section (latency metrics, audio transcripts)      |
 
 ### Mintlify Components Used
 
@@ -1217,6 +1250,7 @@ docs/
 ### Adding Screenshots
 
 Each guide references placeholder images in `/docs/images/`. Image naming convention:
+
 - `{feature}_overview.png` - List/landing page
 - `{feature}_new.png` - Create/new page
 - `{feature}_config.png` - Configuration view
@@ -2105,7 +2139,7 @@ useEffect(() => {
       }
     } catch (error) {
       // Set status to failed and stop polling on fetch error
-      setData((prev) => prev ? { ...prev, status: "failed" } : prev);
+      setData((prev) => (prev ? { ...prev, status: "failed" } : prev));
       if (pollInterval) {
         clearInterval(pollInterval);
         pollInterval = null;
@@ -2133,6 +2167,7 @@ When a fetch error occurs during polling (network failure, server error, etc.), 
 This prevents infinite polling when the backend is unreachable and gives users immediate feedback via the "Failed" status badge.
 
 **Files implementing this pattern:**
+
 - `src/app/stt/[uuid]/page.tsx` - STT evaluation detail page
 - `src/app/tts/[uuid]/page.tsx` - TTS evaluation detail page
 - `src/app/simulations/[uuid]/runs/[runId]/page.tsx` - Simulation run detail page
@@ -2148,7 +2183,7 @@ The `EvaluationResult` type for STT/TTS evaluations:
 type EvaluationResult = {
   task_id: string;
   status: "queued" | "in_progress" | "done" | "failed";
-  language?: string;  // Displayed as a pill next to status badge
+  language?: string; // Displayed as a pill next to status badge
   provider_results?: ProviderResult[];
   leaderboard_summary?: LeaderboardSummary[];
   error?: string | null;
@@ -2169,16 +2204,16 @@ The app enforces usage limits on certain features. When limits are exceeded, a t
 import { LIMITS, CONTACT_LINK } from "@/constants/limits";
 
 // Current limits:
-LIMITS.TTS_MAX_ROWS       // 20 - max rows for TTS CSV upload
-LIMITS.TTS_MAX_TEXT_LENGTH  // 200 - max characters per text input
-LIMITS.STT_MAX_ROWS       // 20 - max rows for STT ZIP upload
-LIMITS.STT_MAX_AUDIO_DURATION_SECONDS  // 60 - max audio file duration in seconds
-LIMITS.STT_MAX_AUDIO_FILE_SIZE_MB  // 5 - max audio file size in MB
-LIMITS.SIMULATION_MAX_PERSONAS   // 2 - max personas per simulation
-LIMITS.SIMULATION_MAX_SCENARIOS  // 5 - max scenarios per simulation
-LIMITS.TESTS_MAX_RUN_ALL  // 20 - max tests for "Run all tests"
+LIMITS.TTS_MAX_ROWS; // 20 - max rows for TTS CSV upload
+LIMITS.TTS_MAX_TEXT_LENGTH; // 200 - max characters per text input
+LIMITS.STT_MAX_ROWS; // 20 - max rows for STT ZIP upload
+LIMITS.STT_MAX_AUDIO_DURATION_SECONDS; // 60 - max audio file duration in seconds
+LIMITS.STT_MAX_AUDIO_FILE_SIZE_MB; // 5 - max audio file size in MB
+LIMITS.SIMULATION_MAX_PERSONAS; // 2 - max personas per simulation
+LIMITS.SIMULATION_MAX_SCENARIOS; // 5 - max scenarios per simulation
+LIMITS.TESTS_MAX_RUN_ALL; // 20 - max tests for "Run all tests"
 
-CONTACT_LINK              // URL for contacting support to extend limits
+CONTACT_LINK; // URL for contacting support to extend limits
 ```
 
 **Toast Notifications** (using `sonner` library):
@@ -2200,13 +2235,14 @@ toast.error(
       Contact us
     </a>{" "}
     to extend your limits.
-  </span>
+  </span>,
 );
 ```
 
 **Toaster Component**: Added to root layout (`src/app/layout.tsx`) with `richColors` and `position="top-right"`.
 
 **Features using limits:**
+
 - TTS evaluation: CSV upload and manual row addition
 - STT evaluation: ZIP upload, manual row addition, and audio file duration (60s max)
 - Simulations: Persona and scenario selection
@@ -2235,7 +2271,9 @@ const getAudioDuration = (file: File): Promise<number> => {
 // Usage: validate before upload
 const duration = await getAudioDuration(file);
 if (duration > LIMITS.STT_MAX_AUDIO_DURATION_SECONDS) {
-  toast.error(`Audio file must be less than ${LIMITS.STT_MAX_AUDIO_DURATION_SECONDS} seconds...`);
+  toast.error(
+    `Audio file must be less than ${LIMITS.STT_MAX_AUDIO_DURATION_SECONDS} seconds...`,
+  );
   return;
 }
 ```
@@ -2326,12 +2364,10 @@ Key patterns:
 ### Sidebar Sections
 
 1. **Main**
-
    - Agents
    - Tools
 
 2. **Unit Tests**
-
    - Speech-to-Text (STT)
    - Text-to-Speech (TTS)
    - Tests
@@ -2353,6 +2389,12 @@ GOOGLE_CLIENT_ID=                              # Google OAuth client ID
 GOOGLE_CLIENT_SECRET=                          # Google OAuth client secret
 MAINTENANCE_MODE=true                          # Show maintenance page at / (optional)
 NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX    # Google Analytics Measurement ID (optional)
+
+# Sentry Error Monitoring (optional)
+NEXT_PUBLIC_SENTRY_DSN=                        # Sentry DSN for error logging
+SENTRY_ORG=                                    # Sentry org slug (for source map uploads)
+SENTRY_PROJECT=                                # Sentry project slug (for source map uploads)
+SENTRY_AUTH_TOKEN=                             # Sentry auth token (for source map uploads during build)
 ```
 
 ### Maintenance Mode
@@ -2454,6 +2496,7 @@ Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When ena
     };
   }, [isOpen, taskId]);
   ```
+
   - **Gotcha**: Without clearing at the start of the effect, re-renders or dependency changes can create multiple concurrent intervals, causing excessive API requests
 - **Dialog close prevention**: Disable dialog close while async operations (delete, save) are in progress
 - **Unsaved changes confirmation**: Form dialogs (like AddTestDialog) should show a confirmation dialog when user clicks backdrop, asking "Discard changes?" with Cancel/Discard buttons
@@ -2560,24 +2603,24 @@ export default function ToolsLayout({
 
 **Route layout hierarchy:**
 
-| Route                      | Layout Title                  |
-| -------------------------- | ----------------------------- |
-| `/agents`                  | "Agents \| Pense"             |
-| `/agents/[uuid]`           | "Agent \| Pense"              |
-| `/tools`                   | "Tools \| Pense"              |
-| `/tests`                   | "Tests \| Pense"              |
-| `/personas`                | "Personas \| Pense"           |
-| `/scenarios`               | "Scenarios \| Pense"          |
-| `/metrics`                 | "Metrics \| Pense"            |
-| `/simulations`             | "Simulations \| Pense"        |
-| `/simulations/[uuid]`      | "Simulation \| Pense"         |
-| `/simulations/[uuid]/runs` | "Simulation Run \| Pense"     |
-| `/stt`                     | "Speech to Text \| Pense"     |
-| `/stt/[uuid]`              | "STT Evaluation \| Pense"     |
-| `/stt/new`                 | "New STT Evaluation \| Pense" |
-| `/tts`                     | "Text to Speech \| Pense"     |
-| `/tts/[uuid]`              | "TTS Evaluation \| Pense"     |
-| `/tts/new`                 | "New TTS Evaluation \| Pense" |
+| Route                      | Layout Title                                              |
+| -------------------------- | --------------------------------------------------------- |
+| `/agents`                  | "Agents \| Pense"                                         |
+| `/agents/[uuid]`           | "Agent \| Pense"                                          |
+| `/tools`                   | "Tools \| Pense"                                          |
+| `/tests`                   | "Tests \| Pense"                                          |
+| `/personas`                | "Personas \| Pense"                                       |
+| `/scenarios`               | "Scenarios \| Pense"                                      |
+| `/metrics`                 | "Metrics \| Pense"                                        |
+| `/simulations`             | "Simulations \| Pense"                                    |
+| `/simulations/[uuid]`      | "Simulation \| Pense"                                     |
+| `/simulations/[uuid]/runs` | "Simulation Run \| Pense"                                 |
+| `/stt`                     | "Speech to Text \| Pense"                                 |
+| `/stt/[uuid]`              | "STT Evaluation \| Pense"                                 |
+| `/stt/new`                 | "New STT Evaluation \| Pense"                             |
+| `/tts`                     | "Text to Speech \| Pense"                                 |
+| `/tts/[uuid]`              | "TTS Evaluation \| Pense"                                 |
+| `/tts/new`                 | "New TTS Evaluation \| Pense"                             |
 | `/login`                   | "Pense \| Scale conversational AI agents with confidence" |
 
 **useEffect for dynamic titles:**
@@ -2657,3 +2700,21 @@ window.history.replaceState(null, "", `?tab=${tabName}`);
 - **Google Analytics**: Enabled via `@next/third-parties/google` - only loads when `NEXT_PUBLIC_GA_MEASUREMENT_ID` is set
   - Both are added in the root layout (`src/app/layout.tsx`)
   - Google Analytics component conditionally renders based on the environment variable
+
+### Error Monitoring (Sentry)
+
+- **Sentry Integration**: Enabled via `@sentry/nextjs` - captures and reports errors to Sentry
+- **Configuration files**:
+  - `sentry.client.config.ts` - Client-side initialization with session replay
+  - `sentry.server.config.ts` - Server-side initialization
+  - `sentry.edge.config.ts` - Edge runtime initialization
+  - `src/instrumentation.ts` - Next.js instrumentation hook that loads the appropriate config
+- **Error boundaries**:
+  - `src/app/error.tsx` - App-level error boundary, captures exceptions to Sentry
+  - `src/app/global-error.tsx` - Global error boundary for root layout errors
+- **Next.js config**: `next.config.ts` is wrapped with `withSentryConfig` for automatic source map uploads
+- **Environment variables**:
+  - `NEXT_PUBLIC_SENTRY_DSN` - Required to enable Sentry (errors are silently ignored if not set)
+  - `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN` - Required for source map uploads during build
+- **Session Replay**: Captures 10% of sessions, 100% of sessions with errors (configurable in client config)
+- **Manual error capture**: Use `Sentry.captureException(error)` to manually report errors
