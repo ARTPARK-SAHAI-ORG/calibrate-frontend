@@ -33,6 +33,7 @@ type LanguageOption =
   | "marathi"
   | "odia"
   | "punjabi"
+  | "sindhi"
   | "tamil"
   | "telugu"
   | "gujarati";
@@ -47,6 +48,7 @@ const languageDisplayName: Record<LanguageOption, string> = {
   marathi: "Marathi",
   odia: "Odia",
   punjabi: "Punjabi",
+  sindhi: "Sindhi",
   tamil: "Tamil",
   telugu: "Telugu",
   gujarati: "Gujarati",
@@ -899,6 +901,7 @@ export function SpeechToTextEvaluation() {
                 <option value="marathi">Marathi</option>
                 <option value="odia">Odia</option>
                 <option value="punjabi">Punjabi</option>
+                <option value="sindhi">Sindhi</option>
                 <option value="tamil">Tamil</option>
                 <option value="telugu">Telugu</option>
                 <option value="gujarati">Gujarati</option>
@@ -1033,7 +1036,7 @@ export function SpeechToTextEvaluation() {
                           {provider.label}
                         </td>
                         <td className="px-4 py-2 text-[13px] text-muted-foreground font-mono">
-                          {provider.model}
+                          {provider.modelOverrides?.[languageDisplayName[language]] || provider.model}
                         </td>
                       </tr>
                     );

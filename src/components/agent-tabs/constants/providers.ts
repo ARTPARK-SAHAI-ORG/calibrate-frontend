@@ -254,6 +254,7 @@ export const googleSTTSupportedLanguages = [
   "Russian",
   "Sepedi",
   "Serbian",
+  "Sindhi",
   "Slovak",
   "Slovenian",
   "Spanish",
@@ -469,6 +470,7 @@ export const googleTTSSupportedLanguages = [
   "Romanian",
   "Russian",
   "Serbian",
+  "Sindhi",
   "Slovak",
   "Slovenian",
   "Spanish",
@@ -508,6 +510,7 @@ export const elevenlabsTTSSupportedLanguages = [
   "Portuguese",
   "Romanian",
   "Russian",
+  "Sindhi",
   "Slovak",
   "Spanish",
   "Swedish",
@@ -582,6 +585,7 @@ export type STTProvider = {
   value: string;
   model: string;
   supportedLanguages?: string[];
+  modelOverrides?: Record<string, string>;
 };
 
 export type TTSProvider = {
@@ -590,6 +594,7 @@ export type TTSProvider = {
   model: string;
   voiceId: string;
   supportedLanguages?: string[];
+  modelOverrides?: Record<string, string>;
 };
 
 export const sttProviders: STTProvider[] = [
@@ -598,7 +603,7 @@ export const sttProviders: STTProvider[] = [
   { label: "Cartesia", value: "cartesia", model: "ink", supportedLanguages: cartesiaSTTSupportedLanguages },
   { label: "ElevenLabs", value: "elevenlabs", model: "scribe-v2", supportedLanguages: elevenlabsSTTSupportedLanguages },
   { label: "Groq", value: "groq", model: "whisper-large-v3-turbo", supportedLanguages: openaiSTTSupportedLanguages },
-  { label: "Google", value: "google", model: "chirp-3", supportedLanguages: googleSTTSupportedLanguages },
+  { label: "Google", value: "google", model: "chirp-3", supportedLanguages: googleSTTSupportedLanguages, modelOverrides: { "Sindhi": "chirp-2" } },
   { label: "Sarvam", value: "sarvam", model: "saarika-v2.5", supportedLanguages: sarvamSTTSupportedLanguages },
   { label: "Smallest", value: "smallest", model: "pulse", supportedLanguages: smallestAiSTTSupportedLanguages },
 ];
@@ -622,8 +627,8 @@ export const ttsProviders: TTSProvider[] = [
   { label: "Cartesia", value: "cartesia", model: "sonic-3", voiceId: "Riya", supportedLanguages: cartesiaTTSSupportedLanguages },
   { label: "OpenAI", value: "openai", model: "gpt-4o-mini-tts", voiceId: "coral", supportedLanguages: openaiSTTSupportedLanguages },
   { label: "Groq", value: "groq", model: "orpheus", voiceId: "troy", supportedLanguages: groqTTSSupportedLanguages },
-  { label: "Google", value: "google", model: "chirp-3", voiceId: "Charon", supportedLanguages: googleTTSSupportedLanguages },
-  { label: "ElevenLabs", value: "elevenlabs", model: "eleven_multilingual_v2", voiceId: "Krishna", supportedLanguages: elevenlabsTTSSupportedLanguages },
+  { label: "Google", value: "google", model: "chirp_3", voiceId: "Charon", supportedLanguages: googleTTSSupportedLanguages, modelOverrides: { "Sindhi": "gemini" } },
+  { label: "ElevenLabs", value: "elevenlabs", model: "eleven_multilingual_v2", voiceId: "Krishna", supportedLanguages: elevenlabsTTSSupportedLanguages, modelOverrides: { "Sindhi": "eleven_v3" } },
   { label: "Sarvam", value: "sarvam", model: "bulbul:v3-beta", voiceId: "aditya", supportedLanguages: sarvamSTTSupportedLanguages },
   { label: "Smallest", value: "smallest", model: "lightning", voiceId: "aditi", supportedLanguages: smallestAiSTTSupportedLanguages },
 ];

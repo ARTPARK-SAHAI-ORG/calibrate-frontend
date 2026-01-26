@@ -31,7 +31,8 @@ type LanguageOption =
   | "punjabi"
   | "tamil"
   | "telugu"
-  | "gujarati";
+  | "gujarati"
+  | "sindhi";
 
 // Map language option to the format used in supportedLanguages arrays
 const languageDisplayName: Record<LanguageOption, string> = {
@@ -46,6 +47,7 @@ const languageDisplayName: Record<LanguageOption, string> = {
   tamil: "Tamil",
   telugu: "Telugu",
   gujarati: "Gujarati",
+  sindhi: "Sindhi",
 };
 
 // Filter providers based on selected language
@@ -484,6 +486,7 @@ export function TextToSpeechEvaluation() {
                 <option value="tamil">Tamil</option>
                 <option value="telugu">Telugu</option>
                 <option value="gujarati">Gujarati</option>
+                <option value="sindhi">Sindhi</option>
               </select>
               <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                 <svg
@@ -618,7 +621,7 @@ export function TextToSpeechEvaluation() {
                           {provider.label}
                         </td>
                         <td className="px-4 py-2 text-[13px] text-muted-foreground font-mono">
-                          {provider.model}
+                          {provider.modelOverrides?.[languageDisplayName[language]] || provider.model}
                         </td>
                         <td className="px-4 py-2 text-[13px] text-muted-foreground font-mono">
                           {provider.voiceId}
