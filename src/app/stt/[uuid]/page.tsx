@@ -864,13 +864,9 @@ export default function STTEvaluationDetailPage() {
                                                                 ? result.llm_judge_reasoning
                                                                 : `Score: ${result.llm_judge_score}`;
                                                             return (
-                                                              <Tooltip
-                                                                content={
-                                                                  tooltipContent
-                                                                }
-                                                              >
+                                                              <div className="flex items-center gap-1.5">
                                                                 <span
-                                                                  className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer ${
+                                                                  className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
                                                                     passed
                                                                       ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
                                                                       : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
@@ -880,7 +876,32 @@ export default function STTEvaluationDetailPage() {
                                                                     ? "Pass"
                                                                     : "Fail"}
                                                                 </span>
-                                                              </Tooltip>
+                                                                <Tooltip
+                                                                  content={
+                                                                    tooltipContent
+                                                                  }
+                                                                >
+                                                                  <button
+                                                                    type="button"
+                                                                    className="p-1 rounded-md hover:bg-muted transition-colors cursor-pointer"
+                                                                    aria-label="View reasoning"
+                                                                  >
+                                                                    <svg
+                                                                      className="w-4 h-4 text-muted-foreground"
+                                                                      fill="none"
+                                                                      viewBox="0 0 24 24"
+                                                                      stroke="currentColor"
+                                                                      strokeWidth={2}
+                                                                    >
+                                                                      <path
+                                                                        strokeLinecap="round"
+                                                                        strokeLinejoin="round"
+                                                                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                                                      />
+                                                                    </svg>
+                                                                  </button>
+                                                                </Tooltip>
+                                                              </div>
                                                             );
                                                           })()}
                                                         </td>

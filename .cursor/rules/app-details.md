@@ -908,7 +908,7 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
   - **Table layout**: Uses `table-fixed` with explicit column widths (ID: `w-12`, Ground Truth/Prediction: `w-[30%]` each) to prevent long text from overflowing. Text columns use `break-words` for wrapping. Container uses `overflow-x-auto` for horizontal scroll fallback
   - **Empty prediction detection**: Helper functions `hasEmptyPredictions()` and `getFirstEmptyPredictionIndex()` check for rows without transcripts. Provider status shows red X if any empty, and clicking scrolls to first empty row via `data-row-index` attribute
 - **TTS Outputs tab**: Shows text input with audio playback; LLM Judge column shown when status is "done" OR when all rows have metrics available
-- **LLM Judge column display**: Shows Pass/Fail badges (green/red) instead of raw scores. Backend returns `"True"`/`"False"` strings (or `"1"`/`"0"`). Parsing: convert to lowercase string, Pass when value is `"true"` or `"1"`. Tooltip shows the reasoning text on hover (falls back to "Score: X" if no reasoning). Uses `cursor-pointer`
+- **LLM Judge column display**: Shows Pass/Fail badges (green/red) as static indicators. Backend returns `"True"`/`"False"` strings (or `"1"`/`"0"`). Parsing: convert to lowercase string, Pass when value is `"true"` or `"1"`. A small info icon button (ⓘ) next to the badge shows the reasoning tooltip on hover (falls back to "Score: X" if no reasoning). The info icon uses Heroicons-style info-circle SVG with `hover:bg-muted` for interactivity feedback. This makes it intuitive that users can view the reasoning rather than requiring them to guess they should hover over the badge
 
 **Metrics Data Structure:**
 
