@@ -105,6 +105,7 @@ export function AgentDetail({
   // Settings tab state
   const [endConversationEnabled, setEndConversationEnabled] = useState(true);
   const [agentSpeaksFirst, setAgentSpeaksFirst] = useState(false);
+  const [maxAssistantTurns, setMaxAssistantTurns] = useState<number>(50);
 
   // Save state
   const [isSaving, setIsSaving] = useState(false);
@@ -197,6 +198,9 @@ export function AgentDetail({
           }
           if (data.config.settings?.agent_speaks_first !== undefined) {
             setAgentSpeaksFirst(data.config.settings.agent_speaks_first);
+          }
+          if (data.config.settings?.max_assistant_turns !== undefined) {
+            setMaxAssistantTurns(data.config.settings.max_assistant_turns);
           }
           if (data.config.system_tools?.end_call !== undefined) {
             setEndConversationEnabled(data.config.system_tools.end_call);
@@ -354,7 +358,10 @@ export function AgentDetail({
               stt: { provider: sttProvider },
               tts: { provider: ttsProvider },
               llm: { model: selectedLLM?.id || "" },
-              settings: { agent_speaks_first: agentSpeaksFirst },
+              settings: {
+                agent_speaks_first: agentSpeaksFirst,
+                max_assistant_turns: maxAssistantTurns,
+              },
               system_tools: { end_call: endConversationEnabled },
               data_extraction_fields: dataExtractionFields.map((field) => ({
                 name: field.name,
@@ -393,6 +400,7 @@ export function AgentDetail({
     ttsProvider,
     selectedLLM,
     agentSpeaksFirst,
+    maxAssistantTurns,
     endConversationEnabled,
     dataExtractionFields,
     backendAccessToken,
@@ -703,6 +711,8 @@ export function AgentDetail({
         <SettingsTabContent
           agentSpeaksFirst={agentSpeaksFirst}
           setAgentSpeaksFirst={setAgentSpeaksFirst}
+          maxAssistantTurns={maxAssistantTurns}
+          setMaxAssistantTurns={setMaxAssistantTurns}
         />
       )}
 

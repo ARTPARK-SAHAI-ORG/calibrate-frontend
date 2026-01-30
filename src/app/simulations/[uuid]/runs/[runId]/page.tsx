@@ -136,7 +136,7 @@ export default function SimulationRunPage() {
     }
 
     const currentSim = runData.simulation_results.find(
-      (sim) => sim.simulation_name === selectedSimulationKey
+      (sim) => sim.simulation_name === selectedSimulationKey,
     );
 
     if (!currentSim) {
@@ -279,9 +279,7 @@ export default function SimulationRunPage() {
           setError(err instanceof Error ? err.message : "Failed to load run");
         } else {
           // Set status to failed and stop polling on fetch error during polling
-          setRunData((prev) =>
-            prev ? { ...prev, status: "failed" } : prev
-          );
+          setRunData((prev) => (prev ? { ...prev, status: "failed" } : prev));
           if (pollInterval) {
             clearInterval(pollInterval);
             pollInterval = null;
@@ -333,28 +331,28 @@ export default function SimulationRunPage() {
 
   const getEvaluationResult = (
     simulation: SimulationResult,
-    metricName: string
+    metricName: string,
   ) => {
     if (!simulation.evaluation_results) return null;
     // Handle mapping: stt_llm_judge metric key maps to stt_llm_judge_score evaluation result
     const evaluationName =
       metricName === "stt_llm_judge" ? "stt_llm_judge_score" : metricName;
     const result = simulation.evaluation_results.find(
-      (r) => r.name === evaluationName || r.name === metricName
+      (r) => r.name === evaluationName || r.name === metricName,
     );
     return result?.value ?? 0;
   };
 
   const getEvaluationReasoning = (
     simulation: SimulationResult,
-    metricName: string
+    metricName: string,
   ) => {
     if (!simulation.evaluation_results) return "";
     // Handle mapping: stt_llm_judge metric key maps to stt_llm_judge_score evaluation result
     const evaluationName =
       metricName === "stt_llm_judge" ? "stt_llm_judge_score" : metricName;
     const result = simulation.evaluation_results.find(
-      (r) => r.name === evaluationName || r.name === metricName
+      (r) => r.name === evaluationName || r.name === metricName,
     );
     return result?.reasoning ?? "";
   };
@@ -380,10 +378,10 @@ export default function SimulationRunPage() {
       component === "stt"
         ? "speech to text"
         : component === "llm"
-        ? "language model"
-        : component === "tts"
-        ? "text to speech"
-        : component;
+          ? "language model"
+          : component === "tts"
+            ? "text to speech"
+            : component;
 
     if (metricType === "ttft") {
       return `Time to first byte for ${componentName}`;
@@ -410,7 +408,7 @@ export default function SimulationRunPage() {
     entry: TranscriptEntry,
     entryIndex: number,
     audioUrls: string[] | undefined,
-    filteredTranscript: TranscriptEntry[]
+    filteredTranscript: TranscriptEntry[],
   ): string | null => {
     if (!audioUrls || !runData || runData.type !== "voice") {
       return null;
@@ -578,14 +576,14 @@ export default function SimulationRunPage() {
             <div className="flex items-center gap-2">
               <span
                 className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${getStatusBadgeClass(
-                  runData.status
+                  runData.status,
                 )}`}
               >
                 {formatStatus(runData.status)}
               </span>
               <span
                 className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${getTypeBadgeClass(
-                  runData.type
+                  runData.type,
                 )}`}
               >
                 {runData.type}
@@ -652,7 +650,7 @@ export default function SimulationRunPage() {
                     if (simulation.evaluation_results) {
                       latencyKeys.forEach((key) => {
                         const result = simulation.evaluation_results!.find(
-                          (r) => r.name === key
+                          (r) => r.name === key,
                         );
                         if (result && typeof result.value === "number") {
                           latencyValues[key].push(result.value);
@@ -816,7 +814,7 @@ export default function SimulationRunPage() {
                 let displayMetricKeys: string[] = [];
                 if (runData.metrics) {
                   displayMetricKeys = Object.keys(runData.metrics).filter(
-                    (key) => !latencyMetricKeys.includes(key)
+                    (key) => !latencyMetricKeys.includes(key),
                   );
                 } else {
                   // Derive from simulation_results' evaluation_results
@@ -879,7 +877,7 @@ export default function SimulationRunPage() {
                                 // Priority: completed (3) > processing (2) > waiting (1)
                                 const getPriority = (
                                   hasTranscript: boolean,
-                                  hasResults: boolean
+                                  hasResults: boolean,
                                 ) => {
                                   if (hasResults) return 3; // completed
                                   if (hasTranscript) return 2; // processing (yellow spinner)
@@ -989,14 +987,14 @@ export default function SimulationRunPage() {
                                     {displayMetricKeys.map((metricKey) => {
                                       const value = getEvaluationResult(
                                         simulation,
-                                        metricKey
+                                        metricKey,
                                       );
                                       const isSttLlmJudge =
                                         metricKey === "stt_llm_judge" ||
                                         metricKey === "stt_llm_judge_score";
                                       const reasoning = getEvaluationReasoning(
                                         simulation,
-                                        metricKey
+                                        metricKey,
                                       );
 
                                       // If evaluation_results is null, show spinner (metrics still processing)
@@ -1040,7 +1038,7 @@ export default function SimulationRunPage() {
                                       // For stt_llm_judge, show percentage
                                       if (isSttLlmJudge) {
                                         const percentage = parseFloat(
-                                          (value * 100).toFixed(2)
+                                          (value * 100).toFixed(2),
                                         );
                                         return (
                                           <td
@@ -1187,9 +1185,17 @@ export default function SimulationRunPage() {
             >
               <div className="space-y-4">
                 {(() => {
-                  const filteredTranscript = (
-                    selectedSimulation.transcript ?? []
-                  ).filter((entry) => entry.role !== "tool");
+                  const fullTranscript = selectedSimulation.transcript ?? [];
+                  const filteredTranscript = fullTranscript.filter(
+                    (entry) =>
+                      entry.role !== "tool" && entry.role !== "end_reason",
+                  );
+                  // Check if conversation ended due to max turns
+                  const lastEntry = fullTranscript[fullTranscript.length - 1];
+                  const endedDueToMaxTurns =
+                    lastEntry?.role === "end_reason" &&
+                    lastEntry?.content === "max_turns";
+
                   if (filteredTranscript.length === 0) {
                     return (
                       <div className="flex items-center justify-center py-8">
@@ -1204,7 +1210,7 @@ export default function SimulationRunPage() {
                       entry,
                       index,
                       selectedSimulation.audio_urls,
-                      filteredTranscript
+                      filteredTranscript,
                     );
                     return (
                       <div
@@ -1268,7 +1274,7 @@ export default function SimulationRunPage() {
                               let parsedArgs: Record<string, any> = {};
                               try {
                                 parsedArgs = JSON.parse(
-                                  toolCall.function.arguments
+                                  toolCall.function.arguments,
                                 );
                               } catch {
                                 parsedArgs = {};
@@ -1308,7 +1314,7 @@ export default function SimulationRunPage() {
                                               {String(value)}
                                             </div>
                                           </div>
-                                        )
+                                        ),
                                       )}
                                     </div>
                                   )}
@@ -1320,6 +1326,39 @@ export default function SimulationRunPage() {
                       </div>
                     );
                   });
+                })()}
+                {/* Show max turns reached note */}
+                {(() => {
+                  const fullTranscript = selectedSimulation.transcript ?? [];
+                  const lastEntry = fullTranscript[fullTranscript.length - 1];
+                  const endedDueToMaxTurns =
+                    lastEntry?.role === "end_reason" &&
+                    lastEntry?.content === "max_turns";
+                  if (endedDueToMaxTurns) {
+                    return (
+                      <div className="flex items-center justify-center py-4 mt-2">
+                        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                          <svg
+                            className="w-4 h-4 text-yellow-500"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+                            />
+                          </svg>
+                          <span className="text-sm text-yellow-500">
+                            Maximum number of assistant turns reached
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
                 })()}
                 {/* Show spinner at bottom while metrics are being fetched */}
                 {!selectedSimulation.evaluation_results &&

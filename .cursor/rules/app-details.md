@@ -81,7 +81,7 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 | **Tools**           | Attach/detach function calling tools + toggle built-in "End conversation" tool   |
 | **Data Extraction** | Define fields to extract from conversations (name, type, description, required)  |
 | **Tests**           | Link test cases to agent, run tests, view past runs with results, compare models |
-| **Settings**        | Toggle "Agent speaks first" behavior                                             |
+| **Settings**        | Toggle "Agent speaks first" behavior, set max assistant turns before call ends   |
 
 **Default Agent Configuration** (when creating new agent):
 
@@ -91,7 +91,7 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
   "stt": { "provider": "google" },
   "tts": { "provider": "google" },
   "llm": { "model": "google/gemini-3-flash-preview" },
-  "settings": { "agent_speaks_first": false },
+  "settings": { "agent_speaks_first": false, "max_assistant_turns": 50 },
   "system_tools": { "end_call": true }
 }
 ```
@@ -452,6 +452,7 @@ Provider website links (external link icons) are shown only on the new evaluatio
   - **Empty state**: Shows "No transcript available yet" when transcript is empty or undefined
   - **Processing indicator**: Shows a yellow spinner at the bottom of transcript while metrics are being fetched (when `evaluation_results` is null but transcript has content)
   - **Graceful null handling**: All transcript accesses use optional chaining (`transcript?.length ?? 0`, `transcript ?? []`) since transcript can be undefined during intermediate results
+  - **End reason handling**: Transcript entries with `role: "end_reason"` are filtered out from display. When the last entry has `role: "end_reason"` and `content: "max_turns"`, a yellow informational banner is shown at the bottom: "Conversation ended: Maximum number of agent turns reached"
   - **Stable audio keys**: All audio elements use `key={audioUrl}` to prevent React from remounting them during polling re-renders (avoids audio restart/reload)
   - **Presigned URL refresh on error**: Audio elements include `onError={refreshRunData}` handler to automatically fetch fresh presigned URLs when they expire. The `refreshRunData` callback clears `frozenSimulationRef` before updating state so new URLs are used instead of stale frozen data
   - Full conversation audio player below header (from `conversation_wav_url`) for voice simulations
@@ -607,7 +608,7 @@ The login page serves as a marketing-style landing page with a consistent light 
 
 **Feature Tabs:**
 
-- Tabs: "Speech to text", "Text to text", "Text to speech", "Simulations"
+- Tabs: "Speech to text", "LLM Evaluation", "Text to speech", "Simulations"
 - State managed via `useState` with `activeTab` (default: "stt")
 - Tab data defined as array: `{ id, label, headingBold, headingLight, description, images }` where `images` is an array of image paths
 
@@ -2440,9 +2441,9 @@ This pattern ensures textareas grow with content on: typing, pasting, and initia
    - Tools
 
 2. **Unit Tests**
-   - Speech-to-Text (STT)
-   - Text to Text (route: `/tests`)
+   - LLM Evaluation (route: `/tests`) - formerly "Text to Text"
    - Text-to-Speech (TTS)
+   - Speech-to-Text (STT)
 
 3. **End-to-End Tests**
    - Personas
@@ -2451,7 +2452,7 @@ This pattern ensures textareas grow with content on: typing, pasting, and initia
    - Simulations
 
 4. **Resources**
-   - Documentation (external link to `https://docs.pense.ai`, opens in new tab with external link icon indicator)
+   - Documentation (external link to `https://penseapp.vercel.app/docs`, opens in new tab with external link icon indicator)
 
 ### External Links in Sidebar
 
