@@ -56,7 +56,7 @@ export default function LoginPage() {
   };
 
   const handleBookDemo = () => {
-    window.open("https://calendly.com/pense-demo", "_blank");
+    window.open("https://cal.com/amandalmia/30min", "_blank");
   };
 
   return (
@@ -656,7 +656,9 @@ export default function LoginPage() {
               </a>
 
               <a
-                href="#"
+                href="https://cal.com/amandalmia/30min"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="flex items-start gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all group"
               >
                 <div className="text-gray-400 mt-1">

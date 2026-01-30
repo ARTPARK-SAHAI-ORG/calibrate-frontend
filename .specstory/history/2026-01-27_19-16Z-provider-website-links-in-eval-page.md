@@ -4918,3 +4918,219 @@ Updated `.cursor/rules/app-details.md`:
 
 ---
 
+_**User**_
+
+https://cal.com/amandalmia/30min
+
+use this as the book demo link on the landing page
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to update the "Book a demo" link on the landing page to use https://cal.com/amandalmia/30min. Let me find where this is used - there should be a `handleBookDemo` function and possibly a direct link in the "Learn more" section.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "handleBookDemo|Book a demo|calendly",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/app/login/page.tsx",
+  "context": 3,
+  "caseInsensitive": true
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "handleBookDemo|Book a demo|calendly",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/app/login/page.tsx",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": "src/app/login/page.tsx",
+              "matches": [
+                {
+                  "lineNumber": 55,
+                  "content": "    signIn(\"google\", { callbackUrl: \"/agents\" });",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 56,
+                  "content": "  };",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 57,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 58,
+                  "content": "  const handleBookDemo = () =&gt; {"
+                },
+                {
+                  "lineNumber": 59,
+                  "content": "    window.open(\"https://calendly.com/pense-demo\", \"_blank\");"
+                },
+                {
+                  "lineNumber": 60,
+                  "content": "  };",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 61,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 62,
+                  "content": "  return (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 97,
+                  "content": "            Join Discord",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 98,
+                  "content": "          &lt;/a&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 99,
+                  "content": "          &lt;button",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 100,
+                  "content": "            onClick={handleBookDemo}"
+                },
+                {
+                  "lineNumber": 101,
+                  "content": "            className=\"px-5 py-2.5 bg-black text-white font-medium rounded-lg hover:bg-gray-800 transition-colors cursor-pointer\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 102,
+                  "content": "          &gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 103,
+                  "content": "            Book a demo"
+                },
+                {
+                  "lineNumber": 104,
+                  "content": "          &lt;/button&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 105,
+                  "content": "        &lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 106,
+                  "content": "      &lt;/nav&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 675,
+                  "content": "                  &lt;/svg&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 676,
+                  "content": "                &lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 677,
+                  "content": "                &lt;div className=\"flex-1\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 678,
+                  "content": "                  &lt;div className=\"font-medium text-gray-900\"&gt;Book a demo&lt;/div&gt;"
+                },
+                {
+                  "lineNumber": 679,
+                  "content": "                  &lt;div className=\"text-sm text-gray-500\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 680,
+                  "content": "                    Get a personalized walkthrough with our team",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 681,
+                  "content": "                  &lt;/div&gt;",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 25,
+          "totalMatchedLines": 5
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I found the `handleBookDemo` function that uses the Calendly link. I need to update it to use the new Cal.com link. Let me also check if the "Book a demo" card in the Learn more section has its own href or uses the same handler.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/login/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see the "Book a demo" card in the Learn more section has `href="#"`. I need to:
+1. Update the `handleBookDemo` function to use the new Cal.com link
+2. Update the "Book a demo" card's href to use the Cal.com link
+
+Let me make both changes.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/login/page.tsx</summary>
+
+Status: **loading**
+
+</details>
+
+</tool-use>
+
+---
+

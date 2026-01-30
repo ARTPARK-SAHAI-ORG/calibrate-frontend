@@ -657,7 +657,7 @@ The login page serves as a marketing-style landing page with a consistent light 
     - Benchmark TTS providers → `/docs/quickstart/text-to-speech`
     - Run LLM tests → `/docs/quickstart/text-to-text`
     - Run simulations → `/docs/quickstart/simulations`
-  - Learn more: Watch the demo, Read documentation, Book a demo, Guide to voice agents (`https://voiceaiandvoiceagents.com`)
+  - Learn more: Watch the demo, Read documentation, Book a demo (`https://cal.com/amandalmia/30min`), Guide to voice agents (`https://voiceaiandvoiceagents.com`)
 
 **Final CTA Section:**
 - **Background**: Dark (`bg-gray-900`) with padding (`py-24 px-12`)
@@ -688,7 +688,7 @@ The login page serves as a marketing-style landing page with a consistent light 
 **CTA Buttons:**
 - "Continue with Google" - Main action in hero section and final CTA section, triggers `signIn("google")`
 - "Join Discord" - Header button (outlined style), opens `https://discord.gg/pense` in new tab
-- "Book a demo" - Header button (filled style), opens external booking link via `handleBookDemo`
+- "Book a demo" - Header button (filled style), opens `https://cal.com/amandalmia/30min` via `handleBookDemo`
 
 ### Authentication Flow
 
