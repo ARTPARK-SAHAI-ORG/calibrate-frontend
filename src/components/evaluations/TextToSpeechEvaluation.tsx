@@ -581,6 +581,9 @@ export function TextToSpeechEvaluation() {
                     <th className="px-4 py-2 text-left text-[12px] font-medium text-foreground">
                       Voice ID
                     </th>
+                    <th className="w-12 px-4 py-2 text-left text-[12px] font-medium text-foreground">
+                      Website
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -625,6 +628,32 @@ export function TextToSpeechEvaluation() {
                         </td>
                         <td className="px-4 py-2 text-[13px] text-muted-foreground font-mono">
                           {provider.voiceId}
+                        </td>
+                        <td className="w-12 px-4 py-2">
+                          {provider.website && (
+                            <a
+                              href={provider.website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-muted-foreground hover:text-foreground transition-colors"
+                              title={`Visit ${provider.label} website`}
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                                />
+                              </svg>
+                            </a>
+                          )}
                         </td>
                       </tr>
                     );

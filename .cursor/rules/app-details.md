@@ -111,40 +111,48 @@ type STTProvider = {
   label: string;           // Provider name (e.g., "Deepgram")
   value: string;           // API identifier (e.g., "deepgram")
   model: string;           // Model name (e.g., "nova-3")
+  website: string;         // Provider website URL (e.g., "https://deepgram.com")
   supportedLanguages?: string[];
+  modelOverrides?: Record<string, string>;  // Language-specific model overrides
 };
 
 type TTSProvider = {
   label: string;           // Provider name (e.g., "Cartesia")
   value: string;           // API identifier (e.g., "cartesia")
-  model: string;           // Model name (e.g., "sonic-2")
-  voiceId: string;         // Voice identifier (e.g., "638efaaa-4d0c-442e-b701-3fae16aad012")
+  model: string;           // Model name (e.g., "sonic-3")
+  voiceId: string;         // Voice identifier (e.g., "Riya")
+  website: string;         // Provider website URL (e.g., "https://cartesia.ai")
   supportedLanguages?: string[];
+  modelOverrides?: Record<string, string>;  // Language-specific model overrides
 };
 ```
 
 **STT Providers Table:**
-| Label | Model |
-|-------|-------|
-| Deepgram | nova-3 |
-| OpenAI | gpt-4o-transcribe |
-| Cartesia | ink |
-| ElevenLabs | scribe-v2 |
-| Groq | whisper-large-v3-turbo |
-| Google | chirp-3 |
-| Sarvam | saarika-v2.5 |
-| Smallest | pulse |
+| Label | Model | Website |
+|-------|-------|---------|
+| Deepgram | nova-3 | https://deepgram.com |
+| OpenAI | gpt-4o-transcribe | https://openai.com |
+| Cartesia | ink | https://cartesia.ai |
+| ElevenLabs | scribe-v2 | https://elevenlabs.io |
+| Groq | whisper-large-v3-turbo | https://groq.com |
+| Google | chirp-3 | https://cloud.google.com/speech-to-text |
+| Sarvam | saarika-v2.5 | https://sarvam.ai |
+| Smallest | pulse | https://smallest.ai |
 
 **TTS Providers Table:**
-| Label | Model | Voice ID |
-|-------|-------|----------|
-| Cartesia | sonic-2 | 638efaaa-4d0c-442e-b701-3fae16aad012 |
-| OpenAI | gpt-4o-mini-tts | coral |
-| Groq | playai-tts | Arista-PlayAI |
-| Google | chirp-3 | Aoede |
-| ElevenLabs | eleven_multilingual_v2 | IbEzPPGLXlYUvxNGhJQp |
-| Sarvam | bulbul:v2 | meera |
-| Smallest | lightning | emily |
+| Label | Model | Voice ID | Website |
+|-------|-------|----------|---------|
+| Cartesia | sonic-3 | Riya | https://cartesia.ai |
+| OpenAI | gpt-4o-mini-tts | coral | https://openai.com |
+| Groq | orpheus | troy | https://groq.com |
+| Google | chirp_3 | Charon | https://cloud.google.com/text-to-speech |
+| ElevenLabs | eleven_multilingual_v2 | Krishna | https://elevenlabs.io |
+| Sarvam | bulbul:v3-beta | aditya | https://sarvam.ai |
+| Smallest | lightning | aditi | https://smallest.ai |
+
+**Provider Website Links in UI:**
+
+Provider website links (external link icons) are shown only on the new evaluation pages (`/stt/new` and `/tts/new`) where providers are selected, not on the list pages. The `getProviderWebsite()` helper function retrieves the website URL from the provider definitions.
 
 **STT Language Arrays** (`*STTSupportedLanguages`):
 - `cartesiaSTTSupportedLanguages`: 99 languages - STT only (TTS has separate list)
@@ -220,7 +228,8 @@ type TTSProvider = {
 **List Page (`/stt`):**
 
 - **View all STT evaluations** in a sortable table (sorted by created date)
-- **Columns**: Providers (as pills), Language, Status, Samples count, Created At
+- **Columns**: Providers (as pills with external link icons), Language, Status, Samples count, Created At
+- **Provider pills**: Each provider name has an external link icon that opens the provider's website in a new tab
 - **Click to view details** - opens the evaluation detail page
 - **"New STT Evaluation" button** - navigates to the create page
 
@@ -274,7 +283,8 @@ type TTSProvider = {
 **List Page (`/tts`):**
 
 - **View all TTS evaluations** in a sortable table (sorted by created date)
-- **Columns**: Providers (as pills), Language, Status, Samples count, Created At
+- **Columns**: Providers (as pills with external link icons), Language, Status, Samples count, Created At
+- **Provider pills**: Each provider name has an external link icon that opens the provider's website in a new tab
 - **Click to view details** - opens the evaluation detail page
 - **"New TTS Evaluation" button** - navigates to the create page
 
@@ -584,14 +594,15 @@ This enables:
 The login page serves as a marketing-style landing page with a consistent light theme throughout:
 
 **Layout (top to bottom):**
-1. **Navigation bar**: PENSE logo (left) + "Book a demo" button (right)
+1. **Navigation bar**: PENSE logo (left) + "Join Discord" button (outlined) + "Book a demo" button (filled, right)
 2. **Hero section**: Large headline, subtitle, centered "Continue with Google" CTA
 3. **Feature Tabs section**: Tab switcher with feature previews
 4. **Integrations section**: Provider grid showing supported STT/TTS/LLM providers
 5. **Open Source section**: GitHub link and self-hosting info (`bg-gray-50`)
 6. **Community section**: Social links (X, LinkedIn)
 7. **Get Started section**: Two-column card layout with CTAs
-8. **Footer**: Three-column links (Company, Resources, Community) + copyright (`bg-gray-50`)
+8. **Final CTA section**: Dark background (`bg-gray-900`) with "Ready to get started?" headline and "Continue with Google" button
+9. **Footer**: Three-column links (Company, Resources, Community) + copyright (`bg-gray-50`)
 
 **Feature Tabs:**
 - Tabs: "Speech to text", "Text to text", "Text to speech", "Simulations"
@@ -610,13 +621,20 @@ The login page serves as a marketing-style landing page with a consistent light 
 - **Background**: White (`bg-white`) with padding (`py-24 px-12`)
 - **Headline**: "Works with any voice agent stack" - same font as hero (`leading-[1.1] tracking-[-0.02em]`)
 - **Subtitle**: About Python SDK, CLI, and provider support
-- **Link buttons**: "Integration overview" and "Request new integration" with arrow icons
-- **Provider grid**: 2×4 bordered grid (text-only, no icons) showing: Deepgram, ElevenLabs, OpenAI, Google, Cartesia, Anthropic, Groq, DeepSeek
+- **Link buttons** (open in new tab with `target="_blank"`):
+  - "Integration overview" → `https://penseapp.vercel.app/docs/integrations`
+  - "Request new integration" → `https://forms.gle/AoGE6DMs7N4DNAK2A`
+- **Provider grid**: 5×4 bordered grid (text-only, no icons) showing 20 providers:
+  - Row 1: Deepgram, ElevenLabs, OpenAI, Google
+  - Row 2: Cartesia, Anthropic, Groq, DeepSeek
+  - Row 3: Smallest AI, Claude, Gemini, Qwen
+  - Row 4: Meta, Mistral, Cohere, Moonshot AI
+  - Row 5: AI21, Baidu, NVIDIA, Amazon
 - **Grid styling**: `grid-cols-2 md:grid-cols-4`, `border border-gray-200 rounded-xl`, cells with `bg-gray-50 p-5`, `text-gray-900 text-sm font-medium` labels
 
 **Open Source Section:**
 - **Background**: Light gray (`bg-gray-50`) with padding (`py-24 px-12`)
-- **Headline**: "Proudly Open Source" - same font as hero
+- **Headline**: "Proudly open source" - same font as hero (sentence case)
 - **Subtitle**: Links to run "locally" or "self-hosted" (underlined, `hover:text-gray-900`)
 - **GitHub button**: Dark button (`bg-gray-900`) linking to `ArtikiTech/pense` repo with GitHub logo and star icon
 
@@ -627,18 +645,32 @@ The login page serves as a marketing-style landing page with a consistent light 
 - **Social links**: "Follow @artikiagents" (light bordered button) and "Connect on LinkedIn" (text link)
 
 **Get Started Section:**
-- **Background**: White (`bg-white`) with padding (`py-20 px-12`)
+- **Background**: Light gray (`bg-gray-50`) with padding (`py-20 px-12`) - alternates with Community section above
 - **Headline**: "Start testing with Pense today." with `tracking-[-0.02em]` for tight letter spacing
 - **Two-column grid**: "Evaluate your agent" (left) and "Learn more" (right)
 - **Card containers**: `bg-gray-50 rounded-2xl p-8 border border-gray-200`
 - **Link cards**: White background with subtle border, hover state adds shadow (`hover:border-gray-300 hover:shadow-sm`)
 - **Icons**: SVG icons (speaker, broadcast, checkmark for evaluation; play, book, calendar for learning)
-- **Links**: Benchmark STT/TTS Providers, Run LLM Tests, Watch Demo, Read Documentation, Book a Demo
+- **Links** (4 per column, sentence case, open in new tab):
+  - Evaluate (links to quickstart docs):
+    - Benchmark STT providers → `/docs/quickstart/speech-to-text`
+    - Benchmark TTS providers → `/docs/quickstart/text-to-speech`
+    - Run LLM tests → `/docs/quickstart/text-to-text`
+    - Run simulations → `/docs/quickstart/simulations`
+  - Learn more: Watch the demo, Read documentation, Book a demo, Guide to voice agents (`https://voiceaiandvoiceagents.com`)
+
+**Final CTA Section:**
+- **Background**: Dark (`bg-gray-900`) with padding (`py-24 px-12`)
+- **Headline**: "Ready to get started?" - white text, same font style as other headlines
+- **Subtitle**: "Join teams building better AI agents with Pense" - gray-400 text
+- **CTA button**: "Continue with Google" - white background, triggers `handleGoogleSignIn`
 
 **Footer:**
 - **Background**: Light gray (`bg-gray-50`) with top border (`border-t border-gray-200`)
-- **Three columns**: Company, Resources, Community - each with left border accent
+- **Two columns**: Resources and Community - each with left border accent (`md:grid-cols-2`)
 - **Column headers**: Uppercase, letter-spaced (`tracking-[0.2em]`), muted color (`text-gray-400`)
+- **Resources column links**: Documentation, Python SDK, CLI, Terms of Service, Privacy Policy
+- **Community column links**: Discord (`https://discord.gg/pense`) and LinkedIn (`https://linkedin.com/company/artpark`)
 - **Links**: Gray text (`text-gray-500`) that darkens on hover (`hover:text-gray-900`)
 - **Copyright**: Right-aligned, muted
 
@@ -646,6 +678,7 @@ The login page serves as a marketing-style landing page with a consistent light 
 - **Consistent light theme** throughout - alternating white (`bg-white`) and light gray (`bg-gray-50`) backgrounds
 - **DM Sans font** applied via inline style: `style={{ fontFamily: 'var(--font-dm-sans), system-ui, -apple-system, sans-serif' }}`
 - **All headlines**: `font-medium text-gray-900 leading-[1.1] tracking-[-0.02em]` for consistent typography
+- **Headline casing**: Sentence case - first letter of first word capitalized, rest lowercase except proper nouns (AI, LLM, STT, TTS, Pense, etc.)
 - **Subtitles**: `text-xl text-gray-500`
 - **Tabs container**: `inline-flex bg-gray-100 rounded-xl p-1` with active tab having white background and shadow
 - **Image containers**: `rounded-xl overflow-hidden shadow-xl` - simple container without fixed aspect ratio
@@ -653,8 +686,9 @@ The login page serves as a marketing-style landing page with a consistent light 
 - **Grid borders**: `border-gray-200` for light theme consistency
 
 **CTA Buttons:**
-- "Continue with Google" - Main action, centered in hero section, triggers `signIn("google")`
-- "Book a demo" - Header button, opens external booking link
+- "Continue with Google" - Main action in hero section and final CTA section, triggers `signIn("google")`
+- "Join Discord" - Header button (outlined style), opens `https://discord.gg/pense` in new tab
+- "Book a demo" - Header button (filled style), opens external booking link via `handleBookDemo`
 
 ### Authentication Flow
 
@@ -876,8 +910,9 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
 - **Provider selection UI** (table format):
   - Table with border, rounded corners (`border border-border rounded-lg`)
   - Header row with select-all checkbox and column titles (`bg-muted/50 border-b`)
-  - **STT columns**: Checkbox | Label | Model
-  - **TTS columns**: Checkbox | Label | Model | Voice ID
+  - **STT columns**: Checkbox | Label | Model | Website
+  - **TTS columns**: Checkbox | Label | Model | Voice ID | Website
+  - Website column has external link icon that opens provider's website in new tab (uses `stopPropagation()` to prevent row selection toggle)
   - Clickable rows (`hover:bg-muted/30 cursor-pointer`) - clicking anywhere on row toggles selection
   - Select-all checkbox in header with tri-state: empty (none), minus icon (some), checkmark (all)
   - Model and Voice ID columns use `font-mono` for technical values
@@ -988,8 +1023,8 @@ const getFilteredProviders = (language: LanguageOption) => {
 - Provider arrays (`sttProviders`, `ttsProviders`) have `label`, `value`, `model`, and optional `supportedLanguages` fields
 - TTS providers additionally have a `voiceId` field
 - **Provider display varies by context**:
-  - **New evaluation pages** (provider selection): Table format showing Label, Model (and Voice ID for TTS) in separate columns
-  - **List pages and detail pages**: Only label shown (e.g., "Deepgram" not "Deepgram (nova-3)")
+  - **New evaluation pages** (provider selection): Table format showing Label, Model, (Voice ID for TTS), and Website columns. Website column has external link icon that opens provider's website in new tab
+  - **List pages and detail pages**: Only label shown as pills (e.g., "Deepgram" not "Deepgram (nova-3)"), no website links
   - `getProviderLabel()` helper returns just the label: `provider.label`
 - Providers without `supportedLanguages` are shown for all languages
 - When language changes, selected providers that don't support the new language are automatically deselected
@@ -2491,6 +2526,24 @@ Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When ena
     }
     prevLengthRef.current = currentLength;
   }, [currentLength]);
+  ```
+- **No nested anchors in Link components**: HTML forbids `<a>` tags nested inside other `<a>` tags. Since Next.js `<Link>` renders as `<a>`, placing an `<a>` inside a `<Link>` causes React hydration errors. Solution: use `<button>` with `window.open()` for nested clickable elements:
+  ```tsx
+  <Link href="/items/123">
+    <span>Item name</span>
+    {/* DON'T: <a href="https://external.com">External</a> */}
+    {/* DO: */}
+    <button
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.open("https://external.com", "_blank", "noopener,noreferrer");
+      }}
+    >
+      External link icon
+    </button>
+  </Link>
   ```
 
 ### Styling
