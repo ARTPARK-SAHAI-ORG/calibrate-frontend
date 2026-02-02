@@ -19,7 +19,7 @@ The platform addresses the challenge of quality assurance for voice agents by pr
 - **End-to-end simulation testing** (full conversations with simulated users)
 - **Benchmarking** across different AI providers to find the best configuration
 
-> **Note on naming**: The app is branded as "Calibrate" in all user-facing UI, page titles, and documentation. However, external URLs and infrastructure still reference "pense" (e.g., Discord: `https://discord.gg/xCJ55Ban`). Documentation links use `process.env.NEXT_PUBLIC_APP_URL` (e.g., `${process.env.NEXT_PUBLIC_APP_URL}/docs`). The npm package name is `calibrate-frontend`.
+> **Note on naming**: The app is branded as "Calibrate" in all user-facing UI, page titles, and documentation. However, external URLs and infrastructure still reference "pense" (e.g., Discord: `https://discord.gg/xCJ55Ban`). Documentation links use `process.env.NEXT_PUBLIC_DOCS_URL` directly. The npm package name is `calibrate-frontend`.
 
 ---
 
@@ -592,13 +592,27 @@ This enables:
 
 ## Architecture Patterns
 
+### Shared Landing Components
+
+Both the login page and about page use shared header/footer components to avoid duplication:
+
+**`LandingHeader`** (`src/components/LandingHeader.tsx`):
+- Props: `showLogoLink` (boolean, whether logo links to /login), `joinHref` (string, defaults to `#join-community`)
+- Contains: Logo, "Docs" link, "Join" button, "Book a demo" button
+- `handleBookDemo` is defined inside the component
+
+**`LandingFooter`** (`src/components/LandingFooter.tsx`):
+- No props - self-contained with all links and constants
+- Contains: 3-column layout (Company, Resources, Community), copyright
+- `WHATSAPP_INVITE_URL` constant is defined inside the component
+
 ### Landing Page (`/login`)
 
 The login page serves as a marketing-style landing page with a consistent light theme throughout:
 
 **Layout (top to bottom):**
 
-1. **Navigation bar**: CALIBRATE logo (`/logo.svg`, 32x32px) + "Join" anchor link (outlined, scrolls to `#join-community`) + "Book a demo" button (filled, right)
+1. **Navigation bar**: Uses `<LandingHeader />` component
 2. **Hero section**: Large headline, subtitle, centered "Continue with Google" CTA
 3. **Feature Tabs section**: Tab switcher with feature previews
 4. **Integrations section**: Provider grid showing supported STT/TTS/LLM providers
@@ -616,8 +630,8 @@ The login page serves as a marketing-style landing page with a consistent light 
 
 **Constants:**
 
-- `WHATSAPP_INVITE_URL` - WhatsApp community invite link, used in both the Community section and footer
-- `GITHUB_REPO_URL` - GitHub repo link (`https://github.com/artpark-sahai-org/agentloop`), used in Open Source section
+- `WHATSAPP_INVITE_URL` - WhatsApp community invite link, used in Community section (login page) and `LandingFooter` component
+- `GITHUB_REPO_URL` - GitHub repo link, used in Open Source section
 
 **Two-Column Layout** (below tabs):
 
@@ -634,7 +648,7 @@ The login page serves as a marketing-style landing page with a consistent light 
 - **Headline**: "Works with any voice agent stack" - same font as hero (`leading-[1.1] tracking-[-0.02em]`)
 - **Subtitle**: About Python SDK, CLI, and provider support
 - **Link buttons** (open in new tab with `target="_blank"`):
-  - "Integration overview" → `https://penseapp.vercel.app/docs/integrations`
+  - "Integration overview" → `${process.env.NEXT_PUBLIC_DOCS_URL}/integrations`
   - "Request new integration" → `https://forms.gle/AoGE6DMs7N4DNAK2A`
 - **Provider grid**: 5×4 bordered grid (text-only, no icons) showing 20 providers:
   - Row 1: Deepgram, ElevenLabs, OpenAI, Google
@@ -671,11 +685,11 @@ The login page serves as a marketing-style landing page with a consistent light 
 - **Link cards**: White background with subtle border, hover state adds shadow (`hover:border-gray-300 hover:shadow-sm`)
 - **Icons**: SVG icons (speaker, broadcast, checkmark for evaluation; play, book, calendar for learning)
 - **Links** (4 per column, sentence case, open in new tab):
-  - Evaluate (links to quickstart docs):
-    - Benchmark STT providers → `/docs/quickstart/speech-to-text`
-    - Benchmark TTS providers → `/docs/quickstart/text-to-speech`
-    - Run LLM tests → `/docs/quickstart/text-to-text`
-    - Run simulations → `/docs/quickstart/simulations`
+  - Evaluate (links to quickstart docs via `NEXT_PUBLIC_DOCS_URL`):
+    - Benchmark STT providers → `${NEXT_PUBLIC_DOCS_URL}/quickstart/speech-to-text`
+    - Benchmark TTS providers → `${NEXT_PUBLIC_DOCS_URL}/quickstart/text-to-speech`
+    - Run LLM tests → `${NEXT_PUBLIC_DOCS_URL}/quickstart/text-to-text`
+    - Run simulations → `${NEXT_PUBLIC_DOCS_URL}/quickstart/simulations`
   - Learn more: Watch the demo, Read documentation, Book a demo (`https://cal.com/amandalmia/30min`), Guide to voice agents (`https://voiceaiandvoiceagents.com`)
 
 **Final CTA Section:**
@@ -687,14 +701,7 @@ The login page serves as a marketing-style landing page with a consistent light 
 
 **Footer:**
 
-- **Background**: Light gray (`bg-gray-50`) with top border (`border-t border-gray-200`)
-- **Three columns**: Company, Resources, and Community - each with left border accent (`md:grid-cols-3`)
-- **Column headers**: Uppercase, letter-spaced (`tracking-[0.2em]`), muted color (`text-gray-400`)
-- **Company column**: Uses `flex flex-col` to enable bottom-aligned content. Links: About Us (`/about`), Privacy Policy. Tagline "Supported by ARTPARK @IISc" at bottom (`mt-auto pt-8 text-xs text-gray-400`, ARTPARK links to `https://artpark.in`)
-- **Resources column links**: Documentation, Python SDK, CLI, Terms of Service
-- **Community column links**: WhatsApp (uses `WHATSAPP_INVITE_URL` constant), Discord (`https://discord.gg/xCJ55Ban`), and LinkedIn (`https://linkedin.com/company/artpark`)
-- **Links**: Gray text (`text-gray-500`) that darkens on hover (`hover:text-gray-900`)
-- **Copyright**: Right-aligned, muted
+Uses `<LandingFooter />` component. See "Shared Landing Components" section above for details.
 
 **Styling Patterns:**
 
@@ -711,22 +718,21 @@ The login page serves as a marketing-style landing page with a consistent light 
 **CTA Buttons:**
 
 - "Continue with Google" - Main action in hero section and final CTA section, triggers `signIn("google")`
+- "Docs" - Header text link (gray, `hover:text-gray-900`), opens `process.env.NEXT_PUBLIC_DOCS_URL` in new tab
 - "Join" - Header anchor link (outlined style), scrolls to `#join-community` section
 - "Book a demo" - Header button (filled style), opens `https://cal.com/amandalmia/30min` via `handleBookDemo`
 
 ### About Page (`/about`)
 
-Public page (no auth required) with information about Calibrate and ARTPARK.
+Public page (no auth required) with information about Calibrate and the team.
 
 **Structure:**
-- Same header as landing page: Logo (links to `/login`), "Join" button (links to `/login#join-community`), "Book a demo" button
-- Same footer as landing page: 3-column layout (Company, Resources, Community) + copyright
-- Has its own `WHATSAPP_INVITE_URL` constant (duplicated from login page for independence)
+- Uses `<LandingHeader showLogoLink joinHref="/login#join-community" />` - logo links to /login, Join button links to login page's community section
+- Uses `<LandingFooter />` - same footer as landing page
 
 **Content sections:**
-- Hero: "About Calibrate" headline + intro paragraph
-- Our Mission: Voice AI challenges and Calibrate's solution
-- Our Team: ARTPARK intro + 2-column grid (`max-w-xl`, left-aligned) with clickable team member cards linking to LinkedIn (Aman Dalmia - Principal ML Engineer, Jigar Doshi). Profile images at `/team/aman-dalmia.jpg` and `/team/jigar-doshi.jpg` with `bg-gray-200` fallback
+- Our Vision: Voice AI challenges and Calibrate's solution
+- Team: 2-column grid (`max-w-xl`, left-aligned) with clickable team member cards linking to LinkedIn. Profile images at `/team/aman.jpeg` and `/team/jigar.jpeg` with `bg-gray-200` fallback
 
 ### Authentication Flow
 
@@ -2478,7 +2484,7 @@ This pattern ensures textareas grow with content on: typing, pasting, and initia
    - Simulations
 
 4. **Resources**
-   - Documentation (external link to `https://penseapp.vercel.app/docs`, opens in new tab with external link icon indicator)
+   - Documentation (external link to `process.env.NEXT_PUBLIC_DOCS_URL`, opens in new tab with external link icon indicator)
 
 ### External Links in Sidebar
 
@@ -2490,7 +2496,8 @@ The sidebar navigation handles external links differently from internal routes. 
 
 ```bash
 NEXT_PUBLIC_BACKEND_URL=http://localhost:8000  # Backend API URL
-NEXT_PUBLIC_APP_URL=https://penseapp.vercel.app  # App URL for docs links (required)
+NEXT_PUBLIC_APP_URL=https://penseapp.vercel.app  # App base URL (required)
+NEXT_PUBLIC_DOCS_URL=https://penseapp.vercel.app/docs  # Documentation base URL (required)
 AUTH_SECRET=                                    # NextAuth secret
 GOOGLE_CLIENT_ID=                              # Google OAuth client ID
 GOOGLE_CLIENT_SECRET=                          # Google OAuth client secret

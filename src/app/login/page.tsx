@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
+import { LandingHeader } from "@/components/LandingHeader";
+import { LandingFooter } from "@/components/LandingFooter";
 
 const tabs = [
   {
@@ -58,10 +60,6 @@ export default function LoginPage() {
     signIn("google", { callbackUrl: "/agents" });
   };
 
-  const handleBookDemo = () => {
-    window.open("https://cal.com/amandalmia/30min", "_blank");
-  };
-
   return (
     <div
       className="min-h-screen bg-white"
@@ -69,30 +67,7 @@ export default function LoginPage() {
         fontFamily: "var(--font-dm-sans), system-ui, -apple-system, sans-serif",
       }}
     >
-      {/* Navigation */}
-      <nav className="flex items-center justify-between px-8 py-4 border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <img src="/logo.svg" alt="Calibrate Logo" className="w-8 h-8" />
-          <span className="text-xl font-bold tracking-tight text-black">
-            Calibrate
-          </span>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <a
-            href="#join-community"
-            className="px-5 py-2.5 border border-gray-300 text-gray-900 font-medium rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
-          >
-            Join
-          </a>
-          <button
-            onClick={handleBookDemo}
-            className="px-5 py-2.5 bg-black text-white font-medium rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
-          >
-            Book a demo
-          </button>
-        </div>
-      </nav>
+      <LandingHeader />
 
       {/* Hero Section */}
       <div className="relative overflow-hidden">
@@ -235,7 +210,7 @@ export default function LoginPage() {
           </p>
           <div className="flex items-center justify-center gap-8 mb-16">
             <a
-              href={`${process.env.NEXT_PUBLIC_APP_URL}/docs/integrations`}
+              href={`${process.env.NEXT_PUBLIC_DOCS_URL}/integrations`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-gray-900 hover:text-gray-600 transition-colors"
@@ -438,7 +413,7 @@ export default function LoginPage() {
             </h3>
             <div className="space-y-4">
               <a
-                href={`${process.env.NEXT_PUBLIC_APP_URL}/docs/quickstart/speech-to-text`}
+                href={`${process.env.NEXT_PUBLIC_DOCS_URL}/quickstart/speech-to-text`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-start gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all group"
@@ -472,7 +447,7 @@ export default function LoginPage() {
               </a>
 
               <a
-                href={`${process.env.NEXT_PUBLIC_APP_URL}/docs/quickstart/text-to-text`}
+                href={`${process.env.NEXT_PUBLIC_DOCS_URL}/quickstart/text-to-text`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-start gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all group"
@@ -506,7 +481,7 @@ export default function LoginPage() {
               </a>
 
               <a
-                href={`${process.env.NEXT_PUBLIC_APP_URL}/docs/quickstart/text-to-speech`}
+                href={`${process.env.NEXT_PUBLIC_DOCS_URL}/quickstart/text-to-speech`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-start gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all group"
@@ -540,7 +515,7 @@ export default function LoginPage() {
               </a>
 
               <a
-                href={`${process.env.NEXT_PUBLIC_APP_URL}/docs/quickstart/simulations`}
+                href={`${process.env.NEXT_PUBLIC_DOCS_URL}/quickstart/simulations`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-start gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all group"
@@ -619,7 +594,7 @@ export default function LoginPage() {
               </a>
 
               <a
-                href={`${process.env.NEXT_PUBLIC_APP_URL}/docs/core-concepts`}
+                href={`${process.env.NEXT_PUBLIC_DOCS_URL}/core-concepts`}
                 className="flex items-start gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all group"
               >
                 <div className="text-gray-400 mt-1">
@@ -756,137 +731,7 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="bg-gray-50 text-gray-500 py-16 px-12 border-t border-gray-200">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-            {/* Company Column */}
-            <div className="border-l border-gray-300 pl-8 flex flex-col">
-              <h3 className="text-gray-400 text-sm tracking-[0.2em] uppercase mb-6">
-                Company
-              </h3>
-              <ul className="space-y-4">
-                <li>
-                  <a
-                    href="/about"
-                    className="hover:text-gray-900 transition-colors"
-                  >
-                    About Us
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://docs.google.com/document/d/e/2PACX-1vRk2LZDD3ZtMHBocQVl5Qh14PtThP2nB1DFUsC0_9w028yx6LrDKHE77IgOxY-PojVgtyGp-hClts8l/pub"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-gray-900 transition-colors"
-                  >
-                    Privacy Policy
-                  </a>
-                </li>
-              </ul>
-              <p className="mt-auto pt-8 text-xs text-gray-400">
-                Supported by{" "}
-                <a
-                  href="https://artpark.in"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-gray-600 transition-colors"
-                >
-                  ARTPARK
-                </a>{" "}
-                @IISc
-              </p>
-            </div>
-
-            {/* Resources Column */}
-            <div className="border-l border-gray-300 pl-8">
-              <h3 className="text-gray-400 text-sm tracking-[0.2em] uppercase mb-6">
-                Resources
-              </h3>
-              <ul className="space-y-4">
-                <li>
-                  <a
-                    href={`${process.env.NEXT_PUBLIC_APP_URL}/docs`}
-                    className="hover:text-gray-900 transition-colors"
-                  >
-                    Documentation
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href={`${process.env.NEXT_PUBLIC_APP_URL}/docs/python-sdk/overview`}
-                    className="hover:text-gray-900 transition-colors"
-                  >
-                    Python SDK
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href={`${process.env.NEXT_PUBLIC_APP_URL}/docs/cli/overview`}
-                    className="hover:text-gray-900 transition-colors"
-                  >
-                    CLI
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://docs.google.com/document/d/e/2PACX-1vTRkPJ3-aoibS0ySGfN62w-ytqZrsQ4EogQNTO01Ts4epzT8KJTXpbgSFV1Nb2xihnVpxniC11se5Cx/pub"
-                    target="_blank"
-                    className="hover:text-gray-900 transition-colors"
-                  >
-                    Terms of Service
-                  </a>
-                </li>
-              </ul>
-            </div>
-
-            {/* Community Column */}
-            <div className="border-l border-gray-300 pl-8">
-              <h3 className="text-gray-400 text-sm tracking-[0.2em] uppercase mb-6">
-                Community
-              </h3>
-              <ul className="space-y-4">
-                <li>
-                  <a
-                    href={WHATSAPP_INVITE_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-gray-900 transition-colors"
-                  >
-                    WhatsApp
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://discord.gg/xCJ55Ban"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-gray-900 transition-colors"
-                  >
-                    Discord
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://linkedin.com/company/artpark"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-gray-900 transition-colors"
-                  >
-                    LinkedIn
-                  </a>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Copyright */}
-          <div className="mt-16 text-right text-gray-400 text-sm">
-            © {new Date().getFullYear()}
-          </div>
-        </div>
-      </footer>
+      <LandingFooter />
     </div>
   );
 }

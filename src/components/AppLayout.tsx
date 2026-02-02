@@ -416,7 +416,7 @@ export function AppLayout({
                       <li key={item.id}>
                         {item.id === "docs" ? (
                           <a
-                            href={`${process.env.NEXT_PUBLIC_APP_URL}/docs`}
+                            href={process.env.NEXT_PUBLIC_DOCS_URL}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-base font-medium transition-colors cursor-pointer text-muted-foreground hover:bg-accent/50 hover:text-foreground"
