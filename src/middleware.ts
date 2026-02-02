@@ -20,9 +20,10 @@ export default auth((req) => {
   const isDebugRoute =
     req.nextUrl.pathname.startsWith("/debug") ||
     req.nextUrl.pathname.startsWith("/api/debug");
+  const isDocsRoute = req.nextUrl.pathname.startsWith("/docs");
 
-  // Allow auth API routes and debug routes
-  if (isAuthRoute || isDebugRoute) {
+  // Allow auth API routes, debug routes, and docs routes (handled by Vercel rewrite)
+  if (isAuthRoute || isDebugRoute || isDocsRoute) {
     return NextResponse.next();
   }
 
