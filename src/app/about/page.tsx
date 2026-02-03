@@ -16,7 +16,7 @@ export default function AboutPage() {
         fontFamily: "var(--font-dm-sans), system-ui, -apple-system, sans-serif",
       }}
     >
-      <LandingHeader showLogoLink joinHref="/login#join-community" />
+      <LandingHeader showLogoLink talkToUsHref="/login#join-community" />
 
       {/* Content */}
       <div className="max-w-4xl mx-auto px-8 py-24">

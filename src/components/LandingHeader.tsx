@@ -3,18 +3,14 @@
 type LandingHeaderProps = {
   /** Whether the logo should link to /login (for non-login pages) */
   showLogoLink?: boolean;
-  /** The href for the Join button - defaults to #join-community for same-page scroll */
-  joinHref?: string;
+  /** The href for the Talk to us button - defaults to #join-community for same-page scroll */
+  talkToUsHref?: string;
 };
 
 export function LandingHeader({
   showLogoLink = false,
-  joinHref = "#join-community",
+  talkToUsHref = "#join-community",
 }: LandingHeaderProps) {
-  const handleBookDemo = () => {
-    window.open("https://cal.com/amandalmia/30min", "_blank");
-  };
-
   const LogoContent = (
     <>
       <img src="/logo.svg" alt="Calibrate Logo" className="w-8 h-8" />
@@ -39,22 +35,16 @@ export function LandingHeader({
           href={process.env.NEXT_PUBLIC_DOCS_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-gray-600 font-medium hover:text-gray-900 transition-colors"
-        >
-          Documentation
-        </a>
-        <a
-          href={joinHref}
           className="px-5 py-2.5 border border-gray-300 text-gray-900 font-medium rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
         >
-          Join
+          Read Documentation
         </a>
-        <button
-          onClick={handleBookDemo}
+        <a
+          href={talkToUsHref}
           className="px-5 py-2.5 bg-black text-white font-medium rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
         >
-          Book a demo
-        </button>
+          Talk to us
+        </a>
       </div>
     </nav>
   );

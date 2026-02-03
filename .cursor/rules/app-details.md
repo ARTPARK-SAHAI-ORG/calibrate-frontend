@@ -597,9 +597,8 @@ This enables:
 Both the login page and about page use shared header/footer components to avoid duplication:
 
 **`LandingHeader`** (`src/components/LandingHeader.tsx`):
-- Props: `showLogoLink` (boolean, whether logo links to /login), `joinHref` (string, defaults to `#join-community`)
-- Contains: Logo, "Docs" link, "Join" button, "Book a demo" button
-- `handleBookDemo` is defined inside the component
+- Props: `showLogoLink` (boolean, whether logo links to /login), `talkToUsHref` (string, defaults to `#join-community`)
+- Contains: Logo, "Read Documentation" button (outlined, links to docs), "Talk to us" button (filled, links to community section)
 
 **`LandingFooter`** (`src/components/LandingFooter.tsx`):
 - No props - self-contained with all links and constants
@@ -672,9 +671,10 @@ The login page serves as a marketing-style landing page with a consistent light 
 - **Headline**: "Join the community" - same font as hero
 - **Subtitle**: About talking to the team and shaping the roadmap
 - **Join buttons** (row 1, bordered style with icons):
-  - "Join WhatsApp" - uses `WHATSAPP_INVITE_URL` constant (green WhatsApp icon)
-  - "Join Discord" - opens `https://discord.gg/xCJ55Ban` (indigo Discord icon)
-- **Social links** (row 2, text links): "Follow @artikiagents" and "Connect on LinkedIn"
+  - "WhatsApp" - uses `WHATSAPP_INVITE_URL` constant (green WhatsApp icon)
+  - "Discord" - opens `https://discord.gg/xCJ55Ban` (indigo Discord icon)
+- **Book a demo** (row 2, filled black style with calendar icon): Opens `https://cal.com/amandalmia/30min` in new tab
+- **Social links** (row 3, text links): "Follow @artikiagents" and "Connect on LinkedIn"
 
 **Get Started Section:**
 
@@ -718,16 +718,15 @@ Uses `<LandingFooter />` component. See "Shared Landing Components" section abov
 **CTA Buttons:**
 
 - "Continue with Google" - Main action in hero section and final CTA section, triggers `signIn("google")`
-- "Docs" - Header text link (gray, `hover:text-gray-900`), opens `process.env.NEXT_PUBLIC_DOCS_URL` in new tab
-- "Join" - Header anchor link (outlined style), scrolls to `#join-community` section
-- "Book a demo" - Header button (filled style), opens `https://cal.com/amandalmia/30min` via `handleBookDemo`
+- "Read Documentation" - Header button (outlined style), opens `process.env.NEXT_PUBLIC_DOCS_URL` in new tab
+- "Talk to us" - Header button (filled style), scrolls to `#join-community` section
 
 ### About Page (`/about`)
 
 Public page (no auth required) with information about Calibrate and the team.
 
 **Structure:**
-- Uses `<LandingHeader showLogoLink joinHref="/login#join-community" />` - logo links to /login, Join button links to login page's community section
+- Uses `<LandingHeader showLogoLink talkToUsHref="/login#join-community" />` - logo links to /login, "Talk to us" button links to login page's community section
 - Uses `<LandingFooter />` - same footer as landing page
 
 **Content sections:**
