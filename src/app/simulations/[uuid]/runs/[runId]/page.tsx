@@ -1381,18 +1381,44 @@ export default function SimulationRunPage() {
                               return null;
                             }
 
+                            // Check if response has error status
+                            const isError = parsed.status === "error";
+
+                            console.log(response)
+
                             // Format response as pretty JSON
                             const jsonString = JSON.stringify(response, null, 2);
 
                             return (
                               <div className="w-1/2">
                                 <div className="flex items-center gap-2 mb-2">
-                                  <span className="text-sm font-medium text-foreground">
-                                    Agent Tool Response
-                                  </span>
+                                  {isError ? (
+                                    <>
+                                      <svg
+                                        className="w-4 h-4 text-red-500"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={2}
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                                        />
+                                      </svg>
+                                      <span className="text-sm font-medium text-red-500">
+                                        Tool Response Error
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="text-sm font-medium text-foreground">
+                                      Agent Tool Response
+                                    </span>
+                                  )}
                                 </div>
-                                <div className="bg-muted border border-border rounded-2xl p-4">
-                                  <pre className="text-sm font-mono text-foreground whitespace-pre-wrap break-all">
+                                <div className={`bg-muted rounded-2xl p-4 border ${isError ? "border-red-500" : "border-border"}`}>
+                                  <pre className={`text-sm font-mono whitespace-pre-wrap break-all ${isError ? "text-red-400" : "text-foreground"}`}>
                                     {jsonString}
                                   </pre>
                                 </div>
