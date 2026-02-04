@@ -18338,7 +18338,2694 @@ Looking at the suggested changes in the screenshot:
 - Line 360-361: Changing from `p.name === paramName ? { ...p, value } : p,` to `p.name === paramName && p.group === group ? { ...p, value } : p,`
 - Lines 1564, 1606, 1643: Adding `param.group,` to the function calls
 
-This is a valid bug fix. If you</details></think>
+This is a valid bug fix. If you have parameters with the same name in different groups (e.g., "id" in both "body" and "query"), updating one would update all of them. The fix is to also match by group.
+
+Let me look at the current implementation and apply the fix.</details></think>
+
+---
+
+This is a valid bug fix! The `updateToolCallParam` function currently only matches by `paramName`, so if you have the same parameter name in both "body" and "query" groups, editing one would update both. Let me apply this fix.
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "updateToolCallParam",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx",
+  "context": 10,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "updateToolCallParam",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": "src/components/AddTestDialog.tsx",
+              "matches": [
+                {
+                  "lineNumber": 339,
+                  "content": "    setToolCallDropdownOpen(false);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 340,
+                  "content": "    setPendingToolCall(null);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 341,
+                  "content": "  };",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 342,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 343,
+                  "content": "  const updateChatMessage = (id: string, content: string) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 344,
+                  "content": "    setChatMessages(",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 345,
+                  "content": "      chatMessages.map((msg) =&gt; (msg.id === id ? { ...msg, content } : msg)),",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 346,
+                  "content": "    );",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 347,
+                  "content": "  };",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 348,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 349,
+                  "content": "  const updateToolCallParam = ("
+                },
+                {
+                  "lineNumber": 350,
+                  "content": "    messageId: string,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 351,
+                  "content": "    paramName: string,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 352,
+                  "content": "    value: string,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 353,
+                  "content": "  ) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 354,
+                  "content": "    setChatMessages(",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 355,
+                  "content": "      chatMessages.map((msg) =&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 356,
+                  "content": "        msg.id === messageId &amp;&amp; msg.toolParams",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 357,
+                  "content": "          ? {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 358,
+                  "content": "              ...msg,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 359,
+                  "content": "              toolParams: msg.toolParams.map((p) =&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1549,
+                  "content": "                                              const showError = localValidationAttempted &amp;&amp; isEmpty;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1550,
+                  "content": "                                              return (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1551,
+                  "content": "                                                &lt;div key={idx}&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1552,
+                  "content": "                                                  &lt;label className=\"block text-sm font-medium text-foreground mb-1.5\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1553,
+                  "content": "                                                    {param.name}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1554,
+                  "content": "                                                  &lt;/label&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1555,
+                  "content": "                                                  &lt;input",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1556,
+                  "content": "                                                    type=\"text\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1557,
+                  "content": "                                                    value={param.value}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1558,
+                  "content": "                                                    onChange={(e) =&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1559,
+                  "content": "                                                      updateToolCallParam("
+                },
+                {
+                  "lineNumber": 1560,
+                  "content": "                                                        message.id,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1561,
+                  "content": "                                                        param.name,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1562,
+                  "content": "                                                        e.target.value,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1563,
+                  "content": "                                                      )",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1564,
+                  "content": "                                                    }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1565,
+                  "content": "                                                    placeholder={&#96;Enter ${param.name}&#96;}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1566,
+                  "content": "                                                    className={&#96;w-full h-10 px-3 rounded-lg text-sm bg-muted text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1567,
+                  "content": "                                                      showError ? \"border-red-500\" : \"border-border\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1568,
+                  "content": "                                                    }&#96;}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1569,
+                  "content": "                                                  /&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1590,
+                  "content": "                                              const showError = localValidationAttempted &amp;&amp; isEmpty;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1591,
+                  "content": "                                              return (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1592,
+                  "content": "                                                &lt;div key={idx}&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1593,
+                  "content": "                                                  &lt;label className=\"block text-sm font-medium text-foreground mb-1.5\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1594,
+                  "content": "                                                    {param.name}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1595,
+                  "content": "                                                  &lt;/label&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1596,
+                  "content": "                                                  &lt;input",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1597,
+                  "content": "                                                    type=\"text\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1598,
+                  "content": "                                                    value={param.value}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1599,
+                  "content": "                                                    onChange={(e) =&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1600,
+                  "content": "                                                      updateToolCallParam("
+                },
+                {
+                  "lineNumber": 1601,
+                  "content": "                                                        message.id,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1602,
+                  "content": "                                                        param.name,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1603,
+                  "content": "                                                        e.target.value,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1604,
+                  "content": "                                                      )",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1605,
+                  "content": "                                                    }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1606,
+                  "content": "                                                    placeholder={&#96;Enter ${param.name}&#96;}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1607,
+                  "content": "                                                    className={&#96;w-full h-10 px-3 rounded-lg text-sm bg-muted text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1608,
+                  "content": "                                                      showError ? \"border-red-500\" : \"border-border\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1609,
+                  "content": "                                                    }&#96;}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1610,
+                  "content": "                                                  /&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1626,
+                  "content": "                                      const showError = localValidationAttempted &amp;&amp; isEmpty;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1627,
+                  "content": "                                      return (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1628,
+                  "content": "                                        &lt;div key={idx}&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1629,
+                  "content": "                                          &lt;label className=\"block text-sm font-medium text-foreground mb-1.5\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1630,
+                  "content": "                                            {param.name}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1631,
+                  "content": "                                          &lt;/label&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1632,
+                  "content": "                                          &lt;input",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1633,
+                  "content": "                                            type=\"text\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1634,
+                  "content": "                                            value={param.value}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1635,
+                  "content": "                                            onChange={(e) =&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1636,
+                  "content": "                                              updateToolCallParam("
+                },
+                {
+                  "lineNumber": 1637,
+                  "content": "                                                message.id,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1638,
+                  "content": "                                                param.name,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1639,
+                  "content": "                                                e.target.value,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1640,
+                  "content": "                                              )",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1641,
+                  "content": "                                            }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1642,
+                  "content": "                                            placeholder={&#96;Enter ${param.name}&#96;}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1643,
+                  "content": "                                            className={&#96;w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1644,
+                  "content": "                                              showError ? \"border-red-500\" : \"border-border\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1645,
+                  "content": "                                            }&#96;}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1646,
+                  "content": "                                          /&gt;",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 84,
+          "totalMatchedLines": 4
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to:1. Update the `updateToolCallParam` function to also accept and match by `group`2. Update all the call sites to pass `param.group`Let me first see the full function definition.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to:
+1. Add `group` parameter to the function
+2. Update the matching logic to also check `group`3. Update all call sites to pass `param.group`</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update all the call sites to pass `param.group`. There are 3 call sites for webhook params (query, body) and 1 for regular params.</details></think>
+
+---
+
+Now let me update the call sites to pass `param.group`:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the Body params section.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to update this Body params section and the regular tool parameters section.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the regular tool parameters section.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the regular tool parameters section. Even though regular params don't have groups, I should still pass `param.group` (which will be undefined) for consistency.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me check for any linter errors.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no linter errors. The fix has been applied. Now parameters are matched by both `name` AND `group`, so editing a param named "id" in the "body" group won't affect a param named "id" in the "query" group.</details></think>
+
+---
+
+Done! Applied the fix. The `updateToolCallParam` function now:
+
+1. Accepts an optional `group` parameter
+2. Matches parameters by both `name` AND `group` (`p.name === paramName && p.group === group`)
+3. All call sites now pass `param.group`
+
+This prevents the bug where editing a parameter with the same name in different groups (e.g., "id" in both "body" and "query") would update all of them simultaneously.
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to AddTestDialog.tsx - I fixed the `updateToolCallParam` function to match by both name AND group. Let me search for relevant sections in app-details.md to update.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "updateToolCallParam|tool.*param.*group",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+  "contextBefore": 2,
+  "contextAfter": 3,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "updateToolCallParam|tool.*param.*group",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": ".cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 473,
+                  "content": "    - Parses &#96;history&#96; array and converts to chatMessages format",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 474,
+                  "content": "    - **Webhook tool call detection**: Checks if args have &#96;body&#96; or &#96;query&#96; keys to determine if it's a webhook-style tool call",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 475,
+                  "content": "    - **Webhook param extraction**: For webhook tools, extracts nested properties from body/query and assigns &#96;group&#96; property to each param so they display in the correct container (e.g., &#96;{body: {task_type: \"x\"}}&#96; → &#96;{name: \"task_type\", value: \"x\", group: \"body\"}&#96;). Headers are intentionally excluded from the UI"
+                },
+                {
+                  "lineNumber": 476,
+                  "content": "    - **Tool response parsing**: &#96;role: \"tool\"&#96; messages are included as &#96;tool_response&#96; type, linked to their corresponding tool call via &#96;tool_call_id&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 477,
+                  "content": "    - Non-webhook tools show params as flat list without group containers"
+                },
+                {
+                  "lineNumber": 478,
+                  "content": "- **View all tests**",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 479,
+                  "content": "- **Edit/delete tests**",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 480,
+                  "content": "- **Link tests to agents** for benchmarking",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 8,
+          "totalMatchedLines": 2
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I found the relevant section. I should add information about the `updateToolCallParam` function needing to match by both name AND group. Let me add this as a gotcha or edge case.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I've added documentation about the param update matching behavior that requires both name AND group to match.</details></think>
+
+---
+
+Updated the documentation to note that `updateToolCallParam` matches by both `name` AND `group` - this prevents the bug where params with the same name in different groups (body vs query) would all be updated simultaneously.
+
+---
+
+_**User**_
+
+The loader infers webhook tool calls purely by checking for body/query keys in the tool-call arguments. This will misclassify any structured-output tool that legitimately has a parameter named body or query, causing it to be treated as a webhook: params are regrouped, a tool-response message is auto-inserted, and JSON response validation is enforced. That changes saved history and can block saving tests that were valid before. Consider using the tool’s actual config/type (or tool list lookup) rather than argument key heuristics for classification.
+
+is this true? The tools with webhook have type = webhook in their config
+
+
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user is asking about a valid concern raised in a code review. The issue is:
+
+1. Currently, when loading saved tests, the code checks if the tool call arguments have `body` or `query` keys to determine if it's a webhook tool
+2. This is problematic because a structured-output tool could legitimately have a parameter named "body" or "query"
+3. This would cause misclassification - the structured-output tool would be treated as a webhook
+
+The user is asking if we should instead use the tool's actual `config.type` to determine if it's a webhook.
+
+Let me check the code to understand:
+1. Where the webhook detection happens when loading saved tests
+2. If we have access to the tool's config/type at that point
+
+The user confirms that webhook tools have `type = webhook` in their config, so we should use that instead of heuristics.</details></think>
+
+---
+
+You're right - this is a valid concern. Let me check the current code and fix it to use the tool's actual `config.type` instead of guessing based on argument keys.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see the issue. The code at line 140-142 checks for `body` or `query` keys to determine if it's a webhook tool. This is a heuristic that could misclassify structured-output tools.Instead, we should:1. Look up the tool by name from `availableTools`
+2. Check if the tool's `config.type === "webhook"`Let me check where `availableTools` is defined and if it's available at this point in the code.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "availableTools|config\\.type.*webhook",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx",
+  "context": 3,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "availableTools|config\\.type.*webhook",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": "src/components/AddTestDialog.tsx",
+              "matches": [
+                {
+                  "lineNumber": 280,
+                  "content": "  const [localValidationAttempted, setLocalValidationAttempted] =",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 281,
+                  "content": "    useState(false);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 282,
+                  "content": "  const [toolDropdownOpen, setToolDropdownOpen] = useState(false);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 283,
+                  "content": "  const [availableTools, setAvailableTools] = useState&lt;AvailableTool[]&gt;([]);"
+                },
+                {
+                  "lineNumber": 284,
+                  "content": "  const [availableToolsLoading, setAvailableToolsLoading] = useState(false);"
+                },
+                {
+                  "lineNumber": 285,
+                  "content": "  const [chatMessages, setChatMessages] = useState&lt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 286,
+                  "content": "    Array&lt;{",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 287,
+                  "content": "      id: string;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 503,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 504,
+                  "content": "  // Helper function to get parameters from tool config for selected tool",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 505,
+                  "content": "  const getToolParamsForSelectedTool = (toolId: string, toolName: string) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 506,
+                  "content": "    const tool = availableTools.find("
+                },
+                {
+                  "lineNumber": 507,
+                  "content": "      (t) =&gt; t.uuid === toolId || t.name === toolName,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 508,
+                  "content": "    );",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 509,
+                  "content": "    if (!tool) return [];",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 594,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 595,
+                  "content": "  // Check if a tool has parameters in its original config",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 596,
+                  "content": "  const toolHasParams = (toolId: string, toolName: string) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 597,
+                  "content": "    const tool = availableTools.find("
+                },
+                {
+                  "lineNumber": 598,
+                  "content": "      (t) =&gt; t.uuid === toolId || t.name === toolName,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 599,
+                  "content": "    );",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 600,
+                  "content": "    if (!tool) return false;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1073,
+                  "content": "                      /&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1074,
+                  "content": "                      &lt;div className=\"absolute right-0 top-8 mt-2 w-72 bg-background border border-border rounded-xl shadow-2xl z-[100] overflow-hidden\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1075,
+                  "content": "                        &lt;ToolPicker",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1076,
+                  "content": "                          availableTools={availableTools}"
+                },
+                {
+                  "lineNumber": 1077,
+                  "content": "                          isLoading={availableToolsLoading}"
+                },
+                {
+                  "lineNumber": 1078,
+                  "content": "                          onSelectInbuiltTool={(toolId, toolName) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1079,
+                  "content": "                            selectInbuiltTool(toolId, toolName);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1080,
+                  "content": "                          }}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1898,
+                  "content": "                                &gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1899,
+                  "content": "                                  {!pendingToolCall ? (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1900,
+                  "content": "                                    &lt;ToolPicker",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1901,
+                  "content": "                                      availableTools={availableTools}"
+                },
+                {
+                  "lineNumber": 1902,
+                  "content": "                                      isLoading={availableToolsLoading}"
+                },
+                {
+                  "lineNumber": 1903,
+                  "content": "                                      onSelectInbuiltTool={(",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1904,
+                  "content": "                                        toolId,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1905,
+                  "content": "                                        toolName,",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 38,
+          "totalMatchedLines": 8
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I see `availableTools` is available. But the issue is that when loading `initialConfig`, we need to check if the tool is a webhook based on its actual config, not the argument structure.
+
+The problem is that during `initialConfig` parsing (in the useEffect), we may not have `availableTools` loaded yet since it's fetched asynchronously. Let me check when `availableTools` is loaded vs when `initialConfig` is parsed.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "useEffect.*initialConfig|fetchTools|setAvailableTools",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx",
+  "context": 5,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "useEffect.*initialConfig|fetchTools|setAvailableTools",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": "src/components/AddTestDialog.tsx",
+              "matches": [
+                {
+                  "lineNumber": 278,
+                  "content": "    \"english\" | \"hindi\" | \"kannada\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 279,
+                  "content": "  &gt;(\"english\");",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 280,
+                  "content": "  const [localValidationAttempted, setLocalValidationAttempted] =",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 281,
+                  "content": "    useState(false);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 282,
+                  "content": "  const [toolDropdownOpen, setToolDropdownOpen] = useState(false);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 283,
+                  "content": "  const [availableTools, setAvailableTools] = useState&lt;AvailableTool[]&gt;([]);"
+                },
+                {
+                  "lineNumber": 284,
+                  "content": "  const [availableToolsLoading, setAvailableToolsLoading] = useState(false);"
+                },
+                {
+                  "lineNumber": 285,
+                  "content": "  const [chatMessages, setChatMessages] = useState&lt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 286,
+                  "content": "    Array&lt;{",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 287,
+                  "content": "      id: string;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 288,
+                  "content": "      role: \"agent\" | \"user\" | \"tool_call\" | \"tool_response\";",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 289,
+                  "content": "      content: string;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 399,
+                  "content": "    }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 400,
+                  "content": "  }, [chatMessages.length]);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 401,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 402,
+                  "content": "  // Fetch available tools when dialog opens",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 403,
+                  "content": "  useEffect(() =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 404,
+                  "content": "    const fetchTools = async () =&gt; {"
+                },
+                {
+                  "lineNumber": 405,
+                  "content": "      if (!isOpen || !backendAccessToken) return;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 406,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 407,
+                  "content": "      try {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 408,
+                  "content": "        setAvailableToolsLoading(true);"
+                },
+                {
+                  "lineNumber": 409,
+                  "content": "        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 410,
+                  "content": "        if (!backendUrl) {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 411,
+                  "content": "          throw new Error(\"BACKEND_URL environment variable is not set\");",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 412,
+                  "content": "        }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 413,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 428,
+                  "content": "        if (!response.ok) {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 429,
+                  "content": "          throw new Error(\"Failed to fetch tools\");",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 430,
+                  "content": "        }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 431,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 432,
+                  "content": "        const data: AvailableTool[] = await response.json();",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 433,
+                  "content": "        setAvailableTools(data);"
+                },
+                {
+                  "lineNumber": 434,
+                  "content": "      } catch (err) {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 435,
+                  "content": "        console.error(\"Error fetching tools:\", err);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 436,
+                  "content": "      } finally {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 437,
+                  "content": "        setAvailableToolsLoading(false);"
+                },
+                {
+                  "lineNumber": 438,
+                  "content": "      }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 439,
+                  "content": "    };",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 440,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 441,
+                  "content": "    fetchTools();"
+                },
+                {
+                  "lineNumber": 442,
+                  "content": "  }, [isOpen, backendAccessToken]);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 443,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 444,
+                  "content": "  const addToolFromSelection = (tool: AvailableTool) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 445,
+                  "content": "    // Check if tool is a webhook type - default to accept any arguments for webhooks",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 446,
+                  "content": "    const isWebhook = tool.config?.type === \"webhook\";",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 46,
+          "totalMatchedLines": 7
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see! The `availableTools` is fetched when the dialog opens (line 402-442), and there's already code that checks `tool.config?.type === "webhook"` (line 446). But the `initialConfig` parsing happens in a different useEffect that might run before tools are loaded.
+
+Let me check where the `initialConfig` parsing happens and how we can fix it to use the tool's actual config type. The challenge is that when loading saved tests, we need to wait for `availableTools` to be loaded before we can properly classify tools.
+
+Let me look at when initialConfig is processed.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see. The initialConfig parsing is in a `useEffect` that likely depends on `initialConfig`. The issue is that we need `availableTools` to be loaded first before we can properly determine if a tool is a webhook.Let me check what triggers this useEffect and see if we can add `availableTools` as a dependency.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to see the full extent of this useEffect to understand its dependencies and modify it properly.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me find where this useEffect ends to see its dependencies.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I see the useEffect depends only on `[initialConfig]`. To fix this properly, I need to:1. Add `availableTools` as a dependency2. When processing tool calls, look up the tool by name in `availableTools` to check if `config.type === "webhook"`However, there's a race condition issue - `availableTools` might not be loaded yet when `initialConfig` changes. We should wait for both to be available.Let me update the code to:1. Add `availableTools` to the dependency array
+2. Only process if `availableTools.length > 0` (or handle the case where tool isn't found)3. Look up the tool by name and check its `config.type`</details></think>
+
+---
+
+I see the issue. The `initialConfig` useEffect only depends on `[initialConfig]` and doesn't have access to `availableTools` at parse time. Let me fix this by:
+
+1. Adding `availableTools` as a dependency
+2. Looking up the tool by name to check its actual `config.type`
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the dependency array of the useEffect to include `availableTools`.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me check for linter errors.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx`
+
+Lint results
+
+Lint errors for `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| Block-scoped variable 'availableTools' used before its declaration. | 275:22-275:36 | DIAGNOSTIC_SEVERITY_ERROR |
+| Variable 'availableTools' is used before being assigned. | 275:22-275:36 | DIAGNOSTIC_SEVERITY_ERROR |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+There's an issue - `availableTools` is defined after the useEffect that uses it. I need to move the state declaration before the useEffect, or move the useEffect after the state declaration. Let me check the order of declarations.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see - the `availableTools` state is declared at line 285, but the useEffect that references it ends at line 275. I need to move the `availableTools` state declaration before the useEffect, or move the useEffect after all state declarations.The cleanest solution is to move the `availableTools` and `availableToolsLoading` state declarations to be before the useEffect. Let me find a good place to move them.</details></think>
+
+---
+
+I need to move the `availableTools` state declaration before the useEffect that uses it. Let me fix the order:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to move the `availableTools` state declaration to before line 92 where the useEffect starts. Let me first remove it from its current location (line 285-286) and add it before the useEffect.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me add the availableTools state declaration before the useEffect that uses it.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me check for linter errors again.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no linter errors. The fix is complete. Now the code:1. Declares `availableTools` state early (before the useEffect that needs it)2. Waits for `availableTools.length > 0` before processing `initialConfig`3. Looks up the tool by name and checks its actual `config.type === "webhook"` instead of guessing based on argument keys</details></think>
+
+---
+
+Done! The fix now:
+
+1. **Uses the tool's actual `config.type`** instead of guessing based on argument keys
+2. **Waits for `availableTools` to be loaded** before processing `initialConfig` (by checking `availableTools.length > 0`)
+3. **Looks up the tool by name** in `availableTools` and checks `tool?.config?.type === "webhook"`
+
+This prevents misclassification of structured-output tools that happen to have parameters named "body" or "query".
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to AddTestDialog.tsx to fix the webhook tool detection. Let me search for relevant sections in app-details.md to update.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "Webhook tool call detection|body.*query.*keys|hasWebhookStructure",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+  "contextBefore": 2,
+  "contextAfter": 3,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "Webhook tool call detection|body.*query.*keys|hasWebhookStructure",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": ".cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 472,
+                  "content": "  - **Loading saved tests** (when &#96;initialConfig&#96; is provided):",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 473,
+                  "content": "    - Parses &#96;history&#96; array and converts to chatMessages format",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 474,
+                  "content": "    - **Webhook tool call detection**: Checks if args have &#96;body&#96; or &#96;query&#96; keys to determine if it's a webhook-style tool call"
+                },
+                {
+                  "lineNumber": 475,
+                  "content": "    - **Webhook param extraction**: For webhook tools, extracts nested properties from body/query and assigns &#96;group&#96; property to each param so they display in the correct container (e.g., &#96;{body: {task_type: \"x\"}}&#96; → &#96;{name: \"task_type\", value: \"x\", group: \"body\"}&#96;). Headers are intentionally excluded from the UI",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 476,
+                  "content": "    - **Tool response parsing**: &#96;role: \"tool\"&#96; messages are included as &#96;tool_response&#96; type, linked to their corresponding tool call via &#96;tool_call_id&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 477,
+                  "content": "    - Non-webhook tools show params as flat list without group containers",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 6,
+          "totalMatchedLines": 1
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Found the section that needs to be updated. The documentation still says "Checks if args have `body` or `query` keys" but now it uses the tool's actual `config.type`. Let me update it.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I've updated the documentation to reflect:1. The useEffect now waits for `availableTools` to be loaded
+2. Webhook detection now uses the tool's actual `config.type` instead of argument key heuristics
+3. This prevents misclassification of structured-output tools with params named "body" or "query"</details></think>
+
+---
+
+Updated the documentation to reflect:
+
+1. **Waits for `availableTools`**: The useEffect now depends on both `initialConfig` AND `availableTools`
+2. **Proper webhook detection**: Now looks up the tool by name and checks `tool?.config?.type === "webhook"` instead of guessing from argument keys
+3. **Why this matters**: Prevents misclassifying structured-output tools that legitimately have parameters named "body" or "query"
+
+---
+
+_**User**_
+
+check throughout the rest of the codebase if this is being done anywhere else
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to check if the same heuristic-based webhook detection (checking for body/query keys in arguments) is being done elsewhere in the codebase. Let me search for this pattern.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "body.*query|webhookKeys|hasWebhookStructure|\\.some\\(.*body|\\.some\\(.*query",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src",
+  "context": 3,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "body.*query|webhookKeys|hasWebhookStructure|\\.some\\(.*body|\\.some\\(.*query",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": "src/components/AddTestDialog.tsx",
+              "matches": [
+                {
+                  "lineNumber": 149,
+                  "content": "              let toolParams: Array&lt;{ name: string; value: string; group?: string }&gt; = [];",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 150,
+                  "content": "              ",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 151,
+                  "content": "              if (isWebhook) {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 152,
+                  "content": "                // Extract params from body, query with their group (headers are not shown in UI)"
+                },
+                {
+                  "lineNumber": 153,
+                  "content": "                const webhookKeys = [\"body\", \"query\"];"
+                },
+                {
+                  "lineNumber": 154,
+                  "content": "                webhookKeys.forEach(groupKey =&gt; {"
+                },
+                {
+                  "lineNumber": 155,
+                  "content": "                  const groupValue = parsedArgs[groupKey];",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 156,
+                  "content": "                  if (groupValue &amp;&amp; typeof groupValue === \"object\" &amp;&amp; !Array.isArray(groupValue)) {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 157,
+                  "content": "                    Object.entries(groupValue).forEach(([paramName, paramValue]) =&gt; {",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 9,
+          "totalMatchedLines": 3
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, let me also search for other patterns that might indicate webhook detection based on argument keys.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "config\\.type.*webhook|type.*===.*webhook|isWebhook",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src",
+  "context": 3,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "config\\.type.*webhook|type.*===.*webhook|isWebhook",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": "src/components/AddTestDialog.tsx",
+              "matches": [
+                {
+                  "lineNumber": 106,
+                  "content": "          toolName?: string;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 107,
+                  "content": "          toolId?: string;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 108,
+                  "content": "          toolParams?: Array&lt;{ name: string; value: string; group?: string }&gt;;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 109,
+                  "content": "          isWebhook?: boolean;"
+                },
+                {
+                  "lineNumber": 110,
+                  "content": "          linkedToolCallId?: string;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 111,
+                  "content": "        }&gt; = [];",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 112,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 144,
+                  "content": "              ",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 145,
+                  "content": "              // Look up the tool by name to check its actual config type",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 146,
+                  "content": "              const tool = availableTools.find(t =&gt; t.name === toolCall.function.name);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 147,
+                  "content": "              const isWebhook = tool?.config?.type === \"webhook\";"
+                },
+                {
+                  "lineNumber": 148,
+                  "content": "              ",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 149,
+                  "content": "              let toolParams: Array&lt;{ name: string; value: string; group?: string }&gt; = [];",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 150,
+                  "content": "              ",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 151,
+                  "content": "              if (isWebhook) {"
+                },
+                {
+                  "lineNumber": 152,
+                  "content": "                // Extract params from body, query with their group (headers are not shown in UI)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 153,
+                  "content": "                const webhookKeys = [\"body\", \"query\"];",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 154,
+                  "content": "                webhookKeys.forEach(groupKey =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 178,
+                  "content": "                toolId: toolCall.id,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 179,
+                  "content": "                toolName: toolCall.function.name,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 180,
+                  "content": "                toolParams,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 181,
+                  "content": "                isWebhook,"
+                },
+                {
+                  "lineNumber": 182,
+                  "content": "              });",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 183,
+                  "content": "            } else {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 184,
+                  "content": "              // Regular assistant message",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 294,
+                  "content": "      toolName?: string;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 295,
+                  "content": "      toolId?: string;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 296,
+                  "content": "      toolParams?: Array&lt;{ name: string; value: string; group?: string }&gt;;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 297,
+                  "content": "      isWebhook?: boolean;"
+                },
+                {
+                  "lineNumber": 298,
+                  "content": "      linkedToolCallId?: string; // For tool_response to link back to tool_call",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 299,
+                  "content": "    }&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 300,
+                  "content": "  &gt;([{ id: \"1\", role: \"agent\", content: \"Hello, how can I help you today?\" }]);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 312,
+                  "content": "    toolId: string,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 313,
+                  "content": "    toolName: string,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 314,
+                  "content": "    params: Array&lt;{ name: string; value: string; group?: string }&gt;,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 315,
+                  "content": "    isWebhook: boolean = false,"
+                },
+                {
+                  "lineNumber": 316,
+                  "content": "  ) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 317,
+                  "content": "    const toolCallId = Date.now().toString();",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 318,
+                  "content": "    const newMessages: typeof chatMessages = [",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 324,
+                  "content": "        toolId,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 325,
+                  "content": "        toolName,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 326,
+                  "content": "        toolParams: params,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 327,
+                  "content": "        isWebhook,"
+                },
+                {
+                  "lineNumber": 328,
+                  "content": "      },",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 329,
+                  "content": "    ];",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 330,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 331,
+                  "content": "    // If it's a webhook tool, automatically add a tool response message after it",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 332,
+                  "content": "    if (isWebhook) {"
+                },
+                {
+                  "lineNumber": 333,
+                  "content": "      newMessages.push({",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 334,
+                  "content": "        id: (Date.now() + 1).toString(),",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 335,
+                  "content": "        role: \"tool_response\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 374,
+                  "content": "    const messageToRemove = chatMessages.find((msg) =&gt; msg.id === id);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 375,
+                  "content": "    ",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 376,
+                  "content": "    // If removing a tool_call that's a webhook, also remove its linked tool_response",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 377,
+                  "content": "    if (messageToRemove?.role === \"tool_call\" &amp;&amp; messageToRemove?.isWebhook) {"
+                },
+                {
+                  "lineNumber": 378,
+                  "content": "      setChatMessages(",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 379,
+                  "content": "        chatMessages.filter(",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 380,
+                  "content": "          (msg) =&gt; msg.id !== id &amp;&amp; msg.linkedToolCallId !== id",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 447,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 448,
+                  "content": "  const addToolFromSelection = (tool: AvailableTool) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 449,
+                  "content": "    // Check if tool is a webhook type - default to accept any arguments for webhooks",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 450,
+                  "content": "    const isWebhook = tool.config?.type === \"webhook\";"
+                },
+                {
+                  "lineNumber": 451,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 452,
+                  "content": "    // Extract parameters from tool config - handle both array (new) and object (legacy) formats",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 453,
+                  "content": "    let paramList: Array&lt;{ id: string; name: string; value: string }&gt; = [];",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 479,
+                  "content": "      id: tool.uuid,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 480,
+                  "content": "      name: tool.name,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 481,
+                  "content": "      expectation: \"should-call\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 482,
+                  "content": "      acceptAnyParameterValues: isWebhook, // Default to true for webhook tools"
+                },
+                {
+                  "lineNumber": 483,
+                  "content": "      isInbuilt: false,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 484,
+                  "content": "      expectedParameters: paramList,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 485,
+                  "content": "    };",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 655,
+                  "content": "          for (const param of message.toolParams) {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 656,
+                  "content": "            // For webhook tools, group params by their group (query, body)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 657,
+                  "content": "            // Note: Headers are not shown in conversation history UI",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 658,
+                  "content": "            if (message.isWebhook &amp;&amp; param.group) {"
+                },
+                {
+                  "lineNumber": 659,
+                  "content": "              if (param.group === \"body\") {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 660,
+                  "content": "                if (!argsObj.body) argsObj.body = {};",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 661,
+                  "content": "                argsObj.body[param.name] = param.value;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 686,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 687,
+                  "content": "        // For webhook tools, find the linked tool_response message and add it to history",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 688,
+                  "content": "        // For non-webhook tools, don't add any tool response",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 689,
+                  "content": "        if (message.isWebhook) {"
+                },
+                {
+                  "lineNumber": 690,
+                  "content": "          const linkedResponse = chatMessages.find(",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 691,
+                  "content": "            (m) =&gt; m.role === \"tool_response\" &amp;&amp; m.linkedToolCallId === message.id",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 692,
+                  "content": "          );",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1528,
+                  "content": "                            &lt;span className=\"text-sm font-medium text-foreground\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1529,
+                  "content": "                              {message.toolName}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1530,
+                  "content": "                            &lt;/span&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1531,
+                  "content": "                            {message.isWebhook &amp;&amp; ("
+                },
+                {
+                  "lineNumber": 1532,
+                  "content": "                              &lt;span className=\"text-xs text-muted-foreground bg-background px-2 py-0.5 rounded\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1533,
+                  "content": "                                Webhook",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1534,
+                  "content": "                              &lt;/span&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1538,
+                  "content": "                            message.toolParams.length &gt; 0 &amp;&amp; (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1539,
+                  "content": "                              &lt;div className=\"space-y-3 mt-3\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1540,
+                  "content": "                                {/* Group parameters by type for webhook tools */}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1541,
+                  "content": "                                {message.isWebhook ? ("
+                },
+                {
+                  "lineNumber": 1542,
+                  "content": "                                  &lt;&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1543,
+                  "content": "                                    {/* Query Parameters */}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1544,
+                  "content": "                                    {message.toolParams.filter(p =&gt; p.group === \"query\").length &gt; 0 &amp;&amp; (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1915,
+                  "content": "                                        );",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1916,
+                  "content": "                                      }}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1917,
+                  "content": "                                      onSelectCustomTool={(tool) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1918,
+                  "content": "                                        const isWebhook = tool.config?.type === \"webhook\";"
+                },
+                {
+                  "lineNumber": 1919,
+                  "content": "                                        let allParams: Array&lt;{ name: string; value: string; group?: string }&gt; = [];",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1920,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1921,
+                  "content": "                                        if (isWebhook &amp;&amp; tool.config?.webhook) {"
+                },
+                {
+                  "lineNumber": 1922,
+                  "content": "                                          // Extract webhook-specific parameters",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1923,
+                  "content": "                                          const webhook = tool.config.webhook;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1924,
+                  "content": "                                          ",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1970,
+                  "content": "                                          tool.uuid,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1971,
+                  "content": "                                          tool.name,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1972,
+                  "content": "                                          allParams,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1973,
+                  "content": "                                          isWebhook,"
+                },
+                {
+                  "lineNumber": 1974,
+                  "content": "                                        );",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1975,
+                  "content": "                                      }}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1976,
+                  "content": "                                    /&gt;",
+                  "isContextLine": true
+                }
+              ]
+            },
+            {
+              "file": "src/app/simulations/[uuid]/runs/[runId]/page.tsx",
+              "matches": [
+                {
+                  "lineNumber": 1193,
+                  "content": "                      // Only include tool messages that are webhook_response",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1194,
+                  "content": "                      try {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1195,
+                  "content": "                        const parsed = JSON.parse(entry.content || \"\");",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1196,
+                  "content": "                        return parsed?.type === \"webhook_response\";"
+                },
+                {
+                  "lineNumber": 1197,
+                  "content": "                      } catch {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1198,
+                  "content": "                        return false;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1199,
+                  "content": "                      }",
+                  "isContextLine": true
+                }
+              ]
+            },
+            {
+              "file": "src/app/tools/page.tsx",
+              "matches": [
+                {
+                  "lineNumber": 151,
+                  "content": "    setEditingToolUuid(uuid);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 152,
+                  "content": "    // Get tool type from config, default to \"structured_output\" if not present",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 153,
+                  "content": "    const tool = tools.find((t) =&gt; t.uuid === uuid);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 154,
+                  "content": "    const type = tool?.config?.type === \"webhook\" ? \"webhook\" : \"structured_output\";"
+                },
+                {
+                  "lineNumber": 155,
+                  "content": "    setToolType(type);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 156,
+                  "content": "    setAddToolDialogOpen(true);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 157,
+                  "content": "  };",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 331,
+                  "content": "                  &lt;/p&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 332,
+                  "content": "                &lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 333,
+                  "content": "                &lt;p className=\"text-sm text-muted-foreground\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 334,
+                  "content": "                  {tool.config?.type === \"webhook\" ? \"Webhook\" : \"Structured Output\"}"
+                },
+                {
+                  "lineNumber": 335,
+                  "content": "                &lt;/p&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 336,
+                  "content": "                &lt;p className=\"text-sm text-muted-foreground line-clamp-1\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 337,
+                  "content": "                  {tool.description || tool.config?.description || \"—\"}",
+                  "isContextLine": true
+                }
+              ]
+            },
+            {
+              "file": "src/components/ToolPicker.tsx",
+              "matches": [
+                {
+                  "lineNumber": 149,
+                  "content": "            )}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 150,
+                  "content": "            {filteredTools.map((tool) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 151,
+                  "content": "              const params = getToolParams(tool);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 152,
+                  "content": "              const toolType = tool.config?.type === \"webhook\" ? \"Webhook\" : \"Structured Output\";"
+                },
+                {
+                  "lineNumber": 153,
+                  "content": "              return (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 154,
+                  "content": "                &lt;button",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 155,
+                  "content": "                  key={tool.uuid}",
+                  "isContextLine": true
+                }
+              ]
+            },
+            {
+              "file": "src/components/agent-tabs/ToolsTabContent.tsx",
+              "matches": [
+                {
+                  "lineNumber": 189,
+                  "content": "                  {/* Type Column */}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 190,
+                  "content": "                  &lt;div className=\"flex items-center\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 191,
+                  "content": "                    &lt;p className=\"text-sm text-muted-foreground\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 192,
+                  "content": "                      {tool.config?.type === \"webhook\" ? \"Webhook\" : \"Structured Output\"}"
+                },
+                {
+                  "lineNumber": 193,
+                  "content": "                    &lt;/p&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 194,
+                  "content": "                  &lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 195,
+                  "content": "                  {/* Description Column */}",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 152,
+          "totalMatchedLines": 23
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good news! The rest of the codebase is already using `config?.type === "webhook"` properly:
+
+1. `src/app/tools/page.tsx` (line 154, 334) - Uses `tool?.config?.type === "webhook"`
+2. `src/components/ToolPicker.tsx` (line 152) - Uses `tool.config?.type === "webhook"`
+3. `src/components/agent-tabs/ToolsTabContent.tsx` (line 192) - Uses `tool.config?.type === "webhook"`
+4. `src/app/simulations/[uuid]/runs/[runId]/page.tsx` (line 1196) - Checks `parsed?.type === "webhook_response"` but this is for the response format, not for detecting if a tool is a webhook
+
+The only place that was using the heuristic-based detection was in `AddTestDialog.tsx` which I already fixed.
+
+Let me verify there's no other place doing heuristic detection.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "Object\\.keys.*some.*body|Object\\.keys.*some.*query|\\.includes\\([\\\"']body[\\\"']\\)|\\.includes\\([\\\"']query[\\\"']\\)",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src",
+  "context": 3,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "Object\\.keys.*some.*body|Object\\.keys.*some.*query|\\.includes\\([\\\"']body[\\\"']\\)|\\.includes\\([\\\"']query[\\\"']\\)",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {}
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good - no other places are using the heuristic-based detection. The rest of the codebase is already properly using `config?.type === "webhook"` to detect webhook tools. The fix I made was the only place that needed to be updated.</details></think>
+
+---
+
+The rest of the codebase is already using the correct approach. All other places check `tool.config?.type === "webhook"`:
+
+- **`src/app/tools/page.tsx`** (lines 154, 334) - correctly uses `tool?.config?.type === "webhook"`
+- **`src/components/ToolPicker.tsx`** (line 152) - correctly uses `tool.config?.type === "webhook"`
+- **`src/components/agent-tabs/ToolsTabContent.tsx`** (line 192) - correctly uses `tool.config?.type === "webhook"`
+- **`src/components/AddTestDialog.tsx`** (lines 147, 450, 1918) - all now correctly use `tool?.config?.type === "webhook"`
+
+The heuristic-based detection (checking for body/query keys) was only in the `initialConfig` loading code, which I've now fixed. No other changes needed.
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I didn't make any code changes in my last response - I only ran grep commands to check if the heuristic-based webhook detection was used elsewhere in the codebase. I confirmed that the rest of the codebase already uses the correct approach (`config?.type === "webhook"`). So no documentation update is needed.</details></think>
+
+---
+
+I didn't make any code changes in my last response - I only searched the codebase to verify that no other places were using the heuristic-based webhook detection. The search confirmed the rest of the codebase already uses `config?.type === "webhook"` correctly. No documentation update is needed.
 
 ---
 

@@ -82,6 +82,10 @@ export function AddTestDialog({
     initialTab || "next-reply",
   );
 
+  // Available tools state - declared early so it's available for initialConfig parsing
+  const [availableTools, setAvailableTools] = useState<AvailableTool[]>([]);
+  const [availableToolsLoading, setAvailableToolsLoading] = useState(false);
+
   // Update active tab when initialTab changes (when opening an existing test)
   useEffect(() => {
     if (initialTab) {
@@ -90,8 +94,9 @@ export function AddTestDialog({
   }, [initialTab]);
 
   // Populate fields from initialConfig when editing an existing test
+  // Wait for availableTools to be loaded so we can properly determine tool types
   useEffect(() => {
-    if (initialConfig) {
+    if (initialConfig && availableTools.length > 0) {
       // Parse history and convert to chatMessages format
       if (initialConfig.history && initialConfig.history.length > 0) {
         const messages: Array<{
@@ -137,14 +142,15 @@ export function AddTestDialog({
               const toolCallId = toolCall.id || `tool-${index}`;
               toolCallIds.push(toolCallId);
               
-              // Check if this is a webhook-style tool call (has body/query keys)
-              const webhookKeys = ["body", "query"];
-              const hasWebhookStructure = Object.keys(parsedArgs).some(k => webhookKeys.includes(k));
+              // Look up the tool by name to check its actual config type
+              const tool = availableTools.find(t => t.name === toolCall.function.name);
+              const isWebhook = tool?.config?.type === "webhook";
               
               let toolParams: Array<{ name: string; value: string; group?: string }> = [];
               
-              if (hasWebhookStructure) {
+              if (isWebhook) {
                 // Extract params from body, query with their group (headers are not shown in UI)
+                const webhookKeys = ["body", "query"];
                 webhookKeys.forEach(groupKey => {
                   const groupValue = parsedArgs[groupKey];
                   if (groupValue && typeof groupValue === "object" && !Array.isArray(groupValue)) {
@@ -172,7 +178,7 @@ export function AddTestDialog({
                 toolId: toolCall.id,
                 toolName: toolCall.function.name,
                 toolParams,
-                isWebhook: hasWebhookStructure,
+                isWebhook,
               });
             } else {
               // Regular assistant message
@@ -270,7 +276,7 @@ export function AddTestDialog({
         }
       }
     }
-  }, [initialConfig]);
+  }, [initialConfig, availableTools]);
 
   const [selectedTools, setSelectedTools] = useState<SelectedToolConfig[]>([]);
   const [expectedMessage, setExpectedMessage] = useState("");
@@ -280,8 +286,6 @@ export function AddTestDialog({
   const [localValidationAttempted, setLocalValidationAttempted] =
     useState(false);
   const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
-  const [availableTools, setAvailableTools] = useState<AvailableTool[]>([]);
-  const [availableToolsLoading, setAvailableToolsLoading] = useState(false);
   const [chatMessages, setChatMessages] = useState<
     Array<{
       id: string;

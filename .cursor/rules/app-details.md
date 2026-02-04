@@ -471,10 +471,12 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
     - **Backend history format**: Webhook tool calls include both the tool call AND linked tool response in history. Structured output tool calls only include the tool call (no fake response injected)
   - **Loading saved tests** (when `initialConfig` is provided):
     - Parses `history` array and converts to chatMessages format
-    - **Webhook tool call detection**: Checks if args have `body` or `query` keys to determine if it's a webhook-style tool call
+    - **Waits for `availableTools`**: The useEffect depends on both `initialConfig` AND `availableTools` - it only processes when `availableTools.length > 0` to ensure proper tool type detection
+    - **Webhook tool call detection**: Looks up the tool by name in `availableTools` and checks `tool?.config?.type === "webhook"`. This is more reliable than checking for body/query argument keys (which could misclassify structured-output tools with params named "body" or "query")
     - **Webhook param extraction**: For webhook tools, extracts nested properties from body/query and assigns `group` property to each param so they display in the correct container (e.g., `{body: {task_type: "x"}}` → `{name: "task_type", value: "x", group: "body"}`). Headers are intentionally excluded from the UI
     - **Tool response parsing**: `role: "tool"` messages are included as `tool_response` type, linked to their corresponding tool call via `tool_call_id`
     - Non-webhook tools show params as flat list without group containers
+    - **Param update matching**: `updateToolCallParam` matches by both `name` AND `group` to avoid updating params with the same name across different groups (e.g., "id" in both body and query)
 - **View all tests**
 - **Edit/delete tests**
 - **Link tests to agents** for benchmarking
