@@ -1718,3 +1718,8492 @@ Status: **completed**
 
 ---
 
+<think><details><summary>Thought Process</summary>
+Good, no linter errors. The change is complete. Now the tool response in the simulation transcript will show the full JSON response in a monospace font, while the tool call parameters are shown as form fields.</details></think>
+
+---
+
+Done. The Agent Tool Response in the simulation transcript will now show the JSON response directly in a monospace format:
+
+```json
+{
+  "status": "success",
+  "data": { ... }
+}
+```
+
+Instead of breaking it into individual form fields. The tool call parameters still display as form fields as you requested earlier.
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made a code change to the simulation transcript tool response display - changed it from showing individual form fields to showing the full JSON response. Let me find and update the relevant section in app-details.md.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "Tool response display|webhook_response|Agent Tool Response",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+  "context": 2,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "Tool response display|webhook_response|Agent Tool Response",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": ".cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 578,
+                  "content": "  - **Processing indicator**: Shows a yellow spinner at the bottom of transcript while metrics are being fetched (when &#96;evaluation_results&#96; is null but transcript has content)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 579,
+                  "content": "  - **Graceful null handling**: All transcript accesses use optional chaining (&#96;transcript?.length ?? 0&#96;, &#96;transcript ?? []&#96;) since transcript can be undefined during intermediate results",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 580,
+                  "content": "  - **Transcript filtering**: Entries are filtered before display - &#96;role: \"end_reason\"&#96; is always filtered out, and &#96;role: \"tool\"&#96; messages are only included if they have valid JSON content with &#96;type: \"webhook_response\"&#96; (other tool messages like \"COMPLETED\" are hidden)"
+                },
+                {
+                  "lineNumber": 581,
+                  "content": "  - **End reason handling**: When the last entry in the full transcript has &#96;role: \"end_reason\"&#96; and &#96;content: \"max_turns\"&#96;, a yellow informational banner is shown at the bottom: \"Conversation ended: Maximum number of agent turns reached\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 582,
+                  "content": "  - **Stable audio keys**: All audio elements use &#96;key={audioUrl}&#96; to prevent React from remounting them during polling re-renders (avoids audio restart/reload)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 586,
+                  "content": "  - Role-based message styling",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 587,
+                  "content": "  - **Tool call details as form fields**: Arguments are displayed as labeled form fields (matching AddTestDialog style). If args has only a &#96;body&#96; key with an object value, the body contents are flattened to show each property as an individual field. Nested objects/arrays within fields are pretty-printed as JSON with 2-space indentation",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 588,
+                  "content": "  - Tool response display for webhook calls: Only shows &#96;role: \"tool\"&#96; messages where content is valid JSON with &#96;type: \"webhook_response\"&#96;. Displays the &#96;response&#96; object fields with \"Agent Tool Response\" header"
+                },
+                {
+                  "lineNumber": 589,
+                  "content": "  - Per-message audio players for voice simulations (matching &#96;audio_urls&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 590,
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 10,
+          "totalMatchedLines": 2
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I found the relevant line at 588. It currently says:```
+- Tool response display for webhook calls: Only shows `role: "tool"` messages where content is valid JSON with `type: "webhook_response"`. Displays the `response` object fields with "Agent Tool Response" header
+```This needs to be updated to reflect that tool responses now show the full JSON instead of individual form fields.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I've updated the documentation to reflect that tool responses show pretty-printed JSON (intentionally different from the form field style used for tool calls), which helps distinguish between input (tool call parameters) and output (tool response).</details></think>
+
+---
+
+I've updated the documentation to clarify that tool responses display as pretty-printed JSON in a monospace block, while tool calls display as form fields - this intentional distinction helps users differentiate between input parameters and output responses.
+
+---
+
+_**User**_
+
+{"history": [{"role": "assistant", "content": "Hello, how can I help you today?"}, {"role": "user", "content": "Hi"}, {"role": "assistant", "tool_calls": [{"id": "bbd0434b-b8b1-4fe3-9d0b-b8cd0a22137e", "function": {"name": "get_presigned_url", "arguments": "{\"body\":{\"task_type\":\"agent\",\"content_type\":\"audio/wav\",\"extension\":\"wav\"}}"}, "type": "function"}]}, {"role": "tool", "content": "{\n  \"status\": \"success\",\n  \"response\": {}\n}", "tool_call_id": "bbd0434b-b8b1-4fe3-9d0b-b8cd0a22137e"}], "evaluation": {"type": "tool_call", "tool_calls": [{"tool": "get_presigned_url", "arguments": {}, "accept_any_arguments": true}]}}
+
+
+This is the saved status of a test where the agent tool_call is also added, but when it is being displayed, it doesn't show the parameters properly, and it also doesn't show for a webhook call. It doesn't show the expected response as well, like the role equal to tool message that should be shown for a webhook tool in the add new test dialogue.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user is showing a test case that has:
+1. An assistant message with a tool call (`get_presigned_url`) with body parameters
+2. A tool response message (`role: "tool"`)
+
+The issues are:
+1. The tool call parameters show "[object Object]" instead of the actual values - this means the flattening logic isn't working properly when there's nested data
+2. The tool response (role: "tool") is not being displayed in the AddTestDialog when editing/viewing a test
+
+Let me look at the AddTestDialog code to understand how it handles:
+1. Parsing and displaying tool_calls from history
+2. Displaying tool responses (role: "tool" messages)
+
+From the earlier code I read, the AddTestDialog populates fields from initialConfig. Let me check how it handles tool_calls and tool responses.</details></think>
+
+---
+
+Let me look at how AddTestDialog handles tool calls and tool responses when populating from initialConfig.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I can see two issues:
+
+1. **Tool call parameters showing "[object Object]"**: On line 123-126, when parsing tool call arguments, it converts each value to `String(value)`. If the value is an object like `{task_type: "agent", ...}`, `String({...})` returns "[object Object]".
+
+2. **Tool response messages not shown**: On line 143, there's a comment "Skip 'tool' role messages as they are tool responses" - meaning tool responses are intentionally skipped and not displayed in the AddTestDialog.
+
+For issue 1, I need to:
+- If the value is an object, JSON.stringify it instead of using String()
+- Also handle the body flattening - if there's only a `body` key with an object, flatten it to show the body's contents
+
+For issue 2, I need to:
+- Parse and include `role: "tool"` messages as `tool_response` type messages
+
+Let me also check the message type definition to see if `tool_response` is supported.
+
+Looking at line 99, the message role type is `"agent" | "user" | "tool_call"`. But from my earlier reading (around line 226-233), I saw that the chatMessages state includes `tool_response` as a role option.
+
+Let me fix both issues:
+1. Properly stringify object values in tool call params
+2. Include tool response messages when parsing initialConfig</details></think>
+
+---
+
+I see the issues:
+
+1. **Tool call params showing "[object Object]"**: The code uses `String(value)` which doesn't work for objects
+2. **Tool response not shown**: The code explicitly skips `role: "tool"` messages
+
+Let me fix both issues.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I've updated the initialConfig parsing. Now let me check for any linter errors.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no linter errors. The changes I made:
+
+1. Added helper functions `formatValue` and `flattenArgs` to properly handle object values
+2. Added support for `tool_response` role in the message type
+3. When parsing tool_calls, now flattens body args and properly stringifies object values
+4. Added parsing for `role: "tool"` messages as tool_response type
+5. Linked tool responses to their corresponding tool calls
+
+This should fix both issues:
+- Tool call params will now show the actual values instead of "[object Object]"
+- Tool responses will now be displayed in the AddTestDialog when editing a saved test</details></think>
+
+---
+
+I've fixed both issues:
+
+1. **Tool call parameters**: Now properly handles objects by:
+   - Using `JSON.stringify()` for object values instead of `String()`
+   - Flattening `body` params (if args has only a `body` key with an object, it shows the body's contents as individual fields)
+
+2. **Tool responses**: Now parses and includes `role: "tool"` messages from history as `tool_response` type, linked to their corresponding tool call.
+
+When you open a saved test with tool calls and tool responses, it will now properly display:
+- The tool call with its parameters shown as form fields (with body flattening)
+- The tool response JSON below it
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to AddTestDialog.tsx to fix how saved tests with tool calls and tool responses are parsed and displayed. Let me find and update the relevant section in app-details.md.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "AddTestDialog|initialConfig|tool_call.*parsing|Webhook tool calls",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+  "context": 3,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "AddTestDialog|initialConfig|tool_call.*parsing|Webhook tool calls",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": ".cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 456,
+                  "content": "  - **Conversation history** (before evaluation):",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 457,
+                  "content": "    - Message types: &#96;agent&#96;, &#96;user&#96;, &#96;tool_call&#96;, &#96;tool_response&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 458,
+                  "content": "    - Add messages via dropdown menu on last message",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 459,
+                  "content": "    - **Webhook tool calls**: When a webhook tool is selected:"
+                },
+                {
+                  "lineNumber": 460,
+                  "content": "      - Parameters shown grouped by: Query Parameters, Body Parameters, Headers",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 461,
+                  "content": "      - A \"Tool Response\" message is automatically added after the tool call",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 462,
+                  "content": "      - Tool response requires valid JSON input (textarea with real-time validation)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 584,
+                  "content": "  - Full conversation audio player below header (from &#96;conversation_wav_url&#96;) for voice simulations",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 585,
+                  "content": "  - Full conversation history (user, assistant, tool calls, tool responses)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 586,
+                  "content": "  - Role-based message styling",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 587,
+                  "content": "  - **Tool call details as form fields**: Arguments are displayed as labeled form fields (matching AddTestDialog style). If args has only a &#96;body&#96; key with an object value, the body contents are flattened to show each property as an individual field. Nested objects/arrays within fields are pretty-printed as JSON with 2-space indentation"
+                },
+                {
+                  "lineNumber": 588,
+                  "content": "  - **Tool response display** (for webhook calls): Only shows &#96;role: \"tool\"&#96; messages where content is valid JSON with &#96;type: \"webhook_response\"&#96;. Displays the &#96;response&#96; object as **pretty-printed JSON** in a monospace &#96;&lt;pre&gt;&#96; block with \"Agent Tool Response\" header (intentionally different from tool call form fields to distinguish input vs output)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 589,
+                  "content": "  - Per-message audio players for voice simulations (matching &#96;audio_urls&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 590,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1271,
+                  "content": "   - Used for: Tools, Personas, Scenarios creation/editing",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1272,
+                  "content": "3. **Modal Dialogs**: Centered overlays for confirmations and simple forms",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1273,
+                  "content": "   - Simple dialogs: Backdrop click closes dialog directly",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1274,
+                  "content": "   - Form dialogs with unsaved data: Backdrop click shows confirmation before closing (e.g., AddTestDialog)"
+                },
+                {
+                  "lineNumber": 1275,
+                  "content": "   - Used for: New agent, New simulation, Delete confirmations, Add/Edit test",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1276,
+                  "content": "   - **Large form dialogs** (like AddTestDialog): Use a header bar with name input and save button, flex-col layout with main content area below"
+                },
+                {
+                  "lineNumber": 1277,
+                  "content": "4. **Delete Confirmation**: Reusable &#96;DeleteConfirmationDialog&#96; component",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1278,
+                  "content": "   - Props: &#96;isOpen&#96;, &#96;onClose&#96;, &#96;onConfirm&#96;, &#96;title&#96;, &#96;message&#96;, &#96;confirmText&#96;, &#96;isDeleting&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1279,
+                  "content": "   - Shows loading spinner during deletion",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1304,
+                  "content": "    - Props: &#96;availableTools&#96;, &#96;isLoading&#96;, &#96;onSelectInbuiltTool&#96;, &#96;onSelectCustomTool&#96;, &#96;selectedToolIds?&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1305,
+                  "content": "    - Dropdown with search, divided into \"In-built tools\" and \"User defined tools\" sections",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1306,
+                  "content": "    - User defined tools show tool type below name (&#96;text-xs text-muted-foreground&#96;): \"Webhook\" or \"Structured Output\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1307,
+                  "content": "    - Used in: AddTestDialog (tool invocation test type)"
+                },
+                {
+                  "lineNumber": 1308,
+                  "content": "11. **Parameter Card**: &#96;ParameterCard&#96; from &#96;@/components/ParameterCard&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1309,
+                  "content": "    - Recursive component for rendering parameter/property cards with full JSON Schema support",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1310,
+                  "content": "    - Props: &#96;param&#96;, &#96;path&#96;, &#96;onUpdate&#96;, &#96;onRemove&#96;, &#96;onAddProperty&#96;, &#96;onSetItems&#96;, &#96;validationAttempted&#96;, &#96;isProperty?&#96;, &#96;isArrayItem?&#96;, &#96;siblingNames?&#96;, &#96;hideDelete?&#96;, &#96;showRequired?&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1312,
+                  "content": "    - &#96;showRequired&#96; prop: When false, hides the required checkbox (default: true). Used for data field properties where required is handled at the parent level",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1313,
+                  "content": "    - Delete button not shown for array items (&#96;isArrayItem&#96;) or when &#96;hideDelete&#96; is true",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1314,
+                  "content": "    - Uses &#96;NestedContainer&#96; for nested object properties and array items",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1315,
+                  "content": "    - Used in: AddToolDialog (structured output parameters, webhook query/body parameters), AddTestDialog, DataExtractionTabContent"
+                },
+                {
+                  "lineNumber": 1316,
+                  "content": "    - **Note**: &#96;DataFieldPropertyCard&#96; is deprecated and now wraps &#96;ParameterCard&#96; with &#96;showRequired={false}&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1317,
+                  "content": "12. **Nested Container**: &#96;NestedContainer&#96; from &#96;@/components/ui/NestedContainer&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1318,
+                  "content": "    - Theme-aware container for nested properties/items sections",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2217,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2218,
+                  "content": "// Display tool call with arguments as form-style fields",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2219,
+                  "content": "// - If args has only a 'body' key with an object value, the body contents are flattened",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2220,
+                  "content": "//   to show each property as an individual labeled field (matching AddTestDialog style)"
+                },
+                {
+                  "lineNumber": 2221,
+                  "content": "// - Otherwise, each top-level arg is shown as a labeled field",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2222,
+                  "content": "// - Nested objects/arrays within fields are pretty-printed as JSON",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2223,
+                  "content": "// - Labels use &#96;text-sm font-medium text-foreground&#96;, values use &#96;text-muted-foreground&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2593,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2594,
+                  "content": "### Large Form Dialog Structure",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2595,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2596,
+                  "content": "For complex form dialogs like &#96;AddTestDialog&#96;, use a flex-col layout with header, content area, and footer:"
+                },
+                {
+                  "lineNumber": 2597,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2598,
+                  "content": "&#96;&#96;&#96;tsx",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2599,
+                  "content": "&lt;div className=\"relative w-full max-w-7xl h-[85vh] bg-background rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-border\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2627,
+                  "content": "- Main content uses &#96;flex-1 overflow-hidden&#96; to fill remaining vertical space",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2628,
+                  "content": "- If using multi-column layout, wrap columns in the Main Content Area div",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2629,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2630,
+                  "content": "**Auto-resizing textareas** (used in AddTestDialog conversation history):"
+                },
+                {
+                  "lineNumber": 2631,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2632,
+                  "content": "&#96;&#96;&#96;tsx",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2633,
+                  "content": "&lt;textarea",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2807,
+                  "content": "  - **Gotcha**: Without clearing at the start of the effect, re-renders or dependency changes can create multiple concurrent intervals, causing excessive API requests",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2808,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2809,
+                  "content": "- **Dialog close prevention**: Disable dialog close while async operations (delete, save) are in progress",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2810,
+                  "content": "- **Unsaved changes confirmation**: Form dialogs (like AddTestDialog) should show a confirmation dialog when user clicks backdrop, asking \"Discard changes?\" with Cancel/Discard buttons"
+                },
+                {
+                  "lineNumber": 2811,
+                  "content": "- **Key-based lookup with freeze-on-complete for live-updating dialogs**: When a dialog shows data that can complete (e.g., transcript with audio):",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2812,
+                  "content": "  1. Store a unique identifier (e.g., &#96;selectedSimulationKey = simulation.simulation_name&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2813,
+                  "content": "  2. Use a ref to store frozen data: &#96;frozenSimulationRef = useRef&lt;DataType | null&gt;(null)&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2903,
+                  "content": "- **Checkboxes need visible borders**: Use &#96;border-muted-foreground&#96; (not &#96;border-border&#96;) and &#96;border-2&#96; for custom checkbox buttons to ensure visibility in both light and dark modes",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2904,
+                  "content": "- **Spinners in flex containers**: Always add &#96;flex-shrink-0&#96; to spinner SVGs to prevent them from shrinking. Standard spinner class: &#96;w-5 h-5 flex-shrink-0 animate-spin&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2905,
+                  "content": "- **Icon action buttons** (play, edit, etc.): Use &#96;bg-foreground/90 text-background hover:bg-foreground&#96; for solid icon buttons that need to be visible in both light and dark modes. Never use &#96;text-white&#96; alone as icons become invisible on light backgrounds. **Avoid &#96;hover:opacity-*&#96;** on buttons with child tooltips - opacity affects all children including tooltips, making them translucent. Use &#96;bg-foreground/90 hover:bg-foreground&#96; instead to only affect the background",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2906,
+                  "content": "- **Chat message bubbles**: Consistent styling across AddTestDialog and TestDetailView (test results). User messages use &#96;bg-muted border border-border text-foreground&#96; (gray background, right-aligned). Agent messages use &#96;bg-background border border-border text-foreground&#96; (white/light background, left-aligned). Tool call cards use &#96;bg-muted border border-border&#96;. All use &#96;rounded-xl&#96; and &#96;w-1/2&#96; width. See &#96;@/components/test-results/shared.tsx&#96; for the pattern"
+                },
+                {
+                  "lineNumber": 2907,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2908,
+                  "content": "### Forms",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2909,
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 72,
+          "totalMatchedLines": 11
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I found the relevant sections. The section around line 459-464 talks about webhook tool calls in AddTestDialog. I need to add information about:1. How saved tests with tool calls are parsed from initialConfig2. The body flattening logic when loading saved tests
+3. Tool response messages being restored from saved testsLet me find a good place to add this information, probably near line 459-464 where AddTestDialog features are described.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I should add information about how saved tests are parsed when editing. Let me add this after line 465 (after the "Structured output tool calls" line) since it's related to how AddTestDialog handles test data.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I've added documentation about how AddTestDialog handles loading saved tests with tool calls and tool responses. This covers:1. The body flattening logic
+2. JSON.stringify for object values to avoid "[object Object]"
+3. Tool response parsing from `role: "tool"` messages
+4. Linking tool responses to their tool calls via `tool_call_id`</details></think>
+
+---
+
+I've updated the documentation to describe how AddTestDialog handles loading saved tests:
+
+- **Tool call parsing**: Body args are flattened, and object values are properly JSON.stringify'd (fixes "[object Object]" issue)
+- **Tool response parsing**: `role: "tool"` messages are now included and linked to their corresponding tool calls
+- Tool calls from saved tests are marked as webhooks so responses display correctly
+
+---
+
+_**User**_
+
+I made a mistake. You basically have to show the body headers and query for webhook as fields. Within body query and headers, they should be like proper JSONs, as it was before. I made a mistake, so make that change everywhere in the conversation history while creating a new test in the test runner, benchmark runner, in the simulation transcripts. Make the change everywhere for webhook tool call.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user is clarifying what they want:
+- For webhook tool calls, the structure should be: body, headers, query as top-level fields
+- Within each of those (body, headers, query), the content should be shown as JSON (not as individual form fields)
+
+So if a webhook tool call has:
+```json
+{
+  "body": {"task_type": "agent", "content_type": "audio/wav"},
+  "query": {"param1": "value1"},
+  "headers": {"Authorization": "Bearer xxx"}
+}
+```
+
+It should display as:
+```
+body
+{"task_type": "agent", "content_type": "audio/wav"}
+
+query
+{"param1": "value1"}
+
+headers
+{"Authorization": "Bearer xxx"}
+```
+
+NOT flattened to show task_type, content_type as individual fields.
+
+So I need to:
+1. Remove the flattening logic I added for body params
+2. Keep the JSON stringify logic for displaying object values as JSON strings
+
+Let me update:
+1. `src/components/test-results/shared.tsx` - ToolCallCard (remove flattenArgs)
+2. `src/app/simulations/[uuid]/runs/[runId]/page.tsx` - transcript tool call display (remove flattenArgs)
+3. `src/components/AddTestDialog.tsx` - initialConfig parsing (remove flattenArgs)
+
+The key change is: don't flatten body/query/headers, but DO stringify object values so they show as JSON.</details></think>
+
+---
+
+I understand now. For webhook tool calls, you want to show `body`, `query`, `headers` as the field labels, with their values displayed as JSON strings (not flattened). Let me revert the flattening logic and keep the JSON stringify for the values.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the rest of ToolCallCard to use `args` instead of `displayArgs`.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, now I need to update the simulation transcript page to remove the flattening logic there as well.</details></think>
+
+---
+
+Now let me update the simulation transcript page.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update AddTestDialog to remove the flattenArgs logic and just keep the formatValue logic (which JSON.stringifies objects).</details></think>
+
+---
+
+Now let me update AddTestDialog to remove the flattening logic.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the part where tool call params are populated - remove the flattenArgs call.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good. Now let me check for any linter errors.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx",
+    "/Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx",
+    "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx"
+    },
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx"
+    },
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no linter errors. Let me also update the app-details.md to remove the flattening documentation I added earlier.</details></think>
+
+---
+
+Now let me update the app-details.md to reflect this change.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I also need to update the ToolCallCard and simulation transcript documentation to remove the flattening mention.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the simulation transcript documentation as well.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good. I've made all the changes:
+
+1. Removed the flattenArgs logic from:   - `src/components/test-results/shared.tsx` (ToolCallCard)
+   - `src/app/simulations/[uuid]/runs/[runId]/page.tsx` (transcript)
+   - `src/components/AddTestDialog.tsx` (initialConfig parsing)
+
+2. Updated app-details.md to remove flattening documentation
+
+Now webhook tool calls will display:
+- `body` as a field with JSON content
+- `query` as a field with JSON content
+- `headers` as a field with JSON content
+
+Instead of flattening the body object into individual fields.</details></think>
+
+---
+
+Done. I've reverted the flattening logic everywhere. Now webhook tool calls will display:
+
+- **body** field with JSON content like `{"task_type": "agent", "content_type": "audio/wav"}`
+- **query** field with JSON content (if present)
+- **headers** field with JSON content (if present)
+
+This applies to:
+1. **TestRunnerDialog** and **BenchmarkResultsDialog** (via `ToolCallCard` in shared.tsx)
+2. **Simulation transcripts** (direct rendering in page.tsx)
+3. **AddTestDialog** when loading saved tests (initialConfig parsing)
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I did make code changes - I removed the flattening logic from multiple files. I already updated the app-details.md in my last response to reflect these changes. Let me verify that the documentation is now accurate by checking what I updated.
+
+Looking back at my changes:
+1. I updated the ToolCallCard documentation
+2. I updated the simulation transcript documentation
+3. I updated the initialConfig parsing documentation
+
+All three were already updated in my previous response. The documentation should now accurately reflect that:
+- Tool call args (body, query, headers) are shown as labeled fields with JSON content
+- No flattening occurs
+
+So I've already done the app-details.md update. I don't need to make further changes since the documentation was updated as part of the code change response.</details></think>
+
+---
+
+I already updated the `app-details.md` in my previous response when I made the code changes. The documentation now accurately reflects:
+
+1. **ToolCallCard section**: Updated to show that each arg key (body, query, headers) is displayed as a labeled field with JSON content - no flattening
+2. **Simulation transcript section**: Updated to describe that arg keys are shown as field labels with pretty-printed JSON values
+3. **AddTestDialog loading saved tests section**: Updated to describe that object values are JSON.stringify'd with pretty-printing (no flattening)
+
+The documentation changes were made alongside the code changes, so no further updates are needed.
+
+---
+
+_**User**_
+
+when adding a new test make another container for each of body header and query inside the agent tool call message
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to update the AddTestDialog to show body, header, and query parameters in separate containers/sections when adding a new webhook tool call. Looking at the screenshots:
+
+1. First screenshot shows "BODY PARAMETERS" as a section header with individual fields like task_type, content_type, extension
+2. Second screenshot shows "BODY" as a section header with the same fields
+
+So the user wants each of body, headers, and query to be in their own visual container/section within the tool call card. Let me look at the AddTestDialog code to see how tool calls are currently rendered and update it to have separate containers for each parameter group.</details></think>
+
+---
+
+Let me look at how tool calls are currently rendered in AddTestDialog when adding a new test.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I can see the current implementation. Each group (Query, Body, Headers) has a section header but they're all in the same container. The user wants each section to be in its own distinct container with a border, similar to how nested containers look.
+
+Let me update the code to wrap each parameter group (body, query, headers) in a separate container with border and background styling.</details></think>
+
+---
+
+I see the current structure. Let me update it to wrap each parameter group (body, query, headers) in its own container with a border.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I've updated the AddTestDialog to wrap each parameter group (Query, Body, Headers) in its own container with:
+- `bg-background border border-border rounded-xl p-3` - white background with border and padding- The section header uses `text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide`- Input fields use `bg-muted` for the input background to provide contrast within the containerLet me check for linter errors.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no linter errors. Now each parameter group (Query, Body, Headers) is wrapped in its own container with:- White background (`bg-background`)- Border (`border border-border`)
+- Rounded corners (`rounded-xl`)
+- Padding (`p-3`)
+- Section title in uppercase- Input fields have `bg-muted` background for contrast</details></think>
+
+---
+
+Done. I've updated the AddTestDialog so that each parameter group (Query, Body, Headers) is now wrapped in its own container with:
+
+- White background (`bg-background`)
+- Border and rounded corners (`border border-border rounded-xl`)
+- Padding (`p-3`)
+- Uppercase section title
+- Input fields have a muted background (`bg-muted`) for better contrast within the container
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to AddTestDialog.tsx to wrap each webhook parameter group (Query, Body, Headers) in its own container. Let me update the app-details.md to reflect this UI pattern.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "Webhook tool calls|Query Parameters|Body Parameters",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+  "context": 3,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "Webhook tool calls|Query Parameters|Body Parameters",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": ".cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 456,
+                  "content": "  - **Conversation history** (before evaluation):",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 457,
+                  "content": "    - Message types: &#96;agent&#96;, &#96;user&#96;, &#96;tool_call&#96;, &#96;tool_response&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 458,
+                  "content": "    - Add messages via dropdown menu on last message",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 459,
+                  "content": "    - **Webhook tool calls**: When a webhook tool is selected:"
+                },
+                {
+                  "lineNumber": 460,
+                  "content": "      - Parameters shown grouped by: Query Parameters, Body Parameters, Headers"
+                },
+                {
+                  "lineNumber": 461,
+                  "content": "      - A \"Tool Response\" message is automatically added after the tool call",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 462,
+                  "content": "      - Tool response requires valid JSON input (textarea with real-time validation)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 463,
+                  "content": "      - User cannot proceed without valid JSON in all tool responses",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 8,
+          "totalMatchedLines": 2
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I found the relevant section. I need to update it to reflect that each parameter group (Query, Body, Headers) is now wrapped in its own container with visual separation.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I've updated the documentation to reflect that webhook tool call parameters are now displayed in separate containers for each group (Query, Body, Headers), with appropriate styling for visual separation.</details></think>
+
+---
+
+I've updated the documentation to reflect that webhook tool call parameters are now displayed in separate containers for each group (Query, Body, Headers), with the container styling details.
+
+---
+
+_**User**_
+
+when the add test dialog is opened for existing test with webhook message in the conversation history but the webhook body/query/headers are not shown when the test dialog is reopeneed
+
+
+{"history": [{"role": "assistant", "content": "Hello, how can I help you today?"}, {"role": "user", "content": "Hi"}, {"role": "assistant", "tool_calls": [{"id": "7916fc1a-5406-408e-9e42-ced9a623105f", "function": {"name": "get_presigned_url", "arguments": "{\"body\":{\"task_type\":\"ada\",\"content_type\":\"asd\",\"extension\":\"asdsa\"}}"}, "type": "function"}]}, {"role": "tool", "content": "{\n  \"status\": \"success\",\n  \"response\": {}\n}", "tool_call_id": "7916fc1a-5406-408e-9e42-ced9a623105f"}], "evaluation": {"type": "tool_call", "tool_calls": [{"tool": "get_presigned_url", "arguments": {}, "accept_any_arguments": true}]}}
+
+this is what is received from the backend for the conversation history
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The issue is that when loading a saved test with webhook tool calls, the body/query/headers params are not being displayed in the grouped containers because they don't have the `group` property set.
+
+Looking at the initialConfig parsing code I updated earlier, I'm parsing the tool call arguments and creating toolParams, but I'm not setting the `group` property for each parameter. The group property is what determines whether params show in the Query, Body, or Headers containers.
+
+For a webhook tool call with arguments like:
+```json
+{"body": {"task_type": "ada", "content_type": "asd", "extension": "asdsa"}}
+```
+
+The current code would create toolParams like:
+```js
+[{ name: "body", value: '{"task_type":"ada",...}' }]
+```
+
+But there's no `group` property, so when the UI filters by `group === "body"`, it finds nothing.
+
+The issue is that for saved tests, the webhook tool call arguments come as a nested structure (body.task_type, etc.), but my current parsing just takes the top-level keys (body, query, headers) without proper group assignment.
+
+I need to:
+1. When parsing webhook tool calls, check if the args have body/query/headers keys
+2. If they do, flatten them and set the appropriate group for each param
+
+Let me look at the current parsing code and fix it.</details></think>
+
+---
+
+I see the issue. When loading saved tests, the webhook tool call parameters aren't being assigned a `group` property, so they don't show up in the grouped containers. Let me fix the initialConfig parsing to properly handle webhook tool call arguments.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see the issue. When parsing tool call params, I'm creating params with just `name` and `value`, but I'm not setting the `group` property. For webhook tools, the args typically have `body`, `query`, `headers` as top-level keys.
+
+I need to:
+1. Check if the parsed args have body/query/headers keys
+2. For each of those keys, extract their nested properties and set the appropriate `group`
+
+For example, if parsedArgs is:
+```js
+{ body: { task_type: "ada", content_type: "asd" } }
+```
+
+I should create params like:
+```js
+[
+  { name: "task_type", value: "ada", group: "body" },
+  { name: "content_type", value: "asd", group: "body" }
+]
+```
+
+Let me update the parsing code.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, now let me check for linter errors.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no linter errors. Now when loading a saved test with webhook tool calls that have body/query/headers structure, the parameters will be properly extracted with their group assignments, so they'll display in the correct containers.For example, with:```json
+{"body": {"task_type": "ada", "content_type": "asd", "extension": "asdsa"}}```
+
+It will create:
+```js[
+  { name: "task_type", value: "ada", group: "body" },
+  { name: "content_type", value: "asd", group: "body" },  { name: "extension", value: "asdsa", group: "body" }]
+```
+
+And these will show up in the "Body" container.</details></think>
+
+---
+
+Done. I've fixed the initialConfig parsing for webhook tool calls. Now when loading a saved test with webhook tool call arguments like:
+
+```json
+{"body": {"task_type": "ada", "content_type": "asd", "extension": "asdsa"}}
+```
+
+It will properly extract each parameter with its group assignment:
+- `task_type` with `group: "body"`
+- `content_type` with `group: "body"`
+- `extension` with `group: "body"`
+
+These will now display in the "Body" container. The same applies for `query` and `headers` if present.
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to AddTestDialog.tsx to fix how webhook tool call params are parsed from saved tests. I need to update the app-details.md to reflect this change.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "Loading saved tests|initialConfig|Tool call parsing",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+  "context": 3,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "Loading saved tests|initialConfig|Tool call parsing",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": ".cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 465,
+                  "content": "      - User cannot proceed without valid JSON in all tool responses",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 466,
+                  "content": "      - Deleting a webhook tool call also removes its linked tool response",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 467,
+                  "content": "    - **Structured output tool calls**: Show flat parameter list as inputs",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 468,
+                  "content": "  - **Loading saved tests** (when &#96;initialConfig&#96; is provided):"
+                },
+                {
+                  "lineNumber": 469,
+                  "content": "    - Parses &#96;history&#96; array and converts to chatMessages format",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 470,
+                  "content": "    - **Tool call parsing**: Object values (like &#96;body&#96;, &#96;query&#96;, &#96;headers&#96;) are JSON.stringify'd with pretty-printing to show as readable JSON in form fields"
+                },
+                {
+                  "lineNumber": 471,
+                  "content": "    - **Tool response parsing**: &#96;role: \"tool\"&#96; messages are included as &#96;tool_response&#96; type, linked to their corresponding tool call via &#96;tool_call_id&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 472,
+                  "content": "    - Tool calls from saved tests are marked as &#96;isWebhook: true&#96; so tool responses display correctly",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 473,
+                  "content": "- **View all tests**",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 9,
+          "totalMatchedLines": 2
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to update this section to reflect the new behavior where webhook tool calls are properly detected by checking for body/query/headers keys, and their nested properties are extracted with group assignments.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I've updated the documentation to reflect the new behavior:1. Webhook tool calls are detected by checking for body/query/headers keys2. Nested properties are extracted with group assignments3. Non-webhook tools show params as a flat list</details></think>
+
+---
+
+I've updated the documentation to describe:
+- How webhook tool calls are detected (by checking for body/query/headers keys)
+- How nested properties are extracted with `group` assignments for proper container display
+- Non-webhook tools show params as a flat list without group containers
+
+---
+
+_**User**_
+
+if agent tool call has been added a a message to the conversation history for creating a test. If it's a structured output, then none of its parameters should be empty. If it's a webhook, then whatever fields are visible (be it for body or query or headers), none of them should be empty. And so don't let them save like if they try to click "Save," just highlight those boxes in red (like their borders) as we have done in other places where there are fields.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to add validation for tool call parameters when saving a test:
+
+1. For structured output tool calls: No parameters should be empty
+2. For webhook tool calls: No visible fields (body, query, headers params) should be empty
+
+When they try to save, if any of these fields are empty, highlight them with red borders.
+
+Let me look at how the save/submit logic works and where validation is handled in AddTestDialog.</details></think>
+
+---
+
+Let me look at the save/submit logic and validation in AddTestDialog.
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "onSubmit|validationAttempted|handleSave",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx",
+  "context": 3,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "onSubmit|validationAttempted|handleSave",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": "src/components/AddTestDialog.tsx",
+              "matches": [
+                {
+                  "lineNumber": 56,
+                  "content": "  createError: string | null;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 57,
+                  "content": "  testName: string;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 58,
+                  "content": "  setTestName: (name: string) =&gt; void;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 59,
+                  "content": "  validationAttempted: boolean;"
+                },
+                {
+                  "lineNumber": 60,
+                  "content": "  onSubmit: (config: TestConfig) =&gt; void;"
+                },
+                {
+                  "lineNumber": 61,
+                  "content": "  initialTab?: \"next-reply\" | \"tool-invocation\";",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 62,
+                  "content": "  initialConfig?: TestConfig;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 63,
+                  "content": "};",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 71,
+                  "content": "  createError,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 72,
+                  "content": "  testName,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 73,
+                  "content": "  setTestName,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 74,
+                  "content": "  validationAttempted,"
+                },
+                {
+                  "lineNumber": 75,
+                  "content": "  onSubmit,"
+                },
+                {
+                  "lineNumber": 76,
+                  "content": "  initialTab,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 77,
+                  "content": "  initialConfig,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 78,
+                  "content": "}: AddTestDialogProps) {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 828,
+                  "content": "    }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 829,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 830,
+                  "content": "    const config = buildConfig();",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 831,
+                  "content": "    onSubmit(config);"
+                },
+                {
+                  "lineNumber": 832,
+                  "content": "  };",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 833,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 834,
+                  "content": "  const handleBackdropClick = () =&gt; {",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 23,
+          "totalMatchedLines": 5
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me look at the buildConfig function and the save button to understand the current validation flow better.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see the current validation logic. Now I need to:1. Add validation for tool call messages in the conversation history
+2. Check if any tool_call message has empty params
+3. Highlight the empty fields with red bordersLet me:
+1. Add validation check in handleSubmit for tool_call messages with empty params
+2. Add red border styling to the input fields when validation fails and param is emptyFirst, let me look at how the tool_call params are rendered to see where to add the validation styling.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to:1. Add validation in handleSubmit to check for empty tool call params in conversation history
+2. Add conditional red border styling to the input fields when validation is attempted and the param is emptyLet me update the validation logic first, then update the input field styling.</details></think>
+
+---
+
+Now I'll add the validation and red border styling. First, let me update the handleSubmit validation, then update the input fields.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, now I need to update the input fields to show red borders when validation is attempted and the param is empty. Let me update the Query, Body, Headers, and regular tool params input fields.</details></think>
+
+---
+
+Now let me update the input fields to show red borders when validation fails.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the regular (non-webhook) tool parameters section to also show red borders for empty fields.</details></think>
+
+---
+
+Now let me update the regular (non-webhook) tool parameters section.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me check for any linter errors.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no linter errors. The changes are complete:1. Added `hasEmptyToolCallParams()` helper function to check if any tool call message has empty params
+2. Added validation check in `handleSubmit` that prevents submission if any tool call has empty params
+3. Updated all input fields (Query, Body, Headers, and regular params) to show red borders (`border-red-500`) when validation is attempted and the param is empty</details></think>
+
+---
+
+Done. I've added validation for tool call parameters:
+
+1. **Validation logic**: Added `hasEmptyToolCallParams()` helper that checks all tool_call messages in conversation history for empty parameters
+
+2. **Submission prevention**: The form won't submit if any tool call parameter is empty (for both webhook and structured output tools)
+
+3. **Red border highlighting**: All tool call parameter inputs (Query, Body, Headers for webhooks, and regular params for structured output) now show `border-red-500` when:
+   - Validation is attempted (user clicks Save)
+   - The parameter value is empty
+
+The red borders auto-clear after 3 seconds (following the existing validation pattern).
+
+---
+
+
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I did make code changes to AddTestDialog.tsx, so I should update the app-details.md file. Let me read it first to see what needs to be updated.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The file is too large. Let me search for relevant sections about AddTestDialog and validation.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "AddTestDialog|tool_call.*validation|validationAttempted",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+  "context": 5,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "AddTestDialog|tool_call.*validation|validationAttempted",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": ".cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 293,
+                  "content": "- **Section ordering for webhook tools**: Configuration → Headers → Query parameters → Body parameters (when applicable)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 294,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 295,
+                  "content": "- **Section styling**: All section containers (Configuration, Parameters, Headers, Query parameters, Body parameters) use &#96;bg-muted/50&#96; background to visually distinguish them from the outer dialog background and inner form fields",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 296,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 297,
+                  "content": "- **Internal state**:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 298,
+                  "content": "  - Common: toolName, toolDescription, validationAttempted, isCreating, createError, isLoadingTool"
+                },
+                {
+                  "lineNumber": 299,
+                  "content": "  - Parameters: &#96;parameters&#96; array (for structured output), &#96;queryParameters&#96; array (for webhook - same &#96;Parameter&#96; type)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 300,
+                  "content": "  - Webhook: webhookMethod, webhookUrl, responseTimeout, showTimeoutTooltip, webhookHeaders array (simplified: id, name, value only)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 301,
+                  "content": "  - Body: &#96;bodyDescription&#96; string, &#96;bodyParameters&#96; array (same &#96;Parameter&#96; type)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 302,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 303,
+                  "content": "- **Parameter handlers** (all use the same helper functions but operate on different state):",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 590,
+                  "content": "  - **Stable audio keys**: All audio elements use &#96;key={audioUrl}&#96; to prevent React from remounting them during polling re-renders (avoids audio restart/reload)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 591,
+                  "content": "  - **Presigned URL refresh on error**: Audio elements include &#96;onError={refreshRunData}&#96; handler to automatically fetch fresh presigned URLs when they expire. The &#96;refreshRunData&#96; callback clears &#96;frozenSimulationRef&#96; before updating state so new URLs are used instead of stale frozen data",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 592,
+                  "content": "  - Full conversation audio player below header (from &#96;conversation_wav_url&#96;) for voice simulations",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 593,
+                  "content": "  - Full conversation history (user, assistant, tool calls, tool responses)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 594,
+                  "content": "  - Role-based message styling",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 595,
+                  "content": "  - **Tool call details as form fields**: Arguments are displayed as labeled form fields (matching AddTestDialog style). Each arg key (body, query, headers) is shown as a field label, with its value displayed as pretty-printed JSON"
+                },
+                {
+                  "lineNumber": 596,
+                  "content": "  - **Tool response display** (for webhook calls): Only shows &#96;role: \"tool\"&#96; messages where content is valid JSON with &#96;type: \"webhook_response\"&#96;. Displays the &#96;response&#96; object as **pretty-printed JSON** in a monospace &#96;&lt;pre&gt;&#96; block with \"Agent Tool Response\" header (intentionally different from tool call form fields to distinguish input vs output)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 597,
+                  "content": "  - Per-message audio players for voice simulations (matching &#96;audio_urls&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 598,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 599,
+                  "content": "- **Latency Metrics** (for voice simulations, in Performance/Latency tabs):",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 600,
+                  "content": "  - STT latency (TTFB, processing time)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1277,
+                  "content": "   - Width: 40% of viewport, min 500px (customizable via &#96;width&#96; prop)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1278,
+                  "content": "   - Backdrop click closes panel",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1279,
+                  "content": "   - Used for: Tools, Personas, Scenarios creation/editing",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1280,
+                  "content": "3. **Modal Dialogs**: Centered overlays for confirmations and simple forms",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1281,
+                  "content": "   - Simple dialogs: Backdrop click closes dialog directly",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1282,
+                  "content": "   - Form dialogs with unsaved data: Backdrop click shows confirmation before closing (e.g., AddTestDialog)"
+                },
+                {
+                  "lineNumber": 1283,
+                  "content": "   - Used for: New agent, New simulation, Delete confirmations, Add/Edit test",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1284,
+                  "content": "   - **Large form dialogs** (like AddTestDialog): Use a header bar with name input and save button, flex-col layout with main content area below"
+                },
+                {
+                  "lineNumber": 1285,
+                  "content": "4. **Delete Confirmation**: Reusable &#96;DeleteConfirmationDialog&#96; component",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1286,
+                  "content": "   - Props: &#96;isOpen&#96;, &#96;onClose&#96;, &#96;onConfirm&#96;, &#96;title&#96;, &#96;message&#96;, &#96;confirmText&#96;, &#96;isDeleting&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1287,
+                  "content": "   - Shows loading spinner during deletion",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1288,
+                  "content": "   - **Skip confirmation for empty items**: When deleting empty rows (e.g., in TTS/STT evaluation input), call &#96;deleteRow()&#96; directly instead of showing confirmation dialog",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1289,
+                  "content": "5. **Toast Notifications**: Bottom-right success toasts",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1310,
+                  "content": "   - Used in: AgentTabContent (settings), BenchmarkDialog (model comparison)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1311,
+                  "content": "10. **Tool Picker**: &#96;ToolPicker&#96; from &#96;@/components/ToolPicker&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1312,
+                  "content": "    - Props: &#96;availableTools&#96;, &#96;isLoading&#96;, &#96;onSelectInbuiltTool&#96;, &#96;onSelectCustomTool&#96;, &#96;selectedToolIds?&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1313,
+                  "content": "    - Dropdown with search, divided into \"In-built tools\" and \"User defined tools\" sections",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1314,
+                  "content": "    - User defined tools show tool type below name (&#96;text-xs text-muted-foreground&#96;): \"Webhook\" or \"Structured Output\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1315,
+                  "content": "    - Used in: AddTestDialog (tool invocation test type)"
+                },
+                {
+                  "lineNumber": 1316,
+                  "content": "11. **Parameter Card**: &#96;ParameterCard&#96; from &#96;@/components/ParameterCard&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1317,
+                  "content": "    - Recursive component for rendering parameter/property cards with full JSON Schema support",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1318,
+                  "content": "    - Props: &#96;param&#96;, &#96;path&#96;, &#96;onUpdate&#96;, &#96;onRemove&#96;, &#96;onAddProperty&#96;, &#96;onSetItems&#96;, &#96;validationAttempted&#96;, &#96;isProperty?&#96;, &#96;isArrayItem?&#96;, &#96;siblingNames?&#96;, &#96;hideDelete?&#96;, &#96;showRequired?&#96;"
+                },
+                {
+                  "lineNumber": 1319,
+                  "content": "    - &#96;hideDelete&#96; prop: When true, hides the delete button (used when only one parameter exists to enforce minimum)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1320,
+                  "content": "    - &#96;showRequired&#96; prop: When false, hides the required checkbox (default: true). Used for data field properties where required is handled at the parent level",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1321,
+                  "content": "    - Delete button not shown for array items (&#96;isArrayItem&#96;) or when &#96;hideDelete&#96; is true",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1322,
+                  "content": "    - Uses &#96;NestedContainer&#96; for nested object properties and array items",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1323,
+                  "content": "    - Used in: AddToolDialog (structured output parameters, webhook query/body parameters), AddTestDialog, DataExtractionTabContent"
+                },
+                {
+                  "lineNumber": 1324,
+                  "content": "    - **Note**: &#96;DataFieldPropertyCard&#96; is deprecated and now wraps &#96;ParameterCard&#96; with &#96;showRequired={false}&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1325,
+                  "content": "12. **Nested Container**: &#96;NestedContainer&#96; from &#96;@/components/ui/NestedContainer&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1326,
+                  "content": "    - Theme-aware container for nested properties/items sections",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1327,
+                  "content": "    - Uses &#96;bg-muted&#96; for proper light/dark mode support (replaces hardcoded &#96;bg-[#1b1b1b]&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1328,
+                  "content": "    - Props: &#96;children&#96;, &#96;onAddProperty?&#96;, &#96;addButtonText?&#96;, &#96;showAddButton?&#96;, &#96;showValidationError?&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2597,
+                  "content": "- Proper accessibility (keyboard navigation, screen readers)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2598,
+                  "content": "- No custom JavaScript context menu needed",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2599,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2600,
+                  "content": "### Large Form Dialog Structure",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2601,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2602,
+                  "content": "For complex form dialogs like &#96;AddTestDialog&#96;, use a flex-col layout with header, content area, and footer:"
+                },
+                {
+                  "lineNumber": 2603,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2604,
+                  "content": "&#96;&#96;&#96;tsx",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2605,
+                  "content": "&lt;div className=\"relative w-full max-w-7xl h-[85vh] bg-background rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-border\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2606,
+                  "content": "  {/* Header - fixed height with name input and action button */}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2607,
+                  "content": "  &lt;div className=\"h-14 flex items-center justify-between px-6 border-b border-border flex-shrink-0\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2631,
+                  "content": "- Name input is transparent with hover state, no border to feel inline-editable",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2632,
+                  "content": "- Action button positioned on the right side of header",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2633,
+                  "content": "- Main content uses &#96;flex-1 overflow-hidden&#96; to fill remaining vertical space",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2634,
+                  "content": "- If using multi-column layout, wrap columns in the Main Content Area div",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2635,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2636,
+                  "content": "**Auto-resizing textareas** (used in AddTestDialog conversation history):"
+                },
+                {
+                  "lineNumber": 2637,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2638,
+                  "content": "&#96;&#96;&#96;tsx",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2639,
+                  "content": "&lt;textarea",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2640,
+                  "content": "  value={content}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2641,
+                  "content": "  onChange={(e) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2733,
+                  "content": "6. **Icons**: Import from &#96;@/components/icons&#96; - all icons are centralized there (Heroicons outline style, 24x24 viewBox, strokeWidth 1.5 or 2)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2734,
+                  "content": "7. **Reusable Components**: Use shared components from &#96;@/components/ui&#96; (Button, SearchInput, SlidePanel, etc.)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2735,
+                  "content": "8. **API Calls**: Use &#96;@/lib/api&#96; utilities (apiGet, apiPost, apiPut, apiDelete) for consistent error handling",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2736,
+                  "content": "9. **CRUD Resources**: Use &#96;useCrudResource&#96; hook from &#96;@/hooks&#96; for standard list pages",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2737,
+                  "content": "10. **Error Handling**: Try-catch with console.error and user-facing error states",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2738,
+                  "content": "11. **Form Validation**: Use &#96;validationAttempted&#96; state to show errors only after submit attempt"
+                },
+                {
+                  "lineNumber": 2739,
+                  "content": "12. **Optimistic Updates**: Update local state immediately, then sync with backend",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2740,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2741,
+                  "content": "---",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2742,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2743,
+                  "content": "## Gotchas &amp; Edge Cases",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2811,
+                  "content": "  &#96;&#96;&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2812,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2813,
+                  "content": "  - **Gotcha**: Without clearing at the start of the effect, re-renders or dependency changes can create multiple concurrent intervals, causing excessive API requests",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2814,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2815,
+                  "content": "- **Dialog close prevention**: Disable dialog close while async operations (delete, save) are in progress",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2816,
+                  "content": "- **Unsaved changes confirmation**: Form dialogs (like AddTestDialog) should show a confirmation dialog when user clicks backdrop, asking \"Discard changes?\" with Cancel/Discard buttons"
+                },
+                {
+                  "lineNumber": 2817,
+                  "content": "- **Key-based lookup with freeze-on-complete for live-updating dialogs**: When a dialog shows data that can complete (e.g., transcript with audio):",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2818,
+                  "content": "  1. Store a unique identifier (e.g., &#96;selectedSimulationKey = simulation.simulation_name&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2819,
+                  "content": "  2. Use a ref to store frozen data: &#96;frozenSimulationRef = useRef&lt;DataType | null&gt;(null)&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2820,
+                  "content": "  3. Use &#96;useMemo&#96; to decide: if frozen and complete → return frozen; if just completed → freeze it; if in progress → return live data",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2821,
+                  "content": "  4. Clear the frozen ref when dialog closes",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2907,
+                  "content": "- **Always use CSS variable classes**: &#96;bg-background&#96;, &#96;text-foreground&#96;, &#96;border-border&#96;, &#96;bg-muted&#96;, &#96;text-muted-foreground&#96;, &#96;bg-accent&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2908,
+                  "content": "- **Do NOT use &#96;bg-popover&#96;** - it causes transparent backgrounds due to Tailwind v4 theme mapping issues; use &#96;bg-background&#96; instead for dropdowns and popovers",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2909,
+                  "content": "- **Checkboxes need visible borders**: Use &#96;border-muted-foreground&#96; (not &#96;border-border&#96;) and &#96;border-2&#96; for custom checkbox buttons to ensure visibility in both light and dark modes",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2910,
+                  "content": "- **Spinners in flex containers**: Always add &#96;flex-shrink-0&#96; to spinner SVGs to prevent them from shrinking. Standard spinner class: &#96;w-5 h-5 flex-shrink-0 animate-spin&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2911,
+                  "content": "- **Icon action buttons** (play, edit, etc.): Use &#96;bg-foreground/90 text-background hover:bg-foreground&#96; for solid icon buttons that need to be visible in both light and dark modes. Never use &#96;text-white&#96; alone as icons become invisible on light backgrounds. **Avoid &#96;hover:opacity-*&#96;** on buttons with child tooltips - opacity affects all children including tooltips, making them translucent. Use &#96;bg-foreground/90 hover:bg-foreground&#96; instead to only affect the background",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2912,
+                  "content": "- **Chat message bubbles**: Consistent styling across AddTestDialog and TestDetailView (test results). User messages use &#96;bg-muted border border-border text-foreground&#96; (gray background, right-aligned). Agent messages use &#96;bg-background border border-border text-foreground&#96; (white/light background, left-aligned). Tool call cards use &#96;bg-muted border border-border&#96;. All use &#96;rounded-xl&#96; and &#96;w-1/2&#96; width. See &#96;@/components/test-results/shared.tsx&#96; for the pattern"
+                },
+                {
+                  "lineNumber": 2913,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2914,
+                  "content": "### Forms",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2915,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2916,
+                  "content": "- **Character limits**: Implement maxLength on inputs AND display character count",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2917,
+                  "content": "- **Required fields**: Mark with red asterisk, validate on submit, highlight invalid fields",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 109,
+          "totalMatchedLines": 12
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me find the relevant section about AddTestDialog validation to update it.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "AddTestDialog|conversation history.*validation|tool_call.*params",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+  "contextBefore": 3,
+  "contextAfter": 15,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "AddTestDialog|conversation history.*validation|tool_call.*params",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": ".cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 592,
+                  "content": "  - Full conversation audio player below header (from &#96;conversation_wav_url&#96;) for voice simulations",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 593,
+                  "content": "  - Full conversation history (user, assistant, tool calls, tool responses)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 594,
+                  "content": "  - Role-based message styling",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 595,
+                  "content": "  - **Tool call details as form fields**: Arguments are displayed as labeled form fields (matching AddTestDialog style). Each arg key (body, query, headers) is shown as a field label, with its value displayed as pretty-printed JSON"
+                },
+                {
+                  "lineNumber": 596,
+                  "content": "  - **Tool response display** (for webhook calls): Only shows &#96;role: \"tool\"&#96; messages where content is valid JSON with &#96;type: \"webhook_response\"&#96;. Displays the &#96;response&#96; object as **pretty-printed JSON** in a monospace &#96;&lt;pre&gt;&#96; block with \"Agent Tool Response\" header (intentionally different from tool call form fields to distinguish input vs output)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 597,
+                  "content": "  - Per-message audio players for voice simulations (matching &#96;audio_urls&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 598,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 599,
+                  "content": "- **Latency Metrics** (for voice simulations, in Performance/Latency tabs):",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 600,
+                  "content": "  - STT latency (TTFB, processing time)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 601,
+                  "content": "  - LLM latency",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 602,
+                  "content": "  - TTS latency",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 603,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 604,
+                  "content": "---",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 605,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 606,
+                  "content": "## Key Concepts Explained",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 607,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 608,
+                  "content": "### Voice Agent Pipeline",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 609,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 610,
+                  "content": "A voice agent processes conversations through this pipeline:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1279,
+                  "content": "   - Used for: Tools, Personas, Scenarios creation/editing",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1280,
+                  "content": "3. **Modal Dialogs**: Centered overlays for confirmations and simple forms",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1281,
+                  "content": "   - Simple dialogs: Backdrop click closes dialog directly",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1282,
+                  "content": "   - Form dialogs with unsaved data: Backdrop click shows confirmation before closing (e.g., AddTestDialog)"
+                },
+                {
+                  "lineNumber": 1283,
+                  "content": "   - Used for: New agent, New simulation, Delete confirmations, Add/Edit test",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1284,
+                  "content": "   - **Large form dialogs** (like AddTestDialog): Use a header bar with name input and save button, flex-col layout with main content area below"
+                },
+                {
+                  "lineNumber": 1285,
+                  "content": "4. **Delete Confirmation**: Reusable &#96;DeleteConfirmationDialog&#96; component",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1286,
+                  "content": "   - Props: &#96;isOpen&#96;, &#96;onClose&#96;, &#96;onConfirm&#96;, &#96;title&#96;, &#96;message&#96;, &#96;confirmText&#96;, &#96;isDeleting&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1287,
+                  "content": "   - Shows loading spinner during deletion",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1288,
+                  "content": "   - **Skip confirmation for empty items**: When deleting empty rows (e.g., in TTS/STT evaluation input), call &#96;deleteRow()&#96; directly instead of showing confirmation dialog",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1289,
+                  "content": "5. **Toast Notifications**: Bottom-right success toasts",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1290,
+                  "content": "   - Auto-dismiss after 3 seconds",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1291,
+                  "content": "   - Manual dismiss button",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1292,
+                  "content": "   - Used after successful save operations",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1293,
+                  "content": "6. **Header Actions (AppLayout)**: Top-right section of header contains:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1294,
+                  "content": "   - **User Profile Dropdown**: Avatar button showing Google image or placeholder (first letter on purple background)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1295,
+                  "content": "     - Dropdown contains: user info, theme switcher, logout button",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1296,
+                  "content": "     - Click outside closes dropdown (uses &#96;useRef&#96; + &#96;mousedown&#96; event)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1297,
+                  "content": "7. **Downloadable Tables**: Reusable &#96;DownloadableTable&#96; component for data tables with CSV export",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1298,
+                  "content": "   - Props: &#96;columns&#96; (array of &#96;{key, header, render?}&#96;), &#96;data&#96;, &#96;filename&#96;, &#96;title&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1299,
+                  "content": "   - Includes \"Download CSV\" button in top-right corner",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1312,
+                  "content": "    - Props: &#96;availableTools&#96;, &#96;isLoading&#96;, &#96;onSelectInbuiltTool&#96;, &#96;onSelectCustomTool&#96;, &#96;selectedToolIds?&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1313,
+                  "content": "    - Dropdown with search, divided into \"In-built tools\" and \"User defined tools\" sections",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1314,
+                  "content": "    - User defined tools show tool type below name (&#96;text-xs text-muted-foreground&#96;): \"Webhook\" or \"Structured Output\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1315,
+                  "content": "    - Used in: AddTestDialog (tool invocation test type)"
+                },
+                {
+                  "lineNumber": 1316,
+                  "content": "11. **Parameter Card**: &#96;ParameterCard&#96; from &#96;@/components/ParameterCard&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1317,
+                  "content": "    - Recursive component for rendering parameter/property cards with full JSON Schema support",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1318,
+                  "content": "    - Props: &#96;param&#96;, &#96;path&#96;, &#96;onUpdate&#96;, &#96;onRemove&#96;, &#96;onAddProperty&#96;, &#96;onSetItems&#96;, &#96;validationAttempted&#96;, &#96;isProperty?&#96;, &#96;isArrayItem?&#96;, &#96;siblingNames?&#96;, &#96;hideDelete?&#96;, &#96;showRequired?&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1319,
+                  "content": "    - &#96;hideDelete&#96; prop: When true, hides the delete button (used when only one parameter exists to enforce minimum)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1320,
+                  "content": "    - &#96;showRequired&#96; prop: When false, hides the required checkbox (default: true). Used for data field properties where required is handled at the parent level",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1321,
+                  "content": "    - Delete button not shown for array items (&#96;isArrayItem&#96;) or when &#96;hideDelete&#96; is true",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1322,
+                  "content": "    - Uses &#96;NestedContainer&#96; for nested object properties and array items",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1323,
+                  "content": "    - Used in: AddToolDialog (structured output parameters, webhook query/body parameters), AddTestDialog, DataExtractionTabContent"
+                },
+                {
+                  "lineNumber": 1324,
+                  "content": "    - **Note**: &#96;DataFieldPropertyCard&#96; is deprecated and now wraps &#96;ParameterCard&#96; with &#96;showRequired={false}&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1325,
+                  "content": "12. **Nested Container**: &#96;NestedContainer&#96; from &#96;@/components/ui/NestedContainer&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1326,
+                  "content": "    - Theme-aware container for nested properties/items sections",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1327,
+                  "content": "    - Uses &#96;bg-muted&#96; for proper light/dark mode support (replaces hardcoded &#96;bg-[#1b1b1b]&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1328,
+                  "content": "    - Props: &#96;children&#96;, &#96;onAddProperty?&#96;, &#96;addButtonText?&#96;, &#96;showAddButton?&#96;, &#96;showValidationError?&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1329,
+                  "content": "    - Includes optional \"Add property\" button with validation error styling",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1330,
+                  "content": "    - Used in: ParameterCard, AddToolDialog (body parameters), DataExtractionTabContent",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1331,
+                  "content": "13. **Native Link Navigation**: List items use Next.js &#96;&lt;Link&gt;&#96; components for browser-native right-click support",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1332,
+                  "content": "    - Enables \"Open in new tab\" via browser's native context menu",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1333,
+                  "content": "    - Supports Cmd/Ctrl+click to open in new tab",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1334,
+                  "content": "    - Applied to: Agents list, Simulations list, Simulation runs list",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1335,
+                  "content": "14. **View Mode Dialogs**: &#96;TestRunnerDialog&#96; and &#96;BenchmarkResultsDialog&#96; support dual modes:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1336,
+                  "content": "    - **Run mode** (default): Opens dialog and starts a new run/benchmark",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1337,
+                  "content": "    - **View mode**: Pass &#96;taskId&#96; prop to view existing run results without starting a new run",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1338,
+                  "content": "    - **TestRunnerDialog behavior based on &#96;initialRunStatus&#96;**:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2599,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2600,
+                  "content": "### Large Form Dialog Structure",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2601,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2602,
+                  "content": "For complex form dialogs like &#96;AddTestDialog&#96;, use a flex-col layout with header, content area, and footer:"
+                },
+                {
+                  "lineNumber": 2603,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2604,
+                  "content": "&#96;&#96;&#96;tsx",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2605,
+                  "content": "&lt;div className=\"relative w-full max-w-7xl h-[85vh] bg-background rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-border\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2606,
+                  "content": "  {/* Header - fixed height with name input and action button */}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2607,
+                  "content": "  &lt;div className=\"h-14 flex items-center justify-between px-6 border-b border-border flex-shrink-0\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2608,
+                  "content": "    &lt;input",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2609,
+                  "content": "      type=\"text\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2610,
+                  "content": "      value={name}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2611,
+                  "content": "      onChange={(e) =&gt; setName(e.target.value)}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2612,
+                  "content": "      placeholder=\"Name\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2613,
+                  "content": "      className=\"h-9 px-3 rounded-lg text-base font-medium bg-transparent text-foreground placeholder:text-muted-foreground border-0 focus:outline-none focus:ring-0 hover:bg-muted/50 transition-colors\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2614,
+                  "content": "      style={{ minWidth: \"200px\", maxWidth: \"400px\" }}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2615,
+                  "content": "    /&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2616,
+                  "content": "    &lt;button className=\"h-9 px-4 rounded-lg text-sm font-medium bg-foreground text-background\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2617,
+                  "content": "      Save",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2633,
+                  "content": "- Main content uses &#96;flex-1 overflow-hidden&#96; to fill remaining vertical space",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2634,
+                  "content": "- If using multi-column layout, wrap columns in the Main Content Area div",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2635,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2636,
+                  "content": "**Auto-resizing textareas** (used in AddTestDialog conversation history):"
+                },
+                {
+                  "lineNumber": 2637,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2638,
+                  "content": "&#96;&#96;&#96;tsx",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2639,
+                  "content": "&lt;textarea",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2640,
+                  "content": "  value={content}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2641,
+                  "content": "  onChange={(e) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2642,
+                  "content": "    updateContent(e.target.value);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2643,
+                  "content": "    // Auto-resize textarea",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2644,
+                  "content": "    e.target.style.height = \"auto\";",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2645,
+                  "content": "    e.target.style.height = &#96;${e.target.scrollHeight}px&#96;;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2646,
+                  "content": "  }}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2647,
+                  "content": "  onInput={(e) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2648,
+                  "content": "    // Auto-resize on paste",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2649,
+                  "content": "    const target = e.target as HTMLTextAreaElement;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2650,
+                  "content": "    target.style.height = \"auto\";",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2651,
+                  "content": "    target.style.height = &#96;${target.scrollHeight}px&#96;;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2813,
+                  "content": "  - **Gotcha**: Without clearing at the start of the effect, re-renders or dependency changes can create multiple concurrent intervals, causing excessive API requests",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2814,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2815,
+                  "content": "- **Dialog close prevention**: Disable dialog close while async operations (delete, save) are in progress",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2816,
+                  "content": "- **Unsaved changes confirmation**: Form dialogs (like AddTestDialog) should show a confirmation dialog when user clicks backdrop, asking \"Discard changes?\" with Cancel/Discard buttons"
+                },
+                {
+                  "lineNumber": 2817,
+                  "content": "- **Key-based lookup with freeze-on-complete for live-updating dialogs**: When a dialog shows data that can complete (e.g., transcript with audio):",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2818,
+                  "content": "  1. Store a unique identifier (e.g., &#96;selectedSimulationKey = simulation.simulation_name&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2819,
+                  "content": "  2. Use a ref to store frozen data: &#96;frozenSimulationRef = useRef&lt;DataType | null&gt;(null)&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2820,
+                  "content": "  3. Use &#96;useMemo&#96; to decide: if frozen and complete → return frozen; if just completed → freeze it; if in progress → return live data",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2821,
+                  "content": "  4. Clear the frozen ref when dialog closes",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2822,
+                  "content": "  5. This prevents re-renders and media reload for completed items while allowing live updates for in-progress items",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2823,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2824,
+                  "content": "### UI Patterns",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2825,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2826,
+                  "content": "- **Sortable tables**: Store both raw date (&#96;updatedAtRaw&#96;) for sorting and formatted date (&#96;updatedAt&#96;) for display",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2827,
+                  "content": "- **Search filtering**: Always use &#96;.toLowerCase()&#96; on both search query and target fields",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2828,
+                  "content": "- **Empty state vs no results**: Differentiate between \"no items exist\" and \"no items match search\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2829,
+                  "content": "- **Status badges**: Use shared utilities from &#96;@/lib/status&#96; and &#96;StatusBadge&#96; component from &#96;@/components/ui&#96;:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2830,
+                  "content": "  - Import &#96;formatStatus&#96;, &#96;getStatusBadgeClass&#96;, &#96;isActiveStatus&#96; from &#96;@/lib/status&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2831,
+                  "content": "  - Use &#96;&lt;StatusBadge status=\"...\" showSpinner /&gt;&#96; for consistent status display",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2909,
+                  "content": "- **Checkboxes need visible borders**: Use &#96;border-muted-foreground&#96; (not &#96;border-border&#96;) and &#96;border-2&#96; for custom checkbox buttons to ensure visibility in both light and dark modes",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2910,
+                  "content": "- **Spinners in flex containers**: Always add &#96;flex-shrink-0&#96; to spinner SVGs to prevent them from shrinking. Standard spinner class: &#96;w-5 h-5 flex-shrink-0 animate-spin&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2911,
+                  "content": "- **Icon action buttons** (play, edit, etc.): Use &#96;bg-foreground/90 text-background hover:bg-foreground&#96; for solid icon buttons that need to be visible in both light and dark modes. Never use &#96;text-white&#96; alone as icons become invisible on light backgrounds. **Avoid &#96;hover:opacity-*&#96;** on buttons with child tooltips - opacity affects all children including tooltips, making them translucent. Use &#96;bg-foreground/90 hover:bg-foreground&#96; instead to only affect the background",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2912,
+                  "content": "- **Chat message bubbles**: Consistent styling across AddTestDialog and TestDetailView (test results). User messages use &#96;bg-muted border border-border text-foreground&#96; (gray background, right-aligned). Agent messages use &#96;bg-background border border-border text-foreground&#96; (white/light background, left-aligned). Tool call cards use &#96;bg-muted border border-border&#96;. All use &#96;rounded-xl&#96; and &#96;w-1/2&#96; width. See &#96;@/components/test-results/shared.tsx&#96; for the pattern"
+                },
+                {
+                  "lineNumber": 2913,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2914,
+                  "content": "### Forms",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2915,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2916,
+                  "content": "- **Character limits**: Implement maxLength on inputs AND display character count",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2917,
+                  "content": "- **Required fields**: Mark with red asterisk, validate on submit, highlight invalid fields",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2918,
+                  "content": "- **Invalid/error row styling**: Use &#96;bg-red-500/10&#96; for row backgrounds (e.g., STT empty predictions, form validation rows). For invalid inputs use &#96;border-red-500&#96;. This pattern is consistent across forms and data tables",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2919,
+                  "content": "- **Nested parameters**: Tool parameters support arbitrary nesting (object → properties, array → items)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2920,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2921,
+                  "content": "### ZIP and CSV File Parsing (STT/TTS Evaluations)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2922,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2923,
+                  "content": "- **Direct path lookup, not search**: Instead of iterating through all ZIP entries, directly check expected locations. First try root (&#96;data.csv&#96;), then check top-level folders (&#96;folder/data.csv&#96;). This avoids accidentally matching macOS metadata files.",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2924,
+                  "content": "- **macOS metadata files**: macOS creates hidden &#96;__MACOSX&#96; folders and &#96;._&#96; prefixed files (resource forks) in ZIPs. Filter these out when listing top-level folders: &#96;!path.includes(\"__MACOSX\") &amp;&amp; !path.startsWith(\"._\")&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2925,
+                  "content": "- **Nested folder structures in ZIPs**: When users compress a folder on macOS, the ZIP wraps contents in a parent folder (e.g., &#96;my_folder/data.csv&#96; instead of &#96;data.csv&#96;). Store the discovered &#96;basePath&#96; and use it for all subsequent file lookups.",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2926,
+                  "content": "- **CSV BOM (Byte Order Mark)**: Excel-exported CSVs often include an invisible BOM character (&#96;\\uFEFF&#96;) at the start. Strip it before parsing: &#96;if (csvContent.charCodeAt(0) === 0xFEFF) csvContent = csvContent.slice(1);&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2927,
+                  "content": "- **CSV line endings**: Handle all types - &#96;\\r\\n&#96; (Windows), &#96;\\n&#96; (Unix), &#96;\\r&#96; (old Mac). Use &#96;.split(/\\r\\n|\\n|\\r/)&#96; instead of &#96;.split(/\\r?\\n/)&#96;.",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 143,
+          "totalMatchedLines": 9
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me find the specific section about AddTestDialog validation patterns to update it.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "Tool call validation|webhook.*param|Loading saved tests|handleSubmit",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+  "contextBefore": 2,
+  "contextAfter": 10,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "Tool call validation|webhook.*param|Loading saved tests|handleSubmit",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": ".cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 291,
+                  "content": "        - Centered \"Add property\" button at the bottom inside the container",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 292,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 293,
+                  "content": "- **Section ordering for webhook tools**: Configuration → Headers → Query parameters → Body parameters (when applicable)"
+                },
+                {
+                  "lineNumber": 294,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 295,
+                  "content": "- **Section styling**: All section containers (Configuration, Parameters, Headers, Query parameters, Body parameters) use &#96;bg-muted/50&#96; background to visually distinguish them from the outer dialog background and inner form fields",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 296,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 297,
+                  "content": "- **Internal state**:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 298,
+                  "content": "  - Common: toolName, toolDescription, validationAttempted, isCreating, createError, isLoadingTool",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 299,
+                  "content": "  - Parameters: &#96;parameters&#96; array (for structured output), &#96;queryParameters&#96; array (for webhook - same &#96;Parameter&#96; type)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 300,
+                  "content": "  - Webhook: webhookMethod, webhookUrl, responseTimeout, showTimeoutTooltip, webhookHeaders array (simplified: id, name, value only)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 301,
+                  "content": "  - Body: &#96;bodyDescription&#96; string, &#96;bodyParameters&#96; array (same &#96;Parameter&#96; type)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 302,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 303,
+                  "content": "- **Parameter handlers** (all use the same helper functions but operate on different state):",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 312,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 313,
+                  "content": "- **Features**:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 314,
+                  "content": "  - Loads existing tool data when &#96;editingToolUuid&#96; is provided (including webhook config, headers, query parameters, body parameters if present)"
+                },
+                {
+                  "lineNumber": 315,
+                  "content": "  - Validates form fields and nested parameters recursively",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 316,
+                  "content": "  - Creates/updates tools via API with config structure:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 317,
+                  "content": "    &#96;&#96;&#96;javascript",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 318,
+                  "content": "    config: {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 319,
+                  "content": "      type: \"webhook\" | \"structured_output\",  // Tool type stored in config",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 320,
+                  "content": "      parameters: [...],           // Structured output parameters",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 321,
+                  "content": "      webhook: {                   // Only for webhook tools",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 322,
+                  "content": "        method, url, timeout, headers, queryParameters,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 323,
+                  "content": "        body: { description, parameters }  // Only for POST/PUT/PATCH",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 324,
+                  "content": "      }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 453,
+                  "content": "  - Test type: \"response\" (check agent response) or \"tool_call\" (check tool invocation)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 454,
+                  "content": "  - Test configuration",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 455,
+                  "content": "  - **Tool invocation defaults**: When selecting a webhook tool, \"Accept any parameter values\" is enabled by default (since webhook responses are unpredictable). Structured output tools default to requiring specific parameter values"
+                },
+                {
+                  "lineNumber": 456,
+                  "content": "  - **Conversation history** (before evaluation):",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 457,
+                  "content": "    - Message types: &#96;agent&#96;, &#96;user&#96;, &#96;tool_call&#96;, &#96;tool_response&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 458,
+                  "content": "    - Add messages via dropdown menu on last message",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 459,
+                  "content": "    - **Webhook tool calls**: When a webhook tool is selected:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 460,
+                  "content": "      - Parameters grouped into separate containers: Query, Body, Headers",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 461,
+                  "content": "      - Each group is in its own container (&#96;bg-background border border-border rounded-xl p-3&#96;) with uppercase section title",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 462,
+                  "content": "      - Input fields within containers use &#96;bg-muted&#96; for contrast",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 463,
+                  "content": "      - A \"Tool Response\" message is automatically added after the tool call",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 464,
+                  "content": "      - Tool response requires valid JSON input (textarea with real-time validation)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 465,
+                  "content": "      - User cannot proceed without valid JSON in all tool responses",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 466,
+                  "content": "      - Deleting a webhook tool call also removes its linked tool response",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 467,
+                  "content": "    - **Structured output tool calls**: Show flat parameter list as inputs",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 468,
+                  "content": "  - **Loading saved tests** (when &#96;initialConfig&#96; is provided):"
+                },
+                {
+                  "lineNumber": 469,
+                  "content": "    - Parses &#96;history&#96; array and converts to chatMessages format",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 470,
+                  "content": "    - **Webhook tool call detection**: Checks if args have &#96;body&#96;, &#96;query&#96;, or &#96;headers&#96; keys to determine if it's a webhook-style tool call",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 471,
+                  "content": "    - **Webhook param extraction**: For webhook tools, extracts nested properties from body/query/headers and assigns &#96;group&#96; property to each param so they display in the correct container (e.g., &#96;{body: {task_type: \"x\"}}&#96; → &#96;{name: \"task_type\", value: \"x\", group: \"body\"}&#96;)"
+                },
+                {
+                  "lineNumber": 472,
+                  "content": "    - **Tool response parsing**: &#96;role: \"tool\"&#96; messages are included as &#96;tool_response&#96; type, linked to their corresponding tool call via &#96;tool_call_id&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 473,
+                  "content": "    - Non-webhook tools show params as flat list without group containers"
+                },
+                {
+                  "lineNumber": 474,
+                  "content": "- **View all tests**",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 475,
+                  "content": "- **Edit/delete tests**",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 476,
+                  "content": "- **Link tests to agents** for benchmarking",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 477,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 478,
+                  "content": "### 6. Personas Management (&#96;/personas&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 479,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 480,
+                  "content": "**What you can do:**",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 481,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 482,
+                  "content": "- **Create user personas** that define WHO the simulated user is:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 483,
+                  "content": "  - **Label**: Persona identifier",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1321,
+                  "content": "    - Delete button not shown for array items (&#96;isArrayItem&#96;) or when &#96;hideDelete&#96; is true",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1322,
+                  "content": "    - Uses &#96;NestedContainer&#96; for nested object properties and array items",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1323,
+                  "content": "    - Used in: AddToolDialog (structured output parameters, webhook query/body parameters), AddTestDialog, DataExtractionTabContent"
+                },
+                {
+                  "lineNumber": 1324,
+                  "content": "    - **Note**: &#96;DataFieldPropertyCard&#96; is deprecated and now wraps &#96;ParameterCard&#96; with &#96;showRequired={false}&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1325,
+                  "content": "12. **Nested Container**: &#96;NestedContainer&#96; from &#96;@/components/ui/NestedContainer&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1326,
+                  "content": "    - Theme-aware container for nested properties/items sections",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1327,
+                  "content": "    - Uses &#96;bg-muted&#96; for proper light/dark mode support (replaces hardcoded &#96;bg-[#1b1b1b]&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1328,
+                  "content": "    - Props: &#96;children&#96;, &#96;onAddProperty?&#96;, &#96;addButtonText?&#96;, &#96;showAddButton?&#96;, &#96;showValidationError?&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1329,
+                  "content": "    - Includes optional \"Add property\" button with validation error styling",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1330,
+                  "content": "    - Used in: ParameterCard, AddToolDialog (body parameters), DataExtractionTabContent",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1331,
+                  "content": "13. **Native Link Navigation**: List items use Next.js &#96;&lt;Link&gt;&#96; components for browser-native right-click support",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1332,
+                  "content": "    - Enables \"Open in new tab\" via browser's native context menu",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1333,
+                  "content": "    - Supports Cmd/Ctrl+click to open in new tab",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 70,
+          "totalMatchedLines": 7
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I found the relevant section around line 453-477. Let me read that full section to understand where to add the validation information.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I found the right section. I need to add validation information after the webhook/structured output tool call descriptions. Let me update to add the tool call param validation info.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I added the validation info. Let me also check if there's a section about form validation patterns where I should add this info as well.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see that the Forms section already mentions "Invalid/error row styling: Use `bg-red-500/10` for row backgrounds (e.g., STT empty predictions, form validation rows). For invalid inputs use `border-red-500`." This is consistent with what I added for tool call param validation. The documentation is now up to date with the change I made.</details></think>
+
+---
+
+I've updated `.cursor/rules/app-details.md` to document the new tool call parameter validation. Added under the conversation history section:
+
+- **Tool call param validation**: All tool call parameters in conversation history must have non-empty values. On save attempt, empty params are highlighted with `border-red-500`. Validation applies to both webhook (body/query/headers params) and structured output tools
+
+This aligns with the existing Forms pattern documented at line 2919 which already mentions using `border-red-500` for invalid inputs.
+
+---
+
+_**User**_
+
+Add error messages in all the form validations that you have added for adding a new test below each form field which is empty. Add a message saying "This cannot be empty" or something like that
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to add error messages below each form field that is empty when validation fails. I need to update the tool call parameter inputs in AddTestDialog to show error messages like "This cannot be empty" below them when they're empty and validation has been attempted.
+
+Let me read the current state of the file to see the input fields.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to add error messages below each input field. Let me update each section to include the error message when showError is true.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I have a clear picture of the structure. I need to add error messages below each input. Let me update all four sections (Query, Body, Headers, and Regular tool parameters).</details></think>
+
+---
+
+Now I'll add error messages below each input field for all the tool call parameters.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, now let me update the Body Parameters section.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, now let me update the Headers section.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, now let me update the regular tool parameters section.</details></think>
+
+---
+
+Now let me update the regular (non-webhook) tool parameters section.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+All sections have been updated. Let me check for linter errors.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no linter errors. All the error messages have been added for all tool call parameter fields (Query, Body, Headers for webhooks, and regular parameters for structured output tools).</details></think>
+
+---
+
+Done. I've added error messages below each tool call parameter field. When validation fails and a field is empty, the message "This field cannot be empty" appears in red (`text-xs text-red-500`) below the input. This applies to:
+
+- **Webhook tools**: Query, Body, and Headers parameter fields
+- **Structured output tools**: All parameter fields
+
+---
+
+_**User**_
+
+@AddTestDialog.tsx (684-694) Stop injecting status equal to received messages for non-webhook tool calls in the chat history when pushing it to the backend. Yeah, stop doing that.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to stop adding a default `{"status": "received"}` response for non-webhook tool calls. Let me look at the context around this code to understand what needs to be changed.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see. Currently, for non-webhook tool calls, it's injecting a default `{"status": "received"}` tool response. The user wants to stop doing this - only webhook tool calls should have tool responses in the history.
+
+I need to modify the logic so that:
+1. For webhook tools: Use the linked tool_response content
+2. For non-webhook tools: Don't add any tool response to the history
+
+Let me update the code.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, the change has been made. Now non-webhook tool calls will only push the tool call message to history, without any tool response. Only webhook tool calls will have their linked tool response added.</details></think>
+
+---
+
+Done. Non-webhook tool calls will no longer have a fake `{"status": "received"}` response injected. Only webhook tool calls will include their linked tool response in the history sent to the backend.
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to AddTestDialog.tsx - specifically I removed the fake `{"status": "received"}` response injection for non-webhook tool calls. Let me search for relevant sections in app-details.md to update.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "tool_response|tool response|non-webhook|status.*received",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+  "contextBefore": 2,
+  "contextAfter": 5,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "tool_response|tool response|non-webhook|status.*received",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": ".cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 455,
+                  "content": "  - **Tool invocation defaults**: When selecting a webhook tool, \"Accept any parameter values\" is enabled by default (since webhook responses are unpredictable). Structured output tools default to requiring specific parameter values",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 456,
+                  "content": "  - **Conversation history** (before evaluation):",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 457,
+                  "content": "    - Message types: &#96;agent&#96;, &#96;user&#96;, &#96;tool_call&#96;, &#96;tool_response&#96;"
+                },
+                {
+                  "lineNumber": 458,
+                  "content": "    - Add messages via dropdown menu on last message",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 459,
+                  "content": "    - **Webhook tool calls**: When a webhook tool is selected:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 460,
+                  "content": "      - Parameters grouped into separate containers: Query, Body, Headers",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 461,
+                  "content": "      - Each group is in its own container (&#96;bg-background border border-border rounded-xl p-3&#96;) with uppercase section title",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 462,
+                  "content": "      - Input fields within containers use &#96;bg-muted&#96; for contrast",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 463,
+                  "content": "      - A \"Tool Response\" message is automatically added after the tool call",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 464,
+                  "content": "      - Tool response requires valid JSON input (textarea with real-time validation)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 465,
+                  "content": "      - User cannot proceed without valid JSON in all tool responses"
+                },
+                {
+                  "lineNumber": 466,
+                  "content": "      - Deleting a webhook tool call also removes its linked tool response"
+                },
+                {
+                  "lineNumber": 467,
+                  "content": "    - **Structured output tool calls**: Show flat parameter list as inputs",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 468,
+                  "content": "    - **Tool call param validation**: All tool call parameters in conversation history must have non-empty values. On save attempt, empty params are highlighted with &#96;border-red-500&#96;. Validation applies to both webhook (body/query/headers params) and structured output tools",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 469,
+                  "content": "  - **Loading saved tests** (when &#96;initialConfig&#96; is provided):",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 470,
+                  "content": "    - Parses &#96;history&#96; array and converts to chatMessages format",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 471,
+                  "content": "    - **Webhook tool call detection**: Checks if args have &#96;body&#96;, &#96;query&#96;, or &#96;headers&#96; keys to determine if it's a webhook-style tool call",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 472,
+                  "content": "    - **Webhook param extraction**: For webhook tools, extracts nested properties from body/query/headers and assigns &#96;group&#96; property to each param so they display in the correct container (e.g., &#96;{body: {task_type: \"x\"}}&#96; → &#96;{name: \"task_type\", value: \"x\", group: \"body\"}&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 473,
+                  "content": "    - **Tool response parsing**: &#96;role: \"tool\"&#96; messages are included as &#96;tool_response&#96; type, linked to their corresponding tool call via &#96;tool_call_id&#96;"
+                },
+                {
+                  "lineNumber": 474,
+                  "content": "    - Non-webhook tools show params as flat list without group containers",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 475,
+                  "content": "- **View all tests**",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 476,
+                  "content": "- **Edit/delete tests**",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 477,
+                  "content": "- **Link tests to agents** for benchmarking",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 478,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 592,
+                  "content": "  - **Presigned URL refresh on error**: Audio elements include &#96;onError={refreshRunData}&#96; handler to automatically fetch fresh presigned URLs when they expire. The &#96;refreshRunData&#96; callback clears &#96;frozenSimulationRef&#96; before updating state so new URLs are used instead of stale frozen data",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 593,
+                  "content": "  - Full conversation audio player below header (from &#96;conversation_wav_url&#96;) for voice simulations",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 594,
+                  "content": "  - Full conversation history (user, assistant, tool calls, tool responses)"
+                },
+                {
+                  "lineNumber": 595,
+                  "content": "  - Role-based message styling",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 596,
+                  "content": "  - **Tool call details as form fields**: Arguments are displayed as labeled form fields (matching AddTestDialog style). Each arg key (body, query, headers) is shown as a field label, with its value displayed as pretty-printed JSON",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 597,
+                  "content": "  - **Tool response display** (for webhook calls): Only shows &#96;role: \"tool\"&#96; messages where content is valid JSON with &#96;type: \"webhook_response\"&#96;. Displays the &#96;response&#96; object as **pretty-printed JSON** in a monospace &#96;&lt;pre&gt;&#96; block with \"Agent Tool Response\" header (intentionally different from tool call form fields to distinguish input vs output)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 598,
+                  "content": "  - Per-message audio players for voice simulations (matching &#96;audio_urls&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 599,
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 32,
+          "totalMatchedLines": 5
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I found the relevant section. I need to update the documentation to clarify:
+1. Webhook tool calls have tool responses in the history sent to backend
+2. Non-webhook (structured output) tool calls do NOT have tool responses in the history sent to backend
+
+Let me update the relevant section around line 467.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to add clarification about what gets sent to the backend for webhook vs non-webhook tool calls. Let me update the structured output section to clarify this.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I've updated the documentation to clarify:
+1. Structured output tool calls don't add tool responses to the backend history
+2. Webhook tool calls include both tool call AND tool response
+3. Also added the error message detail for validation</details></think>
+
+---
+
+Updated the documentation to clarify:
+
+1. **Structured output tool calls**: No tool response is sent to backend - only the tool call itself
+2. **Backend history format**: Webhook tool calls include both tool call AND linked tool response; structured output tool calls only include the tool call
+3. Also added the error message text ("This field cannot be empty") for the validation pattern
+
+---
+
+_**User**_
+
+This field cannot be empty
+
+
+this validation is being done for the Webhook Agent tool calls when they are added. Even without someone clicking "Save," the validation should only run when someone clicks "Save" for saving or "Create" (whatever) to create or save the test case. Only then should the validation be run. When the new message is added, the validation should not be done.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user is saying that when a new webhook tool call message is added to the conversation history, the validation errors are showing immediately (red borders and "This field cannot be empty" messages). The validation should only trigger when the user clicks "Save" to save the test, not immediately when the message is added.
+
+Let me check the current state of the code to understand why this is happening. The issue might be that `localValidationAttempted` or `validationAttempted` is already true when the message is added.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "localValidationAttempted|setLocalValidationAttempted",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx",
+  "context": 3,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "localValidationAttempted|setLocalValidationAttempted",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": "src/components/AddTestDialog.tsx",
+              "matches": [
+                {
+                  "lineNumber": 277,
+                  "content": "  const [testLanguage, setTestLanguage] = useState&lt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 278,
+                  "content": "    \"english\" | \"hindi\" | \"kannada\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 279,
+                  "content": "  &gt;(\"english\");",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 280,
+                  "content": "  const [localValidationAttempted, setLocalValidationAttempted] ="
+                },
+                {
+                  "lineNumber": 281,
+                  "content": "    useState(false);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 282,
+                  "content": "  const [toolDropdownOpen, setToolDropdownOpen] = useState(false);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 283,
+                  "content": "  const [availableTools, setAvailableTools] = useState&lt;AvailableTool[]&gt;([]);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 783,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 784,
+                  "content": "  // Handle form submission",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 785,
+                  "content": "  const handleSubmit = () =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 786,
+                  "content": "    setLocalValidationAttempted(true);"
+                },
+                {
+                  "lineNumber": 787,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 788,
+                  "content": "    // Auto-hide validation errors after 3 seconds",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 789,
+                  "content": "    setTimeout(() =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 790,
+                  "content": "      setLocalValidationAttempted(false);"
+                },
+                {
+                  "lineNumber": 791,
+                  "content": "    }, 3000);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 792,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 793,
+                  "content": "    // Validate tool call params in conversation history (for both test types)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 965,
+                  "content": "                    onChange={(e) =&gt; setTestName(e.target.value)}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 966,
+                  "content": "                    placeholder=\"Your test name\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 967,
+                  "content": "                    className={&#96;w-full h-11 px-4 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 968,
+                  "content": "                      localValidationAttempted &amp;&amp;"
+                },
+                {
+                  "lineNumber": 969,
+                  "content": "                      activeTab === \"next-reply\" &amp;&amp;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 970,
+                  "content": "                      !testName.trim()",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 971,
+                  "content": "                        ? \"border-red-500\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 985,
+                  "content": "                    placeholder=\"Describe the ideal response of the agent given the conversation history on the right to pass this test (e.g., provides a correct answer, uses a specific tone, includes key information).\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 986,
+                  "content": "                    rows={4}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 987,
+                  "content": "                    className={&#96;w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent resize-none ${",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 988,
+                  "content": "                      localValidationAttempted &amp;&amp;"
+                },
+                {
+                  "lineNumber": 989,
+                  "content": "                      activeTab === \"next-reply\" &amp;&amp;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 990,
+                  "content": "                      !expectedMessage.trim()",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 991,
+                  "content": "                        ? \"border-red-500\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1034,
+                  "content": "                    onChange={(e) =&gt; setTestName(e.target.value)}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1035,
+                  "content": "                    placeholder=\"Your test name\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1036,
+                  "content": "                    className={&#96;w-full h-11 px-4 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1037,
+                  "content": "                      localValidationAttempted &amp;&amp;"
+                },
+                {
+                  "lineNumber": 1038,
+                  "content": "                      activeTab === \"tool-invocation\" &amp;&amp;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1039,
+                  "content": "                      !testName.trim()",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1040,
+                  "content": "                        ? \"border-red-500\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1052,
+                  "content": "                    &lt;button",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1053,
+                  "content": "                      onClick={() =&gt; setToolDropdownOpen(!toolDropdownOpen)}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1054,
+                  "content": "                      className={&#96;px-3 py-1.5 text-sm font-medium bg-background text-foreground rounded-lg hover:bg-muted transition-colors cursor-pointer border ${",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1055,
+                  "content": "                        localValidationAttempted &amp;&amp;"
+                },
+                {
+                  "lineNumber": 1056,
+                  "content": "                        activeTab === \"tool-invocation\" &amp;&amp;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1057,
+                  "content": "                        selectedTools.length === 0",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1058,
+                  "content": "                          ? \"border-red-500 text-red-400\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1231,
+                  "content": "                                        }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1232,
+                  "content": "                                        placeholder=\"Expected value\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1233,
+                  "content": "                                        className={&#96;w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1234,
+                  "content": "                                          localValidationAttempted &amp;&amp;"
+                },
+                {
+                  "lineNumber": 1235,
+                  "content": "                                          activeTab === \"tool-invocation\" &amp;&amp;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1236,
+                  "content": "                                          !param.value.trim()",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1237,
+                  "content": "                                            ? \"border-red-500\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1548,
+                  "content": "                                            .filter(p =&gt; p.group === \"query\")",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1549,
+                  "content": "                                            .map((param, idx) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1550,
+                  "content": "                                              const isEmpty = !param.value.trim();",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1551,
+                  "content": "                                              const showError = (localValidationAttempted || validationAttempted) &amp;&amp; isEmpty;"
+                },
+                {
+                  "lineNumber": 1552,
+                  "content": "                                              return (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1553,
+                  "content": "                                                &lt;div key={idx}&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1554,
+                  "content": "                                                  &lt;label className=\"block text-sm font-medium text-foreground mb-1.5\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1589,
+                  "content": "                                            .filter(p =&gt; p.group === \"body\")",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1590,
+                  "content": "                                            .map((param, idx) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1591,
+                  "content": "                                              const isEmpty = !param.value.trim();",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1592,
+                  "content": "                                              const showError = (localValidationAttempted || validationAttempted) &amp;&amp; isEmpty;"
+                },
+                {
+                  "lineNumber": 1593,
+                  "content": "                                              return (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1594,
+                  "content": "                                                &lt;div key={idx}&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1595,
+                  "content": "                                                  &lt;label className=\"block text-sm font-medium text-foreground mb-1.5\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1630,
+                  "content": "                                            .filter(p =&gt; p.group === \"headers\")",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1631,
+                  "content": "                                            .map((param, idx) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1632,
+                  "content": "                                              const isEmpty = !param.value.trim();",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1633,
+                  "content": "                                              const showError = (localValidationAttempted || validationAttempted) &amp;&amp; isEmpty;"
+                },
+                {
+                  "lineNumber": 1634,
+                  "content": "                                              return (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1635,
+                  "content": "                                                &lt;div key={idx}&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1636,
+                  "content": "                                                  &lt;label className=\"block text-sm font-medium text-foreground mb-1.5\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1666,
+                  "content": "                                  &lt;div className=\"space-y-3\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1667,
+                  "content": "                                    {message.toolParams.map((param, idx) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1668,
+                  "content": "                                      const isEmpty = !param.value.trim();",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1669,
+                  "content": "                                      const showError = (localValidationAttempted || validationAttempted) &amp;&amp; isEmpty;"
+                },
+                {
+                  "lineNumber": 1670,
+                  "content": "                                      return (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1671,
+                  "content": "                                        &lt;div key={idx}&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1672,
+                  "content": "                                          &lt;label className=\"block text-sm font-medium text-foreground mb-1.5\"&gt;",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 81,
+          "totalMatchedLines": 12
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see the issue. The `showError` condition checks both `localValidationAttempted` and `validationAttempted`. The `validationAttempted` comes from props - let me check where that comes from. 
+
+Looking at line 74-75, `validationAttempted` is a prop. If the parent component has `validationAttempted` set to true, then newly added messages would immediately show validation errors.
+
+Let me check where AddTestDialog is used and whether validationAttempted might already be true.
+
+Actually, looking at the code more carefully, I see that:
+1. `localValidationAttempted` is the local state that gets set to true when clicking Submit
+2. `validationAttempted` is a prop from the parent
+
+The check is `(localValidationAttempted || validationAttempted)` - if either is true, errors show.
+
+The issue is that the parent might be passing `validationAttempted={true}` OR when the dialog is opened for editing an existing test, the parent's validation state might be true.
+
+Let me check if the validationAttempted prop is being passed correctly. But actually, based on the user's feedback, it sounds like when a NEW webhook tool call message is added, the validation errors are shown immediately. This would only happen if either `localValidationAttempted` or `validationAttempted` is already true.
+
+Looking at lines 785-791, `localValidationAttempted` is set to `true` in `handleSubmit` and then after 3 seconds it's set back to `false`.
+
+The user's issue might be:
+1. The dialog was opened (or a previous submit attempt was made)
+2. `validationAttempted` from props is true
+3. When they add a new tool call message, the errors show immediately
+
+Actually, the simpler explanation is that `validationAttempted` prop from parent might be true. Let me check if this is the case by looking at the component definition.
+
+
+The parent's `validationAttempted` prop is being used for tool call parameters when it should only apply to other form fields like test name and expected message. I need to change the condition to use only `localValidationAttempted` for the tool call message validation, so errors don't appear until the user actually submits the dialog.</details></think>
+
+---
+
+I see the issue. The validation check uses `(localValidationAttempted || validationAttempted)`, but `validationAttempted` is a prop from the parent that may already be true. For tool call parameters in conversation history, we should only validate on local submit attempts.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the Body parameters section.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the Headers section.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the regular (non-webhook) tool parameters section.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+All sections have been updated. Let me check for linter errors.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no linter errors. The fix is complete. Now tool call parameter validation in conversation history only triggers when `localValidationAttempted` is true (i.e., when the user clicks Save/Create), not when the parent's `validationAttempted` prop is true.</details></think>
+
+---
+
+Done. The tool call parameter validation now only uses `localValidationAttempted` (which is set when clicking Save), not the parent's `validationAttempted` prop. This means validation errors will only show after clicking Save, not when a new tool call message is added.
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to AddTestDialog.tsx - specifically I changed the validation for tool call parameters to only use `localValidationAttempted` instead of `(localValidationAttempted || validationAttempted)`. This is a subtle but important distinction.
+
+Let me search for relevant sections in app-details.md to update.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "localValidationAttempted|Tool call param validation",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+  "contextBefore": 2,
+  "contextAfter": 3,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "localValidationAttempted|Tool call param validation",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": ".cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 466,
+                  "content": "      - Deleting a webhook tool call also removes its linked tool response",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 467,
+                  "content": "    - **Structured output tool calls**: Show flat parameter list as inputs (no tool response added - only the tool call is sent to backend)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 468,
+                  "content": "    - **Tool call param validation**: All tool call parameters in conversation history must have non-empty values. On save attempt, empty params are highlighted with &#96;border-red-500&#96; with error message \"This field cannot be empty\". Validation applies to both webhook (body/query/headers params) and structured output tools"
+                },
+                {
+                  "lineNumber": 469,
+                  "content": "    - **Backend history format**: Webhook tool calls include both the tool call AND linked tool response in history. Structured output tool calls only include the tool call (no fake response injected)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 470,
+                  "content": "  - **Loading saved tests** (when &#96;initialConfig&#96; is provided):",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 471,
+                  "content": "    - Parses &#96;history&#96; array and converts to chatMessages format",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 6,
+          "totalMatchedLines": 1
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Found the section. I need to update it to clarify that validation only triggers on local submit attempts (localValidationAttempted), not on the parent's validationAttempted prop.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, the documentation has been updated to reflect the important distinction between `localValidationAttempted` and the parent's `validationAttempted` prop for tool call parameter validation.</details></think>
+
+---
+
+Updated the documentation to clarify that tool call parameter validation uses only `localValidationAttempted` (triggered by clicking Save), not the parent's `validationAttempted` prop. This prevents validation errors from appearing when a new tool call message is first added to the conversation history.
+
+---
+
+_**User**_
+
+update new tool creation dialog box so that when new query params are added it scrolls down to the html of the new param added and not to the bottom of the dialog as there could be a body params section below and we don't want to scroll to the bottom of the body params section when a new param has been added to the query section which is above it. So whenever the add param button is clicked for query params, only scroll to the new query param that has been added.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to update the AddToolDialog so that when a new query parameter is added, it scrolls to the newly added query parameter, not to the bottom of the dialog (which could be the body params section).
+
+Let me first look at the AddToolDialog to understand how query parameters are added and how scrolling is currently handled.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "addQueryParameter|queryParameters|scrollIntoView|scroll",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddToolDialog.tsx",
+  "context": 3,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "addQueryParameter|queryParameters|scrollIntoView|scroll",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddToolDialog.tsx",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": "src/components/AddToolDialog.tsx",
+              "matches": [
+                {
+                  "lineNumber": 75,
+                  "content": "  const [webhookHeaders, setWebhookHeaders] = useState&lt;WebhookHeader[]&gt;([]);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 76,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 77,
+                  "content": "  // Query parameters state (for webhook tools) - uses same Parameter type",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 78,
+                  "content": "  const [queryParameters, setQueryParameters] = useState&lt;Parameter[]&gt;([]);"
+                },
+                {
+                  "lineNumber": 79,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 80,
+                  "content": "  // Body parameters state (for webhook tools with POST, PUT, PATCH methods)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 81,
+                  "content": "  const [bodyDescription, setBodyDescription] = useState(\"\");",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 128,
+                  "content": "  };",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 129,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 130,
+                  "content": "  // Scroll to bottom when parameters change (new parameter added)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 131,
+                  "content": "  const scrollToBottom = () =&gt; {"
+                },
+                {
+                  "lineNumber": 132,
+                  "content": "    if (sidebarContentRef.current) {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 133,
+                  "content": "      setTimeout(() =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 134,
+                  "content": "        sidebarContentRef.current?.scrollTo({"
+                },
+                {
+                  "lineNumber": 135,
+                  "content": "          top: sidebarContentRef.current.scrollHeight,"
+                },
+                {
+                  "lineNumber": 136,
+                  "content": "          behavior: \"smooth\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 137,
+                  "content": "        });",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 138,
+                  "content": "      }, 50);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 151,
+                  "content": "        description: \"\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 152,
+                  "content": "      },",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 153,
+                  "content": "    ]);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 154,
+                  "content": "    scrollToBottom();"
+                },
+                {
+                  "lineNumber": 155,
+                  "content": "  };",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 156,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 157,
+                  "content": "  // Helper to update a parameter at any depth using a path of IDs",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 419,
+                  "content": "  const handleAddPropertyAtPath = (path: string[]) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 420,
+                  "content": "    setValidationAttempted(false);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 421,
+                  "content": "    setParameters((prev) =&gt; addPropertyAtPath(prev, path));",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 422,
+                  "content": "    scrollToBottom();"
+                },
+                {
+                  "lineNumber": 423,
+                  "content": "  };",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 424,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 425,
+                  "content": "  const handleRemoveAtPath = (parentPath: string[], id: string) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 442,
+                  "content": "  const handleQueryAddPropertyAtPath = (path: string[]) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 443,
+                  "content": "    setValidationAttempted(false);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 444,
+                  "content": "    setQueryParameters((prev) =&gt; addPropertyAtPath(prev, path));",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 445,
+                  "content": "    scrollToBottom();"
+                },
+                {
+                  "lineNumber": 446,
+                  "content": "  };",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 447,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 448,
+                  "content": "  const handleQueryRemoveAtPath = (parentPath: string[], id: string) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 457,
+                  "content": "    setQueryParameters((prev) =&gt; setItemsAtPath(prev, path, items));",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 458,
+                  "content": "  };",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 459,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 460,
+                  "content": "  const addQueryParameter = () =&gt; {"
+                },
+                {
+                  "lineNumber": 461,
+                  "content": "    setValidationAttempted(false);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 462,
+                  "content": "    setQueryParameters([",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 463,
+                  "content": "      ...queryParameters,"
+                },
+                {
+                  "lineNumber": 464,
+                  "content": "      {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 465,
+                  "content": "        id: crypto.randomUUID(),",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 466,
+                  "content": "        dataType: \"string\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 469,
+                  "content": "        description: \"\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 470,
+                  "content": "      },",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 471,
+                  "content": "    ]);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 472,
+                  "content": "    scrollToBottom();"
+                },
+                {
+                  "lineNumber": 473,
+                  "content": "  };",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 474,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 475,
+                  "content": "  // Body parameter handlers (same logic, different state)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 480,
+                  "content": "  const handleBodyAddPropertyAtPath = (path: string[]) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 481,
+                  "content": "    setValidationAttempted(false);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 482,
+                  "content": "    setBodyParameters((prev) =&gt; addPropertyAtPath(prev, path));",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 483,
+                  "content": "    scrollToBottom();"
+                },
+                {
+                  "lineNumber": 484,
+                  "content": "  };",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 485,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 486,
+                  "content": "  const handleBodyRemoveAtPath = (parentPath: string[], id: string) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 507,
+                  "content": "        description: \"\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 508,
+                  "content": "      },",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 509,
+                  "content": "    ]);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 510,
+                  "content": "    scrollToBottom();"
+                },
+                {
+                  "lineNumber": 511,
+                  "content": "  };",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 512,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 513,
+                  "content": "  // Validation helpers",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 768,
+                  "content": "          );",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 769,
+                  "content": "        }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 770,
+                  "content": "        // Load query parameters (same format as parameters)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 771,
+                  "content": "        if (toolData.config.webhook.queryParameters) {"
+                },
+                {
+                  "lineNumber": 772,
+                  "content": "          const queryParams: Parameter[] = [];",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 773,
+                  "content": "          if (Array.isArray(toolData.config.webhook.queryParameters)) {"
+                },
+                {
+                  "lineNumber": 774,
+                  "content": "            toolData.config.webhook.queryParameters.forEach((paramConfig: any) =&gt; {"
+                },
+                {
+                  "lineNumber": 775,
+                  "content": "              const paramName = paramConfig.id || paramConfig.name || \"\";",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 776,
+                  "content": "              queryParams.push(parseParameterSchema(paramName, paramConfig));",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 777,
+                  "content": "            });",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 860,
+                  "content": "              name: h.name.trim(),",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 861,
+                  "content": "              value: h.value,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 862,
+                  "content": "            })),",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 863,
+                  "content": "          queryParameters: buildParametersConfig(queryParameters),"
+                },
+                {
+                  "lineNumber": 864,
+                  "content": "          // Only include body for methods that support it",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 865,
+                  "content": "          ...([\"POST\", \"PUT\", \"PATCH\"].includes(webhookMethod) &amp;&amp; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 866,
+                  "content": "            body: {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 944,
+                  "content": "              name: h.name.trim(),",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 945,
+                  "content": "              value: h.value,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 946,
+                  "content": "            })),",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 947,
+                  "content": "          queryParameters: buildParametersConfig(queryParameters),"
+                },
+                {
+                  "lineNumber": 948,
+                  "content": "          // Only include body for methods that support it",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 949,
+                  "content": "          ...([\"POST\", \"PUT\", \"PATCH\"].includes(webhookMethod) &amp;&amp; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 950,
+                  "content": "            body: {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1415,
+                  "content": "                      &lt;/p&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1416,
+                  "content": "                    &lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1417,
+                  "content": "                    &lt;button",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1418,
+                  "content": "                      onClick={addQueryParameter}"
+                },
+                {
+                  "lineNumber": 1419,
+                  "content": "                      className=\"h-9 px-4 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1420,
+                  "content": "                    &gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1421,
+                  "content": "                      Add param",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1423,
+                  "content": "                  &lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1424,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1425,
+                  "content": "                  {/* Query Parameter Cards */}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1426,
+                  "content": "                  {queryParameters.map((param) =&gt; ("
+                },
+                {
+                  "lineNumber": 1427,
+                  "content": "                    &lt;ParameterCard",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1428,
+                  "content": "                      key={param.id}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1429,
+                  "content": "                      param={param}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1433,
+                  "content": "                      onAddProperty={handleQueryAddPropertyAtPath}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1434,
+                  "content": "                      onSetItems={handleQuerySetItemsAtPath}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1435,
+                  "content": "                      validationAttempted={validationAttempted}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1436,
+                  "content": "                      siblingNames={queryParameters"
+                },
+                {
+                  "lineNumber": 1437,
+                  "content": "                        .filter((p) =&gt; p.id !== param.id)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1438,
+                  "content": "                        .map((p) =&gt; p.name)}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1439,
+                  "content": "                    /&gt;",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 115,
+          "totalMatchedLines": 20
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I can see the current implementation uses `scrollToBottom()` which scrolls to the bottom of the entire sidebar. I need to modify `addQueryParameter` to scroll to the newly added query parameter instead.
+
+The approach should be:
+1. Create a ref for the last query parameter element
+2. When a new query parameter is added, scroll to that element instead of the bottom
+
+Let me look at the full context of how query parameters are rendered to understand the structure better.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddToolDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me look at how the query parameters are rendered to understand the structure and add a ref to scroll to the last added item.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddToolDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see the structure. I need to:
+1. Create a ref that will hold a reference to the last query parameter element
+2. Store the ID of the newly added query parameter
+3. Use a useEffect to scroll to that element after the DOM updates
+
+Let me look at the top of the file to see the existing refs and state declarations.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddToolDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I have a better understanding of the structure. I need to:1. Add a state to track the ID of the newly added query parameter
+2. Add a ref to scroll to the newly added element
+3. Modify the `addQueryParameter` function to store the new param ID
+4. Use a useEffect to scroll to that element after the DOM updates
+5. Update the query parameters map to add an id attribute or ref to the last elementLet me implement this:1. Add a state: `const [newlyAddedQueryParamId, setNewlyAddedQueryParamId] = useState<string | null>(null);`2. Add a ref map for query parameter elements3. Modify `addQueryParameter` to set the newly added ID4. Add a useEffect to scroll to that element5. Update the query parameter cards to have refs</details></think>
+
+---
+
+I'll add a state to track the newly added query parameter ID and scroll to it specifically.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddToolDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to add a useEffect to scroll to the newly added query parameter when `newlyAddedQueryParamId` changes.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddToolDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to add a useEffect after the existing useEffect to scroll to the newly added query parameter. Let me add it after the resetForm function.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddToolDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the `addQueryParameter` function to store the new param ID instead of calling `scrollToBottom`.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddToolDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the query parameter cards to attach refs to each parameter element so we can scroll to them. Let me find where the query parameters are rendered.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddToolDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to wrap the ParameterCard in a div with a ref callback that stores the reference in the queryParamRefs map.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddToolDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me also update the `handleQueryAddPropertyAtPath` function to not scroll to the bottom (since adding a nested property should scroll to the query param being edited, not the bottom). Actually, let me check what that function does first.Looking at the grep results earlier, `handleQueryAddPropertyAtPath` calls `scrollToBottom()` when adding a nested property to a query parameter. For nested properties, scrolling to bottom might also not be ideal, but let me leave that for now since the user specifically asked about adding new query parameters.Let me check for linter errors.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddToolDialog.tsx"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddToolDialog.tsx"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no linter errors. The implementation is complete. Let me summarize what was changed:1. Added `newlyAddedQueryParamId` state to track the ID of a newly added query parameter2. Added `queryParamRefs` ref to store references to query parameter elements
+3. Added a useEffect that scrolls to the newly added query parameter when its ID is set4. Modified `addQueryParameter` to store the new param ID instead of calling `scrollToBottom`
+5. Wrapped each ParameterCard for query params in a div with a ref callback to track the elementNow when a new query parameter is added, it will scroll to that specific parameter element rather than to the bottom of the dialog.</details></think>
+
+---
+
+Done. Now when you click "Add param" for query parameters, it will scroll to the newly added query parameter instead of the bottom of the dialog. The changes:
+
+1. Added state to track the newly added query parameter ID
+2. Added a ref map to store references to each query parameter element
+3. Added a useEffect that scrolls to the specific element when a new param is added
+4. Wrapped each query parameter card in a div with a ref callback for tracking
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to AddToolDialog.tsx - specifically I added targeted scrolling for newly added query parameters. Let me search for relevant sections in app-details.md to update.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "AddToolDialog|scrollToBottom|query param|scroll.*param",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+  "contextBefore": 2,
+  "contextAfter": 5,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "AddToolDialog|scrollToBottom|query param|scroll.*param",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": ".cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 218,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 219,
+                  "content": "- **Create custom tools** for LLM function calling via two options:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 220,
+                  "content": "  - **\"Add webhook tool\"** - Opens AddToolDialog with webhook-specific header and description"
+                },
+                {
+                  "lineNumber": 221,
+                  "content": "  - **\"Add structured output tool\"** - Opens AddToolDialog with structured output-specific header and description"
+                },
+                {
+                  "lineNumber": 222,
+                  "content": "- **Define tool parameters** with full JSON Schema support:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 223,
+                  "content": "  - Primitive types: string, number, boolean, integer",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 224,
+                  "content": "  - Complex types: object (with nested properties), array (with item types)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 225,
+                  "content": "  - Required/optional flags",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 226,
+                  "content": "  - Descriptions for each parameter",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 227,
+                  "content": "- **Edit existing tools** - Click a tool row to open AddToolDialog in edit mode (reads &#96;config.type&#96; to determine webhook vs structured output, defaults to structured output if not present)"
+                },
+                {
+                  "lineNumber": 228,
+                  "content": "- **Delete tools**",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 229,
+                  "content": "- **Search tools** by name or description",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 230,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 231,
+                  "content": "**Tools Table Columns:**",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 232,
+                  "content": "- **Name** (200px fixed) - Tool name with horizontal scroll for overflow",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 241,
+                  "content": "&#96;&#96;&#96;tsx",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 242,
+                  "content": "&lt;div className=\"flex gap-4\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 243,
+                  "content": "  &lt;button onClick={() =&gt; openAddToolDialog(\"webhook\")} className=\"h-10 px-4 rounded-xl ...\"&gt;"
+                },
+                {
+                  "lineNumber": 244,
+                  "content": "    Add webhook tool",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 245,
+                  "content": "  &lt;/button&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 246,
+                  "content": "  &lt;button onClick={() =&gt; openAddToolDialog(\"structured_output\")} className=\"h-10 px-4 rounded-xl ...\"&gt;"
+                },
+                {
+                  "lineNumber": 247,
+                  "content": "    Add structured output tool",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 248,
+                  "content": "  &lt;/button&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 249,
+                  "content": "&lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 250,
+                  "content": "&#96;&#96;&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 251,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 252,
+                  "content": "These buttons use standard &#96;h-10 px-4&#96; sizing (same height as other action buttons) with &#96;rounded-xl&#96; for border radius.",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 253,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 254,
+                  "content": "**AddToolDialog Component** (&#96;src/components/AddToolDialog.tsx&#96;):"
+                },
+                {
+                  "lineNumber": 255,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 256,
+                  "content": "A reusable sidebar dialog for creating and editing tools. Contains all form logic internally:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 257,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 258,
+                  "content": "- **Props**:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 259,
+                  "content": "  - &#96;isOpen: boolean&#96; - Controls dialog visibility",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 312,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 313,
+                  "content": "- **Features**:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 314,
+                  "content": "  - Loads existing tool data when &#96;editingToolUuid&#96; is provided (including webhook config, headers, query parameters, body parameters if present)"
+                },
+                {
+                  "lineNumber": 315,
+                  "content": "  - Validates form fields and nested parameters recursively",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 316,
+                  "content": "  - Creates/updates tools via API with config structure:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 317,
+                  "content": "    &#96;&#96;&#96;javascript",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 318,
+                  "content": "    config: {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 319,
+                  "content": "      type: \"webhook\" | \"structured_output\",  // Tool type stored in config",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1272,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1273,
+                  "content": "1. **Tab Navigation**: Used in agent detail and simulation detail pages",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1274,
+                  "content": "   - Tabs sync with URL query param (&#96;?tab=agent&#96;, &#96;?tab=tools&#96;, etc.)"
+                },
+                {
+                  "lineNumber": 1275,
+                  "content": "   - Use &#96;useSearchParams&#96; to read initial tab value",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1276,
+                  "content": "   - Use &#96;window.history.replaceState&#96; to update URL without navigation side effects (avoids title reset issues caused by &#96;router.push&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1277,
+                  "content": "2. **Sidebar Panels**: Slide-in panels for create/edit forms",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1278,
+                  "content": "   - **Preferred**: Use &#96;SlidePanel&#96; and &#96;SlidePanelFooter&#96; from &#96;@/components/ui&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1279,
+                  "content": "   - Width: 40% of viewport, min 500px (customizable via &#96;width&#96; prop)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1323,
+                  "content": "    - Delete button not shown for array items (&#96;isArrayItem&#96;) or when &#96;hideDelete&#96; is true",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1324,
+                  "content": "    - Uses &#96;NestedContainer&#96; for nested object properties and array items",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1325,
+                  "content": "    - Used in: AddToolDialog (structured output parameters, webhook query/body parameters), AddTestDialog, DataExtractionTabContent"
+                },
+                {
+                  "lineNumber": 1326,
+                  "content": "    - **Note**: &#96;DataFieldPropertyCard&#96; is deprecated and now wraps &#96;ParameterCard&#96; with &#96;showRequired={false}&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1327,
+                  "content": "12. **Nested Container**: &#96;NestedContainer&#96; from &#96;@/components/ui/NestedContainer&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1328,
+                  "content": "    - Theme-aware container for nested properties/items sections",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1329,
+                  "content": "    - Uses &#96;bg-muted&#96; for proper light/dark mode support (replaces hardcoded &#96;bg-[#1b1b1b]&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1330,
+                  "content": "    - Props: &#96;children&#96;, &#96;onAddProperty?&#96;, &#96;addButtonText?&#96;, &#96;showAddButton?&#96;, &#96;showValidationError?&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1331,
+                  "content": "    - Includes optional \"Add property\" button with validation error styling",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1332,
+                  "content": "    - Used in: ParameterCard, AddToolDialog (body parameters), DataExtractionTabContent"
+                },
+                {
+                  "lineNumber": 1333,
+                  "content": "13. **Native Link Navigation**: List items use Next.js &#96;&lt;Link&gt;&#96; components for browser-native right-click support",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1334,
+                  "content": "    - Enables \"Open in new tab\" via browser's native context menu",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1335,
+                  "content": "    - Supports Cmd/Ctrl+click to open in new tab",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1336,
+                  "content": "    - Applied to: Agents list, Simulations list, Simulation runs list",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1337,
+                  "content": "14. **View Mode Dialogs**: &#96;TestRunnerDialog&#96; and &#96;BenchmarkResultsDialog&#96; support dual modes:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1798,
+                  "content": "| STT Evaluation  | &#96;POST /stt/evaluate&#96;, &#96;GET /stt/evaluate/{uuid}&#96;                                                                                                                                                                                                                  |",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1799,
+                  "content": "| TTS Evaluation  | &#96;POST /tts/evaluate&#96;, &#96;GET /tts/evaluate/{uuid}&#96;                                                                                                                                                                                                                  |",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1800,
+                  "content": "| Jobs            | &#96;GET /jobs&#96; (optional &#96;job_type&#96; query param: &#96;stt&#96; or &#96;tts&#96;)                                                                                                                                                                                                     |"
+                },
+                {
+                  "lineNumber": 1801,
+                  "content": "| Presigned URLs  | &#96;POST /presigned-url&#96;                                                                                                                                                                                                                                             |",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1802,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1803,
+                  "content": "### Jobs API Response Structure",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1804,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1805,
+                  "content": "The &#96;/jobs&#96; endpoint returns evaluation jobs with the following structure:",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 73,
+          "totalMatchedLines": 11
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I found the relevant section. I should add information about the scroll behavior in AddToolDialog. Let me read around line 254 to see the full AddToolDialog documentation.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I found the section. I should add information about the scroll behavior, specifically that when a new query parameter is added, it scrolls to that specific parameter rather than the bottom of the dialog.Let me update the Parameter handlers section or add a new bullet point about scroll behavior.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I've updated the documentation to include information about the scroll behavior for query parameters.</details></think>
+
+---
+
+Updated the documentation to describe the new scroll behavior for query parameters in AddToolDialog - when adding a new query parameter, it now scrolls to that specific parameter (using a ref map and `scrollIntoView`) instead of scrolling to the bottom of the dialog where body parameters might be.
+
+---
+
+_**User**_
+
+I made another mistake. Essentially for web calls, you have added fields in the conversation history to be added for headers, but we don't want to show headers as a field that they can input in during the conversation history, nor do we want to show it in the test runner, the benchmark runner, or the transcript history. Instead of showing the header value or showing the header field all together.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to remove headers from being displayed/editable in:
+1. AddTestDialog - conversation history when adding a tool call
+2. TestRunnerDialog / BenchmarkResultsDialog (test results)
+3. Simulation transcript
+
+They don't want headers to be shown at all for webhook tool calls. Only body and query should be visible.
+
+Let me search for where headers are being displayed in these locations.</details></think>
+
+---
+
+I'll remove headers from being displayed in conversation history, test results, and simulation transcripts.
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "group === \"headers\"|headers.*param|Headers",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx",
+  "context": 2,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "group === \"headers\"|headers.*param|Headers",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": "src/components/AddTestDialog.tsx",
+              "matches": [
+                {
+                  "lineNumber": 657,
+                  "content": "                if (!argsObj.query) argsObj.query = {};",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 658,
+                  "content": "                argsObj.query[param.name] = param.value;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 659,
+                  "content": "              } else if (param.group === \"headers\") {"
+                },
+                {
+                  "lineNumber": 660,
+                  "content": "                if (!argsObj.headers) argsObj.headers = {};",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 661,
+                  "content": "                argsObj.headers[param.name] = param.value;"
+                },
+                {
+                  "lineNumber": 662,
+                  "content": "              }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 663,
+                  "content": "            } else {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1620,
+                  "content": "                                      &lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1621,
+                  "content": "                                    )}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1622,
+                  "content": "                                    {/* Headers */}"
+                },
+                {
+                  "lineNumber": 1623,
+                  "content": "                                    {message.toolParams.filter(p =&gt; p.group === \"headers\").length &gt; 0 &amp;&amp; ("
+                },
+                {
+                  "lineNumber": 1624,
+                  "content": "                                      &lt;div className=\"bg-background border border-border rounded-xl p-3\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1625,
+                  "content": "                                        &lt;h5 className=\"text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1626,
+                  "content": "                                          Headers"
+                },
+                {
+                  "lineNumber": 1627,
+                  "content": "                                        &lt;/h5&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1628,
+                  "content": "                                        &lt;div className=\"space-y-3\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1629,
+                  "content": "                                          {message.toolParams",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1630,
+                  "content": "                                            .filter(p =&gt; p.group === \"headers\")"
+                },
+                {
+                  "lineNumber": 1631,
+                  "content": "                                            .map((param, idx) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1632,
+                  "content": "                                              const isEmpty = !param.value.trim();",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1980,
+                  "content": "                                          }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1981,
+                  "content": "                                          ",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1982,
+                  "content": "                                          // Headers"
+                },
+                {
+                  "lineNumber": 1983,
+                  "content": "                                          if (webhook.headers &amp;&amp; Array.isArray(webhook.headers)) {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1984,
+                  "content": "                                            webhook.headers.forEach((h: any) =&gt; {",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 25,
+          "totalMatchedLines": 7
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "headers|Headers",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx",
+  "context": 2,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "headers|Headers",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {}
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "headers|Headers",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx",
+  "context": 2,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "headers|Headers",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": "src/app/simulations/[uuid]/runs/[runId]/page.tsx",
+              "matches": [
+                {
+                  "lineNumber": 105,
+                  "content": "      const response = await fetch(&#96;${backendUrl}/simulations/run/${runId}&#96;, {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 106,
+                  "content": "        method: \"GET\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 107,
+                  "content": "        headers: {"
+                },
+                {
+                  "lineNumber": 108,
+                  "content": "          accept: \"application/json\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 109,
+                  "content": "          \"ngrok-skip-browser-warning\": \"true\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 192,
+                  "content": "        const response = await fetch(&#96;${backendUrl}/simulations/${uuid}&#96;, {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 193,
+                  "content": "          method: \"GET\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 194,
+                  "content": "          headers: {"
+                },
+                {
+                  "lineNumber": 195,
+                  "content": "            accept: \"application/json\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 196,
+                  "content": "            \"ngrok-skip-browser-warning\": \"true\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 240,
+                  "content": "        const response = await fetch(&#96;${backendUrl}/simulations/run/${runId}&#96;, {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 241,
+                  "content": "          method: \"GET\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 242,
+                  "content": "          headers: {"
+                },
+                {
+                  "lineNumber": 243,
+                  "content": "            accept: \"application/json\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 244,
+                  "content": "            \"ngrok-skip-browser-warning\": \"true\",",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 15,
+          "totalMatchedLines": 3
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+So the headers in simulation transcript are just HTTP headers for API calls, not related to tool call headers display. That's fine.
+
+For AddTestDialog, I need to:
+1. Remove the Headers section from being displayed (lines 1622-1658)
+2. Keep the code that builds the headers in argsObj when saving (lines 659-661) - actually wait, if we're not showing headers, should we also not send them? Let me think...
+
+Actually, the user said they don't want to SHOW headers in the conversation history UI. But the headers might still be sent as part of the tool call config. Let me re-read the user's request:
+
+"Instead of showing the header value or showing the header field all together."
+
+So they don't want headers to be visible/editable in the UI. But when loading existing tests that have headers, should we preserve them? Or should we strip them entirely?
+
+I think the safest approach is:
+1. Don't display headers in the UI
+2. Don't allow adding headers when creating new tool calls
+3. When loading existing tests with headers, preserve them in the data but don't show them
+
+Let me check the code more carefully. Looking at line 1980-1984, it seems like headers are being loaded from webhook config when the dialog initializes. And lines 1622-1658 show them in the UI.
+
+I'll:
+1. Remove the Headers section from the conversation history display
+2. Remove the code that extracts headers from webhook config when loading (so new tool calls won't have headers)
+3. Keep the code that builds headers into argsObj when saving (so existing headers are preserved if they somehow exist)
+
+Actually, let me look at what happens when a tool call is added to the conversation history.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I understand. When a webhook tool is selected to add to conversation history:1. Query parameters are extracted (lines above this, not shown)
+2. Body parameters are extracted (lines 1975-1980)3. Headers are extracted (lines 1982-1993)
+
+I need to:1. Remove the Headers extraction code when adding a new tool call message (lines 1982-1993)
+2. Remove the Headers display section in the UI (lines 1622-1658)3. Also need to check if there's code that parses headers when loading existing tests
+
+Let me also check if there's code for loading existing tests that parses headers.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "group.*headers|headers.*group",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx",
+  "context": 5,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "group.*headers|headers.*group",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": "src/components/AddTestDialog.tsx",
+              "matches": [
+                {
+                  "lineNumber": 142,
+                  "content": "              const hasWebhookStructure = Object.keys(parsedArgs).some(k =&gt; webhookKeys.includes(k));",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 143,
+                  "content": "              ",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 144,
+                  "content": "              let toolParams: Array&lt;{ name: string; value: string; group?: string }&gt; = [];",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 145,
+                  "content": "              ",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 146,
+                  "content": "              if (hasWebhookStructure) {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 147,
+                  "content": "                // Extract params from body, query, headers with their group"
+                },
+                {
+                  "lineNumber": 148,
+                  "content": "                webhookKeys.forEach(groupKey =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 149,
+                  "content": "                  const groupValue = parsedArgs[groupKey];",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 150,
+                  "content": "                  if (groupValue &amp;&amp; typeof groupValue === \"object\" &amp;&amp; !Array.isArray(groupValue)) {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 151,
+                  "content": "                    Object.entries(groupValue).forEach(([paramName, paramValue]) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 152,
+                  "content": "                      toolParams.push({",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 646,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 647,
+                  "content": "        // Build the arguments object from tool params",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 648,
+                  "content": "        const argsObj: Record&lt;string, any&gt; = {};",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 649,
+                  "content": "        if (message.toolParams) {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 650,
+                  "content": "          for (const param of message.toolParams) {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 651,
+                  "content": "            // For webhook tools, group params by their group (query, body, headers)"
+                },
+                {
+                  "lineNumber": 652,
+                  "content": "            if (message.isWebhook &amp;&amp; param.group) {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 653,
+                  "content": "              if (param.group === \"body\") {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 654,
+                  "content": "                if (!argsObj.body) argsObj.body = {};",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 655,
+                  "content": "                argsObj.body[param.name] = param.value;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 656,
+                  "content": "              } else if (param.group === \"query\") {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 657,
+                  "content": "                if (!argsObj.query) argsObj.query = {};",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 658,
+                  "content": "                argsObj.query[param.name] = param.value;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 659,
+                  "content": "              } else if (param.group === \"headers\") {"
+                },
+                {
+                  "lineNumber": 660,
+                  "content": "                if (!argsObj.headers) argsObj.headers = {};",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 661,
+                  "content": "                argsObj.headers[param.name] = param.value;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 662,
+                  "content": "              }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 663,
+                  "content": "            } else {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 664,
+                  "content": "              argsObj[param.name] = param.value;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1618,
+                  "content": "                                            })}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1619,
+                  "content": "                                        &lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1620,
+                  "content": "                                      &lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1621,
+                  "content": "                                    )}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1622,
+                  "content": "                                    {/* Headers */}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1623,
+                  "content": "                                    {message.toolParams.filter(p =&gt; p.group === \"headers\").length &gt; 0 &amp;&amp; ("
+                },
+                {
+                  "lineNumber": 1624,
+                  "content": "                                      &lt;div className=\"bg-background border border-border rounded-xl p-3\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1625,
+                  "content": "                                        &lt;h5 className=\"text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1626,
+                  "content": "                                          Headers",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1627,
+                  "content": "                                        &lt;/h5&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1628,
+                  "content": "                                        &lt;div className=\"space-y-3\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1629,
+                  "content": "                                          {message.toolParams",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1630,
+                  "content": "                                            .filter(p =&gt; p.group === \"headers\")"
+                },
+                {
+                  "lineNumber": 1631,
+                  "content": "                                            .map((param, idx) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1632,
+                  "content": "                                              const isEmpty = !param.value.trim();",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1633,
+                  "content": "                                              const showError = localValidationAttempted &amp;&amp; isEmpty;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1634,
+                  "content": "                                              return (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1635,
+                  "content": "                                                &lt;div key={idx}&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1984,
+                  "content": "                                            webhook.headers.forEach((h: any) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1985,
+                  "content": "                                              if (h.name) {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1986,
+                  "content": "                                                allParams.push({",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1987,
+                  "content": "                                                  name: h.name,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1988,
+                  "content": "                                                  value: h.value || \"\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1989,
+                  "content": "                                                  group: \"headers\","
+                },
+                {
+                  "lineNumber": 1990,
+                  "content": "                                                });",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1991,
+                  "content": "                                              }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1992,
+                  "content": "                                            });",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1993,
+                  "content": "                                          }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1994,
+                  "content": "                                        } else {",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 59,
+          "totalMatchedLines": 6
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I have a clearer picture. I need to:
+
+1. Remove the Headers display section (lines 1622-1657)
+2. Remove the Headers extraction when adding a new tool call message (lines 1982-1993)
+3. Keep the code that builds headers into argsObj when saving (lines 659-662) - this preserves any existing headers from loaded tests
+4. Check if headers should be filtered out when parsing existing tests (lines 142-152) - actually this code extracts from `webhookKeys` which includes headers. I should remove headers from that extraction too.Let me look at line 142 area to understand the webhookKeys.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I understand. Let me make the changes:1. Line 141: Remove "headers" from webhookKeys - change to `["body", "query"]`2. Line 147: Update the comment to remove mention of headers3. Lines 1622-1657: Remove the entire Headers display section4. Lines 1982-1993: Remove the Headers extraction when adding new tool call
+
+Let me also check if I need to update the code that builds argsObj when saving. Actually, I'll keep that code so existing headers are preserved if they exist - but since we won't be loading or adding headers anymore, they effectively won't exist.
+
+Let me start with the changes.</details></think>
+
+---
+
+I'll remove headers from being displayed and extracted in the conversation history.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me remove the Headers display section.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I'll remove the Headers section from lines 1622-1662.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me remove the Headers extraction when adding a new tool call message.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I'll remove the Headers extraction section (lines 1941-1952).</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me also remove the code that builds headers into argsObj when saving - actually wait, I should keep that because if someone somehow has existing headers in their data, we should preserve them when saving. But since we're not loading or adding headers anymore, that code path won't be hit.
+
+Actually, let me also check if there's any code that handles headers in the saving logic. The user said they don't want headers anywhere, so let me also remove the handling for headers when saving.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I should remove the headers handling in the saving logic too. Since headers are no longer shown or loaded, this code will never be reached, but let me clean it up for consistency.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me check for linter errors.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no linter errors. Now let me check if there's anything in shared.tsx or the simulation transcript that shows headers. Earlier grep showed shared.tsx had no matches for headers, and the simulation transcript only had HTTP headers for API calls, not tool call headers display.
+
+Let me double-check the test results shared.tsx to make sure there's nothing showing headers for tool calls.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "body|query|Headers",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx",
+  "context": 3,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "body|query|Headers",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {}
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, there's nothing in shared.tsx that specifically handles body, query, or headers. That means the test runner and benchmark runner use a generic display for tool call arguments.
+
+Let me also check the simulation transcript page more carefully to see if there's any specific handling for headers in the tool call display.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "parsedArgs|tool_call|function\\.arguments",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx",
+  "context": 3,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "parsedArgs|tool_call|function\\.arguments",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": "src/app/simulations/[uuid]/runs/[runId]/page.tsx",
+              "matches": [
+                {
+                  "lineNumber": 42,
+                  "content": "type TranscriptEntry = {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 43,
+                  "content": "  role: string;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 44,
+                  "content": "  content?: string;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 45,
+                  "content": "  tool_calls?: any[];"
+                },
+                {
+                  "lineNumber": 46,
+                  "content": "  tool_call_id?: string;"
+                },
+                {
+                  "lineNumber": 47,
+                  "content": "};",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 48,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 49,
+                  "content": "type SimulationResult = {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 64,
+                  "content": "  updated_at: string;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 65,
+                  "content": "  total_simulations: number;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 66,
+                  "content": "  metrics: {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 67,
+                  "content": "    tool_calls?: MetricData;"
+                },
+                {
+                  "lineNumber": 68,
+                  "content": "    answer_completeness?: MetricData;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 69,
+                  "content": "    assistant_behavior?: MetricData;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 70,
+                  "content": "    question_completeness?: MetricData;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1233,
+                  "content": "                        {entry.role === \"assistant\" &amp;&amp; (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1234,
+                  "content": "                          &lt;div className=\"flex items-center gap-2\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1235,
+                  "content": "                            &lt;span className=\"text-sm font-medium text-foreground\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1236,
+                  "content": "                              {entry.tool_calls ? \"Agent Tool Call\" : \"Agent\"}"
+                },
+                {
+                  "lineNumber": 1237,
+                  "content": "                            &lt;/span&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1238,
+                  "content": "                          &lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1239,
+                  "content": "                        )}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1269,
+                  "content": "                        {/* Assistant Message (text response) */}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1270,
+                  "content": "                        {entry.role === \"assistant\" &amp;&amp;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1271,
+                  "content": "                          entry.content &amp;&amp;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1272,
+                  "content": "                          !entry.tool_calls &amp;&amp; ("
+                },
+                {
+                  "lineNumber": 1273,
+                  "content": "                            &lt;div className=\"w-1/2\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1274,
+                  "content": "                              &lt;div className=\"px-4 py-3 rounded-xl text-sm text-foreground bg-accent border border-border whitespace-pre-wrap\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1275,
+                  "content": "                                {entry.content}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1278,
+                  "content": "                          )}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1279,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1280,
+                  "content": "                        {/* Tool Call Display */}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1281,
+                  "content": "                        {entry.role === \"assistant\" &amp;&amp; entry.tool_calls &amp;&amp; ("
+                },
+                {
+                  "lineNumber": 1282,
+                  "content": "                          &lt;div className=\"w-1/2\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1283,
+                  "content": "                            {entry.tool_calls.map((toolCall, toolIndex) =&gt; {"
+                },
+                {
+                  "lineNumber": 1284,
+                  "content": "                              let parsedArgs: Record&lt;string, any&gt; = {};"
+                },
+                {
+                  "lineNumber": 1285,
+                  "content": "                              try {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1286,
+                  "content": "                                parsedArgs = JSON.parse("
+                },
+                {
+                  "lineNumber": 1287,
+                  "content": "                                  toolCall.function.arguments,"
+                },
+                {
+                  "lineNumber": 1288,
+                  "content": "                                );",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1289,
+                  "content": "                              } catch {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1290,
+                  "content": "                                parsedArgs = {};"
+                },
+                {
+                  "lineNumber": 1291,
+                  "content": "                              }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1292,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1293,
+                  "content": "                              // Helper to format parameter value",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1327,
+                  "content": "                                                      {toolCall.function.name}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1328,
+                  "content": "                                                    &lt;/span&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1329,
+                  "content": "                                                  &lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1330,
+                  "content": "                                                  {Object.keys(parsedArgs).length &gt; 0 &amp;&amp; ("
+                },
+                {
+                  "lineNumber": 1331,
+                  "content": "                                                    &lt;div className=\"space-y-3 mt-3\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1332,
+                  "content": "                                                      {Object.entries(parsedArgs).map("
+                },
+                {
+                  "lineNumber": 1333,
+                  "content": "                                                        ([key, value], paramIndex) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1334,
+                  "content": "                                                          const displayValue = formatValue(value);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 1335,
+                  "content": "                                                          const isMultiLine = displayValue.includes(\"\\n\");",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 54,
+          "totalMatchedLines": 13
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Looking at the simulation transcript code, it displays all `parsedArgs` keys (including body, query, and headers if they exist). The display is generic - it shows all keys. Since the API response may contain headers in the tool call arguments, they might still be displayed.
+
+However, the user specifically asked about not showing headers in the transcript. Looking at the code, it iterates over `Object.entries(parsedArgs)` and displays each key-value pair. So if the backend sends headers in the tool call arguments, they would be displayed.
+
+I should filter out headers from the display in the simulation transcript too. Let me check how it's rendered.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see the simulation transcript displays all keys from parsedArgs. I need to filter out the "headers" key. Let me update this code to exclude headers.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me check the test results shared.tsx to see if I need to filter headers there too. Let me look at the ToolCallCard component.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me look for the ToolCallCard component which displays the tool call arguments.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "ToolCallCard|Object\\.entries\\(args\\)",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx",
+  "context": 10,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "ToolCallCard|Object\\.entries\\(args\\)",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": "src/components/test-results/shared.tsx",
+              "matches": [
+                {
+                  "lineNumber": 113,
+                  "content": "    try {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 114,
+                  "content": "      return JSON.stringify(value, null, 2);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 115,
+                  "content": "    } catch {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 116,
+                  "content": "      return String(value);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 117,
+                  "content": "    }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 118,
+                  "content": "  }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 119,
+                  "content": "  return String(value);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 120,
+                  "content": "}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 121,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 122,
+                  "content": "// Shared Tool Call Card Component",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 123,
+                  "content": "export function ToolCallCard({"
+                },
+                {
+                  "lineNumber": 124,
+                  "content": "  toolName,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 125,
+                  "content": "  args,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 126,
+                  "content": "}: {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 127,
+                  "content": "  toolName: string;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 128,
+                  "content": "  args: Record&lt;string, any&gt;;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 129,
+                  "content": "}) {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 130,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 131,
+                  "content": "  return (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 132,
+                  "content": "    &lt;div className=\"bg-muted border border-border rounded-2xl p-4\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 133,
+                  "content": "      &lt;div className=\"flex items-center gap-2 mb-2\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 134,
+                  "content": "        &lt;ToolIcon className=\"w-4 h-4 text-muted-foreground\" /&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 135,
+                  "content": "        &lt;span className=\"text-sm font-medium text-foreground\"&gt;{toolName}&lt;/span&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 136,
+                  "content": "      &lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 137,
+                  "content": "      {Object.keys(args).length &gt; 0 &amp;&amp; (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 138,
+                  "content": "        &lt;div className=\"space-y-3 mt-3\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 139,
+                  "content": "          {Object.entries(args).map(([paramName, paramValue]) =&gt; {"
+                },
+                {
+                  "lineNumber": 140,
+                  "content": "            const displayValue = formatParamValue(paramValue);",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 141,
+                  "content": "            const isMultiLine = displayValue.includes(\"\\n\");",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 142,
+                  "content": "            return (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 143,
+                  "content": "              &lt;div key={paramName}&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 144,
+                  "content": "                &lt;label className=\"block text-sm font-medium text-muted-foreground mb-1.5\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 145,
+                  "content": "                  {paramName}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 146,
+                  "content": "                &lt;/label&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 147,
+                  "content": "                &lt;div",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 148,
+                  "content": "                  className={&#96;px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground whitespace-pre-wrap break-all ${",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 149,
+                  "content": "                    isMultiLine ? \"font-mono text-xs\" : \"\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 226,
+                  "content": "                        {message.tool_calls.map((toolCall, tcIndex) =&gt; {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 227,
+                  "content": "                          let parsedArgs: Record&lt;string, any&gt; = {};",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 228,
+                  "content": "                          try {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 229,
+                  "content": "                            parsedArgs = JSON.parse(",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 230,
+                  "content": "                              toolCall.function.arguments",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 231,
+                  "content": "                            );",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 232,
+                  "content": "                          } catch {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 233,
+                  "content": "                            parsedArgs = {};",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 234,
+                  "content": "                          }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 235,
+                  "content": "                          return (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 236,
+                  "content": "                            &lt;ToolCallCard"
+                },
+                {
+                  "lineNumber": 237,
+                  "content": "                              key={tcIndex}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 238,
+                  "content": "                              toolName={toolCall.function.name}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 239,
+                  "content": "                              args={parsedArgs}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 240,
+                  "content": "                            /&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 241,
+                  "content": "                          );",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 242,
+                  "content": "                        })}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 243,
+                  "content": "                      &lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 244,
+                  "content": "                    &lt;/&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 245,
+                  "content": "                  )}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 246,
+                  "content": "              &lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 288,
+                  "content": "            &gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 289,
+                  "content": "              &lt;div className=\"flex items-center gap-2 mb-2\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 290,
+                  "content": "                &lt;span className=\"text-sm font-medium text-foreground\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 291,
+                  "content": "                  Agent Tool Call",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 292,
+                  "content": "                &lt;/span&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 293,
+                  "content": "                &lt;SmallStatusBadge passed={passed} /&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 294,
+                  "content": "              &lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 295,
+                  "content": "              &lt;div className=\"space-y-3\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 296,
+                  "content": "                {output.tool_calls.map((toolCall, index) =&gt; (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 297,
+                  "content": "                  &lt;div key={index} className=\"w-1/2\"&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 298,
+                  "content": "                    &lt;ToolCallCard"
+                },
+                {
+                  "lineNumber": 299,
+                  "content": "                      toolName={toolCall.tool}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 300,
+                  "content": "                      args={toolCall.arguments}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 301,
+                  "content": "                    /&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 302,
+                  "content": "                  &lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 303,
+                  "content": "                ))}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 304,
+                  "content": "              &lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 305,
+                  "content": "            &lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 306,
+                  "content": "          )}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 307,
+                  "content": "        &lt;/div&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 308,
+                  "content": "      )}",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 79,
+          "totalMatchedLines": 4
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see the ToolCallCard component in shared.tsx. I need to filter out "headers" from the args before displaying them.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me check for linter errors.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx",
+    "/Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx",
+    "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx"
+    },
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/pense-frontend/src/app/simulations/[uuid]/runs/[runId]/page.tsx"
+    },
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/test-results/shared.tsx"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no linter errors. All changes have been made:1. AddTestDialog - removed headers from webhookKeys for loading existing tests, removed Headers display section, removed Headers extraction when adding new tool calls, removed headers handling in save logic2. Simulation transcript - filtered out "headers" from parsedArgs display
+3. Test results shared.tsx (ToolCallCard) - filtered out "headers" from args display
+
+The changes ensure headers are not shown in:- Conversation history when creating/editing tests- Test runner results- Benchmark runner results- Simulation transcripts</details></think>
+
+---
+
+Done. I've removed headers from being displayed in all the places:
+
+1. **AddTestDialog** (conversation history):
+   - Removed "headers" from the webhook keys used to detect webhook structure
+   - Removed the Headers display section entirely
+   - Removed Headers extraction when adding a new tool call message
+   - Removed headers handling in the save logic
+
+2. **Simulation transcript** (`page.tsx`):
+   - Filtered out "headers" key from the tool call arguments display
+
+3. **Test results** (`shared.tsx` - used by TestRunnerDialog and BenchmarkResultsDialog):
+   - Filtered out "headers" from the `ToolCallCard` component args display
+
+Now only Query and Body parameters will be shown for webhook tool calls across all these views.
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made code changes to remove headers from being displayed in tool calls across multiple files. Let me search for relevant sections in app-details.md to update.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "headers.*group|group.*headers|Query.*Body.*Headers|body.*query.*headers",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+  "contextBefore": 2,
+  "contextAfter": 3,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "headers.*group|group.*headers|Query.*Body.*Headers|body.*query.*headers",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": ".cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 460,
+                  "content": "    - Add messages via dropdown menu on last message",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 461,
+                  "content": "    - **Webhook tool calls**: When a webhook tool is selected:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 462,
+                  "content": "      - Parameters grouped into separate containers: Query, Body, Headers"
+                },
+                {
+                  "lineNumber": 463,
+                  "content": "      - Each group is in its own container (&#96;bg-background border border-border rounded-xl p-3&#96;) with uppercase section title",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 464,
+                  "content": "      - Input fields within containers use &#96;bg-muted&#96; for contrast",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 465,
+                  "content": "      - A \"Tool Response\" message is automatically added after the tool call",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 472,
+                  "content": "  - **Loading saved tests** (when &#96;initialConfig&#96; is provided):",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 473,
+                  "content": "    - Parses &#96;history&#96; array and converts to chatMessages format",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 474,
+                  "content": "    - **Webhook tool call detection**: Checks if args have &#96;body&#96;, &#96;query&#96;, or &#96;headers&#96; keys to determine if it's a webhook-style tool call"
+                },
+                {
+                  "lineNumber": 475,
+                  "content": "    - **Webhook param extraction**: For webhook tools, extracts nested properties from body/query/headers and assigns &#96;group&#96; property to each param so they display in the correct container (e.g., &#96;{body: {task_type: \"x\"}}&#96; → &#96;{name: \"task_type\", value: \"x\", group: \"body\"}&#96;)"
+                },
+                {
+                  "lineNumber": 476,
+                  "content": "    - **Tool response parsing**: &#96;role: \"tool\"&#96; messages are included as &#96;tool_response&#96; type, linked to their corresponding tool call via &#96;tool_call_id&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 477,
+                  "content": "    - Non-webhook tools show params as flat list without group containers",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 478,
+                  "content": "- **View all tests**",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 597,
+                  "content": "  - Full conversation history (user, assistant, tool calls, tool responses)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 598,
+                  "content": "  - Role-based message styling",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 599,
+                  "content": "  - **Tool call details as form fields**: Arguments are displayed as labeled form fields (matching AddTestDialog style). Each arg key (body, query, headers) is shown as a field label, with its value displayed as pretty-printed JSON"
+                },
+                {
+                  "lineNumber": 600,
+                  "content": "  - **Tool response display** (for webhook calls): Only shows &#96;role: \"tool\"&#96; messages where content is valid JSON with &#96;type: \"webhook_response\"&#96;. Displays the &#96;response&#96; object as **pretty-printed JSON** in a monospace &#96;&lt;pre&gt;&#96; block with \"Agent Tool Response\" header (intentionally different from tool call form fields to distinguish input vs output)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 601,
+                  "content": "  - Per-message audio players for voice simulations (matching &#96;audio_urls&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 602,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2229,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2230,
+                  "content": "// Display tool call with arguments as form-style fields",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2231,
+                  "content": "// - Each arg key (body, query, headers, etc.) is shown as a labeled field"
+                },
+                {
+                  "lineNumber": 2232,
+                  "content": "// - Object/array values are pretty-printed as JSON with 2-space indentation",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2233,
+                  "content": "// - Labels use &#96;text-sm font-medium text-muted-foreground&#96;, values use &#96;text-foreground&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2234,
+                  "content": "// - Parameter values use &#96;whitespace-pre-wrap break-all&#96; to show full content (no truncation)",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 25,
+          "totalMatchedLines": 5
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I found the relevant sections. I need to update these to remove mentions of headers. Let me make the updates.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the loading saved tests section.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the simulation transcript section.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the comment about tool call display.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me also check if there's anything about ToolCallCard that needs updating.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "ToolCallCard",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+  "contextBefore": 2,
+  "contextAfter": 5,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "ToolCallCard",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {
+          "matches": [
+            {
+              "file": ".cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 2211,
+                  "content": "  StatusIcon,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2212,
+                  "content": "  SmallStatusBadge,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2213,
+                  "content": "  ToolCallCard,"
+                },
+                {
+                  "lineNumber": 2214,
+                  "content": "  TestDetailView,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2215,
+                  "content": "  EmptyStateView,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2216,
+                  "content": "  TestStats,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2217,
+                  "content": "} from \"@/components/test-results/shared\";",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2218,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2233,
+                  "content": "// - Labels use &#96;text-sm font-medium text-muted-foreground&#96;, values use &#96;text-foreground&#96;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2234,
+                  "content": "// - Parameter values use &#96;whitespace-pre-wrap break-all&#96; to show full content (no truncation)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2235,
+                  "content": "&lt;ToolCallCard toolName=\"get_weather\" args={{ body: { city: \"London\" }, query: { units: \"metric\" } }} /&gt;"
+                },
+                {
+                  "lineNumber": 2236,
+                  "content": "// Shows \"body\" field with JSON content, \"query\" field with JSON content",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2237,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2238,
+                  "content": "// Full test conversation view",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2239,
+                  "content": "&lt;TestDetailView history={history} output={output} passed={passed} /&gt;",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2240,
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 16,
+          "totalMatchedLines": 2
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The documentation already has a good example without headers. Let me check if there's any other mention of headers in test results that needs updating.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "test-results.*headers|shared\\.tsx.*headers",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+  "contextBefore": 2,
+  "contextAfter": 3,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "test-results.*headers|shared\\.tsx.*headers",
+    "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/pense-frontend": {
+        "content": {}
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no other references to update. Let me also add a note about headers being filtered in the ToolCallCard section to make it clear.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The documentation looks good. The updates I made cover:1. AddTestDialog conversation history - webhook tool calls only show Query and Body
+2. Loading saved tests - detection and extraction only uses body/query
+3. Simulation transcript - headers are filtered out4. ToolCallCard - headers are filtered out from displayLet me verify all changes are complete.</details></think>
+
+---
+
+Updated the documentation to reflect that headers are intentionally excluded from the UI across all locations:
+
+1. **AddTestDialog webhook tool calls**: Changed to "Query, Body (headers are NOT shown in conversation history UI)"
+2. **Webhook tool call detection**: Updated to check for `body` or `query` keys only
+3. **Webhook param extraction**: Updated to mention headers are intentionally excluded
+4. **Simulation transcript tool call display**: Updated to note headers are filtered out
+5. **ToolCallCard example**: Updated comment to clarify headers are filtered out
+
+---
+

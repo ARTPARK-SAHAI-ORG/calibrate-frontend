@@ -304,6 +304,8 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
   - Query: `handleQueryUpdateAtPath`, `handleQueryRemoveAtPath`, `handleQueryAddPropertyAtPath`, `handleQuerySetItemsAtPath`, `addQueryParameter`
   - Body: `handleBodyUpdateAtPath`, `handleBodyRemoveAtPath`, `handleBodyAddPropertyAtPath`, `handleBodySetItemsAtPath`, `addBodyParameter`
 
+- **Scroll behavior**: When adding a new query parameter via `addQueryParameter`, scrolls to the newly added parameter (using `scrollIntoView` with `block: "center"`) instead of scrolling to the bottom of the dialog. This is important because body parameters may exist below query parameters, and we want to keep focus on the section being edited. Uses `queryParamRefs` (a Map of param IDs to DOM elements) and `newlyAddedQueryParamId` state to track and scroll to the new element.
+
 - **URL Validation** (`isValidUrl` helper):
   - Uses JavaScript's `URL` constructor to validate format
   - Requires `http:` or `https:` protocol
@@ -457,12 +459,22 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
     - Message types: `agent`, `user`, `tool_call`, `tool_response`
     - Add messages via dropdown menu on last message
     - **Webhook tool calls**: When a webhook tool is selected:
-      - Parameters shown grouped by: Query Parameters, Body Parameters, Headers
+      - Parameters grouped into separate containers: Query, Body (headers are NOT shown in conversation history UI)
+      - Each group is in its own container (`bg-background border border-border rounded-xl p-3`) with uppercase section title
+      - Input fields within containers use `bg-muted` for contrast
       - A "Tool Response" message is automatically added after the tool call
       - Tool response requires valid JSON input (textarea with real-time validation)
       - User cannot proceed without valid JSON in all tool responses
       - Deleting a webhook tool call also removes its linked tool response
-    - **Structured output tool calls**: Show flat parameter list as inputs
+    - **Structured output tool calls**: Show flat parameter list as inputs (no tool response added - only the tool call is sent to backend)
+    - **Tool call param validation**: All tool call parameters in conversation history must have non-empty values. On save attempt, empty params are highlighted with `border-red-500` with error message "This field cannot be empty". Validation only triggers on `localValidationAttempted` (set when clicking Save), not the parent's `validationAttempted` prop - this prevents showing errors when a new tool call message is first added
+    - **Backend history format**: Webhook tool calls include both the tool call AND linked tool response in history. Structured output tool calls only include the tool call (no fake response injected)
+  - **Loading saved tests** (when `initialConfig` is provided):
+    - Parses `history` array and converts to chatMessages format
+    - **Webhook tool call detection**: Checks if args have `body` or `query` keys to determine if it's a webhook-style tool call
+    - **Webhook param extraction**: For webhook tools, extracts nested properties from body/query and assigns `group` property to each param so they display in the correct container (e.g., `{body: {task_type: "x"}}` → `{name: "task_type", value: "x", group: "body"}`). Headers are intentionally excluded from the UI
+    - **Tool response parsing**: `role: "tool"` messages are included as `tool_response` type, linked to their corresponding tool call via `tool_call_id`
+    - Non-webhook tools show params as flat list without group containers
 - **View all tests**
 - **Edit/delete tests**
 - **Link tests to agents** for benchmarking
@@ -584,7 +596,7 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
   - Full conversation audio player below header (from `conversation_wav_url`) for voice simulations
   - Full conversation history (user, assistant, tool calls, tool responses)
   - Role-based message styling
-  - **Tool call details as form fields**: Arguments are displayed as labeled form fields (matching AddTestDialog style). If args has only a `body` key with an object value, the body contents are flattened to show each property as an individual field. Nested objects/arrays within fields are pretty-printed as JSON with 2-space indentation
+  - **Tool call details as form fields**: Arguments are displayed as labeled form fields (matching AddTestDialog style). Each arg key (body, query) is shown as a field label, with its value displayed as pretty-printed JSON. Headers are filtered out and not shown
   - **Tool response display** (for webhook calls): Only shows `role: "tool"` messages where content is valid JSON with `type: "webhook_response"`. Displays the `response` object as **pretty-printed JSON** in a monospace `<pre>` block with "Agent Tool Response" header (intentionally different from tool call form fields to distinguish input vs output)
   - Per-message audio players for voice simulations (matching `audio_urls`)
 
@@ -2216,14 +2228,12 @@ import {
 <SmallStatusBadge passed={true} />
 
 // Display tool call with arguments as form-style fields
-// - If args has only a 'body' key with an object value, the body contents are flattened
-//   to show each property as an individual labeled field (matching AddTestDialog style)
-// - Otherwise, each top-level arg is shown as a labeled field
-// - Nested objects/arrays within fields are pretty-printed as JSON
-// - Labels use `text-sm font-medium text-foreground`, values use `text-muted-foreground`
+// - Each arg key (body, query) is shown as a labeled field (headers are filtered out)
+// - Object/array values are pretty-printed as JSON with 2-space indentation
+// - Labels use `text-sm font-medium text-muted-foreground`, values use `text-foreground`
 // - Parameter values use `whitespace-pre-wrap break-all` to show full content (no truncation)
-<ToolCallCard toolName="get_weather" args={{ city: "London", units: "metric" }} />
-// With body flattening: args={{ body: { city: "London" } }} → displays as single "city" field
+<ToolCallCard toolName="get_weather" args={{ body: { city: "London" }, query: { units: "metric" } }} />
+// Shows "body" field with JSON content, "query" field with JSON content
 
 // Full test conversation view
 <TestDetailView history={history} output={output} passed={passed} />

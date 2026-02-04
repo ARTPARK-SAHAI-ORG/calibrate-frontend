@@ -96,12 +96,31 @@ export function AddTestDialog({
       if (initialConfig.history && initialConfig.history.length > 0) {
         const messages: Array<{
           id: string;
-          role: "agent" | "user" | "tool_call";
+          role: "agent" | "user" | "tool_call" | "tool_response";
           content: string;
           toolName?: string;
           toolId?: string;
-          toolParams?: Array<{ name: string; value: string }>;
+          toolParams?: Array<{ name: string; value: string; group?: string }>;
+          isWebhook?: boolean;
+          linkedToolCallId?: string;
         }> = [];
+
+        // Helper to format value - stringify objects/arrays for display
+        const formatValue = (val: any): string => {
+          if (val === null) return "null";
+          if (val === undefined) return "";
+          if (typeof val === "object") {
+            try {
+              return JSON.stringify(val, null, 2);
+            } catch {
+              return String(val);
+            }
+          }
+          return String(val);
+        };
+
+        // Track tool call IDs for linking tool responses
+        const toolCallIds: string[] = [];
 
         initialConfig.history.forEach((historyItem, index) => {
           if (historyItem.role === "assistant") {
@@ -114,16 +133,46 @@ export function AddTestDialog({
               } catch {
                 parsedArgs = {};
               }
+              
+              const toolCallId = toolCall.id || `tool-${index}`;
+              toolCallIds.push(toolCallId);
+              
+              // Check if this is a webhook-style tool call (has body/query keys)
+              const webhookKeys = ["body", "query"];
+              const hasWebhookStructure = Object.keys(parsedArgs).some(k => webhookKeys.includes(k));
+              
+              let toolParams: Array<{ name: string; value: string; group?: string }> = [];
+              
+              if (hasWebhookStructure) {
+                // Extract params from body, query with their group (headers are not shown in UI)
+                webhookKeys.forEach(groupKey => {
+                  const groupValue = parsedArgs[groupKey];
+                  if (groupValue && typeof groupValue === "object" && !Array.isArray(groupValue)) {
+                    Object.entries(groupValue).forEach(([paramName, paramValue]) => {
+                      toolParams.push({
+                        name: paramName,
+                        value: formatValue(paramValue),
+                        group: groupKey,
+                      });
+                    });
+                  }
+                });
+              } else {
+                // Regular tool params (non-webhook)
+                toolParams = Object.entries(parsedArgs).map(([name, value]) => ({
+                  name,
+                  value: formatValue(value),
+                }));
+              }
+              
               messages.push({
-                id: toolCall.id || `tool-${index}`,
+                id: toolCallId,
                 role: "tool_call",
                 content: "",
                 toolId: toolCall.id,
                 toolName: toolCall.function.name,
-                toolParams: Object.entries(parsedArgs).map(([name, value]) => ({
-                  name,
-                  value: String(value),
-                })),
+                toolParams,
+                isWebhook: hasWebhookStructure,
               });
             } else {
               // Regular assistant message
@@ -139,8 +188,21 @@ export function AddTestDialog({
               role: "user",
               content: historyItem.content || "",
             });
+          } else if (historyItem.role === "tool" && historyItem.content) {
+            // Tool response message - link to the tool call
+            const linkedToolCallId = historyItem.tool_call_id || toolCallIds[toolCallIds.length - 1] || "";
+            // Find the linked tool call to get its name
+            const linkedToolCall = messages.find(
+              (m) => m.role === "tool_call" && (m.toolId === linkedToolCallId || m.id === linkedToolCallId)
+            );
+            messages.push({
+              id: `tool-response-${index}`,
+              role: "tool_response",
+              content: historyItem.content,
+              linkedToolCallId,
+              toolName: linkedToolCall?.toolName || "",
+            });
           }
-          // Skip "tool" role messages as they are tool responses
         });
 
         if (messages.length > 0) {
@@ -586,7 +648,8 @@ export function AddTestDialog({
         const argsObj: Record<string, any> = {};
         if (message.toolParams) {
           for (const param of message.toolParams) {
-            // For webhook tools, group params by their group (query, body, headers)
+            // For webhook tools, group params by their group (query, body)
+            // Note: Headers are not shown in conversation history UI
             if (message.isWebhook && param.group) {
               if (param.group === "body") {
                 if (!argsObj.body) argsObj.body = {};
@@ -594,9 +657,6 @@ export function AddTestDialog({
               } else if (param.group === "query") {
                 if (!argsObj.query) argsObj.query = {};
                 argsObj.query[param.name] = param.value;
-              } else if (param.group === "headers") {
-                if (!argsObj.headers) argsObj.headers = {};
-                argsObj.headers[param.name] = param.value;
               }
             } else {
               argsObj[param.name] = param.value;
@@ -619,24 +679,20 @@ export function AddTestDialog({
           ],
         });
 
-        // For webhook tools, find the linked tool_response message and use its content
-        // For non-webhook tools, use default response
-        let responseContent = '{"status": "received"}';
+        // For webhook tools, find the linked tool_response message and add it to history
+        // For non-webhook tools, don't add any tool response
         if (message.isWebhook) {
           const linkedResponse = chatMessages.find(
             (m) => m.role === "tool_response" && m.linkedToolCallId === message.id
           );
           if (linkedResponse && linkedResponse.content) {
-            responseContent = linkedResponse.content;
+            history.push({
+              role: "tool",
+              content: linkedResponse.content,
+              tool_call_id: toolCallId,
+            });
           }
         }
-
-        // Add the tool response message
-        history.push({
-          role: "tool",
-          content: responseContent,
-          tool_call_id: toolCallId,
-        });
       }
       // Skip tool_response messages as they're handled with their linked tool_call
     }
@@ -711,6 +767,18 @@ export function AddTestDialog({
     return { history, settings, evaluation };
   };
 
+  // Helper to check if tool call messages have empty params
+  const hasEmptyToolCallParams = () => {
+    const toolCallMessages = chatMessages.filter((m) => m.role === "tool_call");
+    for (const msg of toolCallMessages) {
+      if (msg.toolParams && msg.toolParams.length > 0) {
+        const hasEmpty = msg.toolParams.some((p) => !p.value.trim());
+        if (hasEmpty) return true;
+      }
+    }
+    return false;
+  };
+
   // Handle form submission
   const handleSubmit = () => {
     setLocalValidationAttempted(true);
@@ -719,6 +787,11 @@ export function AddTestDialog({
     setTimeout(() => {
       setLocalValidationAttempted(false);
     }, 3000);
+
+    // Validate tool call params in conversation history (for both test types)
+    if (hasEmptyToolCallParams()) {
+      return; // Don't submit if any tool call has empty params
+    }
 
     // Validate required fields based on test type
     if (activeTab === "next-reply") {
@@ -1458,103 +1531,89 @@ export function AddTestDialog({
                           </div>
                           {message.toolParams &&
                             message.toolParams.length > 0 && (
-                              <div className="space-y-4 mt-3">
+                              <div className="space-y-3 mt-3">
                                 {/* Group parameters by type for webhook tools */}
                                 {message.isWebhook ? (
                                   <>
                                     {/* Query Parameters */}
                                     {message.toolParams.filter(p => p.group === "query").length > 0 && (
-                                      <div>
-                                        <h5 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-                                          Query Parameters
+                                      <div className="bg-background border border-border rounded-xl p-3">
+                                        <h5 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">
+                                          Query
                                         </h5>
-                                        <div className="space-y-2">
+                                        <div className="space-y-3">
                                           {message.toolParams
                                             .filter(p => p.group === "query")
-                                            .map((param, idx) => (
-                                              <div key={idx}>
-                                                <label className="block text-sm font-medium text-muted-foreground mb-1">
-                                                  {param.name}
-                                                </label>
-                                                <input
-                                                  type="text"
-                                                  value={param.value}
-                                                  onChange={(e) =>
-                                                    updateToolCallParam(
-                                                      message.id,
-                                                      param.name,
-                                                      e.target.value,
-                                                    )
-                                                  }
-                                                  placeholder={`Enter ${param.name}`}
-                                                  className="w-full h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent"
-                                                />
-                                              </div>
-                                            ))}
+                                            .map((param, idx) => {
+                                              const isEmpty = !param.value.trim();
+                                              const showError = localValidationAttempted && isEmpty;
+                                              return (
+                                                <div key={idx}>
+                                                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                                                    {param.name}
+                                                  </label>
+                                                  <input
+                                                    type="text"
+                                                    value={param.value}
+                                                    onChange={(e) =>
+                                                      updateToolCallParam(
+                                                        message.id,
+                                                        param.name,
+                                                        e.target.value,
+                                                      )
+                                                    }
+                                                    placeholder={`Enter ${param.name}`}
+                                                    className={`w-full h-10 px-3 rounded-lg text-sm bg-muted text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                                                      showError ? "border-red-500" : "border-border"
+                                                    }`}
+                                                  />
+                                                  {showError && (
+                                                    <p className="text-xs text-red-500 mt-1">This field cannot be empty</p>
+                                                  )}
+                                                </div>
+                                              );
+                                            })}
                                         </div>
                                       </div>
                                     )}
                                     {/* Body Parameters */}
                                     {message.toolParams.filter(p => p.group === "body").length > 0 && (
-                                      <div>
-                                        <h5 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-                                          Body Parameters
+                                      <div className="bg-background border border-border rounded-xl p-3">
+                                        <h5 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">
+                                          Body
                                         </h5>
-                                        <div className="space-y-2">
+                                        <div className="space-y-3">
                                           {message.toolParams
                                             .filter(p => p.group === "body")
-                                            .map((param, idx) => (
-                                              <div key={idx}>
-                                                <label className="block text-sm font-medium text-muted-foreground mb-1">
-                                                  {param.name}
-                                                </label>
-                                                <input
-                                                  type="text"
-                                                  value={param.value}
-                                                  onChange={(e) =>
-                                                    updateToolCallParam(
-                                                      message.id,
-                                                      param.name,
-                                                      e.target.value,
-                                                    )
-                                                  }
-                                                  placeholder={`Enter ${param.name}`}
-                                                  className="w-full h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent"
-                                                />
-                                              </div>
-                                            ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                    {/* Headers */}
-                                    {message.toolParams.filter(p => p.group === "headers").length > 0 && (
-                                      <div>
-                                        <h5 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-                                          Headers
-                                        </h5>
-                                        <div className="space-y-2">
-                                          {message.toolParams
-                                            .filter(p => p.group === "headers")
-                                            .map((param, idx) => (
-                                              <div key={idx}>
-                                                <label className="block text-sm font-medium text-muted-foreground mb-1">
-                                                  {param.name}
-                                                </label>
-                                                <input
-                                                  type="text"
-                                                  value={param.value}
-                                                  onChange={(e) =>
-                                                    updateToolCallParam(
-                                                      message.id,
-                                                      param.name,
-                                                      e.target.value,
-                                                    )
-                                                  }
-                                                  placeholder={`Enter ${param.name}`}
-                                                  className="w-full h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent"
-                                                />
-                                              </div>
-                                            ))}
+                                            .map((param, idx) => {
+                                              const isEmpty = !param.value.trim();
+                                              const showError = localValidationAttempted && isEmpty;
+                                              return (
+                                                <div key={idx}>
+                                                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                                                    {param.name}
+                                                  </label>
+                                                  <input
+                                                    type="text"
+                                                    value={param.value}
+                                                    onChange={(e) =>
+                                                      updateToolCallParam(
+                                                        message.id,
+                                                        param.name,
+                                                        e.target.value,
+                                                      )
+                                                    }
+                                                    placeholder={`Enter ${param.name}`}
+                                                    className={`w-full h-10 px-3 rounded-lg text-sm bg-muted text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                                                      showError ? "border-red-500" : "border-border"
+                                                    }`}
+                                                  />
+                                                  {showError && (
+                                                    <p className="text-xs text-red-500 mt-1">This field cannot be empty</p>
+                                                  )}
+                                                </div>
+                                              );
+                                            })}
                                         </div>
                                       </div>
                                     )}
@@ -1562,26 +1621,35 @@ export function AddTestDialog({
                                 ) : (
                                   /* Regular tool parameters */
                                   <div className="space-y-3">
-                                    {message.toolParams.map((param, idx) => (
-                                      <div key={idx}>
-                                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-                                          {param.name}
-                                        </label>
-                                        <input
-                                          type="text"
-                                          value={param.value}
-                                          onChange={(e) =>
-                                            updateToolCallParam(
-                                              message.id,
-                                              param.name,
-                                              e.target.value,
-                                            )
-                                          }
-                                          placeholder={`Enter ${param.name}`}
-                                          className="w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent"
-                                        />
-                                      </div>
-                                    ))}
+                                    {message.toolParams.map((param, idx) => {
+                                      const isEmpty = !param.value.trim();
+                                      const showError = localValidationAttempted && isEmpty;
+                                      return (
+                                        <div key={idx}>
+                                          <label className="block text-sm font-medium text-foreground mb-1.5">
+                                            {param.name}
+                                          </label>
+                                          <input
+                                            type="text"
+                                            value={param.value}
+                                            onChange={(e) =>
+                                              updateToolCallParam(
+                                                message.id,
+                                                param.name,
+                                                e.target.value,
+                                              )
+                                            }
+                                            placeholder={`Enter ${param.name}`}
+                                            className={`w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                                              showError ? "border-red-500" : "border-border"
+                                            }`}
+                                          />
+                                          {showError && (
+                                            <p className="text-xs text-red-500 mt-1">This field cannot be empty</p>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 )}
                               </div>
@@ -1867,19 +1935,7 @@ export function AddTestDialog({
                                               });
                                             });
                                           }
-                                          
-                                          // Headers
-                                          if (webhook.headers && Array.isArray(webhook.headers)) {
-                                            webhook.headers.forEach((h: any) => {
-                                              if (h.name) {
-                                                allParams.push({
-                                                  name: h.name,
-                                                  value: h.value || "",
-                                                  group: "headers",
-                                                });
-                                              }
-                                            });
-                                          }
+                                          // Note: Headers are not shown in conversation history UI
                                         } else {
                                           // Structured output tool - use regular parameters
                                           const params = tool.config?.parameters;

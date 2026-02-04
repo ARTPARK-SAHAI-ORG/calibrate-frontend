@@ -1304,21 +1304,6 @@ export default function SimulationRunPage() {
                                 return String(val);
                               };
 
-                                              // Flatten args if only 'body' key with object value
-                                              const displayArgs = (() => {
-                                                const keys = Object.keys(parsedArgs);
-                                                if (
-                                                  keys.length === 1 &&
-                                                  keys[0] === "body" &&
-                                                  parsedArgs.body &&
-                                                  typeof parsedArgs.body === "object" &&
-                                                  !Array.isArray(parsedArgs.body)
-                                                ) {
-                                                  return parsedArgs.body;
-                                                }
-                                                return parsedArgs;
-                                              })();
-
                                               return (
                                                 <div
                                                   key={toolIndex}
@@ -1342,9 +1327,11 @@ export default function SimulationRunPage() {
                                                       {toolCall.function.name}
                                                     </span>
                                                   </div>
-                                                  {Object.keys(displayArgs).length > 0 && (
+                                                  {Object.keys(parsedArgs).filter(k => k !== "headers").length > 0 && (
                                                     <div className="space-y-3 mt-3">
-                                                      {Object.entries(displayArgs).map(
+                                                      {Object.entries(parsedArgs)
+                                                        .filter(([key]) => key !== "headers")
+                                                        .map(
                                                         ([key, value], paramIndex) => {
                                                           const displayValue = formatValue(value);
                                                           const isMultiLine = displayValue.includes("\n");

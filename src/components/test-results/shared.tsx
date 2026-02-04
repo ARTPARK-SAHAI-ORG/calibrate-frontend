@@ -119,22 +119,6 @@ function formatParamValue(value: any): string {
   return String(value);
 }
 
-// Helper to flatten args - if there's only a 'body' key with an object, flatten it
-function flattenArgs(args: Record<string, any>): Record<string, any> {
-  const keys = Object.keys(args);
-  // If args has only a 'body' key and its value is an object (not array), flatten it
-  if (
-    keys.length === 1 &&
-    keys[0] === "body" &&
-    args.body &&
-    typeof args.body === "object" &&
-    !Array.isArray(args.body)
-  ) {
-    return args.body;
-  }
-  return args;
-}
-
 // Shared Tool Call Card Component
 export function ToolCallCard({
   toolName,
@@ -143,7 +127,6 @@ export function ToolCallCard({
   toolName: string;
   args: Record<string, any>;
 }) {
-  const displayArgs = flattenArgs(args);
 
   return (
     <div className="bg-muted border border-border rounded-2xl p-4">
@@ -151,9 +134,11 @@ export function ToolCallCard({
         <ToolIcon className="w-4 h-4 text-muted-foreground" />
         <span className="text-sm font-medium text-foreground">{toolName}</span>
       </div>
-      {Object.keys(displayArgs).length > 0 && (
+      {Object.keys(args).filter(k => k !== "headers").length > 0 && (
         <div className="space-y-3 mt-3">
-          {Object.entries(displayArgs).map(([paramName, paramValue]) => {
+          {Object.entries(args)
+            .filter(([paramName]) => paramName !== "headers")
+            .map(([paramName, paramValue]) => {
             const displayValue = formatParamValue(paramValue);
             const isMultiLine = displayValue.includes("\n");
             return (

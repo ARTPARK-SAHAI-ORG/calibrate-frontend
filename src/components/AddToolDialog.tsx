@@ -76,6 +76,8 @@ export function AddToolDialog({
 
   // Query parameters state (for webhook tools) - uses same Parameter type
   const [queryParameters, setQueryParameters] = useState<Parameter[]>([]);
+  const [newlyAddedQueryParamId, setNewlyAddedQueryParamId] = useState<string | null>(null);
+  const queryParamRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Body parameters state (for webhook tools with POST, PUT, PATCH methods)
   const [bodyDescription, setBodyDescription] = useState("");
@@ -126,6 +128,19 @@ export function AddToolDialog({
     resetForm();
     onClose();
   };
+
+  // Scroll to newly added query parameter
+  useEffect(() => {
+    if (newlyAddedQueryParamId) {
+      setTimeout(() => {
+        const element = queryParamRefs.current.get(newlyAddedQueryParamId);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        setNewlyAddedQueryParamId(null);
+      }, 50);
+    }
+  }, [newlyAddedQueryParamId]);
 
   // Scroll to bottom when parameters change (new parameter added)
   const scrollToBottom = () => {
@@ -459,17 +474,18 @@ export function AddToolDialog({
 
   const addQueryParameter = () => {
     setValidationAttempted(false);
+    const newId = crypto.randomUUID();
     setQueryParameters([
       ...queryParameters,
       {
-        id: crypto.randomUUID(),
+        id: newId,
         dataType: "string",
         name: "",
         required: true,
         description: "",
       },
     ]);
-    scrollToBottom();
+    setNewlyAddedQueryParamId(newId);
   };
 
   // Body parameter handlers (same logic, different state)
@@ -1424,19 +1440,29 @@ export function AddToolDialog({
 
                   {/* Query Parameter Cards */}
                   {queryParameters.map((param) => (
-                    <ParameterCard
+                    <div
                       key={param.id}
-                      param={param}
-                      path={[]}
-                      onUpdate={handleQueryUpdateAtPath}
-                      onRemove={handleQueryRemoveAtPath}
-                      onAddProperty={handleQueryAddPropertyAtPath}
-                      onSetItems={handleQuerySetItemsAtPath}
-                      validationAttempted={validationAttempted}
-                      siblingNames={queryParameters
-                        .filter((p) => p.id !== param.id)
-                        .map((p) => p.name)}
-                    />
+                      ref={(el) => {
+                        if (el) {
+                          queryParamRefs.current.set(param.id, el);
+                        } else {
+                          queryParamRefs.current.delete(param.id);
+                        }
+                      }}
+                    >
+                      <ParameterCard
+                        param={param}
+                        path={[]}
+                        onUpdate={handleQueryUpdateAtPath}
+                        onRemove={handleQueryRemoveAtPath}
+                        onAddProperty={handleQueryAddPropertyAtPath}
+                        onSetItems={handleQuerySetItemsAtPath}
+                        validationAttempted={validationAttempted}
+                        siblingNames={queryParameters
+                          .filter((p) => p.id !== param.id)
+                          .map((p) => p.name)}
+                      />
+                    </div>
                   ))}
                 </div>
               )}
