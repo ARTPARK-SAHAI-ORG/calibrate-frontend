@@ -414,23 +414,21 @@ export default function MetricsPage() {
     >
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">Metrics</h1>
-            <p className="text-muted-foreground text-base leading-relaxed mt-1">
-              Understand and analyze the performance of your agents
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              resetForm();
-              setAddMetricSidebarOpen(true);
-            }}
-            className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
-          >
-            Add metric
-          </button>
+        <div>
+          <h1 className="text-2xl font-semibold">Metrics</h1>
+          <p className="text-muted-foreground text-base leading-relaxed mt-1">
+            Understand and analyze the performance of your agents
+          </p>
         </div>
+        <button
+          onClick={() => {
+            resetForm();
+            setAddMetricSidebarOpen(true);
+          }}
+          className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+        >
+          Add metric
+        </button>
 
         {/* Search Input */}
         <div className="relative max-w-md">

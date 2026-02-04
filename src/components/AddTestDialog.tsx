@@ -223,11 +223,13 @@ export function AddTestDialog({
   const [chatMessages, setChatMessages] = useState<
     Array<{
       id: string;
-      role: "agent" | "user" | "tool_call";
+      role: "agent" | "user" | "tool_call" | "tool_response";
       content: string;
       toolName?: string;
       toolId?: string;
-      toolParams?: Array<{ name: string; value: string }>;
+      toolParams?: Array<{ name: string; value: string; group?: string }>;
+      isWebhook?: boolean;
+      linkedToolCallId?: string; // For tool_response to link back to tool_call
     }>
   >([{ id: "1", role: "agent", content: "Hello, how can I help you today?" }]);
 
@@ -243,19 +245,35 @@ export function AddTestDialog({
   const addToolCallMessage = (
     toolId: string,
     toolName: string,
-    params: Array<{ name: string; value: string }>,
+    params: Array<{ name: string; value: string; group?: string }>,
+    isWebhook: boolean = false,
   ) => {
-    setChatMessages([
+    const toolCallId = Date.now().toString();
+    const newMessages: typeof chatMessages = [
       ...chatMessages,
       {
-        id: Date.now().toString(),
+        id: toolCallId,
         role: "tool_call",
         content: "",
         toolId,
         toolName,
         toolParams: params,
+        isWebhook,
       },
-    ]);
+    ];
+
+    // If it's a webhook tool, automatically add a tool response message after it
+    if (isWebhook) {
+      newMessages.push({
+        id: (Date.now() + 1).toString(),
+        role: "tool_response",
+        content: '{\n  "status": "success",\n  "response": {}\n}',
+        linkedToolCallId: toolCallId,
+        toolName,
+      });
+    }
+
+    setChatMessages(newMessages);
     setToolCallDropdownOpen(false);
     setPendingToolCall(null);
   };
@@ -286,7 +304,18 @@ export function AddTestDialog({
   };
 
   const removeChatMessage = (id: string) => {
-    setChatMessages(chatMessages.filter((msg) => msg.id !== id));
+    const messageToRemove = chatMessages.find((msg) => msg.id === id);
+    
+    // If removing a tool_call that's a webhook, also remove its linked tool_response
+    if (messageToRemove?.role === "tool_call" && messageToRemove?.isWebhook) {
+      setChatMessages(
+        chatMessages.filter(
+          (msg) => msg.id !== id && msg.linkedToolCallId !== id
+        )
+      );
+    } else {
+      setChatMessages(chatMessages.filter((msg) => msg.id !== id));
+    }
   };
 
   const [addMessageDropdownOpen, setAddMessageDropdownOpen] = useState(false);
@@ -350,6 +379,9 @@ export function AddTestDialog({
   }, [isOpen, backendAccessToken]);
 
   const addToolFromSelection = (tool: AvailableTool) => {
+    // Check if tool is a webhook type - default to accept any arguments for webhooks
+    const isWebhook = tool.config?.type === "webhook";
+
     // Extract parameters from tool config - handle both array (new) and object (legacy) formats
     let paramList: Array<{ id: string; name: string; value: string }> = [];
     const params = tool.config?.parameters;
@@ -380,7 +412,7 @@ export function AddTestDialog({
       id: tool.uuid,
       name: tool.name,
       expectation: "should-call",
-      acceptAnyParameterValues: false,
+      acceptAnyParameterValues: isWebhook, // Default to true for webhook tools
       isInbuilt: false,
       expectedParameters: paramList,
     };
@@ -551,10 +583,24 @@ export function AddTestDialog({
         const toolCallId = generateUUID();
 
         // Build the arguments object from tool params
-        const argsObj: Record<string, string> = {};
+        const argsObj: Record<string, any> = {};
         if (message.toolParams) {
           for (const param of message.toolParams) {
-            argsObj[param.name] = param.value;
+            // For webhook tools, group params by their group (query, body, headers)
+            if (message.isWebhook && param.group) {
+              if (param.group === "body") {
+                if (!argsObj.body) argsObj.body = {};
+                argsObj.body[param.name] = param.value;
+              } else if (param.group === "query") {
+                if (!argsObj.query) argsObj.query = {};
+                argsObj.query[param.name] = param.value;
+              } else if (param.group === "headers") {
+                if (!argsObj.headers) argsObj.headers = {};
+                argsObj.headers[param.name] = param.value;
+              }
+            } else {
+              argsObj[param.name] = param.value;
+            }
           }
         }
 
@@ -573,13 +619,26 @@ export function AddTestDialog({
           ],
         });
 
+        // For webhook tools, find the linked tool_response message and use its content
+        // For non-webhook tools, use default response
+        let responseContent = '{"status": "received"}';
+        if (message.isWebhook) {
+          const linkedResponse = chatMessages.find(
+            (m) => m.role === "tool_response" && m.linkedToolCallId === message.id
+          );
+          if (linkedResponse && linkedResponse.content) {
+            responseContent = linkedResponse.content;
+          }
+        }
+
         // Add the tool response message
         history.push({
           role: "tool",
-          content: '{"status": "received"}',
+          content: responseContent,
           tool_call_id: toolCallId,
         });
       }
+      // Skip tool_response messages as they're handled with their linked tool_call
     }
 
     // Build the evaluation object based on the active tab
@@ -666,6 +725,15 @@ export function AddTestDialog({
       if (!testName.trim() || !expectedMessage.trim()) {
         return; // Don't submit if validation fails
       }
+      // Validate that all tool_response messages have valid JSON
+      const toolResponses = chatMessages.filter((m) => m.role === "tool_response");
+      for (const response of toolResponses) {
+        try {
+          JSON.parse(response.content);
+        } catch {
+          return; // Don't submit if any tool response has invalid JSON
+        }
+      }
     } else {
       // tool-invocation - name and at least one tool are required
       if (!testName.trim() || selectedTools.length === 0) {
@@ -684,6 +752,15 @@ export function AddTestDialog({
           if (hasEmptyParams) {
             return;
           }
+        }
+      }
+      // Validate that all tool_response messages have valid JSON
+      const toolResponses = chatMessages.filter((m) => m.role === "tool_response");
+      for (const response of toolResponses) {
+        try {
+          JSON.parse(response.content);
+        } catch {
+          return; // Don't submit if any tool response has invalid JSON
         }
       }
     }
@@ -1373,40 +1450,218 @@ export function AddTestDialog({
                             <span className="text-sm font-medium text-foreground">
                               {message.toolName}
                             </span>
+                            {message.isWebhook && (
+                              <span className="text-xs text-muted-foreground bg-background px-2 py-0.5 rounded">
+                                Webhook
+                              </span>
+                            )}
                           </div>
                           {message.toolParams &&
                             message.toolParams.length > 0 && (
-                              <div className="space-y-3 mt-3">
-                                {message.toolParams.map((param, idx) => (
-                                  <div key={idx}>
-                                    <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-                                      {param.name}
-                                    </label>
-                                    <input
-                                      type="text"
-                                      value={param.value}
-                                      onChange={(e) =>
-                                        updateToolCallParam(
-                                          message.id,
-                                          param.name,
-                                          e.target.value,
-                                        )
-                                      }
-                                      placeholder={`Enter ${param.name}`}
-                                      className="w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent"
-                                    />
+                              <div className="space-y-4 mt-3">
+                                {/* Group parameters by type for webhook tools */}
+                                {message.isWebhook ? (
+                                  <>
+                                    {/* Query Parameters */}
+                                    {message.toolParams.filter(p => p.group === "query").length > 0 && (
+                                      <div>
+                                        <h5 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
+                                          Query Parameters
+                                        </h5>
+                                        <div className="space-y-2">
+                                          {message.toolParams
+                                            .filter(p => p.group === "query")
+                                            .map((param, idx) => (
+                                              <div key={idx}>
+                                                <label className="block text-sm font-medium text-muted-foreground mb-1">
+                                                  {param.name}
+                                                </label>
+                                                <input
+                                                  type="text"
+                                                  value={param.value}
+                                                  onChange={(e) =>
+                                                    updateToolCallParam(
+                                                      message.id,
+                                                      param.name,
+                                                      e.target.value,
+                                                    )
+                                                  }
+                                                  placeholder={`Enter ${param.name}`}
+                                                  className="w-full h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent"
+                                                />
+                                              </div>
+                                            ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {/* Body Parameters */}
+                                    {message.toolParams.filter(p => p.group === "body").length > 0 && (
+                                      <div>
+                                        <h5 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
+                                          Body Parameters
+                                        </h5>
+                                        <div className="space-y-2">
+                                          {message.toolParams
+                                            .filter(p => p.group === "body")
+                                            .map((param, idx) => (
+                                              <div key={idx}>
+                                                <label className="block text-sm font-medium text-muted-foreground mb-1">
+                                                  {param.name}
+                                                </label>
+                                                <input
+                                                  type="text"
+                                                  value={param.value}
+                                                  onChange={(e) =>
+                                                    updateToolCallParam(
+                                                      message.id,
+                                                      param.name,
+                                                      e.target.value,
+                                                    )
+                                                  }
+                                                  placeholder={`Enter ${param.name}`}
+                                                  className="w-full h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent"
+                                                />
+                                              </div>
+                                            ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {/* Headers */}
+                                    {message.toolParams.filter(p => p.group === "headers").length > 0 && (
+                                      <div>
+                                        <h5 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
+                                          Headers
+                                        </h5>
+                                        <div className="space-y-2">
+                                          {message.toolParams
+                                            .filter(p => p.group === "headers")
+                                            .map((param, idx) => (
+                                              <div key={idx}>
+                                                <label className="block text-sm font-medium text-muted-foreground mb-1">
+                                                  {param.name}
+                                                </label>
+                                                <input
+                                                  type="text"
+                                                  value={param.value}
+                                                  onChange={(e) =>
+                                                    updateToolCallParam(
+                                                      message.id,
+                                                      param.name,
+                                                      e.target.value,
+                                                    )
+                                                  }
+                                                  placeholder={`Enter ${param.name}`}
+                                                  className="w-full h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent"
+                                                />
+                                              </div>
+                                            ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  /* Regular tool parameters */
+                                  <div className="space-y-3">
+                                    {message.toolParams.map((param, idx) => (
+                                      <div key={idx}>
+                                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+                                          {param.name}
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={param.value}
+                                          onChange={(e) =>
+                                            updateToolCallParam(
+                                              message.id,
+                                              param.name,
+                                              e.target.value,
+                                            )
+                                          }
+                                          placeholder={`Enter ${param.name}`}
+                                          className="w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent"
+                                        />
+                                      </div>
+                                    ))}
                                   </div>
-                                ))}
+                                )}
                               </div>
                             )}
                         </div>
                       </div>
                     )}
 
+                    {/* Tool Response Display (for webhook tools) */}
+                    {message.role === "tool_response" && (
+                      <div className="w-1/2">
+                        <div className="bg-muted border border-border rounded-2xl p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <svg
+                              className="w-4 h-4 text-muted-foreground"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={1.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                              />
+                            </svg>
+                            <span className="text-sm font-medium text-foreground">
+                              Tool Response
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              ({message.toolName})
+                            </span>
+                          </div>
+                          <div className="mt-2">
+                            <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                              JSON Response <span className="text-red-500">*</span>
+                            </label>
+                            <textarea
+                              value={message.content}
+                              onChange={(e) =>
+                                updateChatMessage(message.id, e.target.value)
+                              }
+                              placeholder='{"status": "success", "response": {}}'
+                              rows={5}
+                              className={`w-full px-3 py-2 rounded-lg text-sm font-mono bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                                (() => {
+                                  try {
+                                    JSON.parse(message.content);
+                                    return "border-border";
+                                  } catch {
+                                    return message.content.trim()
+                                      ? "border-red-500"
+                                      : "border-border";
+                                  }
+                                })()
+                              }`}
+                            />
+                            {(() => {
+                              try {
+                                JSON.parse(message.content);
+                                return null;
+                              } catch {
+                                return message.content.trim() ? (
+                                  <p className="text-xs text-red-500 mt-1">
+                                    Invalid JSON format
+                                  </p>
+                                ) : null;
+                              }
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Message Actions - Delete button for all messages, Add button only for last */}
                     <div className="flex items-center gap-2 relative">
-                      {/* Delete and Add Message Buttons - only for last message */}
-                      {index === chatMessages.length - 1 && (
+                      {/* Delete and Add Message Buttons - only for last non-tool-response message */}
+                      {/* Tool response messages are linked to their tool call and shouldn't have independent actions */}
+                      {message.role !== "tool_response" &&
+                        index === chatMessages.length - 1 - (chatMessages[chatMessages.length - 1]?.role === "tool_response" ? 1 : 0) && (
                         <>
                           <button
                             onClick={() => removeChatMessage(message.id)}
@@ -1583,15 +1838,75 @@ export function AddTestDialog({
                                           [],
                                         );
                                       }}
-                                      onSelectCustomTool={(tool, params) => {
-                                        // Always add tool call directly with params (empty values if has params)
+                                      onSelectCustomTool={(tool) => {
+                                        const isWebhook = tool.config?.type === "webhook";
+                                        let allParams: Array<{ name: string; value: string; group?: string }> = [];
+
+                                        if (isWebhook && tool.config?.webhook) {
+                                          // Extract webhook-specific parameters
+                                          const webhook = tool.config.webhook;
+                                          
+                                          // Query parameters (for GET requests)
+                                          if (webhook.queryParameters && Array.isArray(webhook.queryParameters)) {
+                                            webhook.queryParameters.forEach((p: any) => {
+                                              allParams.push({
+                                                name: p.id || p.name || "",
+                                                value: "",
+                                                group: "query",
+                                              });
+                                            });
+                                          }
+                                          
+                                          // Body parameters (for POST requests)
+                                          if (webhook.body?.parameters && Array.isArray(webhook.body.parameters)) {
+                                            webhook.body.parameters.forEach((p: any) => {
+                                              allParams.push({
+                                                name: p.id || p.name || "",
+                                                value: "",
+                                                group: "body",
+                                              });
+                                            });
+                                          }
+                                          
+                                          // Headers
+                                          if (webhook.headers && Array.isArray(webhook.headers)) {
+                                            webhook.headers.forEach((h: any) => {
+                                              if (h.name) {
+                                                allParams.push({
+                                                  name: h.name,
+                                                  value: h.value || "",
+                                                  group: "headers",
+                                                });
+                                              }
+                                            });
+                                          }
+                                        } else {
+                                          // Structured output tool - use regular parameters
+                                          const params = tool.config?.parameters;
+                                          if (Array.isArray(params)) {
+                                            allParams = params.map((p: any) => ({
+                                              name: p.id || p.name || "",
+                                              value: "",
+                                            }));
+                                          } else {
+                                            const propsObj =
+                                              tool.config?.parameters?.properties ||
+                                              tool.config?.function?.parameters?.properties ||
+                                              tool.config?.properties ||
+                                              tool.config?.parameters ||
+                                              {};
+                                            allParams = Object.keys(propsObj).map((name) => ({
+                                              name,
+                                              value: "",
+                                            }));
+                                          }
+                                        }
+
                                         addToolCallMessage(
                                           tool.uuid,
                                           tool.name,
-                                          params.map((p) => ({
-                                            name: p.name,
-                                            value: "",
-                                          })),
+                                          allParams,
+                                          isWebhook,
                                         );
                                       }}
                                     />

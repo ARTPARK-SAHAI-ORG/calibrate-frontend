@@ -138,22 +138,20 @@ export default function TTSPage() {
     >
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">
-              Text-to-Speech Evaluation
-            </h1>
-            <p className="text-muted-foreground text-base leading-relaxed mt-1">
-              Evaluate TTS quality across multiple providers
-            </p>
-          </div>
-          <button
-            onClick={() => router.push("/tts/new")}
-            className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
-          >
-            New TTS evaluation
-          </button>
+        <div>
+          <h1 className="text-2xl font-semibold">
+            Text-to-Speech Evaluation
+          </h1>
+          <p className="text-muted-foreground text-base leading-relaxed mt-1">
+            Evaluate TTS quality across multiple providers
+          </p>
         </div>
+        <button
+          onClick={() => router.push("/tts/new")}
+          className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+        >
+          New TTS evaluation
+        </button>
 
         {/* Jobs List / Loading / Error / Empty State */}
         {isLoading ? (

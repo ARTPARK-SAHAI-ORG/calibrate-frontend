@@ -1186,10 +1186,20 @@ export default function SimulationRunPage() {
               <div className="space-y-4">
                 {(() => {
                   const fullTranscript = selectedSimulation.transcript ?? [];
-                  const filteredTranscript = fullTranscript.filter(
-                    (entry) =>
-                      entry.role !== "tool" && entry.role !== "end_reason",
-                  );
+                  // Filter out end_reason, but keep tool messages that are webhook_response
+                  const filteredTranscript = fullTranscript.filter((entry) => {
+                    if (entry.role === "end_reason") return false;
+                    if (entry.role === "tool") {
+                      // Only include tool messages that are webhook_response
+                      try {
+                        const parsed = JSON.parse(entry.content || "");
+                        return parsed?.type === "webhook_response";
+                      } catch {
+                        return false;
+                      }
+                    }
+                    return true;
+                  });
                   // Check if conversation ended due to max turns
                   const lastEntry = fullTranscript[fullTranscript.length - 1];
                   const endedDueToMaxTurns =
@@ -1279,50 +1289,129 @@ export default function SimulationRunPage() {
                               } catch {
                                 parsedArgs = {};
                               }
-                              return (
-                                <div
-                                  key={toolIndex}
-                                  className="bg-muted border border-border rounded-2xl p-4 mb-2"
-                                >
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <svg
-                                      className="w-4 h-4 text-muted-foreground"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      stroke="currentColor"
-                                      strokeWidth={1.5}
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
-                                      />
-                                    </svg>
-                                    <span className="text-sm font-medium text-foreground">
-                                      {toolCall.function.name}
-                                    </span>
-                                  </div>
-                                  {Object.keys(parsedArgs).length > 0 && (
-                                    <div className="space-y-3 mt-3">
-                                      {Object.entries(parsedArgs).map(
-                                        ([key, value], paramIndex) => (
-                                          <div key={paramIndex}>
-                                            <label className="block text-sm font-medium text-foreground mb-1.5">
-                                              {key}
-                                            </label>
-                                            <div className="px-3 py-2 bg-background border border-border rounded-lg text-sm text-muted-foreground">
-                                              {String(value)}
-                                            </div>
-                                          </div>
-                                        ),
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              );
+
+                              // Helper to format parameter value
+                              const formatValue = (val: any): string => {
+                                if (val === null) return "null";
+                                if (val === undefined) return "undefined";
+                                if (typeof val === "object") {
+                                  try {
+                                    return JSON.stringify(val, null, 2);
+                                  } catch {
+                                    return String(val);
+                                  }
+                                }
+                                return String(val);
+                              };
+
+                                              // Flatten args if only 'body' key with object value
+                                              const displayArgs = (() => {
+                                                const keys = Object.keys(parsedArgs);
+                                                if (
+                                                  keys.length === 1 &&
+                                                  keys[0] === "body" &&
+                                                  parsedArgs.body &&
+                                                  typeof parsedArgs.body === "object" &&
+                                                  !Array.isArray(parsedArgs.body)
+                                                ) {
+                                                  return parsedArgs.body;
+                                                }
+                                                return parsedArgs;
+                                              })();
+
+                                              return (
+                                                <div
+                                                  key={toolIndex}
+                                                  className="bg-muted border border-border rounded-2xl p-4 mb-2"
+                                                >
+                                                  <div className="flex items-center gap-2 mb-2">
+                                                    <svg
+                                                      className="w-4 h-4 text-muted-foreground"
+                                                      fill="none"
+                                                      viewBox="0 0 24 24"
+                                                      stroke="currentColor"
+                                                      strokeWidth={1.5}
+                                                    >
+                                                      <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
+                                                      />
+                                                    </svg>
+                                                    <span className="text-sm font-medium text-foreground">
+                                                      {toolCall.function.name}
+                                                    </span>
+                                                  </div>
+                                                  {Object.keys(displayArgs).length > 0 && (
+                                                    <div className="space-y-3 mt-3">
+                                                      {Object.entries(displayArgs).map(
+                                                        ([key, value], paramIndex) => {
+                                                          const displayValue = formatValue(value);
+                                                          const isMultiLine = displayValue.includes("\n");
+                                                          return (
+                                                            <div key={paramIndex}>
+                                                              <label className="block text-sm font-medium text-foreground mb-1.5">
+                                                                {key}
+                                                              </label>
+                                                              <div
+                                                                className={`px-3 py-2 bg-background border border-border rounded-lg text-sm text-muted-foreground whitespace-pre-wrap break-all ${
+                                                                  isMultiLine ? "font-mono text-xs" : ""
+                                                                }`}
+                                                              >
+                                                                {displayValue}
+                                                              </div>
+                                                            </div>
+                                                          );
+                                                        },
+                                                      )}
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              );
                             })}
                           </div>
                         )}
+
+                        {/* Tool Response Display (webhook_response) */}
+                        {entry.role === "tool" &&
+                          entry.content &&
+                          (() => {
+                            // Try to parse content as JSON
+                            let parsed: any = null;
+                            try {
+                              parsed = JSON.parse(entry.content);
+                            } catch {
+                              return null; // Not valid JSON, don't render
+                            }
+
+                            // Check if it's a webhook_response
+                            if (parsed?.type !== "webhook_response") {
+                              return null;
+                            }
+
+                            const response = parsed.response;
+                            if (!response || typeof response !== "object") {
+                              return null;
+                            }
+
+                            // Format response as pretty JSON
+                            const jsonString = JSON.stringify(response, null, 2);
+
+                            return (
+                              <div className="w-1/2">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="text-sm font-medium text-foreground">
+                                    Agent Tool Response
+                                  </span>
+                                </div>
+                                <div className="bg-muted border border-border rounded-2xl p-4">
+                                  <pre className="text-sm font-mono text-foreground whitespace-pre-wrap break-all">
+                                    {jsonString}
+                                  </pre>
+                                </div>
+                              </div>
+                            );
+                          })()}
                       </div>
                     );
                   });

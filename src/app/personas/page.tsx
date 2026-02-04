@@ -409,24 +409,22 @@ export default function PersonasPage() {
     >
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">Personas</h1>
-            <p className="text-muted-foreground text-base leading-relaxed mt-1">
-              Personas define the characteristics of the simulated user
-              interacting with your agent
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              resetForm();
-              setAddPersonaSidebarOpen(true);
-            }}
-            className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
-          >
-            Add persona
-          </button>
+        <div>
+          <h1 className="text-2xl font-semibold">Personas</h1>
+          <p className="text-muted-foreground text-base leading-relaxed mt-1">
+            Personas define the characteristics of the simulated user
+            interacting with your agent
+          </p>
         </div>
+        <button
+          onClick={() => {
+            resetForm();
+            setAddPersonaSidebarOpen(true);
+          }}
+          className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+        >
+          Add persona
+        </button>
 
         {/* Search Input */}
         <div className="relative max-w-md">

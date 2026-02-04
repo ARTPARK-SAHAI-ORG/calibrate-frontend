@@ -105,6 +105,36 @@ export function SmallStatusBadge({ passed }: { passed: boolean }) {
   );
 }
 
+// Helper to format parameter value for display
+function formatParamValue(value: any): string {
+  if (value === null) return "null";
+  if (value === undefined) return "undefined";
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+}
+
+// Helper to flatten args - if there's only a 'body' key with an object, flatten it
+function flattenArgs(args: Record<string, any>): Record<string, any> {
+  const keys = Object.keys(args);
+  // If args has only a 'body' key and its value is an object (not array), flatten it
+  if (
+    keys.length === 1 &&
+    keys[0] === "body" &&
+    args.body &&
+    typeof args.body === "object" &&
+    !Array.isArray(args.body)
+  ) {
+    return args.body;
+  }
+  return args;
+}
+
 // Shared Tool Call Card Component
 export function ToolCallCard({
   toolName,
@@ -113,26 +143,34 @@ export function ToolCallCard({
   toolName: string;
   args: Record<string, any>;
 }) {
+  const displayArgs = flattenArgs(args);
+
   return (
-    <div className="bg-muted/20 border border-border rounded-2xl p-4">
+    <div className="bg-muted border border-border rounded-2xl p-4">
       <div className="flex items-center gap-2 mb-2">
         <ToolIcon className="w-4 h-4 text-muted-foreground" />
         <span className="text-sm font-medium text-foreground">{toolName}</span>
       </div>
-      {Object.keys(args).length > 0 && (
-        <div className="space-y-2 mt-3">
-          {Object.entries(args).map(([paramName, paramValue]) => (
-            <div key={paramName}>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">
-                {paramName}
-              </label>
-              <div className="px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground">
-                {typeof paramValue === "object"
-                  ? JSON.stringify(paramValue)
-                  : String(paramValue)}
+      {Object.keys(displayArgs).length > 0 && (
+        <div className="space-y-3 mt-3">
+          {Object.entries(displayArgs).map(([paramName, paramValue]) => {
+            const displayValue = formatParamValue(paramValue);
+            const isMultiLine = displayValue.includes("\n");
+            return (
+              <div key={paramName}>
+                <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+                  {paramName}
+                </label>
+                <div
+                  className={`px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground whitespace-pre-wrap break-all ${
+                    isMultiLine ? "font-mono text-xs" : ""
+                  }`}
+                >
+                  {displayValue}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -164,8 +202,8 @@ export function TestDetailView({
               >
                 {/* User Message */}
                 {message.role === "user" && (
-                  <div className="max-w-[80%]">
-                    <div className="px-4 py-3 rounded-2xl bg-[#242426] border border-[#444]">
+                  <div className="w-1/2">
+                    <div className="px-4 py-3 rounded-xl bg-muted border border-border">
                       <p className="text-sm text-foreground whitespace-pre-wrap">
                         {message.content}
                       </p>
@@ -181,8 +219,8 @@ export function TestDetailView({
                         Agent
                       </span>
                     </div>
-                    <div className="max-w-[80%]">
-                      <div className="px-4 py-3 rounded-2xl bg-muted/30 border border-border">
+                    <div className="w-1/2">
+                      <div className="px-4 py-3 rounded-xl bg-background border border-border">
                         <p className="text-sm text-foreground whitespace-pre-wrap">
                           {message.content}
                         </p>
@@ -201,7 +239,7 @@ export function TestDetailView({
                           Agent Tool Call
                         </span>
                       </div>
-                      <div className="max-w-[80%]">
+                      <div className="w-1/2">
                         {message.tool_calls.map((toolCall, tcIndex) => {
                           let parsedArgs: Record<string, any> = {};
                           try {
@@ -246,8 +284,8 @@ export function TestDetailView({
                 </span>
                 <SmallStatusBadge passed={passed} />
               </div>
-              <div className="max-w-[80%]">
-                <div className="px-4 py-3 rounded-2xl bg-muted/30 border border-border">
+              <div className="w-1/2">
+                <div className="px-4 py-3 rounded-xl bg-background border border-border">
                   <p className="text-sm text-foreground whitespace-pre-wrap">
                     {output.response}
                   </p>
@@ -273,7 +311,7 @@ export function TestDetailView({
               </div>
               <div className="space-y-3">
                 {output.tool_calls.map((toolCall, index) => (
-                  <div key={index} className="max-w-[80%]">
+                  <div key={index} className="w-1/2">
                     <ToolCallCard
                       toolName={toolCall.tool}
                       args={toolCall.arguments}

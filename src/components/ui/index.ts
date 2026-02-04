@@ -10,3 +10,4 @@ export {
 } from "./LoadingState";
 export { BackHeader } from "./BackHeader";
 export { StatusBadge } from "./StatusBadge";
+export { NestedContainer } from "./NestedContainer";

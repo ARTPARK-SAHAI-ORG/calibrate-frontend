@@ -1245,6 +1245,10 @@ export function TestsTabContent({
                           </svg>
                           Running
                         </span>
+                      ) : run.status === "failed" ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-500">
+                          Error
+                        </span>
                       ) : run.type === "llm-unit-test" ? (
                         <>
                           {run.passed !== null && run.passed > 0 && (
