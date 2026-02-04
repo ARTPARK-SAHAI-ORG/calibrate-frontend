@@ -85,6 +85,11 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 | **Tests**           | Link test cases to agent, run tests, view past runs with results, compare models |
 | **Settings**        | Toggle "Agent speaks first" behavior, set max assistant turns before call ends   |
 
+**Tools Tab** (`ToolsTabContent.tsx`):
+- Table columns: Name (1fr), Type (120px), Description (2fr), Delete button (auto)
+- Type column shows "Webhook" or "Structured Output" (`text-sm text-muted-foreground`)
+- Two-column layout: tools list (left 2/3), inbuilt tools panel (right 1/3)
+
 **Default Agent Configuration** (when creating new agent):
 
 ```json
@@ -186,7 +191,7 @@ Provider website links (external link icons) are shown only on the new evaluatio
     - Benchmarks: Shows "N models" (e.g., "3 models")
   - **Run Type**: "Test" (blue pill) or "Benchmark" (purple pill) based on `type` field
   - **Time**: Short relative time format (e.g., "now", "5 min ago", "7h ago", "2d ago", "3w ago", "2m ago", "1y ago")
-  - **Result**: "Running" (yellow, with spinner) for pending/queued/in_progress; "N Success" and/or "M Fail" badges for completed `llm-unit-test`; "Complete" for completed `llm-benchmark`
+  - **Result**: "Running" (yellow, with spinner) for pending/queued/in_progress; "Failed" (red) for `status === "failed"` (entire run errored); "N Success" and/or "M Fail" badges for completed `llm-unit-test`; "Complete" for completed `llm-benchmark`
 - **Clickable rows**: Clicking a past run row opens the appropriate results dialog:
   - `llm-unit-test` → Opens `TestRunnerDialog` in view mode with `taskId`, `tests` (from `results`), and `initialRunStatus`
   - `llm-benchmark` → Opens `BenchmarkResultsDialog` in view mode (with `taskId` prop)
@@ -202,7 +207,7 @@ Provider website links (external link icons) are shown only on the new evaluatio
      - When dialog closes, parent resumes polling for that run if still pending
   4. The "Running" badge with spinner is shown until the run completes
   5. Clicking on an in-progress run opens the dialog with the correct `taskId` for real-time polling
-- **Actions**: Add test, Run all tests (header button, max 20 tests), Run single test (row button), Compare models (benchmark)
+- **Actions**: Add test (button in tests table header), Run all tests (header action button, max 20 tests), Run single test (row button), Compare models (benchmark)
 - **Run all tests limit**: Maximum 20 tests at a time. Shows toast error with "Contact Us" link if exceeded
 - **API**: Fetches runs from `GET /agent-tests/agent/{uuid}/runs`
 - **Run types**: `llm-unit-test` (has passed/failed counts) and `llm-benchmark` (results in model_results)
@@ -211,15 +216,127 @@ Provider website links (external link icons) are shown only on the new evaluatio
 
 **What you can do:**
 
-- **Create custom tools** for LLM function calling
+- **Create custom tools** for LLM function calling via two options:
+  - **"Add webhook tool"** - Opens AddToolDialog with webhook-specific header and description
+  - **"Add structured output tool"** - Opens AddToolDialog with structured output-specific header and description
 - **Define tool parameters** with full JSON Schema support:
   - Primitive types: string, number, boolean, integer
   - Complex types: object (with nested properties), array (with item types)
   - Required/optional flags
   - Descriptions for each parameter
-- **Edit existing tools**
+- **Edit existing tools** - Click a tool row to open AddToolDialog in edit mode (reads `config.type` to determine webhook vs structured output, defaults to structured output if not present)
 - **Delete tools**
 - **Search tools** by name or description
+
+**Tools Table Columns:**
+- **Name** (200px fixed) - Tool name with horizontal scroll for overflow
+- **Type** (150px fixed) - Plain text showing "Webhook" or "Structured Output" (`text-sm text-muted-foreground`) - matches tests page styling pattern
+- **Description** (1fr flexible) - Tool description, truncated with ellipsis
+- **Delete button** (auto) - Trash icon to delete tool
+
+**Add Tool UI:**
+
+The page displays two buttons below the header:
+
+```tsx
+<div className="flex gap-4">
+  <button onClick={() => openAddToolDialog("webhook")} className="h-10 px-4 rounded-xl ...">
+    Add webhook tool
+  </button>
+  <button onClick={() => openAddToolDialog("structured_output")} className="h-10 px-4 rounded-xl ...">
+    Add structured output tool
+  </button>
+</div>
+```
+
+These buttons use standard `h-10 px-4` sizing (same height as other action buttons) with `rounded-xl` for border radius.
+
+**AddToolDialog Component** (`src/components/AddToolDialog.tsx`):
+
+A reusable sidebar dialog for creating and editing tools. Contains all form logic internally:
+
+- **Props**:
+  - `isOpen: boolean` - Controls dialog visibility
+  - `onClose: () => void` - Callback when dialog closes
+  - `toolType: "structured_output" | "webhook"` - Determines header title, description text, and which fields/sections are shown
+  - `editingToolUuid: string | null` - UUID of tool being edited (null for new)
+  - `backendAccessToken: string | undefined` - Auth token for API calls
+  - `onToolsUpdated: (tools: ToolData[]) => void` - Callback with updated tools list after create/update
+
+- **Tool Type Configuration** (`TOOL_TYPE_CONFIG`):
+  - `structured_output` type: Shows "Add/Edit structured output tool" header with description about producing data in defined formats
+  - `webhook` type: Shows "Add/Edit webhook tool" header with description about calling external APIs/services
+
+- **Common fields** (both tool types): Name, Description (inside Configuration section)
+
+- **Structured Output Tool** (`toolType === "structured_output"`):
+  - **Parameters section**: Uses `ParameterCard` component for defining output schema with full JSON Schema support
+  - **Default parameter**: New structured output tools automatically start with one empty parameter (required, string type)
+  - **Minimum parameter requirement**: Delete button is hidden when only one parameter exists (enforced via `hideDelete` prop)
+
+- **Webhook Tool** (`toolType === "webhook"`):
+  - **Configuration section** contains:
+    - **Method**: Dropdown for HTTP method (GET, POST, PUT, PATCH, DELETE) - default: POST
+    - **URL**: Text input for webhook endpoint (required, validated as valid HTTP/HTTPS URL)
+    - **Response timeout**: Range slider (1-120 seconds, default: 20) with hover tooltip showing current value
+  - **Headers section**: Add custom HTTP headers with Name and Value fields (vertically stacked in each card). Both fields are required when a header is added - shows red asterisk in labels and red border on validation failure. Delete button uses red styling (`text-red-500 bg-red-500/10`) matching ParameterCard
+  - **Query parameters section**: Uses the same `ParameterCard` component as structured output Parameters section - identical fields and behavior (data type, name, required, description, nested object/array support)
+  - **Body parameters section** (only for POST, PUT, PATCH methods):
+    - Outer container (`bg-muted/50`) with section header and description
+    - Inner container (`bg-background`) holding:
+      - Description textarea (required - validated with red border on empty, red asterisk in label)
+      - Properties section using `NestedContainer` component (theme-aware `bg-muted` styling):
+        - "Properties" label above the nested container
+        - `ParameterCard` components for each property inside the container
+        - Centered "Add property" button at the bottom inside the container
+
+- **Section ordering for webhook tools**: Configuration → Headers → Query parameters → Body parameters (when applicable)
+
+- **Section styling**: All section containers (Configuration, Parameters, Headers, Query parameters, Body parameters) use `bg-muted/50` background to visually distinguish them from the outer dialog background and inner form fields
+
+- **Internal state**:
+  - Common: toolName, toolDescription, validationAttempted, isCreating, createError, isLoadingTool
+  - Parameters: `parameters` array (for structured output), `queryParameters` array (for webhook - same `Parameter` type)
+  - Webhook: webhookMethod, webhookUrl, responseTimeout, showTimeoutTooltip, webhookHeaders array (simplified: id, name, value only)
+  - Body: `bodyDescription` string, `bodyParameters` array (same `Parameter` type)
+
+- **Parameter handlers** (all use the same helper functions but operate on different state):
+  - Query: `handleQueryUpdateAtPath`, `handleQueryRemoveAtPath`, `handleQueryAddPropertyAtPath`, `handleQuerySetItemsAtPath`, `addQueryParameter`
+  - Body: `handleBodyUpdateAtPath`, `handleBodyRemoveAtPath`, `handleBodyAddPropertyAtPath`, `handleBodySetItemsAtPath`, `addBodyParameter`
+
+- **Scroll behavior**: When adding a new query parameter via `addQueryParameter`, scrolls to the newly added parameter (using `scrollIntoView` with `block: "center"`) instead of scrolling to the bottom of the dialog. This is important because body parameters may exist below query parameters, and we want to keep focus on the section being edited. Uses `queryParamRefs` (a Map of param IDs to DOM elements) and `newlyAddedQueryParamId` state to track and scroll to the new element.
+
+- **URL Validation** (`isValidUrl` helper):
+  - Uses JavaScript's `URL` constructor to validate format
+  - Requires `http:` or `https:` protocol
+  - Hostname must contain a `.` (domain.tld) or be `localhost`
+  - Shows contextual error messages: "URL is required" (empty) or "Please enter a valid URL" (invalid format)
+
+- **Features**:
+  - Loads existing tool data when `editingToolUuid` is provided (including webhook config, headers, query parameters, body parameters if present)
+  - **Validation by tool type**:
+    - **Structured output tools**: Validates `parameters` array via `hasInvalidParameters` helper
+    - **Webhook tools**: Validates URL, headers (via `hasInvalidHeaders`), `queryParameters`, and for POST/PUT/PATCH: `bodyDescription` and `bodyParameters`
+  - All string values are trimmed before submission (name, description, URL, header names/values)
+  - Creates/updates tools via API with config structure:
+    ```javascript
+    config: {
+      type: "webhook" | "structured_output",  // Tool type stored in config
+      parameters: [...],           // Structured output parameters
+      webhook: {                   // Only for webhook tools
+        method, url, timeout, headers, queryParameters,
+        body: { description, parameters }  // Only for POST/PUT/PATCH
+      }
+    }
+    ```
+  - Query and body parameters use `buildParametersConfig()` for API - same format as structured output parameters
+  - Resets form state when dialog opens/closes
+  - Sidebar slides in from right (40% width, min 500px)
+
+- **Tool type persistence**:
+  - Tool type is stored in `config.type` ("webhook" or "structured_output")
+  - When editing, parent component reads `config.type` to determine which mode to open
+  - If `config.type` is not present (legacy tools), defaults to "structured_output"
 
 ### 3. Speech-to-Text Evaluation (`/stt`)
 
@@ -235,7 +352,7 @@ Provider website links (external link icons) are shown only on the new evaluatio
 - **Columns**: Providers (as pills with external link icons), Language, Status, Samples count, Created At
 - **Provider pills**: Each provider name has an external link icon that opens the provider's website in a new tab
 - **Click to view details** - opens the evaluation detail page
-- **"New STT Evaluation" button** - navigates to the create page
+- **"New STT evaluation" button** (below header) - navigates to the create page
 
 **Create Page (`/stt/new`):**
 
@@ -290,7 +407,7 @@ Provider website links (external link icons) are shown only on the new evaluatio
 - **Columns**: Providers (as pills with external link icons), Language, Status, Samples count, Created At
 - **Provider pills**: Each provider name has an external link icon that opens the provider's website in a new tab
 - **Click to view details** - opens the evaluation detail page
-- **"New TTS Evaluation" button** - navigates to the create page
+- **"New TTS evaluation" button** (below header) - navigates to the create page
 
 **Create Page (`/tts/new`):**
 
@@ -340,6 +457,29 @@ Provider website links (external link icons) are shown only on the new evaluatio
   - Name and description
   - Test type: "response" (check agent response) or "tool_call" (check tool invocation)
   - Test configuration
+  - **Tool invocation defaults**: When selecting a webhook tool, "Accept any parameter values" is enabled by default (since webhook responses are unpredictable). Structured output tools default to requiring specific parameter values
+  - **Conversation history** (before evaluation):
+    - Message types: `agent`, `user`, `tool_call`, `tool_response`
+    - Add messages via dropdown menu on last message
+    - **Webhook tool calls**: When a webhook tool is selected:
+      - Parameters grouped into separate containers: Query, Body (headers are NOT shown in conversation history UI)
+      - Each group is in its own container (`bg-background border border-border rounded-xl p-3`) with uppercase section title
+      - Input fields within containers use `bg-muted` for contrast
+      - A "Tool Response" message is automatically added after the tool call
+      - Tool response requires valid JSON input (textarea with real-time validation)
+      - User cannot proceed without valid JSON in all tool responses
+      - Deleting a webhook tool call also removes its linked tool response
+    - **Structured output tool calls**: Show flat parameter list as inputs (no tool response added - only the tool call is sent to backend)
+    - **Tool call param validation**: All tool call parameters in conversation history must have non-empty values. On save attempt, empty params are highlighted with `border-red-500` with error message "This field cannot be empty". Validation only triggers on `localValidationAttempted` (set when clicking Save), not the parent's `validationAttempted` prop - this prevents showing errors when a new tool call message is first added
+    - **Backend history format**: Webhook tool calls include both the tool call AND linked tool response in history. Structured output tool calls only include the tool call (no fake response injected)
+  - **Loading saved tests** (when `initialConfig` is provided):
+    - Parses `history` array and converts to chatMessages format
+    - **Waits for `availableTools`**: The useEffect depends on both `initialConfig` AND `availableTools` - it only processes when `availableTools.length > 0` to ensure proper tool type detection
+    - **Webhook tool call detection**: Looks up the tool by name in `availableTools` and checks `tool?.config?.type === "webhook"`. This is more reliable than checking for body/query argument keys (which could misclassify structured-output tools with params named "body" or "query")
+    - **Webhook param extraction**: For webhook tools, extracts nested properties from body/query and assigns `group` property to each param so they display in the correct container (e.g., `{body: {task_type: "x"}}` → `{name: "task_type", value: "x", group: "body"}`). Headers are intentionally excluded from the UI
+    - **Tool response parsing**: `role: "tool"` messages are included as `tool_response` type, linked to their corresponding tool call via `tool_call_id`
+    - Non-webhook tools show params as flat list without group containers
+    - **Param update matching**: `updateToolCallParam` matches by both `name` AND `group` to avoid updating params with the same name across different groups (e.g., "id" in both body and query)
 - **View all tests**
 - **Edit/delete tests**
 - **Link tests to agents** for benchmarking
@@ -454,13 +594,15 @@ Provider website links (external link icons) are shown only on the new evaluatio
   - **Empty state**: Shows "No transcript available yet" when transcript is empty or undefined
   - **Processing indicator**: Shows a yellow spinner at the bottom of transcript while metrics are being fetched (when `evaluation_results` is null but transcript has content)
   - **Graceful null handling**: All transcript accesses use optional chaining (`transcript?.length ?? 0`, `transcript ?? []`) since transcript can be undefined during intermediate results
-  - **End reason handling**: Transcript entries with `role: "end_reason"` are filtered out from display. When the last entry has `role: "end_reason"` and `content: "max_turns"`, a yellow informational banner is shown at the bottom: "Conversation ended: Maximum number of agent turns reached"
+  - **Transcript filtering**: Entries are filtered before display - `role: "end_reason"` is always filtered out, and `role: "tool"` messages are only included if they have valid JSON content with `type: "webhook_response"` (other tool messages like "COMPLETED" are hidden)
+  - **End reason handling**: When the last entry in the full transcript has `role: "end_reason"` and `content: "max_turns"`, a yellow informational banner is shown at the bottom: "Conversation ended: Maximum number of agent turns reached"
   - **Stable audio keys**: All audio elements use `key={audioUrl}` to prevent React from remounting them during polling re-renders (avoids audio restart/reload)
   - **Presigned URL refresh on error**: Audio elements include `onError={refreshRunData}` handler to automatically fetch fresh presigned URLs when they expire. The `refreshRunData` callback clears `frozenSimulationRef` before updating state so new URLs are used instead of stale frozen data
   - Full conversation audio player below header (from `conversation_wav_url`) for voice simulations
-  - Full conversation history (user, assistant, tool calls)
+  - Full conversation history (user, assistant, tool calls, tool responses)
   - Role-based message styling
-  - Tool call details with arguments
+  - **Tool call details as form fields**: Arguments are displayed as labeled form fields (matching AddTestDialog style). Each arg key (body, query) is shown as a field label, with its value displayed as pretty-printed JSON. Headers are filtered out and not shown
+  - **Tool response display** (for webhook calls): Only shows `role: "tool"` messages where content is valid JSON with `type: "webhook_response"`. Displays the `response` object as **pretty-printed JSON** in a monospace `<pre>` block with "Agent Tool Response" header (intentionally different from tool call form fields to distinguish input vs output). **Error handling**: If `response.status === "error"`, displays with red styling: warning icon, "Tool Response Error" label in red, `border-red-500` border, and `text-red-400` for the JSON content
   - Per-message audio players for voice simulations (matching `audio_urls`)
 
 - **Latency Metrics** (for voice simulations, in Performance/Latency tabs):
@@ -838,6 +980,48 @@ export default function ExamplePage() {
 - `customHeader`: Optional React node for custom header content (left side of header bar)
 - `headerActions`: Optional React node for action buttons beside user profile dropdown (right side of header bar)
 
+### List Page Content Structure
+
+List pages (Agents, Simulations, Personas, Scenarios, Tools, Tests, Metrics, STT, TTS) follow a consistent content structure inside `AppLayout`:
+
+```tsx
+<div className="space-y-6">
+  {/* Header - title and description only */}
+  <div>
+    <h1 className="text-2xl font-semibold">Page Title</h1>
+    <p className="text-muted-foreground text-base leading-relaxed mt-1">
+      Description of what this page shows
+    </p>
+  </div>
+
+  {/* Primary action button - below header, left-aligned */}
+  <button
+    onClick={handleAdd}
+    className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+  >
+    Add item
+  </button>
+
+  {/* Search input */}
+  <div className="relative max-w-md">
+    {/* Search icon + input */}
+  </div>
+
+  {/* Content: Loading / Error / Empty / Table */}
+  {isLoading ? <LoadingState /> : error ? <ErrorState /> : items.length === 0 ? <EmptyState /> : <Table />}
+</div>
+```
+
+**Key layout rules:**
+
+- Container uses `space-y-6` for consistent vertical spacing between sections
+- Header section contains only title (`h1`) and description (`p`) - no action button
+- Primary action button ("Add X", "New X") is a separate element below the header, left-aligned
+- Search input comes after the action button
+- Content area (loading/error/empty/table) comes last
+
+This pattern applies to: Agents, Simulations, Personas, Scenarios, Tools, Tests (LLM Evaluation), Metrics, STT, and TTS list pages.
+
 ### Detail Page Header Pattern
 
 Detail pages place navigation and actions in the header bar using `customHeader` and `headerActions`:
@@ -942,7 +1126,7 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
 
 - Fetches jobs from `GET /jobs?job_type=tts` or `GET /jobs?job_type=stt`
 - Displays in sortable table with columns: Providers (as pills), Language, Status, Samples count, Created At
-- "New [TTS/STT] Evaluation" button navigates to `/[tts|stt]/new`
+- "New [TTS/STT] Evaluation" button below header navigates to `/[tts|stt]/new`
 - Clicking a row navigates to `/[tts|stt]/{uuid}`
 
 **New Page:**
@@ -1133,11 +1317,31 @@ const getFilteredProviders = (language: LanguageOption) => {
    - Props: `isOpen`, `onClose`, `selectedLLM`, `onSelect`, `availableProviders?`
    - Optional `availableProviders` prop for filtering available models (used in BenchmarkDialog)
    - Used in: AgentTabContent (settings), BenchmarkDialog (model comparison)
-10. **Native Link Navigation**: List items use Next.js `<Link>` components for browser-native right-click support
+10. **Tool Picker**: `ToolPicker` from `@/components/ToolPicker`
+    - Props: `availableTools`, `isLoading`, `onSelectInbuiltTool`, `onSelectCustomTool`, `selectedToolIds?`
+    - Dropdown with search, divided into "In-built tools" and "User defined tools" sections
+    - User defined tools show tool type below name (`text-xs text-muted-foreground`): "Webhook" or "Structured Output"
+    - Used in: AddTestDialog (tool invocation test type)
+11. **Parameter Card**: `ParameterCard` from `@/components/ParameterCard`
+    - Recursive component for rendering parameter/property cards with full JSON Schema support
+    - Props: `param`, `path`, `onUpdate`, `onRemove`, `onAddProperty`, `onSetItems`, `validationAttempted`, `isProperty?`, `isArrayItem?`, `siblingNames?`, `hideDelete?`, `showRequired?`
+    - `hideDelete` prop: When true, hides the delete button (used when only one parameter exists to enforce minimum)
+    - `showRequired` prop: When false, hides the required checkbox (default: true). Used for data field properties where required is handled at the parent level
+    - Delete button not shown for array items (`isArrayItem`) or when `hideDelete` is true
+    - Uses `NestedContainer` for nested object properties and array items
+    - Used in: AddToolDialog (structured output parameters, webhook query/body parameters), AddTestDialog, DataExtractionTabContent
+    - **Note**: `DataFieldPropertyCard` is deprecated and now wraps `ParameterCard` with `showRequired={false}`
+12. **Nested Container**: `NestedContainer` from `@/components/ui/NestedContainer`
+    - Theme-aware container for nested properties/items sections
+    - Uses `bg-muted` for proper light/dark mode support (replaces hardcoded `bg-[#1b1b1b]`)
+    - Props: `children`, `onAddProperty?`, `addButtonText?`, `showAddButton?`, `showValidationError?`
+    - Includes optional "Add property" button with validation error styling
+    - Used in: ParameterCard, AddToolDialog (body parameters), DataExtractionTabContent
+13. **Native Link Navigation**: List items use Next.js `<Link>` components for browser-native right-click support
     - Enables "Open in new tab" via browser's native context menu
     - Supports Cmd/Ctrl+click to open in new tab
     - Applied to: Agents list, Simulations list, Simulation runs list
-11. **View Mode Dialogs**: `TestRunnerDialog` and `BenchmarkResultsDialog` support dual modes:
+14. **View Mode Dialogs**: `TestRunnerDialog` and `BenchmarkResultsDialog` support dual modes:
     - **Run mode** (default): Opens dialog and starts a new run/benchmark
     - **View mode**: Pass `taskId` prop to view existing run results without starting a new run
     - **TestRunnerDialog behavior based on `initialRunStatus`**:
@@ -2028,8 +2232,13 @@ import {
 // Small badge for inline status
 <SmallStatusBadge passed={true} />
 
-// Display tool call with arguments
-<ToolCallCard toolName="get_weather" args={{ city: "London" }} />
+// Display tool call with arguments as form-style fields
+// - Each arg key (body, query) is shown as a labeled field (headers are filtered out)
+// - Object/array values are pretty-printed as JSON with 2-space indentation
+// - Labels use `text-sm font-medium text-muted-foreground`, values use `text-foreground`
+// - Parameter values use `whitespace-pre-wrap break-all` to show full content (no truncation)
+<ToolCallCard toolName="get_weather" args={{ body: { city: "London" }, query: { units: "metric" } }} />
+// Shows "body" field with JSON content, "query" field with JSON content
 
 // Full test conversation view
 <TestDetailView history={history} output={output} passed={passed} />
@@ -2131,7 +2340,8 @@ import { SpinnerIcon, ToolIcon } from "@/components/icons";
 | Page Type                     | Grid Columns                              | Description                                                   |
 | ----------------------------- | ----------------------------------------- | ------------------------------------------------------------- |
 | **Agents, Simulations**       | `[1fr_1fr_auto]` or `[1fr_1fr_auto_auto]` | Equal-width data columns, auto action buttons                 |
-| **Tools, Scenarios, Metrics** | `[200px_1fr_auto]`                        | Fixed 200px name column, flexible description, auto actions   |
+| **Tools**                     | `[200px_150px_1fr_auto]`                  | Fixed name, fixed type badge, flexible description, auto actions |
+| **Scenarios, Metrics**        | `[200px_1fr_auto]`                        | Fixed 200px name column, flexible description, auto actions   |
 | **Personas**                  | `[200px_1fr_100px_100px_120px_auto]`      | Fixed name, flexible characteristics, fixed attribute columns |
 | **Simulation Runs**           | `[1fr_1fr_1fr_1fr]`                       | Four equal columns (Name, Status, Type, Created At)           |
 | **Tests**                     | `[1fr_1fr_auto]`                          | Equal-width name and type columns                             |
@@ -2635,6 +2845,42 @@ Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When ena
   - Pass `showSpinner` prop to show spinner for active statuses (`queued`/`in_progress`)
   - Badge classes use dark mode variants: `dark:bg-{color}-500/20 dark:text-{color}-400`
 - **Stable keys for media elements**: When rendering audio/video in components that re-render during polling, use stable keys (`key={src}`) to prevent React from remounting the element and restarting playback
+- **Range slider with filled track and tooltip**: For sliders that show progress from start to current value with a hover tooltip:
+  ```tsx
+  const [showTooltip, setShowTooltip] = useState(false);
+  const percentage = ((value - min) / (max - min)) * 100;
+  
+  <div className="relative pt-6">
+    {/* Tooltip - positioned above thumb */}
+    {showTooltip && (
+      <div
+        className="absolute -top-1 transform -translate-x-1/2 pointer-events-none"
+        style={{ left: `calc(${percentage}% + ${8 - (percentage / 100) * 16}px)` }}
+      >
+        <div className="bg-foreground text-background text-xs font-medium px-2 py-1 rounded-md">
+          {value} secs
+        </div>
+        <div className="w-2 h-2 bg-foreground transform rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1" />
+      </div>
+    )}
+    <input
+      type="range"
+      min={min}
+      max={max}
+      value={value}
+      onChange={(e) => setValue(parseInt(e.target.value, 10))}
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+      onFocus={() => setShowTooltip(true)}
+      onBlur={() => setShowTooltip(false)}
+      className="w-full h-2 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-runnable-track]:rounded-lg [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-foreground [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:mt-[-3px] [&::-moz-range-track]:rounded-lg [&::-moz-range-track]:bg-transparent [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-foreground [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
+      style={{
+        background: `linear-gradient(to right, white 0%, white ${percentage}%, hsl(var(--muted)) ${percentage}%, hsl(var(--muted)) 100%)`,
+      }}
+    />
+  </div>
+  ```
+  **Gotchas**: Use `white` directly instead of `hsl(var(--foreground))` for the filled track color - CSS variables in inline styles may not render correctly. Add explicit track styling (`-webkit-slider-runnable-track`, `-moz-range-track`) with `bg-transparent` to let the gradient show through. The tooltip position formula `calc(${percentage}% + ${8 - (percentage / 100) * 16}px)` accounts for thumb width offset at edges
 - **Ref-based previous value tracking**: To only trigger effects when values actually change (not just when references change), use a ref to track the previous value:
   ```tsx
   const prevLengthRef = useRef(0);
@@ -2671,6 +2917,8 @@ Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When ena
 - **Do NOT use `bg-popover`** - it causes transparent backgrounds due to Tailwind v4 theme mapping issues; use `bg-background` instead for dropdowns and popovers
 - **Checkboxes need visible borders**: Use `border-muted-foreground` (not `border-border`) and `border-2` for custom checkbox buttons to ensure visibility in both light and dark modes
 - **Spinners in flex containers**: Always add `flex-shrink-0` to spinner SVGs to prevent them from shrinking. Standard spinner class: `w-5 h-5 flex-shrink-0 animate-spin`
+- **Icon action buttons** (play, edit, etc.): Use `bg-foreground/90 text-background hover:bg-foreground` for solid icon buttons that need to be visible in both light and dark modes. Never use `text-white` alone as icons become invisible on light backgrounds. **Avoid `hover:opacity-*`** on buttons with child tooltips - opacity affects all children including tooltips, making them translucent. Use `bg-foreground/90 hover:bg-foreground` instead to only affect the background
+- **Chat message bubbles**: Consistent styling across AddTestDialog and TestDetailView (test results). User messages use `bg-muted border border-border text-foreground` (gray background, right-aligned). Agent messages use `bg-background border border-border text-foreground` (white/light background, left-aligned). Tool call cards use `bg-muted border border-border`. All use `rounded-xl` and `w-1/2` width. See `@/components/test-results/shared.tsx` for the pattern
 
 ### Forms
 

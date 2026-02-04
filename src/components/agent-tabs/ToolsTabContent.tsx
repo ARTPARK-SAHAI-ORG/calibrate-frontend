@@ -162,9 +162,12 @@ export function ToolsTabContent({
           ) : (
             <div className="border border-border rounded-xl overflow-hidden">
               {/* Table Header */}
-              <div className="grid grid-cols-[1fr_2fr_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+              <div className="grid grid-cols-[1fr_120px_2fr_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
                 <div className="text-sm font-medium text-muted-foreground">
                   Name
+                </div>
+                <div className="text-sm font-medium text-muted-foreground">
+                  Type
                 </div>
                 <div className="text-sm font-medium text-muted-foreground">
                   Description
@@ -175,13 +178,19 @@ export function ToolsTabContent({
               {filteredTools.map((tool) => (
                 <div
                   key={tool.uuid}
-                  className="grid grid-cols-[1fr_2fr_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
+                  className="grid grid-cols-[1fr_120px_2fr_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
                 >
                   {/* Name Column */}
                   <div className="flex items-center">
                     <div className="text-sm font-medium text-foreground">
                       {tool.name}
                     </div>
+                  </div>
+                  {/* Type Column */}
+                  <div className="flex items-center">
+                    <p className="text-sm text-muted-foreground">
+                      {tool.config?.type === "webhook" ? "Webhook" : "Structured Output"}
+                    </p>
                   </div>
                   {/* Description Column */}
                   <div className="flex items-center">

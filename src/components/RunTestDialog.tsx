@@ -47,13 +47,13 @@ export function RunTestDialog({
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Dialog */}
-      <div className="relative w-full max-w-lg bg-[#1a1a1a] rounded-2xl shadow-2xl">
+      <div className="relative w-full max-w-lg bg-background border border-border rounded-2xl shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-1">
-          <h2 className="text-xl font-semibold text-white">Run test</h2>
+          <h2 className="text-xl font-semibold text-foreground">Run test</h2>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-[#333] transition-colors cursor-pointer"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
           >
             <svg
               className="w-5 h-5"
@@ -74,15 +74,15 @@ export function RunTestDialog({
         {/* Content */}
         <div className="px-6 pb-2 space-y-4">
           {/* Subtitle */}
-          <p className="text-gray-400 text-sm">
+          <p className="text-muted-foreground text-sm">
             Select an agent to run the test &quot;{testName}&quot;
           </p>
 
           {/* Info Box */}
-          <div className="bg-[#252525] rounded-xl px-4 py-3 flex gap-3">
+          <div className="bg-muted rounded-xl px-4 py-3 flex gap-3">
             <div className="flex-shrink-0 mt-0.5">
               <svg
-                className="w-5 h-5 text-gray-400"
+                className="w-5 h-5 text-muted-foreground"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -95,7 +95,7 @@ export function RunTestDialog({
                 />
               </svg>
             </div>
-            <p className="text-gray-300 text-sm leading-relaxed">
+            <p className="text-foreground text-sm leading-relaxed">
               You can save and run tests in bulk. Check out the
               &quot;Tests&quot; tab in the agent&apos;s configuration.
             </p>
@@ -113,15 +113,15 @@ export function RunTestDialog({
           <div className="flex items-center gap-3">
             <button
               onClick={() => setAttachToAgent(!attachToAgent)}
-              className={`w-6 h-6 rounded-md border flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
+              className={`w-6 h-6 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
                 attachToAgent
-                  ? "bg-white border-white"
-                  : "border-[#444] hover:border-[#666]"
+                  ? "bg-foreground border-foreground"
+                  : "border-muted-foreground hover:border-foreground"
               }`}
             >
               {attachToAgent && (
                 <svg
-                  className="w-4 h-4 text-black"
+                  className="w-4 h-4 text-background"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -135,7 +135,7 @@ export function RunTestDialog({
                 </svg>
               )}
             </button>
-            <span className="text-sm text-white">
+            <span className="text-sm text-foreground">
               Attach this test to the agent config
             </span>
           </div>
@@ -145,14 +145,14 @@ export function RunTestDialog({
         <div className="px-6 py-3 flex items-center justify-end gap-3">
           <button
             onClick={onClose}
-            className="h-10 px-5 rounded-lg text-base font-medium bg-[#333] text-white hover:bg-[#444] transition-colors cursor-pointer"
+            className="h-10 px-5 rounded-lg text-base font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
           >
             Cancel
           </button>
           <button
             onClick={handleRunTest}
             disabled={!selectedAgent}
-            className="h-10 px-5 rounded-lg text-base font-medium bg-transparent text-white border border-[#444] hover:bg-[#333] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="h-10 px-5 rounded-lg text-base font-medium bg-transparent text-foreground border border-border hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8 5v14l11-7z" />

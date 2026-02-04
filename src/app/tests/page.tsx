@@ -455,23 +455,21 @@ export default function LLMPage() {
     >
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">LLM Evaluation</h1>
-            <p className="text-muted-foreground text-base leading-relaxed mt-1">
-              Create and manage tests to evaluate your LLM
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              resetForm();
-              setAddTestSidebarOpen(true);
-            }}
-            className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
-          >
-            Add test
-          </button>
+        <div>
+          <h1 className="text-2xl font-semibold">LLM Evaluation</h1>
+          <p className="text-muted-foreground text-base leading-relaxed mt-1">
+            Create and manage tests to evaluate your LLM
+          </p>
         </div>
+        <button
+          onClick={() => {
+            resetForm();
+            setAddTestSidebarOpen(true);
+          }}
+          className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+        >
+          Add test
+        </button>
 
         {/* Search Input */}
         <div className="relative max-w-md">
@@ -599,7 +597,7 @@ export default function LLMPage() {
                       e.stopPropagation();
                       openRunTestDialog(test);
                     }}
-                    className="group relative w-8 h-8 flex items-center justify-center rounded-lg bg-transparent text-white hover:bg-[#444] transition-colors cursor-pointer"
+                    className="group relative w-8 h-8 flex items-center justify-center rounded-lg bg-foreground/90 text-background hover:bg-foreground transition-colors cursor-pointer"
                   >
                     <svg
                       className="w-3.5 h-3.5"

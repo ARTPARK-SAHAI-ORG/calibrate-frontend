@@ -1,8 +1,10 @@
+import { NestedContainer } from "@/components/ui/NestedContainer";
+
 export type Parameter = {
   id: string;
   dataType: string;
   name: string;
-  required: boolean;
+  required?: boolean; // Optional - only used when showRequired is true
   description: string;
   properties?: Parameter[];
   items?: Parameter; // For array types - defines the schema of array items
@@ -19,9 +21,12 @@ type ParameterCardProps = {
   isProperty?: boolean;
   isArrayItem?: boolean;
   siblingNames?: string[]; // Names of sibling parameters (excluding this one)
+  hideDelete?: boolean; // Hide delete button (e.g., when only one parameter exists)
+  showRequired?: boolean; // Show required checkbox (default: true)
 };
 
 // Recursive component for rendering parameter/property cards
+// Can be used for tool parameters, data field properties, etc.
 export const ParameterCard = ({
   param,
   path,
@@ -33,6 +38,8 @@ export const ParameterCard = ({
   isProperty = false,
   isArrayItem = false,
   siblingNames = [],
+  hideDelete = false,
+  showRequired = true,
 }: ParameterCardProps) => {
   const currentPath = [...path, param.id];
   const parentPath = path;
@@ -113,8 +120,8 @@ export const ParameterCard = ({
         )}
       </div>
 
-      {/* Required checkbox - not shown for array items */}
-      {!isArrayItem && (
+      {/* Required checkbox - not shown for array items or when showRequired is false */}
+      {!isArrayItem && showRequired && (
         <div className="flex items-center gap-3">
           <button
             onClick={() => onUpdate(currentPath, { required: !param.required })}
@@ -174,7 +181,15 @@ export const ParameterCard = ({
           <label className="block text-sm font-medium mb-2">
             Properties <span className="text-red-500">*</span>
           </label>
-          <div className="border border-border rounded-xl bg-[#1b1b1b] p-4 space-y-4">
+          <NestedContainer
+            onAddProperty={() =>
+              onAddProperty(isArrayItem ? [...path] : currentPath)
+            }
+            showValidationError={
+              validationAttempted &&
+              (!param.properties || param.properties.length === 0)
+            }
+          >
             {/* Render nested properties recursively */}
             {param.properties && param.properties.length > 0 && (
               <div className="space-y-4">
@@ -194,28 +209,12 @@ export const ParameterCard = ({
                         ?.filter((p) => p.id !== prop.id)
                         .map((p) => p.name) ?? []
                     }
+                    showRequired={showRequired}
                   />
                 ))}
               </div>
             )}
-            {/* Add property button */}
-            <div className="flex justify-center">
-              <button
-                type="button"
-                onClick={() =>
-                  onAddProperty(isArrayItem ? [...path] : currentPath)
-                }
-                className={`h-10 px-6 rounded-md text-sm font-medium border bg-background hover:bg-muted/50 transition-colors cursor-pointer ${
-                  validationAttempted &&
-                  (!param.properties || param.properties.length === 0)
-                    ? "border-red-500"
-                    : "border-border"
-                }`}
-              >
-                Add property
-              </button>
-            </div>
-          </div>
+          </NestedContainer>
         </div>
       )}
 
@@ -223,7 +222,7 @@ export const ParameterCard = ({
       {param.dataType === "array" && (
         <div>
           <label className="block text-sm font-medium mb-2">Item</label>
-          <div className="border border-border rounded-xl bg-[#1b1b1b] p-4 space-y-4">
+          <NestedContainer showAddButton={false}>
             <ParameterCard
               param={
                 param.items || {
@@ -245,13 +244,14 @@ export const ParameterCard = ({
               onSetItems={onSetItems}
               validationAttempted={validationAttempted}
               isArrayItem={true}
+              showRequired={showRequired}
             />
-          </div>
+          </NestedContainer>
         </div>
       )}
 
-      {/* Delete button - not shown for array items */}
-      {!isArrayItem && (
+      {/* Delete button - not shown for array items or when hideDelete is true */}
+      {!isArrayItem && !hideDelete && (
         <div className="flex justify-end">
           <button
             onClick={() => onRemove(parentPath, param.id)}

@@ -82,6 +82,10 @@ export function AddTestDialog({
     initialTab || "next-reply",
   );
 
+  // Available tools state - declared early so it's available for initialConfig parsing
+  const [availableTools, setAvailableTools] = useState<AvailableTool[]>([]);
+  const [availableToolsLoading, setAvailableToolsLoading] = useState(false);
+
   // Update active tab when initialTab changes (when opening an existing test)
   useEffect(() => {
     if (initialTab) {
@@ -90,18 +94,38 @@ export function AddTestDialog({
   }, [initialTab]);
 
   // Populate fields from initialConfig when editing an existing test
+  // Wait for availableTools to be loaded so we can properly determine tool types
   useEffect(() => {
-    if (initialConfig) {
+    if (initialConfig && availableTools.length > 0) {
       // Parse history and convert to chatMessages format
       if (initialConfig.history && initialConfig.history.length > 0) {
         const messages: Array<{
           id: string;
-          role: "agent" | "user" | "tool_call";
+          role: "agent" | "user" | "tool_call" | "tool_response";
           content: string;
           toolName?: string;
           toolId?: string;
-          toolParams?: Array<{ name: string; value: string }>;
+          toolParams?: Array<{ name: string; value: string; group?: string }>;
+          isWebhook?: boolean;
+          linkedToolCallId?: string;
         }> = [];
+
+        // Helper to format value - stringify objects/arrays for display
+        const formatValue = (val: any): string => {
+          if (val === null) return "null";
+          if (val === undefined) return "";
+          if (typeof val === "object") {
+            try {
+              return JSON.stringify(val, null, 2);
+            } catch {
+              return String(val);
+            }
+          }
+          return String(val);
+        };
+
+        // Track tool call IDs for linking tool responses
+        const toolCallIds: string[] = [];
 
         initialConfig.history.forEach((historyItem, index) => {
           if (historyItem.role === "assistant") {
@@ -114,16 +138,47 @@ export function AddTestDialog({
               } catch {
                 parsedArgs = {};
               }
+              
+              const toolCallId = toolCall.id || `tool-${index}`;
+              toolCallIds.push(toolCallId);
+              
+              // Look up the tool by name to check its actual config type
+              const tool = availableTools.find(t => t.name === toolCall.function.name);
+              const isWebhook = tool?.config?.type === "webhook";
+              
+              let toolParams: Array<{ name: string; value: string; group?: string }> = [];
+              
+              if (isWebhook) {
+                // Extract params from body, query with their group (headers are not shown in UI)
+                const webhookKeys = ["body", "query"];
+                webhookKeys.forEach(groupKey => {
+                  const groupValue = parsedArgs[groupKey];
+                  if (groupValue && typeof groupValue === "object" && !Array.isArray(groupValue)) {
+                    Object.entries(groupValue).forEach(([paramName, paramValue]) => {
+                      toolParams.push({
+                        name: paramName,
+                        value: formatValue(paramValue),
+                        group: groupKey,
+                      });
+                    });
+                  }
+                });
+              } else {
+                // Regular tool params (non-webhook)
+                toolParams = Object.entries(parsedArgs).map(([name, value]) => ({
+                  name,
+                  value: formatValue(value),
+                }));
+              }
+              
               messages.push({
-                id: toolCall.id || `tool-${index}`,
+                id: toolCallId,
                 role: "tool_call",
                 content: "",
                 toolId: toolCall.id,
                 toolName: toolCall.function.name,
-                toolParams: Object.entries(parsedArgs).map(([name, value]) => ({
-                  name,
-                  value: String(value),
-                })),
+                toolParams,
+                isWebhook,
               });
             } else {
               // Regular assistant message
@@ -139,8 +194,21 @@ export function AddTestDialog({
               role: "user",
               content: historyItem.content || "",
             });
+          } else if (historyItem.role === "tool" && historyItem.content) {
+            // Tool response message - link to the tool call
+            const linkedToolCallId = historyItem.tool_call_id || toolCallIds[toolCallIds.length - 1] || "";
+            // Find the linked tool call to get its name
+            const linkedToolCall = messages.find(
+              (m) => m.role === "tool_call" && (m.toolId === linkedToolCallId || m.id === linkedToolCallId)
+            );
+            messages.push({
+              id: `tool-response-${index}`,
+              role: "tool_response",
+              content: historyItem.content,
+              linkedToolCallId,
+              toolName: linkedToolCall?.toolName || "",
+            });
           }
-          // Skip "tool" role messages as they are tool responses
         });
 
         if (messages.length > 0) {
@@ -208,7 +276,7 @@ export function AddTestDialog({
         }
       }
     }
-  }, [initialConfig]);
+  }, [initialConfig, availableTools]);
 
   const [selectedTools, setSelectedTools] = useState<SelectedToolConfig[]>([]);
   const [expectedMessage, setExpectedMessage] = useState("");
@@ -218,16 +286,16 @@ export function AddTestDialog({
   const [localValidationAttempted, setLocalValidationAttempted] =
     useState(false);
   const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
-  const [availableTools, setAvailableTools] = useState<AvailableTool[]>([]);
-  const [availableToolsLoading, setAvailableToolsLoading] = useState(false);
   const [chatMessages, setChatMessages] = useState<
     Array<{
       id: string;
-      role: "agent" | "user" | "tool_call";
+      role: "agent" | "user" | "tool_call" | "tool_response";
       content: string;
       toolName?: string;
       toolId?: string;
-      toolParams?: Array<{ name: string; value: string }>;
+      toolParams?: Array<{ name: string; value: string; group?: string }>;
+      isWebhook?: boolean;
+      linkedToolCallId?: string; // For tool_response to link back to tool_call
     }>
   >([{ id: "1", role: "agent", content: "Hello, how can I help you today?" }]);
 
@@ -243,19 +311,35 @@ export function AddTestDialog({
   const addToolCallMessage = (
     toolId: string,
     toolName: string,
-    params: Array<{ name: string; value: string }>,
+    params: Array<{ name: string; value: string; group?: string }>,
+    isWebhook: boolean = false,
   ) => {
-    setChatMessages([
+    const toolCallId = Date.now().toString();
+    const newMessages: typeof chatMessages = [
       ...chatMessages,
       {
-        id: Date.now().toString(),
+        id: toolCallId,
         role: "tool_call",
         content: "",
         toolId,
         toolName,
         toolParams: params,
+        isWebhook,
       },
-    ]);
+    ];
+
+    // If it's a webhook tool, automatically add a tool response message after it
+    if (isWebhook) {
+      newMessages.push({
+        id: (Date.now() + 1).toString(),
+        role: "tool_response",
+        content: '{\n  "status": "success",\n  "response": {}\n}',
+        linkedToolCallId: toolCallId,
+        toolName,
+      });
+    }
+
+    setChatMessages(newMessages);
     setToolCallDropdownOpen(false);
     setPendingToolCall(null);
   };
@@ -270,6 +354,7 @@ export function AddTestDialog({
     messageId: string,
     paramName: string,
     value: string,
+    group?: string,
   ) => {
     setChatMessages(
       chatMessages.map((msg) =>
@@ -277,7 +362,7 @@ export function AddTestDialog({
           ? {
               ...msg,
               toolParams: msg.toolParams.map((p) =>
-                p.name === paramName ? { ...p, value } : p,
+                p.name === paramName && p.group === group ? { ...p, value } : p,
               ),
             }
           : msg,
@@ -286,7 +371,18 @@ export function AddTestDialog({
   };
 
   const removeChatMessage = (id: string) => {
-    setChatMessages(chatMessages.filter((msg) => msg.id !== id));
+    const messageToRemove = chatMessages.find((msg) => msg.id === id);
+    
+    // If removing a tool_call that's a webhook, also remove its linked tool_response
+    if (messageToRemove?.role === "tool_call" && messageToRemove?.isWebhook) {
+      setChatMessages(
+        chatMessages.filter(
+          (msg) => msg.id !== id && msg.linkedToolCallId !== id
+        )
+      );
+    } else {
+      setChatMessages(chatMessages.filter((msg) => msg.id !== id));
+    }
   };
 
   const [addMessageDropdownOpen, setAddMessageDropdownOpen] = useState(false);
@@ -350,6 +446,9 @@ export function AddTestDialog({
   }, [isOpen, backendAccessToken]);
 
   const addToolFromSelection = (tool: AvailableTool) => {
+    // Check if tool is a webhook type - default to accept any arguments for webhooks
+    const isWebhook = tool.config?.type === "webhook";
+
     // Extract parameters from tool config - handle both array (new) and object (legacy) formats
     let paramList: Array<{ id: string; name: string; value: string }> = [];
     const params = tool.config?.parameters;
@@ -380,7 +479,7 @@ export function AddTestDialog({
       id: tool.uuid,
       name: tool.name,
       expectation: "should-call",
-      acceptAnyParameterValues: false,
+      acceptAnyParameterValues: isWebhook, // Default to true for webhook tools
       isInbuilt: false,
       expectedParameters: paramList,
     };
@@ -551,10 +650,22 @@ export function AddTestDialog({
         const toolCallId = generateUUID();
 
         // Build the arguments object from tool params
-        const argsObj: Record<string, string> = {};
+        const argsObj: Record<string, any> = {};
         if (message.toolParams) {
           for (const param of message.toolParams) {
-            argsObj[param.name] = param.value;
+            // For webhook tools, group params by their group (query, body)
+            // Note: Headers are not shown in conversation history UI
+            if (message.isWebhook && param.group) {
+              if (param.group === "body") {
+                if (!argsObj.body) argsObj.body = {};
+                argsObj.body[param.name] = param.value;
+              } else if (param.group === "query") {
+                if (!argsObj.query) argsObj.query = {};
+                argsObj.query[param.name] = param.value;
+              }
+            } else {
+              argsObj[param.name] = param.value;
+            }
           }
         }
 
@@ -573,13 +684,22 @@ export function AddTestDialog({
           ],
         });
 
-        // Add the tool response message
-        history.push({
-          role: "tool",
-          content: '{"status": "received"}',
-          tool_call_id: toolCallId,
-        });
+        // For webhook tools, find the linked tool_response message and add it to history
+        // For non-webhook tools, don't add any tool response
+        if (message.isWebhook) {
+          const linkedResponse = chatMessages.find(
+            (m) => m.role === "tool_response" && m.linkedToolCallId === message.id
+          );
+          if (linkedResponse && linkedResponse.content) {
+            history.push({
+              role: "tool",
+              content: linkedResponse.content,
+              tool_call_id: toolCallId,
+            });
+          }
+        }
       }
+      // Skip tool_response messages as they're handled with their linked tool_call
     }
 
     // Build the evaluation object based on the active tab
@@ -652,6 +772,18 @@ export function AddTestDialog({
     return { history, settings, evaluation };
   };
 
+  // Helper to check if tool call messages have empty params
+  const hasEmptyToolCallParams = () => {
+    const toolCallMessages = chatMessages.filter((m) => m.role === "tool_call");
+    for (const msg of toolCallMessages) {
+      if (msg.toolParams && msg.toolParams.length > 0) {
+        const hasEmpty = msg.toolParams.some((p) => !p.value.trim());
+        if (hasEmpty) return true;
+      }
+    }
+    return false;
+  };
+
   // Handle form submission
   const handleSubmit = () => {
     setLocalValidationAttempted(true);
@@ -661,10 +793,24 @@ export function AddTestDialog({
       setLocalValidationAttempted(false);
     }, 3000);
 
+    // Validate tool call params in conversation history (for both test types)
+    if (hasEmptyToolCallParams()) {
+      return; // Don't submit if any tool call has empty params
+    }
+
     // Validate required fields based on test type
     if (activeTab === "next-reply") {
       if (!testName.trim() || !expectedMessage.trim()) {
         return; // Don't submit if validation fails
+      }
+      // Validate that all tool_response messages have valid JSON
+      const toolResponses = chatMessages.filter((m) => m.role === "tool_response");
+      for (const response of toolResponses) {
+        try {
+          JSON.parse(response.content);
+        } catch {
+          return; // Don't submit if any tool response has invalid JSON
+        }
       }
     } else {
       // tool-invocation - name and at least one tool are required
@@ -684,6 +830,15 @@ export function AddTestDialog({
           if (hasEmptyParams) {
             return;
           }
+        }
+      }
+      // Validate that all tool_response messages have valid JSON
+      const toolResponses = chatMessages.filter((m) => m.role === "tool_response");
+      for (const response of toolResponses) {
+        try {
+          JSON.parse(response.content);
+        } catch {
+          return; // Don't submit if any tool response has invalid JSON
         }
       }
     }
@@ -1373,40 +1528,216 @@ export function AddTestDialog({
                             <span className="text-sm font-medium text-foreground">
                               {message.toolName}
                             </span>
+                            {message.isWebhook && (
+                              <span className="text-xs text-muted-foreground bg-background px-2 py-0.5 rounded">
+                                Webhook
+                              </span>
+                            )}
                           </div>
                           {message.toolParams &&
                             message.toolParams.length > 0 && (
                               <div className="space-y-3 mt-3">
-                                {message.toolParams.map((param, idx) => (
-                                  <div key={idx}>
-                                    <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-                                      {param.name}
-                                    </label>
-                                    <input
-                                      type="text"
-                                      value={param.value}
-                                      onChange={(e) =>
-                                        updateToolCallParam(
-                                          message.id,
-                                          param.name,
-                                          e.target.value,
-                                        )
-                                      }
-                                      placeholder={`Enter ${param.name}`}
-                                      className="w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent"
-                                    />
+                                {/* Group parameters by type for webhook tools */}
+                                {message.isWebhook ? (
+                                  <>
+                                    {/* Query Parameters */}
+                                    {message.toolParams.filter(p => p.group === "query").length > 0 && (
+                                      <div className="bg-background border border-border rounded-xl p-3">
+                                        <h5 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">
+                                          Query
+                                        </h5>
+                                        <div className="space-y-3">
+                                          {message.toolParams
+                                            .filter(p => p.group === "query")
+                                            .map((param, idx) => {
+                                              const isEmpty = !param.value.trim();
+                                              const showError = localValidationAttempted && isEmpty;
+                                              return (
+                                                <div key={idx}>
+                                                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                                                    {param.name}
+                                                  </label>
+                                                  <input
+                                                    type="text"
+                                                    value={param.value}
+                                                    onChange={(e) =>
+                                                      updateToolCallParam(
+                                                        message.id,
+                                                        param.name,
+                                                        e.target.value,
+                                                        param.group,
+                                                      )
+                                                    }
+                                                    placeholder={`Enter ${param.name}`}
+                                                    className={`w-full h-10 px-3 rounded-lg text-sm bg-muted text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                                                      showError ? "border-red-500" : "border-border"
+                                                    }`}
+                                                  />
+                                                  {showError && (
+                                                    <p className="text-xs text-red-500 mt-1">This field cannot be empty</p>
+                                                  )}
+                                                </div>
+                                              );
+                                            })}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {/* Body Parameters */}
+                                    {message.toolParams.filter(p => p.group === "body").length > 0 && (
+                                      <div className="bg-background border border-border rounded-xl p-3">
+                                        <h5 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">
+                                          Body
+                                        </h5>
+                                        <div className="space-y-3">
+                                          {message.toolParams
+                                            .filter(p => p.group === "body")
+                                            .map((param, idx) => {
+                                              const isEmpty = !param.value.trim();
+                                              const showError = localValidationAttempted && isEmpty;
+                                              return (
+                                                <div key={idx}>
+                                                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                                                    {param.name}
+                                                  </label>
+                                                  <input
+                                                    type="text"
+                                                    value={param.value}
+                                                    onChange={(e) =>
+                                                      updateToolCallParam(
+                                                        message.id,
+                                                        param.name,
+                                                        e.target.value,
+                                                        param.group,
+                                                      )
+                                                    }
+                                                    placeholder={`Enter ${param.name}`}
+                                                    className={`w-full h-10 px-3 rounded-lg text-sm bg-muted text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                                                      showError ? "border-red-500" : "border-border"
+                                                    }`}
+                                                  />
+                                                  {showError && (
+                                                    <p className="text-xs text-red-500 mt-1">This field cannot be empty</p>
+                                                  )}
+                                                </div>
+                                              );
+                                            })}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  /* Regular tool parameters */
+                                  <div className="space-y-3">
+                                    {message.toolParams.map((param, idx) => {
+                                      const isEmpty = !param.value.trim();
+                                      const showError = localValidationAttempted && isEmpty;
+                                      return (
+                                        <div key={idx}>
+                                          <label className="block text-sm font-medium text-foreground mb-1.5">
+                                            {param.name}
+                                          </label>
+                                          <input
+                                            type="text"
+                                            value={param.value}
+                                            onChange={(e) =>
+                                              updateToolCallParam(
+                                                message.id,
+                                                param.name,
+                                                e.target.value,
+                                                param.group,
+                                              )
+                                            }
+                                            placeholder={`Enter ${param.name}`}
+                                            className={`w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                                              showError ? "border-red-500" : "border-border"
+                                            }`}
+                                          />
+                                          {showError && (
+                                            <p className="text-xs text-red-500 mt-1">This field cannot be empty</p>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
                                   </div>
-                                ))}
+                                )}
                               </div>
                             )}
                         </div>
                       </div>
                     )}
 
+                    {/* Tool Response Display (for webhook tools) */}
+                    {message.role === "tool_response" && (
+                      <div className="w-1/2">
+                        <div className="bg-muted border border-border rounded-2xl p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <svg
+                              className="w-4 h-4 text-muted-foreground"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={1.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                              />
+                            </svg>
+                            <span className="text-sm font-medium text-foreground">
+                              Tool Response
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              ({message.toolName})
+                            </span>
+                          </div>
+                          <div className="mt-2">
+                            <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                              JSON Response <span className="text-red-500">*</span>
+                            </label>
+                            <textarea
+                              value={message.content}
+                              onChange={(e) =>
+                                updateChatMessage(message.id, e.target.value)
+                              }
+                              placeholder='{"status": "success", "response": {}}'
+                              rows={5}
+                              className={`w-full px-3 py-2 rounded-lg text-sm font-mono bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                                (() => {
+                                  try {
+                                    JSON.parse(message.content);
+                                    return "border-border";
+                                  } catch {
+                                    return message.content.trim()
+                                      ? "border-red-500"
+                                      : "border-border";
+                                  }
+                                })()
+                              }`}
+                            />
+                            {(() => {
+                              try {
+                                JSON.parse(message.content);
+                                return null;
+                              } catch {
+                                return message.content.trim() ? (
+                                  <p className="text-xs text-red-500 mt-1">
+                                    Invalid JSON format
+                                  </p>
+                                ) : null;
+                              }
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Message Actions - Delete button for all messages, Add button only for last */}
                     <div className="flex items-center gap-2 relative">
-                      {/* Delete and Add Message Buttons - only for last message */}
-                      {index === chatMessages.length - 1 && (
+                      {/* Delete and Add Message Buttons - only for last non-tool-response message */}
+                      {/* Tool response messages are linked to their tool call and shouldn't have independent actions */}
+                      {message.role !== "tool_response" &&
+                        index === chatMessages.length - 1 - (chatMessages[chatMessages.length - 1]?.role === "tool_response" ? 1 : 0) && (
                         <>
                           <button
                             onClick={() => removeChatMessage(message.id)}
@@ -1583,15 +1914,63 @@ export function AddTestDialog({
                                           [],
                                         );
                                       }}
-                                      onSelectCustomTool={(tool, params) => {
-                                        // Always add tool call directly with params (empty values if has params)
+                                      onSelectCustomTool={(tool) => {
+                                        const isWebhook = tool.config?.type === "webhook";
+                                        let allParams: Array<{ name: string; value: string; group?: string }> = [];
+
+                                        if (isWebhook && tool.config?.webhook) {
+                                          // Extract webhook-specific parameters
+                                          const webhook = tool.config.webhook;
+                                          
+                                          // Query parameters (for GET requests)
+                                          if (webhook.queryParameters && Array.isArray(webhook.queryParameters)) {
+                                            webhook.queryParameters.forEach((p: any) => {
+                                              allParams.push({
+                                                name: p.id || p.name || "",
+                                                value: "",
+                                                group: "query",
+                                              });
+                                            });
+                                          }
+                                          
+                                          // Body parameters (for POST requests)
+                                          if (webhook.body?.parameters && Array.isArray(webhook.body.parameters)) {
+                                            webhook.body.parameters.forEach((p: any) => {
+                                              allParams.push({
+                                                name: p.id || p.name || "",
+                                                value: "",
+                                                group: "body",
+                                              });
+                                            });
+                                          }
+                                          // Note: Headers are not shown in conversation history UI
+                                        } else {
+                                          // Structured output tool - use regular parameters
+                                          const params = tool.config?.parameters;
+                                          if (Array.isArray(params)) {
+                                            allParams = params.map((p: any) => ({
+                                              name: p.id || p.name || "",
+                                              value: "",
+                                            }));
+                                          } else {
+                                            const propsObj =
+                                              tool.config?.parameters?.properties ||
+                                              tool.config?.function?.parameters?.properties ||
+                                              tool.config?.properties ||
+                                              tool.config?.parameters ||
+                                              {};
+                                            allParams = Object.keys(propsObj).map((name) => ({
+                                              name,
+                                              value: "",
+                                            }));
+                                          }
+                                        }
+
                                         addToolCallMessage(
                                           tool.uuid,
                                           tool.name,
-                                          params.map((p) => ({
-                                            name: p.name,
-                                            value: "",
-                                          })),
+                                          allParams,
+                                          isWebhook,
                                         );
                                       }}
                                     />

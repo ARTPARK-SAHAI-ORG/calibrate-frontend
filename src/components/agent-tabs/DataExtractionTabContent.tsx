@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import {
-  DataFieldPropertyCard,
-  DataFieldProperty,
-} from "@/components/DataFieldPropertyCard";
+import { ParameterCard, Parameter } from "@/components/ParameterCard";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
+import { NestedContainer } from "@/components/ui/NestedContainer";
+
+// Type alias for backward compatibility
+type DataFieldProperty = Parameter;
 
 type DataExtractionFieldData = {
   uuid: string;
@@ -1061,11 +1062,17 @@ export function DataExtractionTabContent({
                   <label className="block text-sm font-medium mb-2">
                     Properties <span className="text-red-500">*</span>
                   </label>
-                  <div className="border border-border rounded-xl bg-[#1b1b1b] p-4 space-y-4">
+                  <NestedContainer
+                    onAddProperty={addDataFieldProperty}
+                    showValidationError={
+                      dataFieldValidationAttempted &&
+                      dataFieldProperties.length === 0
+                    }
+                  >
                     {dataFieldProperties.map((prop) => (
-                      <DataFieldPropertyCard
+                      <ParameterCard
                         key={prop.id}
-                        property={prop}
+                        param={prop}
                         path={[]}
                         onUpdate={(path, updates) => {
                           if (path.length === 0) {
@@ -1114,23 +1121,10 @@ export function DataExtractionTabContent({
                           }
                         }}
                         validationAttempted={dataFieldValidationAttempted}
+                        showRequired={false}
                       />
                     ))}
-                    <div className="flex justify-center">
-                      <button
-                        type="button"
-                        onClick={addDataFieldProperty}
-                        className={`h-10 px-6 rounded-md text-sm font-medium border bg-background hover:bg-muted/50 transition-colors cursor-pointer ${
-                          dataFieldValidationAttempted &&
-                          dataFieldProperties.length === 0
-                            ? "border-red-500"
-                            : "border-border"
-                        }`}
-                      >
-                        Add property
-                      </button>
-                    </div>
-                  </div>
+                  </NestedContainer>
                 </div>
               )}
 
@@ -1138,9 +1132,9 @@ export function DataExtractionTabContent({
               {dataFieldDataType === "array" && (
                 <div>
                   <label className="block text-sm font-medium mb-2">Item</label>
-                  <div className="border border-border rounded-xl bg-[#1b1b1b] p-4 space-y-4">
-                    <DataFieldPropertyCard
-                      property={
+                  <NestedContainer showAddButton={false}>
+                    <ParameterCard
+                      param={
                         dataFieldItems || {
                           id: crypto.randomUUID(),
                           dataType: "string",
@@ -1167,8 +1161,9 @@ export function DataExtractionTabContent({
                       }}
                       validationAttempted={dataFieldValidationAttempted}
                       isArrayItem={true}
+                      showRequired={false}
                     />
-                  </div>
+                  </NestedContainer>
                 </div>
               )}
             </div>

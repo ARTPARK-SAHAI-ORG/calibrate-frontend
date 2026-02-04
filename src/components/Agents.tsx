@@ -210,15 +210,15 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div>
         <h2 className="text-2xl font-semibold tracking-tight">Agents</h2>
-        <button
-          onClick={() => setDialogOpen(true)}
-          className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
-        >
-          New agent
-        </button>
       </div>
+      <button
+        onClick={() => setDialogOpen(true)}
+        className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+      >
+        New agent
+      </button>
 
       {/* Search Bar */}
       <div className="relative">

@@ -202,20 +202,18 @@ export default function SimulationsPage() {
     >
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">Simulations</h1>
-            <p className="text-muted-foreground text-base leading-relaxed mt-1">
-              Simulate agent-user conversations and evaluate the results
-            </p>
-          </div>
-          <button
-            onClick={() => setDialogOpen(true)}
-            className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
-          >
-            Add simulation
-          </button>
+        <div>
+          <h1 className="text-2xl font-semibold">Simulations</h1>
+          <p className="text-muted-foreground text-base leading-relaxed mt-1">
+            Simulate agent-user conversations and evaluate the results
+          </p>
         </div>
+        <button
+          onClick={() => setDialogOpen(true)}
+          className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+        >
+          Add simulation
+        </button>
 
         {/* Search Input */}
         <div className="relative max-w-md">
