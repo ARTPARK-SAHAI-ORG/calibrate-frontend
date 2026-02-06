@@ -638,15 +638,17 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
 - **Responsive Tab Structure** (for voice simulations with metrics):
 
   - **Mobile (3 tabs)**: Results, Performance, Latency
-    - Results tab shows the simulation results table/cards
+    - Results tab shows the simulation results table/cards (default on mobile)
     - Performance tab shows performance metrics only
     - Latency tab shows latency metrics only
     - Tab buttons use smaller sizing: `text-xs md:text-sm`, `px-3 md:px-4`
     - "Results" tab is hidden on desktop with `md:hidden`
     - **Section headers hidden on mobile**: Both "Overall Metrics" and "Simulation Results" headers use `hidden md:block` to avoid redundancy with tab names (cleaner mobile UI)
+    - **Default tab**: Set via `useEffect` checking `window.innerWidth < 768` to select "results" on mobile
   - **Desktop (2 tabs)**: Performance, Latency
     - Both section headers visible for context
-    - Simulation results always shown below Overall Metrics section
+    - Performance tab is default on desktop (set via `useEffect`)
+    - Simulation results always shown below Overall Metrics section (not tab-dependent)
     - Performance tab shows performance metrics only
     - Latency tab shows latency metrics only
   - **Text simulations**: No tabs shown, all metrics displayed inline with visible headers

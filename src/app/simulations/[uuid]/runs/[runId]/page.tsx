@@ -166,7 +166,13 @@ export default function SimulationRunPage() {
 
   const [activeMetricsTab, setActiveMetricsTab] = useState<
     "results" | "performance" | "latency"
-  >("results");
+  >("performance");
+
+  // Set default tab based on screen size: "results" for mobile, "performance" for desktop
+  useEffect(() => {
+    const isMobile = window.innerWidth < 768;
+    setActiveMetricsTab(isMobile ? "results" : "performance");
+  }, []);
 
   // Ref for transcript container to auto-scroll
   const transcriptContainerRef = useRef<HTMLDivElement>(null);
