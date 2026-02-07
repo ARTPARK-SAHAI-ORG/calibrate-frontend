@@ -370,7 +370,7 @@ export function BenchmarkResultsDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50">
       <div className="bg-background rounded-none md:rounded-xl w-full max-w-5xl h-full md:h-[80vh] flex flex-col shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-border">
+        <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
             <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
               Benchmark for {agentName}
@@ -469,7 +469,7 @@ export function BenchmarkResultsDialog({
 
         {/* Tab Navigation - Only show when done */}
         {!isInitialLoading && !error && isDone && (
-          <div className="border-b border-border -mx-4 md:mx-0 px-4 md:px-6 overflow-x-auto hide-scrollbar">
+          <div className="border-b border-border -mx-4 md:mx-0 px-4 md:px-6 pt-2 overflow-x-auto hide-scrollbar">
             <div className="flex gap-3 md:gap-4 lg:gap-6">
               <button
                 onClick={() => setActiveTab("leaderboard")}
@@ -716,63 +716,86 @@ function ProviderSection({
       {/* Test List */}
       {isExpanded && (
         <div className="px-4 pb-3">
-          {hasResults ? (
-            <div className="space-y-1 ml-4">
-              {modelResult.test_results!.map((testResult, index) => {
-                const isSelected =
-                  selectedTest?.model === modelResult.model &&
-                  selectedTest?.testIndex === index;
-                const testName =
-                  testResult.name ||
-                  testResult.test_case?.name ||
-                  testNames[index] ||
-                  `Test ${index + 1}`;
+          {(() => {
+            // Build a combined list of tests: results we have + placeholders for missing ones
+            const resultsCount = modelResult.test_results?.length ?? 0;
+            const expectedCount = Math.max(
+              totalTests,
+              testNames.length,
+              resultsCount
+            );
 
-                return (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => onTestSelect(index)}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-                      isSelected ? "bg-muted" : "hover:bg-muted/50"
-                    }`}
-                  >
-                    <StatusIcon
-                      status={
-                        testResult.passed === null
-                          ? "running"
-                          : testResult.passed
-                          ? "passed"
-                          : "failed"
-                      }
-                    />
-                    <span className="text-sm text-foreground truncate">
-                      {testName}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : isProcessing && testNames.length > 0 ? (
-            // Show test names with yellow running dots while processing
-            <div className="space-y-1 ml-4">
-              {testNames.map((testName, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg"
-                >
-                  <StatusIcon status="running" />
-                  <span className="text-sm text-foreground truncate">
-                    {testName || `Test ${index + 1}`}
-                  </span>
+            if (expectedCount === 0 && !hasResults) {
+              return (
+                <div className="ml-4 px-3 py-2 text-sm text-muted-foreground">
+                  {isProcessing ? "Processing..." : "No test results"}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="ml-4 px-3 py-2 text-sm text-muted-foreground">
-              {isProcessing ? "Processing..." : "No test results"}
-            </div>
-          )}
+              );
+            }
+
+            return (
+              <div className="space-y-1 ml-4">
+                {Array.from({ length: expectedCount }).map((_, index) => {
+                  const testResult = modelResult.test_results?.[index];
+                  const hasResult = !!testResult;
+                  const isSelected =
+                    selectedTest?.model === modelResult.model &&
+                    selectedTest?.testIndex === index;
+
+                  // Get test name from result, or fall back to testNames array
+                  const testName = hasResult
+                    ? testResult.name ||
+                      testResult.test_case?.name ||
+                      testNames[index] ||
+                      `Test ${index + 1}`
+                    : testNames[index] || `Test ${index + 1}`;
+
+                  // Determine status: if we have a result use it, otherwise show as running
+                  const status = hasResult
+                    ? testResult.passed === null
+                      ? "running"
+                      : testResult.passed
+                      ? "passed"
+                      : "failed"
+                    : "running";
+
+                  // Only make clickable if we have a result
+                  if (hasResult) {
+                    return (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => onTestSelect(index)}
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                          isSelected ? "bg-muted" : "hover:bg-muted/50"
+                        }`}
+                      >
+                        <StatusIcon
+                          status={status as "running" | "passed" | "failed"}
+                        />
+                        <span className="text-sm text-foreground truncate">
+                          {testName}
+                        </span>
+                      </button>
+                    );
+                  }
+
+                  // No result yet - show as running placeholder (not clickable)
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                    >
+                      <StatusIcon status="running" />
+                      <span className="text-sm text-foreground truncate">
+                        {testName}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>

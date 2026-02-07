@@ -2134,6 +2134,10 @@ const getFilteredProviders = (language: LanguageOption) => {
       - Provider sections are expandable to show individual test results underneath
       - **Immediate provider display**: On dialog open, creates placeholder entries for ALL models from `models` prop (doesn't wait for API results)
       - **Processing state display**: When a provider has `success === null` and no results yet, shows all test names from `testNames` prop with yellow running indicators (similar to TestRunnerDialog)
+      - **Intermediate results handling**: When API returns partial results (some tests completed, others pending), the component shows:
+        - Completed tests with their actual status (green checkmark for passed, red X for failed) - these are clickable to view details
+        - Missing/pending tests as "running" (yellow indicator) - these are not clickable (displayed as `<div>` not `<button>`)
+        - Uses `Math.max(totalTests, testNames.length, resultsCount)` to determine expected test count, ensuring tests don't disappear during polling
       - As results arrive from API, running indicators update to green checkmarks or red X marks
       - **Auto-expand behavior**: First provider (from `models` prop) is expanded immediately when dialog opens, not waiting for results
       - **Merged providers**: `getProvidersToDisplay()` function merges `modelResults` from API with placeholders for any models that don't have results yet

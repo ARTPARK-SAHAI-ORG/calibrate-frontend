@@ -1045,7 +1045,7 @@ export function TestsTabContent({
                 {/* Desktop Table */}
                 <div className="hidden md:block border border-border rounded-xl overflow-hidden">
                   {/* Table Header */}
-                  <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+                  <div className="grid grid-cols-[2fr_1fr_auto_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
                     <div className="text-sm font-medium text-muted-foreground">
                       Name
                     </div>
@@ -1059,7 +1059,7 @@ export function TestsTabContent({
                   {filteredAgentTests.map((test) => (
                     <div
                       key={test.uuid}
-                      className="grid grid-cols-[1fr_1fr_auto_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
+                      className="grid grid-cols-[2fr_1fr_auto_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
                     >
                       {/* Name Column with Edit Icon */}
                       <div className="flex items-center gap-2">
