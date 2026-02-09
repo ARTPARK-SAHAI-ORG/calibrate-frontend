@@ -20,6 +20,8 @@ The platform addresses the challenge of quality assurance for voice agents by pr
 - **Benchmarking** across different AI providers to find the best configuration
 
 > **Note on naming**: The app is branded as "Calibrate" in all user-facing UI, page titles, and documentation. However, external URLs and infrastructure still reference "pense" (e.g., Discord: `https://discord.gg/9dQB4AngK2`). Documentation links use `process.env.NEXT_PUBLIC_DOCS_URL` directly. The npm package name is `calibrate-frontend`.
+>
+> **Community links**: WhatsApp and Discord invite URLs appear in two places with different links — the landing page (`/login` community section + `LandingFooter`) and the in-app "Talk to Us" FAB (`AppLayout`). The landing page uses `WHATSAPP_INVITE_URL` constant and `https://discord.gg/9dQB4AngK2`. The in-app FAB uses `https://chat.whatsapp.com/LNLIcaXVdOdJqjMPuPeTpS` and `https://discord.gg/SAkPaHfn9Q`. These are hardcoded in their respective components.
 
 ---
 
@@ -1291,6 +1293,20 @@ The entire application is fully responsive and works on mobile, tablet, and desk
 - Responsive horizontal padding: `px-4 md:px-6 lg:px-8` for progressive spacing
 - Content is fully accessible and functional on all screen sizes
 - No viewport blocking or "use a laptop" messages - all features work on mobile
+
+**"Talk to Us" Floating Action Button (FAB):**
+
+- Rendered inside `AppLayout`, so it appears on all authenticated pages (not on the landing/login page)
+- **Position**: Fixed bottom-right corner (`fixed bottom-6 right-6 z-50`)
+- **Button**: 48×48px circle (`w-12 h-12 rounded-full`), uses `bg-foreground text-background` (theme-aware), shows a chat bubble icon (three dots in a circle)
+- **Open state**: Icon changes to an X (close icon), button color changes to `bg-muted-foreground`
+- **Popup**: Appears above the FAB (`absolute bottom-14 right-0`), 224px wide (`w-56`), rounded card with border and shadow
+  - "Join WhatsApp" — green WhatsApp icon, links to `https://chat.whatsapp.com/LNLIcaXVdOdJqjMPuPeTpS`
+  - "Join Discord" — indigo Discord icon, links to `https://discord.gg/SAkPaHfn9Q`
+  - Both links open in new tabs (`target="_blank"`)
+- **State**: `talkToUsOpen` boolean state, toggled by clicking the FAB
+- **Click-outside**: Uses a `talkToUsRef` ref with the same `mousedown` click-outside handler that manages the profile dropdown
+- **Note**: The community invite URLs here differ from those on the landing page (see naming note at the top of this file)
 
 **Key difference from landing page**: The `/login` marketing/landing page does not use `AppLayout`, so it has its own responsive behavior defined separately (see Landing Page section).
 
