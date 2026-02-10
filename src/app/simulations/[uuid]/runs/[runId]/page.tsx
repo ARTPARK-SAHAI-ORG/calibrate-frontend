@@ -49,6 +49,7 @@ type TranscriptEntry = {
 
 type SimulationResult = {
   simulation_name: string;
+  aborted?: boolean;
   persona: Persona;
   scenario: Scenario;
   evaluation_results: EvaluationResult[] | null;
@@ -88,6 +89,7 @@ export default function SimulationRunPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<401 | 403 | 404 | null>(null);
+  const [isAborting, setIsAborting] = useState(false);
   const [transcriptDialogOpen, setTranscriptDialogOpen] = useState(false);
   const [selectedSimulationKey, setSelectedSimulationKey] = useState<
     string | null
@@ -366,6 +368,7 @@ export default function SimulationRunPage() {
 
   // Check if a simulation row is still processing (has transcript but no evaluation results) - yellow spinner
   const isSimulationProcessing = (simulation: SimulationResult) => {
+    if (simulation.aborted) return false;
     return (
       (simulation.transcript?.length ?? 0) > 0 && !simulation.evaluation_results
     );
@@ -373,6 +376,7 @@ export default function SimulationRunPage() {
 
   // Check if a simulation row is waiting (no transcript and no evaluation results) - gray spinner
   const isSimulationWaiting = (simulation: SimulationResult) => {
+    if (simulation.aborted) return false;
     return (
       (simulation.transcript?.length ?? 0) === 0 &&
       !simulation.evaluation_results
@@ -409,6 +413,45 @@ export default function SimulationRunPage() {
     setTranscriptDialogOpen(false);
     setSelectedSimulationKey(null);
     frozenSimulationRef.current = null; // Clear frozen data when dialog closes
+  };
+
+  const abortSimulation = async () => {
+    if (!backendAccessToken || isAborting) return;
+
+    try {
+      setIsAborting(true);
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) return;
+
+      const response = await fetch(
+        `${backendUrl}/simulations/run/${runId}/abort`,
+        {
+          method: "POST",
+          headers: {
+            accept: "application/json",
+            "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
+          },
+        }
+      );
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
+      if (!response.ok) {
+        console.error("Failed to abort simulation");
+        return;
+      }
+
+      const data: RunData = await response.json();
+      setRunData(data);
+    } catch (err) {
+      console.error("Error aborting simulation:", err);
+    } finally {
+      setIsAborting(false);
+    }
   };
 
   const getAudioUrlForEntry = (
@@ -595,6 +638,51 @@ export default function SimulationRunPage() {
               >
                 {runData.type}
               </span>
+              {(runData.status.toLowerCase() === "in_progress" ||
+                runData.status.toLowerCase() === "queued") && (
+                <button
+                  onClick={abortSimulation}
+                  disabled={isAborting}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium border border-red-500/50 text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isAborting ? (
+                    <svg
+                      className="w-3 h-3 animate-spin"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                  ) : (
+                    <svg
+                      className="w-3 h-3"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z"
+                      />
+                    </svg>
+                  )}
+                  {isAborting ? "Stopping..." : "Stop"}
+                </button>
+              )}
             </div>
 
             {/* Error Message - show when simulation has failed */}
@@ -987,7 +1075,7 @@ export default function SimulationRunPage() {
                                             className="relative z-10 flex items-center justify-center w-4 h-4 cursor-pointer"
                                           >
                                             <svg
-                                              className="w-4 h-4 text-foreground"
+                                              className={`w-4 h-4 ${simulation.aborted ? "text-red-500" : "text-foreground"}`}
                                               fill="none"
                                               viewBox="0 0 24 24"
                                               stroke="currentColor"
@@ -1030,7 +1118,7 @@ export default function SimulationRunPage() {
                                         metricKey
                                       );
 
-                                      // If evaluation_results is null, show spinner (metrics still processing)
+                                      // If evaluation_results is null, show spinner (metrics still processing) or N/A for aborted
                                       if (value === null) {
                                         return (
                                           <td
@@ -1038,6 +1126,11 @@ export default function SimulationRunPage() {
                                             className="px-3 py-4 whitespace-nowrap"
                                           >
                                             <div className="flex justify-center">
+                                              {simulation.aborted ? (
+                                                <span className="text-xs text-muted-foreground">
+                                                  N/A
+                                                </span>
+                                              ) : (
                                               <svg
                                                 className={`w-5 h-5 flex-shrink-0 animate-spin ${
                                                   isProcessing
@@ -1061,6 +1154,7 @@ export default function SimulationRunPage() {
                                                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                                                 ></path>
                                               </svg>
+                                              )}
                                             </div>
                                           </td>
                                         );
@@ -1226,6 +1320,11 @@ export default function SimulationRunPage() {
                                             </span>
                                             <div className="flex items-center gap-2">
                                               {value === null ? (
+                                                simulation.aborted ? (
+                                                  <span className="text-xs text-muted-foreground">
+                                                    N/A
+                                                  </span>
+                                                ) : (
                                                 <svg
                                                   className={`w-4 h-4 flex-shrink-0 animate-spin ${
                                                     isProcessing
@@ -1249,6 +1348,7 @@ export default function SimulationRunPage() {
                                                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                                                   ></path>
                                                 </svg>
+                                                )
                                               ) : isSttLlmJudge ? (
                                                 <span className="text-sm font-medium text-foreground">
                                                   {parseFloat(
@@ -1304,7 +1404,7 @@ export default function SimulationRunPage() {
                                     onClick={() =>
                                       openTranscriptDialog(simulation)
                                     }
-                                    className="w-full h-9 flex items-center justify-center gap-2 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity"
+                                    className={`w-full h-9 flex items-center justify-center gap-2 rounded-md text-sm font-medium hover:opacity-90 transition-opacity ${simulation.aborted ? "bg-red-500/10 border border-red-500/30 text-red-500" : "bg-foreground text-background"}`}
                                   >
                                     <svg
                                       className="w-4 h-4"
@@ -1323,6 +1423,25 @@ export default function SimulationRunPage() {
                                       ? "Processing..."
                                       : "View Transcript"}
                                   </button>
+                                )}
+                                {/* Aborted indicator for simulations without transcript */}
+                                {simulation.aborted && !hasTranscript && (
+                                  <div className="w-full h-9 flex items-center justify-center gap-2 rounded-md text-sm font-medium bg-red-500/10 border border-red-500/30 text-red-500">
+                                    <svg
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      strokeWidth={2}
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+                                      />
+                                    </svg>
+                                    Simulation aborted by user
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -1708,8 +1827,31 @@ export default function SimulationRunPage() {
                   }
                   return null;
                 })()}
+                {/* Show simulation aborted by user note */}
+                {selectedSimulation.aborted && (
+                  <div className="flex items-center justify-center py-4 mt-2">
+                    <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/30">
+                      <svg
+                        className="w-4 h-4 text-red-500"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+                        />
+                      </svg>
+                      <span className="text-sm text-red-500">
+                        Simulation aborted by user
+                      </span>
+                    </div>
+                  </div>
+                )}
                 {/* Show spinner at bottom while metrics are being fetched */}
-                {!selectedSimulation.evaluation_results &&
+                {!selectedSimulation.aborted && !selectedSimulation.evaluation_results &&
                   (selectedSimulation.transcript?.length ?? 0) > 0 && (
                     <div className="flex items-center justify-center py-4">
                       <svg

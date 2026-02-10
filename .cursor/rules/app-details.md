@@ -622,7 +622,7 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
 
 - **Run types**: chat (text-based), audio, voice (full pipeline)
 - Runs are executed asynchronously with polling for status updates
-- Status flow: queued → in_progress → done (or failed)
+- Status flow: queued → in_progress → done (or failed). When a run is aborted, the API returns `status: "done"` with individual `simulation_results` entries having `aborted: true`
 
 **Runs Tab UI** (`SimulationRunsTab` component):
 
@@ -663,13 +663,16 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
   - Simulation results appear incrementally as each simulation completes
   - Overall metrics only shown after run completes (status === "done")
   - **Failed state error banner**: When `runData.status === "failed"`, a red error banner is displayed below the status pills with a warning triangle icon and "Simulation Failed" text (styled with `border-red-500/30`, `bg-red-500/10`, `text-red-500`)
+  - **Abort button**: Shown inline next to the status/type pills when status is `in_progress` or `queued`. Red-outlined button (`border-red-500/50 text-red-500`) with stop icon. Calls `POST /simulations/run/{runId}/abort`. Shows spinner and "Aborting..." while request is in flight (`isAborting` state), disabled during the request. The abort API returns the same `RunData` response structure as the status GET endpoint, so the response is parsed and used to immediately update the UI via `setRunData(data)` — no need to wait for the next poll cycle
+  - **Aborted simulations**: When a run is aborted, individual `SimulationResult` entries may have `aborted: true`. Aborted simulations are treated as terminal — no spinners are shown, `isSimulationProcessing()` and `isSimulationWaiting()` both return `false` for aborted rows. Metric cells show "N/A" instead of spinners when `evaluation_results` is null and `aborted` is true. Aborted simulations with transcript still show the play button in red (`text-red-500` in table, `bg-red-500/10 border-red-500/30 text-red-500` button in cards); those without transcript show a red "Simulation aborted by user" indicator in the card view
   - Individual simulation rows can have `evaluation_results: null` while still processing
   - **Row spinner states**:
-    - **Play button only**: Row has `evaluation_results` (metrics complete)
-    - **Spinner around play button (yellow)**: Row has transcript but no `evaluation_results` (processing)
-    - **Spinner only (gray)**: Row has no transcript and no `evaluation_results` (waiting)
+    - **Play button only**: Row has `evaluation_results` (metrics complete), or row is `aborted` with transcript
+    - **Spinner around play button (yellow)**: Row has transcript but no `evaluation_results` (processing, not aborted)
+    - **Spinner only (gray)**: Row has no transcript and no `evaluation_results` (waiting, not aborted)
+    - **Aborted with no transcript**: No spinner, no play button. Card view shows red "Simulation aborted by user" label
     - **First column structure**: Uses `relative` container with spinner positioned `absolute inset-0`, play button centered with `relative z-10`. Spinner wraps around the play button visually.
-    - **Metric column spinners**: Each metric cell shows `w-5 h-5 flex-shrink-0` spinner when `evaluation_results` is null; yellow when processing, gray when waiting
+    - **Metric column spinners**: Each metric cell shows `w-5 h-5 flex-shrink-0` spinner when `evaluation_results` is null and not aborted; yellow when processing, gray when waiting. Aborted simulations show "N/A" text instead
 
 - **Overall Metrics Section** (only shown when status is "done", aggregated across all simulations):
 
@@ -691,7 +694,7 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
     - `stt_llm_judge_score` displayed as percentage, other metrics as Pass/Fail
     - View transcript button (only shown for rows with transcript history; available even while evaluation is pending)
     - Audio playback (for voice simulations)
-    - **Processing state**: Rows with `evaluation_results: null` show spinners in metric cells (yellow if has transcript/processing, gray if waiting) and a spinner beside the play button
+    - **Processing state**: Rows with `evaluation_results: null` (and not aborted) show spinners in metric cells (yellow if has transcript/processing, gray if waiting) and a spinner beside the play button. Aborted rows show "N/A" in metric cells instead
 
   - **Mobile** (`md:hidden`): Card-based layout with clear label/value structure:
 
@@ -699,10 +702,11 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
     - **Scenario section**: "Scenario" label (text-xs muted) with value below (text-sm font-medium)
     - Visual separator (border-bottom) between info sections and metrics
     - **Metrics section**: "Metrics" heading (text-xs font-semibold) followed by metric list
-    - Each metric shows: spinner (if processing), percentage (for stt_llm_judge), or Pass/Fail badge with info icon
+    - Each metric shows: spinner (if processing), "N/A" (if aborted), percentage (for stt_llm_judge), or Pass/Fail badge with info icon
     - Metrics displayed as list items with label/value pairs (border-bottom separators)
     - "View Transcript" button at bottom (full-width, only shown when transcript exists)
     - Processing state indicator: button text changes to "Processing..." when evaluation pending
+    - **Aborted without transcript**: Shows red "Simulation aborted by user" indicator (`bg-red-500/10 border-red-500/30 text-red-500`) in place of the transcript button
     - Cards use standard styling: p-5, rounded-xl borders, space-y-3 for sections
 
   - **Row sorting** (same for desktop and mobile): Rows are sorted by processing state priority:
@@ -729,10 +733,11 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
 
   - **Auto-scroll**: Transcript container scrolls to bottom only when new messages are added (tracks `prevTranscriptLengthRef` and only scrolls if `currentLength > previous`)
   - **Empty state**: Shows "No transcript available yet" when transcript is empty or undefined
-  - **Processing indicator**: Shows a yellow spinner at the bottom of transcript while metrics are being fetched (when `evaluation_results` is null but transcript has content)
+  - **Processing indicator**: Shows a yellow spinner at the bottom of transcript while metrics are being fetched (when `evaluation_results` is null, transcript has content, and simulation is not aborted)
   - **Graceful null handling**: All transcript accesses use optional chaining (`transcript?.length ?? 0`, `transcript ?? []`) since transcript can be undefined during intermediate results
   - **Transcript filtering**: Entries are filtered before display - `role: "end_reason"` is always filtered out, and `role: "tool"` messages are only included if they have valid JSON content with `type: "webhook_response"` (other tool messages like "COMPLETED" are hidden)
-  - **End reason handling**: When the last entry in the full transcript has `role: "end_reason"` and `content: "max_turns"`, a yellow informational banner is shown at the bottom: "Conversation ended: Maximum number of agent turns reached"
+  - **End reason handling**: When the last entry in the full transcript has `role: "end_reason"` and `content: "max_turns"`, a yellow informational banner is shown at the bottom: "Maximum number of assistant turns reached"
+  - **Aborted simulation banner**: When `selectedSimulation.aborted` is true, a red informational banner is shown at the bottom of the transcript: "Simulation aborted by user" (styled with `bg-red-500/10 border-red-500/30 text-red-500`, same layout pattern as the max_turns banner)
   - **Stable audio keys**: All audio elements use `key={audioUrl}` to prevent React from remounting them during polling re-renders (avoids audio restart/reload)
   - **Presigned URL refresh on error**: Audio elements include `onError={refreshRunData}` handler to automatically fetch fresh presigned URLs when they expire. The `refreshRunData` callback clears `frozenSimulationRef` before updating state so new URLs are used instead of stale frozen data
   - Full conversation audio player below header (from `conversation_wav_url`) for voice simulations
@@ -862,6 +867,7 @@ This enables:
 │   ├── constants/             # Static configuration data
 │   │   ├── inbuilt-tools.ts   # Built-in tool definitions
 │   │   ├── limits.ts          # Usage limits and contact link for upgrade requests
+│   │   ├── links.ts           # WHATSAPP_INVITE_URL, DISCORD_INVITE_URL - community invite links
 │   │   └── polling.ts         # POLLING_INTERVAL_MS (3000ms) - shared polling interval
 │   ├── hooks/                 # Custom React hooks (useCrudResource, etc.)
 │   ├── lib/                   # Utility libraries (api.ts, status.ts, etc.)
@@ -975,8 +981,8 @@ The login page serves as a marketing-style landing page with a consistent light 
 
 **Constants:**
 
-- `WHATSAPP_INVITE_URL` - WhatsApp community invite link, used in Community section (login page) and `LandingFooter` component
-- `GITHUB_REPO_URL` - GitHub repo link, used in Open Source section
+- `WHATSAPP_INVITE_URL` and `DISCORD_INVITE_URL` - imported from `@/constants/links` (shared across login page, `LandingFooter`, and `AppLayout`)
+- `GITHUB_REPO_URL` - GitHub repo link, defined locally in login page, used in Open Source section
 
 **Feature Section Layout:**
 
@@ -1018,8 +1024,8 @@ The login page serves as a marketing-style landing page with a consistent light 
 - **Headline**: `text-3xl md:text-4xl lg:text-5xl`
 - **Subtitle**: `text-base md:text-xl`
 - **Join buttons** (row 1, bordered style with icons, `px-4 md:px-6 py-2.5 md:py-3 text-sm md:text-base`):
-  - "WhatsApp" - uses `WHATSAPP_INVITE_URL` constant (green WhatsApp icon)
-  - "Discord" - opens `https://discord.gg/9dQB4AngK2` (indigo Discord icon)
+  - "WhatsApp" - uses `WHATSAPP_INVITE_URL` from `@/constants/links` (green WhatsApp icon)
+  - "Discord" - uses `DISCORD_INVITE_URL` from `@/constants/links` (indigo Discord icon)
 - **Book a demo** (row 2, filled black style with calendar icon, same responsive sizing): Opens `https://cal.com/amandalmia/30min` in new tab
 - **Social links** (row 3, text links): "Follow @artikiagents" and "Connect on LinkedIn"
 
@@ -1302,8 +1308,8 @@ The entire application is fully responsive and works on mobile, tablet, and desk
 - **Button**: 48×48px circle (`w-12 h-12 rounded-full`), uses `bg-foreground text-background` (theme-aware), shows a chat bubble icon (three dots in a circle)
 - **Open state**: Icon changes to an X (close icon), button color changes to `bg-muted-foreground`
 - **Popup**: Appears above the FAB (`absolute bottom-14 right-0`), 224px wide (`w-56`), rounded card with border and shadow
-  - "Join WhatsApp" — green WhatsApp icon, links to `https://chat.whatsapp.com/LNLIcaXVdOdJqjMPuPeTpS`
-  - "Join Discord" — indigo Discord icon, links to `https://discord.gg/SAkPaHfn9Q`
+  - "Join WhatsApp" — green WhatsApp icon, uses `WHATSAPP_INVITE_URL` from `@/constants/links`
+  - "Join Discord" — indigo Discord icon, uses `DISCORD_INVITE_URL` from `@/constants/links`
   - Both links open in new tabs (`target="_blank"`)
 - **State**: `talkToUsOpen` boolean state, toggled by clicking the FAB
 - **Click-outside**: Uses a `talkToUsRef` ref with the same `mousedown` click-outside handler that manages the profile dropdown
@@ -2688,7 +2694,7 @@ All endpoints are relative to `NEXT_PUBLIC_BACKEND_URL`:
 | Scenarios       | `GET/POST /scenarios`, `GET/PUT/DELETE /scenarios/{uuid}`                                                                                                                                                                                                         |
 | Metrics         | `GET/POST /metrics`, `GET/PUT/DELETE /metrics/{uuid}`, `POST /metrics/{uuid}/duplicate`                                                                                                                                                                           |
 | Simulations     | `GET/POST /simulations`, `GET/DELETE /simulations/{uuid}`                                                                                                                                                                                                         |
-| Simulation Runs | `GET /simulations/run/{runId}`, `POST /simulations/{uuid}/run`                                                                                                                                                                                                    |
+| Simulation Runs | `GET /simulations/run/{runId}`, `POST /simulations/{uuid}/run`, `POST /simulations/run/{runId}/abort`                                                                                                                                                             |
 | Tests           | `GET/POST /tests`, `GET/PUT/DELETE /tests/{uuid}`                                                                                                                                                                                                                 |
 | Agent Tests     | `GET /agent-tests/agent/{uuid}/tests`, `GET /agent-tests/agent/{uuid}/runs`, `POST/DELETE /agent-tests`, `POST /agent-tests/agent/{uuid}/run`, `GET /agent-tests/run/{taskId}`, `POST /agent-tests/agent/{uuid}/benchmark`, `GET /agent-tests/benchmark/{taskId}` |
 | STT Evaluation  | `POST /stt/evaluate`, `GET /stt/evaluate/{uuid}`                                                                                                                                                                                                                  |
