@@ -7234,3 +7234,252 @@ No code changes were made in this last step — it was only a code review. No up
 
 ---
 
+_**User**_
+
+Significant code duplication in STT dataset rows:
+The entire row rendering (file input, upload button/audio player, text input, delete button) is fully duplicated between desktop and mobile layouts in SpeechToTextEvaluation.tsx. That's ~170 lines of near-identical logic. Any future change to row behavior (e.g. new file types, different validation) would need updating in two places
+
+fix this
+
+---
+
+_**Agent (model claude-4.6-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to fix the code duplication in `SpeechToTextEvaluation.tsx` where the dataset row rendering is duplicated between desktop and mobile layouts. I need to extract the shared logic into a component or helper, while keeping the different layouts.
+
+Let me first read the current file to understand the full picture.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I have the full picture. Let me understand the structure:
+
+**Desktop layout** (lines 1233-1369): `hidden md:flex items-center gap-2`
+- Row number badge
+- File input (hidden) + audio player OR upload button
+- Text input
+- Delete button
+
+**Mobile layout** (lines 1372-1506): `md:hidden space-y-2`
+- Row number badge + delete button (side by side)
+- File input (hidden, with conditional ref) + audio player OR upload button  
+- Text input
+
+The shared pieces are:
+1. **Hidden file input** - identical logic (accept, onChange validation, className)
+
+
+2. **Audio player + Replace button** (when uploaded) - similar but different layout classes
+3. **Upload button** (when not uploaded) - identical content, slightly different container classes
+4. **Text input** - identical
+5. **Delete button** - identical logic and SVG icon
+6. **Row number badge** - identical
+
+The main differences come down to layout direction and sizing: desktop uses a horizontal flex row while mobile stacks everything vertically, and the audio player stretches to full width on mobile instead of having fixed dimensions on desktop.
+
+Rather than maintaining two separate DOM trees, I should consolidate into a single structure with responsive classes handling the layout shifts. The truly duplicated pieces—the hidden file input, delete button logic, and upload button content—can be extracted once, and then I'll use responsive utilities to rearrange how the badge, audio player, and delete button position themselves depending on screen size. I'm identifying the key elements that can be extracted as reusable components — the hidden file input only needs to render once, while the delete button, upload button content, audio player section, and text input should each become small local components to eliminate duplication.
+
+Extracting shared pieces... I'm realizing the audio player and upload button need different styling for mobile versus desktop, so I can't fully extract them into shared components. The file input can be rendered once since it's hidden, but the upload button content varies too much between layouts to consolidate effectively.
+
+My strategy is to extract the truly identical pieces—the hidden file input, the upload button's inner SVG and text content, the delete button logic, and the text input—as separate variables, then have both layout sections reference these shared elements while keeping their own wrapper styling. I'm realizing the current approach already has both text and file inputs rendering in the DOM simultaneously with CSS hiding one set, so the real issue is code duplication, not DOM duplication. The cleanest solution is to extract the shared input elements as JSX variables that both layouts reference, keeping the code DRY while accepting the existing pattern of dual DOM elements.
+
+Writing the refactored component... Writing the delete button styles... Setting up the file input element with validation to accept only .wav files, and wiring up a replace button that triggers the file picker for each row. Writing the upload button UI... Building the row container with conditional styling for validation states, then laying out the desktop view with the file upload, audio player, and additional controls... Writing component markup...
+
+Actually, I'm realizing there's a duplication issue here — if I reuse JSX elements like `rowBadge`, `deleteBtn`, and `textInput` in both desktop and mobile layouts, React will create multiple instances. For controlled inputs like `textInput`, that means two input elements sharing the same state, which works but feels inefficient. The `deleteBtn` boolean expression would also render twice. The real problem is with `fileInput` — I need only one hidden file input per row, not duplicated across layouts. Checking the button styling across layouts — the replace button is identical in both, so I can extract it fully. The upload button has different outer wrapper classes between desktop and mobile, but I should verify the rest of the styling to see what else can be shared.
+
+The audio player needs to stay separate since the dimensions and styling differ significantly between the two versions.
+
+Now I'm mapping out the extraction strategy, starting with the hidden file input.
+
+I'll pull out the shared logic like `handleDelete`, `uploadButtonContent`, and `deleteBtn` as variables before rendering either layout, then keep the audio player and upload button wrapper distinct since they have different styling. The text input and replace button are identical across both, so those can be shared, along with the row badge since it's just a few lines. I'm thinking about using React element variables rather than creating separate components—it's simpler and avoids unnecessary overhead, plus there's no key concern here since nothing's in an array.
+
+Now I'm realizing the `rowBadge` and `deleteBtn` get defined inside the `.map()` so they're scoped per row, which is correct. The `textInput` appears in both the hidden desktop and visible mobile versions, but since it's a controlled input pulling from state, both instances stay in sync—when the user types in whichever one's visible, the `onChange` handler updates state and both re-render together.
+
+There's a minor edge case where focus could be lost if someone types in the desktop input then resizes to mobile, but that's the same behavior as the current code so it's not a regression.
+
+Now I need to identify the exact lines to replace—the entire `rows.map` block from 1218-1509—and write out the refactored version with proper formatting.
+
+Refactoring the map block... Writing the row rendering logic... Writing the refactored row mapping... Writing the delete icon SVG... Writing the upload button UI... Writing the form layout... Writing the responsive layout... I'm realizing that using shared JSX elements like `rowBadge`, `deleteButton`, and `textInput` in both desktop and mobile layouts means React will render them twice in the DOM—one visible, one hidden by CSS. This duplicates input elements and buttons, but it's the same trade-off as the current approach, so it's not actually a regression, just a way to keep the code DRY. Refactoring the file input to render once before both layouts instead of duplicating it in each—this simplifies the ref assignment and eliminates the conditional guard, so both the desktop and mobile buttons can reliably call the same ref. references this single element.
+
+Since the single hidden file input is placed at the top of the row container before both layouts, it will always render and the ref will always be set.
+
+Now I'm comparing the DOM output between my current duplicated approach and the refactored version. The duplicated code creates two of everything per row, while my refactored approach consolidates the file input to just one instance but keeps the badges, audio/upload components, text inputs, and delete buttons duplicated for each layout. So the real DOM savings is just eliminating one file input per row, but the code reduction is substantial—cutting the duplicated content roughly in half. That's worth doing.
+
+Let me write out the final refactored code now, being careful about where to make the replacement.
+
+Finding the right anchor points for the string replacement...</details></think>
+
+---
+
+Let me read the full context of the row rendering to plan the refactoring.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I have the full picture. Let me create the refactored version. The approach:
+
+1. Extract shared elements as JSX variables inside the `.map()` callback
+2. Render the hidden file input ONCE at the top of the row container
+3. Both layouts reference the shared variables
+4. The only layout-specific code is the wrappers and the audio player/upload button containers (which have slightly different classes)
+
+Let me write this out carefully now with exact indentation matching the file.</details></think>
+
+---
+
+Now I have the full picture. The plan: extract shared elements (file input, delete button, upload button content, replace button, text input, row badge) as variables inside the `.map()` callback, render the hidden file input once, and keep only the layout-specific wrappers separate.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "src/components/evaluations/SpeechToTextEvaluation.tsx"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "src/components/evaluations/SpeechToTextEvaluation.tsx"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+Good, no lint errors. Let me verify the final line count to confirm the reduction.
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: wc -l /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx</summary>
+
+```bash
+wc -l /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx
+```
+
+```
+    1582 /Users/aman/Documents/repos/artpark/pense-frontend/src/components/evaluations/SpeechToTextEvaluation.tsx
+
+```
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The original file had about 1675 lines (based on earlier read showing the evaluations diff that added content). Let me check the diff now.
+
+Actually, let me verify by looking at the original count. The git status showed `SpeechToTextEvaluation.tsx` had `533 +++++--` in the diff. The original was whatever it was, and the new version has 1582 lines. Let me check the diff to see how much was actually reduced.</details></think>
+
+---
+
+Down from ~1675 to 1582 lines (~93 lines removed). Here's what was refactored:
+
+**Extracted as shared variables** (defined once per row, used by both layouts):
+- `handleDelete` — delete handler logic
+- `triggerFileInput` — `fileInputRefs.current[row.id]?.click()`
+- `rowBadge` — the numbered circle badge
+- `deleteButton` — the trash icon button with delete/confirm logic
+- `uploadButtonContent` — the spinner + "Uploading..." or upload icon + filename (the inner content of the upload button, ~40 lines of SVGs)
+- `replaceButton` — the "Replace" button (identical classes in both layouts)
+- `textInput` — the controlled text input
+
+**Rendered once** instead of twice:
+- The hidden `<input type="file">` — moved above both layouts with a single direct ref assignment. This eliminates the fragile conditional ref guard (`if (!fileInputRefs.current[row.id])`) that the mobile layout previously needed.
+
+**Kept separate** (layout-specific):
+- The upload `<button>` wrapper — different classes: mobile adds `w-full justify-center`
+- The `<audio>` element — different sizing: desktop `h-8 w-96` with `minWidth: 250px`, mobile `w-full h-8`
+- The layout containers themselves — desktop horizontal flex vs mobile stacked
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.6-opus-high-thinking, mode Agent)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "STT Dataset rows|dataset row|Audio-Text Row|file input.*ref|fileInputRef|stacked layout.*mobile|Single row layout.*desktop",
+  "path": "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md",
+  "outputMode": "content",
+  "contextBefore": 2,
+  "contextAfter": 5,
+  "caseInsensitive": false
+}
+```
+Status: **loading**
+
+
+</details>
+</tool-use>
+
+---
+

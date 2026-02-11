@@ -1911,11 +1911,13 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
     - Each card shows checkbox + provider label + website link icon in a row, with model name (`font-mono truncate`) below
     - Selected state uses `border-foreground/30 bg-muted/30`, unselected uses `border-border hover:bg-muted/20`
   - Shows "(X selected)" count next to the header title
-- **STT Dataset rows** (responsive):
+- **STT Dataset rows** (responsive, DRY pattern):
   - **Desktop** (`hidden md:flex`): Single horizontal row with row number, audio player/upload, text input, delete button
   - **Mobile** (`md:hidden`): Stacked layout — row number + delete button on top, full-width audio upload/player, full-width text input
   - Audio player uses `w-full h-8` on mobile (no min-width), `w-96 min-width: 250px` on desktop
   - Upload button is `w-full justify-center` on mobile for full-width tap target
+  - **Shared elements pattern**: To avoid duplicating logic between desktop/mobile layouts, shared pieces are extracted as JSX variables inside the `.map()` callback (`rowBadge`, `deleteButton`, `uploadButtonContent`, `replaceButton`, `textInput`, `handleDelete`, `triggerFileInput`). Both layouts reference these variables. Only layout-specific wrappers (flex direction, audio sizing, upload button width) remain separate.
+  - **Single hidden file input per row**: One `<input type="file" className="hidden">` is rendered at the top of each row container (before both layout divs), with a direct ref assignment. Both desktop and mobile upload/replace buttons call `triggerFileInput()` which clicks this single element. No conditional ref guard needed.
 - **STT ZIP upload section**: `w-full md:w-2/3 md:mx-auto` — full width on mobile, 2/3 centered on desktop. Buttons stack vertically on small screens (`flex-col sm:flex-row`)
 - **TTS CSV upload section**: Buttons stack vertically on small screens (`flex-col sm:flex-row`)
 - **Providers start unselected by default** - user must select at least 1 provider before evaluating

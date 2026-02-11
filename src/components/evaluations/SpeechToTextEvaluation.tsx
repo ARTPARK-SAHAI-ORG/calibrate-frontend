@@ -1220,6 +1220,111 @@ export function SpeechToTextEvaluation() {
             const isUploading = uploadStatus[row.id] === "uploading";
             const isUploaded = uploadStatus[row.id] === "success";
 
+            const handleDelete = () => {
+              if (!row.audioFile && !row.text.trim()) {
+                deleteRow(row.id);
+              } else {
+                setDeleteDialogOpen(row.id);
+              }
+            };
+
+            const triggerFileInput = () =>
+              fileInputRefs.current[row.id]?.click();
+
+            const rowBadge = (
+              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[11px] font-medium text-muted-foreground">
+                {index + 1}
+              </div>
+            );
+
+            const deleteButton = rows.length > 1 && (
+              <button
+                onClick={handleDelete}
+                className="flex-shrink-0 w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex items-center justify-center cursor-pointer"
+                aria-label="Delete row"
+              >
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                  />
+                </svg>
+              </button>
+            );
+
+            const uploadButtonContent = isUploading ? (
+              <>
+                <svg
+                  className="w-3.5 h-3.5 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                <span>Uploading...</span>
+              </>
+            ) : (
+              <>
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+                  />
+                </svg>
+                <span>
+                  {row.audioFile
+                    ? getFileName(row.audioFile)
+                    : "Upload .wav"}
+                </span>
+              </>
+            );
+
+            const replaceButton = (
+              <button
+                onClick={triggerFileInput}
+                className="h-7 px-2 rounded text-[11px] font-medium border border-border bg-background hover:bg-accent transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
+                title="Replace audio"
+              >
+                Replace
+              </button>
+            );
+
+            const textInput = (
+              <input
+                type="text"
+                value={row.text}
+                onChange={(e) => handleTextChange(row.id, e.target.value)}
+                placeholder="Enter reference transcription"
+                className="w-full h-8 px-2 rounded text-[13px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              />
+            );
+
             return (
               <div
                 key={row.id}
@@ -1229,33 +1334,32 @@ export function SpeechToTextEvaluation() {
                     : "border-border bg-muted/10"
                 }`}
               >
+                {/* Single hidden file input per row */}
+                <input
+                  type="file"
+                  ref={(el) => {
+                    fileInputRefs.current[row.id] = el;
+                  }}
+                  accept=".wav,audio/wav,audio/x-wav"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    if (
+                      file &&
+                      !file.name.toLowerCase().endsWith(".wav")
+                    ) {
+                      alert("Please select a .wav file only");
+                      e.target.value = "";
+                      return;
+                    }
+                    handleFileChange(row.id, file);
+                  }}
+                  className="hidden"
+                />
+
                 {/* Desktop: Single row layout */}
                 <div className="hidden md:flex items-center gap-2">
-                  {/* Row Number */}
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[11px] font-medium text-muted-foreground">
-                    {index + 1}
-                  </div>
-
-                  {/* File Upload / Audio Player */}
+                  {rowBadge}
                   <div className="flex-shrink-0 flex items-center gap-2">
-                    <input
-                      type="file"
-                      ref={(el) => {
-                        fileInputRefs.current[row.id] = el;
-                      }}
-                      accept=".wav,audio/wav,audio/x-wav"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0] || null;
-                        if (file && !file.name.toLowerCase().endsWith(".wav")) {
-                          alert("Please select a .wav file only");
-                          e.target.value = "";
-                          return;
-                        }
-                        handleFileChange(row.id, file);
-                      }}
-                      className="hidden"
-                    />
-
                     {isUploaded && row.audioUrl ? (
                       <div className="flex items-center gap-2">
                         <audio
@@ -1264,167 +1368,29 @@ export function SpeechToTextEvaluation() {
                           className="h-8 w-96"
                           style={{ minWidth: "250px" }}
                         />
-                        <button
-                          onClick={() => fileInputRefs.current[row.id]?.click()}
-                          className="h-7 px-2 rounded text-[11px] font-medium border border-border bg-background hover:bg-accent transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
-                          title="Replace audio"
-                        >
-                          Replace
-                        </button>
+                        {replaceButton}
                       </div>
                     ) : (
                       <button
-                        onClick={() => fileInputRefs.current[row.id]?.click()}
+                        onClick={triggerFileInput}
                         disabled={isUploading}
                         className="h-8 px-3 rounded text-[12px] font-medium border border-border bg-background hover:bg-accent transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {isUploading ? (
-                          <>
-                            <svg
-                              className="w-3.5 h-3.5 animate-spin"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                              ></circle>
-                              <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                              ></path>
-                            </svg>
-                            <span>Uploading...</span>
-                          </>
-                        ) : (
-                          <>
-                            <svg
-                              className="w-3.5 h-3.5"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={1.5}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-                              />
-                            </svg>
-                            <span>
-                              {row.audioFile
-                                ? getFileName(row.audioFile)
-                                : "Upload .wav"}
-                            </span>
-                          </>
-                        )}
+                        {uploadButtonContent}
                       </button>
                     )}
                   </div>
-
-                  {/* Text Input */}
-                  <div className="flex-1">
-                    <input
-                      type="text"
-                      value={row.text}
-                      onChange={(e) => handleTextChange(row.id, e.target.value)}
-                      placeholder="Enter reference transcription"
-                      className="w-full h-8 px-2 rounded text-[13px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                    />
-                  </div>
-
-                  {/* Delete Button */}
-                  {rows.length > 1 && (
-                    <button
-                      onClick={() => {
-                        if (!row.audioFile && !row.text.trim()) {
-                          deleteRow(row.id);
-                        } else {
-                          setDeleteDialogOpen(row.id);
-                        }
-                      }}
-                      className="flex-shrink-0 w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex items-center justify-center cursor-pointer"
-                      aria-label="Delete row"
-                    >
-                      <svg
-                        className="w-3.5 h-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={1.5}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                        />
-                      </svg>
-                    </button>
-                  )}
+                  <div className="flex-1">{textInput}</div>
+                  {deleteButton}
                 </div>
 
                 {/* Mobile: Stacked layout */}
                 <div className="md:hidden space-y-2">
                   <div className="flex items-center justify-between">
-                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[11px] font-medium text-muted-foreground">
-                      {index + 1}
-                    </div>
-                    {rows.length > 1 && (
-                      <button
-                        onClick={() => {
-                          if (!row.audioFile && !row.text.trim()) {
-                            deleteRow(row.id);
-                          } else {
-                            setDeleteDialogOpen(row.id);
-                          }
-                        }}
-                        className="flex-shrink-0 w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex items-center justify-center cursor-pointer"
-                        aria-label="Delete row"
-                      >
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={1.5}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                          />
-                        </svg>
-                      </button>
-                    )}
+                    {rowBadge}
+                    {deleteButton}
                   </div>
-
-                  {/* Audio upload/player */}
                   <div>
-                    <input
-                      type="file"
-                      ref={(el) => {
-                        if (!fileInputRefs.current[row.id]) {
-                          fileInputRefs.current[row.id] = el;
-                        }
-                      }}
-                      accept=".wav,audio/wav,audio/x-wav"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0] || null;
-                        if (file && !file.name.toLowerCase().endsWith(".wav")) {
-                          alert("Please select a .wav file only");
-                          e.target.value = "";
-                          return;
-                        }
-                        handleFileChange(row.id, file);
-                      }}
-                      className="hidden"
-                    />
-
                     {isUploaded && row.audioUrl ? (
                       <div className="space-y-1.5">
                         <audio
@@ -1432,77 +1398,19 @@ export function SpeechToTextEvaluation() {
                           controls
                           className="w-full h-8"
                         />
-                        <button
-                          onClick={() => fileInputRefs.current[row.id]?.click()}
-                          className="h-7 px-2 rounded text-[11px] font-medium border border-border bg-background hover:bg-accent transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
-                          title="Replace audio"
-                        >
-                          Replace
-                        </button>
+                        {replaceButton}
                       </div>
                     ) : (
                       <button
-                        onClick={() => fileInputRefs.current[row.id]?.click()}
+                        onClick={triggerFileInput}
                         disabled={isUploading}
                         className="h-8 px-3 rounded text-[12px] font-medium border border-border bg-background hover:bg-accent transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed w-full justify-center"
                       >
-                        {isUploading ? (
-                          <>
-                            <svg
-                              className="w-3.5 h-3.5 animate-spin"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                              ></circle>
-                              <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                              ></path>
-                            </svg>
-                            <span>Uploading...</span>
-                          </>
-                        ) : (
-                          <>
-                            <svg
-                              className="w-3.5 h-3.5"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={1.5}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-                              />
-                            </svg>
-                            <span>
-                              {row.audioFile
-                                ? getFileName(row.audioFile)
-                                : "Upload .wav"}
-                            </span>
-                          </>
-                        )}
+                        {uploadButtonContent}
                       </button>
                     )}
                   </div>
-
-                  {/* Text Input */}
-                  <input
-                    type="text"
-                    value={row.text}
-                    onChange={(e) => handleTextChange(row.id, e.target.value)}
-                    placeholder="Enter reference transcription"
-                    className="w-full h-8 px-2 rounded text-[13px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                  />
+                  {textInput}
                 </div>
               </div>
             );
