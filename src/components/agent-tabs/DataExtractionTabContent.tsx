@@ -1217,7 +1217,9 @@ export function DataExtractionTabContent({
               {/* Item section for array type */}
               {dataFieldDataType === "array" && (
                 <div>
-                  <label className="block text-xs md:text-sm font-medium mb-1.5 md:mb-2">Item</label>
+                  <label className="block text-xs md:text-sm font-medium mb-1.5 md:mb-2">
+                    Item
+                  </label>
                   <NestedContainer showAddButton={false}>
                     <ParameterCard
                       param={
@@ -1257,7 +1259,9 @@ export function DataExtractionTabContent({
             {/* Footer */}
             <div className="px-4 md:px-6 py-3 md:py-4 border-t border-border space-y-2 md:space-y-3">
               {createDataFieldError && (
-                <p className="text-xs md:text-sm text-red-500">{createDataFieldError}</p>
+                <p className="text-xs md:text-sm text-red-500">
+                  {createDataFieldError}
+                </p>
               )}
               <div className="flex items-center justify-end gap-2 md:gap-3">
                 <button

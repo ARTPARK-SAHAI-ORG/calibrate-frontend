@@ -1280,10 +1280,10 @@ export function TestsTabContent({
                   <div
                     key={run.uuid}
                     onClick={() => handlePastRunClick(run)}
-                    className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto_auto] gap-2 sm:gap-4 px-3 md:px-4 py-2 md:py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer"
+                    className="flex flex-col sm:grid sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-2 sm:gap-4 px-3 md:px-4 py-2 md:py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer"
                   >
-                    <div className="flex items-center justify-between sm:block">
-                      <span className="text-xs md:text-sm font-medium text-foreground truncate">
+                    <div className="flex items-center justify-between sm:block min-w-0">
+                      <span className="text-xs md:text-sm font-medium text-foreground truncate block">
                         {getTestRunDisplayName(run)}
                       </span>
                       <span className="sm:hidden text-xs text-muted-foreground">

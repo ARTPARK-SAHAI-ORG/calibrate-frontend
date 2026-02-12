@@ -48,7 +48,7 @@ export function ToolsTabContent({
       ((tool.description || tool.config?.description) &&
         (tool.description || tool.config?.description)
           .toLowerCase()
-          .includes(toolsSearchQuery.toLowerCase())),
+          .includes(toolsSearchQuery.toLowerCase()))
   );
 
   return (
@@ -191,7 +191,9 @@ export function ToolsTabContent({
                     {/* Type Column */}
                     <div className="flex items-center">
                       <p className="text-sm text-muted-foreground">
-                        {tool.config?.type === "webhook" ? "Webhook" : "Structured Output"}
+                        {tool.config?.type === "webhook"
+                          ? "Webhook"
+                          : "Structured Output"}
                       </p>
                     </div>
                     {/* Description Column */}
@@ -241,7 +243,9 @@ export function ToolsTabContent({
                           {tool.name}
                         </h4>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {tool.config?.type === "webhook" ? "Webhook" : "Structured Output"}
+                          {tool.config?.type === "webhook"
+                            ? "Webhook"
+                            : "Structured Output"}
                         </p>
                         {(tool.description || tool.config?.description) && (
                           <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
