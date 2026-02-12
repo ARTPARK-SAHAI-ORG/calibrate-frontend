@@ -43,6 +43,8 @@ export function LandingFooter() {
                 ARTPARK
               </a>{" "}
               @IISc
+              <br />
+              Funded by Government of Karnataka (GoK)
             </p>
           </div>
 

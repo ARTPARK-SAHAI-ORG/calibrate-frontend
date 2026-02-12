@@ -954,6 +954,7 @@ Both the login page and about page use shared header/footer components to avoid 
 - No props - self-contained with all links and constants
 - Contains: 3-column layout (Company, Resources, Community), copyright
 - Imports `WHATSAPP_INVITE_URL` and `DISCORD_INVITE_URL` from `@/constants/links`
+- Company column includes "Supported by ARTPARK @IISc" and "Funded by Government of Karnataka (GoK)" attribution text at the bottom
 
 ### Landing Page (`/login`)
 
@@ -962,7 +963,7 @@ The login page serves as a marketing-style landing page with a consistent light 
 **Layout (top to bottom):**
 
 1. **Navigation bar**: Uses `<LandingHeader />` component with "Continue with Google" as primary CTA
-2. **Hero section**: Large, responsive headline and subtitle (no CTA button - moved to header); heading scales from `text-4xl` on mobile to `text-6xl` on desktop, with matching responsive padding and margin
+2. **Hero section**: Large, responsive headline and subtitle (no CTA button - moved to header); heading scales from `text-4xl` on mobile to `text-6xl` on desktop, with matching responsive padding and margin. Includes an embedded YouTube launch video (`https://www.youtube.com/embed/_VS8KQbBxKs`) below the subtitle with 16:9 aspect ratio, rounded corners, and shadow styling.
 3. **Feature Tabs section**: Tab switcher with feature previews
 4. **Integrations section**: Provider grid showing supported STT/TTS/LLM providers
 5. **Open Source section**: GitHub link and self-hosting info (`bg-gray-50`)
