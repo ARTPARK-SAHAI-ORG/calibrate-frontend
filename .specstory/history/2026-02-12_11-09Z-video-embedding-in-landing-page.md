@@ -323,6 +323,121 @@ Lines added: 2, lines removed: undefined
 
 ---
 
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/LandingFooter.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+Done! I've added "Funded by Government of Karnataka (GoK)" on a new line below "Supported by ARTPARK @IISc" in the footer.
+
+---
+
+_**User (2026-02-12 07:55Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high, mode Agent)**_
+
+Let me find the LandingFooter documentation in the app-details.md file to update it.
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "LandingFooter|Supported by|ARTPARK" in "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md" • 5 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.cursor/rules/app-details.md` | `> **Community links**: WhatsApp and Discord invite URLs are defined once in `src/constants/links.ts` (`WHATSAPP_INVITE_URL`, `DISCORD_INVITE_URL`) and imported wherever needed: `AppLayout.tsx` (Talk to Us FAB), `login/page.tsx` (Community section), and `LandingFooter.tsx`. Always import from `@/constants/links` — never hardcode these URLs.` | L24 |
+| `.cursor/rules/app-details.md` | `**`LandingFooter`** (`src/components/LandingFooter.tsx`):` | L952 |
+| `.cursor/rules/app-details.md` | `- `WHATSAPP_INVITE_URL` and `DISCORD_INVITE_URL` - imported from `@/constants/links` (shared across login page, `LandingFooter`, and `AppLayout`)` | L984 |
+| `.cursor/rules/app-details.md` | `Uses `<LandingFooter />` component. See "Shared Landing Components" section above for details.` | L1067 |
+| `.cursor/rules/app-details.md` | `- Uses `<LandingFooter />` - same footer as landing page` | L1116 |
+
+
+</details>
+</tool-use>
+
+---
+
+Let me read the LandingFooter section:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+I need to update the LandingFooter description to include the "Supported by ARTPARK @IISc" and "Funded by Government of Karnataka (GoK)" information:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -955,4 +955,5 @@
+  - Contains: 3-column layout (Company, Resources, Community), copyright
+  - Imports &#96;WHATSAPP_INVITE_URL&#96; and &#96;DISCORD_INVITE_URL&#96; from &#96;@/constants/links&#96;
++ - Company column includes "Supported by ARTPARK @IISc" and "Funded by Government of Karnataka (GoK)" attribution text at the bottom
+  
+  ### Landing Page (&#96;/login&#96;)
+```
+
+</details>
+
+</tool-use>
+
+---
+
+The documentation has been updated to reflect the funding attribution in the LandingFooter component.
+
+---
+
+_**User (2026-02-14 18:45Z)**_
+
+@page.tsx (119-126) autoplay
+
+---
+
+_**Agent (model claude-4.5-opus-high, mode Agent)**_
+
 
 
 ---

@@ -963,7 +963,7 @@ The login page serves as a marketing-style landing page with a consistent light 
 **Layout (top to bottom):**
 
 1. **Navigation bar**: Uses `<LandingHeader />` component with "Continue with Google" as primary CTA
-2. **Hero section**: Large, responsive headline and subtitle (no CTA button - moved to header); heading scales from `text-4xl` on mobile to `text-6xl` on desktop, with matching responsive padding and margin. Includes an embedded YouTube launch video (`https://www.youtube.com/embed/_VS8KQbBxKs`) below the subtitle with 16:9 aspect ratio, rounded corners, and shadow styling.
+2. **Hero section**: Large, responsive headline and subtitle (no CTA button - moved to header); heading scales from `text-4xl` on mobile to `text-6xl` on desktop, with matching responsive padding and margin. Includes an embedded YouTube launch video (`https://www.youtube.com/embed/_VS8KQbBxKs?autoplay=1&mute=1`) below the subtitle with 16:9 aspect ratio, rounded corners, and shadow styling. Video autoplays muted (browsers require `mute=1` for autoplay to work).
 3. **Feature Tabs section**: Tab switcher with feature previews
 4. **Integrations section**: Provider grid showing supported STT/TTS/LLM providers
 5. **Open Source section**: GitHub link and self-hosting info (`bg-gray-50`)

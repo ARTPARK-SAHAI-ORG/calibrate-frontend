@@ -104,15 +104,13 @@ export default function LoginPage() {
 
         <div className="relative max-w-4xl mx-auto px-4 md:px-8 pt-16 md:pt-24 pb-12 md:pb-16 text-center">
           <h1 className="text-4xl md:text-6xl font-medium text-gray-900 leading-[1.1] mb-4 md:mb-6 tracking-[-0.02em]">
-            Build & scale your
+            Simulation and evaluation 
             <br />
-            voice agents with confidence
+            studio for voice agents
           </h1>
 
           <p className="text-base md:text-xl text-gray-500 max-w-2xl mx-auto">
-            Evaluate every component of your voice agent, identify where it
-            fails and rapidly improve performance with an automated testing
-            process
+            Run simulations with realistic user personas for key scenarios and evaluate every component of your voice agent to ship with confidence  
           </p>
 
           {/* Launch Video */}
@@ -120,7 +118,7 @@ export default function LoginPage() {
             <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
               <iframe
                 className="absolute top-0 left-0 w-full h-full rounded-xl shadow-lg"
-                src="https://www.youtube.com/embed/_VS8KQbBxKs"
+                src="https://www.youtube.com/embed/_VS8KQbBxKs?autoplay=1&mute=1"
                 title="Calibrate Launch Video"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
