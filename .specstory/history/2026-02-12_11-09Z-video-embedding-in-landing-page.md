@@ -438,7 +438,106 @@ _**User (2026-02-14 18:45Z)**_
 
 _**Agent (model claude-4.5-opus-high, mode Agent)**_
 
+<tool-use data-tool-type="write" data-tool-name="search_replace">
 
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/app/login/page.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 2
+
+```diff
+@@ -119,9 +119,8 @@
+                &lt;iframe
+                  className="absolute top-0 left-0 w-full h-full rounded-xl shadow-lg"
+-                 src="https://www.youtube.com/embed/_VS8KQbBxKs"
++                 src="https://www.youtube.com/embed/_VS8KQbBxKs?autoplay=1&amp;mute=1"
+                  title="Calibrate Launch Video"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+-               
+                /&gt;
+              &lt;/div&gt;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+Added autoplay to the YouTube embed. Note: browsers require videos to be muted (`mute=1`) for autoplay to work, so I've included that parameter as well.
+
+---
+
+_**User (2026-02-14 18:45Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high, mode Agent)**_
+
+The change I made was minor - just adding `?autoplay=1&mute=1` to the YouTube embed URL. Let me check if there's existing documentation about the hero section video that needs updating:
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "YouTube|launch video|autoplay|embed" in "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md" • 2 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.cursor/rules/app-details.md` | `2. **Hero section**: Large, responsive headline and subtitle (no CTA button - moved to header); heading scales from `text-4xl` on mobile to `text-6xl` on desktop, with matching responsive padding and margin. Includes an embedded YouTube launch video (`https://www.youtube.com/embed/_VS8KQbBxKs`) below the subtitle with 16:9 aspect ratio, rounded corners, and shadow styling.` | L966 |
+| `.cursor/rules/app-details.md` | `- **`NEXT_PUBLIC_*` vars are build-time**: These environment variables are embedded into client-side JavaScript at build time, not runtime. Server-side code (API routes) reads them at runtime.` | L4114 |
+
+
+</details>
+</tool-use>
+
+---
+
+I need to update line 966 to mention the autoplay behavior and the mute requirement:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -964,5 +964,5 @@
+  
+  1. **Navigation bar**: Uses &#96;&lt;LandingHeader /&gt;&#96; component with "Continue with Google" as primary CTA
+- 2. **Hero section**: Large, responsive headline and subtitle (no CTA button - moved to header); heading scales from &#96;text-4xl&#96; on mobile to &#96;text-6xl&#96; on desktop, with matching responsive padding and margin. Includes an embedded YouTube launch video (&#96;https://www.youtube.com/embed/_VS8KQbBxKs&#96;) below the subtitle with 16:9 aspect ratio, rounded corners, and shadow styling.
++ 2. **Hero section**: Large, responsive headline and subtitle (no CTA button - moved to header); heading scales from &#96;text-4xl&#96; on mobile to &#96;text-6xl&#96; on desktop, with matching responsive padding and margin. Includes an embedded YouTube launch video (&#96;https://www.youtube.com/embed/_VS8KQbBxKs?autoplay=1&amp;mute=1&#96;) below the subtitle with 16:9 aspect ratio, rounded corners, and shadow styling. Video autoplays muted (browsers require &#96;mute=1&#96; for autoplay to work).
+  3. **Feature Tabs section**: Tab switcher with feature previews
+  4. **Integrations section**: Provider grid showing supported STT/TTS/LLM providers
+```
+
+</details>
+
+</tool-use>
+
+---
+
+Updated the documentation to reflect the autoplay behavior and the browser requirement that videos must be muted for autoplay to work.
 
 ---
 

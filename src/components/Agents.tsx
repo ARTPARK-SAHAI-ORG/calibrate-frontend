@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useSession, signOut } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { useAccessToken } from "@/hooks";
 
 type Agent = {
   uuid: string;
@@ -35,7 +36,7 @@ const formatDate = (dateString: string): string => {
 };
 
 export function Agents({ onNavigateToAgent }: AgentsProps) {
-  const { data: session } = useSession();
+  const backendAccessToken = useAccessToken();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -57,8 +58,6 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
   // Hide the floating "Talk to Us" button when any dialog is open
   useHideFloatingButton(dialogOpen);
   useHideFloatingButton(duplicateDialogOpen);
-
-  const backendAccessToken = (session as any)?.backendAccessToken;
 
   useEffect(() => {
     const fetchAgents = async () => {

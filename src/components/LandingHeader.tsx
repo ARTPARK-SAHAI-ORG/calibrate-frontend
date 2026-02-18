@@ -1,9 +1,9 @@
 "use client";
 
-import { signIn } from "next-auth/react";
+import Link from "next/link";
 
 type LandingHeaderProps = {
-  /** Whether the logo should link to /login (for non-login pages) */
+  /** Whether the logo should link to / (for non-home pages) */
   showLogoLink?: boolean;
   /** The href for the Talk to us button - defaults to #join-community for same-page scroll */
   talkToUsHref?: string;
@@ -13,10 +13,6 @@ export function LandingHeader({
   showLogoLink = false,
   talkToUsHref = "#join-community",
 }: LandingHeaderProps) {
-  const handleGoogleSignIn = () => {
-    signIn("google");
-  };
-
   const LogoContent = (
     <>
       <img
@@ -33,9 +29,9 @@ export function LandingHeader({
   return (
     <nav className="flex items-center justify-between gap-3 px-4 md:px-8 py-4 border-b border-gray-100">
       {showLogoLink ? (
-        <a href="/login" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2">
           {LogoContent}
-        </a>
+        </Link>
       ) : (
         <div className="flex items-center gap-2">{LogoContent}</div>
       )}
@@ -55,12 +51,12 @@ export function LandingHeader({
         >
           Talk to us
         </a>
-        <button
-          onClick={handleGoogleSignIn}
+        <Link
+          href="/login"
           className="px-4 md:px-5 py-2 bg-black text-white text-sm md:text-base font-medium rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
         >
           Login
-        </button>
+        </Link>
       </div>
     </nav>
   );

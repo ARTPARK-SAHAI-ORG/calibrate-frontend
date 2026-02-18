@@ -69,6 +69,12 @@ export async function apiClient<T>(
 
   // Handle 401 Unauthorized - sign out user
   if (response.status === 401) {
+    // Clear localStorage
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("user");
+    // Clear cookie
+    document.cookie = "access_token=; path=/; max-age=0; SameSite=Lax";
+    // Sign out via NextAuth
     await signOut({ callbackUrl: "/login" });
     throw new Error("Unauthorized - session expired");
   }

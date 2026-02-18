@@ -237,6 +237,16 @@ type AppLayoutProps = {
   headerActions?: React.ReactNode;
 };
 
+// Type for user stored in localStorage (from email/password login)
+type LocalUser = {
+  uuid: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export function AppLayout({
   activeItem,
   onItemChange,
@@ -247,11 +257,29 @@ export function AppLayout({
   headerActions,
 }: AppLayoutProps) {
   const { data: session } = useSession();
+  const [localUser, setLocalUser] = useState<LocalUser | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [talkToUsOpen, setTalkToUsOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>("device");
   const profileRef = useRef<HTMLDivElement>(null);
   const talkToUsRef = useRef<HTMLDivElement>(null);
+
+  // Load user from localStorage (for email/password login)
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        setLocalUser(JSON.parse(storedUser));
+      } catch {
+        // Invalid JSON, ignore
+      }
+    }
+  }, []);
+
+  // Compute user display info from either session or localStorage
+  const userName = session?.user?.name || (localUser ? `${localUser.first_name} ${localUser.last_name}` : "User");
+  const userEmail = session?.user?.email || localUser?.email || "";
+  const userImage = session?.user?.image || null;
 
   // Get the hide count from the global context provider
   const floatingButtonHideCount = useFloatingButtonHideCount();
@@ -545,15 +573,15 @@ export function AppLayout({
                 onClick={() => setProfileOpen(!profileOpen)}
                 className="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center text-white font-medium text-sm hover:bg-purple-700 transition-colors cursor-pointer overflow-hidden"
               >
-                {session?.user?.image ? (
+                {userImage ? (
                   <img
-                    src={session.user.image}
-                    alt={session.user.name || "User"}
+                    src={userImage}
+                    alt={userName}
                     className="w-full h-full rounded-full object-cover"
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  getFirstLetter(session?.user?.name)
+                  getFirstLetter(userName)
                 )}
               </button>
 
@@ -563,23 +591,23 @@ export function AppLayout({
                   {/* User Info */}
                   <div className="p-4 flex items-center gap-3 border-b border-border">
                     <div className="w-11 h-11 rounded-full bg-purple-600 flex items-center justify-center text-white font-medium text-base flex-shrink-0 overflow-hidden">
-                      {session?.user?.image ? (
+                      {userImage ? (
                         <img
-                          src={session.user.image}
-                          alt={session.user.name || "User"}
+                          src={userImage}
+                          alt={userName}
                           className="w-full h-full rounded-full object-cover"
                           referrerPolicy="no-referrer"
                         />
                       ) : (
-                        getFirstLetter(session?.user?.name)
+                        getFirstLetter(userName)
                       )}
                     </div>
                     <div className="min-w-0">
                       <p className="font-medium text-foreground truncate">
-                        {session?.user?.name || "User"}
+                        {userName}
                       </p>
                       <p className="text-sm text-muted-foreground truncate">
-                        {session?.user?.email || ""}
+                        {userEmail}
                       </p>
                     </div>
                   </div>
@@ -611,7 +639,15 @@ export function AppLayout({
                   {/* Logout */}
                   <div className="p-2">
                     <button
-                      onClick={() => signOut({ callbackUrl: "/login" })}
+                      onClick={() => {
+                        // Clear localStorage
+                        localStorage.removeItem("access_token");
+                        localStorage.removeItem("user");
+                        // Clear cookie
+                        document.cookie = "access_token=; path=/; max-age=0; SameSite=Lax";
+                        // Sign out via NextAuth
+                        signOut({ callbackUrl: "/login" });
+                      }}
                       className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted rounded-lg transition-colors cursor-pointer"
                     >
                       <svg

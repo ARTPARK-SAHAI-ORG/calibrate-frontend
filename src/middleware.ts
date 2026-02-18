@@ -22,22 +22,30 @@ export default auth((req) => {
     req.nextUrl.pathname.startsWith("/api/debug");
   const isDocsRoute = req.nextUrl.pathname.startsWith("/docs");
   const isAboutPage = req.nextUrl.pathname === "/about";
+  const isTermsPage = req.nextUrl.pathname === "/terms";
+  const isPrivacyPage = req.nextUrl.pathname === "/privacy";
 
-  // Allow auth API routes, debug routes, docs routes, and about page
-  if (isAuthRoute || isDebugRoute || isDocsRoute || isAboutPage) {
+  // Allow public pages: landing page, auth API, debug, docs, about, terms, privacy
+  if (isHomePage || isAuthRoute || isDebugRoute || isDocsRoute || isAboutPage || isTermsPage || isPrivacyPage) {
     return NextResponse.next();
   }
 
-  const isLoggedIn = !!req.auth;
-  const isLoginPage = req.nextUrl.pathname === "/login";
+  // Check for authentication via NextAuth session OR JWT cookie
+  const hasNextAuthSession = !!req.auth;
+  const hasJwtCookie = !!req.cookies.get("access_token")?.value;
+  const isLoggedIn = hasNextAuthSession || hasJwtCookie;
 
-  // Redirect logged-in users away from login page
-  if (isLoginPage && isLoggedIn) {
+  const isLoginPage = req.nextUrl.pathname === "/login";
+  const isSignupPage = req.nextUrl.pathname === "/signup";
+  const isAuthPage = isLoginPage || isSignupPage;
+
+  // Redirect logged-in users away from login/signup pages
+  if (isAuthPage && isLoggedIn) {
     return NextResponse.redirect(new URL("/agents", req.url));
   }
 
-  // Redirect unauthenticated users to login page
-  if (!isLoginPage && !isLoggedIn) {
+  // Redirect unauthenticated users to login page (except for auth pages)
+  if (!isAuthPage && !isLoggedIn) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 

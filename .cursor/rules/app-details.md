@@ -21,7 +21,7 @@ The platform addresses the challenge of quality assurance for voice agents by pr
 
 > **Note on naming**: The app is branded as "Calibrate" in all user-facing UI, page titles, and documentation. However, external URLs and infrastructure still reference "pense" (e.g., Discord: `https://discord.gg/9dQB4AngK2`). Documentation links use `process.env.NEXT_PUBLIC_DOCS_URL` directly. The npm package name is `calibrate-frontend`.
 >
-> **Community links**: WhatsApp and Discord invite URLs are defined once in `src/constants/links.ts` (`WHATSAPP_INVITE_URL`, `DISCORD_INVITE_URL`) and imported wherever needed: `AppLayout.tsx` (Talk to Us FAB), `login/page.tsx` (Community section), and `LandingFooter.tsx`. Always import from `@/constants/links` — never hardcode these URLs.
+> **Community links**: WhatsApp and Discord invite URLs are defined once in `src/constants/links.ts` (`WHATSAPP_INVITE_URL`, `DISCORD_INVITE_URL`) and imported wherever needed: `AppLayout.tsx` (Talk to Us FAB), `page.tsx` (landing page Community section), and `LandingFooter.tsx`. Always import from `@/constants/links` — never hardcode these URLs.
 
 ---
 
@@ -853,7 +853,9 @@ This enables:
 │   │   ├── scenarios/         # Test scenario definitions (has layout.tsx)
 │   │   ├── metrics/           # Evaluation metrics (has layout.tsx)
 │   │   ├── simulations/       # End-to-end simulation testing (has layout.tsx)
-│   │   ├── login/             # Landing page with Google OAuth (has layout.tsx)
+│   │   ├── page.tsx           # Landing page (marketing page with features, integrations, community)
+│   │   ├── login/             # Login page with email/password and Google OAuth (has layout.tsx)
+│   │   ├── signup/            # Signup page with registration form and password validation (has layout.tsx)
 │   │   └── api/auth/          # NextAuth.js route handlers
 │   ├── components/
 │   │   ├── agent-tabs/        # Agent detail tab components
@@ -869,7 +871,10 @@ This enables:
 │   │   ├── limits.ts          # Usage limits and contact link for upgrade requests
 │   │   ├── links.ts           # WHATSAPP_INVITE_URL, DISCORD_INVITE_URL - community invite links
 │   │   └── polling.ts         # POLLING_INTERVAL_MS (3000ms) - shared polling interval
-│   ├── hooks/                 # Custom React hooks (useCrudResource, etc.)
+│   ├── hooks/                 # Custom React hooks
+│   │   ├── index.ts           # Re-exports all hooks
+│   │   ├── useCrudResource.ts # CRUD operations hook for resource pages
+│   │   └── useAccessToken.ts  # Unified auth token hook (useAccessToken, useAuth)
 │   ├── lib/                   # Utility libraries (api.ts, status.ts, etc.)
 │   ├── auth.ts               # NextAuth.js configuration
 │   └── middleware.ts         # Route protection middleware
@@ -936,13 +941,13 @@ The entire Calibrate application is fully responsive and works seamlessly across
 
 ### Shared Landing Components
 
-Both the login page and about page use shared header/footer components to avoid duplication:
+The landing page (`/`), about page, login page, and signup page use shared header/footer components to avoid duplication:
 
 **`LandingHeader`** (`src/components/LandingHeader.tsx`):
 
-- Props: `showLogoLink` (boolean, whether logo links to /login), `talkToUsHref` (string, defaults to `#join-community`)
-- Contains: Logo, "Documentation" text link (tertiary), "Talk to us" button (outlined/secondary), "Get started" button (filled/primary)
-- Uses `signIn` from `next-auth/react` for Google authentication
+- Props: `showLogoLink` (boolean, whether logo links to `/`), `talkToUsHref` (string, defaults to `#join-community`)
+- Contains: Logo, "Documentation" text link (tertiary), "Talk to us" button (outlined/secondary), "Login" button (filled/primary, links to `/login`)
+- Uses Next.js `Link` component for navigation (no longer uses `signIn` from next-auth)
 - **Responsive behavior**:
   - Nav padding is responsive (`px-4 md:px-8`) so the header fits small screens without crowding
   - Logo and brand text scale with breakpoints (smaller icon + `text-lg` on mobile, `text-xl` on desktop)
@@ -956,20 +961,20 @@ Both the login page and about page use shared header/footer components to avoid 
 - Imports `WHATSAPP_INVITE_URL` and `DISCORD_INVITE_URL` from `@/constants/links`
 - Company column includes "Supported by ARTPARK @IISc" and "Funded by Government of Karnataka (GoK)" attribution text at the bottom
 
-### Landing Page (`/login`)
+### Landing Page (`/`)
 
-The login page serves as a marketing-style landing page with a consistent light theme throughout:
+The root page serves as a marketing-style landing page with a consistent light theme throughout:
 
 **Layout (top to bottom):**
 
-1. **Navigation bar**: Uses `<LandingHeader />` component with "Continue with Google" as primary CTA
+1. **Navigation bar**: Uses `<LandingHeader />` component with "Login" button linking to `/login`
 2. **Hero section**: Large, responsive headline and subtitle (no CTA button - moved to header); heading scales from `text-4xl` on mobile to `text-6xl` on desktop, with matching responsive padding and margin. Includes an embedded YouTube launch video (`https://www.youtube.com/embed/_VS8KQbBxKs?autoplay=1&mute=1`) below the subtitle with 16:9 aspect ratio, rounded corners, and shadow styling. Video autoplays muted (browsers require `mute=1` for autoplay to work).
 3. **Feature Tabs section**: Tab switcher with feature previews
 4. **Integrations section**: Provider grid showing supported STT/TTS/LLM providers
 5. **Open Source section**: GitHub link and self-hosting info (`bg-gray-50`)
 6. **Community section**: WhatsApp/Discord join buttons + social links (X, LinkedIn), has `id="join-community"` for anchor linking
 7. **Get Started section**: Two-column card layout with CTAs
-8. **Final CTA section**: Dark background (`bg-gray-900`) with "Ready to get started?" headline and "Continue with Google" button
+8. **Final CTA section**: Dark background (`bg-gray-900`) with "Ready to get started?" headline and "Get started free" button linking to `/login`
 9. **Footer**: Three-column links (Company, Resources, Community) in `md:grid-cols-3` + copyright (`bg-gray-50`)
 
 **Feature Tabs:**
@@ -982,8 +987,8 @@ The login page serves as a marketing-style landing page with a consistent light 
 
 **Constants:**
 
-- `WHATSAPP_INVITE_URL` and `DISCORD_INVITE_URL` - imported from `@/constants/links` (shared across login page, `LandingFooter`, and `AppLayout`)
-- `GITHUB_REPO_URL` - GitHub repo link, defined locally in login page, used in Open Source section
+- `WHATSAPP_INVITE_URL` and `DISCORD_INVITE_URL` - imported from `@/constants/links` (shared across landing page, `LandingFooter`, and `AppLayout`)
+- `GITHUB_REPO_URL` - GitHub repo link, defined locally in landing page, used in Open Source section
 
 **Feature Section Layout:**
 
@@ -1061,7 +1066,7 @@ The login page serves as a marketing-style landing page with a consistent light 
 - **Background**: Dark (`bg-gray-900`) with responsive padding (`py-16 md:py-24 px-4 md:px-8 lg:px-12`)
 - **Headline**: `text-3xl md:text-4xl lg:text-5xl` white text
 - **Subtitle**: `text-base md:text-xl` gray-400 text
-- **CTA button**: "Continue with Google" - `px-6 md:px-8 py-3 md:py-4 text-sm md:text-base` white background, triggers `handleGoogleSignIn`
+- **CTA button**: "Get started free" - `px-6 md:px-8 py-3 md:py-4 text-sm md:text-base` white background, links to `/login`
 
 **Footer:**
 
@@ -1100,10 +1105,74 @@ The entire landing page is fully responsive. Every section uses a mobile-first a
 
 **Key rule**: Never use fixed large values (`px-12`, `py-24`, `text-5xl`) without a smaller mobile default. Always provide the mobile value first, then scale up with `md:` / `lg:`.
 
+### Login Page (`/login`)
+
+Dedicated authentication page for existing users.
+
+**Layout:**
+
+- **Header**: Logo linking to `/`, "Don't have an account? Sign up" link to `/signup`
+- **Card**: Centered white card with shadow on gradient background (`from-slate-50 via-white to-emerald-50`)
+- **Google OAuth**: "Continue with Google" button at top
+- **Divider**: "or continue with email" separator
+- **Form fields**: Username, Password
+- **Submit button**: "Sign in" (disabled during loading, shows spinner)
+- **Terms**: Links to Terms of Service (`/terms`) and Privacy Policy (`/privacy`)
+- **Footer link**: "Don't have an account? Create one for free" → `/signup`
+
+**Styling:**
+
+- Gradient background: `bg-gradient-to-br from-slate-50 via-white to-emerald-50`
+- Card: `bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 p-8 md:p-10`
+- Input focus: `focus:ring-2 focus:ring-emerald-500 focus:border-transparent`
+- Accent color: Emerald (`text-emerald-600`, `hover:text-emerald-700`)
+- Font: DM Sans via inline style
+
+**API Integration:**
+
+- Calls `POST /auth/login` with `{ email, password }`
+- On success: stores `access_token` in localStorage and cookie, redirects to `/agents`
+- On error: displays error message in red alert box
+
+### Signup Page (`/signup`)
+
+Registration page for new users.
+
+**Layout:**
+
+- **Header**: Logo linking to `/`, "Already have an account? Sign in" link to `/login`
+- **Card**: Same styling as login page
+- **Google OAuth**: "Continue with Google" button at top
+- **Divider**: "or sign up with email" separator
+- **Form fields**: First name + Last name (side by side), Email, Password (with optional strength indicator), Confirm password
+- **Submit button**: "Create account" (disabled until all fields are filled and passwords match)
+- **Terms**: Links to Terms of Service (`/terms`) and Privacy Policy (`/privacy`)
+- **Footer link**: "Already have an account? Sign in instead" → `/login`
+
+**Password Strength Indicator (informational only):**
+
+- Real-time strength indicator with progress bar and label (Weak/Fair/Good/Strong)
+- Color coding: red (weak), orange (fair), yellow (good), emerald (strong)
+- Requirements checked for scoring:
+  - Length: 8+ characters (+1 point), 12+ characters (+1 point)
+  - Lowercase letter (+1 point)
+  - Uppercase letter (+1 point)
+  - Number (+1 point)
+  - Special character (+1 point)
+- Shows "Missing: ..." feedback when password field is focused
+- **Does not block form submission** - users can create accounts with any password strength
+- Confirm password field shows red border and error message if passwords don't match
+
+**API Integration:**
+
+- Calls `POST /auth/signup` with `{ first_name, last_name, email, password }`
+- On success: stores `access_token` in localStorage and cookie, redirects to `/agents`
+- On error: displays error message in red alert box
+
 **CTA Buttons:**
 
-- "Get started" - Primary action in header (filled/black style), triggers `signIn("google")`
-- "Continue with Google" - Primary action in final CTA section (white style on dark background), triggers `signIn("google")`
+- "Login" - Primary action in header (filled/black style), links to `/login`
+- "Get started free" - Primary action in final CTA section (white style on dark background), links to `/login`
 - "Documentation" - Header text link (tertiary style, gray text), opens `process.env.NEXT_PUBLIC_DOCS_URL` in new tab; **hidden on very small screens** (`hidden sm:inline-block`)
 - "Talk to us" - Header button (outlined/secondary style), scrolls to `#join-community` section
 
@@ -1113,7 +1182,7 @@ Public page (no auth required) with information about Calibrate and the team.
 
 **Structure:**
 
-- Uses `<LandingHeader showLogoLink talkToUsHref="/login#join-community" />` - logo links to /login, "Talk to us" button links to login page's community section
+- Uses `<LandingHeader showLogoLink talkToUsHref="/#join-community" />` - logo links to `/`, "Talk to us" button links to landing page's community section
 - Uses `<LandingFooter />` - same footer as landing page
 
 **Content sections:**
@@ -1131,21 +1200,74 @@ Public page (no auth required) with information about Calibrate and the team.
 
 ### Authentication Flow
 
-The app uses NextAuth.js v5 with middleware-based route protection and backend sync:
+The app supports two authentication methods:
+1. **Email/password authentication** via backend API (`POST /auth/login` and `POST /auth/signup`)
+2. **Google OAuth** via NextAuth.js v5
 
-1. **Middleware** (`src/middleware.ts`) protects all routes:
+**Route Structure:**
 
-   - Unauthenticated users → redirected to `/login`
-   - Authenticated users on `/login` → redirected to `/agents`
-   - Auth API routes (`/api/auth/*`), debug routes (`/debug*`), and docs routes (`/docs*`) are always accessible
+- `/` - Landing page (public, marketing page)
+- `/login` - Login page with email/password form and Google OAuth
+- `/signup` - Registration page with name, email, password
+- `/agents` - Main app (requires authentication)
 
-2. **SessionProvider** wraps the app in `layout.tsx` for client-side session access. **FloatingButtonProvider** also wraps the app (inside SessionProvider) to enable the FAB hide/show functionality across all pages
+**Middleware** (`src/middleware.ts`) protects routes:
 
-3. **Login page** (`/login`) shows landing page with Google OAuth CTA
+- **Public pages** (no auth check, always accessible): `/` (landing), `/about`, `/terms`, `/privacy`, `/api/auth/*`, `/debug*`, `/docs*`
+- **Auth pages** (`/login`, `/signup`): Accessible to unauthenticated users; authenticated users are redirected to `/agents`
+- **Protected pages** (everything else): Unauthenticated users are redirected to `/login`
+- **Maintenance mode**: When `MAINTENANCE_MODE=true`, all non-API routes redirect to `/`
 
-4. **Backend sync**: On successful Google login, the `jwt` callback sends the Google ID token to `POST /auth/google` on the backend to create/retrieve the user
+**Middleware implementation details:**
 
-5. **Session persistence**: NextAuth uses HTTP-only cookies, sessions persist across reloads
+- **Dual auth check**: `isLoggedIn = hasNextAuthSession || hasJwtCookie` - supports both Google OAuth (NextAuth session) and email/password (JWT cookie)
+- `hasNextAuthSession` checks `!!req.auth` (NextAuth session)
+- `hasJwtCookie` checks `!!req.cookies.get("access_token")?.value` (JWT from email/password login)
+- `isHomePage` checks for `/` and is included in the public routes check (not just used for maintenance mode)
+- `isAuthPage` combines `isLoginPage` and `isSignupPage` to handle both auth pages uniformly
+- Public routes return `NextResponse.next()` early, before any auth checks
+- Order matters: public routes → auth page redirect for logged-in users → protected route redirect for logged-out users
+
+**Email/Password Auth:**
+
+1. **Login** (`/login`): User enters email and password, form submits to `POST /auth/login`
+2. **Signup** (`/signup`): User enters first name, last name, email, password, form submits to `POST /auth/signup`
+3. **Password strength indicator**: Shows real-time feedback (weak/fair/good/strong) but does not block submission - purely informational to help users choose better passwords.
+4. **Token storage**: On successful auth:
+   - JWT token stored in `localStorage` as `access_token`
+   - JWT token stored in cookie `access_token` (for middleware to read)
+   - User object stored in `localStorage` as `user`
+5. **Redirect**: Uses `window.location.href = "/agents"` (hard redirect, not `router.push`) to ensure middleware re-evaluates auth state
+
+**Google OAuth Flow:**
+
+1. **SessionProvider** wraps the app in `layout.tsx` for client-side session access. **FloatingButtonProvider** also wraps the app (inside SessionProvider) to enable the FAB hide/show functionality across all pages
+
+2. **Login/Signup pages** have "Continue with Google" button that triggers `signIn("google")` from next-auth
+
+3. **Backend sync**: On successful Google login, the `jwt` callback sends the Google ID token to `POST /auth/google` on the backend to create/retrieve the user
+
+4. **Session persistence**: NextAuth uses HTTP-only cookies, sessions persist across reloads
+
+**Backend Auth Endpoints:**
+
+- `POST /auth/signup` - Register with first_name, last_name, email, password → returns `{ access_token, token_type, user, message }`
+  - Validation: email >= 3 chars, password >= 6 chars
+  - Returns 409 Conflict if email already exists
+  - Returns 422 for validation errors
+- `POST /auth/login` - Login with email, password → returns `{ access_token, token_type, user, message }`
+  - Returns 401 Unauthorized for invalid credentials
+  - Returns 422 for validation errors
+- `POST /auth/google` - Exchange Google ID token for backend JWT (used by NextAuth callback)
+
+**Frontend Validation (matches backend):**
+
+- Email: minimum 3 characters (validated client-side before API call)
+- Password: minimum 6 characters (validated client-side before API call)
+- Network errors: Shows "Unable to connect to server" message
+- 409 on signup: Shows "An account with this email already exists" with suggestion to sign in
+- 401 on login: Shows "Invalid email or password"
+- 422 errors: Parses and displays validation messages from backend
 
 **Session properties available:**
 
@@ -1174,26 +1296,65 @@ The app uses NextAuth.js v5 with middleware-based route protection and backend s
 
 **Accessing user data:**
 
+For **Google OAuth** users (via NextAuth session):
 - **User UUID:** `(session as any)?.backendUser?.user?.uuid`
 - **JWT Token:** `(session as any)?.backendAccessToken`
 
+For **Email/Password** users (via localStorage):
+- **User object:** `JSON.parse(localStorage.getItem("user") || "{}")` - contains `{ uuid, first_name, last_name, email, created_at, updated_at }`
+- **JWT Token:** `localStorage.getItem("access_token")`
+
+**Unified Access Token Hook (Recommended):**
+
+Use the `useAccessToken` hook from `@/hooks` to get the JWT token regardless of auth method:
+
 ```tsx
-// Check auth in client components
+import { useAccessToken } from "@/hooks";
+
+// Gets token from NextAuth session OR localStorage automatically
+const accessToken = useAccessToken();
+
+// Use in API calls
+useEffect(() => {
+  if (!accessToken) return;
+  // Make API calls with accessToken
+}, [accessToken]);
+```
+
+**Alternative: useAuth hook** for more control:
+
+```tsx
+import { useAuth } from "@/hooks";
+
+const { isAuthenticated, isLoading, accessToken } = useAuth();
+// isLoading: true while checking both NextAuth session and localStorage
+// isAuthenticated: true if either auth method has a token
+// accessToken: the JWT token string or null
+```
+
+**Legacy pattern (still used in some files):**
+
+```tsx
 import { useSession, signOut } from "next-auth/react";
 
 const { data: session, status } = useSession();
-// status: "loading" | "authenticated" | "unauthenticated"
-
-// Get JWT token for API authentication
 const backendAccessToken = (session as any)?.backendAccessToken;
+// Note: This only works for Google OAuth, not email/password login
+```
 
-// Get user UUID (if needed)
-const userId = (session as any)?.backendUser?.user?.uuid;
+**Sign out / Logout (clears all auth state):**
 
-// Sign out (used for manual logout or 401 error handling)
+```tsx
+// Must clear localStorage, cookie, AND call signOut
+localStorage.removeItem("access_token");
+localStorage.removeItem("user");
+document.cookie = "access_token=; path=/; max-age=0; SameSite=Lax";
 await signOut({ callbackUrl: "/login" });
+```
 
-// Server-side auth check
+**Server-side auth check:**
+
+```tsx
 import { auth } from "@/auth";
 const session = await auth();
 ```
@@ -1304,7 +1465,7 @@ The entire application is fully responsive and works on mobile, tablet, and desk
 
 **"Talk to Us" Floating Action Button (FAB):**
 
-- Rendered inside `AppLayout`, so it appears on all authenticated pages (not on the landing/login page)
+- Rendered inside `AppLayout`, so it appears on all authenticated pages (not on public pages like landing, login, or signup)
 - **Position**: Fixed bottom-right corner (`fixed bottom-6 right-6 z-50`)
 - **Button**: 48×48px circle (`w-12 h-12 rounded-full`), uses `bg-foreground text-background` (theme-aware), shows a chat bubble icon (three dots in a circle)
 - **Open state**: Icon changes to an X (close icon), button color changes to `bg-muted-foreground`
@@ -1331,7 +1492,7 @@ The entire application is fully responsive and works on mobile, tablet, and desk
   - **Components using this**: All dialog components (`AddToolDialog`, `AddTestDialog`, `DeleteConfirmationDialog`, etc.), slide panels (`SlidePanel`), and page-level sidebars (personas, scenarios, metrics add/edit sidebars, simulation transcript dialogs)
   - **How it works**: Uses a counter-based system — multiple dialogs can be open, and the FAB only shows when the count is 0
 
-**Key difference from landing page**: The `/login` marketing/landing page does not use `AppLayout`, so it has its own responsive behavior defined separately (see Landing Page section).
+**Key difference from public pages**: The landing page (`/`), login page (`/login`), and signup page (`/signup`) do not use `AppLayout`, so they have their own responsive behavior defined separately (see Landing Page, Login Page, and Signup Page sections).
 
 ### List Page Content Structure
 
@@ -2128,7 +2289,11 @@ const getFilteredProviders = (language: LanguageOption) => {
    - Used after successful save operations
 6. **Header Actions (AppLayout)**: Top-right section of header contains:
    - **User Profile Dropdown**: Avatar button showing Google image or placeholder (first letter on purple background)
-     - Dropdown contains: user info, theme switcher, logout button
+     - **User info sources**: Reads from NextAuth session (Google OAuth) OR localStorage (email/password login)
+       - Google OAuth: `session?.user?.name`, `session?.user?.email`, `session?.user?.image`
+       - Email/Password: `localStorage.getItem("user")` → `{ first_name, last_name, email }` → displays as `"first_name last_name"`
+     - Dropdown contains: user info (name, email), theme switcher, logout button
+     - Logout button clears localStorage (`access_token`, `user`), cookie (`access_token`), then calls `signOut({ callbackUrl: "/login" })`
      - Click outside closes dropdown (uses `useRef` + `mousedown` event)
 7. **Downloadable Tables**: Reusable `DownloadableTable` component for data tables with CSV export
    - Props: `columns` (array of `{key, header, render?}`), `data`, `filename`, `title`
@@ -3714,7 +3879,7 @@ Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When ena
 - **Preferred: Use `@/lib/api` utilities** - `apiGet`, `apiPost`, `apiPut`, `apiDelete` handle headers, 401 errors, and JSON parsing automatically
 - **For CRUD pages**: Use `useCrudResource` hook from `@/hooks` for standardized list/create/update/delete patterns
 - **JWT authentication required**: All API calls must include `Authorization: Bearer ${backendAccessToken}` header (handled automatically by API utilities)
-- **401 error handling**: API utilities automatically call `signOut({ callbackUrl: "/login" })` on 401 responses. For manual fetch calls, check `response.status === 401`
+- **401 error handling**: API utilities automatically clear localStorage, cookie, and call `signOut({ callbackUrl: "/login" })` on 401 responses. For manual fetch calls, check `response.status === 401`
 - **HTTP error handling (401, 403, 404)**: Detail pages (STT, TTS, Simulation Run) handle specific HTTP error codes with dedicated UI states:
   - **401 Unauthorized**: Automatically redirects to login via `signOut({ callbackUrl: "/login" })`
   - **403 Forbidden**: Shows `NotFoundState` with "403 Forbidden" message
@@ -3722,7 +3887,10 @@ Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When ena
   - Pattern: add `errorCode` state (`useState<401 | 403 | 404 | null>(null)`), check status codes before `!response.ok`, render `<NotFoundState errorCode={errorCode} />`
   - For simulation runs, a special `notFoundHeader` is used that shows empty header and navigates back to `/simulations` (main page) instead of the specific simulation
 - **User-facing error messages**: Never expose raw error strings from the API or catch blocks to users. Show generic, friendly messages instead. Pattern: "Something went wrong" as the heading with "We're looking into it. Please reach out to us if this issue persists." as the description. Raw errors should only be logged to `console.error`. Applied in: `TestRunnerDialog` (individual test error detail view AND overall error state when entire run fails), `BenchmarkResultsDialog` (error state panel), STT/TTS evaluation provider error banners ("There was an error running this provider. Please contact us by posting your issue to help us help you.")
-- **Wait for token**: In `useEffect` hooks, return early if `backendAccessToken` is not yet available; include it in the dependency array
+- **Wait for token**: In `useEffect` hooks, return early if access token is not yet available; include it in the dependency array
+- **Dual auth support**: Use `useAccessToken()` hook from `@/hooks` to get token from either NextAuth session (Google OAuth) or localStorage (email/password). Components using only `(session as any)?.backendAccessToken` will NOT work with email/password login.
+  - **Migrated components**: `Agents.tsx` uses `useAccessToken` hook
+  - **Not yet migrated**: Most other components still use session-only pattern and need migration for email/password login support
 - **ngrok header**: `"ngrok-skip-browser-warning": "true"` header is included automatically by API utilities
 - **Backend URL check**: API utilities will throw an error if `NEXT_PUBLIC_BACKEND_URL` is not set
 - **Date formatting**: API returns ISO dates; use `toLocaleString()` for display
@@ -4102,10 +4270,11 @@ window.history.replaceState(null, "", `?tab=${tabName}`);
 
 - **Middleware matcher**: Excludes static assets (`_next/static`, `_next/image`, `favicon.ico`, `*.svg`, `*.png`, `*.jpg`, `*.jpeg`, `*.gif`, `*.webp`, `*.ico`)
 - **Protected routes**: All routes except public routes require authentication
-- **Public routes** (no auth required): `/login`, `/about`, `/api/auth/*`, `/debug*`, `/docs*` (proxied to Mintlify via Vercel rewrite)
+- **Public routes** (no auth required): `/`, `/login`, `/signup`, `/about`, `/terms`, `/privacy`, `/api/auth/*`, `/debug*`, `/docs*` (proxied to Mintlify via Vercel rewrite)
 - **Session access**: Use `useSession()` in client components, `auth()` in server components
-- **Token expiration**: Backend returns 401 when JWT expires; always handle this by calling `signOut({ callbackUrl: "/login" })`
+- **Token expiration**: Backend returns 401 when JWT expires; always handle this by clearing localStorage, cookie, and calling `signOut({ callbackUrl: "/login" })`
 - **Import pattern**: Always import both `useSession` and `signOut` from `next-auth/react` when making API calls
+- **Logout handling**: Always clear all three auth stores when logging out: `localStorage.removeItem("access_token")`, `localStorage.removeItem("user")`, `document.cookie = "access_token=; path=/; max-age=0; SameSite=Lax"`, then `signOut({ callbackUrl: "/login" })`
 - **Backend token obtained at login**: The `backendAccessToken` is fetched from the backend during the JWT callback (at login time). If the backend URL was misconfigured when a user logged in, their session won't have the token. **Solution**: User must log out and log back in after fixing the backend URL.
 - **Google OAuth forces account selection**: The Google provider is configured with `prompt: "select_account"` to always show the account picker, preventing auto-login with cached credentials. This ensures users consciously choose their account each login.
 
