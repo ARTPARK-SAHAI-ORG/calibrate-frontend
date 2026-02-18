@@ -1312,6 +1312,7 @@ Use the `useAccessToken` hook from `@/hooks` to get the JWT token regardless of 
 import { useAccessToken } from "@/hooks";
 
 // Gets token from NextAuth session OR localStorage automatically
+// Returns string | null
 const accessToken = useAccessToken();
 
 // Use in API calls
@@ -3891,6 +3892,7 @@ Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When ena
 - **Dual auth support**: Use `useAccessToken()` hook from `@/hooks` to get token from either NextAuth session (Google OAuth) or localStorage (email/password). Components using only `(session as any)?.backendAccessToken` will NOT work with email/password login.
   - **Migrated components**: `Agents.tsx`, `AgentDetail.tsx` use `useAccessToken` hook
   - **Not yet migrated**: Most other components still use session-only pattern and need migration for email/password login support
+  - **Type gotcha**: `useAccessToken()` returns `string | null`, but many component props expect `string | undefined`. Use nullish coalescing when passing to child components: `backendAccessToken={accessToken ?? undefined}`
 - **ngrok header**: `"ngrok-skip-browser-warning": "true"` header is included automatically by API utilities
 - **Backend URL check**: API utilities will throw an error if `NEXT_PUBLIC_BACKEND_URL` is not set
 - **Date formatting**: API returns ISO dates; use `toLocaleString()` for display
