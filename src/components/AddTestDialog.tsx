@@ -97,10 +97,13 @@ export function AddTestDialog({
     }
   }, [initialTab]);
 
+  // Track if tools have been fetched (even if the result is empty)
+  const [toolsFetched, setToolsFetched] = useState(false);
+
   // Populate fields from initialConfig when editing an existing test
-  // Wait for availableTools to be loaded so we can properly determine tool types
+  // Wait for tools fetch to complete so we can properly determine tool types
   useEffect(() => {
-    if (initialConfig && availableTools.length > 0) {
+    if (initialConfig && toolsFetched) {
       // Parse history and convert to chatMessages format
       if (initialConfig.history && initialConfig.history.length > 0) {
         const messages: Array<{
@@ -299,7 +302,7 @@ export function AddTestDialog({
         }
       }
     }
-  }, [initialConfig, availableTools]);
+  }, [initialConfig, toolsFetched, availableTools]);
 
   const [selectedTools, setSelectedTools] = useState<SelectedToolConfig[]>([]);
   const [expectedMessage, setExpectedMessage] = useState("");
@@ -462,6 +465,7 @@ export function AddTestDialog({
         console.error("Error fetching tools:", err);
       } finally {
         setAvailableToolsLoading(false);
+        setToolsFetched(true);
       }
     };
 
