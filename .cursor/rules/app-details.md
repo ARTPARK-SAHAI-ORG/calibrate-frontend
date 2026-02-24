@@ -523,7 +523,7 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
     - **Backend history format**: Webhook tool calls include both the tool call AND linked tool response in history. Structured output tool calls only include the tool call (no fake response injected)
   - **Loading saved tests** (when `initialConfig` is provided):
     - Parses `history` array and converts to chatMessages format
-    - **Waits for `availableTools`**: The useEffect depends on both `initialConfig` AND `availableTools` - it only processes when `availableTools.length > 0` to ensure proper tool type detection
+    - **Waits for tools fetch to complete**: Uses a `toolsFetched` state flag that's set to `true` in the `finally` block of the tools API call. The useEffect depends on `initialConfig`, `toolsFetched`, and `availableTools` - it only processes when `toolsFetched` is true. This ensures the form populates even if no tools exist or the tools API fails
     - **Webhook tool call detection**: Looks up the tool by name in `availableTools` and checks `tool?.config?.type === "webhook"`. This is more reliable than checking for body/query argument keys (which could misclassify structured-output tools with params named "body" or "query")
     - **Webhook param extraction**: For webhook tools, extracts nested properties from body/query and assigns `group` property to each param so they display in the correct container (e.g., `{body: {task_type: "x"}}` → `{name: "task_type", value: "x", group: "body"}`). Headers are intentionally excluded from the UI
     - **Tool response parsing**: `role: "tool"` messages are included as `tool_response` type, linked to their corresponding tool call via `tool_call_id`
@@ -946,13 +946,15 @@ The landing page (`/`), about page, login page, and signup page use shared heade
 **`LandingHeader`** (`src/components/LandingHeader.tsx`):
 
 - Props: `showLogoLink` (boolean, whether logo links to `/`), `talkToUsHref` (string, defaults to `#join-community`)
-- Contains: Logo, "Documentation" text link (tertiary), "Talk to us" button (outlined/secondary), "Login" button (filled/primary, links to `/login`)
+- Contains: Logo, "Documentation" text link (tertiary), GitHub icon button, "Talk to us" button (outlined/secondary), "Login" button (filled/primary, links to `/login`)
 - Uses Next.js `Link` component for navigation (no longer uses `signIn` from next-auth)
+- **GitHub icon button**: Icon-only link to `https://github.com/artpark-sahai-org/calibrate`, opens in new tab, positioned between "Documentation" and "Talk to us", uses inline SVG with responsive sizing (`w-5 h-5 md:w-6 md:h-6`)
 - **Responsive behavior**:
   - Nav padding is responsive (`px-4 md:px-8`) so the header fits small screens without crowding
   - Logo and brand text scale with breakpoints (smaller icon + `text-lg` on mobile, `text-xl` on desktop)
   - "Documentation" link is **hidden on the smallest screens** (`hidden sm:inline-block`) to leave room for the CTAs
-  - "Talk to us" and "Login" buttons use smaller text/padding on mobile (`text-sm`, tighter `px`) and scale up on `md+`
+  - "Talk to us" button is **hidden on mobile** (`hidden sm:inline-block`) to reduce header clutter on small screens
+  - "Login" button uses smaller text/padding on mobile (`text-sm`, tighter `px`) and scales up on `md+`
 
 **`LandingFooter`** (`src/components/LandingFooter.tsx`):
 

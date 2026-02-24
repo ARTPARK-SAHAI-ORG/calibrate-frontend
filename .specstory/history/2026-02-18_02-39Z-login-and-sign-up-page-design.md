@@ -10644,23 +10644,43 @@ Output mode: content
 
 ---
 
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
 
-
----
-
-
-
----
-
-
+</details>
+</tool-use>
 
 ---
 
-<tool-use data-tool-type="unknown" data-tool-name="grep">
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+I see the issue. The code at line 103 checks `if (initialConfig && availableTools.length > 0)`. This means it waits for `availableTools` to be loaded before populating the form. But if there are no tools (or tools haven't loaded yet), the history won't be populated.
+
+Let me check if this is the issue:
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
 <details>
-<summary>Tool use: **grep**</summary>
+<summary>Tool use: **grep** • Grep for "availableTools.length|setAvailableTools" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx" • 6 matches</summary>
 
-Status: **loading**
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/components/AddTestDialog.tsx` | `const [availableTools, setAvailableTools] = useState<AvailableTool[]>([]);` | L90 |
+| `src/components/AddTestDialog.tsx` | `const [availableToolsLoading, setAvailableToolsLoading] = useState(false);` | L91 |
+| `src/components/AddTestDialog.tsx` | `if (initialConfig && availableTools.length > 0) \{` | L103 |
+| `src/components/AddTestDialog.tsx` | `setAvailableToolsLoading(true);` | L435 |
+| `src/components/AddTestDialog.tsx` | `setAvailableTools(data);` | L460 |
+| `src/components/AddTestDialog.tsx` | `setAvailableToolsLoading(false);` | L464 |
 
 
 </details>
@@ -10668,15 +10688,32 @@ Status: **loading**
 
 ---
 
+I see the problem! The condition `availableTools.length > 0` means if there are no tools in the system, or if tools fail to load, the form won't be populated with the initial config.
 
+For a "response" type test (not a tool invocation test), we don't need tools to be loaded. Let me fix this:
 
 ---
 
-<tool-use data-tool-type="unknown" data-tool-name="read_file">
-<details>
-<summary>Tool use: **read_file**</summary>
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
 
-Status: **loading**
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "availableToolsLoading" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx" • 3 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/components/AddTestDialog.tsx` | `const [availableToolsLoading, setAvailableToolsLoading] = useState(false);` | L91 |
+| `src/components/AddTestDialog.tsx` | `isLoading=\{availableToolsLoading\}` | L1109 |
+| `src/components/AddTestDialog.tsx` | `isLoading=\{availableToolsLoading\}` | L1962 |
 
 
 </details>
@@ -10684,19 +10721,34 @@ Status: **loading**
 
 ---
 
-
-
----
-
-
+The issue is that the condition checks `availableTools.length > 0`, but if the API returns an empty array of tools, the condition will never be true. The fix should wait for the loading to complete, not for tools to exist:
 
 ---
 
 <tool-use data-tool-type="write" data-tool-name="search_replace">
 
-<details><summary>Tool use: **search_replace**</summary>
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
 
-Status: **loading**
+**Chunk 1**
+Lines added: 5, lines removed: 2
+
+```diff
+@@ -97,9 +97,12 @@
+      }
+    }, [initialTab]);
++ 
++   // Track if tools have been fetched (even if the result is empty)
++   const [toolsFetched, setToolsFetched] = useState(false);
+  
+    // Populate fields from initialConfig when editing an existing test
+-   // Wait for availableTools to be loaded so we can properly determine tool types
++   // Wait for tools fetch to complete so we can properly determine tool types
+    useEffect(() =&gt; {
+-     if (initialConfig &amp;&amp; availableTools.length &gt; 0) {
++     if (initialConfig &amp;&amp; toolsFetched) {
+        // Parse history and convert to chatMessages format
+        if (initialConfig.history &amp;&amp; initialConfig.history.length &gt; 0) {
+```
 
 </details>
 
@@ -10704,15 +10756,20 @@ Status: **loading**
 
 ---
 
-
+Now I need to update the dependency array and set `toolsFetched` to true when tools are loaded:
 
 ---
 
-<tool-use data-tool-type="unknown" data-tool-name="grep">
+<tool-use data-tool-type="search" data-tool-name="grep">
 <details>
-<summary>Tool use: **grep**</summary>
+<summary>Tool use: **grep** • Grep for "\}, \[initialConfig, availableTools" in "/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx" • 1 match</summary>
 
-Status: **loading**
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `src/components/AddTestDialog.tsx` | `\}, [initialConfig, availableTools]);` | L305 |
 
 
 </details>
@@ -10720,19 +10777,218 @@ Status: **loading**
 
 ---
 
+<tool-use data-tool-type="write" data-tool-name="search_replace">
 
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -303,5 +303,5 @@
+        }
+      }
+-   }, [initialConfig, availableTools]);
++   }, [initialConfig, toolsFetched, availableTools]);
+  
+    const [selectedTools, setSelectedTools] = useState&lt;SelectedToolConfig[]&gt;([]);
+```
+
+</details>
+
+</tool-use>
 
 ---
 
-
+Now I need to set `toolsFetched` to true after the tools fetch completes:
 
 ---
 
-<tool-use data-tool-type="unknown" data-tool-name="read_file">
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -466,4 +466,5 @@
+        } finally {
+          setAvailableToolsLoading(false);
++         setToolsFetched(true);
+        }
+      };
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
 <details>
-<summary>Tool use: **read_file**</summary>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
 
-Status: **loading**
+- `/Users/aman/Documents/repos/artpark/pense-frontend/src/components/AddTestDialog.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+Now let's run the build to make sure everything compiles:
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_cmd">
+<details><summary>Tool use: **run_terminal_cmd** • Run command: cd /Users/aman/Documents/repos/artpark/pense-frontend && npm run build 2>&1</summary>
+
+```bash
+cd /Users/aman/Documents/repos/artpark/pense-frontend && npm run build 2>&1
+```
+
+```
+
+&gt; calibrate-frontend@0.1.0 build
+&gt; next build
+
+▲ Next.js 16.1.1 (Turbopack)
+- Environments: .env.local
+- Experiments (use with caution):
+  · clientTraceMetadata
+
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+✓ Compiled successfully in 3.8s
+  Running next.config.js provided runAfterProductionCompile ...
+✓ Completed runAfterProductionCompile in 2868ms
+  Running TypeScript ...
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/21) ...
+  Generating static pages using 11 workers (5/21) 
+  Generating static pages using 11 workers (10/21) 
+  Generating static pages using 11 workers (15/21) 
+✓ Generating static pages using 11 workers (21/21) in 273.5ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /about
+├ ○ /agents
+├ ƒ /agents/[uuid]
+├ ƒ /api/auth/[...nextauth]
+├ ƒ /api/debug-env
+├ ƒ /api/sentry-example-api
+├ ○ /debug-client
+├ ○ /login
+├ ○ /metrics
+├ ○ /personas
+├ ○ /scenarios
+├ ○ /sentry-example-page
+├ ○ /signup
+├ ○ /simulations
+├ ƒ /simulations/[uuid]
+├ ƒ /simulations/[uuid]/runs/[runId]
+├ ○ /stt
+├ ƒ /stt/[uuid]
+├ ○ /stt/new
+├ ○ /tests
+├ ○ /tools
+├ ○ /tts
+├ ƒ /tts/[uuid]
+└ ○ /tts/new
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+```
+</details>
+</tool-use>
+
+---
+
+The fix is complete. The issue was that the `AddTestDialog` component was waiting for `availableTools.length > 0` before populating the form with the initial config. This meant:
+
+1. If there were no tools in the system, the condition would never be true
+2. If tools failed to load, the condition would never be true
+
+The fix:
+1. Added a new state `toolsFetched` to track whether the tools API call has completed (regardless of whether it returned any tools)
+2. Changed the condition from `availableTools.length > 0` to `toolsFetched`
+3. Set `toolsFetched = true` in the `finally` block of the tools fetch, so it's set even if the fetch fails or returns an empty array
+
+Now the form will populate with the test data (including the user message "Enter uasdaser message") once the tools fetch completes, even if no tools exist.
+
+---
+
+_**User (2026-02-17 21:32Z)**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Keep the file organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high, mode Agent)**_
+
+I made a code change (fixed `AddTestDialog.tsx` to properly load initial config), so I'll update the documentation:
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "AddTestDialog|initialConfig" in "/Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md" • 16 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `.cursor/rules/app-details.md` | `- **Loading saved tests** (when `initialConfig` is provided):` | L524 |
+| `.cursor/rules/app-details.md` | `- **Waits for `availableTools`**: The useEffect depends on both `initialConfig` AND `availableTools` - it only processes when `availableTools.length > 0` to ensure proper tool type detection` | L526 |
+| `.cursor/rules/app-details.md` | `- **Tool call details as form fields**: Arguments are displayed as labeled form fields (matching AddTestDialog style). Each arg key (body, query) is shown as a field label, with its value displayed as pretty-printed JSON. Headers are filtered out and not shown` | L746 |
+| `.cursor/rules/app-details.md` | `- **Dialog components updated**: `DeleteConfirmationDialog`, `NewSimulationDialog`, `RunTestDialog`, `AddToolDialog`, `AddTestDialog`, and all inline sidebars (personas, scenarios, metrics)` | L923 |
+| `.cursor/rules/app-details.md` | `- **Components using this**: All dialog components (`AddToolDialog`, `AddTestDialog`, `DeleteConfirmationDialog`, etc.), slide panels (`SlidePanel`), and page-level sidebars (personas, scenarios, metrics add/edit sidebars, simulation transcript dialogs)` | L1494 |
+| `.cursor/rules/app-details.md` | `**Large Form Dialogs** (AddTestDialog, TestRunnerDialog):` | L1901 |
+| `.cursor/rules/app-details.md` | `// AddTestDialog - Two-column layout (form + preview)` | L1904 |
+| `.cursor/rules/app-details.md` | `- **AddTestDialog**: Large centered modal for add/edit tests (fully responsive)` | L1984 |
+| `.cursor/rules/app-details.md` | `- Form dialogs with unsaved data: Backdrop click shows confirmation before closing (e.g., AddTestDialog)` | L2279 |
+| `.cursor/rules/app-details.md` | `- **Large form dialogs** (like AddTestDialog): Use a header bar with name input and save button, flex-col layout with main content area below` | L2281 |
+| `.cursor/rules/app-details.md` | `- Used in: AddTestDialog (tool invocation test type)` | L2325 |
+| `.cursor/rules/app-details.md` | `- Used in: AddToolDialog (structured output parameters, webhook query/body parameters), AddTestDialog, DataExtractionTabContent` | L2333 |
+| `.cursor/rules/app-details.md` | `For complex form dialogs like `AddTestDialog`, use a flex-col layout with header, content area, and footer:` | L3725 |
+| `.cursor/rules/app-details.md` | `**Auto-resizing textareas** (used in AddTestDialog conversation history):` | L3759 |
+| `.cursor/rules/app-details.md` | `- **Unsaved changes confirmation**: Form dialogs (like AddTestDialog) should show a confirmation dialog when user clicks backdrop, asking "Discard changes?" with Cancel/Discard buttons` | L3959 |
+| `.cursor/rules/app-details.md` | `- **Chat message bubbles**: Consistent styling across AddTestDialog and TestDetailView (test results). User messages use `bg-muted border border-border text-foreground` (gray background, right-aligned). Agent messages use `bg-background border border-border text-foreground` (white/light background, left-aligned). Tool call cards use `bg-muted border border-border`. All use `rounded-xl` corners. **Width pattern**: `w-[70%] md:w-1/2` (70% width on mobile for better visual differentiation between user/agent messages, 50% on desktop). This prevents full-width message bubbles on mobile that look monotonous. See `@/components/test-results/shared.tsx` for the pattern` | L4137 |
 
 
 </details>
@@ -10740,11 +10996,37 @@ Status: **loading**
 
 ---
 
-
+I found the relevant section. Let me update it:
 
 ---
 
+<tool-use data-tool-type="write" data-tool-name="search_replace">
 
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/pense-frontend/.cursor/rules/app-details.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -524,5 +524,5 @@
+    - **Loading saved tests** (when &#96;initialConfig&#96; is provided):
+      - Parses &#96;history&#96; array and converts to chatMessages format
+-     - **Waits for &#96;availableTools&#96;**: The useEffect depends on both &#96;initialConfig&#96; AND &#96;availableTools&#96; - it only processes when &#96;availableTools.length &gt; 0&#96; to ensure proper tool type detection
++     - **Waits for tools fetch to complete**: Uses a &#96;toolsFetched&#96; state flag that's set to &#96;true&#96; in the &#96;finally&#96; block of the tools API call. The useEffect depends on &#96;initialConfig&#96;, &#96;toolsFetched&#96;, and &#96;availableTools&#96; - it only processes when &#96;toolsFetched&#96; is true. This ensures the form populates even if no tools exist or the tools API fails
+      - **Webhook tool call detection**: Looks up the tool by name in &#96;availableTools&#96; and checks &#96;tool?.config?.type === "webhook"&#96;. This is more reliable than checking for body/query argument keys (which could misclassify structured-output tools with params named "body" or "query")
+      - **Webhook param extraction**: For webhook tools, extracts nested properties from body/query and assigns &#96;group&#96; property to each param so they display in the correct container (e.g., &#96;{body: {task_type: "x"}}&#96; → &#96;{name: "task_type", value: "x", group: "body"}&#96;). Headers are intentionally excluded from the UI
+```
+
+</details>
+
+</tool-use>
+
+---
+
+Updated the documentation to reflect the fix. The key change documented:
+
+- Changed from "waits for `availableTools.length > 0`" to "uses a `toolsFetched` state flag set in the `finally` block"
+- Explained that this ensures the form populates even if no tools exist or the tools API fails
 
 ---
 
