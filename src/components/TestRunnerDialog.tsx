@@ -210,7 +210,6 @@ export function TestRunnerDialog({
         method: "GET",
         headers: {
           accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
       });
@@ -425,7 +424,6 @@ export function TestRunnerDialog({
           headers: {
             accept: "application/json",
             "Content-Type": "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({
@@ -511,7 +509,6 @@ export function TestRunnerDialog({
           headers: {
             accept: "application/json",
             "Content-Type": "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({
@@ -540,7 +537,6 @@ export function TestRunnerDialog({
               method: "GET",
               headers: {
                 accept: "application/json",
-                "ngrok-skip-browser-warning": "true",
                 Authorization: `Bearer ${backendAccessToken}`,
               },
             }
@@ -689,7 +685,6 @@ export function TestRunnerDialog({
           headers: {
             accept: "application/json",
             "Content-Type": "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({

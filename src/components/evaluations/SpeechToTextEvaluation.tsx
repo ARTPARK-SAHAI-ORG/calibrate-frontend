@@ -758,7 +758,6 @@ export function SpeechToTextEvaluation() {
         headers: {
           "Content-Type": "application/json",
           accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
