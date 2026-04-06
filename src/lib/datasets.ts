@@ -15,6 +15,7 @@ export type Dataset = {
   name: string;
   dataset_type: DatasetType;
   item_count: number;
+  eval_count: number;
   created_at: string;
   updated_at: string;
 };

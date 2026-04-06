@@ -58,6 +58,7 @@ function STTPageInner() {
   const [newDatasetName, setNewDatasetName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
+
   // Set page title
   useEffect(() => {
     document.title = "Speech to Text | Calibrate";
@@ -186,6 +187,7 @@ function STTPageInner() {
     return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
   });
 
+
   return (
     <AppLayout
       activeItem="stt"
@@ -248,6 +250,7 @@ function STTPageInner() {
         {/* Evaluations Tab */}
         {activeTab === "evaluations" && (
           <>
+
             {isLoading ? (
               <div className="flex items-center justify-center gap-3 py-8">
                 <svg
@@ -683,29 +686,26 @@ function STTPageInner() {
                   <div className="text-sm font-medium text-muted-foreground">Evals</div>
                   <div className="text-sm font-medium text-muted-foreground">Created</div>
                 </div>
-                {datasets.map((dataset) => {
-                  const evalCount = jobs.filter((j) => j.dataset_id === dataset.uuid).length;
-                  return (
-                    <Link
-                      key={dataset.uuid}
-                      href={`/datasets/${dataset.uuid}`}
-                      className="flex flex-col md:grid md:grid-cols-[2fr_80px_80px_1fr] gap-1 md:gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
-                    >
-                      <div className="text-sm font-medium text-foreground">
-                        {dataset.name}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {dataset.item_count}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {evalCount}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {dataset.created_at ? formatDate(dataset.created_at) : "—"}
-                      </div>
-                    </Link>
-                  );
-                })}
+                {datasets.map((dataset) => (
+                  <Link
+                    key={dataset.uuid}
+                    href={`/datasets/${dataset.uuid}`}
+                    className="flex flex-col md:grid md:grid-cols-[2fr_80px_80px_1fr] gap-1 md:gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
+                  >
+                    <div className="text-sm font-medium text-foreground">
+                      {dataset.name}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {dataset.item_count}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {dataset.eval_count}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {dataset.created_at ? formatDate(dataset.created_at) : "—"}
+                    </div>
+                  </Link>
+                ))}
               </div>
             )}
           </>

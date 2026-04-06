@@ -631,9 +631,7 @@ function TTSPageInner() {
                   <div className="text-sm font-medium text-muted-foreground">Evals</div>
                   <div className="text-sm font-medium text-muted-foreground">Created</div>
                 </div>
-                {datasets.map((dataset) => {
-                  const evalCount = jobs.filter((j) => j.dataset_id === dataset.uuid).length;
-                  return (
+                {datasets.map((dataset) => (
                   <Link
                     key={dataset.uuid}
                     href={`/datasets/${dataset.uuid}`}
@@ -646,14 +644,13 @@ function TTSPageInner() {
                       {dataset.item_count}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {evalCount}
+                      {dataset.eval_count}
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {dataset.created_at ? formatDate(dataset.created_at) : "—"}
                     </div>
                   </Link>
-                  );
-                })}
+                ))}
               </div>
             )}
           </>
