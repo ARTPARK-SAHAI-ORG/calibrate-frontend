@@ -11,12 +11,12 @@ import {
   DataExtractionTabContent,
   TestsTabContent,
   SettingsTabContent,
-  llmProviders,
 } from "@/components/agent-tabs";
 import type {
   LLMModel,
   DataExtractionFieldData,
 } from "@/components/agent-tabs";
+import { useOpenRouterModels, findModelInProviders } from "@/hooks";
 import { useHideFloatingButton } from "@/components/AppLayout";
 
 export type AgentDetailHeaderState = {
@@ -75,6 +75,8 @@ export function AgentDetail({
     }
     return "agent";
   };
+
+  const { providers: llmProviders } = useOpenRouterModels();
 
   const [agent, setAgent] = useState<AgentData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -238,6 +240,15 @@ export function AgentDetail({
       fetchAgent();
     }
   }, [agentUuid, backendAccessToken]);
+
+  // When providers load asynchronously, resolve the display name if it was set to the raw ID
+  useEffect(() => {
+    if (!selectedLLM || llmProviders.length === 0) return;
+    const found = findModelInProviders(llmProviders, selectedLLM.id);
+    if (found && found.name !== selectedLLM.name) {
+      setSelectedLLM(found);
+    }
+  }, [llmProviders, selectedLLM]);
 
   // Fetch tools linked to this agent
   useEffect(() => {

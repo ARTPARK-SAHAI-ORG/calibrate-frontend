@@ -4,12 +4,10 @@ import React, { useState } from "react";
 import {
   sttProviders,
   ttsProviders,
-  llmProviders,
   type LLMModel,
 } from "./constants/providers";
 import { LLMSelectorModal } from "./LLMSelectorModal";
 
-export { llmProviders };
 export type { LLMModel };
 
 type AgentTabContentProps = {

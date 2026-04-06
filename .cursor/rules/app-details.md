@@ -112,9 +112,11 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 
 - **STT**: deepgram, openai, cartesia, elevenlabs, whisper (groq), google, sarvam, smallest
 - **TTS**: cartesia, openai, orpheus (groq), google, elevenlabs, sarvam, smallest
-- **LLM**: 20+ providers including OpenAI, Google, Anthropic, DeepSeek, Meta, Mistral, Qwen, xAI, Perplexity, Cohere, Amazon, NVIDIA, Microsoft, and more
+- **LLM**: Fetched dynamically from the OpenRouter API (`https://openrouter.ai/api/v1/models`) via the `useOpenRouterModels` hook. Models are grouped by provider and cached in-memory for 10 minutes. All model IDs use OpenRouter's `provider/model-name` format (e.g., `openai/gpt-5.2-chat`).
 
 **Provider Language Support** (defined in `src/components/agent-tabs/constants/providers.ts`):
+
+> `providers.ts` contains STT/TTS provider definitions and language arrays only. LLM models are fetched at runtime from the OpenRouter API via `useOpenRouterModels` hook (`src/hooks/useOpenRouterModels.ts`). The types `LLMModel` and `LLMProvider` are still defined in `providers.ts` and used throughout the app.
 
 STT and TTS providers have typed definitions with the following fields:
 
@@ -874,7 +876,8 @@ This enables:
 │   ├── hooks/                 # Custom React hooks
 │   │   ├── index.ts           # Re-exports all hooks
 │   │   ├── useCrudResource.ts # CRUD operations hook for resource pages
-│   │   └── useAccessToken.ts  # Unified auth token hook (useAccessToken, useAuth)
+│   │   ├── useAccessToken.ts  # Unified auth token hook (useAccessToken, useAuth)
+│   │   └── useOpenRouterModels.ts # Fetches LLM models from OpenRouter API with 10-min cache
 │   ├── lib/                   # Utility libraries (api.ts, status.ts, etc.)
 │   ├── auth.ts               # NextAuth.js configuration
 │   └── middleware.ts         # Route protection middleware
@@ -2309,7 +2312,9 @@ const getFilteredProviders = (language: LanguageOption) => {
    - Used in: BenchmarkResultsDialog, SpeechToTextEvaluation, TextToSpeechEvaluation
 9. **LLM Selector Modal**: `LLMSelectorModal` from `@/components/agent-tabs/LLMSelectorModal`
    - Props: `isOpen`, `onClose`, `selectedLLM`, `onSelect`, `availableProviders?`
-   - Optional `availableProviders` prop for filtering available models (used in BenchmarkDialog)
+   - Internally uses `useOpenRouterModels` hook to fetch models from OpenRouter API as the default model list
+   - Shows "Loading models..." while fetching; shows error message with "Retry" button on failure; skips loading/error state when `availableProviders` is passed
+   - Optional `availableProviders` prop for filtered models (used in BenchmarkDialog to exclude already-selected models)
    - Used in: AgentTabContent (settings), BenchmarkDialog (model comparison)
 10. **Benchmark Dialog**: `BenchmarkDialog` from `@/components/BenchmarkDialog`
     - Model selection dialog for running benchmarks comparing multiple LLM models
@@ -2828,7 +2833,7 @@ Voice agents configured with:
 - **System Prompt**: Defines agent persona and behavior
 - **STT Provider**: Speech-to-text service (google, openai, deepgram, etc.)
 - **TTS Provider**: Text-to-speech service (google, openai, cartesia, etc.)
-- **LLM Model**: Language model (organized by provider: OpenAI, Google, Anthropic, etc.)
+- **LLM Model**: Language model fetched from OpenRouter API, identified by `provider/model-name` format (e.g., `openai/gpt-5.2-chat`)
 - **Tools**: Function calling tools the agent can use
 - **Data Extraction Fields**: Fields to extract from conversations
 - **Settings**: Agent speaks first, end conversation tool enabled
@@ -3314,6 +3319,15 @@ const { data, isLoading, error, refetch } = useFetchResource<ItemType>({
   accessToken,
   id: itemUuid,
 });
+
+// useOpenRouterModels - fetch LLM models from OpenRouter API with 10-min cache
+// Uses module-level cache shared across all component instances; deduplicates concurrent requests
+// Validates API response shape; skips malformed model entries
+const { providers, isLoading, error, retry } = useOpenRouterModels();
+
+// findModelInProviders - utility to look up a model by ID in the providers list
+import { findModelInProviders } from "@/hooks";
+const model = findModelInProviders(providers, "openai/gpt-5.2-chat");
 ```
 
 ### Test Results Components (`@/components/test-results/shared`)
