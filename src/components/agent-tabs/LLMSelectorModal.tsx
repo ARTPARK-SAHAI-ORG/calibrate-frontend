@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { llmProviders, type LLMModel } from "./constants/providers";
+import type { LLMModel } from "./constants/providers";
 import { ChevronLeftIcon, CloseIcon } from "@/components/icons";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { useOpenRouterModels } from "@/hooks";
 
 type LLMProvider = {
   name: string;
@@ -15,7 +16,6 @@ type LLMSelectorModalProps = {
   onClose: () => void;
   selectedLLM: LLMModel | null;
   onSelect: (model: LLMModel) => void;
-  // Optional: pass custom providers list (e.g., with filtered models)
   availableProviders?: LLMProvider[];
 };
 
@@ -26,15 +26,14 @@ export function LLMSelectorModal({
   onSelect,
   availableProviders,
 }: LLMSelectorModalProps) {
-  // Hide the floating "Talk to Us" button when this modal is open
   useHideFloatingButton(isOpen);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const { providers: fetchedProviders, isLoading, error, retry } = useOpenRouterModels();
 
   if (!isOpen) return null;
 
-  // Use custom providers if provided, otherwise use default
-  const providers = availableProviders || llmProviders;
+  const providers = availableProviders || fetchedProviders;
 
   const handleClose = () => {
     setSearchQuery("");
@@ -95,7 +94,21 @@ export function LLMSelectorModal({
 
         {/* Models List */}
         <div className="flex-1 overflow-y-auto">
-          {filteredProviders.length === 0 ? (
+          {error && providers.length === 0 ? (
+            <div className="p-8 flex flex-col items-center gap-3 text-sm text-muted-foreground">
+              <span>{error}</span>
+              <button
+                onClick={retry}
+                className="px-4 py-2 text-sm font-medium rounded-md border border-border hover:bg-muted/50 transition-colors cursor-pointer"
+              >
+                Retry
+              </button>
+            </div>
+          ) : isLoading && providers.length === 0 ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              Loading models...
+            </div>
+          ) : filteredProviders.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">
               No models found
             </div>

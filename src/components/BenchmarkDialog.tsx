@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { llmProviders, type LLMModel } from "./agent-tabs/constants/providers";
+import type { LLMModel } from "./agent-tabs/constants/providers";
 import { LLMSelectorModal } from "./agent-tabs/LLMSelectorModal";
+import { useOpenRouterModels } from "@/hooks";
 import { BenchmarkResultsDialog } from "./BenchmarkResultsDialog";
 import {
   CloseIcon,
@@ -41,8 +42,8 @@ export function BenchmarkDialog({
   tests,
   onBenchmarkCreated,
 }: BenchmarkDialogProps) {
-  // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
+  const { providers: llmProviders } = useOpenRouterModels();
 
   const [selectedModels, setSelectedModels] = useState<(LLMModel | null)[]>([
     null,
