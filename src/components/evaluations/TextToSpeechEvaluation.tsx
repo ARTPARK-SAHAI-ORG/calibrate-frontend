@@ -90,6 +90,7 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange }: Text
   const [availableDatasets, setAvailableDatasets] = useState<Dataset[]>([]);
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>("");
   const [datasetName, setDatasetName] = useState("");
+  const [datasetNameInvalid, setDatasetNameInvalid] = useState(false);
 
   useEffect(() => {
     if (!backendAccessToken) return;
@@ -324,8 +325,8 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange }: Text
     } else {
       // Validate dataset name
       if (!datasetName.trim()) {
+        setDatasetNameInvalid(true);
         setActiveTab("input");
-        toast.error("Please enter a dataset name.");
         return;
       }
 
@@ -883,12 +884,13 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange }: Text
             <input
               type="text"
               value={datasetName}
-              onChange={(e) => setDatasetName(e.target.value)}
+              onChange={(e) => {
+                setDatasetName(e.target.value);
+                if (e.target.value.trim()) setDatasetNameInvalid(false);
+              }}
               placeholder="e.g. English TTS test set"
               className={`w-full max-w-sm h-9 px-3 rounded-md text-sm border bg-background focus:outline-none focus:ring-1 focus:ring-foreground/30 ${
-                !datasetName.trim() && invalidRowIds.size > 0
-                  ? "border-red-500"
-                  : "border-border"
+                datasetNameInvalid ? "border-red-500 bg-red-500/10" : "border-border"
               }`}
             />
           </div>
