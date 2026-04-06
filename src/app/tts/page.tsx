@@ -20,6 +20,8 @@ type TTSJob = {
     providers: string[];
     language: string;
   };
+  dataset_id?: string | null;
+  dataset_name?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -623,35 +625,35 @@ function TTSPageInner() {
             ) : (
               <div className="border border-border rounded-xl overflow-hidden">
                 {/* Table Header */}
-                <div className="hidden md:grid grid-cols-[2fr_100px_1fr] gap-4 px-4 py-2 border-b border-border bg-muted/30">
-                  <div className="text-sm font-medium text-muted-foreground">
-                    Name
-                  </div>
-                  <div className="text-sm font-medium text-muted-foreground">
-                    Items
-                  </div>
-                  <div className="text-sm font-medium text-muted-foreground">
-                    Created
-                  </div>
+                <div className="hidden md:grid grid-cols-[2fr_80px_80px_1fr] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+                  <div className="text-sm font-medium text-muted-foreground">Name</div>
+                  <div className="text-sm font-medium text-muted-foreground">Items</div>
+                  <div className="text-sm font-medium text-muted-foreground">Evals</div>
+                  <div className="text-sm font-medium text-muted-foreground">Created</div>
                 </div>
-                {datasets.map((dataset) => (
+                {datasets.map((dataset) => {
+                  const evalCount = jobs.filter((j) => j.dataset_id === dataset.uuid).length;
+                  return (
                   <Link
                     key={dataset.uuid}
                     href={`/datasets/${dataset.uuid}`}
-                    className="flex flex-col md:grid md:grid-cols-[2fr_100px_1fr] gap-1 md:gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
+                    className="flex flex-col md:grid md:grid-cols-[2fr_80px_80px_1fr] gap-1 md:gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
                   >
                     <div className="text-sm font-medium text-foreground">
                       {dataset.name}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {dataset.item_count}{" "}
-                      {dataset.item_count === 1 ? "item" : "items"}
+                      {dataset.item_count}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {evalCount}
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {dataset.created_at ? formatDate(dataset.created_at) : "—"}
                     </div>
                   </Link>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>
