@@ -455,10 +455,10 @@ function STTPageInner() {
                 {/* Mobile Card View */}
                 <div className="md:hidden space-y-4">
                   {sortedJobs.map((job) => (
-                    <Link
+                    <div
                       key={job.uuid}
-                      href={`/stt/${job.uuid}`}
-                      className="block border border-border rounded-xl overflow-hidden bg-background hover:shadow-lg hover:border-foreground/20 transition-all duration-200"
+                      onClick={() => router.push(`/stt/${job.uuid}`)}
+                      className="block border border-border rounded-xl overflow-hidden bg-background hover:shadow-lg hover:border-foreground/20 transition-all duration-200 cursor-pointer"
                     >
                       <div className="p-5">
                         {/* Header with Providers */}
@@ -511,13 +511,15 @@ function STTPageInner() {
                                 <p className="text-xs text-muted-foreground mb-0.5">
                                   Dataset
                                 </p>
-                                <Link
-                                  href={`/datasets/${job.dataset_id}`}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="text-sm font-medium text-foreground hover:underline"
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    router.push(`/datasets/${job.dataset_id}`);
+                                  }}
+                                  className="text-sm font-medium text-foreground hover:underline cursor-pointer text-left"
                                 >
                                   {job.dataset_name}
-                                </Link>
+                                </button>
                               </div>
                             </div>
                           )}
@@ -602,7 +604,7 @@ function STTPageInner() {
                           </div>
                         </div>
                       </div>
-                    </Link>
+                    </div>
                   ))}
                 </div>
               </>
