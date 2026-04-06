@@ -71,7 +71,7 @@ const hasEmptyPredictions = (providerResult: ProviderResult): boolean => {
 
 // Helper function to get the index of the first empty prediction
 const getFirstEmptyPredictionIndex = (
-  providerResult: ProviderResult
+  providerResult: ProviderResult,
 ): number => {
   return (
     providerResult.results?.findIndex((r) => !r.pred || r.pred.trim() === "") ??
@@ -94,7 +94,7 @@ export default function STTEvaluationDetailPage() {
     "leaderboard" | "outputs" | "about"
   >("outputs");
   const [activeProviderTab, setActiveProviderTab] = useState<string | null>(
-    null
+    null,
   );
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
@@ -180,7 +180,7 @@ export default function STTEvaluationDetailPage() {
       } catch (err) {
         console.error("Error fetching evaluation result:", err);
         setError(
-          err instanceof Error ? err.message : "Failed to load evaluation"
+          err instanceof Error ? err.message : "Failed to load evaluation",
         );
       } finally {
         setIsLoading(false);
@@ -216,7 +216,7 @@ export default function STTEvaluationDetailPage() {
       // Set first provider as active tab when results first become available
       if (result.provider_results && result.provider_results.length > 0) {
         setActiveProviderTab(
-          (current) => current || result.provider_results![0].provider
+          (current) => current || result.provider_results![0].provider,
         );
       }
 
@@ -234,7 +234,7 @@ export default function STTEvaluationDetailPage() {
       console.error("Error polling task status:", error);
       // Set status to failed so the UI shows the error state
       setEvaluationResult((prev) =>
-        prev ? { ...prev, status: "failed" } : prev
+        prev ? { ...prev, status: "failed" } : prev,
       );
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
@@ -244,11 +244,7 @@ export default function STTEvaluationDetailPage() {
   };
 
   const customHeader = (
-    <BackHeader
-      label="Back to all STT evaluations"
-      onBack={() => router.push("/stt")}
-      title="Back to STT evaluations"
-    />
+    <BackHeader label="Back" onBack={() => router.push("/stt")} title="Back" />
   );
 
   return (
@@ -344,7 +340,7 @@ export default function STTEvaluationDetailPage() {
                           evaluationResult.provider_results.length > 0
                         ) {
                           setActiveProviderTab(
-                            evaluationResult.provider_results[0].provider
+                            evaluationResult.provider_results[0].provider,
                           );
                         }
                       }}
@@ -589,7 +585,7 @@ export default function STTEvaluationDetailPage() {
                             {(() => {
                               const providerNames =
                                 evaluationResult.leaderboard_summary.map(
-                                  (s) => s.run
+                                  (s) => s.run,
                                 );
                               const colorMap = getColorMap(providerNames);
                               return (
@@ -603,7 +599,7 @@ export default function STTEvaluationDetailPage() {
                                           label: getProviderLabel(s.run),
                                           value: s.wer,
                                           colorKey: s.run,
-                                        })
+                                        }),
                                       )}
                                       colorMap={colorMap}
                                     />
@@ -614,7 +610,7 @@ export default function STTEvaluationDetailPage() {
                                           label: getProviderLabel(s.run),
                                           value: s.string_similarity,
                                           colorKey: s.run,
-                                        })
+                                        }),
                                       )}
                                       colorMap={colorMap}
                                       yDomain={[0, 1]}
@@ -630,7 +626,7 @@ export default function STTEvaluationDetailPage() {
                                           label: getProviderLabel(s.run),
                                           value: s.llm_judge_score,
                                           colorKey: s.run,
-                                        })
+                                        }),
                                       )}
                                       colorMap={colorMap}
                                       yDomain={[0, 1]}
@@ -662,14 +658,14 @@ export default function STTEvaluationDetailPage() {
                                     key={providerResult.provider}
                                     onClick={() => {
                                       setActiveProviderTab(
-                                        providerResult.provider
+                                        providerResult.provider,
                                       );
                                       // Scroll to first empty prediction after a short delay
                                       if (hasEmptyPredictions(providerResult)) {
                                         setTimeout(() => {
                                           const firstEmptyIndex =
                                             getFirstEmptyPredictionIndex(
-                                              providerResult
+                                              providerResult,
                                             );
                                           if (
                                             firstEmptyIndex >= 0 &&
@@ -677,7 +673,7 @@ export default function STTEvaluationDetailPage() {
                                           ) {
                                             const row =
                                               tableContainerRef.current.querySelector(
-                                                `[data-row-index="${firstEmptyIndex}"]`
+                                                `[data-row-index="${firstEmptyIndex}"]`,
                                               );
                                             row?.scrollIntoView({
                                               behavior: "smooth",
@@ -735,12 +731,12 @@ export default function STTEvaluationDetailPage() {
                                     )}
                                     <span className="text-sm text-foreground truncate">
                                       {getProviderLabel(
-                                        providerResult.provider
+                                        providerResult.provider,
                                       )}
                                     </span>
                                   </div>
                                 );
-                              }
+                              },
                             )}
                           </div>
                         </div>
@@ -754,7 +750,7 @@ export default function STTEvaluationDetailPage() {
                             evaluationResult.provider_results[0]?.provider;
                           const providerResult =
                             evaluationResult.provider_results.find(
-                              (pr) => pr.provider === selectedProvider
+                              (pr) => pr.provider === selectedProvider,
                             );
 
                           if (!providerResult) {
@@ -833,8 +829,8 @@ export default function STTEvaluationDetailPage() {
                                           {providerResult.metrics.wer != null
                                             ? parseFloat(
                                                 providerResult.metrics.wer.toFixed(
-                                                  4
-                                                )
+                                                  4,
+                                                ),
                                               )
                                             : "-"}
                                         </div>
@@ -848,8 +844,8 @@ export default function STTEvaluationDetailPage() {
                                             .string_similarity != null
                                             ? parseFloat(
                                                 providerResult.metrics.string_similarity.toFixed(
-                                                  4
-                                                )
+                                                  4,
+                                                ),
                                               )
                                             : "-"}
                                         </div>
@@ -880,7 +876,7 @@ export default function STTEvaluationDetailPage() {
                                         r.string_similarity !== undefined &&
                                         r.string_similarity !== "" &&
                                         r.llm_judge_score !== undefined &&
-                                        r.llm_judge_score !== ""
+                                        r.llm_judge_score !== "",
                                     );
                                   const showMetrics =
                                     evaluationResult.status === "done" ||
@@ -973,8 +969,8 @@ export default function STTEvaluationDetailPage() {
                                                             {result.wer != null
                                                               ? parseFloat(
                                                                   parseFloat(
-                                                                    result.wer
-                                                                  ).toFixed(4)
+                                                                    result.wer,
+                                                                  ).toFixed(4),
                                                                 )
                                                               : "-"}
                                                           </td>
@@ -983,8 +979,8 @@ export default function STTEvaluationDetailPage() {
                                                             null
                                                               ? parseFloat(
                                                                   parseFloat(
-                                                                    result.string_similarity
-                                                                  ).toFixed(4)
+                                                                    result.string_similarity,
+                                                                  ).toFixed(4),
                                                                 )
                                                               : "-"}
                                                           </td>
@@ -993,7 +989,7 @@ export default function STTEvaluationDetailPage() {
                                                               const scoreStr =
                                                                 String(
                                                                   result.llm_judge_score ||
-                                                                    ""
+                                                                    "",
                                                                 ).toLowerCase();
                                                               const passed =
                                                                 scoreStr ===
@@ -1052,7 +1048,7 @@ export default function STTEvaluationDetailPage() {
                                                       )}
                                                     </tr>
                                                   );
-                                                }
+                                                },
                                               )}
                                             </tbody>
                                           </table>
@@ -1087,7 +1083,7 @@ export default function STTEvaluationDetailPage() {
                                                     (() => {
                                                       const scoreStr = String(
                                                         result.llm_judge_score ||
-                                                          ""
+                                                          "",
                                                       ).toLowerCase();
                                                       const passed =
                                                         scoreStr === "true" ||
@@ -1140,8 +1136,8 @@ export default function STTEvaluationDetailPage() {
                                                           {result.wer != null
                                                             ? parseFloat(
                                                                 parseFloat(
-                                                                  result.wer
-                                                                ).toFixed(4)
+                                                                  result.wer,
+                                                                ).toFixed(4),
                                                               )
                                                             : "-"}
                                                         </p>
@@ -1155,8 +1151,8 @@ export default function STTEvaluationDetailPage() {
                                                           null
                                                             ? parseFloat(
                                                                 parseFloat(
-                                                                  result.string_similarity
-                                                                ).toFixed(4)
+                                                                  result.string_similarity,
+                                                                ).toFixed(4),
                                                               )
                                                             : "-"}
                                                         </p>
@@ -1178,7 +1174,7 @@ export default function STTEvaluationDetailPage() {
                                                 )}
                                               </div>
                                             );
-                                          }
+                                          },
                                         )}
                                       </div>
                                     </>
