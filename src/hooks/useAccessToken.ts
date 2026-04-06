@@ -22,7 +22,8 @@ export function useAccessToken(): string | null {
     setLocalToken(token);
   }, []);
 
-  // Prefer session token (Google OAuth), fall back to localStorage token
+  if (status === "loading") return null;
+
   return sessionToken || localToken;
 }
 
