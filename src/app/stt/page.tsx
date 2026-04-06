@@ -385,10 +385,10 @@ function STTPageInner() {
                   </div>
                   {/* Table Rows */}
                   {sortedJobs.map((job) => (
-                    <Link
+                    <div
                       key={job.uuid}
-                      href={`/stt/${job.uuid}`}
-                      className="grid grid-cols-[2fr_1fr_100px_100px_80px_1fr] gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors items-center"
+                      onClick={() => router.push(`/stt/${job.uuid}`)}
+                      className="grid grid-cols-[2fr_1fr_100px_100px_80px_1fr] gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors items-center cursor-pointer"
                     >
                       {/* Providers as pills */}
                       <div className="flex flex-wrap gap-1.5">
@@ -448,7 +448,7 @@ function STTPageInner() {
                       <p className="text-sm text-muted-foreground">
                         {job.created_at ? formatDate(job.created_at) : "—"}
                       </p>
-                    </Link>
+                    </div>
                   ))}
                 </div>
 
