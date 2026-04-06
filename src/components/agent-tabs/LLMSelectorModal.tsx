@@ -94,7 +94,7 @@ export function LLMSelectorModal({
 
         {/* Models List */}
         <div className="flex-1 overflow-y-auto">
-          {error && !availableProviders ? (
+          {error && providers.length === 0 ? (
             <div className="p-8 flex flex-col items-center gap-3 text-sm text-muted-foreground">
               <span>{error}</span>
               <button
@@ -104,7 +104,7 @@ export function LLMSelectorModal({
                 Retry
               </button>
             </div>
-          ) : isLoading && !availableProviders ? (
+          ) : isLoading && providers.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">
               Loading models...
             </div>

@@ -131,24 +131,35 @@ export function useOpenRouterModels(): {
   useEffect(() => {
     let cancelled = false;
 
-    getOrFetchProviders()
-      .then((result) => {
-        if (!cancelled) {
-          setProviders(result);
-          setIsLoading(false);
-          setError(null);
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to fetch OpenRouter models:", err);
-        if (!cancelled) {
-          setIsLoading(false);
-          setError("Failed to load models. Please check your connection.");
-        }
-      });
+    const doFetch = () => {
+      getOrFetchProviders()
+        .then((result) => {
+          if (!cancelled) {
+            setProviders(result);
+            setIsLoading(false);
+            setError(null);
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to fetch OpenRouter models:", err);
+          if (!cancelled) {
+            setIsLoading(false);
+            setError("Failed to load models. Please check your connection.");
+          }
+        });
+    };
+
+    doFetch();
+
+    const interval = setInterval(() => {
+      if (!cache || Date.now() - cache.timestamp >= CACHE_TTL_MS) {
+        doFetch();
+      }
+    }, CACHE_TTL_MS);
 
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
   }, [retryCount]);
 

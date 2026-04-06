@@ -2313,7 +2313,7 @@ const getFilteredProviders = (language: LanguageOption) => {
 9. **LLM Selector Modal**: `LLMSelectorModal` from `@/components/agent-tabs/LLMSelectorModal`
    - Props: `isOpen`, `onClose`, `selectedLLM`, `onSelect`, `availableProviders?`
    - Internally uses `useOpenRouterModels` hook to fetch models from OpenRouter API as the default model list
-   - Shows "Loading models..." while fetching; shows error message with "Retry" button on failure; skips loading/error state when `availableProviders` is passed
+   - Shows "Loading models..." while fetching; shows error message with "Retry" button on failure. These states show whenever the effective provider list is empty (`providers.length === 0`), so they work correctly both with and without `availableProviders`
    - Optional `availableProviders` prop for filtered models (used in BenchmarkDialog to exclude already-selected models)
    - Used in: AgentTabContent (settings), BenchmarkDialog (model comparison)
 10. **Benchmark Dialog**: `BenchmarkDialog` from `@/components/BenchmarkDialog`
@@ -3323,6 +3323,7 @@ const { data, isLoading, error, refetch } = useFetchResource<ItemType>({
 // useOpenRouterModels - fetch LLM models from OpenRouter API with 10-min cache
 // Uses module-level cache shared across all component instances; deduplicates concurrent requests
 // Validates API response shape; skips malformed model entries
+// Auto-revalidates in background when cache expires while component stays mounted
 const { providers, isLoading, error, retry } = useOpenRouterModels();
 
 // findModelInProviders - utility to look up a model by ID in the providers list
