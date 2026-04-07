@@ -9,7 +9,13 @@ import { AppLayout } from "@/components/AppLayout";
 import { sttProviders } from "@/components/agent-tabs/constants/providers";
 import { formatStatus, getStatusBadgeClass } from "@/lib/status";
 import { useSidebarState } from "@/lib/sidebar";
-import { listDatasets, createDataset, Dataset } from "@/lib/datasets";
+import {
+  listDatasets,
+  createDataset,
+  deleteDataset,
+  Dataset,
+} from "@/lib/datasets";
+import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 
 type STTJob = {
   uuid: string;
@@ -41,7 +47,7 @@ function STTPageInner() {
 
   // Tab state – initialise from ?tab= query param
   const [activeTab, setActiveTab] = useState<"evaluations" | "datasets">(
-    searchParams.get("tab") === "datasets" ? "datasets" : "evaluations"
+    searchParams.get("tab") === "datasets" ? "datasets" : "evaluations",
   );
 
   // Evaluations state
@@ -57,7 +63,8 @@ function STTPageInner() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newDatasetName, setNewDatasetName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
-
+  const [deleteDatasetId, setDeleteDatasetId] = useState<string | null>(null);
+  const [isDeletingDataset, setIsDeletingDataset] = useState(false);
 
   // Set page title
   useEffect(() => {
@@ -100,7 +107,7 @@ function STTPageInner() {
       } catch (err) {
         console.error("Error fetching STT jobs:", err);
         setError(
-          err instanceof Error ? err.message : "Failed to load STT jobs"
+          err instanceof Error ? err.message : "Failed to load STT jobs",
         );
       } finally {
         setIsLoading(false);
@@ -120,7 +127,7 @@ function STTPageInner() {
       setDatasets(data);
     } catch (err) {
       setDatasetsError(
-        err instanceof Error ? err.message : "Failed to load datasets"
+        err instanceof Error ? err.message : "Failed to load datasets",
       );
     } finally {
       setDatasetsLoading(false);
@@ -131,6 +138,20 @@ function STTPageInner() {
     fetchDatasets();
   }, [fetchDatasets]);
 
+  const handleDeleteDataset = async (uuid: string) => {
+    if (!backendAccessToken) return;
+    setIsDeletingDataset(true);
+    try {
+      await deleteDataset(backendAccessToken, uuid);
+      setDatasets((prev) => prev.filter((d) => d.uuid !== uuid));
+      setDeleteDatasetId(null);
+    } catch (err) {
+      console.error("Failed to delete dataset:", err);
+    } finally {
+      setIsDeletingDataset(false);
+    }
+  };
+
   const handleCreateDataset = async () => {
     if (!backendAccessToken || !newDatasetName.trim()) return;
     setIsCreating(true);
@@ -138,7 +159,7 @@ function STTPageInner() {
       const dataset = await createDataset(
         backendAccessToken,
         newDatasetName.trim(),
-        "stt"
+        "stt",
       );
       setShowCreateModal(false);
       setNewDatasetName("");
@@ -186,7 +207,6 @@ function STTPageInner() {
     }
     return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
   });
-
 
   return (
     <AppLayout
@@ -250,7 +270,6 @@ function STTPageInner() {
         {/* Evaluations Tab */}
         {activeTab === "evaluations" && (
           <>
-
             {isLoading ? (
               <div className="flex items-center justify-center gap-3 py-8">
                 <svg
@@ -275,7 +294,9 @@ function STTPageInner() {
               </div>
             ) : error ? (
               <div className="border border-border rounded-xl p-8 md:p-12 flex flex-col items-center justify-center bg-muted/20">
-                <p className="text-sm md:text-base text-red-500 mb-2">{error}</p>
+                <p className="text-sm md:text-base text-red-500 mb-2">
+                  {error}
+                </p>
                 <button
                   onClick={() => window.location.reload()}
                   className="text-sm md:text-base text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
@@ -400,7 +421,9 @@ function STTPageInner() {
                             {getProviderLabel(provider)}
                           </span>
                         )) || (
-                          <span className="text-sm text-muted-foreground">—</span>
+                          <span className="text-sm text-muted-foreground">
+                            —
+                          </span>
                         )}
                       </div>
                       {/* Dataset */}
@@ -411,13 +434,25 @@ function STTPageInner() {
                             onClick={(e) => e.stopPropagation()}
                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-foreground hover:bg-muted/70 transition-colors max-w-[160px]"
                           >
-                            <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+                            <svg
+                              className="w-3 h-3 shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
+                              />
                             </svg>
                             <span className="truncate">{job.dataset_name}</span>
                           </Link>
                         ) : (
-                          <span className="text-sm text-muted-foreground">—</span>
+                          <span className="text-sm text-muted-foreground">
+                            —
+                          </span>
                         )}
                       </div>
                       {/* Language */}
@@ -432,7 +467,7 @@ function STTPageInner() {
                       <div>
                         <span
                           className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${getStatusBadgeClass(
-                            job.status
+                            job.status,
                           )}`}
                         >
                           {formatStatus(job.status)}
@@ -481,7 +516,7 @@ function STTPageInner() {
                         <div className="mb-4">
                           <span
                             className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold ${getStatusBadgeClass(
-                              job.status
+                              job.status,
                             )}`}
                           >
                             {formatStatus(job.status)}
@@ -598,7 +633,9 @@ function STTPageInner() {
                                 Created
                               </p>
                               <p className="text-sm font-medium text-foreground">
-                                {job.created_at ? formatDate(job.created_at) : "—"}
+                                {job.created_at
+                                  ? formatDate(job.created_at)
+                                  : "—"}
                               </p>
                             </div>
                           </div>
@@ -682,17 +719,26 @@ function STTPageInner() {
             ) : (
               <div className="border border-border rounded-xl overflow-hidden">
                 {/* Table Header */}
-                <div className="hidden md:grid grid-cols-[2fr_80px_80px_1fr] gap-4 px-4 py-2 border-b border-border bg-muted/30">
-                  <div className="text-sm font-medium text-muted-foreground">Name</div>
-                  <div className="text-sm font-medium text-muted-foreground">Items</div>
-                  <div className="text-sm font-medium text-muted-foreground">Evals</div>
-                  <div className="text-sm font-medium text-muted-foreground">Created</div>
+                <div className="hidden md:grid grid-cols-[2fr_80px_80px_1fr_40px] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+                  <div className="text-sm font-medium text-muted-foreground">
+                    Name
+                  </div>
+                  <div className="text-sm font-medium text-muted-foreground">
+                    Items
+                  </div>
+                  <div className="text-sm font-medium text-muted-foreground">
+                    Evals
+                  </div>
+                  <div className="text-sm font-medium text-muted-foreground">
+                    Updated
+                  </div>
+                  <div />
                 </div>
                 {datasets.map((dataset) => (
-                  <Link
+                  <div
                     key={dataset.uuid}
-                    href={`/datasets/${dataset.uuid}`}
-                    className="flex flex-col md:grid md:grid-cols-[2fr_80px_80px_1fr] gap-1 md:gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
+                    onClick={() => router.push(`/datasets/${dataset.uuid}`)}
+                    className="flex flex-col md:grid md:grid-cols-[2fr_80px_80px_1fr_40px] gap-1 md:gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                   >
                     <div className="text-sm font-medium text-foreground">
                       {dataset.name}
@@ -704,15 +750,53 @@ function STTPageInner() {
                       {dataset.eval_count}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {dataset.created_at ? formatDate(dataset.created_at) : "—"}
+                      {dataset.updated_at
+                        ? formatDate(dataset.updated_at)
+                        : "—"}
                     </div>
-                  </Link>
+                    <div className="flex justify-end">
+                      <button
+                        title="Delete dataset"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteDatasetId(dataset.uuid);
+                        }}
+                        className="p-1.5 rounded hover:bg-muted/50 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
+                      >
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
           </>
         )}
       </div>
+
+      {/* Delete Dataset Confirmation */}
+      {deleteDatasetId && (
+        <DeleteConfirmationDialog
+          isOpen={true}
+          onClose={() => setDeleteDatasetId(null)}
+          onConfirm={() => handleDeleteDataset(deleteDatasetId)}
+          title="Delete dataset"
+          message={`Are you sure you want to delete "${datasets.find((d) => d.uuid === deleteDatasetId)?.name}"? The evaluations associated with this dataset will not be impacted but this action cannot be undone.`}
+          isDeleting={isDeletingDataset}
+        />
+      )}
 
       {/* Create Dataset Modal */}
       {showCreateModal && (

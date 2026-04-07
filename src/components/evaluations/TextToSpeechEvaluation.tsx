@@ -9,6 +9,7 @@ import { ttsProviders, TTSProvider } from "../agent-tabs/constants/providers";
 import { DeleteConfirmationDialog } from "../DeleteConfirmationDialog";
 import { LIMITS, CONTACT_LINK } from "@/constants/limits";
 import { listDatasets, Dataset } from "@/lib/datasets";
+import { DatasetPicker } from "./DatasetPicker";
 
 type TextRow = {
   id: string;
@@ -852,23 +853,11 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange }: Text
                   </button>
                 </div>
               ) : (
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-medium text-foreground">
-                    Select dataset
-                  </label>
-                  <select
-                    value={selectedDatasetId}
-                    onChange={(e) => setSelectedDatasetId(e.target.value)}
-                    className="w-full max-w-sm h-10 px-3 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/30 cursor-pointer"
-                  >
-                    <option value="">— choose a dataset —</option>
-                    {availableDatasets.map((ds) => (
-                      <option key={ds.uuid} value={ds.uuid}>
-                        {ds.name} ({ds.item_count} item{ds.item_count !== 1 ? "s" : ""})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <DatasetPicker
+                  datasets={availableDatasets}
+                  selectedId={selectedDatasetId}
+                  onSelect={setSelectedDatasetId}
+                />
               )}
             </div>
           )}

@@ -9,7 +9,8 @@ import { AppLayout } from "@/components/AppLayout";
 import { ttsProviders } from "@/components/agent-tabs/constants/providers";
 import { formatStatus, getStatusBadgeClass } from "@/lib/status";
 import { useSidebarState } from "@/lib/sidebar";
-import { listDatasets, createDataset, Dataset } from "@/lib/datasets";
+import { listDatasets, createDataset, deleteDataset, Dataset } from "@/lib/datasets";
+import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 
 type TTSJob = {
   uuid: string;
@@ -56,6 +57,8 @@ function TTSPageInner() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newDatasetName, setNewDatasetName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [deleteDatasetId, setDeleteDatasetId] = useState<string | null>(null);
+  const [isDeletingDataset, setIsDeletingDataset] = useState(false);
 
   // Set page title
   useEffect(() => {
@@ -128,6 +131,20 @@ function TTSPageInner() {
   useEffect(() => {
     fetchDatasets();
   }, [fetchDatasets]);
+
+  const handleDeleteDataset = async (uuid: string) => {
+    if (!backendAccessToken) return;
+    setIsDeletingDataset(true);
+    try {
+      await deleteDataset(backendAccessToken, uuid);
+      setDatasets((prev) => prev.filter((d) => d.uuid !== uuid));
+      setDeleteDatasetId(null);
+    } catch (err) {
+      console.error("Failed to delete dataset:", err);
+    } finally {
+      setIsDeletingDataset(false);
+    }
+  };
 
   const handleCreateDataset = async () => {
     if (!backendAccessToken || !newDatasetName.trim()) return;
@@ -629,7 +646,7 @@ function TTSPageInner() {
                   <div className="text-sm font-medium text-muted-foreground">Name</div>
                   <div className="text-sm font-medium text-muted-foreground">Items</div>
                   <div className="text-sm font-medium text-muted-foreground">Evals</div>
-                  <div className="text-sm font-medium text-muted-foreground">Created</div>
+                  <div className="text-sm font-medium text-muted-foreground">Updated</div>
                 </div>
                 {datasets.map((dataset) => (
                   <Link
@@ -647,7 +664,7 @@ function TTSPageInner() {
                       {dataset.eval_count}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {dataset.created_at ? formatDate(dataset.created_at) : "—"}
+                      {dataset.updated_at ? formatDate(dataset.updated_at) : "—"}
                     </div>
                   </Link>
                 ))}

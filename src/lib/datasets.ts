@@ -89,6 +89,20 @@ export function addDatasetItems(
   );
 }
 
+// Update a single item's text
+export function updateDatasetItem(
+  accessToken: string,
+  datasetId: string,
+  itemUuid: string,
+  text: string
+): Promise<DatasetItem> {
+  return apiClient<DatasetItem>(
+    `/datasets/${datasetId}/items/${itemUuid}`,
+    accessToken,
+    { method: "PATCH", body: { text } }
+  );
+}
+
 // Delete a single item from a dataset
 export function deleteDatasetItem(
   accessToken: string,

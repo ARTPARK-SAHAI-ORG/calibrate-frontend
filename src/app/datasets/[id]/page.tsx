@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAccessToken } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
@@ -8,10 +8,17 @@ import { useSidebarState } from "@/lib/sidebar";
 import {
   getDataset,
   deleteDatasetItem,
+  updateDatasetItem,
+  addDatasetItems,
   DatasetDetail,
   DatasetItem,
 } from "@/lib/datasets";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
+import {
+  STTDatasetEditor,
+  STTDatasetEditorHandle,
+} from "@/components/evaluations/STTDatasetEditor";
+import { toast } from "sonner";
 
 export default function DatasetDetailPage() {
   const router = useRouter();
@@ -23,9 +30,14 @@ export default function DatasetDetailPage() {
   const [dataset, setDataset] = useState<DatasetDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasPendingChanges, setHasPendingChanges] = useState(false);
 
+  // TTS-only delete state (STT deletion is handled inside STTDatasetEditor)
   const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
   const [isDeletingItem, setIsDeletingItem] = useState(false);
+
+  const editorRef = useRef<STTDatasetEditorHandle | null>(null);
 
   useEffect(() => {
     if (dataset) {
@@ -72,7 +84,36 @@ export default function DatasetDetailPage() {
     }
   };
 
-  const itemToDelete = dataset?.items.find((i: DatasetItem) => i.uuid === deleteItemId);
+  const handleSave = async () => {
+    if (!accessToken || !dataset) return;
+    const dirtyUpdates = editorRef.current?.getDirtyUpdates() ?? [];
+    const newRows = editorRef.current?.getNewRows() ?? [];
+    if (dirtyUpdates.length === 0 && newRows.length === 0) return;
+    setIsSaving(true);
+    try {
+      await Promise.all(
+        dirtyUpdates.map((u) => updateDatasetItem(accessToken, dataset.uuid, u.uuid, u.text)),
+      );
+      if (newRows.length > 0) {
+        await addDatasetItems(accessToken, dataset.uuid, newRows);
+      }
+      editorRef.current?.clearDirtyUpdates();
+      await fetchDataset();
+      const parts: string[] = [];
+      if (dirtyUpdates.length > 0) parts.push(`${dirtyUpdates.length} transcript${dirtyUpdates.length !== 1 ? "s" : ""} updated`);
+      if (newRows.length > 0) parts.push(`${newRows.length} item${newRows.length !== 1 ? "s" : ""} added`);
+      toast.success(parts.join(", ") + ".");
+    } catch (err) {
+      console.error("Failed to save:", err);
+      toast.error("Failed to save. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const itemToDelete = dataset?.items.find(
+    (i: DatasetItem) => i.uuid === deleteItemId,
+  );
 
   return (
     <AppLayout
@@ -89,8 +130,18 @@ export default function DatasetDetailPage() {
           }
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
+            />
           </svg>
           Back to Datasets
         </button>
@@ -118,7 +169,9 @@ export default function DatasetDetailPage() {
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-xl md:text-2xl font-semibold">{dataset.name}</h1>
+                  <h1 className="text-xl md:text-2xl font-semibold">
+                    {dataset.name}
+                  </h1>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-foreground uppercase">
                     {dataset.dataset_type}
                   </span>
@@ -127,80 +180,94 @@ export default function DatasetDetailPage() {
                   {dataset.item_count} item{dataset.item_count !== 1 ? "s" : ""}
                 </p>
               </div>
-              <button
-                onClick={() => router.push(`/${dataset.dataset_type}/new`)}
-                className="h-9 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
-              >
-                New evaluation with this dataset
-              </button>
+              <div className="flex items-center gap-2">
+                {dataset.dataset_type === "stt" && hasPendingChanges && (
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="h-9 px-4 rounded-md text-sm font-medium border border-border hover:bg-muted/50 transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSaving ? "Saving..." : "Save"}
+                  </button>
+                )}
+                <button
+                  onClick={() => router.push(`/${dataset.dataset_type}/new?dataset=${dataset.uuid}`)}
+                  className="h-9 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
+                >
+                  New evaluation
+                </button>
+              </div>
             </div>
 
             {/* Items */}
-            {dataset.items.length === 0 ? (
-              <div className="border border-border rounded-xl p-8 md:p-12 flex flex-col items-center justify-center bg-muted/20">
-                <p className="text-sm text-muted-foreground">
-                  This dataset has no items yet. Items are added when you run an evaluation with a dataset name.
-                </p>
-              </div>
+            {dataset.dataset_type === "stt" ? (
+              /* STT: reusable editor with saved items */
+              <STTDatasetEditor
+                ref={editorRef}
+                accessToken={accessToken}
+                savedItems={[...dataset.items].sort(
+                  (a, b) => a.order_index - b.order_index,
+                )}
+                onDeleteSavedItem={handleDeleteItem}
+                onHasPendingChangesChange={setHasPendingChanges}
+              />
             ) : (
-              <div className="border border-border rounded-xl overflow-hidden">
-                {/* Table Header */}
-                <div className={`hidden md:grid gap-4 px-4 py-2 border-b border-border bg-muted/30 ${dataset.dataset_type === "stt" ? "grid-cols-[40px_1fr_1fr_40px]" : "grid-cols-[40px_1fr_40px]"}`}>
-                  <div className="text-sm font-medium text-muted-foreground">#</div>
-                  {dataset.dataset_type === "stt" && (
-                    <div className="text-sm font-medium text-muted-foreground">Audio path</div>
-                  )}
-                  <div className="text-sm font-medium text-muted-foreground">Text</div>
-                  <div />
+              /* TTS: plain table */
+              dataset.items.length === 0 ? (
+                <div className="border border-border rounded-xl p-8 md:p-12 flex flex-col items-center justify-center bg-muted/20">
+                  <p className="text-sm text-muted-foreground">
+                    This dataset has no items yet. Items are added when you run an
+                    evaluation with a dataset name.
+                  </p>
                 </div>
-
-                {[...dataset.items]
-                  .sort((a: DatasetItem, b: DatasetItem) => a.order_index - b.order_index)
-                  .map((item: DatasetItem, index: number) => (
-                    <div
-                      key={item.uuid}
-                      className={`flex flex-col md:grid gap-2 md:gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/10 transition-colors ${dataset.dataset_type === "stt" ? "md:grid-cols-[40px_1fr_1fr_40px]" : "md:grid-cols-[40px_1fr_40px]"}`}
-                    >
-                      <div className="flex items-center">
-                        <span className="text-sm text-muted-foreground">{index + 1}</span>
-                      </div>
-                      {dataset.dataset_type === "stt" && item.audio_path && (
+              ) : (
+                <div className="border border-border rounded-xl overflow-hidden">
+                  <div className="hidden md:grid gap-4 px-4 py-2 border-b border-border bg-muted/30 grid-cols-[40px_1fr_40px]">
+                    <div className="text-sm font-medium text-muted-foreground">#</div>
+                    <div className="text-sm font-medium text-muted-foreground">Text</div>
+                    <div />
+                  </div>
+                  {[...dataset.items]
+                    .sort((a: DatasetItem, b: DatasetItem) => a.order_index - b.order_index)
+                    .map((item: DatasetItem, index: number) => (
+                      <div
+                        key={item.uuid}
+                        className="flex flex-col md:grid gap-2 md:gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/10 transition-colors md:grid-cols-[40px_1fr_40px]"
+                      >
                         <div className="flex items-center">
-                          <span className="text-sm text-foreground font-mono truncate" title={item.audio_path}>
-                            {item.audio_path.split("/").pop()}
-                          </span>
+                          <span className="text-sm text-muted-foreground">{index + 1}</span>
                         </div>
-                      )}
-                      <div className="flex items-center">
-                        <span className="text-sm text-foreground">{item.text}</span>
+                        <div className="flex items-center">
+                          <span className="text-sm text-foreground">{item.text}</span>
+                        </div>
+                        <div className="flex items-center justify-end">
+                          <button
+                            title="Delete item"
+                            onClick={() => setDeleteItemId(item.uuid)}
+                            className="p-1.5 rounded hover:bg-muted/50 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-end">
-                        <button
-                          title="Delete item"
-                          onClick={() => setDeleteItemId(item.uuid)}
-                          className="p-1.5 rounded hover:bg-muted/50 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-              </div>
+                    ))}
+                </div>
+              )
             )}
           </>
         ) : null}
       </div>
 
-      {/* Delete Item Confirmation */}
+      {/* TTS delete confirmation */}
       {deleteItemId && itemToDelete && (
         <DeleteConfirmationDialog
           isOpen={true}
           onClose={() => setDeleteItemId(null)}
           onConfirm={() => handleDeleteItem(deleteItemId)}
           title="Delete item"
-          message={`Remove item "${itemToDelete.text.slice(0, 60)}${itemToDelete.text.length > 60 ? "…" : ""}" from this dataset?`}
+          message="Remove item from this dataset?"
           isDeleting={isDeletingItem}
         />
       )}
