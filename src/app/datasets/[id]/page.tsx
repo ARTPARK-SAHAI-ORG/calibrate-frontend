@@ -65,15 +65,21 @@ export default function DatasetDetailPage() {
   // Deletion is handled inside each editor via onDeleteSavedItem
   const handleDeleteItem = async (itemUuid: string) => {
     if (!accessToken || !datasetId) return;
-    await deleteDatasetItem(accessToken, datasetId, itemUuid);
-    setDataset((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        items: prev.items.filter((item) => item.uuid !== itemUuid),
-        item_count: prev.item_count - 1,
-      };
-    });
+    try {
+      await deleteDatasetItem(accessToken, datasetId, itemUuid);
+      setDataset((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          items: prev.items.filter((item) => item.uuid !== itemUuid),
+          item_count: prev.item_count - 1,
+        };
+      });
+    } catch (err) {
+      console.error("Failed to delete item:", err);
+      toast.error("Failed to delete item. Please try again.");
+      throw err;
+    }
   };
 
   const handleSave = async () => {
@@ -97,6 +103,7 @@ export default function DatasetDetailPage() {
         await addDatasetItems(accessToken, dataset.uuid, newRows);
       }
       editorRef.current?.clearDirtyUpdates();
+      editorRef.current?.clearNewRows();
       await fetchDataset();
       const parts: string[] = [];
       if (dirtyUpdates.length > 0)

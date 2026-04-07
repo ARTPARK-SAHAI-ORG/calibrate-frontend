@@ -35,6 +35,8 @@ export type STTDatasetEditorHandle = {
   getDirtyUpdates: () => { uuid: string; text: string }[];
   /** Clears local edits (call after a successful save) */
   clearDirtyUpdates: () => void;
+  /** Resets new rows to a single blank row (call after a successful save) */
+  clearNewRows: () => void;
 };
 
 type Props = {
@@ -145,6 +147,9 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
       },
       clearDirtyUpdates() {
         setEditedTexts({});
+      },
+      clearNewRows() {
+        setNewRows([{ id: Date.now().toString(), audioFile: null, audioUrl: null, text: "", s3Path: null }]);
       },
     }));
 
@@ -352,14 +357,14 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
             if (candidate) { csvFile = candidate; basePath = folder; break; }
           }
         }
-        if (!csvFile) { alert("ZIP must contain a data.csv file"); return; }
+        if (!csvFile) { toast.error("ZIP must contain a data.csv file"); return; }
 
         let csvContent = await csvFile.async("string");
         if (csvContent.charCodeAt(0) === 0xfeff) csvContent = csvContent.slice(1);
         const lines = csvContent.split(/\r\n|\n|\r/).filter((l) => l.trim());
 
         if (lines.length < 2) {
-          alert(`data.csv must have a header and at least one data row. Found ${lines.length} line(s).`);
+          toast.error(`data.csv must have a header and at least one data row. Found ${lines.length} line(s).`);
           return;
         }
 
@@ -367,7 +372,7 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
         const audioIdx = headers.indexOf("audio_file");
         const textIdx = headers.indexOf("text");
         if (audioIdx === -1 || textIdx === -1) {
-          alert("data.csv must have 'audio_file' and 'text' columns");
+          toast.error("data.csv must have 'audio_file' and 'text' columns");
           return;
         }
 
@@ -387,7 +392,7 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
           }
         }
 
-        if (dataRows.length === 0) { alert("No valid data rows found in data.csv"); return; }
+        if (dataRows.length === 0) { toast.error("No valid data rows found in data.csv"); return; }
         if (dataRows.length > LIMITS.STT_MAX_ROWS) {
           toast.error(
             <span>
@@ -422,6 +427,7 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
           const sizeMB = audioFile.size / (1024 * 1024);
           if (sizeMB > LIMITS.STT_MAX_AUDIO_FILE_SIZE_MB) {
             toast.error(`"${audioFileName}" exceeds ${LIMITS.STT_MAX_AUDIO_FILE_SIZE_MB} MB.`);
+            builtRows.forEach((r) => { if (r.audioUrl) URL.revokeObjectURL(r.audioUrl); });
             return;
           }
 
@@ -429,6 +435,7 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
             const duration = await getAudioDuration(audioFile);
             if (duration > LIMITS.STT_MAX_AUDIO_DURATION_SECONDS) {
               toast.error(`"${audioFileName}" exceeds ${LIMITS.STT_MAX_AUDIO_DURATION_SECONDS}s.`);
+              builtRows.forEach((r) => { if (r.audioUrl) URL.revokeObjectURL(r.audioUrl); });
               return;
             }
           } catch {
@@ -456,7 +463,7 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
           }
         }
       } catch {
-        alert("Failed to process ZIP file");
+        toast.error("Failed to process ZIP file");
       } finally {
         setIsProcessingZip(false);
         if (zipInputRef.current) zipInputRef.current.value = "";
@@ -812,9 +819,14 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
           onConfirm={async () => {
             if (!deleteSavedId || !onDeleteSavedItem) return;
             setIsDeletingSaved(true);
-            await onDeleteSavedItem(deleteSavedId);
-            setIsDeletingSaved(false);
-            setDeleteSavedId(null);
+            try {
+              await onDeleteSavedItem(deleteSavedId);
+              setDeleteSavedId(null);
+            } catch {
+              setDeleteSavedId(null);
+            } finally {
+              setIsDeletingSaved(false);
+            }
           }}
           title="Delete item"
           message="Remove this item from the dataset?"

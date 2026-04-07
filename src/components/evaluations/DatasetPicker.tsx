@@ -68,7 +68,9 @@ export function DatasetPicker({ datasets, selectedId, onSelect }: Props) {
         {/* Rows */}
         {filtered.length === 0 ? (
           <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-            No datasets match your search
+            {datasets.length === 0
+              ? "No datasets yet"
+              : "No datasets match your search"}
           </div>
         ) : (
           filtered.map((ds, i) => {

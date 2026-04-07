@@ -26,6 +26,8 @@ export type TTSDatasetEditorHandle = {
   getDirtyUpdates: () => { uuid: string; text: string }[];
   /** Clears local edits (call after a successful save) */
   clearDirtyUpdates: () => void;
+  /** Resets new rows to a single blank row (call after a successful save) */
+  clearNewRows: () => void;
 };
 
 type Props = {
@@ -95,6 +97,9 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
       },
       clearDirtyUpdates() {
         setEditedTexts({});
+      },
+      clearNewRows() {
+        setNewRows([{ id: Date.now().toString(), text: "" }]);
       },
     }));
 
@@ -176,8 +181,16 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
         }
         const parsed: NewRow[] = [];
         for (let i = 1; i < lines.length; i++) {
-          const cols = lines[i].split(",");
-          const text = cols[textIdx]?.trim().replace(/^"|"$/g, "");
+          const cols: string[] = [];
+          let current = "";
+          let inQuotes = false;
+          for (const char of lines[i]) {
+            if (char === '"') { inQuotes = !inQuotes; }
+            else if (char === "," && !inQuotes) { cols.push(current.trim()); current = ""; }
+            else { current += char; }
+          }
+          cols.push(current.trim());
+          const text = cols[textIdx]?.trim();
           if (text) parsed.push({ id: Date.now().toString() + i, text });
         }
         if (parsed.length > LIMITS.TTS_MAX_ROWS) {
@@ -223,6 +236,8 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
       setIsDeletingSaved(true);
       try {
         await onDeleteSavedItem(deleteSavedId);
+        setDeleteSavedId(null);
+      } catch {
         setDeleteSavedId(null);
       } finally {
         setIsDeletingSaved(false);
