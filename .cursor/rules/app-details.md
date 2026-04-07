@@ -374,8 +374,9 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
 
 - **Responsive layout with separate desktop and mobile views**
 - **Desktop**: Sortable table (sorted by created date)
-  - **Columns**: Providers (as pills), Language, Status, Samples count, Created At
+  - **Columns**: Providers (as pills), Dataset (link to dataset page), Language, Status, Samples count, Created At
   - **Click any row** to view evaluation details
+- **Dataset validation**: After fetching jobs, all unique `dataset_id` values are verified via `getDataset()` API calls. If a dataset no longer exists (deleted), its `dataset_id` and `dataset_name` are nulled out so no broken link is shown
 - **Mobile**: Enhanced card-based layout with visual hierarchy
   - **Card design patterns**:
     - Rounded-xl corners with border and hover effects (shadow + border color transition)
@@ -413,6 +414,7 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
   - When evaluation is in progress: defaults to "Outputs" to show results as they arrive
   - Automatically switches to "Leaderboard" when evaluation completes during polling
 - **Language pill**: Displayed first (left side) with `bg-muted rounded-full capitalize` styling (e.g., "punjabi" → "Punjabi")
+- **Dataset link pill**: If evaluation has a valid `dataset_id`, shows a clickable pill linking to `/datasets/{dataset_id}` with a database icon. On initial fetch, `dataset_id` is verified via `getDataset()` — if the dataset no longer exists, `dataset_id` and `dataset_name` are nulled out (this check runs only on initial fetch, not during polling)
 - **Status badge**: Shows "Running" or "Queued" badge with spinner to the right of language pill when evaluation is not done
 - **Tabs only appear when at least one provider result exists**:
   - **Leaderboard**: Only visible when status is `done` (needs all providers to compare)
@@ -447,8 +449,9 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
 
 - **Responsive layout with separate desktop and mobile views**
 - **Desktop**: Sortable table (sorted by created date)
-  - **Columns**: Providers (as pills), Language, Status, Samples count, Created At
+  - **Columns**: Providers (as pills), Dataset (link to dataset page), Language, Status, Samples count, Created At
   - **Click any row** to view evaluation details
+- **Dataset validation**: After fetching jobs, all unique `dataset_id` values are verified via `getDataset()` API calls (same pattern as STT list page). If a dataset no longer exists, its `dataset_id` and `dataset_name` are nulled out
 - **Mobile**: Enhanced card-based layout with visual hierarchy (same pattern as STT)
   - **Card design patterns**:
     - Rounded-xl corners with border and hover effects (shadow + border color transition)
@@ -459,7 +462,7 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
     - Clear label/value distinction: labels are small + muted, values are medium weight
     - Visual separation with subtle border-top before created date
     - Smooth transitions (duration-200) on all interactive elements
-  - **Icons used**: Language (translation icon), Samples (document icon), Created (clock icon)
+  - **Icons used**: Dataset (database icon, conditional), Language (translation icon), Samples (document icon), Created (clock icon)
 - **Provider pills**: Display provider labels (e.g., "Cartesia", "ElevenLabs", "Google") without external link icons on list page
 - **Sort functionality**: Toggle button to sort by created date (ascending/descending)
 - **"New evaluation" button** in header - navigates to create page
@@ -484,7 +487,8 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
   - Automatically switches to "Leaderboard" when evaluation completes during polling
 - **Intermediate results**: Shows Outputs and About tabs during `in_progress` status
 - **Language pill**: Displayed first (left side) with `bg-muted rounded-full capitalize` styling
-- **Status badge**: Shows "Running" or "Queued" badge with spinner to the right of language pill when evaluation is not done
+- **Dataset link pill**: If evaluation has a valid `dataset_id`, shows a clickable pill linking to `/datasets/{dataset_id}` with a database icon. On initial fetch, `dataset_id` is verified via `getDataset()` — if the dataset no longer exists, `dataset_id` and `dataset_name` are nulled out (this check runs only on initial fetch, not during polling)
+- **Status badge**: Shows "Running" or "Queued" badge with spinner to the right of language/dataset pills when evaluation is not done
 - **Tabs**:
   - **Leaderboard**: Only visible when status is `done` - comparative table and charts
   - **Outputs**: Responsive layout — side-by-side panels on desktop, stacked on mobile (same pattern as STT)
@@ -2071,7 +2075,9 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
 **List Page:**
 
 - Fetches jobs from `GET /jobs?job_type=tts` or `GET /jobs?job_type=stt`
-- Displays in sortable table with columns: Providers (as pills), Language, Status, Samples count, Created At
+- Displays in sortable table with columns: Providers (as pills), Dataset (link), Language, Status, Samples count, Created At
+- After fetching, all `dataset_id` values are validated via `getDataset()` — deleted datasets are nulled out to prevent broken links
+- Table rows use `<div>` with `onClick`/`router.push` (not `<Link>`) to allow `e.stopPropagation()` on the dataset link
 - "New [TTS/STT] Evaluation" button below header navigates to `/[tts|stt]/new`
 - Clicking a row navigates to `/[tts|stt]/{uuid}`
 
@@ -2080,6 +2086,7 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
 - Contains the evaluation form component (`TextToSpeechEvaluation` or `SpeechToTextEvaluation`)
 - **Header**: Description text + Evaluate button. Uses `flex flex-col sm:flex-row sm:items-center justify-between gap-3` — stacks vertically on mobile, side-by-side on desktop
 - **Tabs**: Settings and Dataset tabs use `text-sm md:text-base` with `gap-4 md:gap-6`
+- **Tab state preservation**: Both tab panels stay mounted in the DOM using `className="hidden"` to toggle visibility (not conditional rendering). This prevents uploaded files and entered data from being lost when switching between Dataset and Settings tabs
 - Both components use the same tab layout:
   - **Settings tab**: Language selection dropdown + provider selection (responsive: table on desktop, cards on mobile)
   - **Dataset tab**: Sample rows + add sample button (TTS also has CSV upload with OR divider and sample download)

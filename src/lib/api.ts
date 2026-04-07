@@ -85,13 +85,17 @@ export async function apiClient<T>(
     throw new Error(`Request failed: ${response.status} - ${errorText}`);
   }
 
-  // Handle empty responses (204 No Content, etc.)
+  // Handle empty responses (204 No Content, zero-length body, etc.)
+  if (response.status === 204) return {} as T;
+
   const contentType = response.headers.get("content-type");
   if (!contentType || !contentType.includes("application/json")) {
     return {} as T;
   }
 
-  return response.json();
+  const text = await response.text();
+  if (!text) return {} as T;
+  return JSON.parse(text) as T;
 }
 
 /**
