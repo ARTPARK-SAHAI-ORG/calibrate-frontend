@@ -72,7 +72,7 @@ function NewTTSEvaluationPageInner() {
 
 export default function NewTTSEvaluationPage() {
   return (
-    <Suspense>
+    <Suspense fallback={null}>
       <NewTTSEvaluationPageInner />
     </Suspense>
   );

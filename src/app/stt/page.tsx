@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, Suspense } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
@@ -9,13 +9,9 @@ import { AppLayout } from "@/components/AppLayout";
 import { sttProviders } from "@/components/agent-tabs/constants/providers";
 import { formatStatus, getStatusBadgeClass } from "@/lib/status";
 import { useSidebarState } from "@/lib/sidebar";
-import {
-  listDatasets,
-  createDataset,
-  deleteDataset,
-  Dataset,
-} from "@/lib/datasets";
+import { Dataset } from "@/lib/datasets";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
+import { useDatasetManagement } from "@/hooks";
 
 type STTJob = {
   uuid: string;
@@ -57,14 +53,24 @@ function STTPageInner() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // Datasets state
-  const [datasets, setDatasets] = useState<Dataset[]>([]);
-  const [datasetsLoading, setDatasetsLoading] = useState(true);
-  const [datasetsError, setDatasetsError] = useState<string | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newDatasetName, setNewDatasetName] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
-  const [deleteDatasetId, setDeleteDatasetId] = useState<string | null>(null);
-  const [isDeletingDataset, setIsDeletingDataset] = useState(false);
+  const {
+    datasets,
+    datasetsLoading,
+    datasetsError,
+    fetchDatasets,
+    showCreateModal,
+    setShowCreateModal,
+    newDatasetName,
+    setNewDatasetName,
+    isCreating,
+    deleteDatasetId,
+    setDeleteDatasetId,
+    isDeletingDataset,
+    handleDeleteDataset,
+    handleCreateDataset,
+  } = useDatasetManagement(backendAccessToken, "stt", (uuid) =>
+    router.push(`/datasets/${uuid}`),
+  );
 
   // Set page title
   useEffect(() => {
@@ -116,60 +122,6 @@ function STTPageInner() {
 
     fetchJobs();
   }, [backendAccessToken]);
-
-  // Fetch STT datasets
-  const fetchDatasets = useCallback(async () => {
-    if (!backendAccessToken) return;
-    try {
-      setDatasetsLoading(true);
-      setDatasetsError(null);
-      const data = await listDatasets(backendAccessToken, "stt");
-      setDatasets(data);
-    } catch (err) {
-      setDatasetsError(
-        err instanceof Error ? err.message : "Failed to load datasets",
-      );
-    } finally {
-      setDatasetsLoading(false);
-    }
-  }, [backendAccessToken]);
-
-  useEffect(() => {
-    fetchDatasets();
-  }, [fetchDatasets]);
-
-  const handleDeleteDataset = async (uuid: string) => {
-    if (!backendAccessToken) return;
-    setIsDeletingDataset(true);
-    try {
-      await deleteDataset(backendAccessToken, uuid);
-      setDatasets((prev) => prev.filter((d) => d.uuid !== uuid));
-      setDeleteDatasetId(null);
-    } catch (err) {
-      console.error("Failed to delete dataset:", err);
-    } finally {
-      setIsDeletingDataset(false);
-    }
-  };
-
-  const handleCreateDataset = async () => {
-    if (!backendAccessToken || !newDatasetName.trim()) return;
-    setIsCreating(true);
-    try {
-      const dataset = await createDataset(
-        backendAccessToken,
-        newDatasetName.trim(),
-        "stt",
-      );
-      setShowCreateModal(false);
-      setNewDatasetName("");
-      router.push(`/datasets/${dataset.uuid}`);
-    } catch (err) {
-      console.error("Failed to create dataset:", err);
-    } finally {
-      setIsCreating(false);
-    }
-  };
 
   const formatDate = (dateString: string): string => {
     try {
@@ -844,7 +796,7 @@ function STTPageInner() {
 
 export default function STTPage() {
   return (
-    <Suspense>
+    <Suspense fallback={null}>
       <STTPageInner />
     </Suspense>
   );
