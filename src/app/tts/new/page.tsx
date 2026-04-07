@@ -1,13 +1,15 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { TextToSpeechEvaluation } from "@/components/evaluations/TextToSpeechEvaluation";
 import { useSidebarState } from "@/lib/sidebar";
 
-export default function NewTTSEvaluationPage() {
+function NewTTSEvaluationPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialDatasetId = searchParams.get("dataset") ?? undefined;
   const [sidebarOpen, setSidebarOpen] = useSidebarState();
   const [isEvaluating, setIsEvaluating] = useState(false);
   const evaluateRef = useRef<(() => void) | null>(null);
@@ -62,7 +64,16 @@ export default function NewTTSEvaluationPage() {
       <TextToSpeechEvaluation
         evaluateRef={evaluateRef}
         onEvaluatingChange={setIsEvaluating}
+        initialDatasetId={initialDatasetId}
       />
     </AppLayout>
+  );
+}
+
+export default function NewTTSEvaluationPage() {
+  return (
+    <Suspense>
+      <NewTTSEvaluationPageInner />
+    </Suspense>
   );
 }

@@ -6,15 +6,10 @@ import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import { toast } from "sonner";
 import { ttsProviders, TTSProvider } from "../agent-tabs/constants/providers";
-import { DeleteConfirmationDialog } from "../DeleteConfirmationDialog";
 import { LIMITS, CONTACT_LINK } from "@/constants/limits";
 import { listDatasets, Dataset } from "@/lib/datasets";
 import { DatasetPicker } from "./DatasetPicker";
-
-type TextRow = {
-  id: string;
-  text: string;
-};
+import { TTSDatasetEditor, TTSDatasetEditorHandle } from "./TTSDatasetEditor";
 
 type EvaluationResult = {
   task_id: string;
@@ -66,15 +61,15 @@ const getFilteredProviders = (language: LanguageOption): TTSProvider[] => {
 type TextToSpeechEvaluationProps = {
   evaluateRef?: React.MutableRefObject<(() => void) | null>;
   onEvaluatingChange?: (v: boolean) => void;
+  initialDatasetId?: string;
 };
 
-export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange }: TextToSpeechEvaluationProps = {}) {
+export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange, initialDatasetId }: TextToSpeechEvaluationProps = {}) {
   const router = useRouter();
   const backendAccessToken = useAccessToken();
-  const [activeTab, setActiveTab] = useState<TabType>("settings");
-  const [rows, setRows] = useState<TextRow[]>([{ id: "1", text: "" }]);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState<string | null>(null);
-  const [invalidRowIds, setInvalidRowIds] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<TabType>(
+    initialDatasetId ? "settings" : "input"
+  );
   const [providersInvalid, setProvidersInvalid] = useState(false);
   const [selectedProviders, setSelectedProviders] = useState<Set<string>>(
     new Set()
@@ -87,11 +82,17 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange }: Text
   };
 
   // Dataset mode
-  const [inputMode, setInputMode] = useState<"inline" | "dataset">("inline");
+  const [inputMode, setInputMode] = useState<"inline" | "dataset">(
+    initialDatasetId ? "dataset" : "inline"
+  );
   const [availableDatasets, setAvailableDatasets] = useState<Dataset[]>([]);
-  const [selectedDatasetId, setSelectedDatasetId] = useState<string>("");
+  const [selectedDatasetId, setSelectedDatasetId] = useState<string>(
+    initialDatasetId ?? ""
+  );
   const [datasetName, setDatasetName] = useState("");
   const [datasetNameInvalid, setDatasetNameInvalid] = useState(false);
+
+  const editorRef = useRef<TTSDatasetEditorHandle | null>(null);
 
   useEffect(() => {
     if (!backendAccessToken) return;
@@ -127,169 +128,6 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange }: Text
       return newSet;
     });
   };
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleDownloadSampleCsv = () => {
-    const csvContent =
-      'text\n"Hello, how are you today?"\nThe weather is nice outside.\nThis is a sample text for TTS evaluation.';
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "sample_tts_input.csv";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleCsvUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      if (!content) return;
-
-      const lines = content.split(/\r?\n/).filter((line) => line.trim());
-      if (lines.length === 0) return;
-
-      // Find the text column index from header
-      const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
-      const textColumnIndex = headers.indexOf("text");
-
-      if (textColumnIndex === -1) {
-        alert("CSV must have a 'text' column header");
-        return;
-      }
-
-      // Parse rows (skip header)
-      const newRows: TextRow[] = [];
-      for (let i = 1; i < lines.length; i++) {
-        const columns = lines[i].split(",");
-        const text = columns[textColumnIndex]?.trim();
-        if (text) {
-          newRows.push({
-            id: Date.now().toString() + i,
-            text: text,
-          });
-        }
-      }
-
-      // Check row limit
-      if (newRows.length > LIMITS.TTS_MAX_ROWS) {
-        toast.error(
-          <span>
-            You can only upload up to {LIMITS.TTS_MAX_ROWS} rows at a time.{" "}
-            <a
-              href={CONTACT_LINK}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline"
-            >
-              Contact us
-            </a>{" "}
-            to extend your limits.
-          </span>
-        );
-        return;
-      }
-
-      // Check text length limit
-      const longTextRow = newRows.find(
-        (row) => row.text.length > LIMITS.TTS_MAX_TEXT_LENGTH
-      );
-      if (longTextRow) {
-        toast.error(
-          <span>
-            Text must be {LIMITS.TTS_MAX_TEXT_LENGTH} characters or less. Found
-            text with {longTextRow.text.length} characters.{" "}
-            <a
-              href={CONTACT_LINK}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline"
-            >
-              Contact us
-            </a>{" "}
-            to extend your limits.
-          </span>
-        );
-        return;
-      }
-
-      if (newRows.length > 0) {
-        setRows(newRows);
-        setInvalidRowIds(new Set());
-      }
-    };
-    reader.readAsText(file);
-
-    // Reset file input so the same file can be uploaded again
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  const addRow = () => {
-    // Check row limit
-    if (rows.length >= LIMITS.TTS_MAX_ROWS) {
-      toast.error(
-        <span>
-          You can only add up to {LIMITS.TTS_MAX_ROWS} rows at a time.{" "}
-          <a
-            href={CONTACT_LINK}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline"
-          >
-            Contact us
-          </a>{" "}
-          to extend your limits.
-        </span>
-      );
-      return;
-    }
-
-    // Validate existing rows
-    const invalidIds = new Set<string>();
-    rows.forEach((row) => {
-      if (!row.text.trim()) {
-        invalidIds.add(row.id);
-      }
-    });
-
-    if (invalidIds.size > 0) {
-      // Highlight invalid rows
-      setInvalidRowIds(invalidIds);
-      return; // Don't add new row if validation fails
-    }
-
-    // Clear validation errors and add new row
-    setInvalidRowIds(new Set());
-    const newId = Date.now().toString();
-    setRows([...rows, { id: newId, text: "" }]);
-  };
-
-  const deleteRow = (id: string) => {
-    if (rows.length === 1) return; // Don't allow deleting the last row
-    setRows(rows.filter((row) => row.id !== id));
-    setDeleteDialogOpen(null);
-  };
-
-  const handleTextChange = (id: string, text: string) => {
-    setRows(rows.map((row) => (row.id === id ? { ...row, text } : row)));
-    // Clear validation error for this row if text is entered
-    if (text.trim()) {
-      setInvalidRowIds((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(id);
-        return newSet;
-      });
-    }
-  };
-
   const toggleProvider = (provider: string) => {
     setSelectedProviders((prev) => {
       const newSet = new Set(prev);
@@ -331,35 +169,21 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange }: Text
         return;
       }
 
-      // Validate all rows
-      const invalidIds = new Set<string>();
-      rows.forEach((row) => {
-        if (!row.text.trim()) {
-          invalidIds.add(row.id);
-        }
-      });
-
-      if (invalidIds.size > 0) {
-        setInvalidRowIds(invalidIds);
+      const newRows = editorRef.current?.getNewRows() ?? [];
+      if (newRows.length === 0) {
+        toast.error("Add at least one text row before evaluating.");
         setActiveTab("input");
         return;
       }
 
-      // Check text length limit
-      const longTextRow = rows.find(
-        (row) => row.text.length > LIMITS.TTS_MAX_TEXT_LENGTH
+      const longTextRow = newRows.find(
+        (r) => r.text.length > LIMITS.TTS_MAX_TEXT_LENGTH
       );
       if (longTextRow) {
         toast.error(
           <span>
-            Text must be {LIMITS.TTS_MAX_TEXT_LENGTH} characters or less. Found
-            text with {longTextRow.text.length} characters.{" "}
-            <a
-              href={CONTACT_LINK}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline"
-            >
+            Text must be {LIMITS.TTS_MAX_TEXT_LENGTH} characters or less.{" "}
+            <a href={CONTACT_LINK} target="_blank" rel="noopener noreferrer" className="underline">
               Contact us
             </a>{" "}
             to extend your limits.
@@ -370,8 +194,6 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange }: Text
       }
     }
 
-    // Clear validation errors and proceed with evaluation
-    setInvalidRowIds(new Set());
     setProvidersInvalid(false);
     setIsEvaluating(true);
 
@@ -396,9 +218,9 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange }: Text
           language,
         };
       } else {
-        const texts = rows.map((row) => row.text.trim());
+        const newRows = editorRef.current?.getNewRows() ?? [];
         requestBody = {
-          texts,
+          texts: newRows.map((r) => r.text),
           providers,
           language,
           ...(datasetName.trim() ? { dataset_name: datasetName.trim() } : {}),
@@ -443,16 +265,6 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange }: Text
       {/* Tabs Navigation */}
       <div className="flex items-center gap-4 md:gap-6 border-b border-border">
         <button
-          onClick={() => setActiveTab("settings")}
-          className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer ${
-            activeTab === "settings"
-              ? "text-foreground border-b-2 border-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Settings
-        </button>
-        <button
           onClick={() => setActiveTab("input")}
           className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer ${
             activeTab === "input"
@@ -461,6 +273,16 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange }: Text
           }`}
         >
           Dataset
+        </button>
+        <button
+          onClick={() => setActiveTab("settings")}
+          className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer ${
+            activeTab === "settings"
+              ? "text-foreground border-b-2 border-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Settings
         </button>
       </div>
 
@@ -865,211 +687,21 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange }: Text
           {/* Inline mode */}
           {inputMode === "inline" && (
           <div className="space-y-4">
-          {/* Dataset name (required) */}
-          <div>
-            <label className="text-[13px] font-medium text-foreground block mb-2">
-              Dataset name
-            </label>
-            <input
-              type="text"
-              value={datasetName}
-              onChange={(e) => {
-                setDatasetName(e.target.value);
-                if (e.target.value.trim()) setDatasetNameInvalid(false);
+            <TTSDatasetEditor
+              ref={editorRef}
+              showDatasetName
+              datasetName={datasetName}
+              onDatasetNameChange={(v) => {
+                setDatasetName(v);
+                if (v.trim()) setDatasetNameInvalid(false);
               }}
-              placeholder="e.g. English TTS test set"
-              className={`w-full max-w-sm h-9 px-3 rounded-md text-sm border bg-background focus:outline-none focus:ring-1 focus:ring-foreground/30 ${
-                datasetNameInvalid ? "border-red-500 bg-red-500/10" : "border-border"
-              }`}
+              datasetNameInvalid={datasetNameInvalid}
             />
-          </div>
-          <div className="space-y-2">
-          {/* Text Rows */}
-          {rows.map((row, index) => {
-            const isInvalid = invalidRowIds.has(row.id);
-            return (
-              <div
-                key={row.id}
-                className={`border rounded-lg py-1.5 px-3 flex items-center gap-2 transition-colors ${
-                  isInvalid
-                    ? "border-red-500 bg-red-500/10"
-                    : "border-border bg-muted/10"
-                }`}
-              >
-                {/* Row Number */}
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[11px] font-medium text-muted-foreground">
-                  {index + 1}
-                </div>
-
-                {/* Text Input */}
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    value={row.text}
-                    onChange={(e) => handleTextChange(row.id, e.target.value)}
-                    placeholder="Enter text to synthesize"
-                    className="w-full h-8 px-2 rounded text-[13px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                  />
-                </div>
-
-                {/* Delete Button */}
-                {rows.length > 1 && (
-                  <button
-                    onClick={() => {
-                      // Skip confirmation if row is empty
-                      if (!row.text.trim()) {
-                        deleteRow(row.id);
-                      } else {
-                        setDeleteDialogOpen(row.id);
-                      }
-                    }}
-                    className="flex-shrink-0 w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex items-center justify-center cursor-pointer"
-                    aria-label="Delete row"
-                  >
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={1.5}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                      />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            );
-          })}
-
-          {/* Add Row Button */}
-          <button
-            onClick={addRow}
-            className="w-full h-8 px-3 rounded-lg text-[12px] font-medium border border-dashed border-border bg-muted/20 hover:bg-muted/40 transition-colors flex items-center justify-center gap-1.5 text-muted-foreground hover:text-foreground cursor-pointer"
-          >
-            <svg
-              className="w-3.5 h-3.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 4.5v15m7.5-7.5h-15"
-              />
-            </svg>
-            Add another sample
-          </button>
-
-          {/* OR Divider */}
-          <div className="flex items-center gap-4 py-2">
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-[13px] font-medium text-muted-foreground">
-              OR
-            </span>
-            <div className="flex-1 h-px bg-border" />
-          </div>
-
-          {/* CSV Upload Section */}
-          <div className="border border-border rounded-xl p-4 md:p-6 bg-muted/10">
-            <div className="flex items-start gap-3 md:gap-4">
-              <div className="flex-shrink-0 w-9 h-9 md:w-10 md:h-10 rounded-full bg-muted flex items-center justify-center">
-                <svg
-                  className="w-5 h-5 text-muted-foreground"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
-                  />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-[14px] font-medium text-foreground mb-1">
-                  Upload CSV
-                </h3>
-                <p className="text-[13px] text-muted-foreground mb-4">
-                  Upload a CSV file with all the texts you want to be spoken
-                </p>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".csv"
-                    onChange={handleCsvUpload}
-                    className="hidden"
-                    id="csv-upload"
-                  />
-                  <label
-                    htmlFor="csv-upload"
-                    className="h-9 px-4 rounded-md text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-2"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={1.5}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-                      />
-                    </svg>
-                    Choose CSV file
-                  </label>
-                  <button
-                    onClick={handleDownloadSampleCsv}
-                    className="h-9 px-4 rounded-md text-[13px] font-medium border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer flex items-center gap-2"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={1.5}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-                      />
-                    </svg>
-                    Download sample CSV
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          </div>
           </div>
           )}
         </div>
       )}
 
-      {/* Delete Confirmation Dialog */}
-      <DeleteConfirmationDialog
-        isOpen={deleteDialogOpen !== null}
-        onClose={() => setDeleteDialogOpen(null)}
-        onConfirm={() => {
-          if (deleteDialogOpen) {
-            deleteRow(deleteDialogOpen);
-          }
-        }}
-        title="Delete row"
-        message="Are you sure you want to delete this row? This action cannot be undone."
-        confirmText="Delete"
-      />
     </div>
   );
 }

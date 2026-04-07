@@ -11,13 +11,15 @@ import {
   updateDatasetItem,
   addDatasetItems,
   DatasetDetail,
-  DatasetItem,
 } from "@/lib/datasets";
-import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import {
   STTDatasetEditor,
   STTDatasetEditorHandle,
 } from "@/components/evaluations/STTDatasetEditor";
+import {
+  TTSDatasetEditor,
+  TTSDatasetEditorHandle,
+} from "@/components/evaluations/TTSDatasetEditor";
 import { toast } from "sonner";
 
 export default function DatasetDetailPage() {
@@ -33,11 +35,8 @@ export default function DatasetDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasPendingChanges, setHasPendingChanges] = useState(false);
 
-  // TTS-only delete state (STT deletion is handled inside STTDatasetEditor)
-  const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
-  const [isDeletingItem, setIsDeletingItem] = useState(false);
-
-  const editorRef = useRef<STTDatasetEditorHandle | null>(null);
+  const sttEditorRef = useRef<STTDatasetEditorHandle | null>(null);
+  const ttsEditorRef = useRef<TTSDatasetEditorHandle | null>(null);
 
   useEffect(() => {
     if (dataset) {
@@ -63,36 +62,36 @@ export default function DatasetDetailPage() {
     fetchDataset();
   }, [fetchDataset]);
 
+  // Deletion is handled inside each editor via onDeleteSavedItem
   const handleDeleteItem = async (itemUuid: string) => {
     if (!accessToken || !datasetId) return;
-    setIsDeletingItem(true);
-    try {
-      await deleteDatasetItem(accessToken, datasetId, itemUuid);
-      setDataset((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          items: prev.items.filter((item) => item.uuid !== itemUuid),
-          item_count: prev.item_count - 1,
-        };
-      });
-      setDeleteItemId(null);
-    } catch (err) {
-      console.error("Failed to delete item:", err);
-    } finally {
-      setIsDeletingItem(false);
-    }
+    await deleteDatasetItem(accessToken, datasetId, itemUuid);
+    setDataset((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        items: prev.items.filter((item) => item.uuid !== itemUuid),
+        item_count: prev.item_count - 1,
+      };
+    });
   };
 
   const handleSave = async () => {
     if (!accessToken || !dataset) return;
+
+    const isStt = dataset.dataset_type === "stt";
+    const editorRef = isStt ? sttEditorRef : ttsEditorRef;
+
     const dirtyUpdates = editorRef.current?.getDirtyUpdates() ?? [];
     const newRows = editorRef.current?.getNewRows() ?? [];
     if (dirtyUpdates.length === 0 && newRows.length === 0) return;
+
     setIsSaving(true);
     try {
       await Promise.all(
-        dirtyUpdates.map((u) => updateDatasetItem(accessToken, dataset.uuid, u.uuid, u.text)),
+        dirtyUpdates.map((u) =>
+          updateDatasetItem(accessToken, dataset.uuid, u.uuid, u.text),
+        ),
       );
       if (newRows.length > 0) {
         await addDatasetItems(accessToken, dataset.uuid, newRows);
@@ -100,8 +99,14 @@ export default function DatasetDetailPage() {
       editorRef.current?.clearDirtyUpdates();
       await fetchDataset();
       const parts: string[] = [];
-      if (dirtyUpdates.length > 0) parts.push(`${dirtyUpdates.length} transcript${dirtyUpdates.length !== 1 ? "s" : ""} updated`);
-      if (newRows.length > 0) parts.push(`${newRows.length} item${newRows.length !== 1 ? "s" : ""} added`);
+      if (dirtyUpdates.length > 0)
+        parts.push(
+          `${dirtyUpdates.length} item${dirtyUpdates.length !== 1 ? "s" : ""} updated`,
+        );
+      if (newRows.length > 0)
+        parts.push(
+          `${newRows.length} item${newRows.length !== 1 ? "s" : ""} added`,
+        );
       toast.success(parts.join(", ") + ".");
     } catch (err) {
       console.error("Failed to save:", err);
@@ -110,10 +115,6 @@ export default function DatasetDetailPage() {
       setIsSaving(false);
     }
   };
-
-  const itemToDelete = dataset?.items.find(
-    (i: DatasetItem) => i.uuid === deleteItemId,
-  );
 
   return (
     <AppLayout
@@ -181,7 +182,7 @@ export default function DatasetDetailPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {dataset.dataset_type === "stt" && hasPendingChanges && (
+                {hasPendingChanges && (
                   <button
                     onClick={handleSave}
                     disabled={isSaving}
@@ -191,7 +192,11 @@ export default function DatasetDetailPage() {
                   </button>
                 )}
                 <button
-                  onClick={() => router.push(`/${dataset.dataset_type}/new?dataset=${dataset.uuid}`)}
+                  onClick={() =>
+                    router.push(
+                      `/${dataset.dataset_type}/new?dataset=${dataset.uuid}`,
+                    )
+                  }
                   className="h-9 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
                 >
                   New evaluation
@@ -201,9 +206,8 @@ export default function DatasetDetailPage() {
 
             {/* Items */}
             {dataset.dataset_type === "stt" ? (
-              /* STT: reusable editor with saved items */
               <STTDatasetEditor
-                ref={editorRef}
+                ref={sttEditorRef}
                 accessToken={accessToken}
                 savedItems={[...dataset.items].sort(
                   (a, b) => a.order_index - b.order_index,
@@ -212,65 +216,18 @@ export default function DatasetDetailPage() {
                 onHasPendingChangesChange={setHasPendingChanges}
               />
             ) : (
-              /* TTS: plain table */
-              dataset.items.length === 0 ? (
-                <div className="border border-border rounded-xl p-8 md:p-12 flex flex-col items-center justify-center bg-muted/20">
-                  <p className="text-sm text-muted-foreground">
-                    This dataset has no items yet. Items are added when you run an
-                    evaluation with a dataset name.
-                  </p>
-                </div>
-              ) : (
-                <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="hidden md:grid gap-4 px-4 py-2 border-b border-border bg-muted/30 grid-cols-[40px_1fr_40px]">
-                    <div className="text-sm font-medium text-muted-foreground">#</div>
-                    <div className="text-sm font-medium text-muted-foreground">Text</div>
-                    <div />
-                  </div>
-                  {[...dataset.items]
-                    .sort((a: DatasetItem, b: DatasetItem) => a.order_index - b.order_index)
-                    .map((item: DatasetItem, index: number) => (
-                      <div
-                        key={item.uuid}
-                        className="flex flex-col md:grid gap-2 md:gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/10 transition-colors md:grid-cols-[40px_1fr_40px]"
-                      >
-                        <div className="flex items-center">
-                          <span className="text-sm text-muted-foreground">{index + 1}</span>
-                        </div>
-                        <div className="flex items-center">
-                          <span className="text-sm text-foreground">{item.text}</span>
-                        </div>
-                        <div className="flex items-center justify-end">
-                          <button
-                            title="Delete item"
-                            onClick={() => setDeleteItemId(item.uuid)}
-                            className="p-1.5 rounded hover:bg-muted/50 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )
+              <TTSDatasetEditor
+                ref={ttsEditorRef}
+                savedItems={[...dataset.items].sort(
+                  (a, b) => a.order_index - b.order_index,
+                )}
+                onDeleteSavedItem={handleDeleteItem}
+                onHasPendingChangesChange={setHasPendingChanges}
+              />
             )}
           </>
         ) : null}
       </div>
-
-      {/* TTS delete confirmation */}
-      {deleteItemId && itemToDelete && (
-        <DeleteConfirmationDialog
-          isOpen={true}
-          onClose={() => setDeleteItemId(null)}
-          onConfirm={() => handleDeleteItem(deleteItemId)}
-          title="Delete item"
-          message="Remove item from this dataset?"
-          isDeleting={isDeletingItem}
-        />
-      )}
     </AppLayout>
   );
 }
