@@ -232,7 +232,6 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange, initia
         headers: {
           "Content-Type": "application/json",
           accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify(requestBody),

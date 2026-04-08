@@ -104,7 +104,6 @@ function STTPageInner() {
           method: "GET",
           headers: {
             accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
         });

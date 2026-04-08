@@ -167,7 +167,6 @@ export function BenchmarkResultsDialog({
           method: "GET",
           headers: {
             accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
           },
         }
       );
@@ -258,7 +257,6 @@ export function BenchmarkResultsDialog({
           headers: {
             accept: "application/json",
             "Content-Type": "application/json",
-            "ngrok-skip-browser-warning": "true",
           },
           body: JSON.stringify({
             test_uuids: testUuids,

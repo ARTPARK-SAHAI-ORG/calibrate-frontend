@@ -156,7 +156,6 @@ export function AgentDetail({
           method: "GET",
           headers: {
             accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
         });
@@ -269,7 +268,6 @@ export function AgentDetail({
             method: "GET",
             headers: {
               accept: "application/json",
-              "ngrok-skip-browser-warning": "true",
               Authorization: `Bearer ${backendAccessToken}`,
             },
           }
@@ -316,7 +314,6 @@ export function AgentDetail({
           method: "GET",
           headers: {
             accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
         });
@@ -363,7 +360,6 @@ export function AgentDetail({
           headers: {
             accept: "application/json",
             "Content-Type": "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({
@@ -448,7 +444,6 @@ export function AgentDetail({
         headers: {
           accept: "application/json",
           "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
