@@ -12,6 +12,7 @@ import {
   TestDetailView as SharedTestDetailView,
   EmptyStateView,
   TestStats,
+  EvaluationCriteriaPanel,
 } from "./test-results/shared";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
@@ -39,6 +40,7 @@ type TestResult = {
   chatHistory?: ChatMessage[];
   output?: TestCaseOutput;
   testCase?: TestCaseData;
+  reasoning?: string;
   evaluation?: {
     passed: boolean;
     message?: string;
@@ -53,6 +55,7 @@ type TestCaseResult = {
   name?: string; // Test name from in-progress API response
   status?: "passed" | "failed" | "error";
   passed?: boolean | null; // null means test is still running
+  reasoning?: string;
   output?: TestCaseOutput | null;
   test_case?: TestCaseData | null;
   chat_history?: ChatMessage[];
@@ -93,7 +96,7 @@ type TestRunnerDialogProps = {
       test_case?: { name?: string } | null;
     }[],
     passed?: number | null,
-    failed?: number | null
+    failed?: number | null,
   ) => void; // Called when run status changes (for coordinated polling)
 };
 
@@ -126,7 +129,7 @@ export function TestRunnerDialog({
     console.log("selectedTestUuid changed to:", selectedTestUuid);
     console.log(
       "testResults:",
-      testResults.map((r) => ({ uuid: r.test.uuid, name: r.test.name }))
+      testResults.map((r) => ({ uuid: r.test.uuid, name: r.test.name })),
     );
   }, [selectedTestUuid, testResults]);
 
@@ -237,7 +240,7 @@ export function TestRunnerDialog({
         setRunStatus(
           result.status === "completed"
             ? "done"
-            : (result.status as "queued" | "in_progress" | "done" | "failed")
+            : (result.status as "queued" | "in_progress" | "done" | "failed"),
         );
       }
 
@@ -245,7 +248,7 @@ export function TestRunnerDialog({
       setTestResults((prev) => {
         // Helper to determine test status from API result
         const getTestStatus = (
-          apiResult: TestCaseResult
+          apiResult: TestCaseResult,
         ): "passed" | "failed" | "running" => {
           // If passed is null, the test is still running
           if (apiResult.passed === null || apiResult.passed === undefined) {
@@ -283,9 +286,12 @@ export function TestRunnerDialog({
               chatHistory: apiResult.chat_history,
               output: apiResult.output ?? undefined,
               testCase: apiResult.test_case ?? undefined,
+              reasoning: apiResult.reasoning,
               evaluation:
                 testStatus !== "running"
-                  ? apiResult.evaluation ?? { passed: testStatus === "passed" }
+                  ? (apiResult.evaluation ?? {
+                      passed: testStatus === "passed",
+                    })
                   : undefined,
               error: apiResult.error,
             };
@@ -296,13 +302,14 @@ export function TestRunnerDialog({
         const updatedResults: TestResult[] = prev.map((r, index) => {
           // First try to find by UUID in results
           let apiResult = result.results?.find(
-            (res) => res.test_uuid === r.test.uuid
+            (res) => res.test_uuid === r.test.uuid,
           );
 
           // If no UUID match, try to find by test name (check both name and test_name)
           if (!apiResult) {
             apiResult = result.results?.find(
-              (res) => res.test_name === r.test.name || res.name === r.test.name
+              (res) =>
+                res.test_name === r.test.name || res.name === r.test.name,
             );
           }
 
@@ -319,9 +326,12 @@ export function TestRunnerDialog({
               chatHistory: apiResult.chat_history,
               output: apiResult.output ?? undefined,
               testCase: apiResult.test_case ?? undefined,
+              reasoning: apiResult.reasoning,
               evaluation:
                 testStatus !== "running"
-                  ? apiResult.evaluation ?? { passed: testStatus === "passed" }
+                  ? (apiResult.evaluation ?? {
+                      passed: testStatus === "passed",
+                    })
                   : undefined,
               error: apiResult.error,
             };
@@ -353,7 +363,7 @@ export function TestRunnerDialog({
           result.status,
           apiResults,
           result.passed,
-          result.failed
+          result.failed,
         );
       }
 
@@ -376,8 +386,8 @@ export function TestRunnerDialog({
             prev.map((r) =>
               r.status === "pending" || r.status === "running"
                 ? { ...r, status: "failed", error: result.error }
-                : r
-            )
+                : r,
+            ),
           );
         }
       }
@@ -431,7 +441,7 @@ export function TestRunnerDialog({
           body: JSON.stringify({
             test_uuids: testUuids,
           }),
-        }
+        },
       );
 
       if (response.status === 401) {
@@ -467,7 +477,7 @@ export function TestRunnerDialog({
           status: "failed",
           error:
             error instanceof Error ? error.message : "Failed to start test run",
-        }))
+        })),
       );
       setIsRunning(false);
     }
@@ -482,8 +492,8 @@ export function TestRunnerDialog({
       prev.map((r) =>
         r.test.uuid === testUuid
           ? { ...r, status: "running", error: undefined }
-          : r
-      )
+          : r,
+      ),
     );
 
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -496,8 +506,8 @@ export function TestRunnerDialog({
                 status: "failed",
                 error: "BACKEND_URL environment variable is not set",
               }
-            : r
-        )
+            : r,
+        ),
       );
       return;
     }
@@ -517,7 +527,7 @@ export function TestRunnerDialog({
           body: JSON.stringify({
             test_uuids: [testUuid],
           }),
-        }
+        },
       );
 
       if (response.status === 401) {
@@ -543,7 +553,7 @@ export function TestRunnerDialog({
                 "ngrok-skip-browser-warning": "true",
                 Authorization: `Bearer ${backendAccessToken}`,
               },
-            }
+            },
           );
 
           if (pollResponse.status === 401) {
@@ -563,7 +573,7 @@ export function TestRunnerDialog({
             pollResult.status === "failed"
           ) {
             const apiResult = pollResult.results?.find(
-              (res) => res.test_uuid === testUuid
+              (res) => res.test_uuid === testUuid,
             );
             if (apiResult) {
               setTestResults((prev) =>
@@ -577,16 +587,16 @@ export function TestRunnerDialog({
                         evaluation: apiResult.evaluation,
                         error: apiResult.error,
                       }
-                    : r
-                )
+                    : r,
+                ),
               );
             } else if (pollResult.error) {
               setTestResults((prev) =>
                 prev.map((r) =>
                   r.test.uuid === testUuid
                     ? { ...r, status: "failed", error: pollResult.error }
-                    : r
-                )
+                    : r,
+                ),
               );
             }
           } else {
@@ -603,8 +613,8 @@ export function TestRunnerDialog({
                     error:
                       error instanceof Error ? error.message : "Test failed",
                   }
-                : r
-            )
+                : r,
+            ),
           );
         }
       };
@@ -618,7 +628,7 @@ export function TestRunnerDialog({
         setTimeout(pollSingleTest, POLLING_INTERVAL_MS);
       } else if (result.status === "completed" || result.status === "done") {
         const apiResult = result.results?.find(
-          (res) => res.test_uuid === testUuid
+          (res) => res.test_uuid === testUuid,
         );
         if (apiResult) {
           setTestResults((prev) =>
@@ -631,8 +641,8 @@ export function TestRunnerDialog({
                     evaluation: apiResult.evaluation,
                     error: apiResult.error,
                   }
-                : r
-            )
+                : r,
+            ),
           );
         }
       }
@@ -645,8 +655,8 @@ export function TestRunnerDialog({
                 status: "failed",
                 error: error instanceof Error ? error.message : "Test failed",
               }
-            : r
-        )
+            : r,
+        ),
       );
     }
   };
@@ -675,8 +685,8 @@ export function TestRunnerDialog({
       prev.map((r) =>
         r.status === "failed"
           ? { ...r, status: "running", error: undefined }
-          : r
-      )
+          : r,
+      ),
     );
 
     try {
@@ -695,7 +705,7 @@ export function TestRunnerDialog({
           body: JSON.stringify({
             test_uuids: testUuids,
           }),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -718,7 +728,7 @@ export function TestRunnerDialog({
           setTestResults((prev) =>
             prev.map((r) => {
               const apiResult = result.results?.find(
-                (res) => res.test_uuid === r.test.uuid
+                (res) => res.test_uuid === r.test.uuid,
               );
               if (apiResult) {
                 return {
@@ -730,7 +740,7 @@ export function TestRunnerDialog({
                 };
               }
               return r;
-            })
+            }),
           );
         }
         setIsRunning(false);
@@ -748,8 +758,8 @@ export function TestRunnerDialog({
                     ? error.message
                     : "Failed to retry tests",
               }
-            : r
-        )
+            : r,
+        ),
       );
       setIsRunning(false);
     }
@@ -758,7 +768,7 @@ export function TestRunnerDialog({
   const retryAll = async () => {
     // Reset all tests to pending
     setTestResults((prev) =>
-      prev.map((r) => ({ ...r, status: "pending", error: undefined }))
+      prev.map((r) => ({ ...r, status: "pending", error: undefined })),
     );
 
     const resetResults = testResults.map((r) => ({
@@ -769,7 +779,7 @@ export function TestRunnerDialog({
   };
 
   const selectedResult = testResults.find(
-    (r) => r.test.uuid === selectedTestUuid
+    (r) => r.test.uuid === selectedTestUuid,
   );
 
   // Debug: Log selectedResult
@@ -778,7 +788,7 @@ export function TestRunnerDialog({
       "selectedResult:",
       selectedResult
         ? { name: selectedResult.test.name, status: selectedResult.status }
-        : null
+        : null,
     );
   }, [selectedResult]);
 
@@ -798,7 +808,7 @@ export function TestRunnerDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-0 md:p-4">
-      <div className="bg-background rounded-none md:rounded-xl w-full max-w-5xl h-full md:h-[80vh] flex flex-col shadow-2xl">
+      <div className="bg-background rounded-none md:rounded-xl w-full max-w-7xl h-full md:h-[80vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-border">
           <h2 className="text-base md:text-lg font-semibold text-foreground">
@@ -854,156 +864,170 @@ export function TestRunnerDialog({
             </div>
           </div>
         ) : (
-        /* Content - Split panel */
-        <div className="flex-1 flex overflow-hidden">
-          {/* Left Panel - Test List */}
-          <div
-            className={`w-full md:w-80 border-r border-border flex flex-col overflow-hidden ${
-              selectedTestUuid ? "hidden md:flex" : "flex"
-            }`}
-          >
-            <div className="flex-1 overflow-y-auto">
-              {/* Failed Tests - Always shown first */}
-              {failedTests.length > 0 && (
-                <div className="p-4">
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                    Failed ({failedTests.length})
-                  </h3>
-                  <div className="space-y-1">
-                    {failedTests.map((result) => (
-                      <TestListItem
-                        key={result.test.uuid}
-                        result={result}
-                        isSelected={selectedTestUuid === result.test.uuid}
-                        onSelect={() => setSelectedTestUuid(result.test.uuid)}
-                      />
-                    ))}
+          /* Content - Split panel */
+          <div className="flex-1 flex overflow-hidden">
+            {/* Left Panel - Test List */}
+            <div
+              className={`w-full md:w-80 border-r border-border flex flex-col overflow-hidden ${
+                selectedTestUuid ? "hidden md:flex" : "flex"
+              }`}
+            >
+              <div className="flex-1 overflow-y-auto">
+                {/* Failed Tests - Always shown first */}
+                {failedTests.length > 0 && (
+                  <div className="p-4">
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                      Failed ({failedTests.length})
+                    </h3>
+                    <div className="space-y-1">
+                      {failedTests.map((result) => (
+                        <TestListItem
+                          key={result.test.uuid}
+                          result={result}
+                          isSelected={selectedTestUuid === result.test.uuid}
+                          onSelect={() => setSelectedTestUuid(result.test.uuid)}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Passed Tests */}
-              {passedTests.length > 0 && (
-                <div className="p-4">
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                    Passed ({passedTests.length})
-                  </h3>
-                  <div className="space-y-1">
-                    {passedTests.map((result) => (
-                      <TestListItem
-                        key={result.test.uuid}
-                        result={result}
-                        isSelected={selectedTestUuid === result.test.uuid}
-                        onSelect={() => setSelectedTestUuid(result.test.uuid)}
-                      />
-                    ))}
+                {/* Passed Tests */}
+                {passedTests.length > 0 && (
+                  <div className="p-4">
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                      Passed ({passedTests.length})
+                    </h3>
+                    <div className="space-y-1">
+                      {passedTests.map((result) => (
+                        <TestListItem
+                          key={result.test.uuid}
+                          result={result}
+                          isSelected={selectedTestUuid === result.test.uuid}
+                          onSelect={() => setSelectedTestUuid(result.test.uuid)}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Queued Tests */}
-              {queuedTests.length > 0 && (
-                <div className="p-4">
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-                    Queued ({queuedTests.length})
-                  </h3>
-                  <div className="space-y-1">
-                    {queuedTests.map((result) => (
-                      <TestListItem
-                        key={result.test.uuid}
-                        result={result}
-                        isSelected={selectedTestUuid === result.test.uuid}
-                        onSelect={() => setSelectedTestUuid(result.test.uuid)}
-                      />
-                    ))}
+                {/* Queued Tests */}
+                {queuedTests.length > 0 && (
+                  <div className="p-4">
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                      Queued ({queuedTests.length})
+                    </h3>
+                    <div className="space-y-1">
+                      {queuedTests.map((result) => (
+                        <TestListItem
+                          key={result.test.uuid}
+                          result={result}
+                          isSelected={selectedTestUuid === result.test.uuid}
+                          onSelect={() => setSelectedTestUuid(result.test.uuid)}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Running Tests */}
-              {runningTests.length > 0 && (
-                <div className="p-4">
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>
-                    Running ({runningTests.length})
-                  </h3>
-                  <div className="space-y-1">
-                    {runningTests.map((result) => (
-                      <TestListItem
-                        key={result.test.uuid}
-                        result={result}
-                        isSelected={selectedTestUuid === result.test.uuid}
-                        onSelect={() => setSelectedTestUuid(result.test.uuid)}
-                      />
-                    ))}
+                {/* Running Tests */}
+                {runningTests.length > 0 && (
+                  <div className="p-4">
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>
+                      Running ({runningTests.length})
+                    </h3>
+                    <div className="space-y-1">
+                      {runningTests.map((result) => (
+                        <TestListItem
+                          key={result.test.uuid}
+                          result={result}
+                          isSelected={selectedTestUuid === result.test.uuid}
+                          onSelect={() => setSelectedTestUuid(result.test.uuid)}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Pending Tests */}
-              {pendingTests.length > 0 && (
-                <div className="p-4">
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-                    Pending ({pendingTests.length})
-                  </h3>
-                  <div className="space-y-1">
-                    {pendingTests.map((result) => (
-                      <TestListItem
-                        key={result.test.uuid}
-                        result={result}
-                        isSelected={selectedTestUuid === result.test.uuid}
-                        onSelect={() => setSelectedTestUuid(result.test.uuid)}
-                      />
-                    ))}
+                {/* Pending Tests */}
+                {pendingTests.length > 0 && (
+                  <div className="p-4">
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                      Pending ({pendingTests.length})
+                    </h3>
+                    <div className="space-y-1">
+                      {pendingTests.map((result) => (
+                        <TestListItem
+                          key={result.test.uuid}
+                          result={result}
+                          isSelected={selectedTestUuid === result.test.uuid}
+                          onSelect={() => setSelectedTestUuid(result.test.uuid)}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
+              </div>
+            </div>
+
+            {/* Middle Panel - Conversation History */}
+            <div
+              className={`flex-1 ${
+                selectedTestUuid ? "flex" : "hidden md:flex"
+              } flex-col overflow-hidden`}
+            >
+              {selectedResult ? (
+                <>
+                  {/* Mobile Back Button */}
+                  <div className="md:hidden px-4 py-3 border-b border-border flex-shrink-0">
+                    <button
+                      onClick={() => setSelectedTestUuid(null)}
+                      className="flex items-center gap-2 text-sm text-foreground hover:text-muted-foreground transition-colors"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M15 19l-7-7 7-7"
+                        />
+                      </svg>
+                      Back to tests
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto">
+                    <LocalTestDetailView result={selectedResult} />
+                  </div>
+                </>
+              ) : (
+                <EmptyStateView message="Select a test to view details" />
               )}
             </div>
-          </div>
 
-          {/* Right Panel - Test Details */}
-          <div
-            className={`flex-1 ${
-              selectedTestUuid ? "flex" : "hidden md:flex"
-            } flex-col overflow-hidden`}
-          >
-            {selectedResult ? (
-              <>
-                {/* Mobile Back Button */}
-                <div className="md:hidden px-4 py-3 border-b border-border flex-shrink-0">
-                  <button
-                    onClick={() => setSelectedTestUuid(null)}
-                    className="flex items-center gap-2 text-sm text-foreground hover:text-muted-foreground transition-colors"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M15 19l-7-7 7-7"
-                      />
-                    </svg>
-                    Back to tests
-                  </button>
+            {/* Right Panel - Evaluation Criteria (only after test completes) */}
+            {selectedResult &&
+              (selectedResult.status === "passed" ||
+                selectedResult.status === "failed") && (
+                <div className="hidden md:flex w-72 border-l border-border flex-col overflow-hidden">
+                  <div className="flex-1 overflow-y-auto">
+                    <EvaluationCriteriaPanel
+                      evaluation={selectedResult.testCase?.evaluation}
+                      testType={selectedResult.testCase?.evaluation?.type}
+                    />
+                  </div>
                 </div>
-                <div className="flex-1 overflow-y-auto">
-                  <LocalTestDetailView result={selectedResult} />
-                </div>
-              </>
-            ) : (
-              <EmptyStateView message="Select a test to view details" />
-            )}
+              )}
           </div>
-        </div>
         )}
       </div>
     </div>
@@ -1067,7 +1091,7 @@ function LocalTestDetailView({ result }: { result: TestResult }) {
       <div className="flex items-center justify-center h-full">
         <div className="flex items-center gap-3">
           <SpinnerIcon className="w-5 h-5 animate-spin text-muted-foreground" />
-          <p className="text-muted-foreground">Running test...</p>
+          <p className="text-muted-foreground">Running test</p>
         </div>
       </div>
     );
@@ -1091,10 +1115,13 @@ function LocalTestDetailView({ result }: { result: TestResult }) {
                 d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
               />
             </svg>
-            <span className="font-medium text-red-500">Something went wrong</span>
+            <span className="font-medium text-red-500">
+              Something went wrong
+            </span>
           </div>
           <p className="text-sm text-red-400">
-            We&apos;re looking into it. Please reach out to us if this issue persists.
+            We&apos;re looking into it. Please reach out to us if this issue
+            persists.
           </p>
         </div>
       </div>
@@ -1107,6 +1134,7 @@ function LocalTestDetailView({ result }: { result: TestResult }) {
       history={result.testCase?.history || []}
       output={result.output}
       passed={result.evaluation?.passed ?? false}
+      reasoning={result.reasoning}
     />
   );
 }

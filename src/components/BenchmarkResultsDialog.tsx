@@ -9,6 +9,7 @@ import {
   SpinnerIcon,
   TestDetailView,
   EmptyStateView,
+  EvaluationCriteriaPanel,
 } from "./test-results/shared";
 import { StatusBadge } from "@/components/ui";
 import { LeaderboardBarChart, getColorMap } from "./charts/LeaderboardBarChart";
@@ -19,6 +20,7 @@ import { useHideFloatingButton } from "@/components/AppLayout";
 type BenchmarkTestResult = {
   name?: string;
   passed: boolean | null; // null means still running
+  reasoning?: string;
   output?: TestCaseOutput;
   test_case?: TestCaseData;
 };
@@ -78,11 +80,11 @@ export function BenchmarkResultsDialog({
   useHideFloatingButton(isOpen);
 
   const [activeTab, setActiveTab] = useState<"leaderboard" | "outputs">(
-    "outputs"
+    "outputs",
   );
   // Track which providers are expanded
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   // Track selected test: { model, testIndex }
   const [selectedTest, setSelectedTest] = useState<{
@@ -169,7 +171,7 @@ export function BenchmarkResultsDialog({
             accept: "application/json",
             "ngrok-skip-browser-warning": "true",
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -190,7 +192,7 @@ export function BenchmarkResultsDialog({
           setExpandedProviders((prev) => {
             if (prev.size === 0) {
               const firstWithResults = result.model_results!.find(
-                (m) => m.test_results && m.test_results.length > 0
+                (m) => m.test_results && m.test_results.length > 0,
               );
               if (firstWithResults) {
                 return new Set([firstWithResults.model]);
@@ -264,7 +266,7 @@ export function BenchmarkResultsDialog({
             test_uuids: testUuids,
             models: models,
           }),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -290,7 +292,7 @@ export function BenchmarkResultsDialog({
       console.error("Error starting benchmark:", err);
       setIsInitialLoading(false);
       setError(
-        err instanceof Error ? err.message : "Failed to start benchmark"
+        err instanceof Error ? err.message : "Failed to start benchmark",
       );
     }
   };
@@ -315,7 +317,7 @@ export function BenchmarkResultsDialog({
   const getSelectedTestResult = (): BenchmarkTestResult | null => {
     if (!selectedTest) return null;
     const modelResult = modelResults.find(
-      (m) => m.model === selectedTest.model
+      (m) => m.model === selectedTest.model,
     );
     if (!modelResult?.test_results) return null;
     return modelResult.test_results[selectedTest.testIndex] || null;
@@ -369,12 +371,12 @@ export function BenchmarkResultsDialog({
 
   // Check if we have any results to show
   const hasAnyResults = modelResults.some(
-    (m) => m.test_results && m.test_results.length > 0
+    (m) => m.test_results && m.test_results.length > 0,
   );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50">
-      <div className="bg-background rounded-none md:rounded-xl w-full max-w-5xl h-full md:h-[80vh] flex flex-col shadow-2xl">
+      <div className="bg-background rounded-none md:rounded-xl w-full max-w-7xl h-full md:h-[80vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
@@ -445,7 +447,9 @@ export function BenchmarkResultsDialog({
                     d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
                   />
                 </svg>
-                <span className="font-medium text-red-500">Something went wrong</span>
+                <span className="font-medium text-red-500">
+                  Something went wrong
+                </span>
               </div>
               <p className="text-sm text-red-400 mb-4">
                 We&apos;re looking into it. Please reach out to us if this issue
@@ -626,7 +630,7 @@ export function BenchmarkResultsDialog({
                           <div className="flex items-center gap-3">
                             <SpinnerIcon className="w-5 h-5 animate-spin text-muted-foreground" />
                             <p className="text-muted-foreground">
-                              Running test...
+                              Running test
                             </p>
                           </div>
                         </div>
@@ -635,6 +639,7 @@ export function BenchmarkResultsDialog({
                           history={selectedTestResult.test_case?.history || []}
                           output={selectedTestResult.output}
                           passed={selectedTestResult.passed}
+                          reasoning={selectedTestResult.reasoning}
                         />
                       )
                     ) : (
@@ -642,6 +647,17 @@ export function BenchmarkResultsDialog({
                     )}
                   </div>
                 </div>
+
+                {/* Right Panel - Evaluation Criteria */}
+                {selectedTestResult && selectedTestResult.passed !== null && (
+                  <div className="hidden md:flex w-72 border-l border-border flex-col overflow-hidden">
+                    <div className="flex-1 overflow-y-auto">
+                      <EvaluationCriteriaPanel
+                        evaluation={selectedTestResult.test_case?.evaluation}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -731,7 +747,7 @@ function ProviderSection({
             const expectedCount = Math.max(
               totalTests,
               testNames.length,
-              resultsCount
+              resultsCount,
             );
 
             if (expectedCount === 0 && !hasResults) {
@@ -764,8 +780,8 @@ function ProviderSection({
                     ? testResult.passed === null
                       ? "running"
                       : testResult.passed
-                      ? "passed"
-                      : "failed"
+                        ? "passed"
+                        : "failed"
                     : "running";
 
                   // Only make clickable if we have a result
