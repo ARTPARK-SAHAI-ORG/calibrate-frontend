@@ -1,4 +1,5 @@
 export { AgentTabContent } from "./AgentTabContent";
+export { AgentConnectionTabContent } from "./AgentConnectionTabContent";
 export type { LLMModel } from "./AgentTabContent";
 export type { LLMProvider } from "./constants/providers";
 

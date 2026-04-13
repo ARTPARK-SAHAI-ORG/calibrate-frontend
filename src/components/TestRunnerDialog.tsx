@@ -98,6 +98,10 @@ type TestRunnerDialogProps = {
     passed?: number | null,
     failed?: number | null,
   ) => void; // Called when run status changes (for coordinated polling)
+  runAllLinked?: boolean; // When true, omit test_uuids from run request (backend runs all linked tests)
+  // Agent connection props
+  agentType?: "agent" | "connection";
+  connectionVerified?: boolean;
 };
 
 export function TestRunnerDialog({
@@ -110,6 +114,9 @@ export function TestRunnerDialog({
   onRunCreated,
   initialRunStatus,
   onStatusUpdate,
+  runAllLinked,
+  agentType,
+  connectionVerified,
 }: TestRunnerDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
@@ -123,6 +130,13 @@ export function TestRunnerDialog({
   >("queued");
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Verification state for agent connections
+  const [verificationStep, setVerificationStep] = useState<
+    "idle" | "verifying" | "failed"
+  >("idle");
+  const [verificationError, setVerificationError] = useState<string | null>(
+    null
+  );
 
   // Debug: Log when selectedTestUuid changes
   useEffect(() => {
@@ -195,6 +209,8 @@ export function TestRunnerDialog({
 
     setSelectedTestUuid(null);
     setCurrentTaskId(null);
+    setVerificationStep("idle");
+    setVerificationError(null);
     const initialResults: TestResult[] = tests.map((test) => ({
       test,
       status: "pending",
@@ -202,7 +218,11 @@ export function TestRunnerDialog({
     setTestResults(initialResults);
 
     setTimeout(() => {
-      runAllTests(initialResults);
+      if (agentType === "connection" && !connectionVerified) {
+        runWithVerification(initialResults);
+      } else {
+        runAllTests(initialResults);
+      }
     }, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, taskId, tests]);
@@ -403,6 +423,51 @@ export function TestRunnerDialog({
     }
   };
 
+  const runWithVerification = async (initialResults: TestResult[]) => {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl) return;
+
+    setVerificationStep("verifying");
+    try {
+      const response = await fetch(
+        `${backendUrl}/agents/${agentUuid}/verify/connection`,
+        {
+          method: "POST",
+          headers: {
+            accept: "application/json",
+            "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
+          },
+        }
+      );
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("Verification request failed");
+      }
+
+      const result = await response.json();
+      if (result.connection_verified) {
+        setVerificationStep("idle");
+        runAllTests(initialResults);
+      } else {
+        setVerificationStep("failed");
+        setVerificationError(
+          result.connection_verified_error || "Connection verification failed"
+        );
+      }
+    } catch (err) {
+      setVerificationStep("failed");
+      setVerificationError(
+        err instanceof Error ? err.message : "Connection verification failed"
+      );
+    }
+  };
+
   const runAllTests = async (initialResults: TestResult[]) => {
     setIsRunning(true);
 
@@ -424,10 +489,8 @@ export function TestRunnerDialog({
     setTestResults((prev) => prev.map((r) => ({ ...r, status: "queued" })));
 
     try {
-      // Collect all test UUIDs
       const testUuids = initialResults.map((r) => r.test.uuid);
 
-      // Make batch API call
       const response = await fetch(
         `${backendUrl}/agent-tests/agent/${agentUuid}/run`,
         {
@@ -438,10 +501,10 @@ export function TestRunnerDialog({
             "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
-          body: JSON.stringify({
-            test_uuids: testUuids,
-          }),
-        },
+          body: JSON.stringify(
+            runAllLinked ? {} : { test_uuids: testUuids }
+          ),
+        }
       );
 
       if (response.status === 401) {
@@ -808,7 +871,7 @@ export function TestRunnerDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-0 md:p-4">
-      <div className="bg-background rounded-none md:rounded-xl w-full max-w-7xl h-full md:h-[80vh] flex flex-col shadow-2xl">
+      <div className="bg-background rounded-none md:rounded-xl w-full max-w-7xl h-full md:h-[85vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-border">
           <h2 className="text-base md:text-lg font-semibold text-foreground">
@@ -835,8 +898,68 @@ export function TestRunnerDialog({
           </div>
         </div>
 
-        {/* Overall Error State - replaces split panel */}
-        {isOverallError ? (
+        {/* Verification state - replaces split panel while verifying/failed */}
+        {(verificationStep === "verifying" || verificationStep === "failed") ? (
+          <div className="flex-1 flex items-center justify-center p-6">
+            {verificationStep === "verifying" ? (
+              <div className="text-center space-y-3">
+                <svg
+                  className="w-6 h-6 animate-spin text-muted-foreground mx-auto"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                <p className="text-sm text-muted-foreground">
+                  Verifying agent connection…
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Checking format compatibility before running tests
+                </p>
+              </div>
+            ) : (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-6 max-w-md text-center space-y-3">
+                <div className="flex items-center justify-center gap-2">
+                  <svg
+                    className="w-5 h-5 text-red-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+                    />
+                  </svg>
+                  <span className="font-medium text-red-500">
+                    Connection verification failed
+                  </span>
+                </div>
+                {verificationError && (
+                  <p className="text-sm text-red-400">{verificationError}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Fix the issue on the agent&apos;s Connection tab and try again.
+                </p>
+              </div>
+            )}
+          </div>
+        ) : /* Overall Error State - replaces split panel */
+        isOverallError ? (
           <div className="flex-1 flex items-center justify-center p-6">
             <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-6 max-w-md text-center">
               <div className="flex items-center justify-center gap-2 mb-3">

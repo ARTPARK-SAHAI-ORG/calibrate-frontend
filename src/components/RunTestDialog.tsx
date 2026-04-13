@@ -116,35 +116,37 @@ export function RunTestDialog({
           />
 
           {/* Attach checkbox */}
-          <div className="flex items-center gap-2 md:gap-3">
-            <button
-              onClick={() => setAttachToAgent(!attachToAgent)}
-              className={`w-5 h-5 md:w-6 md:h-6 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
-                attachToAgent
-                  ? "bg-foreground border-foreground"
-                  : "border-muted-foreground hover:border-foreground"
-              }`}
-            >
-              {attachToAgent && (
-                <svg
-                  className="w-3 h-3 md:w-4 md:h-4 text-background"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={3}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M4.5 12.75l6 6 9-13.5"
-                  />
-                </svg>
-              )}
-            </button>
-            <span className="text-xs md:text-sm text-foreground">
-              Attach this test to the agent config
-            </span>
-          </div>
+          {selectedAgent && (
+            <div className="flex items-center gap-2 md:gap-3">
+              <button
+                onClick={() => setAttachToAgent(!attachToAgent)}
+                className={`w-5 h-5 md:w-6 md:h-6 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
+                  attachToAgent
+                    ? "bg-foreground border-foreground"
+                    : "border-muted-foreground hover:border-foreground"
+                }`}
+              >
+                {attachToAgent && (
+                  <svg
+                    className="w-3 h-3 md:w-4 md:h-4 text-background"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={3}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M4.5 12.75l6 6 9-13.5"
+                    />
+                  </svg>
+                )}
+              </button>
+              <span className="text-xs md:text-sm text-foreground">
+                Attach this test to the agent config
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

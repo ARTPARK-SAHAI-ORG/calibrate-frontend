@@ -323,6 +323,7 @@ export default function SimulationDetailPage() {
           setSelectedAgent({
             uuid: data.agent.uuid,
             name: data.agent.name,
+            type: (data.agent.config?.agent_url !== undefined ? "connection" : "agent") as "agent" | "connection",
           });
         }
 
@@ -606,7 +607,7 @@ export default function SimulationDetailPage() {
 
         {/* Dropdown Menu */}
         {launchDropdownOpen && (
-          <div className="absolute right-0 top-full mt-2 bg-background border border-border rounded-xl shadow-xl z-50 overflow-hidden min-w-[180px]">
+          <div className="absolute right-0 top-full mt-2 bg-background border border-border rounded-xl shadow-xl z-50 min-w-[180px]">
             <button
               onClick={() => handleLaunch("text")}
               disabled={isLaunching}
@@ -627,26 +628,33 @@ export default function SimulationDetailPage() {
               </svg>
               Text Simulation
             </button>
-            <button
-              onClick={() => handleLaunch("voice")}
-              disabled={isLaunching}
-              className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}
+            <div className="relative group">
+              <button
+                onClick={() => handleLaunch("voice")}
+                disabled={isLaunching || selectedAgent?.type === "connection"}
+                className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-3 rounded-b-xl"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
-                />
-              </svg>
-              Voice Simulation
-            </button>
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
+                  />
+                </svg>
+                Voice Simulation
+              </button>
+              {selectedAgent?.type === "connection" && (
+                <div className="absolute left-0 top-full mt-1 w-64 px-3 py-2 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[60]">
+                  Agent connections don&apos;t support voice simulations yet
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -757,6 +765,7 @@ export default function SimulationDetailPage() {
                 isConfigured={isConfigured}
                 isCreating={isCreating}
                 onCreateClick={handleCreate}
+                isAgentConnection={selectedAgent?.type === "connection"}
               />
             )}
 

@@ -9,6 +9,7 @@ import { useSidebarState } from "@/lib/sidebar";
 // Map tab IDs to display names for page title
 const tabDisplayNames: Record<string, string> = {
   agent: "Agent",
+  connection: "Connection",
   tools: "Tools",
   "data-extraction": "Data Extraction",
   tests: "Tests",

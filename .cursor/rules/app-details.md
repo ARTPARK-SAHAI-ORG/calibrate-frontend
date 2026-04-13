@@ -71,13 +71,16 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 
 **What you can do:**
 
-- **Create agents** with a name and default configuration
+- **Create agents** — two types: **Build** (`type: "agent"`) where the platform configures STT/TTS/LLM, or **Connect** (`type: "connection"`) where you provide an external agent URL. The `type` field is `"agent" | "connection"` throughout the codebase (never `"calibrate"`).
+  - Build agents get default STT/TTS/LLM config; Connection agents get `agent_url`, `agent_headers`, and connection verification fields
 - **View all agents** in a searchable, sortable list (sorted by last updated)
 - **Duplicate agents** - clone existing agent configurations
 - **Delete agents**
 - **Right-click or Cmd/Ctrl+click** any agent row to open in a new browser tab (native browser support)
 
-**Agent Detail Page** (`/agents/[uuid]`) has 5 tabs:
+**Agent Detail Page** (`/agents/[uuid]`) — tabs vary by agent type:
+
+Build agents (`type: "agent"`) have 5 tabs:
 
 | Tab                 | Purpose                                                                          |
 | ------------------- | -------------------------------------------------------------------------------- |
@@ -86,6 +89,26 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 | **Data Extraction** | Define fields to extract from conversations (name, type, description, required)  |
 | **Tests**           | Link test cases to agent, run tests, view past runs with results, compare models |
 | **Settings**        | Toggle "Agent speaks first" behavior, set max assistant turns before call ends   |
+
+Connection agents (`type: "connection"`) have 2 tabs:
+
+| Tab            | Purpose                                                                          |
+| -------------- | -------------------------------------------------------------------------------- |
+| **Connection** | Configure agent URL, headers, verify connection, view expected request/response format |
+| **Tests**      | Link test cases to agent, run tests, view past runs with results, compare models |
+
+**Connection Tab — Verification Logic** (`AgentConnectionTabContent.tsx`):
+
+The "Check connection" button uses **two different endpoints** depending on whether the user has unsaved changes:
+
+- **Unsaved changes** (current `agentUrl`/`agentHeaders` differ from `connectionConfig.agent_url`/`connectionConfig.agent_headers`): Calls `POST /agents/verify-connection` (pre-save, no auth) with `{ agent_url, agent_headers }` in the body. This tests the connection without requiring a save first.
+- **No unsaved changes** (form matches saved config): Calls `POST /agents/{uuid}/verify-connection` (post-save, requires auth) with an empty body `{}`. The server reads URL/headers from the saved agent config.
+
+The basic connection check does not send a `model` field. The same post-save endpoint (`POST /agents/{uuid}/verify-connection`) is also used for per-model benchmark verification by passing `{ "model": "openai/gpt-5.4" }` in the body — there is no separate benchmark verification endpoint. The response schema for all verify-connection calls is `{ success: boolean, error: string | null, sample_response: object | null }`. The frontend maps `success` → `connection_verified` and `error` → `connection_verified_error` in the local `connectionConfig` state. When verification fails and `sample_response` is present (e.g., the agent returned JSON in an unexpected format), it is displayed below the error message in a scrollable `<pre>` block labeled "Your agent responded with:" so the user can see exactly what their agent returned and fix it.
+
+**Save response updates verification status**: The `PUT /agents/{uuid}` response returns the full agent including `config.connection_verified`, `config.connection_verified_at`, `config.connection_verified_error`, and `config.benchmark_models_verified`. After a successful save of a connection agent, `AgentDetail.tsx` parses this response and updates `connectionConfig` state with these fields. A `useEffect` in `AgentConnectionTabContent` watches `connectionConfig.connection_verified` and `connectionConfig.connection_verified_error` and syncs the local `verifyStatus` display state accordingly, so the UI immediately reflects any backend-driven reset (e.g., URL/headers changed → backend sets `connection_verified: false` → UI shows "Not verified").
+
+**Connection check UI states**: The button and status pill share a row (`flex items-center justify-between`). During verification, only the button shows a loading indicator (inline spinner + "Checking…" text). The status pill area does not show a separate spinner — it only renders for terminal states (verified, failed, unverified). This avoids redundant loading indicators.
 
 **Tools Tab** (`ToolsTabContent.tsx`):
 
@@ -214,7 +237,7 @@ Provider website links (external link icons) are shown only on the new evaluatio
      - When dialog closes, parent resumes polling for that run if still pending
   4. The "Running" badge with spinner is shown until the run completes
   5. Clicking on an in-progress run opens the dialog with the correct `taskId` for real-time polling
-- **Actions**: Add test (button in tests table header), Run all tests (header action button, max 20 tests), Run single test (row button), Compare models (benchmark)
+- **Actions**: Add test (button in tests table header), Run all tests (header action button, max 20 tests — sends empty body so backend runs all linked tests), Run single test (row button — sends `test_uuids: [uuid]`), Compare models (benchmark — sends only `models`, no `test_uuids`)
 - **Run all tests limit**: Maximum 20 tests at a time. Shows toast error with "Contact Us" link if exceeded
 - **API**: Fetches runs from `GET /agent-tests/agent/{uuid}/runs`
 - **Run types**: `llm-unit-test` (has passed/failed counts) and `llm-benchmark` (results in model_results)
@@ -1994,7 +2017,7 @@ Key styling:
 
 - **DeleteConfirmationDialog**: Used across all list pages for delete confirmation
 - **NewSimulationDialog**: Create simulation modal on simulations list page
-- **RunTestDialog**: Run test modal on tests list page (already responsive)
+- **RunTestDialog**: Run test modal on tests list page (already responsive). The "Attach test to agent" checkbox is visible and respected for all agent types including connection agents — shown whenever an agent is selected (`selectedAgent &&`), no type-based hiding.
 - **Personas sidebar**: Full-page slide-in for add/edit personas
 - **Scenarios sidebar**: Full-page slide-in for add/edit scenarios
 - **Metrics sidebar**: Full-page slide-in for add/edit metrics
@@ -2279,6 +2302,7 @@ const getFilteredProviders = (language: LanguageOption) => {
    - **Tab content container**: Wrap all tab content in a container with `pt-2 md:pt-4` for tight spacing below the tab bar (avoids excessive whitespace)
    - **Responsive tab content patterns** (all agent detail tabs are responsive):
      - **AgentTabContent**: Two-column layouts use `flex flex-col md:grid md:grid-cols-2` to stack on mobile. System prompt textarea uses `md:flex-1 h-[350px] md:h-auto` - explicit 350px height on mobile for balanced editing space without dominating screen, `flex-1` only on desktop to fill available vertical space
+     - **AgentConnectionTabContent**: Two-column layout (`flex flex-col md:grid md:grid-cols-2`). Left column: "Support benchmarking different models" toggle, Agent URL, Headers, and conditionally a benchmark provider **dropdown** (`<select>`) wrapped in a distinct card (`border border-border rounded-xl bg-muted/20 p-3 md:p-4`) to visually separate it from the URL/headers section. The dropdown defaults to `"openrouter"` (no empty placeholder option) and includes 11 providers: OpenRouter (all providers), OpenAI, Anthropic, Google, Meta, Mistral, DeepSeek, xAI, Cohere, Qwen, AI21. Provider values use OpenRouter slug format (e.g., `"meta-llama"`, `"mistralai"`, `"x-ai"`). Right column: Connection check + always-visible expected request/response format (the example `model` value dynamically reflects the selected provider: OpenRouter shows `openai/gpt-4.1` with provider prefix, non-OpenRouter providers show just the model name — e.g., `llama-3.1-nemotron-ultra-253b` for NVIDIA, `gpt-4.1` for OpenAI). Headers use a mobile card / desktop inline row pattern: on mobile (`md:hidden`), each header is a bordered card with the remove button absolutely positioned top-right and key/value inputs stacked; on desktop (`hidden md:flex`), key/value are side-by-side with the remove button inline. Headers initialized with `[{ key: "", value: "" }]` in `AgentDetail.tsx`. Benchmark state (`supports_benchmark`, `benchmark_provider`) stored in `connectionConfig` and persisted via the existing spread-based save (`...connectionConfig`).
      - **ToolsTabContent**: Uses `flex flex-col lg:grid lg:grid-cols-3` to stack on mobile/tablet. In-built tools panel shows first on mobile via `order-1 lg:order-2`. Uses mobile card view alongside desktop table view
      - **DataExtractionTabContent**: Uses mobile card view alongside desktop table view. Add/Edit sidebar is full-width on mobile (`w-full md:w-[40%]`)
      - **TestsTabContent**: Uses `flex flex-col lg:flex-row` to stack tests list above past runs on mobile. Past runs panel is `w-full lg:w-[400px] xl:w-[560px]` (not fixed width). Mobile card view for tests list
@@ -2307,7 +2331,7 @@ const getFilteredProviders = (language: LanguageOption) => {
    - Shows loading spinner during deletion
    - **Skip confirmation for empty items**: When deleting empty rows (e.g., in TTS/STT evaluation input), call `deleteRow()` directly instead of showing confirmation dialog
    - **Fully responsive**: Uses mobile-first sizing with `p-4` outer margin, `p-5 md:p-6` dialog padding, `h-9 md:h-10` buttons, `text-base md:text-lg` title, `gap-2 md:gap-3` between actions
-5. **Toast Notifications**: Bottom-right success toasts
+5. **Toast Notifications**: Top-right success toasts (positioned `top-16 right-6` — just below the `h-14` header, avoiding overlap with both the header and the "Talk to Us" FAB at bottom-right)
    - Auto-dismiss after 3 seconds
    - Manual dismiss button
    - Used after successful save operations
@@ -2337,10 +2361,12 @@ const getFilteredProviders = (language: LanguageOption) => {
    - Used in: AgentTabContent (settings), BenchmarkDialog (model comparison)
 10. **Benchmark Dialog**: `BenchmarkDialog` from `@/components/BenchmarkDialog`
     - Model selection dialog for running benchmarks comparing multiple LLM models
-    - Props: `isOpen`, `onClose`, `agentUuid`, `agentName`, `tests`, `onBenchmarkCreated?`
+    - Props: `isOpen`, `onClose`, `agentUuid`, `agentName`, `tests`, `onBenchmarkCreated?`, `agentType?`, `benchmarkModelsVerified?`, `benchmarkProvider?`
     - Allows selecting up to 5 models for comparison
     - Uses `LLMSelectorModal` for model selection with filtered available models (prevents selecting same model twice)
+    - **Provider-based model filtering**: When `benchmarkProvider` is set and is not `"openrouter"`, the LLM selector only shows models from that provider (filtered by `model.id.startsWith(providerSlug + "/")` matching OpenRouter's `provider/model-name` ID format). When `benchmarkProvider` is `"openrouter"` or empty, all providers are shown. The `benchmarkProvider` prop flows from `connectionConfig.benchmark_provider` in `AgentDetail` → `TestsTabContent` → `BenchmarkDialog`.
     - Opens `BenchmarkResultsDialog` when "Run comparison" is clicked
+    - **Connection agent verification**: For `agentType === "connection"`, each model shows an inline verification badge (not checked / verifying / verified / failed). Clicking "Run comparison" triggers verification for unverified models in-place — badges update with spinners then results, all within the same dialog (no separate verification screen). Failed models show a retry icon button and a chevron toggle to expand error details (error message + sample response JSON in a red-tinted container below the row); the expand toggle and error details are only shown for failed models — verified models never display sample response or expand UI. On successful retry, `expandedModelError` and `modelSampleResponses` are cleared for that model so stale failure data doesn't persist. The "Run comparison" button is disabled while any model is verifying. Only proceeds to results when all selected models are verified. Uses the same `POST /agents/{uuid}/verify-connection` endpoint with `{ "model": "..." }` in the body. Response uses `result.success` (not `result.verified`) consistent with the connection check response schema.
     - **Theme-aware**: Uses `bg-background` for proper light/dark mode support
 11. **Tool Picker**: `ToolPicker` from `@/components/ToolPicker`
     - Props: `availableTools`, `isLoading`, `onSelectInbuiltTool`, `onSelectCustomTool`, `selectedToolIds?`
@@ -2369,6 +2395,8 @@ const getFilteredProviders = (language: LanguageOption) => {
 15. **View Mode Dialogs**: `TestRunnerDialog` and `BenchmarkResultsDialog` support dual modes:
     - **Run mode** (default): Opens dialog and starts a new run/benchmark
     - **View mode**: Pass `taskId` prop to view existing run results without starting a new run
+    - **Test run API** (`POST /agent-tests/agent/{uuid}/run`): `test_uuids` is optional. When omitted (empty body `{}`), the backend runs all tests linked to the agent. When provided, only those specific tests are run. `TestRunnerDialog` has a `runAllLinked?: boolean` prop — when true, sends `{}` (used by "Run all tests" on the agent page); when false/undefined, sends `{ test_uuids: [...] }` (used for single test runs and retries). Single-test retry and retry-all-failed always send explicit `test_uuids`.
+    - **Benchmark API** (`POST /agent-tests/agent/{uuid}/benchmark`): Body only contains `{ models: [...] }` — `test_uuids` is not sent. Benchmarks always run all tests linked to the agent. Returns 400 if the agent has no linked tests.
     - **TestRunnerDialog behavior based on `initialRunStatus`**:
       - **Completed runs** (`done`/`completed`): Clears test results initially, fetches fresh from API once (no polling), displays actual pass/fail status
       - **In-progress runs** (`pending`/`queued`/`in_progress`): Initializes tests as "running" (yellow), polls API at `POLLING_INTERVAL_MS` until complete

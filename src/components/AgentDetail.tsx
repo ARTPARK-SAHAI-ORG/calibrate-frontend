@@ -7,6 +7,7 @@ import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import {
   AgentTabContent,
+  AgentConnectionTabContent,
   ToolsTabContent,
   DataExtractionTabContent,
   TestsTabContent,
@@ -36,6 +37,7 @@ type AgentDetailProps = {
 type AgentData = {
   uuid: string;
   name: string;
+  type?: "agent" | "connection";
   config: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -49,15 +51,16 @@ type ToolData = {
   updated_at: string;
 };
 
-type TabType = "agent" | "tools" | "data-extraction" | "tests" | "settings";
+type TabType = "agent" | "connection" | "tools" | "data-extraction" | "tests" | "settings";
 
-const validTabs: TabType[] = [
+const calibrateTabs: TabType[] = [
   "agent",
   "tools",
   "data-extraction",
   "tests",
   "settings",
 ];
+const connectionTabs: TabType[] = ["connection", "tests"];
 
 export function AgentDetail({
   agentUuid,
@@ -67,10 +70,10 @@ export function AgentDetail({
   const router = useRouter();
   const backendAccessToken = useAccessToken();
 
-  // Get initial tab from URL or default to "agent"
+  // Get initial tab from URL or default based on agent type
   const getInitialTab = (): TabType => {
     const tabParam = searchParams.get("tab");
-    if (tabParam && validTabs.includes(tabParam as TabType)) {
+    if (tabParam && [...calibrateTabs, ...connectionTabs].includes(tabParam as TabType)) {
       return tabParam as TabType;
     }
     return "agent";
@@ -139,6 +142,15 @@ export function AgentDetail({
     string | null
   >(null);
 
+  // Agent connection state
+  const [connectionUrl, setConnectionUrl] = useState("");
+  const [connectionHeaders, setConnectionHeaders] = useState<
+    Array<{ key: string; value: string }>
+  >([{ key: "", value: "" }]);
+  const [connectionConfig, setConnectionConfig] = useState<Record<string, any>>(
+    {}
+  );
+
   // Fetch agent data
   useEffect(() => {
     const fetchAgent = async () => {
@@ -172,6 +184,32 @@ export function AgentDetail({
 
         const data: AgentData = await response.json();
         setAgent(data);
+
+        // Set initial tab based on agent type
+        const currentTab = searchParams.get("tab") as TabType | null;
+        if (data.type === "connection") {
+          if (!currentTab || !connectionTabs.includes(currentTab)) {
+            setActiveTab("connection");
+          }
+        } else {
+          if (!currentTab || !calibrateTabs.includes(currentTab)) {
+            setActiveTab("agent");
+          }
+        }
+
+        // Initialize connection fields if agent is a connection type
+        if (data.type === "connection" && data.config) {
+          setConnectionUrl(data.config.agent_url || "");
+          const headers = data.config.agent_headers || {};
+          const parsed = Object.entries(headers).map(([key, value]) => ({
+            key,
+            value: String(value),
+          }));
+          setConnectionHeaders(
+            parsed.length > 0 ? parsed : [{ key: "", value: "" }],
+          );
+          setConnectionConfig(data.config);
+        }
 
         // Initialize form fields from agent config if available
         if (data.config) {
@@ -358,6 +396,36 @@ export function AgentDetail({
           throw new Error("BACKEND_URL environment variable is not set");
         }
 
+        // Build config based on agent type
+        const configPayload =
+          agent.type === "connection"
+            ? {
+                ...connectionConfig,
+                agent_url: connectionUrl,
+                agent_headers: Object.fromEntries(
+                  connectionHeaders
+                    .filter((h) => h.key.trim())
+                    .map((h) => [h.key.trim(), h.value])
+                ),
+              }
+            : {
+                system_prompt: systemPrompt,
+                stt: { provider: sttProvider },
+                tts: { provider: ttsProvider },
+                llm: { model: selectedLLM?.id || "" },
+                settings: {
+                  agent_speaks_first: agentSpeaksFirst,
+                  max_assistant_turns: maxAssistantTurns,
+                },
+                system_tools: { end_call: endConversationEnabled },
+                data_extraction_fields: dataExtractionFields.map((field) => ({
+                  name: field.name,
+                  type: field.type,
+                  description: field.description,
+                  required: field.required,
+                })),
+              };
+
         const response = await fetch(`${backendUrl}/agents/${agentUuid}`, {
           method: "PUT",
           headers: {
@@ -368,23 +436,7 @@ export function AgentDetail({
           },
           body: JSON.stringify({
             name: agent.name,
-            config: {
-              system_prompt: systemPrompt,
-              stt: { provider: sttProvider },
-              tts: { provider: ttsProvider },
-              llm: { model: selectedLLM?.id || "" },
-              settings: {
-                agent_speaks_first: agentSpeaksFirst,
-                max_assistant_turns: maxAssistantTurns,
-              },
-              system_tools: { end_call: endConversationEnabled },
-              data_extraction_fields: dataExtractionFields.map((field) => ({
-                name: field.name,
-                type: field.type,
-                description: field.description,
-                required: field.required,
-              })),
-            },
+            config: configPayload,
           }),
         });
 
@@ -395,6 +447,22 @@ export function AgentDetail({
 
         if (!response.ok) {
           throw new Error("Failed to save agent");
+        }
+
+        const savedAgent = await response.json();
+
+        if (agent.type === "connection" && savedAgent.config) {
+          setConnectionConfig((prev) => ({
+            ...prev,
+            connection_verified:
+              savedAgent.config.connection_verified ?? false,
+            connection_verified_at:
+              savedAgent.config.connection_verified_at ?? null,
+            connection_verified_error:
+              savedAgent.config.connection_verified_error ?? null,
+            benchmark_models_verified:
+              savedAgent.config.benchmark_models_verified ?? {},
+          }));
         }
 
         // Show success toast
@@ -418,6 +486,9 @@ export function AgentDetail({
     maxAssistantTurns,
     endConversationEnabled,
     dataExtractionFields,
+    connectionUrl,
+    connectionHeaders,
+    connectionConfig,
     backendAccessToken,
   ]);
 
@@ -625,63 +696,104 @@ export function AgentDetail({
         className="hide-scrollbar flex items-center gap-3 md:gap-4 lg:gap-6 border-b border-border overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
-        <button
-          onClick={() => handleTabChange("agent")}
-          className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-            activeTab === "agent"
-              ? "text-foreground border-b-2 border-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Agent
-        </button>
-        <button
-          onClick={() => handleTabChange("tools")}
-          className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-            activeTab === "tools"
-              ? "text-foreground border-b-2 border-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Tools
-        </button>
-        <button
-          onClick={() => handleTabChange("data-extraction")}
-          className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-            activeTab === "data-extraction"
-              ? "text-foreground border-b-2 border-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Data extraction
-        </button>
-        <button
-          onClick={() => handleTabChange("tests")}
-          className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-            activeTab === "tests"
-              ? "text-foreground border-b-2 border-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Tests
-        </button>
-        {/* Settings tab button - commented out to hide the tab */}
-        <button
-          onClick={() => handleTabChange("settings")}
-          className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-            activeTab === "settings"
-              ? "text-foreground border-b-2 border-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Settings
-        </button>
+        {agent.type === "connection" ? (
+          <>
+            <button
+              onClick={() => handleTabChange("connection")}
+              className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                activeTab === "connection"
+                  ? "text-foreground border-b-2 border-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Connection
+            </button>
+            <button
+              onClick={() => handleTabChange("tests")}
+              className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                activeTab === "tests"
+                  ? "text-foreground border-b-2 border-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Tests
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => handleTabChange("agent")}
+              className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                activeTab === "agent"
+                  ? "text-foreground border-b-2 border-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Agent
+            </button>
+            <button
+              onClick={() => handleTabChange("tools")}
+              className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                activeTab === "tools"
+                  ? "text-foreground border-b-2 border-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Tools
+            </button>
+            <button
+              onClick={() => handleTabChange("data-extraction")}
+              className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                activeTab === "data-extraction"
+                  ? "text-foreground border-b-2 border-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Data extraction
+            </button>
+            <button
+              onClick={() => handleTabChange("tests")}
+              className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                activeTab === "tests"
+                  ? "text-foreground border-b-2 border-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Tests
+            </button>
+            <button
+              onClick={() => handleTabChange("settings")}
+              className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                activeTab === "settings"
+                  ? "text-foreground border-b-2 border-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Settings
+            </button>
+          </>
+        )}
       </div>
 
       {/* Tab Content Container */}
       <div className="pt-2 md:pt-4">
+        {/* Connection Tab Content */}
+        {activeTab === "connection" && agent.type === "connection" && (
+          <AgentConnectionTabContent
+            agentUuid={agentUuid}
+            agentUrl={connectionUrl}
+            onAgentUrlChange={setConnectionUrl}
+            agentHeaders={connectionHeaders}
+            onAgentHeadersChange={setConnectionHeaders}
+            connectionConfig={connectionConfig}
+            onConnectionConfigChange={setConnectionConfig}
+            onSave={() => saveRef.current()}
+            isSaving={isSaving}
+          />
+        )}
+
         {/* Agent Tab Content */}
-        {activeTab === "agent" && (
+        {activeTab === "agent" && agent.type !== "connection" && (
           <AgentTabContent
             systemPrompt={systemPrompt}
             setSystemPrompt={setSystemPrompt}
@@ -723,7 +835,26 @@ export function AgentDetail({
 
         {/* Tests Tab Content */}
         {activeTab === "tests" && (
-          <TestsTabContent agentUuid={agentUuid} agentName={agent.name} />
+          <TestsTabContent
+            agentUuid={agentUuid}
+            agentName={agent.name}
+            agentType={agent.type}
+            connectionVerified={
+              agent.type === "connection"
+                ? connectionConfig.connection_verified === true
+                : undefined
+            }
+            benchmarkModelsVerified={
+              agent.type === "connection"
+                ? connectionConfig.benchmark_models_verified
+                : undefined
+            }
+            benchmarkProvider={
+              agent.type === "connection"
+                ? connectionConfig.benchmark_provider
+                : undefined
+            }
+          />
         )}
 
         {/* Settings Tab Content - commented out to hide the tab */}
@@ -786,7 +917,7 @@ export function AgentDetail({
 
       {/* Success Toast */}
       {showSaveToast && (
-        <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
+        <div className="fixed top-16 right-6 z-50 animate-in slide-in-from-top-4 fade-in duration-300">
           <div className="flex items-center gap-3 bg-foreground text-background px-4 py-3 rounded-lg shadow-lg">
             <svg
               className="w-5 h-5 text-green-400"

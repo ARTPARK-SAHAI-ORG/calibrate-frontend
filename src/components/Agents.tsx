@@ -10,6 +10,7 @@ import { useAccessToken } from "@/hooks";
 type Agent = {
   uuid: string;
   name: string;
+  type: "agent" | "connection";
   updatedAt: string; // Formatted display date
   updatedAtRaw: string; // Original date for sorting
 };
@@ -44,7 +45,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingAgentUuid, setDeletingAgentUuid] = useState<string | null>(
-    null
+    null,
   );
 
   // Delete confirmation state
@@ -98,6 +99,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
               return {
                 uuid: agent.uuid,
                 name: agent.name || agent.agent_name || String(agent),
+                type: agent.type === "connection" ? "connection" : "agent",
                 updatedAt: formatDate(rawDate),
                 updatedAtRaw: rawDate,
               };
@@ -116,7 +118,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
   }, [backendAccessToken]);
 
   const filteredAgents = agents.filter((agent) =>
-    agent.name.toLowerCase().includes(searchQuery.toLowerCase())
+    agent.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const sortedAgents = [...filteredAgents].sort((a, b) => {
@@ -183,7 +185,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
             "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
-        }
+        },
       );
 
       if (response.status === 401) {
@@ -197,7 +199,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
 
       // Remove the agent from the list
       setAgents((prevAgents) =>
-        prevAgents.filter((agent) => agent.uuid !== agentToDelete.uuid)
+        prevAgents.filter((agent) => agent.uuid !== agentToDelete.uuid),
       );
       closeDeleteDialog();
     } catch (err) {
@@ -347,9 +349,12 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
           {/* Desktop Table View */}
           <div className="hidden md:block border border-border rounded-xl overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+            <div className="grid grid-cols-[1fr_160px_1fr_auto_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
               <div className="text-sm font-medium text-muted-foreground">
                 Name
+              </div>
+              <div className="text-sm font-medium text-muted-foreground">
+                Type
               </div>
               <div className="text-sm font-medium text-muted-foreground">
                 <button
@@ -381,7 +386,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
             {sortedAgents.map((agent) => (
               <div
                 key={agent.uuid}
-                className="grid grid-cols-[1fr_1fr_auto_auto] gap-4 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
+                className="grid grid-cols-[1fr_160px_1fr_auto_auto] gap-4 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
               >
                 {/* Name Column */}
                 <Link
@@ -397,6 +402,27 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                   <div className="text-sm font-medium text-foreground">
                     {agent.name}
                   </div>
+                </Link>
+                {/* Type Column */}
+                <Link
+                  href={`/agents/${agent.uuid}`}
+                  onClick={(e) => {
+                    if (onNavigateToAgent) {
+                      e.preventDefault();
+                      onNavigateToAgent(agent.uuid);
+                    }
+                  }}
+                  className="flex items-center px-4 py-2"
+                >
+                  <span
+                    className={`text-xs px-2 py-1 rounded-md font-medium ${
+                      agent.type === "connection"
+                        ? "bg-blue-500/10 text-blue-500"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {agent.type === "connection" ? "Connection" : "Agent"}
+                  </span>
                 </Link>
                 {/* Last Updated At Column */}
                 <Link
@@ -507,8 +533,19 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                   }}
                   className="block p-4"
                 >
-                  <div className="font-medium text-sm text-foreground mb-1">
-                    {agent.name}
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="font-medium text-sm text-foreground">
+                      {agent.name}
+                    </div>
+                    <span
+                      className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                        agent.type === "connection"
+                          ? "bg-blue-500/10 text-blue-500"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {agent.type === "connection" ? "Connection" : "Agent"}
+                    </span>
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {agent.updatedAt}
@@ -635,6 +672,7 @@ function NewAgentDialog({
   backendAccessToken?: string;
 }) {
   const [agentName, setAgentName] = useState("");
+  const [agentKind, setAgentKind] = useState<"agent" | "connection">("agent");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const maxLength = 50;
@@ -650,6 +688,33 @@ function NewAgentDialog({
         throw new Error("BACKEND_URL environment variable is not set");
       }
 
+      const body =
+        agentKind === "connection"
+          ? {
+              name: agentName.trim(),
+              type: "connection",
+              config: {
+                agent_url: "",
+                agent_headers: {},
+                connection_verified: false,
+                connection_verified_at: null,
+                connection_verified_error: null,
+                benchmark_models_verified: {},
+              },
+            }
+          : {
+              name: agentName.trim(),
+              type: "agent",
+              config: {
+                system_prompt: "You are a helpful assistant.",
+                stt: { provider: "google" },
+                tts: { provider: "google" },
+                llm: { model: "google/gemini-3-flash-preview" },
+                settings: { agent_speaks_first: false },
+                system_tools: { end_call: true },
+              },
+            };
+
       const response = await fetch(`${backendUrl}/agents`, {
         method: "POST",
         headers: {
@@ -658,17 +723,7 @@ function NewAgentDialog({
           "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
-        body: JSON.stringify({
-          name: agentName.trim(),
-          config: {
-            system_prompt: "You are a helpful assistant.",
-            stt: { provider: "google" },
-            tts: { provider: "google" },
-            llm: { model: "google/gemini-3-flash-preview" },
-            settings: { agent_speaks_first: false },
-            system_tools: { end_call: true },
-          },
-        }),
+        body: JSON.stringify(body),
       });
 
       if (response.status === 401) {
@@ -684,7 +739,7 @@ function NewAgentDialog({
       const agentUuid = data.uuid;
 
       if (agentUuid && onCreateAgent) {
-        onClose(); // Close dialog first
+        onClose();
         onCreateAgent(agentUuid);
       }
     } catch (err) {
@@ -707,17 +762,17 @@ function NewAgentDialog({
         {/* Header */}
         <div className="mb-6">
           <h2 className="text-2xl font-semibold tracking-tight mb-1">
-            Complete your agent
+            New agent
           </h2>
           <p className="text-muted-foreground text-[15px]">
-            Choose a name that reflects your agent's purpose
+            Choose a name and how you want to set up your agent
           </p>
         </div>
 
         {/* Agent Name Input */}
-        <div className="mb-6">
+        <div className="mb-5">
           <label className="block text-[13px] font-medium text-foreground mb-2">
-            Agent Name <span className="text-red-500">*</span>
+            Agent name <span className="text-red-500">*</span>
           </label>
           <div className="relative">
             <input
@@ -728,9 +783,15 @@ function NewAgentDialog({
                   setAgentName(e.target.value);
                 }
               }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && agentName.trim() && !isCreating) {
+                  handleCreate();
+                }
+              }}
               placeholder="Enter agent name"
               className="w-full h-10 px-3 pr-16 rounded-md text-[13px] border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
               maxLength={maxLength}
+              autoFocus
             />
             <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
               <span className="text-[12px] text-muted-foreground">
@@ -740,9 +801,85 @@ function NewAgentDialog({
           </div>
         </div>
 
+        {/* Agent Kind Selection */}
+        <div className="mb-5 space-y-2">
+          <label className="block text-[13px] font-medium text-foreground mb-2">
+            Setup
+          </label>
+
+          {/* Build option */}
+          <button
+            type="button"
+            onClick={() => setAgentKind("agent")}
+            className={`w-full text-left p-4 rounded-lg border transition-colors cursor-pointer ${
+              agentKind === "agent"
+                ? "border-foreground bg-muted/30"
+                : "border-border hover:border-muted-foreground"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                  agentKind === "agent"
+                    ? "border-foreground"
+                    : "border-muted-foreground"
+                }`}
+              >
+                {agentKind === "agent" && (
+                  <div className="w-2 h-2 rounded-full bg-foreground" />
+                )}
+              </div>
+              <div>
+                <div className="text-[13px] font-medium text-foreground">
+                  Build your agent in Calibrate
+                </div>
+                <div className="text-[12px] text-muted-foreground mt-0.5">
+                  Configure the LLM/STT/TTS models for your agent, set the
+                  instructions and define the tools your agent can use. All
+                  within Calibrate.
+                </div>
+              </div>
+            </div>
+          </button>
+
+          {/* Connect option */}
+          <button
+            type="button"
+            onClick={() => setAgentKind("connection")}
+            className={`w-full text-left p-4 rounded-lg border transition-colors cursor-pointer ${
+              agentKind === "connection"
+                ? "border-foreground bg-muted/30"
+                : "border-border hover:border-muted-foreground"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                  agentKind === "connection"
+                    ? "border-foreground"
+                    : "border-muted-foreground"
+                }`}
+              >
+                {agentKind === "connection" && (
+                  <div className="w-2 h-2 rounded-full bg-foreground" />
+                )}
+              </div>
+              <div>
+                <div className="text-[13px] font-medium text-foreground">
+                  Connect your existing agent
+                </div>
+                <div className="text-[12px] text-muted-foreground mt-0.5">
+                  Provide a URL for your deployed agent. Calibrate will call it
+                  directly to run evals, benchmarks and simulations.
+                </div>
+              </div>
+            </div>
+          </button>
+        </div>
+
         {/* Error Message */}
         {error && (
-          <div className="mb-6 p-3 rounded-md bg-red-500/10 border border-red-500/20">
+          <div className="mb-5 p-3 rounded-md bg-red-500/10 border border-red-500/20">
             <p className="text-[13px] text-red-500">{error}</p>
           </div>
         )}
@@ -751,22 +888,9 @@ function NewAgentDialog({
         <div className="flex items-center justify-between">
           <button
             onClick={onClose}
-            className="h-9 px-4 rounded-md text-[13px] font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors cursor-pointer flex items-center gap-2"
+            className="h-9 px-4 rounded-md text-[13px] font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
           >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15.75 19.5L8.25 12l7.5-7.5"
-              />
-            </svg>
-            Back
+            Cancel
           </button>
           <button
             onClick={handleCreate}
@@ -797,7 +921,7 @@ function NewAgentDialog({
                 Creating...
               </>
             ) : (
-              "Create Agent"
+              "Create"
             )}
           </button>
         </div>
@@ -849,7 +973,7 @@ function DuplicateAgentDialog({
           body: JSON.stringify({
             name: agentName.trim(),
           }),
-        }
+        },
       );
 
       if (response.status === 401) {
@@ -865,6 +989,7 @@ function DuplicateAgentDialog({
       const newAgent: Agent = {
         uuid: data.uuid,
         name: agentName.trim(),
+        type: originalAgent.type,
         updatedAt: formatDate(new Date().toISOString()),
         updatedAtRaw: new Date().toISOString(),
       };
@@ -878,7 +1003,7 @@ function DuplicateAgentDialog({
     } catch (err) {
       console.error("Error duplicating agent:", err);
       setError(
-        err instanceof Error ? err.message : "Failed to duplicate agent"
+        err instanceof Error ? err.message : "Failed to duplicate agent",
       );
     } finally {
       setIsDuplicating(false);

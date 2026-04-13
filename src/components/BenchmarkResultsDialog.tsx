@@ -137,7 +137,7 @@ export function BenchmarkResultsDialog({
           setIsInitialLoading(false);
           setError("BACKEND_URL environment variable is not set");
         }
-      } else if (testUuids.length > 0 && models.length > 0) {
+      } else if (models.length > 0) {
         // Start a new benchmark
         runBenchmark();
       } else {
@@ -263,7 +263,6 @@ export function BenchmarkResultsDialog({
             "ngrok-skip-browser-warning": "true",
           },
           body: JSON.stringify({
-            test_uuids: testUuids,
             models: models,
           }),
         },
@@ -376,7 +375,7 @@ export function BenchmarkResultsDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50">
-      <div className="bg-background rounded-none md:rounded-xl w-full max-w-7xl h-full md:h-[80vh] flex flex-col shadow-2xl">
+      <div className="bg-background rounded-none md:rounded-xl w-full max-w-7xl h-full md:h-[85vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
@@ -630,7 +629,7 @@ export function BenchmarkResultsDialog({
                           <div className="flex items-center gap-3">
                             <SpinnerIcon className="w-5 h-5 animate-spin text-muted-foreground" />
                             <p className="text-muted-foreground">
-                              Running test
+                              Running test...
                             </p>
                           </div>
                         </div>

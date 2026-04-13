@@ -118,11 +118,22 @@ function formatRelativeTime(dateString: string): string {
 type TestsTabContentProps = {
   agentUuid: string;
   agentName?: string;
+  agentType?: "agent" | "connection";
+  connectionVerified?: boolean;
+  benchmarkModelsVerified?: Record<
+    string,
+    { verified: boolean; verified_at: string; error: string | null }
+  >;
+  benchmarkProvider?: string;
 };
 
 export function TestsTabContent({
   agentUuid,
   agentName = "Agent",
+  agentType,
+  connectionVerified,
+  benchmarkModelsVerified,
+  benchmarkProvider,
 }: TestsTabContentProps) {
   const backendAccessToken = useAccessToken();
   // Agent tests state (tests attached to the agent)
@@ -148,6 +159,7 @@ export function TestsTabContent({
   // Test runner dialog state
   const [testRunnerOpen, setTestRunnerOpen] = useState(false);
   const [testsToRun, setTestsToRun] = useState<TestData[]>([]);
+  const [runAllLinked, setRunAllLinked] = useState(false);
 
   // Benchmark dialog state
   const [benchmarkDialogOpen, setBenchmarkDialogOpen] = useState(false);
@@ -803,6 +815,7 @@ export function TestsTabContent({
                   return;
                 }
                 setTestsToRun(agentTests);
+                setRunAllLinked(true);
                 setTestRunnerOpen(true);
               }}
               className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex items-center gap-2"
@@ -1122,6 +1135,7 @@ export function TestsTabContent({
                         <button
                           onClick={() => {
                             setTestsToRun([test]);
+                            setRunAllLinked(false);
                             setTestRunnerOpen(true);
                           }}
                           className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
@@ -1189,6 +1203,7 @@ export function TestsTabContent({
                           <button
                             onClick={() => {
                               setTestsToRun([test]);
+                              setRunAllLinked(false);
                               setTestRunnerOpen(true);
                             }}
                             className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
@@ -1376,11 +1391,15 @@ export function TestsTabContent({
         onClose={() => {
           setTestRunnerOpen(false);
           setTestsToRun([]);
+          setRunAllLinked(false);
         }}
         agentUuid={agentUuid}
         agentName={agentName}
         tests={testsToRun}
+        runAllLinked={runAllLinked}
         onRunCreated={handleTestRunCreated}
+        agentType={agentType}
+        connectionVerified={connectionVerified}
       />
 
       {/* Benchmark Dialog */}
@@ -1391,6 +1410,9 @@ export function TestsTabContent({
         agentName={agentName}
         tests={agentTests}
         onBenchmarkCreated={handleBenchmarkCreated}
+        agentType={agentType}
+        benchmarkModelsVerified={benchmarkModelsVerified}
+        benchmarkProvider={benchmarkProvider}
       />
 
       {/* View Past Test Results Dialog */}
