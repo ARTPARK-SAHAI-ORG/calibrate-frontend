@@ -9,6 +9,7 @@ import {
   SpinnerIcon,
   TestDetailView,
   EmptyStateView,
+  EvaluationCriteriaPanel,
 } from "./test-results/shared";
 import { StatusBadge } from "@/components/ui";
 import { LeaderboardBarChart, getColorMap } from "./charts/LeaderboardBarChart";
@@ -19,6 +20,7 @@ import { useHideFloatingButton } from "@/components/AppLayout";
 type BenchmarkTestResult = {
   name?: string;
   passed: boolean | null; // null means still running
+  reasoning?: string;
   output?: TestCaseOutput;
   test_case?: TestCaseData;
 };
@@ -374,7 +376,7 @@ export function BenchmarkResultsDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50">
-      <div className="bg-background rounded-none md:rounded-xl w-full max-w-5xl h-full md:h-[80vh] flex flex-col shadow-2xl">
+      <div className="bg-background rounded-none md:rounded-xl w-full max-w-7xl h-full md:h-[80vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
@@ -635,6 +637,7 @@ export function BenchmarkResultsDialog({
                           history={selectedTestResult.test_case?.history || []}
                           output={selectedTestResult.output}
                           passed={selectedTestResult.passed}
+                          reasoning={selectedTestResult.reasoning}
                         />
                       )
                     ) : (
@@ -642,6 +645,17 @@ export function BenchmarkResultsDialog({
                     )}
                   </div>
                 </div>
+
+                {/* Right Panel - Evaluation Criteria */}
+                {selectedTestResult && selectedTestResult.passed !== null && (
+                  <div className="hidden md:flex w-72 border-l border-border flex-col overflow-hidden">
+                    <div className="flex-1 overflow-y-auto">
+                      <EvaluationCriteriaPanel
+                        evaluation={selectedTestResult.test_case?.evaluation}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

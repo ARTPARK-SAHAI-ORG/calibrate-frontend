@@ -166,10 +166,12 @@ export function TestDetailView({
   history,
   output,
   passed,
+  reasoning,
 }: {
   history: TestCaseHistory[];
   output?: TestCaseOutput;
   passed: boolean;
+  reasoning?: string;
 }) {
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
@@ -268,6 +270,11 @@ export function TestDetailView({
                 </span>
                 <SmallStatusBadge passed={passed} />
               </div>
+              {reasoning && (
+                <p className="text-xs text-muted-foreground italic mb-2">
+                  {reasoning}
+                </p>
+              )}
               <div className="w-[70%] md:w-1/2">
                 <div className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-background border border-border">
                   <p className="text-sm text-foreground whitespace-pre-wrap">
@@ -293,6 +300,11 @@ export function TestDetailView({
                 </span>
                 <SmallStatusBadge passed={passed} />
               </div>
+              {reasoning && (
+                <p className="text-xs text-muted-foreground italic mb-2">
+                  {reasoning}
+                </p>
+              )}
               <div className="space-y-3">
                 {output.tool_calls.map((toolCall, index) => (
                   <div key={index} className="w-[70%] md:w-1/2">
@@ -330,6 +342,87 @@ export function EmptyStateView({ message }: { message: string }) {
         </div>
         <p className="text-muted-foreground text-sm">{message}</p>
       </div>
+    </div>
+  );
+}
+
+// Evaluation Criteria Panel Component (third column)
+export function EvaluationCriteriaPanel({
+  evaluation,
+  testType,
+}: {
+  evaluation?: TestCaseEvaluation;
+  testType?: string;
+}) {
+  const resolvedType =
+    testType || evaluation?.type || (evaluation?.tool_calls ? "tool_call" : "response");
+  const isToolCall = resolvedType === "tool_call";
+  const displayType = isToolCall ? "Tool Call" : "Next Reply Text";
+
+  return (
+    <div className="p-4 md:p-6 space-y-4">
+      <h3 className="text-sm font-semibold text-foreground">
+        Evaluation Criteria
+      </h3>
+
+      {/* Test Type */}
+      <div>
+        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+          Type
+        </label>
+        <span
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ${
+            isToolCall
+              ? "bg-purple-500/10 text-purple-400"
+              : "bg-blue-500/10 text-blue-400"
+          }`}
+        >
+          {isToolCall ? (
+            <ToolIcon className="w-3.5 h-3.5" />
+          ) : (
+            <DocumentIcon className="w-3.5 h-3.5" />
+          )}
+          {displayType}
+        </span>
+      </div>
+
+      {/* Criteria text */}
+      {evaluation?.criteria && (
+        <div>
+          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+            Criteria
+          </label>
+          <p className="text-sm text-foreground whitespace-pre-wrap">
+            {evaluation.criteria}
+          </p>
+        </div>
+      )}
+
+      {/* Expected tool calls */}
+      {evaluation?.tool_calls && evaluation.tool_calls.length > 0 && (
+        <div>
+          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+            Expected Tool Calls
+          </label>
+          <div className="space-y-2">
+            {evaluation.tool_calls.map((tc, i) => (
+              <ToolCallCard
+                key={i}
+                toolName={tc.tool}
+                args={tc.arguments || {}}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Empty state when no detailed criteria */}
+      {!evaluation?.criteria &&
+        (!evaluation?.tool_calls || evaluation.tool_calls.length === 0) && (
+          <p className="text-xs text-muted-foreground">
+            No additional criteria specified
+          </p>
+        )}
     </div>
   );
 }

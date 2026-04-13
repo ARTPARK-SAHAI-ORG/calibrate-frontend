@@ -12,6 +12,7 @@ import {
   TestDetailView as SharedTestDetailView,
   EmptyStateView,
   TestStats,
+  EvaluationCriteriaPanel,
 } from "./test-results/shared";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
@@ -39,6 +40,7 @@ type TestResult = {
   chatHistory?: ChatMessage[];
   output?: TestCaseOutput;
   testCase?: TestCaseData;
+  reasoning?: string;
   evaluation?: {
     passed: boolean;
     message?: string;
@@ -53,6 +55,7 @@ type TestCaseResult = {
   name?: string; // Test name from in-progress API response
   status?: "passed" | "failed" | "error";
   passed?: boolean | null; // null means test is still running
+  reasoning?: string;
   output?: TestCaseOutput | null;
   test_case?: TestCaseData | null;
   chat_history?: ChatMessage[];
@@ -283,6 +286,7 @@ export function TestRunnerDialog({
               chatHistory: apiResult.chat_history,
               output: apiResult.output ?? undefined,
               testCase: apiResult.test_case ?? undefined,
+              reasoning: apiResult.reasoning,
               evaluation:
                 testStatus !== "running"
                   ? apiResult.evaluation ?? { passed: testStatus === "passed" }
@@ -319,6 +323,7 @@ export function TestRunnerDialog({
               chatHistory: apiResult.chat_history,
               output: apiResult.output ?? undefined,
               testCase: apiResult.test_case ?? undefined,
+              reasoning: apiResult.reasoning,
               evaluation:
                 testStatus !== "running"
                   ? apiResult.evaluation ?? { passed: testStatus === "passed" }
@@ -798,7 +803,7 @@ export function TestRunnerDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-0 md:p-4">
-      <div className="bg-background rounded-none md:rounded-xl w-full max-w-5xl h-full md:h-[80vh] flex flex-col shadow-2xl">
+      <div className="bg-background rounded-none md:rounded-xl w-full max-w-7xl h-full md:h-[80vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-border">
           <h2 className="text-base md:text-lg font-semibold text-foreground">
@@ -965,7 +970,7 @@ export function TestRunnerDialog({
             </div>
           </div>
 
-          {/* Right Panel - Test Details */}
+          {/* Middle Panel - Conversation History */}
           <div
             className={`flex-1 ${
               selectedTestUuid ? "flex" : "hidden md:flex"
@@ -1003,6 +1008,18 @@ export function TestRunnerDialog({
               <EmptyStateView message="Select a test to view details" />
             )}
           </div>
+
+          {/* Right Panel - Evaluation Criteria */}
+          {selectedResult && (
+            <div className="hidden md:flex w-72 border-l border-border flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto">
+                <EvaluationCriteriaPanel
+                  evaluation={selectedResult.testCase?.evaluation}
+                  testType={selectedResult.test.type}
+                />
+              </div>
+            </div>
+          )}
         </div>
         )}
       </div>
@@ -1107,6 +1124,7 @@ function LocalTestDetailView({ result }: { result: TestResult }) {
       history={result.testCase?.history || []}
       output={result.output}
       passed={result.evaluation?.passed ?? false}
+      reasoning={result.reasoning}
     />
   );
 }

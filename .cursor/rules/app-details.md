@@ -1932,9 +1932,9 @@ Key styling:
   </div>
 </div>
 
-// TestRunnerDialog - Two-panel with mobile navigation
+// TestRunnerDialog / BenchmarkResultsDialog - Three-panel with mobile navigation
 <div className="fixed inset-0 z-50 flex items-center p-0 md:p-4">
-  <div className="w-full max-w-5xl h-full md:h-[80vh] rounded-none md:rounded-xl flex flex-col">
+  <div className="w-full max-w-7xl h-full md:h-[80vh] rounded-none md:rounded-xl flex flex-col">
     {/* Header with stats (desktop only) */}
     <div className="px-4 md:px-6 py-3 md:py-4 border-b">
       <h2>Test Status</h2>
@@ -1945,24 +1945,32 @@ Key styling:
     </div>
 
     <div className="flex-1 flex overflow-hidden">
-      {/* Left panel - test list, hidden when test selected on mobile */}
+      {/* Left panel - test list (w-80), hidden when test selected on mobile */}
       <div className={`w-full md:w-80 ${selectedTest ? 'hidden md:flex' : 'flex'} flex-col`}>
         {/* Test list (no mobile stats - cleaner UI) */}
         {/* Uses button elements for list items with onTouchEnd for mobile support */}
       </div>
 
-      {/* Right panel - test details, hidden when no test selected on mobile */}
+      {/* Middle panel - conversation history, hidden when no test selected on mobile */}
       <div className={`flex-1 ${selectedTest ? 'flex' : 'hidden md:flex'} flex-col overflow-hidden`}>
         {/* Mobile back button - flex-shrink-0 to prevent squishing */}
         <div className="md:hidden px-4 py-3 border-b flex-shrink-0">
           <button onClick={() => setSelectedTest(null)}>Back to tests</button>
         </div>
         {/* Test details - flex-1 for remaining space */}
-        {/* Message bubbles use w-[70%] md:w-1/2 for better visual differentiation on mobile */}
         <div className="flex-1 overflow-y-auto">
           <TestDetailView />
         </div>
       </div>
+
+      {/* Right panel - evaluation criteria (w-72), desktop only, shown when test selected */}
+      {selectedResult && (
+        <div className="hidden md:flex w-72 border-l border-border flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto">
+            <EvaluationCriteriaPanel evaluation={testCase?.evaluation} testType={test.type} />
+          </div>
+        </div>
+      )}
     </div>
   </div>
 </div>
@@ -1992,9 +2000,9 @@ Key styling:
 - **Metrics sidebar**: Full-page slide-in for add/edit metrics
 - **AddToolDialog**: Full-page slide-in for add/edit tools
 - **AddTestDialog**: Large centered modal for add/edit tests (fully responsive)
-- **TestRunnerDialog**: Test results viewer with two-panel layout (fully responsive with mobile navigation)
+- **TestRunnerDialog**: Test results viewer with three-panel layout on desktop (test list | conversation | evaluation criteria), two-panel mobile navigation
 - **Simulation Run Page**: `/simulations/[uuid]/runs/[runId]` - Responsive tabs (3 tabs on mobile: Results/Performance/Latency, 2 tabs on desktop: Performance/Latency), conditional content display, reduced font sizes on mobile
-- **BenchmarkResultsDialog**: Benchmark results viewer with two-panel layout (fully responsive with mobile navigation, same patterns as TestRunnerDialog)
+- **BenchmarkResultsDialog**: Benchmark results viewer with three-panel layout on desktop (providers/tests | conversation | evaluation criteria), two-panel mobile navigation (same patterns as TestRunnerDialog)
 
 **Gotchas:**
 
@@ -2008,9 +2016,10 @@ Key styling:
 - Input/button heights must be `h-9` on mobile for proper touch targets (not `h-8`)
 - Two-column layouts must stack vertically on mobile (`flex-col md:flex-row`)
 - Dialog heights need more space on mobile (`h-[95vh] md:h-[85vh]`)
-- For two-panel views, implement mobile navigation with hide/show panels and back buttons
+- For multi-panel views, implement mobile navigation with hide/show panels and back buttons
 - Stats/summary info should show in header on desktop only (mobile stats removed for cleaner UI in TestRunnerDialog)
-- Right panel in two-panel layouts needs proper flex structure: `flex-col overflow-hidden` parent, `flex-shrink-0` for fixed sections, `flex-1 overflow-y-auto` for scrollable content
+- Middle panel in three-panel layouts needs proper flex structure: `flex-col overflow-hidden` parent, `flex-shrink-0` for fixed sections, `flex-1 overflow-y-auto` for scrollable content
+- Third column (evaluation criteria) is desktop-only (`hidden md:flex`), fixed width `w-72`, with `border-l border-border`; only rendered when a test is selected
 - Use `useSidebarState()` hook from `@/lib/sidebar` for sidebar state - handles hydration-safe initialization (prevents SSR mismatch and mobile flash)
 - **Mobile touch handling for interactive lists**: Use `<button>` elements instead of `<div>` with `onClick` for list items to ensure reliable touch events on mobile. Add both `onClick` and `onTouchEnd` handlers for maximum compatibility. Include `type="button"` to prevent form submission and `w-full` to make entire area tappable. Example: TestRunnerDialog's TestListItem component
 
@@ -2367,9 +2376,9 @@ const getFilteredProviders = (language: LanguageOption) => {
     - **BenchmarkResultsDialog intermediate results**:
       - **When in progress**: Shows Outputs view directly (no tabs visible), all providers displayed immediately
       - **When done**: Shows both Leaderboard and Outputs tabs, auto-switches to Leaderboard tab
-      - **Fully responsive**: Two-panel layout with mobile navigation (same pattern as TestRunnerDialog)
-        - Mobile: Left panel (providers) and right panel (test details) toggle visibility, back button to return to provider list
-        - Desktop: Both panels always visible side-by-side
+      - **Fully responsive**: Three-panel layout on desktop, mobile navigation (same pattern as TestRunnerDialog)
+        - Mobile: Left panel (providers) and middle panel (test details) toggle visibility, back button to return to provider list; evaluation criteria panel hidden
+        - Desktop: All three panels visible — providers list (w-80) | conversation (flex-1) | evaluation criteria (w-72)
         - Uses `w-full md:w-80` for left panel, conditional hiding with `${selectedTest ? 'hidden md:flex' : 'flex'}`
       - Uses expandable provider toggles (not a dropdown) in the left panel
       - Each provider section shows: provider name, processing spinner (if still running), passed/failed counts (when complete)
@@ -3353,6 +3362,7 @@ import {
   TestDetailView,
   EmptyStateView,
   TestStats,
+  EvaluationCriteriaPanel,
 } from "@/components/test-results/shared";
 
 // Status indicator (passed/failed/running/queued/pending)
@@ -3384,6 +3394,12 @@ import {
 // Stats bar - shows passed/failed counts
 // In TestRunnerDialog: show in header on desktop, at top of list on mobile
 <TestStats passedCount={5} failedCount={2} />
+
+// Evaluation criteria panel - third column in test/benchmark runner dialogs
+// Shows test type badge ("Next Reply Text" blue / "Tool Call" purple), criteria text, expected tool calls
+// Desktop only (hidden on mobile), w-72, border-l
+// testType can come from TestData.type or inferred from evaluation.type / presence of evaluation.tool_calls
+<EvaluationCriteriaPanel evaluation={testCase?.evaluation} testType="response" />
 ```
 
 ---
