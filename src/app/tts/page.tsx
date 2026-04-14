@@ -786,7 +786,7 @@ function TTSPageInner() {
 
       {/* Create Dataset Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-background border border-border rounded-xl p-6 w-full max-w-sm mx-4 shadow-xl">
             <h2 className="text-base font-semibold mb-4">New TTS dataset</h2>
             <div>

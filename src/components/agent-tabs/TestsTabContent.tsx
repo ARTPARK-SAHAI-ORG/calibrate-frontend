@@ -120,6 +120,7 @@ type TestsTabContentProps = {
   agentName?: string;
   agentType?: "agent" | "connection";
   connectionVerified?: boolean;
+  supportsBenchmark?: boolean;
   benchmarkModelsVerified?: Record<
     string,
     { verified: boolean; verified_at: string; error: string | null }
@@ -132,6 +133,7 @@ export function TestsTabContent({
   agentName = "Agent",
   agentType,
   connectionVerified,
+  supportsBenchmark,
   benchmarkModelsVerified,
   benchmarkProvider,
 }: TestsTabContentProps) {
@@ -165,6 +167,7 @@ export function TestsTabContent({
   const [benchmarkDialogOpen, setBenchmarkDialogOpen] = useState(false);
 
   const isConnectionUnverified = agentType === "connection" && connectionVerified === false;
+  const isBenchmarkDisabled = agentType === "connection" && supportsBenchmark !== true;
 
   // Past test runs state
   const [pastRuns, setPastRuns] = useState<TestRun[]>([]);
@@ -857,12 +860,12 @@ export function TestsTabContent({
             <div className="relative group/compare">
               <button
                 onClick={() => {
-                  if (isConnectionUnverified) return;
+                  if (isConnectionUnverified || isBenchmarkDisabled) return;
                   setBenchmarkDialogOpen(true);
                 }}
-                disabled={isConnectionUnverified}
+                disabled={isConnectionUnverified || isBenchmarkDisabled}
                 className={`h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background transition-colors flex items-center gap-2 ${
-                  isConnectionUnverified
+                  isConnectionUnverified || isBenchmarkDisabled
                     ? "opacity-50 cursor-not-allowed"
                     : "hover:bg-muted/50 cursor-pointer"
                 }`}
@@ -886,6 +889,11 @@ export function TestsTabContent({
               {isConnectionUnverified && (
                 <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/compare:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
                   Verify agent connection first
+                </div>
+              )}
+              {!isConnectionUnverified && isBenchmarkDisabled && (
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/compare:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                  You have turned off benchmarking models in connection settings — turn it on to enable this
                 </div>
               )}
             </div>

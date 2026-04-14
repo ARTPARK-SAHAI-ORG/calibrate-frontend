@@ -59,7 +59,7 @@ export function LLMSelectorModal({
     .filter((provider) => provider.models.length > 0);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center pt-16 bg-black/50">
+    <div className="fixed inset-0 z-[60] flex items-start justify-center pt-16 bg-black/50 backdrop-blur-sm">
       <div className="bg-background border border-border rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl">
         {/* Modal Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">

@@ -36,7 +36,7 @@ export function DeleteConfirmationDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-background rounded-xl w-full max-w-md p-5 md:p-6 shadow-2xl">
         <h2 className="text-base md:text-lg font-semibold text-foreground mb-2">
           {title}

@@ -264,7 +264,7 @@ export function EvaluationTabContent({
         <div className="fixed inset-0 z-50 flex justify-end">
           {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => {
               resetCriteriaForm();
               setAddCriteriaSidebarOpen(false);

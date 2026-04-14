@@ -531,7 +531,7 @@ export function AppLayout({
       {/* Backdrop for mobile sidebar */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 md:hidden"
           onClick={onSidebarToggle}
         />
       )}

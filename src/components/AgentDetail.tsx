@@ -102,16 +102,36 @@ export function AgentDetail({
   const [isEditNameDialogOpen, setIsEditNameDialogOpen] = useState(false);
   const [editedName, setEditedName] = useState("");
 
+  // Track the last-saved benchmark provider so we can detect unsaved changes
+  const [savedBenchmarkProvider, setSavedBenchmarkProvider] = useState<string | undefined>(undefined);
+
+  // Unsaved changes dialog state (shown when switching tabs with unsaved benchmark provider)
+  const [unsavedChangesDialogOpen, setUnsavedChangesDialogOpen] = useState(false);
+  const [pendingTab, setPendingTab] = useState<TabType | null>(null);
+
   // Hide the floating "Talk to Us" button when the edit name dialog is open
   useHideFloatingButton(isEditNameDialogOpen);
 
-  // Update URL when tab changes
-  const handleTabChange = (tab: TabType) => {
+  // Helper to perform the actual tab switch + URL update
+  const performTabSwitch = (tab: TabType) => {
     setActiveTab(tab);
-    // Use replaceState to update URL without triggering navigation
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", tab);
     window.history.replaceState(null, "", `?${params.toString()}`);
+  };
+
+  // Update URL when tab changes, with unsaved-changes guard for benchmark provider
+  const handleTabChange = (tab: TabType) => {
+    if (
+      agent?.type === "connection" &&
+      activeTab === "connection" &&
+      connectionConfig.benchmark_provider !== savedBenchmarkProvider
+    ) {
+      setPendingTab(tab);
+      setUnsavedChangesDialogOpen(true);
+      return;
+    }
+    performTabSwitch(tab);
   };
 
   // Agent tab state
@@ -238,6 +258,7 @@ export function AgentDetail({
             parsed.length > 0 ? parsed : [{ key: "", value: "" }],
           );
           setConnectionConfig(data.config);
+          setSavedBenchmarkProvider(data.config.benchmark_provider);
         }
 
         // Initialize form fields from agent config if available
@@ -500,6 +521,7 @@ export function AgentDetail({
             benchmark_models_verified:
               savedAgent.config.benchmark_models_verified ?? {},
           }));
+          setSavedBenchmarkProvider(connectionConfig.benchmark_provider);
         }
 
         // Show success toast
@@ -590,6 +612,29 @@ export function AgentDetail({
   const handleCancelEditName = () => {
     setIsEditNameDialogOpen(false);
     setEditedName("");
+  };
+
+  // Unsaved benchmark provider dialog: discard changes and switch tab
+  const handleDiscardAndSwitchTab = () => {
+    setConnectionConfig((prev) => ({
+      ...prev,
+      benchmark_provider: savedBenchmarkProvider,
+    }));
+    setUnsavedChangesDialogOpen(false);
+    if (pendingTab) {
+      performTabSwitch(pendingTab);
+      setPendingTab(null);
+    }
+  };
+
+  // Unsaved benchmark provider dialog: save changes then switch tab
+  const handleSaveAndSwitchTab = async () => {
+    await saveRef.current();
+    setUnsavedChangesDialogOpen(false);
+    if (pendingTab) {
+      performTabSwitch(pendingTab);
+      setPendingTab(null);
+    }
   };
 
   // Auto-dismiss toast after 3 seconds
@@ -833,6 +878,11 @@ export function AgentDetail({
                 ? connectionConfig.connection_verified === true
                 : undefined
             }
+            supportsBenchmark={
+              agent.type === "connection"
+                ? connectionConfig.supports_benchmark === true
+                : undefined
+            }
             benchmarkModelsVerified={
               agent.type === "connection"
                 ? connectionConfig.benchmark_models_verified
@@ -860,7 +910,7 @@ export function AgentDetail({
       {/* Edit Name Dialog */}
       {isEditNameDialogOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
           onClick={handleCancelEditName}
         >
           <div
@@ -898,6 +948,66 @@ export function AgentDetail({
                 className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Unsaved Benchmark Provider Changes Dialog */}
+      {unsavedChangesDialogOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => {
+            setUnsavedChangesDialogOpen(false);
+            setPendingTab(null);
+          }}
+        >
+          <div
+            className="bg-background border border-border rounded-xl p-5 md:p-6 max-w-md w-full shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-base md:text-lg font-semibold mb-2">
+              Unsaved changes
+            </h2>
+            <p className="text-sm md:text-base text-muted-foreground mb-5 md:mb-6">
+              You have unsaved changes to the benchmark provider. Would you like
+              to save before switching tabs?
+            </p>
+            <div className="flex items-center justify-end gap-2 md:gap-3">
+              <button
+                onClick={handleDiscardAndSwitchTab}
+                className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+              >
+                Discard
+              </button>
+              <button
+                onClick={handleSaveAndSwitchTab}
+                disabled={isSaving}
+                className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isSaving && (
+                  <svg
+                    className="w-4 h-4 animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                )}
+                {isSaving ? "Saving..." : "Save"}
               </button>
             </div>
           </div>

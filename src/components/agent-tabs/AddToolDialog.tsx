@@ -110,7 +110,7 @@ export function AddToolDialog({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-background border border-border rounded-xl w-[40%] min-w-[500px] max-h-[80vh] flex flex-col shadow-2xl">
         {/* Dialog Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
