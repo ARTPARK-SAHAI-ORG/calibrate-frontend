@@ -44,6 +44,7 @@ type MetricData = {
 type AgentData = {
   uuid: string;
   name: string;
+  type?: "agent" | "connection";
   config?: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -325,7 +326,7 @@ export default function SimulationDetailPage() {
 
         // Pre-populate agent if present
         if (data.agent) {
-          const agentType = (data.agent.config?.agent_url !== undefined ? "connection" : "agent") as "agent" | "connection";
+          const agentType = data.agent.type === "connection" ? "connection" : "agent";
           setSelectedAgent({
             uuid: data.agent.uuid,
             name: data.agent.name,

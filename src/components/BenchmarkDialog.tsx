@@ -375,7 +375,7 @@ export function BenchmarkDialog({
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            retryVerifyModel(modelId);
+            verifyModel(modelId);
           }}
           className="w-5 h-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           title="Retry verification"
@@ -396,10 +396,6 @@ export function BenchmarkDialog({
         </button>
       </span>
     );
-  };
-
-  const retryVerifyModel = async (modelId: string) => {
-    await verifyModel(modelId);
   };
 
   return (

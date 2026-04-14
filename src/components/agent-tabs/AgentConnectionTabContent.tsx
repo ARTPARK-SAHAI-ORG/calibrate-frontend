@@ -3,10 +3,11 @@
 import React, { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
+import { SpinnerIcon, CheckCircleIcon, AlertIcon } from "@/components/icons";
 
 type VerificationStatus = "unverified" | "verifying" | "verified" | "failed";
 
-type ConnectionConfig = {
+export type ConnectionConfig = {
   agent_url?: string;
   agent_headers?: Record<string, string>;
   connection_verified?: boolean;
@@ -123,6 +124,7 @@ export function AgentConnectionTabContent({
             "Content-Type": "application/json",
             accept: "application/json",
             "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({
             agent_url: agentUrl.trim(),
@@ -201,6 +203,20 @@ export function AgentConnectionTabContent({
 
   const supportsBenchmark = connectionConfig.supports_benchmark ?? false;
   const benchmarkProvider = connectionConfig.benchmark_provider || "openrouter";
+
+  const exampleModelByProvider: Record<string, string> = {
+    openrouter: "openai/gpt-4.1",
+    openai: "gpt-4.1",
+    google: "gemini-3-flash",
+    anthropic: "claude-4.6-sonnet",
+    "meta-llama": "llama-4-scout",
+    mistralai: "mistral-large",
+    deepseek: "deepseek-chat",
+    "x-ai": "grok-3",
+    cohere: "command-a",
+    qwen: "qwen-max",
+    ai21: "jamba-1.5-large",
+  };
 
   const handleBenchmarkToggle = () => {
     onConnectionConfigChange({
@@ -452,19 +468,7 @@ export function AgentConnectionTabContent({
               {verifyStatus === "verifying" ? null : verifyStatus ===
                 "verified" ? (
                 <>
-                  <svg
-                    className="w-4 h-4 text-green-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
+                  <CheckCircleIcon className="w-4 h-4 text-green-500" />
                   <span className="text-sm text-green-600">
                     Verified
                     {verifiedAt && (
@@ -477,19 +481,7 @@ export function AgentConnectionTabContent({
                 </>
               ) : verifyStatus === "failed" ? (
                 <>
-                  <svg
-                    className="w-4 h-4 text-red-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-                    />
-                  </svg>
+                  <AlertIcon className="w-4 h-4 text-red-500" />
                   <span className="text-sm text-red-500">Failed</span>
                 </>
               ) : (
@@ -509,34 +501,18 @@ export function AgentConnectionTabContent({
               disabled={
                 verifyStatus === "verifying" || !agentUrl.trim() || isSaving
               }
-              className="h-8 md:h-9 px-3 rounded-md text-xs font-medium border border-border bg-background text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 flex items-center gap-1.5"
+              className="h-8 md:h-9 px-3 md:px-4 rounded-md text-xs md:text-sm font-medium bg-yellow-500 text-black hover:bg-yellow-400 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex-shrink-0 flex items-center gap-1.5"
             >
-              {verifyStatus === "verifying" && (
-                <svg
-                  className="w-3.5 h-3.5 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
+              {verifyStatus === "verifying" ? (
+                <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <CheckCircleIcon className="w-3.5 h-3.5" />
               )}
               {verifyStatus === "verifying"
-                ? "Checking"
+                ? "Verifying..."
                 : verifyStatus === "verified"
                   ? "Re-verify"
-                  : "Check connection"}
+                  : "Verify"}
             </button>
           </div>
 
@@ -606,7 +582,7 @@ export function AgentConnectionTabContent({
                     LLM:
                   </p>
                   <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground">
-                    {`{ "messages": [...], "model": "${benchmarkProvider === "openrouter" || !benchmarkProvider ? "openai/gpt-4.1" : benchmarkProvider === "openai" ? "gpt-4.1" : benchmarkProvider === "google" ? "gemini-3-flash" : benchmarkProvider === "anthropic" ? "claude-4.6-sonnet" : benchmarkProvider === "meta-llama" ? "llama-4-scout" : benchmarkProvider === "mistralai" ? "mistral-large" : benchmarkProvider === "deepseek" ? "deepseek-chat" : benchmarkProvider === "x-ai" ? "grok-3" : benchmarkProvider === "cohere" ? "command-a" : benchmarkProvider === "qwen" ? "qwen-max" : benchmarkProvider === "ai21" ? "jamba-1.5-large" : "model-name"}" }`}
+                    {`{ "messages": [...], "model": "${exampleModelByProvider[benchmarkProvider] || "model-name"}" }`}
                   </pre>
                   <div className="flex gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
                     <svg

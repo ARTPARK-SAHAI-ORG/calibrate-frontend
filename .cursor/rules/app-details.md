@@ -78,7 +78,7 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 - **Delete agents**
 - **Right-click or Cmd/Ctrl+click** any agent row to open in a new browser tab (native browser support)
 
-**Agent Detail Page** (`/agents/[uuid]`) — tabs vary by agent type:
+**Agent Detail Page** (`/agents/[uuid]`) — tabs vary by agent type. Tab navigation is data-driven: `calibrateTabs` and `connectionTabs` arrays define which tabs to show, and `tabLabels` maps tab IDs to display names. The buttons are rendered by mapping over the appropriate array — no per-tab JSX duplication.
 
 Build agents (`type: "agent"`) have 5 tabs:
 
@@ -102,8 +102,9 @@ Connection agents (`type: "connection"`) have 3 tabs:
 
 The "Check connection" button uses **two different endpoints** depending on whether the user has unsaved changes:
 
-- **Unsaved changes** (current `agentUrl`/`agentHeaders` differ from `connectionConfig.agent_url`/`connectionConfig.agent_headers`): Calls `POST /agents/verify-connection` (pre-save, no auth) with `{ agent_url, agent_headers }` in the body. This tests the connection without requiring a save first.
+- **Unsaved changes** (current `agentUrl`/`agentHeaders` differ from `connectionConfig.agent_url`/`connectionConfig.agent_headers`): Calls `POST /agents/verify-connection` (pre-save, requires auth) with `{ agent_url, agent_headers }` in the body. This tests the connection without requiring a save first.
 - **No unsaved changes** (form matches saved config): Calls `POST /agents/{uuid}/verify-connection` (post-save, requires auth) with an empty body `{}`. The server reads URL/headers from the saved agent config.
+- Both endpoints require `Authorization: Bearer` header.
 
 The basic connection check does not send a `model` field. The same post-save endpoint (`POST /agents/{uuid}/verify-connection`) is also used for per-model benchmark verification by passing `{ "model": "openai/gpt-5.4" }` in the body — there is no separate benchmark verification endpoint. The response schema for all verify-connection calls is `{ success: boolean, error: string | null, sample_response: object | null }`. The frontend maps `success` → `connection_verified` and `error` → `connection_verified_error` in the local `connectionConfig` state. When verification fails and `sample_response` is present (e.g., the agent returned JSON in an unexpected format), it is displayed below the error message in a scrollable `<pre>` block labeled "Your agent responded with:" so the user can see exactly what their agent returned and fix it.
 
@@ -111,7 +112,7 @@ The basic connection check does not send a `model` field. The same post-save end
 
 **Save response updates verification status**: The `PUT /agents/{uuid}` response returns the full agent including `config.connection_verified`, `config.connection_verified_at`, `config.connection_verified_error`, and `config.benchmark_models_verified`. After a successful save of a connection agent, `AgentDetail.tsx` parses this response and updates `connectionConfig` state with these fields. A `useEffect` in `AgentConnectionTabContent` watches `connectionConfig.connection_verified` and `connectionConfig.connection_verified_error` and syncs the local `verifyStatus` display state accordingly, so the UI immediately reflects any backend-driven reset (e.g., URL/headers changed → backend sets `connection_verified: false` → UI shows "Not verified").
 
-**Connection check UI states**: The button and status pill share a row (`flex items-center justify-between`). During verification, only the button shows a loading indicator (inline spinner + "Checking…" text). The status pill area does not show a separate spinner — it only renders for terminal states (verified, failed, unverified). This avoids redundant loading indicators.
+**Connection check UI states**: The button and status pill share a row (`flex items-center justify-between`). The button uses the same yellow style and labeling as the header Verify button: `CheckCircleIcon` + "Verify" (unverified), `SpinnerIcon` + "Verifying..." (in progress), `CheckCircleIcon` + "Re-verify" (verified). The status pill area does not show a separate spinner — it only renders for terminal states (verified, failed, unverified).
 
 **Tools Tab** (`ToolsTabContent.tsx`):
 
@@ -242,6 +243,7 @@ Provider website links (external link icons) are shown only on the new evaluatio
   5. Clicking on an in-progress run opens the dialog with the correct `taskId` for real-time polling
 - **Actions**: Add test (button in tests table header), Run all tests (header action button, max 20 tests — sends empty body so backend runs all linked tests), Run single test (row button — sends `test_uuids: [uuid]`), Compare models (benchmark — sends only `models`, no `test_uuids`)
 - **Run all tests limit**: Maximum 20 tests at a time. Shows toast error with "Contact Us" link if exceeded
+- **Connection agent verification (header-level)**: When a connection agent is unverified, a yellow "Verify" button (`bg-yellow-500 text-black`) appears beside the Save button in the `AgentDetail` page header — visible on all tabs **except** the Connection tab (which has its own inline "Verify" / "Re-verify" button in the same yellow style). The header button is hidden via `headerState.activeTab !== "connection"`. It calls `POST /agents/{uuid}/verify-connection` with empty body. On success, updates `connectionConfig.connection_verified` directly. On failure, a popover drops down (fixed backdrop + absolute dropdown with "Verification Failed" header, close button, error text, optional sample response JSON). State: `isVerifying`, `verifyError`, `verifySampleResponse` live in `AgentDetail`. On the Tests tab, "Run all tests" and "Compare models" buttons are disabled (`opacity-50 cursor-not-allowed`) with a hover tooltip ("Verify agent connection first") using Tailwind named groups (`group/runall`, `group/compare`) when the connection is unverified.
 - **API**: Fetches runs from `GET /agent-tests/agent/{uuid}/runs`
 - **Run types**: `llm-unit-test` (has passed/failed counts) and `llm-benchmark` (results in model_results)
 
@@ -654,7 +656,7 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
 - **Unverified agent warning**: When an unverified connection agent is selected, a yellow warning banner appears below the picker: "This agent needs to be verified before the simulation can be run."
 - **Verification error popover**: When the Verify button is clicked and fails, a dropdown popover appears beneath the Verify button (not in the config tab) with a "Verification Failed" header, close button, error message, and optional sample response in a scrollable `<pre>` block. Dismissed by clicking outside or the X button. State (`verifyError`, `verifySampleResponse`) lives in the simulation page and is cleared on each new verify attempt.
 - **Voice simulation restriction**: When a connection agent is selected, a blue info banner explains that voice simulations are only supported for built agents
-- The simulation detail page (`/simulations/[uuid]/page.tsx`) pre-populates `selectedAgent` from the simulation's agent data including the `verified` field derived from `data.agent.config?.connection_verified`
+- The simulation detail page (`/simulations/[uuid]/page.tsx`) pre-populates `selectedAgent` from the simulation's agent data. Agent type is read directly from `data.agent.type` (the backend returns `"agent"` or `"connection"`). The `verified` field is derived from `data.agent.config?.connection_verified` for connection agents; built agents are always considered verified. **Important**: Always use the backend-provided `type` field — never infer agent type from the presence/absence of config fields like `agent_url`.
 
 **Selection Limits:**
 
@@ -2318,7 +2320,7 @@ const getFilteredProviders = (language: LanguageOption) => {
    - **Tab content container**: Wrap all tab content in a container with `pt-2 md:pt-4` for tight spacing below the tab bar (avoids excessive whitespace)
    - **Responsive tab content patterns** (all agent detail tabs are responsive):
      - **AgentTabContent**: Two-column layouts use `flex flex-col md:grid md:grid-cols-2` to stack on mobile. System prompt textarea uses `md:flex-1 h-[350px] md:h-auto` - explicit 350px height on mobile for balanced editing space without dominating screen, `flex-1` only on desktop to fill available vertical space
-     - **AgentConnectionTabContent**: Two-column layout (`flex flex-col md:grid md:grid-cols-2`). Left column: "Support benchmarking different models" toggle, Agent URL, Headers, and conditionally a benchmark provider **dropdown** (`<select>`) wrapped in a distinct card (`border border-border rounded-xl bg-muted/20 p-3 md:p-4`) to visually separate it from the URL/headers section. The dropdown defaults to `"openrouter"` (no empty placeholder option) and includes 11 providers: OpenRouter (all providers), OpenAI, Anthropic, Google, Meta, Mistral, DeepSeek, xAI, Cohere, Qwen, AI21. Provider values use OpenRouter slug format (e.g., `"meta-llama"`, `"mistralai"`, `"x-ai"`). Right column: Connection check + always-visible expected request/response format (the example `model` value dynamically reflects the selected provider: OpenRouter shows `openai/gpt-4.1` with provider prefix, non-OpenRouter providers show just the model name — e.g., `llama-3.1-nemotron-ultra-253b` for NVIDIA, `gpt-4.1` for OpenAI). Headers use a mobile card / desktop inline row pattern: on mobile (`md:hidden`), each header is a bordered card with the remove button absolutely positioned top-right and key/value inputs stacked; on desktop (`hidden md:flex`), key/value are side-by-side with the remove button inline. Headers initialized with `[{ key: "", value: "" }]` in `AgentDetail.tsx`. Benchmark state (`supports_benchmark`, `benchmark_provider`) stored in `connectionConfig` and persisted via the existing spread-based save (`...connectionConfig`).
+     - **AgentConnectionTabContent**: Two-column layout (`flex flex-col md:grid md:grid-cols-2`). Left column: "Support benchmarking different models" toggle, Agent URL, Headers, and conditionally a benchmark provider **dropdown** (`<select>`) wrapped in a distinct card (`border border-border rounded-xl bg-muted/20 p-3 md:p-4`) to visually separate it from the URL/headers section. The dropdown defaults to `"openrouter"` (no empty placeholder option) and includes 11 providers: OpenRouter (all providers), OpenAI, Anthropic, Google, Meta, Mistral, DeepSeek, xAI, Cohere, Qwen, AI21. Provider values use OpenRouter slug format (e.g., `"meta-llama"`, `"mistralai"`, `"x-ai"`). Right column: Connection check + always-visible expected request/response format (the example `model` value is looked up from the `exampleModelByProvider` object keyed by provider slug — e.g., `"openrouter"` → `"openai/gpt-4.1"`, `"openai"` → `"gpt-4.1"`). Headers use a mobile card / desktop inline row pattern: on mobile (`md:hidden`), each header is a bordered card with the remove button absolutely positioned top-right and key/value inputs stacked; on desktop (`hidden md:flex`), key/value are side-by-side with the remove button inline. Headers initialized with `[{ key: "", value: "" }]` in `AgentDetail.tsx`. Benchmark state (`supports_benchmark`, `benchmark_provider`) stored in `connectionConfig` and persisted via the existing spread-based save (`...connectionConfig`).
      - **ToolsTabContent**: Uses `flex flex-col lg:grid lg:grid-cols-3` to stack on mobile/tablet. In-built tools panel shows first on mobile via `order-1 lg:order-2`. Uses mobile card view alongside desktop table view
      - **DataExtractionTabContent**: Uses mobile card view alongside desktop table view. Add/Edit sidebar is full-width on mobile (`w-full md:w-[40%]`)
      - **TestsTabContent**: Uses `flex flex-col lg:flex-row` to stack tests list above past runs on mobile. Past runs panel is `w-full lg:w-[400px] xl:w-[560px]` (not fixed width). Mobile card view for tests list
@@ -3160,6 +3162,7 @@ import {
   SearchIcon,
   TrashIcon,
   CheckIcon,
+  CheckCircleIcon, // Circled checkmark (verification status)
   XIcon,
   PlusIcon,
   ChevronDownIcon,
@@ -3168,13 +3171,18 @@ import {
   DocumentIcon,
   PlayIcon,
   RefreshIcon,
+  AlertIcon, // Circle with exclamation (error/failed status)
+  WarningTriangleIcon, // Triangle with exclamation (warnings)
   // ... and more
 } from "@/components/icons";
 
 // Usage
 <SpinnerIcon className="w-5 h-5 animate-spin" />
-<CloseIcon className="w-5 h-5" />
+<CheckCircleIcon className="w-4 h-4 text-green-500" />
+<AlertIcon className="w-4 h-4 text-red-500" />
 ```
+
+**Important**: Always use shared icons from `@/components/icons` instead of inline SVGs for spinner, checkmark, alert, warning, close, etc. The `ConnectionConfig` type is exported from `AgentConnectionTabContent.tsx` and reused in `AgentDetail.tsx` for type safety.
 
 ### Status Utilities (`@/lib/status`)
 

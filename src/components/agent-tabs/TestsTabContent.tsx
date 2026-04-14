@@ -164,6 +164,8 @@ export function TestsTabContent({
   // Benchmark dialog state
   const [benchmarkDialogOpen, setBenchmarkDialogOpen] = useState(false);
 
+  const isConnectionUnverified = agentType === "connection" && connectionVerified === false;
+
   // Past test runs state
   const [pastRuns, setPastRuns] = useState<TestRun[]>([]);
   const [pastRunsLoading, setPastRunsLoading] = useState(true);
@@ -794,68 +796,99 @@ export function TestsTabContent({
                 </div>
               )}
             </div>
-            <button
-              onClick={() => {
-                if (agentTests.length > LIMITS.TESTS_MAX_RUN_ALL) {
-                  toast.error(
-                    <span>
-                      You can only run up to {LIMITS.TESTS_MAX_RUN_ALL} tests at
-                      a time.{" "}
-                      <a
-                        href={CONTACT_LINK}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline"
-                      >
-                        Contact us
-                      </a>{" "}
-                      to extend your limits.
-                    </span>
-                  );
-                  return;
-                }
-                setTestsToRun(agentTests);
-                setRunAllLinked(true);
-                setTestRunnerOpen(true);
-              }}
-              className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex items-center gap-2"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
+            {/* Run all tests */}
+            <div className="relative group/runall">
+              <button
+                onClick={() => {
+                  if (isConnectionUnverified) return;
+                  if (agentTests.length > LIMITS.TESTS_MAX_RUN_ALL) {
+                    toast.error(
+                      <span>
+                        You can only run up to {LIMITS.TESTS_MAX_RUN_ALL} tests at
+                        a time.{" "}
+                        <a
+                          href={CONTACT_LINK}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline"
+                        >
+                          Contact us
+                        </a>{" "}
+                        to extend your limits.
+                      </span>
+                    );
+                    return;
+                  }
+                  setTestsToRun(agentTests);
+                  setRunAllLinked(true);
+                  setTestRunnerOpen(true);
+                }}
+                disabled={isConnectionUnverified}
+                className={`h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background transition-colors flex items-center gap-2 ${
+                  isConnectionUnverified
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-muted/50 cursor-pointer"
+                }`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
-                />
-              </svg>
-              <span className="hidden sm:inline">Run all tests</span>
-              <span className="sm:hidden">Run all</span>
-            </button>
-            <button
-              onClick={() => setBenchmarkDialogOpen(true)}
-              className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex items-center gap-2"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
+                  />
+                </svg>
+                <span className="hidden sm:inline">Run all tests</span>
+                <span className="sm:hidden">Run all</span>
+              </button>
+              {isConnectionUnverified && (
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/runall:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                  Verify agent connection first
+                </div>
+              )}
+            </div>
+
+            {/* Compare models */}
+            <div className="relative group/compare">
+              <button
+                onClick={() => {
+                  if (isConnectionUnverified) return;
+                  setBenchmarkDialogOpen(true);
+                }}
+                disabled={isConnectionUnverified}
+                className={`h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background transition-colors flex items-center gap-2 ${
+                  isConnectionUnverified
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-muted/50 cursor-pointer"
+                }`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5m.75-9l3-3 2.148 2.148A12.061 12.061 0 0116.5 7.605"
-                />
-              </svg>
-              <span className="hidden sm:inline">Compare models</span>
-              <span className="sm:hidden">Compare</span>
-            </button>
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5m.75-9l3-3 2.148 2.148A12.061 12.061 0 0116.5 7.605"
+                  />
+                </svg>
+                <span className="hidden sm:inline">Compare models</span>
+                <span className="sm:hidden">Compare</span>
+              </button>
+              {isConnectionUnverified && (
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/compare:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                  Verify agent connection first
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1398,8 +1431,6 @@ export function TestsTabContent({
         tests={testsToRun}
         runAllLinked={runAllLinked}
         onRunCreated={handleTestRunCreated}
-        agentType={agentType}
-        connectionVerified={connectionVerified}
       />
 
       {/* Benchmark Dialog */}

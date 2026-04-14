@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { AgentDetail, AgentDetailHeaderState } from "@/components/AgentDetail";
 import { useSidebarState } from "@/lib/sidebar";
+import { SpinnerIcon, CheckCircleIcon, CloseIcon } from "@/components/icons";
 
 // Map tab IDs to display names for page title
 const tabDisplayNames: Record<string, string> = {
@@ -74,36 +75,70 @@ export default function AgentDetailPage() {
     </div>
   );
 
-  // Save button for header actions
+  // Header actions: Verify button (for unverified connection agents) + Save button
   const headerActions =
     headerState && !headerState.isLoading ? (
-      <div className="mr-1 md:mr-2">
+      <div className="flex items-center gap-2 mr-1 md:mr-2">
+        {headerState.isConnectionUnverified && headerState.activeTab !== "connection" && (
+          <div className="relative">
+            <button
+              onClick={() => headerState.onVerify()}
+              disabled={headerState.isVerifying}
+              className="h-8 px-3 md:px-4 rounded-md text-xs md:text-sm font-medium bg-yellow-500 text-black hover:bg-yellow-400 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {headerState.isVerifying ? (
+                <>
+                  <SpinnerIcon className="w-4 h-4 animate-spin" />
+                  <span>Verifying...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircleIcon className="w-4 h-4" />
+                  <span>Verify</span>
+                </>
+              )}
+            </button>
+
+            {(headerState.verifyError || headerState.verifySampleResponse) && (
+              <>
+                <div
+                  className="fixed inset-0 z-[99]"
+                  onClick={() => headerState.onDismissVerifyError()}
+                />
+                <div className="absolute right-0 top-full mt-2 w-80 bg-background border border-border rounded-xl shadow-xl z-[100] overflow-hidden">
+                  <div className="flex items-center justify-between p-3 border-b border-border">
+                    <span className="text-sm font-medium text-red-400">Verification Failed</span>
+                    <button
+                      onClick={() => headerState.onDismissVerifyError()}
+                      className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted transition-colors cursor-pointer"
+                    >
+                      <CloseIcon className="w-4 h-4 text-muted-foreground" />
+                    </button>
+                  </div>
+                  <div className="p-3 space-y-2">
+                    {headerState.verifyError && (
+                      <p className="text-xs text-red-400">{headerState.verifyError}</p>
+                    )}
+                    {headerState.verifySampleResponse && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground">Your agent responded with:</p>
+                        <pre className="text-xs bg-muted rounded-lg p-2 overflow-x-auto text-foreground max-h-32 overflow-y-auto">
+                          {JSON.stringify(headerState.verifySampleResponse, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
         <button
           onClick={() => headerState.onSave()}
           disabled={headerState.isSaving}
           className="h-8 px-3 md:px-4 rounded-md text-xs md:text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
         >
-          {headerState.isSaving && (
-            <svg
-              className="w-4 h-4 animate-spin"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              ></circle>
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
-          )}
+          {headerState.isSaving && <SpinnerIcon className="w-4 h-4 animate-spin" />}
           {headerState.isSaving ? "" : "Save"}
         </button>
       </div>

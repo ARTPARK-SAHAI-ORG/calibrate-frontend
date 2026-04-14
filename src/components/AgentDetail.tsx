@@ -18,6 +18,8 @@ import type {
   DataExtractionFieldData,
 } from "@/components/agent-tabs";
 import { useOpenRouterModels, findModelInProviders } from "@/hooks";
+import { SpinnerIcon, CheckCircleIcon, CloseIcon } from "@/components/icons";
+import type { ConnectionConfig } from "@/components/agent-tabs/AgentConnectionTabContent";
 import { useHideFloatingButton } from "@/components/AppLayout";
 
 export type AgentDetailHeaderState = {
@@ -27,6 +29,12 @@ export type AgentDetailHeaderState = {
   isSaving: boolean;
   onSave: () => void;
   onEditName: () => void;
+  isConnectionUnverified: boolean;
+  isVerifying: boolean;
+  onVerify: () => void;
+  verifyError: string | null;
+  verifySampleResponse: Record<string, unknown> | null;
+  onDismissVerifyError: () => void;
 };
 
 type AgentDetailProps = {
@@ -53,13 +61,16 @@ type ToolData = {
 
 type TabType = "agent" | "connection" | "tools" | "data-extraction" | "tests" | "settings";
 
-const calibrateTabs: TabType[] = [
-  "agent",
-  "tools",
-  "data-extraction",
-  "tests",
-  "settings",
-];
+const tabLabels: Record<TabType, string> = {
+  agent: "Agent",
+  connection: "Connection",
+  tools: "Tools",
+  "data-extraction": "Data extraction",
+  tests: "Tests",
+  settings: "Settings",
+};
+
+const calibrateTabs: TabType[] = ["agent", "tools", "data-extraction", "tests", "settings"];
 const connectionTabs: TabType[] = ["connection", "tests", "settings"];
 
 export function AgentDetail({
@@ -147,9 +158,68 @@ export function AgentDetail({
   const [connectionHeaders, setConnectionHeaders] = useState<
     Array<{ key: string; value: string }>
   >([{ key: "", value: "" }]);
-  const [connectionConfig, setConnectionConfig] = useState<Record<string, any>>(
-    {}
+  const [connectionConfig, setConnectionConfig] = useState<ConnectionConfig>(
+    {},
   );
+
+  // Connection verification state (shown beside Save button)
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [verifySampleResponse, setVerifySampleResponse] = useState<Record<string, unknown> | null>(null);
+
+  const isConnectionUnverified = agent?.type === "connection" && connectionConfig.connection_verified !== true;
+
+  const handleVerifyConnection = async () => {
+    try {
+      setIsVerifying(true);
+      setVerifyError(null);
+      setVerifySampleResponse(null);
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) throw new Error("BACKEND_URL not set");
+
+      const response = await fetch(
+        `${backendUrl}/agents/${agentUuid}/verify-connection`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            accept: "application/json",
+            "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
+          },
+          body: JSON.stringify({}),
+        },
+      );
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
+      if (!response.ok) throw new Error("Verification request failed");
+
+      const result = await response.json();
+
+      if (result.success) {
+        setConnectionConfig((prev) => ({
+          ...prev,
+          connection_verified: true,
+          connection_verified_at: new Date().toISOString(),
+          connection_verified_error: null,
+        }));
+        setVerifyError(null);
+        setVerifySampleResponse(null);
+      } else {
+        setVerifyError(result.error || "Connection verification failed");
+        setVerifySampleResponse(result.sample_response ?? null);
+      }
+    } catch (err) {
+      console.error("Error verifying connection:", err);
+      setVerifyError(err instanceof Error ? err.message : "Verification failed");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   // Fetch agent data
   useEffect(() => {
@@ -579,9 +649,15 @@ export function AgentDetail({
         isSaving,
         onSave: () => saveRef.current(),
         onEditName: handleOpenEditNameDialog,
+        isConnectionUnverified,
+        isVerifying,
+        onVerify: handleVerifyConnection,
+        verifyError,
+        verifySampleResponse,
+        onDismissVerifyError: () => { setVerifyError(null); setVerifySampleResponse(null); },
       });
     }
-  }, [agent?.name, activeTab, isLoading, isSaving, onHeaderStateChange]);
+  }, [agent?.name, activeTab, isLoading, isSaving, onHeaderStateChange, isConnectionUnverified, isVerifying, verifyError, verifySampleResponse]);
 
   if (isLoading) {
     return (
@@ -664,34 +740,70 @@ export function AgentDetail({
               {agent.name}
             </h1>
           </div>
-          <button
-            onClick={() => saveRef.current()}
-            disabled={isSaving}
-            className="h-8 md:h-9 px-4 md:px-6 rounded-md text-xs md:text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2 flex-shrink-0"
-          >
-            {isSaving && (
-              <svg
-                className="w-4 h-4 animate-spin"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                ></circle>
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {isConnectionUnverified && (
+              <div className="relative">
+                <button
+                  onClick={handleVerifyConnection}
+                  disabled={isVerifying}
+                  className="h-8 md:h-9 px-3 md:px-4 rounded-md text-xs md:text-sm font-medium bg-yellow-500 text-black hover:bg-yellow-400 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isVerifying ? (
+                    <>
+                      <SpinnerIcon className="w-4 h-4 animate-spin" />
+                      <span>Verifying...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircleIcon className="w-4 h-4" />
+                      <span>Verify</span>
+                    </>
+                  )}
+                </button>
+
+                {(verifyError || verifySampleResponse) && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-[99]"
+                      onClick={() => { setVerifyError(null); setVerifySampleResponse(null); }}
+                    />
+                    <div className="absolute right-0 top-full mt-2 w-80 bg-background border border-border rounded-xl shadow-xl z-[100] overflow-hidden">
+                      <div className="flex items-center justify-between p-3 border-b border-border">
+                        <span className="text-sm font-medium text-red-400">Verification Failed</span>
+                        <button
+                          onClick={() => { setVerifyError(null); setVerifySampleResponse(null); }}
+                          className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted transition-colors cursor-pointer"
+                        >
+                          <CloseIcon className="w-4 h-4 text-muted-foreground" />
+                        </button>
+                      </div>
+                      <div className="p-3 space-y-2">
+                        {verifyError && (
+                          <p className="text-xs text-red-400">{verifyError}</p>
+                        )}
+                        {verifySampleResponse && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-muted-foreground">Your agent responded with:</p>
+                            <pre className="text-xs bg-muted rounded-lg p-2 overflow-x-auto text-foreground max-h-32 overflow-y-auto">
+                              {JSON.stringify(verifySampleResponse, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
-            {isSaving ? "" : "Save"}
-          </button>
+            <button
+              onClick={() => saveRef.current()}
+              disabled={isSaving}
+              className="h-8 md:h-9 px-4 md:px-6 rounded-md text-xs md:text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {isSaving && <SpinnerIcon className="w-4 h-4 animate-spin" />}
+              {isSaving ? "" : "Save"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -700,92 +812,20 @@ export function AgentDetail({
         className="hide-scrollbar flex items-center gap-3 md:gap-4 lg:gap-6 border-b border-border overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
-        {agent.type === "connection" ? (
-          <>
+        {(agent.type === "connection" ? connectionTabs : calibrateTabs).map(
+          (tab) => (
             <button
-              onClick={() => handleTabChange("connection")}
+              key={tab}
+              onClick={() => handleTabChange(tab)}
               className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-                activeTab === "connection"
+                activeTab === tab
                   ? "text-foreground border-b-2 border-foreground"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              Connection
+              {tabLabels[tab]}
             </button>
-            <button
-              onClick={() => handleTabChange("tests")}
-              className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-                activeTab === "tests"
-                  ? "text-foreground border-b-2 border-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Tests
-            </button>
-            <button
-              onClick={() => handleTabChange("settings")}
-              className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-                activeTab === "settings"
-                  ? "text-foreground border-b-2 border-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Settings
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              onClick={() => handleTabChange("agent")}
-              className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-                activeTab === "agent"
-                  ? "text-foreground border-b-2 border-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Agent
-            </button>
-            <button
-              onClick={() => handleTabChange("tools")}
-              className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-                activeTab === "tools"
-                  ? "text-foreground border-b-2 border-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Tools
-            </button>
-            <button
-              onClick={() => handleTabChange("data-extraction")}
-              className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-                activeTab === "data-extraction"
-                  ? "text-foreground border-b-2 border-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Data extraction
-            </button>
-            <button
-              onClick={() => handleTabChange("tests")}
-              className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-                activeTab === "tests"
-                  ? "text-foreground border-b-2 border-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Tests
-            </button>
-            <button
-              onClick={() => handleTabChange("settings")}
-              className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-                activeTab === "settings"
-                  ? "text-foreground border-b-2 border-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Settings
-            </button>
-          </>
+          ),
         )}
       </div>
 
