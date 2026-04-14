@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
@@ -14,6 +14,7 @@ import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog"
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { RunTestDialog } from "@/components/RunTestDialog";
 import { AddTestDialog, TestConfig } from "@/components/AddTestDialog";
+import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
 import { useSidebarState } from "@/lib/sidebar";
 
 type TestData = {
@@ -75,51 +76,53 @@ export default function LLMPage() {
   const [testRunnerAgentUuid, setTestRunnerAgentUuid] = useState<string>("");
   const [testRunnerAgentName, setTestRunnerAgentName] = useState<string>("");
 
-  // Fetch tests from backend
-  useEffect(() => {
-    const fetchTests = async () => {
-      if (!backendAccessToken) return;
+  // Bulk upload modal state
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
 
-      try {
-        setTestsLoading(true);
-        setTestsError(null);
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-        if (!backendUrl) {
-          throw new Error("BACKEND_URL environment variable is not set");
-        }
+  const fetchTests = useCallback(async () => {
+    if (!backendAccessToken) return;
 
-        const response = await fetch(`${backendUrl}/tests`, {
-          method: "GET",
-          headers: {
-            accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
-            Authorization: `Bearer ${backendAccessToken}`,
-          },
-        });
-
-        if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch tests");
-        }
-
-        const data: TestData[] = await response.json();
-        setTests(data);
-      } catch (err) {
-        console.error("Error fetching tests:", err);
-        setTestsError(
-          err instanceof Error ? err.message : "Failed to load tests"
-        );
-      } finally {
-        setTestsLoading(false);
+    try {
+      setTestsLoading(true);
+      setTestsError(null);
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) {
+        throw new Error("BACKEND_URL environment variable is not set");
       }
-    };
 
-    fetchTests();
+      const response = await fetch(`${backendUrl}/tests`, {
+        method: "GET",
+        headers: {
+          accept: "application/json",
+          "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
+        },
+      });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch tests");
+      }
+
+      const data: TestData[] = await response.json();
+      setTests(data);
+    } catch (err) {
+      console.error("Error fetching tests:", err);
+      setTestsError(
+        err instanceof Error ? err.message : "Failed to load tests"
+      );
+    } finally {
+      setTestsLoading(false);
+    }
   }, [backendAccessToken]);
+
+  useEffect(() => {
+    fetchTests();
+  }, [fetchTests]);
 
   // Open delete confirmation dialog
   const openDeleteDialog = (test: TestData) => {
@@ -465,15 +468,23 @@ export default function LLMPage() {
               Create and manage tests to evaluate your LLM
             </p>
           </div>
-          <button
-            onClick={() => {
-              resetForm();
-              setAddTestSidebarOpen(true);
-            }}
-            className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
-          >
-            Add test
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setBulkUploadOpen(true)}
+              className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer flex-shrink-0"
+            >
+              Bulk upload
+            </button>
+            <button
+              onClick={() => {
+                resetForm();
+                setAddTestSidebarOpen(true);
+              }}
+              className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
+            >
+              Add test
+            </button>
+          </div>
         </div>
 
         {/* Search Input */}
@@ -774,6 +785,13 @@ export default function LLMPage() {
         agentUuid={testRunnerAgentUuid}
         agentName={testRunnerAgentName}
         tests={testToRun ? [testToRun] : []}
+      />
+
+      {/* Bulk Upload Modal */}
+      <BulkUploadTestsModal
+        isOpen={bulkUploadOpen}
+        onClose={() => setBulkUploadOpen(false)}
+        onSuccess={fetchTests}
       />
     </AppLayout>
   );
