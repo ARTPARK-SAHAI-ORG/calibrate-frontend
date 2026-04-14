@@ -14,6 +14,7 @@ import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog"
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { RunTestDialog } from "@/components/RunTestDialog";
 import { AddTestDialog, TestConfig } from "@/components/AddTestDialog";
+import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
 import { useSidebarState } from "@/lib/sidebar";
 
 type TestData = {
@@ -75,6 +76,9 @@ export default function LLMPage() {
   const [testRunnerAgentUuid, setTestRunnerAgentUuid] = useState<string>("");
   const [testRunnerAgentName, setTestRunnerAgentName] = useState<string>("");
 
+  // Bulk upload modal state
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
+
   // Fetch tests from backend
   useEffect(() => {
     const fetchTests = async () => {
@@ -120,6 +124,28 @@ export default function LLMPage() {
 
     fetchTests();
   }, [backendAccessToken]);
+
+  const refetchTests = async () => {
+    if (!backendAccessToken) return;
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) return;
+      const response = await fetch(`${backendUrl}/tests`, {
+        method: "GET",
+        headers: {
+          accept: "application/json",
+          "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
+        },
+      });
+      if (response.ok) {
+        const data: TestData[] = await response.json();
+        setTests(data);
+      }
+    } catch (err) {
+      console.error("Error refetching tests:", err);
+    }
+  };
 
   // Open delete confirmation dialog
   const openDeleteDialog = (test: TestData) => {
@@ -465,15 +491,23 @@ export default function LLMPage() {
               Create and manage tests to evaluate your LLM
             </p>
           </div>
-          <button
-            onClick={() => {
-              resetForm();
-              setAddTestSidebarOpen(true);
-            }}
-            className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
-          >
-            Add test
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setBulkUploadOpen(true)}
+              className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer flex-shrink-0"
+            >
+              Bulk upload
+            </button>
+            <button
+              onClick={() => {
+                resetForm();
+                setAddTestSidebarOpen(true);
+              }}
+              className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
+            >
+              Add test
+            </button>
+          </div>
         </div>
 
         {/* Search Input */}
@@ -774,6 +808,13 @@ export default function LLMPage() {
         agentUuid={testRunnerAgentUuid}
         agentName={testRunnerAgentName}
         tests={testToRun ? [testToRun] : []}
+      />
+
+      {/* Bulk Upload Modal */}
+      <BulkUploadTestsModal
+        isOpen={bulkUploadOpen}
+        onClose={() => setBulkUploadOpen(false)}
+        onSuccess={refetchTests}
       />
     </AppLayout>
   );

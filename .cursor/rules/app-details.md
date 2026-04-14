@@ -531,7 +531,7 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
 
 ### 5. LLM Tests (`/tests`)
 
-**Page heading:** "LLM tests"
+**Page heading:** "LLM Evaluation"
 
 **What you can do:**
 
@@ -562,6 +562,20 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
     - **Tool response parsing**: `role: "tool"` messages are included as `tool_response` type, linked to their corresponding tool call via `tool_call_id`
     - Non-webhook tools show params as flat list without group containers
     - **Param update matching**: `updateToolCallParam` matches by both `name` AND `group` to avoid updating params with the same name across different groups (e.g., "id" in both body and query)
+- **Bulk upload tests** via CSV:
+  - Opens `BulkUploadTestsModal` from "Bulk upload" button beside "Add test"
+  - **Step 1**: "Select the type of test" — "Next Reply" or "Tool Call" (toggle buttons, same style as language toggle)
+  - **Step 2**: Upload CSV file (drag-and-drop or click-to-browse). A brief paragraph describes the expected CSV format (adapts to selected test type). "Download sample CSV" button generates a ZIP file (via `jszip`) containing the sample CSV and a `README.txt` with detailed column descriptions, value formats, JSON escaping rules, and examples
+  - **CSV format for Next Reply**: columns `name`, `conversation_history` (OpenAI chat format JSON array), `criteria`
+  - **CSV format for Tool Call**: columns `name`, `conversation_history` (OpenAI chat format JSON array), `tool_calls` (JSON array matching `TestConfig.evaluation.tool_calls` format — supports `tool`, `arguments`, `is_called`, `accept_any_arguments`)
+  - **Validation**: Checks required columns, unique test names, valid JSON in `conversation_history` and `tool_calls`/`criteria` fields. Shows errors with row numbers (up to 5 shown, rest summarized)
+  - **Step 3** (optional): Checkbox "Assign tests to agents" → multi-select dropdown to pick agents (with search, type badges, verified/unverified status — same style as `AgentPicker`)
+  - **API**: Single `POST /tests/bulk` call with body `{ type, tests: [...], language?, agent_uuids? }`. Backend handles test creation, language setting, and agent attachment
+  - **Language**: UI toggle (English/Hindi/Kannada, same style as AddTestDialog) applies to all tests in the batch. Only sent when not "english" (the default). Backend stores it as `settings.language` in each test's config
+  - **Bulk API structure differs from single-test API**: The `type` is top-level (applies to all tests in the batch), not per-test. Type values are `"response"` and `"tool_call"` (same as `POST /tests`). Each test is a flat object with `name`, `conversation_history`, and `criteria`/`tool_calls` — not wrapped in the nested `config.evaluation` structure used by `POST /tests`
+  - **Error handling**: Status-specific fallback messages for 400 (duplicate names/missing fields), 403 (agent not owned), 404 (agent not found), 422 (schema validation). Backend's `message`/`error` field is preferred when available
+  - **Bulk API is atomic**: If any test name conflicts (within batch or with existing tests), none are created. Agent validation happens before test creation — if any agent UUID is invalid, no tests are created
+  - Uses `papaparse` for robust CSV parsing (handles quoted fields containing JSON with commas/quotes)
 - **View all tests**
 - **Edit/delete tests**
 - **Link tests to agents** for benchmarking
@@ -853,6 +867,7 @@ This enables:
   - **DM Sans** - Used on landing page for Coval-style typography (via `--font-dm-sans`)
 - **Authentication**: NextAuth.js v5 (beta) with Google OAuth
 - **Charts**: Recharts 3.6.0
+- **CSV Parsing**: PapaParse (for bulk test CSV upload)
 - **TypeScript**: 5.x
 
 ---
@@ -967,7 +982,7 @@ The entire Calibrate application is fully responsive and works seamlessly across
 - **Removed**: `src/components/MobileGuard.tsx` (no longer needed)
 - **Updated**: All page components, `AppLayout.tsx`, and all dialogs/sidebars for responsive behavior
 - **Pattern established**: List pages, detail pages, dialogs, sidebars, and empty states all follow consistent responsive patterns
-- **Dialog components updated**: `DeleteConfirmationDialog`, `NewSimulationDialog`, `RunTestDialog`, `AddToolDialog`, `AddTestDialog`, and all inline sidebars (personas, scenarios, metrics)
+- **Dialog components updated**: `DeleteConfirmationDialog`, `NewSimulationDialog`, `RunTestDialog`, `AddToolDialog`, `AddTestDialog`, `BulkUploadTestsModal`, and all inline sidebars (personas, scenarios, metrics)
 
 **Gotchas:**
 
@@ -2040,6 +2055,7 @@ Key styling:
 - **Metrics sidebar**: Full-page slide-in for add/edit metrics
 - **AddToolDialog**: Full-page slide-in for add/edit tools
 - **AddTestDialog**: Large centered modal for add/edit tests (fully responsive)
+- **BulkUploadTestsModal**: Centered modal for bulk CSV upload of tests (type selection, file upload with drag-and-drop, optional agent assignment with multi-select)
 - **TestRunnerDialog**: Test results viewer with three-panel layout on desktop (test list | conversation | evaluation criteria), two-panel mobile navigation
 - **Simulation Run Page**: `/simulations/[uuid]/runs/[runId]` - Responsive tabs (3 tabs on mobile: Results/Performance/Latency, 2 tabs on desktop: Performance/Latency), conditional content display, reduced font sizes on mobile
 - **BenchmarkResultsDialog**: Benchmark results viewer with three-panel layout on desktop (providers/tests | conversation | evaluation criteria), two-panel mobile navigation (same patterns as TestRunnerDialog)
@@ -2966,7 +2982,7 @@ All endpoints are relative to `NEXT_PUBLIC_BACKEND_URL`:
 | Metrics         | `GET/POST /metrics`, `GET/PUT/DELETE /metrics/{uuid}`, `POST /metrics/{uuid}/duplicate`                                                                                                                                                                           |
 | Simulations     | `GET/POST /simulations`, `GET/DELETE /simulations/{uuid}`                                                                                                                                                                                                         |
 | Simulation Runs | `GET /simulations/run/{runId}`, `POST /simulations/{uuid}/run`, `POST /simulations/run/{runId}/abort`                                                                                                                                                             |
-| Tests           | `GET/POST /tests`, `GET/PUT/DELETE /tests/{uuid}`                                                                                                                                                                                                                 |
+| Tests           | `GET/POST /tests`, `GET/PUT/DELETE /tests/{uuid}`, `POST /tests/bulk`                                                                                                                                                                                            |
 | Agent Tests     | `GET /agent-tests/agent/{uuid}/tests`, `GET /agent-tests/agent/{uuid}/runs`, `POST/DELETE /agent-tests`, `POST /agent-tests/agent/{uuid}/run`, `GET /agent-tests/run/{taskId}`, `POST /agent-tests/agent/{uuid}/benchmark`, `GET /agent-tests/benchmark/{taskId}` |
 | STT Evaluation  | `POST /stt/evaluate`, `GET /stt/evaluate/{uuid}`                                                                                                                                                                                                                  |
 | TTS Evaluation  | `POST /tts/evaluate`, `GET /tts/evaluate/{uuid}`                                                                                                                                                                                                                  |
