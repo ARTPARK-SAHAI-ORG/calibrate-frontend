@@ -5,7 +5,7 @@ import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import Papa from "papaparse";
 import JSZip from "jszip";
-import type { Agent } from "@/components/AgentPicker";
+import { MultiAgentPicker } from "@/components/AgentPicker";
 
 type TestType = "response" | "tool_call";
 
@@ -160,7 +160,6 @@ export function BulkUploadTestsModal({
 }: BulkUploadTestsModalProps) {
   const backendAccessToken = useAccessToken();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const agentTriggerRef = useRef<HTMLDivElement>(null);
   const assignAgentsSectionRef = useRef<HTMLDivElement>(null);
 
   const [testType, setTestType] = useState<TestType | null>(null);
@@ -170,15 +169,12 @@ export function BulkUploadTestsModal({
   const [parseError, setParseError] = useState<string | null>(null);
   const [assignToAgents, setAssignToAgents] = useState(false);
   const [selectedAgentUuids, setSelectedAgentUuids] = useState<string[]>([]);
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [agentsLoading, setAgentsLoading] = useState(false);
-  const [agentDropdownOpen, setAgentDropdownOpen] = useState(false);
-  const [agentSearchQuery, setAgentSearchQuery] = useState("");
   const [language, setLanguage] = useState<"english" | "hindi" | "kannada">(
     "english"
   );
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadWarnings, setUploadWarnings] = useState<string[] | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
@@ -189,61 +185,11 @@ export function BulkUploadTestsModal({
       setLanguage("english");
       setAssignToAgents(false);
       setSelectedAgentUuids([]);
-      setAgentDropdownOpen(false);
-      setAgentSearchQuery("");
       setIsUploading(false);
       setUploadError(null);
+      setUploadWarnings(null);
     }
   }, [isOpen]);
-
-  useEffect(() => {
-    const fetchAgents = async () => {
-      if (!backendAccessToken || !assignToAgents) return;
-      if (agents.length > 0) return;
-
-      try {
-        setAgentsLoading(true);
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-        if (!backendUrl) return;
-
-        const response = await fetch(`${backendUrl}/agents`, {
-          method: "GET",
-          headers: {
-            accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
-            Authorization: `Bearer ${backendAccessToken}`,
-          },
-        });
-
-        if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
-          return;
-        }
-
-        if (!response.ok) return;
-
-        const data = await response.json();
-        const formattedAgents: Agent[] = Array.isArray(data)
-          ? data.map((agent: any) => ({
-              uuid: agent.uuid,
-              name: agent.name || agent.agent_name || String(agent),
-              type: agent.type === "connection" ? "connection" : "agent",
-              verified:
-                agent.type === "connection"
-                  ? agent.config?.connection_verified === true
-                  : true,
-            }))
-          : [];
-        setAgents(formattedAgents);
-      } catch (err) {
-        console.error("Error fetching agents:", err);
-      } finally {
-        setAgentsLoading(false);
-      }
-    };
-
-    fetchAgents();
-  }, [backendAccessToken, assignToAgents, agents.length]);
 
   const downloadSampleCsv = async () => {
     if (!testType) return;
@@ -275,6 +221,7 @@ export function BulkUploadTestsModal({
     setParseError(null);
     setParsedTests([]);
     setUploadError(null);
+    setUploadWarnings(null);
 
     Papa.parse(file, {
       header: true,
@@ -284,6 +231,13 @@ export function BulkUploadTestsModal({
 
         if (data.length === 0) {
           setParseError("CSV file is empty");
+          return;
+        }
+
+        if (data.length > 500) {
+          setParseError(
+            `CSV contains ${data.length} rows — the maximum is 500 tests per upload`,
+          );
           return;
         }
 
@@ -469,18 +423,24 @@ export function BulkUploadTestsModal({
           400: "Invalid request — check for duplicate test names or missing fields",
           403: "You don't have permission to access one or more of the selected agents",
           404: "One or more selected agents were not found",
-          422: "Validation failed — check your CSV data format",
         };
         throw new Error(
-          errorData?.message ||
-            errorData?.error ||
+          errorData?.detail ||
+            errorData?.message ||
             fallbackMessages[response.status] ||
             "Failed to bulk upload tests"
         );
       }
 
+      const result = await response.json();
+
       onSuccess();
-      onClose();
+
+      if (result.warnings && result.warnings.length > 0) {
+        setUploadWarnings(result.warnings);
+      } else {
+        onClose();
+      }
     } catch (err) {
       console.error("Error bulk uploading tests:", err);
       setUploadError(
@@ -496,12 +456,6 @@ export function BulkUploadTestsModal({
       prev.includes(uuid) ? prev.filter((id) => id !== uuid) : [...prev, uuid],
     );
   };
-
-  const filteredAgents = agents.filter(
-    (agent) =>
-      agent.name.toLowerCase().includes(agentSearchQuery.toLowerCase()) &&
-      !selectedAgentUuids.includes(agent.uuid),
-  );
 
   if (!isOpen) return null;
 
@@ -792,7 +746,6 @@ export function BulkUploadTestsModal({
                     setAssignToAgents(next);
                     if (!next) {
                       setSelectedAgentUuids([]);
-                      setAgentDropdownOpen(false);
                     } else {
                       setTimeout(() => {
                         assignAgentsSectionRef.current?.scrollIntoView({
@@ -830,198 +783,10 @@ export function BulkUploadTestsModal({
               </div>
 
               {assignToAgents && (
-                <div>
-                  {/* Selected agents tags */}
-                  <div
-                    ref={agentTriggerRef}
-                    onClick={() => setAgentDropdownOpen(!agentDropdownOpen)}
-                    className="w-full min-h-[44px] px-3 py-2 rounded-xl text-sm bg-background text-foreground border border-border hover:border-muted-foreground transition-colors cursor-pointer flex flex-wrap items-center gap-2"
-                  >
-                    {selectedAgentUuids.length === 0 ? (
-                      <span className="text-muted-foreground">
-                        Select agents
-                      </span>
-                    ) : (
-                      selectedAgentUuids.map((uuid) => {
-                        const agent = agents.find((a) => a.uuid === uuid);
-                        return (
-                          <span
-                            key={uuid}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-xs font-medium text-foreground"
-                          >
-                            {agent?.name || uuid}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleAgentSelection(uuid);
-                              }}
-                              className="text-muted-foreground hover:text-foreground"
-                            >
-                              <svg
-                                className="w-3 h-3"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M6 18L18 6M6 6l12 12"
-                                />
-                              </svg>
-                            </button>
-                          </span>
-                        );
-                      })
-                    )}
-                    <svg
-                      className={`w-4 h-4 text-muted-foreground ml-auto flex-shrink-0 transition-transform ${
-                        agentDropdownOpen ? "rotate-180" : ""
-                      }`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                      />
-                    </svg>
-                  </div>
-
-                  {/* Dropdown */}
-                  {agentDropdownOpen && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-[99]"
-                        onClick={() => setAgentDropdownOpen(false)}
-                      />
-                      <div
-                        className="fixed bg-background border border-border rounded-xl shadow-xl z-[100] overflow-hidden"
-                        style={{
-                          ...(agentTriggerRef.current
-                            ? (() => {
-                                const rect =
-                                  agentTriggerRef.current.getBoundingClientRect();
-                                const dropdownHeight = 240;
-                                const spaceBelow =
-                                  window.innerHeight - rect.bottom - 8;
-                                const openAbove =
-                                  spaceBelow < dropdownHeight &&
-                                  rect.top > dropdownHeight;
-                                return {
-                                  left: rect.left,
-                                  width: rect.width,
-                                  ...(openAbove
-                                    ? {
-                                        bottom:
-                                          window.innerHeight - rect.top + 8,
-                                      }
-                                    : { top: rect.bottom + 8 }),
-                                };
-                              })()
-                            : {}),
-                        }}
-                      >
-                        <div className="p-3 border-b border-border">
-                          <input
-                            type="text"
-                            value={agentSearchQuery}
-                            onChange={(e) =>
-                              setAgentSearchQuery(e.target.value)
-                            }
-                            placeholder="Search agents"
-                            className="w-full h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-1 focus:ring-accent"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </div>
-                        <div className="max-h-48 overflow-y-auto">
-                          {agentsLoading ? (
-                            <div className="px-4 py-3 text-sm text-muted-foreground">
-                              Loading agents...
-                            </div>
-                          ) : filteredAgents.length === 0 ? (
-                            <div className="px-4 py-3 text-sm text-muted-foreground">
-                              No agents found
-                            </div>
-                          ) : (
-                            filteredAgents.map((agent) => {
-                              const isSelected = selectedAgentUuids.includes(
-                                agent.uuid,
-                              );
-                              return (
-                                <button
-                                  key={agent.uuid}
-                                  onClick={() =>
-                                    toggleAgentSelection(agent.uuid)
-                                  }
-                                  className={`w-full px-4 py-2.5 text-left text-sm transition-colors cursor-pointer flex items-center justify-between gap-2 ${
-                                    isSelected
-                                      ? "bg-accent text-foreground"
-                                      : "text-foreground hover:bg-muted"
-                                  }`}
-                                >
-                                  <span className="truncate flex items-center gap-1.5">
-                                    {agent.name}
-                                    {agent.verified === false && (
-                                      <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-500/10 text-yellow-500 flex-shrink-0">
-                                        <svg
-                                          className="w-3 h-3"
-                                          fill="none"
-                                          viewBox="0 0 24 24"
-                                          stroke="currentColor"
-                                          strokeWidth={2.5}
-                                        >
-                                          <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-                                          />
-                                        </svg>
-                                        Unverified
-                                      </span>
-                                    )}
-                                  </span>
-                                  <div className="flex items-center gap-2 flex-shrink-0">
-                                    <span
-                                      className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                                        agent.type === "connection"
-                                          ? "bg-blue-500/10 text-blue-500"
-                                          : "bg-muted text-muted-foreground"
-                                      }`}
-                                    >
-                                      {agent.type === "connection"
-                                        ? "Connection"
-                                        : "Agent"}
-                                    </span>
-                                    {isSelected && (
-                                      <svg
-                                        className="w-4 h-4 text-foreground"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                        strokeWidth={2}
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          d="M4.5 12.75l6 6 9-13.5"
-                                        />
-                                      </svg>
-                                    )}
-                                  </div>
-                                </button>
-                              );
-                            })
-                          )}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
+                <MultiAgentPicker
+                  selectedAgentUuids={selectedAgentUuids}
+                  onToggleAgent={toggleAgentSelection}
+                />
               )}
             </div>
           )}
@@ -1032,50 +797,73 @@ export function BulkUploadTestsModal({
           {uploadError && (
             <p className="text-sm text-red-500 mb-3">{uploadError}</p>
           )}
+          {uploadWarnings && uploadWarnings.length > 0 && (
+            <div className="mb-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+              <p className="text-sm font-medium text-yellow-500 mb-1">
+                Tests created, but with warnings:
+              </p>
+              <ul className="text-sm text-yellow-500 list-disc list-inside">
+                {uploadWarnings.map((warning, idx) => (
+                  <li key={idx}>{warning}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="flex items-center justify-end gap-3">
-            <button
-              onClick={onClose}
-              disabled={isUploading}
-              className="h-10 px-4 rounded-lg text-sm font-medium bg-background text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border border-border"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={
-                isUploading ||
-                parsedTests.length === 0 ||
-                (assignToAgents && selectedAgentUuids.length === 0)
-              }
-              className="h-10 px-5 rounded-lg text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {isUploading ? (
-                <>
-                  <svg
-                    className="w-4 h-4 animate-spin"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Uploading...
-                </>
-              ) : (
-                `Upload ${parsedTests.length > 0 ? parsedTests.length + " " : ""}test${parsedTests.length !== 1 ? "s" : ""}`
-              )}
-            </button>
+            {uploadWarnings ? (
+              <button
+                onClick={onClose}
+                className="h-10 px-5 rounded-lg text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+              >
+                Done
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={onClose}
+                  disabled={isUploading}
+                  className="h-10 px-4 rounded-lg text-sm font-medium bg-background text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border border-border"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={
+                    isUploading ||
+                    parsedTests.length === 0 ||
+                    (assignToAgents && selectedAgentUuids.length === 0)
+                  }
+                  className="h-10 px-5 rounded-lg text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isUploading ? (
+                    <>
+                      <svg
+                        className="w-4 h-4 animate-spin"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      Uploading...
+                    </>
+                  ) : (
+                    `Upload ${parsedTests.length > 0 ? parsedTests.length + " " : ""}test${parsedTests.length !== 1 ? "s" : ""}`
+                  )}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

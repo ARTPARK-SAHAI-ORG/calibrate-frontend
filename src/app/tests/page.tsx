@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
@@ -79,57 +79,17 @@ export default function LLMPage() {
   // Bulk upload modal state
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
 
-  // Fetch tests from backend
-  useEffect(() => {
-    const fetchTests = async () => {
-      if (!backendAccessToken) return;
-
-      try {
-        setTestsLoading(true);
-        setTestsError(null);
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-        if (!backendUrl) {
-          throw new Error("BACKEND_URL environment variable is not set");
-        }
-
-        const response = await fetch(`${backendUrl}/tests`, {
-          method: "GET",
-          headers: {
-            accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
-            Authorization: `Bearer ${backendAccessToken}`,
-          },
-        });
-
-        if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch tests");
-        }
-
-        const data: TestData[] = await response.json();
-        setTests(data);
-      } catch (err) {
-        console.error("Error fetching tests:", err);
-        setTestsError(
-          err instanceof Error ? err.message : "Failed to load tests"
-        );
-      } finally {
-        setTestsLoading(false);
-      }
-    };
-
-    fetchTests();
-  }, [backendAccessToken]);
-
-  const refetchTests = async () => {
+  const fetchTests = useCallback(async () => {
     if (!backendAccessToken) return;
+
     try {
+      setTestsLoading(true);
+      setTestsError(null);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-      if (!backendUrl) return;
+      if (!backendUrl) {
+        throw new Error("BACKEND_URL environment variable is not set");
+      }
+
       const response = await fetch(`${backendUrl}/tests`, {
         method: "GET",
         headers: {
@@ -138,14 +98,31 @@ export default function LLMPage() {
           Authorization: `Bearer ${backendAccessToken}`,
         },
       });
-      if (response.ok) {
-        const data: TestData[] = await response.json();
-        setTests(data);
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
       }
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch tests");
+      }
+
+      const data: TestData[] = await response.json();
+      setTests(data);
     } catch (err) {
-      console.error("Error refetching tests:", err);
+      console.error("Error fetching tests:", err);
+      setTestsError(
+        err instanceof Error ? err.message : "Failed to load tests"
+      );
+    } finally {
+      setTestsLoading(false);
     }
-  };
+  }, [backendAccessToken]);
+
+  useEffect(() => {
+    fetchTests();
+  }, [fetchTests]);
 
   // Open delete confirmation dialog
   const openDeleteDialog = (test: TestData) => {
@@ -814,7 +791,7 @@ export default function LLMPage() {
       <BulkUploadTestsModal
         isOpen={bulkUploadOpen}
         onClose={() => setBulkUploadOpen(false)}
-        onSuccess={refetchTests}
+        onSuccess={fetchTests}
       />
     </AppLayout>
   );

@@ -568,14 +568,16 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
   - **Step 2**: Upload CSV file (drag-and-drop or click-to-browse). A brief paragraph describes the expected CSV format (adapts to selected test type). "Download sample CSV" button generates a ZIP file (via `jszip`) containing the sample CSV and a `README.txt` with detailed column descriptions, value formats, JSON escaping rules, and examples
   - **CSV format for Next Reply**: columns `name`, `conversation_history` (OpenAI chat format JSON array), `criteria`
   - **CSV format for Tool Call**: columns `name`, `conversation_history` (OpenAI chat format JSON array), `tool_calls` (JSON array matching `TestConfig.evaluation.tool_calls` format — supports `tool`, `arguments`, `is_called`, `accept_any_arguments`)
-  - **Validation**: Checks required columns, unique test names, valid JSON in `conversation_history` and `tool_calls`/`criteria` fields. Shows errors with row numbers (up to 5 shown, rest summarized)
-  - **Step 3** (optional): Checkbox "Assign tests to agents" → multi-select dropdown to pick agents (with search, type badges, verified/unverified status — same style as `AgentPicker`)
-  - **API**: Single `POST /tests/bulk` call with body `{ type, tests: [...], language?, agent_uuids? }`. Backend handles test creation, language setting, and agent attachment
+  - **Validation**: Checks required columns, unique test names, valid JSON in `conversation_history` and `tool_calls`/`criteria` fields, and enforces a **max 500 tests per upload** limit. Shows errors with row numbers (up to 5 shown, rest summarized)
+  - **Step 3** (optional): Checkbox "Assign tests to agents" → uses `MultiAgentPicker` component from `AgentPicker.tsx` for multi-select agent selection. Agent state lives inside `MultiAgentPicker` — when the modal closes, the component unmounts and state is naturally reset (no stale agent cache)
+  - **API**: `POST /tests/bulk` with body `{ type, tests: [...], language?, agent_uuids? }`. Response: `{ uuids, count, message, warnings }`. `warnings` is `null` on full success, or an array of strings when some agent linking failed (test creation itself is all-or-nothing)
+  - **Warnings handling**: If the response contains `warnings`, the modal stays open showing a yellow warning banner listing each warning, with a "Done" button to dismiss. If no warnings, the modal auto-closes
   - **Language**: UI toggle (English/Hindi/Kannada, same style as AddTestDialog) applies to all tests in the batch. Only sent when not "english" (the default). Backend stores it as `settings.language` in each test's config
   - **Bulk API structure differs from single-test API**: The `type` is top-level (applies to all tests in the batch), not per-test. Type values are `"response"` and `"tool_call"` (same as `POST /tests`). Each test is a flat object with `name`, `conversation_history`, and `criteria`/`tool_calls` — not wrapped in the nested `config.evaluation` structure used by `POST /tests`
-  - **Error handling**: Status-specific fallback messages for 400 (duplicate names/missing fields), 403 (agent not owned), 404 (agent not found), 422 (schema validation). Backend's `message`/`error` field is preferred when available
-  - **Bulk API is atomic**: If any test name conflicts (within batch or with existing tests), none are created. Agent validation happens before test creation — if any agent UUID is invalid, no tests are created
+  - **Error handling**: Status-specific fallback messages for 400 (duplicate names/missing fields/batch > 500), 403 (agent not owned), 404 (agent not found). Backend's `detail` field (FastAPI standard) is preferred, then `message`, then fallback
+  - **Bulk API is atomic for test creation**: If any test name conflicts (within batch or with existing tests), none are created. Agent linking is best-effort — tests are created first, then linking is attempted per-agent. Partial linking failures produce `warnings` in the response, not errors
   - Uses `papaparse` for robust CSV parsing (handles quoted fields containing JSON with commas/quotes)
+  - **Data refresh**: The tests page uses a shared `fetchTests` function (wrapped in `useCallback`) for both initial load and post-upload refresh, with consistent 401 handling and loading/error states
 - **View all tests**
 - **Edit/delete tests**
 - **Link tests to agents** for benchmarking
@@ -663,7 +665,8 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
 
 **Config Tab — Agent Selection** (`SimulationConfigTab.tsx` + `AgentPicker.tsx`):
 
-- Uses the `AgentPicker` component (custom dropdown, not a native `<select>`) with search, type tags (Agent/Connection), and verification status
+- Uses the `AgentPicker` component (single-select, custom dropdown, not a native `<select>`) with search, type tags (Agent/Connection), and verification status
+- `MultiAgentPicker` (also in `AgentPicker.tsx`) provides multi-select with selected agent tags (removable chips), fixed-position dropdown with smart above/below placement, search, and type/verification badges. Used by `BulkUploadTestsModal`. Each instance manages its own agent fetch — when unmounted, state is naturally cleaned up
 - The `Agent` type (`AgentPicker.tsx`) has fields: `uuid`, `name`, `type` (`"agent" | "connection"`), and `verified` (`boolean`). The `verified` field is derived from `config.connection_verified` for connection agents; built agents are always considered verified
 - **Unverified agent tag**: Unverified agents show a yellow "Unverified" pill with an exclamation-mark triangle icon inline next to the agent name (left side), not grouped with the type tags on the right
 - **Unverified agent warning**: When an unverified connection agent is selected, a yellow warning banner appears below the picker: "This agent needs to be verified before the simulation can be run."
