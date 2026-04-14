@@ -60,7 +60,7 @@ const calibrateTabs: TabType[] = [
   "tests",
   "settings",
 ];
-const connectionTabs: TabType[] = ["connection", "tests"];
+const connectionTabs: TabType[] = ["connection", "tests", "settings"];
 
 export function AgentDetail({
   agentUuid,
@@ -407,6 +407,10 @@ export function AgentDetail({
                     .filter((h) => h.key.trim())
                     .map((h) => [h.key.trim(), h.value])
                 ),
+                settings: {
+                  agent_speaks_first: agentSpeaksFirst,
+                  max_assistant_turns: maxAssistantTurns,
+                },
               }
             : {
                 system_prompt: systemPrompt,
@@ -717,6 +721,16 @@ export function AgentDetail({
               }`}
             >
               Tests
+            </button>
+            <button
+              onClick={() => handleTabChange("settings")}
+              className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                activeTab === "settings"
+                  ? "text-foreground border-b-2 border-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Settings
             </button>
           </>
         ) : (

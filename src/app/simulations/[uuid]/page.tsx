@@ -115,6 +115,11 @@ export default function SimulationDetailPage() {
   const [isConfigured, setIsConfigured] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
+  // Name editing state
+  const [isEditNameDialogOpen, setIsEditNameDialogOpen] = useState(false);
+  const [editedName, setEditedName] = useState("");
+  const [isSavingName, setIsSavingName] = useState(false);
+
   // Launch dropdown state
   const [launchDropdownOpen, setLaunchDropdownOpen] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
@@ -320,10 +325,15 @@ export default function SimulationDetailPage() {
 
         // Pre-populate agent if present
         if (data.agent) {
+          const agentType = (data.agent.config?.agent_url !== undefined ? "connection" : "agent") as "agent" | "connection";
           setSelectedAgent({
             uuid: data.agent.uuid,
             name: data.agent.name,
-            type: (data.agent.config?.agent_url !== undefined ? "connection" : "agent") as "agent" | "connection",
+            type: agentType,
+            verified:
+              agentType === "connection"
+                ? data.agent.config?.connection_verified === true
+                : true,
           });
         }
 
@@ -520,6 +530,63 @@ export default function SimulationDetailPage() {
     fetchMetrics();
   }, [backendAccessToken]);
 
+  // Name editing handlers
+  const handleOpenEditName = () => {
+    if (simulation) {
+      setEditedName(simulation.name);
+      setIsEditNameDialogOpen(true);
+    }
+  };
+
+  const handleSaveName = async () => {
+    if (!simulation || !editedName.trim() || editedName.trim() === simulation.name) {
+      setIsEditNameDialogOpen(false);
+      return;
+    }
+
+    try {
+      setIsSavingName(true);
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) {
+        throw new Error("BACKEND_URL environment variable is not set");
+      }
+
+      const response = await fetch(`${backendUrl}/simulations/${uuid}`, {
+        method: "PUT",
+        headers: {
+          accept: "application/json",
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
+          Authorization: `Bearer ${backendAccessToken}`,
+        },
+        body: JSON.stringify({ name: editedName.trim() }),
+      });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to update simulation name");
+      }
+
+      setSimulation({ ...simulation, name: editedName.trim() });
+      setIsEditNameDialogOpen(false);
+      toast.success("Simulation name updated");
+    } catch (err) {
+      console.error("Error saving simulation name:", err);
+      toast.error(err instanceof Error ? err.message : "Failed to save name");
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  const handleCancelEditName = () => {
+    setIsEditNameDialogOpen(false);
+    setEditedName("");
+  };
+
   // Header with back button and simulation name
   const customHeader = (
     <div className="flex items-center gap-3">
@@ -542,19 +609,171 @@ export default function SimulationDetailPage() {
           />
         </svg>
       </button>
-      <span className="text-base font-semibold text-foreground">
+      <span
+        className={`text-base font-semibold text-foreground ${
+          !isLoading && simulation ? "cursor-pointer hover:opacity-70 transition-opacity" : ""
+        }`}
+        onClick={!isLoading && simulation ? handleOpenEditName : undefined}
+        title={!isLoading && simulation ? "Click to edit name" : undefined}
+      >
         {isLoading ? "Loading..." : simulation?.name || "Simulation"}
       </span>
     </div>
   );
 
+  const isAgentUnverified = selectedAgent?.verified === false;
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [verifySampleResponse, setVerifySampleResponse] = useState<Record<string, unknown> | null>(null);
+
+  const handleVerifyAgent = async () => {
+    if (!selectedAgent) return;
+
+    try {
+      setIsVerifying(true);
+      setVerifyError(null);
+      setVerifySampleResponse(null);
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) {
+        throw new Error("BACKEND_URL environment variable is not set");
+      }
+
+      const response = await fetch(
+        `${backendUrl}/agents/${selectedAgent.uuid}/verify-connection`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            accept: "application/json",
+            "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
+          },
+          body: JSON.stringify({}),
+        }
+      );
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("Verification request failed");
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        setSelectedAgent({ ...selectedAgent, verified: true });
+        toast.success("Agent connection verified successfully");
+      } else {
+        setVerifyError(result.error || "Connection verification failed");
+        setVerifySampleResponse(result.sample_response ?? null);
+      }
+    } catch (err) {
+      console.error("Error verifying agent connection:", err);
+      setVerifyError(err instanceof Error ? err.message : "Verification failed");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   // Launch button for header actions
   const headerActions =
     !isLoading && !error && simulation && isConfigured ? (
-      <div className="relative mr-2" ref={launchDropdownRef}>
+      <div className="flex items-center gap-2 mr-2">
+        {isAgentUnverified && (
+          <div className="relative">
+            <button
+              onClick={handleVerifyAgent}
+              disabled={isVerifying}
+              className="h-8 px-4 rounded-md text-sm font-medium bg-yellow-500 text-black hover:bg-yellow-400 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {isVerifying ? (
+                <>
+                  <svg
+                    className="w-4 h-4 animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  <span>Verifying...</span>
+                </>
+              ) : (
+                <>
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <span>Verify</span>
+                </>
+              )}
+            </button>
+
+            {(verifyError || verifySampleResponse) && (
+              <>
+                <div
+                  className="fixed inset-0 z-[99]"
+                  onClick={() => { setVerifyError(null); setVerifySampleResponse(null); }}
+                />
+                <div className="absolute right-0 top-full mt-2 w-80 bg-background border border-border rounded-xl shadow-xl z-[100] overflow-hidden">
+                  <div className="flex items-center justify-between p-3 border-b border-border">
+                    <span className="text-sm font-medium text-red-400">Verification Failed</span>
+                    <button
+                      onClick={() => { setVerifyError(null); setVerifySampleResponse(null); }}
+                      className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted transition-colors cursor-pointer"
+                    >
+                      <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="p-3 space-y-2">
+                    {verifyError && (
+                      <p className="text-xs text-red-400">{verifyError}</p>
+                    )}
+                    {verifySampleResponse && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          Your agent responded with:
+                        </p>
+                        <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground max-h-48 overflow-y-auto">
+                          {JSON.stringify(verifySampleResponse, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+        <div className="relative group" ref={launchDropdownRef}>
         <button
-          onClick={() => setLaunchDropdownOpen(!launchDropdownOpen)}
-          disabled={isLaunching}
+          onClick={() => !isAgentUnverified && setLaunchDropdownOpen(!launchDropdownOpen)}
+          disabled={isLaunching || isAgentUnverified}
           className="h-8 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
         >
           {isLaunching ? (
@@ -605,6 +824,12 @@ export default function SimulationDetailPage() {
           )}
         </button>
 
+        {isAgentUnverified && (
+          <div className="absolute right-0 top-full mt-1 w-56 px-3 py-2 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[60]">
+            Agent must be verified before launching a simulation
+          </div>
+        )}
+
         {/* Dropdown Menu */}
         {launchDropdownOpen && (
           <div className="absolute right-0 top-full mt-2 bg-background border border-border rounded-xl shadow-xl z-50 min-w-[180px]">
@@ -628,7 +853,7 @@ export default function SimulationDetailPage() {
               </svg>
               Text Simulation
             </button>
-            <div className="relative group">
+            <div className="relative group/voice">
               <button
                 onClick={() => handleLaunch("voice")}
                 disabled={isLaunching || selectedAgent?.type === "connection"}
@@ -650,13 +875,14 @@ export default function SimulationDetailPage() {
                 Voice Simulation
               </button>
               {selectedAgent?.type === "connection" && (
-                <div className="absolute left-0 top-full mt-1 w-64 px-3 py-2 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[60]">
+                <div className="absolute left-0 top-full mt-1 w-64 px-3 py-2 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/voice:opacity-100 pointer-events-none transition-opacity z-[60]">
                   Agent connections don&apos;t support voice simulations yet
                 </div>
               )}
             </div>
           </div>
         )}
+        </div>
       </div>
     ) : null;
 
@@ -776,6 +1002,53 @@ export default function SimulationDetailPage() {
           </div>
         ) : null}
       </div>
+
+      {/* Edit Name Dialog */}
+      {isEditNameDialogOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={handleCancelEditName}
+        >
+          <div
+            className="bg-background border border-border rounded-xl p-5 md:p-6 max-w-md w-full shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-base md:text-lg font-semibold mb-3 md:mb-4">
+              Edit Simulation Name
+            </h2>
+            <input
+              type="text"
+              value={editedName}
+              onChange={(e) => setEditedName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleSaveName();
+                } else if (e.key === "Escape") {
+                  handleCancelEditName();
+                }
+              }}
+              className="w-full h-9 md:h-10 px-3 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent mb-4"
+              maxLength={50}
+              autoFocus
+            />
+            <div className="flex items-center justify-end gap-2 md:gap-3">
+              <button
+                onClick={handleCancelEditName}
+                className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveName}
+                disabled={!editedName.trim() || isSavingName}
+                className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSavingName ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

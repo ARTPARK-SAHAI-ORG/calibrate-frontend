@@ -8,6 +8,7 @@ export type Agent = {
   uuid: string;
   name: string;
   type?: "agent" | "connection";
+  verified?: boolean;
 };
 
 type AgentPickerProps = {
@@ -69,6 +70,10 @@ export function AgentPicker({
               uuid: agent.uuid,
               name: agent.name || agent.agent_name || String(agent),
               type: agent.type === "connection" ? "connection" : "agent",
+              verified:
+                agent.type === "connection"
+                  ? agent.config?.connection_verified === true
+                  : true,
             }))
           : [];
         setAgents(formattedAgents);
@@ -174,7 +179,17 @@ export function AgentPicker({
                           : "text-foreground hover:bg-muted"
                       }`}
                     >
-                      <span className="truncate">{agent.name}</span>
+                      <span className="truncate flex items-center gap-1.5">
+                        {agent.name}
+                        {agent.verified === false && (
+                          <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-500/10 text-yellow-500 flex-shrink-0">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                            </svg>
+                            Unverified
+                          </span>
+                        )}
+                      </span>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <span
                           className={`text-xs px-1.5 py-0.5 rounded font-medium ${

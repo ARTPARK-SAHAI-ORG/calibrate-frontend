@@ -90,12 +90,13 @@ Build agents (`type: "agent"`) have 5 tabs:
 | **Tests**           | Link test cases to agent, run tests, view past runs with results, compare models |
 | **Settings**        | Toggle "Agent speaks first" behavior, set max assistant turns before call ends   |
 
-Connection agents (`type: "connection"`) have 2 tabs:
+Connection agents (`type: "connection"`) have 3 tabs:
 
 | Tab            | Purpose                                                                          |
 | -------------- | -------------------------------------------------------------------------------- |
 | **Connection** | Configure agent URL, headers, verify connection, view expected request/response format |
 | **Tests**      | Link test cases to agent, run tests, view past runs with results, compare models |
+| **Settings**   | Toggle "Agent speaks first" behavior, set max assistant turns before call ends   |
 
 **Connection Tab — Verification Logic** (`AgentConnectionTabContent.tsx`):
 
@@ -105,6 +106,8 @@ The "Check connection" button uses **two different endpoints** depending on whet
 - **No unsaved changes** (form matches saved config): Calls `POST /agents/{uuid}/verify-connection` (post-save, requires auth) with an empty body `{}`. The server reads URL/headers from the saved agent config.
 
 The basic connection check does not send a `model` field. The same post-save endpoint (`POST /agents/{uuid}/verify-connection`) is also used for per-model benchmark verification by passing `{ "model": "openai/gpt-5.4" }` in the body — there is no separate benchmark verification endpoint. The response schema for all verify-connection calls is `{ success: boolean, error: string | null, sample_response: object | null }`. The frontend maps `success` → `connection_verified` and `error` → `connection_verified_error` in the local `connectionConfig` state. When verification fails and `sample_response` is present (e.g., the agent returned JSON in an unexpected format), it is displayed below the error message in a scrollable `<pre>` block labeled "Your agent responded with:" so the user can see exactly what their agent returned and fix it.
+
+**Save config payload by agent type**: Both agent types include `settings: { agent_speaks_first, max_assistant_turns }` in the config sent to `PUT /agents/{uuid}`. Connection agents send `{ ...connectionConfig, agent_url, agent_headers, settings }`. Calibrate agents send `{ system_prompt, stt, tts, llm, settings, system_tools, data_extraction_fields }`. The settings values are loaded from `data.config.settings` on fetch for all agent types.
 
 **Save response updates verification status**: The `PUT /agents/{uuid}` response returns the full agent including `config.connection_verified`, `config.connection_verified_at`, `config.connection_verified_error`, and `config.benchmark_models_verified`. After a successful save of a connection agent, `AgentDetail.tsx` parses this response and updates `connectionConfig` state with these fields. A `useEffect` in `AgentConnectionTabContent` watches `connectionConfig.connection_verified` and `connectionConfig.connection_verified_error` and syncs the local `verifyStatus` display state accordingly, so the UI immediately reflects any backend-driven reset (e.g., URL/headers changed → backend sets `connection_verified: false` → UI shows "Not verified").
 
@@ -633,6 +636,7 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
 - **Create simulations** with a name
 - **View all simulations** in a searchable, sortable list
 - **Delete simulations**
+- **Rename simulations** — click the simulation name in the header to open an edit name dialog (same pattern as agent name editing: modal with text input, Enter/Escape keyboard support, 50 char max, `PUT /simulations/{uuid}` with `{ name }`)
 - **Right-click or Cmd/Ctrl+click** any simulation row to open in a new browser tab (native browser support)
 
 **Simulation Detail Page** (`/simulations/[uuid]`) has 2 tabs:
@@ -641,6 +645,16 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
 | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Config** | Select agent, personas (max 2), scenarios (max 5) for the simulation                                                                                                                                                  |
 | **Runs**   | View history of simulation runs (right-click or Cmd/Ctrl+click to open run in new tab). **Responsive**: Desktop table view (`hidden md:block`) with sortable columns, mobile card view with pills for status and type |
+
+**Config Tab — Agent Selection** (`SimulationConfigTab.tsx` + `AgentPicker.tsx`):
+
+- Uses the `AgentPicker` component (custom dropdown, not a native `<select>`) with search, type tags (Agent/Connection), and verification status
+- The `Agent` type (`AgentPicker.tsx`) has fields: `uuid`, `name`, `type` (`"agent" | "connection"`), and `verified` (`boolean`). The `verified` field is derived from `config.connection_verified` for connection agents; built agents are always considered verified
+- **Unverified agent tag**: Unverified agents show a yellow "Unverified" pill with an exclamation-mark triangle icon inline next to the agent name (left side), not grouped with the type tags on the right
+- **Unverified agent warning**: When an unverified connection agent is selected, a yellow warning banner appears below the picker: "This agent needs to be verified before the simulation can be run."
+- **Verification error popover**: When the Verify button is clicked and fails, a dropdown popover appears beneath the Verify button (not in the config tab) with a "Verification Failed" header, close button, error message, and optional sample response in a scrollable `<pre>` block. Dismissed by clicking outside or the X button. State (`verifyError`, `verifySampleResponse`) lives in the simulation page and is cleared on each new verify attempt.
+- **Voice simulation restriction**: When a connection agent is selected, a blue info banner explains that voice simulations are only supported for built agents
+- The simulation detail page (`/simulations/[uuid]/page.tsx`) pre-populates `selectedAgent` from the simulation's agent data including the `verified` field derived from `data.agent.config?.connection_verified`
 
 **Selection Limits:**
 
@@ -652,6 +666,8 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
 - **Run types**: chat (text-based), audio, voice (full pipeline)
 - Runs are executed asynchronously with polling for status updates
 - Status flow: queued → in_progress → done (or failed). When a run is aborted, the API returns `status: "done"` with individual `simulation_results` entries having `aborted: true`
+- **Launch button**: Appears in header actions after simulation is configured. Uses a dropdown with "Text Simulation" and "Voice Simulation" options. Disabled with a hover tooltip ("Agent must be verified before launching a simulation") when `selectedAgent.verified === false`. Voice option is separately disabled for connection agents with its own tooltip using a Tailwind named group (`group/voice` + `group-hover/voice:`) to scope the tooltip to only the voice option — avoids leaking to sibling items when nested `group` classes exist.
+- **Verify button**: Shown beside the Launch button only when the selected agent is unverified. Styled with a prominent yellow background (`bg-yellow-500 text-black`) to attract attention. Calls `POST /agents/{uuid}/verify-connection` with empty body (same post-save endpoint used by `AgentConnectionTabContent`). On success, updates `selectedAgent.verified` to `true` in local state (hides the Verify button and enables Launch) with a success toast. On failure, error details shown only via popover (no toast). Shows spinner + "Verifying..." while in progress.
 
 **Runs Tab UI** (`SimulationRunsTab` component):
 
@@ -3417,7 +3433,8 @@ import {
 // - Message bubbles: `w-[70%] md:w-1/2` (70% width on mobile for visual differentiation, half on desktop)
 // - User messages aligned right, agent messages aligned left for clear visual distinction
 // - Status indicators: responsive padding `pl-2 md:pl-3`
-<TestDetailView history={history} output={output} passed={passed} />
+// - `reasoning` (optional): LLM evaluator's reasoning for the pass/fail decision, displayed in the detail view
+<TestDetailView history={history} output={output} passed={passed} reasoning={reasoning} />
 
 // Stats bar - shows passed/failed counts
 // In TestRunnerDialog: show in header on desktop, at top of list on mobile
@@ -3426,6 +3443,7 @@ import {
 // Evaluation criteria panel - third column in test/benchmark runner dialogs
 // Shows test type badge ("Next Reply Text" blue / "Tool Call" purple), criteria text, expected tool calls
 // Desktop only (hidden on mobile), w-72, border-l
+// IMPORTANT: Both TestRunnerDialog and BenchmarkResultsDialog import this from shared — no local copies
 // IMPORTANT: Only rendered after test completes (status "passed" or "failed"). During running/pending/queued,
 // evaluation data isn't available yet, so showing the panel would display misleading defaults.
 // IMPORTANT: testType must come from evaluation.type (API data), NOT from test.type (synthesized data).
@@ -3712,7 +3730,7 @@ toast.error(
 );
 ```
 
-**Toaster Component**: Added to root layout (`src/app/layout.tsx`) with `richColors` and `position="top-right"`.
+**Toaster Component**: Added to root layout (`src/app/layout.tsx`) with `richColors`, `position="top-right"`, and `closeButton` (all toasts show an X button for dismissal).
 
 **Features using limits:**
 

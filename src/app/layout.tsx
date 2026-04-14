@@ -49,7 +49,7 @@ export default function RootLayout({
         <SessionProvider>
           <FloatingButtonProvider>{children}</FloatingButtonProvider>
         </SessionProvider>
-        <Toaster richColors position="top-right" />
+        <Toaster richColors position="top-right" closeButton />
         <Analytics />
         {process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID && (
           <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID} />
