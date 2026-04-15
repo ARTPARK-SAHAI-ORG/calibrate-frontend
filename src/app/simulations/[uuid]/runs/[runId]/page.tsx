@@ -16,6 +16,7 @@ import { NotFoundState } from "@/components/ui";
 import { formatStatus, getStatusBadgeClass } from "@/lib/status";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useSidebarState } from "@/lib/sidebar";
+import { ShareButton } from "@/components/ShareButton";
 
 type MetricData = {
   mean: number;
@@ -75,6 +76,8 @@ type RunData = {
   simulation_results: SimulationResult[];
   results_s3_prefix: string;
   error: string | null;
+  is_public?: boolean;
+  share_token?: string | null;
 };
 
 export default function SimulationRunPage() {
@@ -648,6 +651,15 @@ export default function SimulationRunPage() {
               >
                 {runData.type}
               </span>
+              {runData.status.toLowerCase() === "done" && backendAccessToken && (
+                <ShareButton
+                  entityType="simulation-run"
+                  entityId={runId}
+                  accessToken={backendAccessToken}
+                  initialIsPublic={runData.is_public ?? false}
+                  initialShareToken={runData.share_token ?? null}
+                />
+              )}
               {(runData.status.toLowerCase() === "in_progress" ||
                 runData.status.toLowerCase() === "queued") && (
                 <button
@@ -838,13 +850,13 @@ export default function SimulationRunPage() {
                             key === "stt_llm_judge" ||
                             key === "stt_llm_judge_score";
                           return (
-                            <div key={key}>
-                              <div className="text-xs md:text-sm text-muted-foreground mb-2 flex items-center gap-1.5">
+                            <div key={key} className="border border-border rounded-xl p-4 bg-muted/10">
+                              <div className="text-[12px] text-muted-foreground mb-1 flex items-center gap-1.5">
                                 {key}
                                 {isSttLlmJudge && (
                                   <Tooltip content="This is the speech to text accuracy for the text spoken by the simulated user calculated by comparing it with the transcribed text by the agent">
                                     <svg
-                                      className="w-3.5 md:w-4 h-3.5 md:h-4 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                      className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                                       fill="none"
                                       viewBox="0 0 24 24"
                                       stroke="currentColor"
@@ -859,7 +871,7 @@ export default function SimulationRunPage() {
                                   </Tooltip>
                                 )}
                               </div>
-                              <div className="text-sm md:text-base font-medium text-foreground">
+                              <div className="text-[18px] font-semibold text-foreground">
                                 {Math.round(mean * 100)}%
                               </div>
                             </div>
@@ -877,13 +889,13 @@ export default function SimulationRunPage() {
                             const mean = metric.mean;
                             const tooltipContent = getLatencyMetricTooltip(key);
                             return (
-                              <div key={key}>
-                                <div className="text-xs md:text-sm text-muted-foreground mb-2 flex items-center gap-1.5">
+                              <div key={key} className="border border-border rounded-xl p-4 bg-muted/10">
+                                <div className="text-[12px] text-muted-foreground mb-1 flex items-center gap-1.5">
                                   {key}
                                   {tooltipContent && (
                                     <Tooltip content={tooltipContent}>
                                       <svg
-                                        className="w-3.5 md:w-4 h-3.5 md:h-4 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                        className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                                         fill="none"
                                         viewBox="0 0 24 24"
                                         stroke="currentColor"
@@ -898,9 +910,9 @@ export default function SimulationRunPage() {
                                     </Tooltip>
                                   )}
                                 </div>
-                                <div className="text-sm md:text-base font-medium text-foreground">
+                                <div className="text-[18px] font-semibold text-foreground">
                                   {mean < 1
-                                    ? `${(mean * 1000).toFixed(2)}ms`
+                                    ? `${(mean * 1000).toFixed(0)}ms`
                                     : `${mean.toFixed(2)}s`}
                                 </div>
                               </div>
@@ -962,9 +974,15 @@ export default function SimulationRunPage() {
 
                 return (
                   <>
-                    <h2 className="hidden md:block text-base md:text-lg font-semibold mb-3 md:mb-4">
-                      Simulation Results
-                    </h2>
+                    <div className="flex items-baseline gap-3 mb-3 md:mb-4">
+                      <h2 className="hidden md:block text-base md:text-lg font-semibold">
+                        Simulation Results
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        {runData.simulation_results.length}{" "}
+                        {runData.simulation_results.length === 1 ? "simulation" : "simulations"}
+                      </p>
+                    </div>
 
                     {/* Desktop Table View */}
                     <div className="hidden md:block border border-border rounded-xl overflow-hidden bg-muted/20">

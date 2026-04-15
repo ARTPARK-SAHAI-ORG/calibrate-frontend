@@ -17,6 +17,7 @@ import { DownloadableTable } from "@/components/DownloadableTable";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useSidebarState } from "@/lib/sidebar";
 import { getDataset } from "@/lib/datasets";
+import { ShareButton } from "@/components/ShareButton";
 
 type LatencyMetric = {
   mean: number;
@@ -61,6 +62,8 @@ type EvaluationResult = {
   provider_results?: ProviderResult[];
   leaderboard_summary?: LeaderboardSummary[];
   error?: string | null;
+  is_public?: boolean;
+  share_token?: string | null;
 };
 
 // Helper function to map provider value back to label
@@ -335,6 +338,15 @@ export default function TTSEvaluationDetailPage() {
               )}
               {evaluationResult.status !== "done" && (
                 <StatusBadge status={evaluationResult.status} showSpinner />
+              )}
+              {evaluationResult.status === "done" && backendAccessToken && (
+                <ShareButton
+                  entityType="tts"
+                  entityId={taskId}
+                  accessToken={backendAccessToken}
+                  initialIsPublic={evaluationResult.is_public ?? false}
+                  initialShareToken={evaluationResult.share_token ?? null}
+                />
               )}
             </div>
 

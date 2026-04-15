@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
@@ -12,6 +12,7 @@ import {
 } from "@/components/ToolPicker";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
+import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
 import { RunTestDialog } from "@/components/RunTestDialog";
 import { AddTestDialog, TestConfig } from "@/components/AddTestDialog";
 import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
@@ -32,13 +33,98 @@ type Tool = {
   name: string;
 };
 
+type TestRunResult = {
+  name?: string;
+  passed: boolean | null;
+  output?: Record<string, any> | null;
+  test_case?: {
+    name?: string;
+    history?: { role: string; content: string }[];
+    evaluation?: Record<string, any>;
+  } | null;
+};
+
+type AllRun = {
+  uuid: string;
+  name: string;
+  status: string;
+  type: "llm-unit-test" | "llm-benchmark";
+  updated_at: string;
+  total_tests: number | null;
+  passed: number | null;
+  failed: number | null;
+  results?: TestRunResult[] | null;
+  model_results?: { model: string }[] | null;
+  leaderboard_summary?: null;
+  results_s3_prefix?: string;
+  error: boolean;
+  is_public: boolean;
+  share_token: string | null;
+  agent_id: string;
+  agent_name: string;
+};
+
+function getRunDisplayName(run: AllRun): string {
+  if (run.type === "llm-benchmark") {
+    const modelCount = run.model_results?.length ?? 0;
+    return `${modelCount} model${modelCount !== 1 ? "s" : ""}`;
+  }
+  const totalTests = run.total_tests ?? run.results?.length ?? 0;
+  if (totalTests === 1 && run.results?.[0]) {
+    const testName = run.results[0].name || run.results[0].test_case?.name;
+    if (testName) return testName;
+  }
+  return `${totalTests} test${totalTests !== 1 ? "s" : ""}`;
+}
+
+function formatRelativeTime(dateString: string): string {
+  let date: Date;
+  if (dateString.endsWith("Z") || dateString.includes("+")) {
+    date = new Date(dateString);
+  } else {
+    date = new Date(dateString.replace(" ", "T") + "Z");
+  }
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (diffInSeconds < 60) return "now";
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) return `${diffInMinutes} min ago`;
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) return `${diffInHours}h ago`;
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays < 7) return diffInDays === 1 ? "yesterday" : `${diffInDays}d ago`;
+  const diffInWeeks = Math.floor(diffInDays / 7);
+  if (diffInWeeks < 4) return `${diffInWeeks}w ago`;
+  const diffInMonths = Math.floor(diffInDays / 30);
+  if (diffInMonths < 12) return `${diffInMonths}m ago`;
+  return `${Math.floor(diffInDays / 365)}y ago`;
+}
+
 // AddTestDialog and related types have been moved to @/components/AddTestDialog
 
-export default function LLMPage() {
+function LLMPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const backendAccessToken = useAccessToken();
   const [sidebarOpen, setSidebarOpen] = useSidebarState();
+  const [activeTab, setActiveTab] = useState<"tests" | "runs">(
+    searchParams.get("tab") === "runs" ? "runs" : "tests"
+  );
   const [searchQuery, setSearchQuery] = useState("");
+
+  // All runs state
+  const [allRuns, setAllRuns] = useState<AllRun[]>([]);
+  const [allRunsLoading, setAllRunsLoading] = useState(false);
+  const [runsTypeFilter, setRunsTypeFilter] = useState<"all" | "llm-unit-test" | "llm-benchmark">("all");
+  const [runsAgentFilter, setRunsAgentFilter] = useState<string>("all");
+  const [runsAgentDropdownOpen, setRunsAgentDropdownOpen] = useState(false);
+  const runsAgentDropdownRef = useRef<HTMLDivElement>(null);
+  const [runsStatusFilter, setRunsStatusFilter] = useState<"all" | "passed" | "failed" | "error">("all");
+
+  // Viewing a run from the Runs tab
+  const [selectedRun, setSelectedRun] = useState<AllRun | null>(null);
+  const [viewingRunTest, setViewingRunTest] = useState(false);
+  const [viewingRunBenchmark, setViewingRunBenchmark] = useState(false);
 
   // Set page title
   useEffect(() => {
@@ -129,6 +215,44 @@ export default function LLMPage() {
   useEffect(() => {
     fetchTests();
   }, [fetchTests]);
+
+  // Fetch all runs when Runs tab is activated
+  useEffect(() => {
+    if (activeTab !== "runs" || !backendAccessToken) return;
+    const fetchAllRuns = async () => {
+      try {
+        setAllRunsLoading(true);
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+        if (!backendUrl) throw new Error("BACKEND_URL not set");
+        const response = await fetch(`${backendUrl}/agent-tests/runs`, {
+          method: "GET",
+          headers: {
+            accept: "application/json",
+            "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
+          },
+        });
+        if (response.status === 401) { await signOut({ callbackUrl: "/login" }); return; }
+        if (!response.ok) throw new Error("Failed to fetch runs");
+        const data = await response.json();
+        setAllRuns(data.runs || []);
+      } catch (err) {
+        console.error("Error fetching all runs:", err);
+      } finally {
+        setAllRunsLoading(false);
+      }
+    };
+    fetchAllRuns();
+  }, [activeTab, backendAccessToken]);
+
+  const handleRunClick = (run: AllRun) => {
+    setSelectedRun(run);
+    if (run.type === "llm-unit-test") {
+      setViewingRunTest(true);
+    } else {
+      setViewingRunBenchmark(true);
+    }
+  };
 
   const toggleTestSelection = (uuid: string) => {
     setSelectedTestUuids((prev) => {
@@ -513,32 +637,61 @@ export default function LLMPage() {
               Create and manage tests to evaluate your LLM
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {selectedTestUuids.size > 0 && (
+          {activeTab === "tests" && (
+            <div className="flex items-center gap-2">
+              {selectedTestUuids.size > 0 && (
+                <button
+                  onClick={openBulkDeleteDialog}
+                  className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-red-500 text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer flex-shrink-0"
+                >
+                  Delete selected ({selectedTestUuids.size})
+                </button>
+              )}
               <button
-                onClick={openBulkDeleteDialog}
-                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-red-500 text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer flex-shrink-0"
+                onClick={() => setBulkUploadOpen(true)}
+                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer flex-shrink-0"
               >
-                Delete selected ({selectedTestUuids.size})
+                Bulk upload
               </button>
-            )}
-            <button
-              onClick={() => setBulkUploadOpen(true)}
-              className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer flex-shrink-0"
-            >
-              Bulk upload
-            </button>
-            <button
-              onClick={() => {
-                resetForm();
-                setAddTestSidebarOpen(true);
-              }}
-              className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
-            >
-              Add test
-            </button>
-          </div>
+              <button
+                onClick={() => {
+                  resetForm();
+                  setAddTestSidebarOpen(true);
+                }}
+                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
+              >
+                Add test
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Tab Bar */}
+        <div className="flex gap-1 border-b border-border">
+          <button
+            onClick={() => { setActiveTab("tests"); router.replace("/tests", { scroll: false }); }}
+            className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 -mb-px ${
+              activeTab === "tests"
+                ? "border-foreground text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Tests
+          </button>
+          <button
+            onClick={() => { setActiveTab("runs"); router.replace("/tests?tab=runs", { scroll: false }); }}
+            className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 -mb-px ${
+              activeTab === "runs"
+                ? "border-foreground text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Runs
+          </button>
+        </div>
+
+        {/* ── TESTS TAB ── */}
+        {activeTab === "tests" && <>
 
         {/* Search Input */}
         <div className="relative max-w-md">
@@ -882,6 +1035,255 @@ export default function LLMPage() {
             </div>
           </>
         )}
+
+        </> /* end Tests tab */}
+
+        {/* ── RUNS TAB ── */}
+        {activeTab === "runs" && (
+          <>
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Type filter */}
+              <div className="flex gap-1.5">
+                {(["all", "llm-unit-test", "llm-benchmark"] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setRunsTypeFilter(f)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors cursor-pointer ${
+                      runsTypeFilter === f
+                        ? "bg-foreground text-background border-foreground"
+                        : "border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {f === "all" ? "All types" : f === "llm-unit-test" ? "Tests" : "Benchmarks"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Status filter */}
+              <div className="flex gap-1.5">
+                {(["all", "passed", "failed", "error"] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setRunsStatusFilter(f)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors cursor-pointer ${
+                      runsStatusFilter === f
+                        ? "bg-foreground text-background border-foreground"
+                        : "border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {f === "all" ? "All results" : f === "passed" ? "All passed" : f === "failed" ? "All failed" : "Error"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Agent filter */}
+              {allRuns.length > 0 && (() => {
+                const agents = Array.from(new Map(allRuns.map((r) => [r.agent_id, r.agent_name])).entries());
+                if (agents.length <= 1) return null;
+                const selectedLabel = runsAgentFilter === "all"
+                  ? "All agents"
+                  : (agents.find(([id]) => id === runsAgentFilter)?.[1] ?? "All agents");
+                return (
+                  <div ref={runsAgentDropdownRef} className="relative">
+                    <button
+                      onClick={() => setRunsAgentDropdownOpen((o) => !o)}
+                      className="flex items-center gap-2 pl-3 pr-2.5 py-1.5 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:border-muted-foreground transition-colors cursor-pointer"
+                    >
+                      {selectedLabel}
+                      <svg
+                        className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${runsAgentDropdownOpen ? "rotate-180" : ""}`}
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                      </svg>
+                    </button>
+
+                    {runsAgentDropdownOpen && (
+                      <>
+                        <div className="fixed inset-0 z-[99]" onClick={() => setRunsAgentDropdownOpen(false)} />
+                        <div className="absolute left-0 top-full mt-1.5 bg-background border border-border rounded-xl shadow-xl z-[100] overflow-hidden min-w-[160px]">
+                          {([["all", "All agents"], ...agents] as [string, string][]).map(([id, name]) => (
+                            <button
+                              key={id}
+                              onClick={() => { setRunsAgentFilter(id); setRunsAgentDropdownOpen(false); }}
+                              className={`w-full px-3.5 py-2 text-left text-xs transition-colors cursor-pointer flex items-center justify-between gap-3 ${
+                                runsAgentFilter === id ? "bg-accent text-foreground" : "text-foreground hover:bg-muted"
+                              }`}
+                            >
+                              <span className="truncate">{name}</span>
+                              {runsAgentFilter === id && (
+                                <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                </svg>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {allRunsLoading ? (
+              <div className="flex items-center justify-center gap-3 py-8">
+                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              </div>
+            ) : (() => {
+              const isRunning = (r: AllRun) =>
+                r.status === "pending" || r.status === "queued" || r.status === "in_progress";
+              const isError = (r: AllRun) => r.status === "failed" || r.error;
+              const isDone = (r: AllRun) => r.status === "done" && !r.error;
+              const isAllPassed = (r: AllRun) => isDone(r) && (r.failed === null || r.failed === 0);
+              const isAllFailed = (r: AllRun) => isDone(r) && r.failed !== null && r.failed > 0;
+
+              const filtered = allRuns.filter((r) => {
+                if (runsTypeFilter !== "all" && r.type !== runsTypeFilter) return false;
+                if (runsAgentFilter !== "all" && r.agent_id !== runsAgentFilter) return false;
+                if (runsStatusFilter === "passed" && (!isAllPassed(r) || isRunning(r))) return false;
+                if (runsStatusFilter === "failed" && (!isAllFailed(r) || isRunning(r))) return false;
+                if (runsStatusFilter === "error" && !isError(r)) return false;
+                return true;
+              });
+              if (filtered.length === 0) {
+                return (
+                  <div className="border border-border rounded-xl p-8 md:p-12 flex flex-col items-center justify-center bg-muted/20">
+                    <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-muted flex items-center justify-center mb-3 md:mb-4">
+                      <svg className="w-6 h-6 md:w-7 md:h-7 text-muted-foreground" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9 3h6v2h-1v4.5l4.5 7.5c.5.83.5 1.5-.17 2.17-.67.67-1.34.83-2.33.83H8c-1 0-1.67-.17-2.33-.83-.67-.67-.67-1.34-.17-2.17L10 9.5V5H9V3zm3 8.5L8.5 17h7L12 11.5z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-base md:text-lg font-semibold text-foreground mb-1">No runs yet</h3>
+                    <p className="text-sm md:text-base text-muted-foreground text-center">
+                      {(runsTypeFilter !== "all" || runsAgentFilter !== "all" || runsStatusFilter !== "all")
+                        ? "No runs match the selected filters"
+                        : "Run tests from an agent to see results here"}
+                    </p>
+                  </div>
+                );
+              }
+              return (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    {filtered.length} {filtered.length === 1 ? "run" : "runs"}
+                  </p>
+
+                  {/* Desktop Table */}
+                  <div className="hidden md:block border border-border rounded-xl overflow-hidden">
+                    <div className="grid grid-cols-[1fr_1fr_120px_140px_120px] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+                      <div className="text-sm font-medium text-muted-foreground">Name</div>
+                      <div className="text-sm font-medium text-muted-foreground">Agent</div>
+                      <div className="text-sm font-medium text-muted-foreground">Type</div>
+                      <div className="text-sm font-medium text-muted-foreground">Result</div>
+                      <div className="text-sm font-medium text-muted-foreground">Updated</div>
+                    </div>
+                    {filtered.map((run) => (
+                      <div
+                        key={run.uuid}
+                        onClick={() => handleRunClick(run)}
+                        className="grid grid-cols-[1fr_1fr_120px_140px_120px] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{run.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{getRunDisplayName(run)}</p>
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate">{run.agent_name}</p>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium w-fit ${
+                          run.type === "llm-unit-test"
+                            ? "bg-blue-500/20 text-blue-400"
+                            : "bg-purple-500/20 text-purple-400"
+                        }`}>
+                          {run.type === "llm-unit-test" ? "Test" : "Benchmark"}
+                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {run.status === "pending" || run.status === "queued" || run.status === "in_progress" ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-yellow-500/20 text-yellow-500">
+                              <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                              Running
+                            </span>
+                          ) : run.status === "failed" || run.error ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-500">Error</span>
+                          ) : run.type === "llm-unit-test" ? (
+                            <>
+                              {run.passed !== null && run.passed > 0 && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-500">{run.passed} Pass</span>
+                              )}
+                              {run.failed !== null && run.failed > 0 && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-500">{run.failed} Fail</span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-500">Complete</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">{formatRelativeTime(run.updated_at)}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Mobile Card View */}
+                  <div className="md:hidden space-y-3">
+                    {filtered.map((run) => (
+                      <div
+                        key={run.uuid}
+                        onClick={() => handleRunClick(run)}
+                        className="border border-border rounded-xl p-4 bg-background hover:shadow-lg hover:border-foreground/20 transition-all duration-200 cursor-pointer"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">{run.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{run.agent_name}</p>
+                          </div>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium shrink-0 ${
+                            run.type === "llm-unit-test" ? "bg-blue-500/20 text-blue-400" : "bg-purple-500/20 text-purple-400"
+                          }`}>
+                            {run.type === "llm-unit-test" ? "Test" : "Benchmark"}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {run.status === "pending" || run.status === "queued" || run.status === "in_progress" ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-yellow-500/20 text-yellow-500">
+                                <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                                Running
+                              </span>
+                            ) : run.status === "failed" || run.error ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-500">Error</span>
+                            ) : run.type === "llm-unit-test" ? (
+                              <>
+                                {run.passed !== null && run.passed > 0 && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-500">{run.passed} Pass</span>
+                                )}
+                                {run.failed !== null && run.failed > 0 && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-500">{run.failed} Fail</span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-500">Complete</span>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground">{formatRelativeTime(run.updated_at)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
+          </>
+        )}
+
       </div>
 
       {/* Add Test Dialog */}
@@ -950,6 +1352,57 @@ export default function LLMPage() {
         onClose={() => setBulkUploadOpen(false)}
         onSuccess={fetchTests}
       />
+
+      {/* View Run — Test Runner Dialog (from Runs tab) */}
+      {selectedRun && selectedRun.type === "llm-unit-test" && (
+        <TestRunnerDialog
+          isOpen={viewingRunTest}
+          onClose={() => {
+            setViewingRunTest(false);
+            setSelectedRun(null);
+          }}
+          agentUuid={selectedRun.agent_id}
+          agentName={selectedRun.agent_name}
+          tests={
+            selectedRun.results?.map((r, i) => ({
+              uuid: `run-test-${i}`,
+              name: r.name || r.test_case?.name || `Test ${i + 1}`,
+              description: "",
+              type: "response" as const,
+              config: {},
+              created_at: "",
+              updated_at: "",
+            })) || []
+          }
+          taskId={selectedRun.uuid}
+          initialRunStatus={selectedRun.status}
+        />
+      )}
+
+      {/* View Run — Benchmark Results Dialog (from Runs tab) */}
+      {selectedRun && selectedRun.type === "llm-benchmark" && (
+        <BenchmarkResultsDialog
+          isOpen={viewingRunBenchmark}
+          onClose={() => {
+            setViewingRunBenchmark(false);
+            setSelectedRun(null);
+          }}
+          agentUuid={selectedRun.agent_id}
+          agentName={selectedRun.agent_name}
+          testUuids={[]}
+          testNames={[]}
+          models={[]}
+          taskId={selectedRun.uuid}
+        />
+      )}
     </AppLayout>
+  );
+}
+
+export default function LLMPage() {
+  return (
+    <Suspense>
+      <LLMPageInner />
+    </Suspense>
   );
 }

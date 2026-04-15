@@ -209,6 +209,10 @@ export function SimulationRunsTab({ simulationUuid }: SimulationRunsTabProps) {
         </button>
       </div>
 
+      <p className="text-sm text-muted-foreground mb-3">
+        {runs.length} {runs.length === 1 ? "run" : "runs"}
+      </p>
+
       {/* Desktop Table View */}
       <div className="hidden md:block border border-border rounded-xl overflow-hidden">
         {/* Table Header */}

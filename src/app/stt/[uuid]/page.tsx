@@ -17,6 +17,7 @@ import { DownloadableTable } from "@/components/DownloadableTable";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useSidebarState } from "@/lib/sidebar";
 import { getDataset } from "@/lib/datasets";
+import { ShareButton } from "@/components/ShareButton";
 
 type ProviderMetrics = {
   wer: number;
@@ -57,6 +58,8 @@ type EvaluationResult = {
   provider_results?: ProviderResult[];
   leaderboard_summary?: LeaderboardSummary[];
   error?: string | null;
+  is_public?: boolean;
+  share_token?: string | null;
 };
 
 // Helper function to map provider value back to label
@@ -314,7 +317,7 @@ export default function STTEvaluationDetailPage() {
         {/* Evaluation Results */}
         {!isLoading && !error && !errorCode && evaluationResult && (
           <div className="space-y-4">
-            {/* Language Pill, Dataset link, and Status Badge */}
+            {/* Language Pill, Dataset link, Status Badge, and Share */}
             <div className="flex items-center gap-3 flex-wrap">
               {evaluationResult.language && (
                 <span className="px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground capitalize">
@@ -344,6 +347,15 @@ export default function STTEvaluationDetailPage() {
               )}
               {evaluationResult.status !== "done" && (
                 <StatusBadge status={evaluationResult.status} showSpinner />
+              )}
+              {evaluationResult.status === "done" && backendAccessToken && (
+                <ShareButton
+                  entityType="stt"
+                  entityId={taskId}
+                  accessToken={backendAccessToken}
+                  initialIsPublic={evaluationResult.is_public ?? false}
+                  initialShareToken={evaluationResult.share_token ?? null}
+                />
               )}
             </div>
 

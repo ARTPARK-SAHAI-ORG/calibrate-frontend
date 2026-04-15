@@ -24,9 +24,10 @@ export default auth((req) => {
   const isAboutPage = req.nextUrl.pathname === "/about";
   const isTermsPage = req.nextUrl.pathname === "/terms";
   const isPrivacyPage = req.nextUrl.pathname === "/privacy";
+  const isPublicShareRoute = req.nextUrl.pathname.startsWith("/public/");
 
-  // Allow public pages: landing page, auth API, debug, docs, about, terms, privacy
-  if (isHomePage || isAuthRoute || isDebugRoute || isDocsRoute || isAboutPage || isTermsPage || isPrivacyPage) {
+  // Allow public pages: landing page, auth API, debug, docs, about, terms, privacy, public share links
+  if (isHomePage || isAuthRoute || isDebugRoute || isDocsRoute || isAboutPage || isTermsPage || isPrivacyPage || isPublicShareRoute) {
     return NextResponse.next();
   }
 

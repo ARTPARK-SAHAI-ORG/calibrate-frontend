@@ -16,6 +16,7 @@ import {
 } from "./test-results/shared";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { ShareButton } from "@/components/ShareButton";
 
 type TestData = {
   uuid: string;
@@ -69,6 +70,7 @@ type TestCaseResult = {
 
 type TestRunStatusResponse = {
   task_id: string;
+  name?: string;
   status: string;
   total_tests?: number;
   passed?: number;
@@ -76,6 +78,8 @@ type TestRunStatusResponse = {
   results?: TestCaseResult[];
   results_s3_prefix?: string;
   error?: string;
+  is_public?: boolean;
+  share_token?: string | null;
 };
 
 type TestRunnerDialogProps = {
@@ -124,6 +128,9 @@ export function TestRunnerDialog({
     "queued" | "in_progress" | "done" | "failed"
   >("queued");
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [runName, setRunName] = useState<string | null>(null);
+  const [isPublic, setIsPublic] = useState(false);
+  const [shareToken, setShareToken] = useState<string | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Debug: Log when selectedTestUuid changes
@@ -153,6 +160,8 @@ export function TestRunnerDialog({
     // Initialize state for viewing existing run
     setSelectedTestUuid(null);
     setCurrentTaskId(taskId);
+    setIsPublic(false);
+    setShareToken(null);
 
     const isInProgress =
       initialRunStatus === "pending" ||
@@ -245,6 +254,11 @@ export function TestRunnerDialog({
             : (result.status as "queued" | "in_progress" | "done" | "failed"),
         );
       }
+
+      // Capture name and share state from backend
+      if (result.name) setRunName(result.name);
+      if (result.is_public !== undefined) setIsPublic(result.is_public);
+      if (result.share_token !== undefined) setShareToken(result.share_token ?? null);
 
       // Update test results based on polling response
       setTestResults((prev) => {
@@ -809,9 +823,12 @@ export function TestRunnerDialog({
       <div className="bg-background rounded-none md:rounded-xl w-full max-w-7xl h-full md:h-[85vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-border">
-          <h2 className="text-base md:text-lg font-semibold text-foreground">
-            Test Status for {agentName}
-          </h2>
+          <div className="min-w-0">
+            <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
+              {runName ?? "Test run"}
+            </h2>
+            <p className="text-xs text-muted-foreground truncate">{agentName}</p>
+          </div>
           <div className="flex items-center gap-3">
             {/* Passed/Failed counts - desktop only */}
             {!isOverallError &&
@@ -824,6 +841,18 @@ export function TestRunnerDialog({
                   />
                 </div>
               )}
+            {/* Share button — only shown when run is done and we have a taskId */}
+            {runStatus === "done" && (currentTaskId || taskId) && backendAccessToken && (
+              <div className="hidden md:block">
+                <ShareButton
+                  entityType="test-run"
+                  entityId={(currentTaskId || taskId)!}
+                  accessToken={backendAccessToken}
+                  initialIsPublic={isPublic}
+                  initialShareToken={shareToken}
+                />
+              </div>
+            )}
             <button
               onClick={onClose}
               className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"

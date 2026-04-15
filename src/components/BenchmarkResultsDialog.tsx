@@ -16,6 +16,8 @@ import { LeaderboardBarChart, getColorMap } from "./charts/LeaderboardBarChart";
 import { DownloadableTable } from "./DownloadableTable";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { ShareButton } from "@/components/ShareButton";
+import { useAccessToken } from "@/hooks";
 
 type BenchmarkTestResult = {
   name?: string;
@@ -44,11 +46,14 @@ type LeaderboardSummary = {
 
 type BenchmarkStatusResponse = {
   task_id: string;
+  name?: string;
   status: string;
   model_results?: ModelResult[];
   leaderboard_summary?: LeaderboardSummary[];
   results_s3_prefix?: string;
   error?: string;
+  is_public?: boolean;
+  share_token?: string | null;
 };
 
 type BenchmarkResultsDialogProps = {
@@ -100,6 +105,11 @@ export function BenchmarkResultsDialog({
     LeaderboardSummary[] | undefined
   >(undefined);
   const [error, setError] = useState<string | null>(null);
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [runName, setRunName] = useState<string | null>(null);
+  const [isPublic, setIsPublic] = useState(false);
+  const [shareToken, setShareToken] = useState<string | null>(null);
+  const backendAccessToken = useAccessToken();
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const isDone =
@@ -124,6 +134,9 @@ export function BenchmarkResultsDialog({
       setExpandedProviders(new Set(models.length > 0 ? [models[0]] : []));
       setSelectedTest(null);
       setActiveTab("outputs");
+      setIsPublic(false);
+      setShareToken(null);
+      setCurrentTaskId(taskId ?? null);
 
       if (taskId) {
         // View existing benchmark - poll the task immediately
@@ -182,6 +195,11 @@ export function BenchmarkResultsDialog({
 
       // Update task status for display
       setTaskStatus(result.status);
+
+      // Capture name and share state from backend
+      if (result.name) setRunName(result.name);
+      if (result.is_public !== undefined) setIsPublic(result.is_public);
+      if (result.share_token !== undefined) setShareToken(result.share_token ?? null);
 
       // Update model results (intermediate or final)
       if (result.model_results) {
@@ -274,6 +292,7 @@ export function BenchmarkResultsDialog({
 
       const result: BenchmarkStatusResponse = await response.json();
       const newTaskId = result.task_id;
+      setCurrentTaskId(newTaskId);
 
       // Notify parent about the new benchmark
       if (onBenchmarkCreated) {
@@ -379,14 +398,29 @@ export function BenchmarkResultsDialog({
         {/* Header */}
         <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
-            <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
-              Benchmark for {agentName}
-            </h2>
+            <div className="min-w-0">
+              <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
+                {runName ?? "Benchmark"}
+              </h2>
+              <p className="text-xs text-muted-foreground truncate">{agentName}</p>
+            </div>
             {!isDone && !isInitialLoading && (
               <StatusBadge status={taskStatus} showSpinner />
             )}
           </div>
           <div className="flex items-center gap-2">
+            {/* Share button — only shown when benchmark is done */}
+            {isDone && !error && currentTaskId && backendAccessToken && (
+              <div className="hidden md:block">
+                <ShareButton
+                  entityType="benchmark"
+                  entityId={currentTaskId}
+                  accessToken={backendAccessToken}
+                  initialIsPublic={isPublic}
+                  initialShareToken={shareToken}
+                />
+              </div>
+            )}
             {/* Rerun button - show when benchmark is complete (not loading and no error) */}
             {isDone && !error && onGoBack && (
               <button

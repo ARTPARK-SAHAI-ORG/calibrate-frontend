@@ -235,7 +235,7 @@ function STTPageInner() {
         {/* Tab Bar */}
         <div className="flex gap-1 border-b border-border">
           <button
-            onClick={() => setActiveTab("evaluations")}
+            onClick={() => { setActiveTab("evaluations"); router.replace("/stt", { scroll: false }); }}
             className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 -mb-px ${
               activeTab === "evaluations"
                 ? "border-foreground text-foreground"
@@ -245,7 +245,7 @@ function STTPageInner() {
             Evaluations
           </button>
           <button
-            onClick={() => setActiveTab("datasets")}
+            onClick={() => { setActiveTab("datasets"); router.replace("/stt?tab=datasets", { scroll: false }); }}
             className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 -mb-px ${
               activeTab === "datasets"
                 ? "border-foreground text-foreground"
