@@ -337,8 +337,8 @@ export default function SimulationRunPage() {
 
   const getPassFailClass = (mean: number) => {
     return mean === 1
-      ? "bg-green-500/20 text-green-400"
-      : "bg-red-500/20 text-red-400";
+      ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
+      : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400";
   };
 
   const getEvaluationResult = (
@@ -1215,8 +1215,8 @@ export default function SimulationRunPage() {
                                                 <span
                                                   className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
                                                     passed
-                                                      ? "bg-green-500/20 text-green-400"
-                                                      : "bg-red-500/20 text-red-400"
+                                                      ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
+                                                      : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
                                                   }`}
                                                 >
                                                   {passed ? "Pass" : "Fail"}
@@ -1226,8 +1226,8 @@ export default function SimulationRunPage() {
                                               <span
                                                 className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
                                                   passed
-                                                    ? "bg-green-500/20 text-green-400"
-                                                    : "bg-red-500/20 text-red-400"
+                                                    ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
+                                                    : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
                                                 }`}
                                               >
                                                 {passed ? "Pass" : "Fail"}
