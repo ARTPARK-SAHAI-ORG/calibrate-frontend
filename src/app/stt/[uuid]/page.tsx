@@ -32,6 +32,7 @@ type ProviderResult = {
   metrics: ProviderMetrics;
   results: Array<{
     id: string;
+    audio_url?: string;
     gt: string;
     pred: string;
     wer: string;
@@ -106,9 +107,10 @@ export default function STTEvaluationDetailPage() {
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Set page title
+  // Set page title and collapse main sidebar for more space
   useEffect(() => {
     document.title = "STT Evaluation | Calibrate";
+    setSidebarOpen(false);
   }, []);
 
   // Cleanup polling interval on unmount
@@ -599,7 +601,7 @@ export default function STTEvaluationDetailPage() {
 
                   {/* Leaderboard Tab */}
                   {activeTab === "leaderboard" && (
-                    <div className="space-y-4 md:space-y-6 -mx-4 md:-mx-8 px-4 md:px-8 w-[calc(100vw-32px)] md:w-[calc(100vw-260px)] ml-[calc((32px-100vw)/2+50%)] md:ml-[calc((260px-100vw)/2+50%)] relative">
+                    <div className="space-y-4 md:space-y-6 -mx-4 md:-mx-8 px-4 md:px-8 w-[calc(100vw-32px)] md:w-[calc(100vw-56px)] ml-[calc((32px-100vw)/2+50%)] md:ml-[calc((56px-100vw)/2+50%)] relative">
                       {evaluationResult.leaderboard_summary &&
                         evaluationResult.leaderboard_summary.length > 0 && (
                           <>
@@ -691,7 +693,7 @@ export default function STTEvaluationDetailPage() {
                   {activeTab === "outputs" && (
                     <div className="flex flex-col md:flex-row border border-border rounded-xl overflow-hidden md:h-[calc(100vh-220px)]">
                       {/* Provider List - Horizontal scroll on mobile, vertical sidebar on desktop */}
-                      <div className="md:w-64 border-b md:border-b-0 md:border-r border-border flex flex-col overflow-hidden bg-muted/10">
+                      <div className="md:w-48 border-b md:border-b-0 md:border-r border-border flex flex-col overflow-hidden bg-muted/10">
                         <div className="overflow-x-auto md:overflow-x-visible md:overflow-y-auto md:flex-1 p-2">
                           <div className="flex md:flex-col gap-1 md:gap-1 min-w-max md:min-w-0">
                             {evaluationResult.provider_results!.map(
@@ -928,6 +930,10 @@ export default function STTEvaluationDetailPage() {
                                   const showMetrics =
                                     evaluationResult.status === "done" ||
                                     allRowsHaveMetrics;
+                                  const hasAudio =
+                                    providerResult.results.some(
+                                      (r) => !!r.audio_url,
+                                    );
 
                                   return (
                                     <>
@@ -940,36 +946,41 @@ export default function STTEvaluationDetailPage() {
                                           <table className="w-full table-fixed">
                                             <thead className="bg-muted/50 border-b border-border">
                                               <tr>
-                                                <th className="w-12 px-4 py-3 text-left text-[12px] font-medium text-foreground">
+                                                <th className="w-10 px-3 py-3 text-left text-[12px] font-medium text-foreground">
                                                   ID
                                                 </th>
+                                                {hasAudio && (
+                                                  <th className="w-[180px] px-3 py-3 text-left text-[12px] font-medium text-foreground">
+                                                    Audio
+                                                  </th>
+                                                )}
                                                 <th
                                                   className={`${
                                                     showMetrics
-                                                      ? "w-[30%]"
-                                                      : "w-[calc(50%-24px)]"
-                                                  } px-4 py-3 text-left text-[12px] font-medium text-foreground`}
+                                                      ? "w-[25%]"
+                                                      : "w-[calc(50%-20px)]"
+                                                  } px-3 py-3 text-left text-[12px] font-medium text-foreground`}
                                                 >
                                                   Ground Truth
                                                 </th>
                                                 <th
                                                   className={`${
                                                     showMetrics
-                                                      ? "w-[30%]"
-                                                      : "w-[calc(50%-24px)]"
-                                                  } px-4 py-3 text-left text-[12px] font-medium text-foreground`}
+                                                      ? "w-[25%]"
+                                                      : "w-[calc(50%-20px)]"
+                                                  } px-3 py-3 text-left text-[12px] font-medium text-foreground`}
                                                 >
                                                   Prediction
                                                 </th>
                                                 {showMetrics && (
                                                   <>
-                                                    <th className="px-4 py-3 text-left text-[12px] font-medium text-foreground">
+                                                    <th className="w-[72px] px-3 py-3 text-left text-[12px] font-medium text-foreground">
                                                       WER
                                                     </th>
-                                                    <th className="px-4 py-3 text-left text-[12px] font-medium text-foreground">
-                                                      String Similarity
+                                                    <th className="w-[100px] px-3 py-3 text-left text-[12px] font-medium text-foreground">
+                                                      Similarity
                                                     </th>
-                                                    <th className="px-4 py-3 text-left text-[12px] font-medium text-foreground">
+                                                    <th className="w-[90px] px-3 py-3 text-left text-[12px] font-medium text-foreground">
                                                       LLM Judge
                                                     </th>
                                                   </>
@@ -992,13 +1003,27 @@ export default function STTEvaluationDetailPage() {
                                                           : ""
                                                       }`}
                                                     >
-                                                      <td className="px-4 py-3 text-[13px] text-foreground">
+                                                      <td className="px-3 py-3 text-[13px] text-foreground">
                                                         {index + 1}
                                                       </td>
-                                                      <td className="px-4 py-3 text-[13px] text-foreground break-words">
+                                                      {hasAudio && (
+                                                        <td className="px-3 py-3">
+                                                          {result.audio_url ? (
+                                                            <audio
+                                                              src={result.audio_url}
+                                                              controls
+                                                              preload="none"
+                                                              className="h-8 w-full max-w-[160px]"
+                                                            />
+                                                          ) : (
+                                                            <span className="text-[13px] text-muted-foreground">—</span>
+                                                          )}
+                                                        </td>
+                                                      )}
+                                                      <td className="px-3 py-3 text-[13px] text-foreground break-words">
                                                         {result.gt}
                                                       </td>
-                                                      <td className="px-4 py-3 text-[13px] break-words">
+                                                      <td className="px-3 py-3 text-[13px] break-words">
                                                         {isEmptyPrediction ? (
                                                           <span className="text-muted-foreground">
                                                             No transcript
@@ -1012,7 +1037,7 @@ export default function STTEvaluationDetailPage() {
                                                       </td>
                                                       {showMetrics && (
                                                         <>
-                                                          <td className="px-4 py-3 text-[13px] text-foreground">
+                                                          <td className="px-3 py-3 text-[13px] text-foreground">
                                                             {result.wer != null
                                                               ? parseFloat(
                                                                   parseFloat(
@@ -1021,7 +1046,7 @@ export default function STTEvaluationDetailPage() {
                                                                 )
                                                               : "-"}
                                                           </td>
-                                                          <td className="px-4 py-3 text-[13px] text-foreground">
+                                                          <td className="px-3 py-3 text-[13px] text-foreground">
                                                             {result.string_similarity !=
                                                             null
                                                               ? parseFloat(
@@ -1031,7 +1056,7 @@ export default function STTEvaluationDetailPage() {
                                                                 )
                                                               : "-"}
                                                           </td>
-                                                          <td className="px-4 py-3">
+                                                          <td className="px-3 py-3">
                                                             {(() => {
                                                               const scoreStr =
                                                                 String(
@@ -1150,6 +1175,21 @@ export default function STTEvaluationDetailPage() {
                                                       );
                                                     })()}
                                                 </div>
+                                                {result.audio_url && (
+                                                  <div>
+                                                    <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                                                      Audio
+                                                    </span>
+                                                    <div className="mt-1">
+                                                      <audio
+                                                        src={result.audio_url}
+                                                        controls
+                                                        preload="none"
+                                                        className="w-full h-8"
+                                                      />
+                                                    </div>
+                                                  </div>
+                                                )}
                                                 <div>
                                                   <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
                                                     Ground Truth
