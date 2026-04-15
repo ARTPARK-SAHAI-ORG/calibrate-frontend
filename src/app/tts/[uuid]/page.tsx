@@ -88,9 +88,10 @@ export default function TTSEvaluationDetailPage() {
   );
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Set page title
+  // Set page title and collapse main sidebar for more space
   useEffect(() => {
     document.title = "TTS Evaluation | Calibrate";
+    setSidebarOpen(false);
   }, []);
 
   // Cleanup polling interval on unmount
@@ -580,7 +581,7 @@ export default function TTSEvaluationDetailPage() {
                   {activeTab === "outputs" && (
                     <div className="flex flex-col md:flex-row border border-border rounded-xl overflow-hidden md:h-[calc(100vh-220px)]">
                       {/* Provider List - Horizontal scroll on mobile, vertical sidebar on desktop */}
-                      <div className="md:w-64 border-b md:border-b-0 md:border-r border-border flex flex-col overflow-hidden bg-muted/10">
+                      <div className="md:w-48 border-b md:border-b-0 md:border-r border-border flex flex-col overflow-hidden bg-muted/10">
                         <div className="overflow-x-auto md:overflow-x-visible md:overflow-y-auto md:flex-1 p-2">
                           <div className="flex md:flex-col gap-1 md:gap-1 min-w-max md:min-w-0">
                             {evaluationResult.provider_results!.map(

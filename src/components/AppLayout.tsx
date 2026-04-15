@@ -456,7 +456,7 @@ export function AppLayout({
           </div>
         </div>
 
-        {/* Navigation */}
+        {/* Navigation - Expanded */}
         {sidebarOpen && (
           <>
             <nav className="flex-1 overflow-y-auto py-4 px-3">
@@ -525,6 +525,49 @@ export function AppLayout({
               ))}
             </nav>
           </>
+        )}
+
+        {/* Navigation - Collapsed (icons only with tooltips) */}
+        {!sidebarOpen && (
+          <nav className="flex-1 py-4 px-2 overflow-visible">
+            {navSections.map((section, index) => (
+              <div key={section.title || index} className="mb-4">
+                {section.title && (
+                  <div className="h-px bg-border mx-1 mb-3" />
+                )}
+                <ul className="space-y-1">
+                  {section.items.map((item) => (
+                    <li key={item.id} className="relative group/tip">
+                      {item.id === "docs" ? (
+                        <a
+                          href={process.env.NEXT_PUBLIC_DOCS_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-10 h-10 flex items-center justify-center rounded-md transition-colors cursor-pointer text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                        >
+                          {item.icon}
+                        </a>
+                      ) : (
+                        <Link
+                          href={`/${item.id}`}
+                          className={`w-10 h-10 flex items-center justify-center rounded-md transition-colors cursor-pointer ${
+                            activeItem === item.id
+                              ? "bg-accent text-accent-foreground"
+                              : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                          }`}
+                        >
+                          {item.icon}
+                        </Link>
+                      )}
+                      <div className="fixed ml-[3.5rem] -mt-9 px-2 py-1.5 rounded-md text-xs font-medium bg-popover text-popover-foreground border border-border shadow-md whitespace-nowrap opacity-0 pointer-events-none group-hover/tip:opacity-100 transition-opacity z-[9999]">
+                        {item.label}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </nav>
         )}
       </aside>
 
