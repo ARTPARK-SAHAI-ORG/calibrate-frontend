@@ -138,6 +138,7 @@ export function BenchmarkOutputsPanel({
                 testNames={testNames}
                 statusFilter={statusFilter}
                 formatModelName={formatModelName}
+                showRunningSpinner={showRunningSpinner}
               />
             ))
           ) : (
@@ -215,6 +216,7 @@ function ModelSection({
   testNames,
   statusFilter,
   formatModelName,
+  showRunningSpinner = false,
 }: {
   modelResult: BenchmarkModelResult;
   isExpanded: boolean;
@@ -224,6 +226,7 @@ function ModelSection({
   testNames: string[];
   statusFilter: "all" | "passed" | "failed";
   formatModelName: (name: string) => string;
+  showRunningSpinner?: boolean;
 }) {
   const isProcessing = modelResult.success === null;
   const hasResults = modelResult.test_results && modelResult.test_results.length > 0;
@@ -285,6 +288,10 @@ function ModelSection({
                 {Array.from({ length: expectedCount }).map((_, index) => {
                   const testResult = modelResult.test_results?.[index];
                   const hasResult = !!testResult;
+
+                  // Skip placeholder rows for completed benchmarks — only show running placeholders during in-progress
+                  if (!hasResult && !showRunningSpinner) return null;
+
                   const status = hasResult
                     ? testResult.passed === null ? "running" : testResult.passed ? "passed" : "failed"
                     : "running";
