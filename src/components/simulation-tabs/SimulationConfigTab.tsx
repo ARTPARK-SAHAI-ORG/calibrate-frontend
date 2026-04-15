@@ -84,7 +84,7 @@ export function SimulationConfigTab({
       {isAgentConnection && (
         <div className="flex items-start gap-2.5 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
           <svg
-            className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0"
+            className="w-4 h-4 text-blue-500 dark:text-blue-400 mt-0.5 flex-shrink-0"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -96,7 +96,7 @@ export function SimulationConfigTab({
               d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
             />
           </svg>
-          <p className="text-xs text-blue-300/90">
+          <p className="text-xs text-blue-600 dark:text-blue-300/90">
             Voice simulations are currently only supported for agents built
             within Calibrate but you can still run text simulations on your
             connected agent
