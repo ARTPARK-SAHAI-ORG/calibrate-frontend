@@ -543,6 +543,7 @@ export function AppLayout({
                           href={process.env.NEXT_PUBLIC_DOCS_URL}
                           target="_blank"
                           rel="noopener noreferrer"
+                          aria-label={item.label}
                           className="w-10 h-10 flex items-center justify-center rounded-md transition-colors cursor-pointer text-muted-foreground hover:bg-accent/50 hover:text-foreground"
                         >
                           {item.icon}
@@ -550,6 +551,7 @@ export function AppLayout({
                       ) : (
                         <Link
                           href={`/${item.id}`}
+                          aria-label={item.label}
                           className={`w-10 h-10 flex items-center justify-center rounded-md transition-colors cursor-pointer ${
                             activeItem === item.id
                               ? "bg-accent text-accent-foreground"
