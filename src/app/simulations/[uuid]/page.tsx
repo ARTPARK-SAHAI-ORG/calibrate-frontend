@@ -7,6 +7,10 @@ import { useAccessToken, useVerifyConnection } from "@/hooks";
 import { toast } from "sonner";
 import { SpinnerIcon, CheckCircleIcon } from "@/components/icons";
 import { VerifyErrorPopover } from "@/components/VerifyErrorPopover";
+import {
+  VerifyRequestPreviewDialog,
+  type MessageRow,
+} from "@/components/VerifyRequestPreviewDialog";
 import { AppLayout } from "@/components/AppLayout";
 import { Agent } from "@/components/AgentPicker";
 import { PickerItem } from "@/components/MultiSelectPicker";
@@ -598,13 +602,19 @@ export default function SimulationDetailPage() {
 
   const isAgentUnverified = selectedAgent?.verified === false;
   const verify = useVerifyConnection();
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
 
-  const handleVerifyAgent = async () => {
+  const handleVerifyClick = () => {
+    setVerifyDialogOpen(true);
+  };
+
+  const handleVerifyConfirm = async (messages: MessageRow[]) => {
     if (!selectedAgent) return;
-    const success = await verify.verifySavedAgent(selectedAgent.uuid);
+    const success = await verify.verifySavedAgent(selectedAgent.uuid, messages);
     if (success) {
       setSelectedAgent({ ...selectedAgent, verified: true });
       toast.success("Agent connection verified successfully");
+      setVerifyDialogOpen(false);
     }
   };
 
@@ -615,7 +625,7 @@ export default function SimulationDetailPage() {
         {isAgentUnverified && (
           <div className="relative">
             <button
-              onClick={handleVerifyAgent}
+              onClick={handleVerifyClick}
               disabled={verify.isVerifying}
               className="h-8 px-4 rounded-md text-sm font-medium bg-yellow-500 text-black hover:bg-yellow-400 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
             >
@@ -881,6 +891,14 @@ export default function SimulationDetailPage() {
           </div>
         </div>
       )}
+      <VerifyRequestPreviewDialog
+        open={verifyDialogOpen}
+        onClose={() => setVerifyDialogOpen(false)}
+        onConfirm={handleVerifyConfirm}
+        isVerifying={verify.isVerifying}
+        verifyError={verify.verifyError}
+        verifySampleResponse={verify.verifySampleResponse}
+      />
     </AppLayout>
   );
 }

@@ -4,16 +4,19 @@ import { useState, useCallback } from "react";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "./useAccessToken";
 
+export type VerifyMessage = { role: string; content: string };
+
 export type VerifyConnectionResult = {
   isVerifying: boolean;
   verifyError: string | null;
   verifySampleResponse: Record<string, unknown> | null;
   /** Verify a saved agent's connection by UUID */
-  verifySavedAgent: (agentUuid: string) => Promise<boolean>;
+  verifySavedAgent: (agentUuid: string, messages?: VerifyMessage[]) => Promise<boolean>;
   /** Verify an ad-hoc connection (unsaved URL/headers) */
   verifyAdHoc: (
     agentUrl: string,
     agentHeaders?: Record<string, string>,
+    messages?: VerifyMessage[],
   ) => Promise<boolean>;
   dismiss: () => void;
 };
@@ -55,7 +58,7 @@ export function useVerifyConnection(): VerifyConnectionResult {
   };
 
   const verifySavedAgent = useCallback(
-    async (agentUuid: string): Promise<boolean> => {
+    async (agentUuid: string, messages?: VerifyMessage[]): Promise<boolean> => {
       setIsVerifying(true);
       setVerifyError(null);
       setVerifySampleResponse(null);
@@ -74,7 +77,9 @@ export function useVerifyConnection(): VerifyConnectionResult {
               "ngrok-skip-browser-warning": "true",
               Authorization: `Bearer ${backendAccessToken}`,
             },
-            body: JSON.stringify({}),
+            body: JSON.stringify(
+              messages && messages.length > 0 ? { messages } : {},
+            ),
           },
         );
 
@@ -96,6 +101,7 @@ export function useVerifyConnection(): VerifyConnectionResult {
     async (
       agentUrl: string,
       agentHeaders?: Record<string, string>,
+      messages?: VerifyMessage[],
     ): Promise<boolean> => {
       setIsVerifying(true);
       setVerifyError(null);
@@ -121,6 +127,7 @@ export function useVerifyConnection(): VerifyConnectionResult {
                 Object.keys(agentHeaders).length > 0 && {
                   agent_headers: agentHeaders,
                 }),
+              ...(messages && messages.length > 0 && { messages }),
             }),
           },
         );
