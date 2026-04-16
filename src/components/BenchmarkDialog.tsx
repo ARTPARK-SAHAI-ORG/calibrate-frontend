@@ -15,6 +15,10 @@ import {
 } from "@/components/icons";
 import { Button } from "@/components/ui";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import {
+  VerifyRequestPreviewDialog,
+  type MessageRow,
+} from "@/components/VerifyRequestPreviewDialog";
 
 type TestData = {
   uuid: string;
@@ -81,10 +85,25 @@ export function BenchmarkDialog({
       string,
       { verified: boolean; verified_at: string; error: string | null }
     >
-  >(initialBenchmarkModelsVerified || {});
+  >(() => {
+    if (!initialBenchmarkModelsVerified) return {};
+    const verified: typeof initialBenchmarkModelsVerified = {};
+    for (const [id, entry] of Object.entries(initialBenchmarkModelsVerified)) {
+      if (entry.verified) verified[id] = entry;
+    }
+    return verified;
+  });
   const [modelVerifyStatus, setModelVerifyStatus] = useState<
     Record<string, ModelVerificationStatus>
   >({});
+
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
+  const [verifyMessages, setVerifyMessages] = useState<MessageRow[] | null>(null);
+  const [pendingVerifyAction, setPendingVerifyAction] = useState<
+    | { type: "run-comparison" }
+    | { type: "retry-all" }
+    | null
+  >(null);
 
   if (!isOpen) return null;
 
@@ -92,11 +111,15 @@ export function BenchmarkDialog({
     setSelectedModels([null]);
     setShowResults(false);
     setModelVerifyStatus({});
+    setVerifyDialogOpen(false);
+    setVerifyMessages(null);
+    setPendingVerifyAction(null);
     onClose();
   };
 
   const verifyModel = async (
     modelId: string,
+    messages?: MessageRow[],
   ): Promise<{ verified: boolean; error?: string }> => {
     setModelVerifyStatus((prev) => ({ ...prev, [modelId]: "verifying" }));
 
@@ -114,7 +137,10 @@ export function BenchmarkDialog({
             "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
-          body: JSON.stringify({ model: modelId }),
+          body: JSON.stringify({
+            model: modelId,
+            ...(messages && messages.length > 0 && { messages }),
+          }),
         },
       );
 
@@ -181,15 +207,35 @@ export function BenchmarkDialog({
         });
 
       if (modelsToVerify.length > 0) {
-        const results = await Promise.all(
-          modelsToVerify.map((m) => verifyModel(m.id)),
-        );
-        const anyFailed = results.some((r) => !r.verified);
-        if (anyFailed) return;
+        setPendingVerifyAction({ type: "run-comparison" });
+        setVerifyDialogOpen(true);
+        return;
       }
     }
 
     setShowResults(true);
+  };
+
+  const runVerificationWithMessages = async (messages: MessageRow[]) => {
+    setVerifyMessages(messages);
+    const action = pendingVerifyAction;
+
+    const modelsToVerify = selectedModels
+      .filter((m): m is LLMModel => m !== null)
+      .filter((m) => {
+        const existing = benchmarkModelsVerified[m.id];
+        return !existing || !existing.verified;
+      });
+
+    const results = await Promise.all(
+      modelsToVerify.map((m) => verifyModel(m.id, messages)),
+    );
+    const anyFailed = results.some((r) => !r.verified);
+    setVerifyDialogOpen(false);
+    setPendingVerifyAction(null);
+    if (!anyFailed) {
+      setShowResults(true);
+    }
   };
 
   const handleCloseResults = () => {
@@ -269,6 +315,12 @@ export function BenchmarkDialog({
   const isVerifying = Object.values(modelVerifyStatus).some(
     (s) => s === "verifying",
   );
+  const hasFailedModels = selectedModels
+    .filter((m): m is LLMModel => m !== null)
+    .some((m) => {
+      const existing = benchmarkModelsVerified[m.id];
+      return existing && !existing.verified;
+    });
   const maxModels = 5;
   const canAddMore = selectedModels.length < maxModels;
 
@@ -371,29 +423,6 @@ export function BenchmarkDialog({
             </svg>
           </button>
         )}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            verifyModel(modelId);
-          }}
-          className="w-5 h-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-          title="Retry verification"
-        >
-          <svg
-            className="w-3 h-3"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M20.015 4.356v4.992"
-            />
-          </svg>
-        </button>
       </span>
     );
   };
@@ -512,6 +541,30 @@ export function BenchmarkDialog({
           <Button variant="secondary" size="md" onClick={handleClose}>
             Cancel
           </Button>
+          {hasFailedModels && !isVerifying && (
+            <button
+              onClick={() => {
+                setPendingVerifyAction({ type: "retry-all" });
+                setVerifyDialogOpen(true);
+              }}
+              className="h-9 px-4 rounded-md text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors cursor-pointer flex items-center gap-2"
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M20.015 4.356v4.992"
+                />
+              </svg>
+              Retry failed
+            </button>
+          )}
           <Button
             variant="primary"
             size="md"
@@ -550,6 +603,16 @@ export function BenchmarkDialog({
         testNames={tests.map((t) => t.name)}
         models={selectedModels.filter((m) => m !== null).map((m) => m!.id)}
         onBenchmarkCreated={onBenchmarkCreated}
+      />
+
+      <VerifyRequestPreviewDialog
+        open={verifyDialogOpen}
+        onClose={() => {
+          setVerifyDialogOpen(false);
+          setPendingVerifyAction(null);
+        }}
+        onConfirm={runVerificationWithMessages}
+        isVerifying={isVerifying}
       />
     </div>
   );

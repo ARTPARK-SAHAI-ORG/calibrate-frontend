@@ -20,6 +20,10 @@ import type {
 import { useOpenRouterModels, findModelInProviders, useVerifyConnection } from "@/hooks";
 import { SpinnerIcon, CheckCircleIcon } from "@/components/icons";
 import { VerifyErrorPopover } from "@/components/VerifyErrorPopover";
+import {
+  VerifyRequestPreviewDialog,
+  type MessageRow,
+} from "@/components/VerifyRequestPreviewDialog";
 import type { ConnectionConfig } from "@/components/agent-tabs/AgentConnectionTabContent";
 import { useHideFloatingButton } from "@/components/AppLayout";
 
@@ -188,8 +192,14 @@ export function AgentDetail({
 
   const isConnectionUnverified = agent?.type === "connection" && connectionConfig.connection_verified !== true;
 
-  const handleVerifyConnection = async () => {
-    const success = await verify.verifySavedAgent(agentUuid);
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
+
+  const handleVerifyClick = () => {
+    setVerifyDialogOpen(true);
+  };
+
+  const handleVerifyConfirm = async (messages: MessageRow[]) => {
+    const success = await verify.verifySavedAgent(agentUuid, messages);
     if (success) {
       setConnectionConfig((prev) => ({
         ...prev,
@@ -197,6 +207,7 @@ export function AgentDetail({
         connection_verified_at: new Date().toISOString(),
         connection_verified_error: null,
       }));
+      setVerifyDialogOpen(false);
     }
   };
 
@@ -659,7 +670,7 @@ export function AgentDetail({
         onEditName: handleOpenEditNameDialog,
         isConnectionUnverified,
         isVerifying: verify.isVerifying,
-        onVerify: handleVerifyConnection,
+        onVerify: handleVerifyClick,
         verifyError: verify.verifyError,
         verifySampleResponse: verify.verifySampleResponse,
         onDismissVerifyError: verify.dismiss,
@@ -752,7 +763,7 @@ export function AgentDetail({
             {isConnectionUnverified && (
               <div className="relative">
                 <button
-                  onClick={handleVerifyConnection}
+                  onClick={handleVerifyClick}
                   disabled={verify.isVerifying}
                   className="h-8 md:h-9 px-3 md:px-4 rounded-md text-xs md:text-sm font-medium bg-yellow-500 text-black hover:bg-yellow-400 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
                 >
@@ -1053,6 +1064,15 @@ export function AgentDetail({
           </div>
         </div>
       )}
+
+      <VerifyRequestPreviewDialog
+        open={verifyDialogOpen}
+        onClose={() => setVerifyDialogOpen(false)}
+        onConfirm={handleVerifyConfirm}
+        isVerifying={verify.isVerifying}
+        verifyError={verify.verifyError}
+        verifySampleResponse={verify.verifySampleResponse}
+      />
     </div>
   );
 }

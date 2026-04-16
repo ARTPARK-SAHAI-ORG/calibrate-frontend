@@ -3,6 +3,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useVerifyConnection } from "@/hooks";
 import { SpinnerIcon, CheckCircleIcon, AlertIcon } from "@/components/icons";
+import {
+  VerifyRequestPreviewDialog,
+  type MessageRow,
+} from "@/components/VerifyRequestPreviewDialog";
 
 type VerificationStatus = "unverified" | "verifying" | "verified" | "failed";
 
@@ -153,7 +157,13 @@ export function AgentConnectionTabContent({
     onAgentHeadersChange(updated);
   };
 
-  const handleVerify = async () => {
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
+
+  const handleVerifyClick = () => {
+    setVerifyDialogOpen(true);
+  };
+
+  const handleVerifyConfirm = async (messages: MessageRow[]) => {
     setVerifyStatus("verifying");
 
     const currentHeadersObj: Record<string, string> = {};
@@ -163,7 +173,7 @@ export function AgentConnectionTabContent({
       }
     }
 
-    const success = await verify.verifyAdHoc(agentUrl, currentHeadersObj);
+    const success = await verify.verifyAdHoc(agentUrl, currentHeadersObj, messages);
 
     const newStatus: VerificationStatus = success ? "verified" : "failed";
     const now = success ? new Date().toISOString() : null;
@@ -184,6 +194,9 @@ export function AgentConnectionTabContent({
     });
 
     setVerifyStatus(newStatus);
+    if (success) {
+      setVerifyDialogOpen(false);
+    }
   };
 
   const verifiedAt = connectionConfig.connection_verified_at
@@ -498,7 +511,7 @@ export function AgentConnectionTabContent({
             {/* Verify button */}
             <button
               type="button"
-              onClick={handleVerify}
+              onClick={handleVerifyClick}
               disabled={
                 verify.isVerifying || !agentUrl.trim() || isSaving
               }
@@ -627,6 +640,15 @@ export function AgentConnectionTabContent({
           </div>
         </div>
       </div>
+
+      <VerifyRequestPreviewDialog
+        open={verifyDialogOpen}
+        onClose={() => setVerifyDialogOpen(false)}
+        onConfirm={handleVerifyConfirm}
+        isVerifying={verify.isVerifying}
+        verifyError={verify.verifyError}
+        verifySampleResponse={verify.verifySampleResponse}
+      />
     </div>
   );
 }
