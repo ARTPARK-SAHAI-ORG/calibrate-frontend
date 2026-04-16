@@ -215,6 +215,7 @@ Provider website links (external link icons) are shown only on the new evaluatio
 
 - **Two-column layout**: Tests table on left, Past runs panel (560px) on right
 - **Tests table**: Shows attached tests with name, type (Tool Call/Next Reply), run button, delete button
+  - **Desktop grid columns**: `grid-cols-[40px_minmax(0,1fr)_120px_auto_auto]` — Checkbox (40px), Name (fills remaining space, horizontally scrollable via `overflow-x-auto whitespace-nowrap` when text overflows), Type (fixed 120px), Run button (auto), Delete button (auto)
   - **Individual run button**: Play button on each test row runs only that specific test (not all tests)
 - **Past runs panel**: Has "Past runs" heading with `bg-muted/30` background, showing history of test runs (no column headers):
   - **Row content**: Name/count, Run Type pill, Time, Result badges
