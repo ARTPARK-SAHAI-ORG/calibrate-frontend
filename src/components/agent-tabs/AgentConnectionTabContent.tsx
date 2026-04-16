@@ -158,6 +158,7 @@ export function AgentConnectionTabContent({
   };
 
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
+  const [showToolCalls, setShowToolCalls] = useState(false);
 
   const handleVerifyClick = () => {
     setVerifyDialogOpen(true);
@@ -625,15 +626,40 @@ export function AgentConnectionTabContent({
                 </>
               )}
 
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={showToolCalls}
+                  onClick={() => setShowToolCalls((v) => !v)}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer ${
+                    showToolCalls ? "bg-foreground" : "bg-border"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
+                      showToolCalls ? "translate-x-4" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+                <span className="text-sm text-muted-foreground">
+                  Does your agent return tool calls?
+                </span>
+              </label>
+
               <p className="text-sm text-muted-foreground">
-                Your agent must respond with at least one of:
+                Your agent must respond with:
               </p>
               <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground">
-                {`{
+                {showToolCalls
+                  ? `{
   "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye.",
   "tool_calls": [
     { "tool": "get_schedule", "arguments": { "child_age_weeks": 14 } }
   ]
+}`
+                  : `{
+  "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye."
 }`}
               </pre>
             </div>
