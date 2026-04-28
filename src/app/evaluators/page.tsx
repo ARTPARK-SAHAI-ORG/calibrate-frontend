@@ -91,6 +91,24 @@ function extractVariableNames(prompt: string): string[] {
   return result;
 }
 
+async function getEvaluatorErrorMessage(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  const contentType = response.headers.get("content-type");
+  if (contentType?.includes("application/json")) {
+    const data = await response.json().catch(() => null);
+    if (data && typeof data.detail === "string") return data.detail;
+  }
+
+  const text = await response.text().catch(() => "");
+  return text || fallback;
+}
+
+function isEvaluatorNameConflict(response: Response, message: string): boolean {
+  return response.status === 409 && message === "Evaluator name already exists";
+}
+
 const JUDGE_PROVIDER_SLUGS = [
   "openai",
   "anthropic",
@@ -161,6 +179,7 @@ function MetricsPageInner() {
   const [metricsError, setMetricsError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [createNameError, setCreateNameError] = useState<string | null>(null);
   const [editingMetricUuid, setEditingMetricUuid] = useState<string | null>(
     null,
   );
@@ -472,6 +491,7 @@ function MetricsPageInner() {
     setMetricDescription("");
     setEditingMetricUuid(null);
     setCreateError(null);
+    setCreateNameError(null);
     setValidationAttempted(false);
     setNewEvaluatorType(null);
     setNewEvaluatorJudgeModel(null);
@@ -523,6 +543,7 @@ function MetricsPageInner() {
     try {
       setIsCreating(true);
       setCreateError(null);
+      setCreateNameError(null);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
         throw new Error("BACKEND_URL environment variable is not set");
@@ -584,7 +605,15 @@ function MetricsPageInner() {
       }
 
       if (!response.ok) {
-        throw new Error("Failed to create evaluator");
+        const message = await getEvaluatorErrorMessage(
+          response,
+          "Failed to create evaluator",
+        );
+        if (isEvaluatorNameConflict(response, message)) {
+          setCreateNameError(message);
+          return;
+        }
+        throw new Error(message);
       }
 
       // Refetch the evaluators list to get the updated data
@@ -626,6 +655,7 @@ function MetricsPageInner() {
       setEditingMetricUuid(uuid);
       setAddMetricSidebarOpen(true);
       setCreateError(null);
+      setCreateNameError(null);
 
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
@@ -674,13 +704,14 @@ function MetricsPageInner() {
     try {
       setIsCreating(true);
       setCreateError(null);
+      setCreateNameError(null);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
         throw new Error("BACKEND_URL environment variable is not set");
       }
 
       const response = await fetch(
-        `${backendUrl}/metrics/${editingMetricUuid}`,
+        `${backendUrl}/evaluators/${editingMetricUuid}`,
         {
           method: "PUT",
           headers: {
@@ -702,18 +733,29 @@ function MetricsPageInner() {
       }
 
       if (!response.ok) {
-        throw new Error("Failed to update metric");
+        const message = await getEvaluatorErrorMessage(
+          response,
+          "Failed to update evaluator",
+        );
+        if (isEvaluatorNameConflict(response, message)) {
+          setCreateNameError(message);
+          return;
+        }
+        throw new Error(message);
       }
 
       // Refetch the metrics list to get the updated data
-      const metricsResponse = await fetch(`${backendUrl}/metrics`, {
-        method: "GET",
-        headers: {
-          accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
-          Authorization: `Bearer ${backendAccessToken}`,
+      const metricsResponse = await fetch(
+        `${backendUrl}/evaluators?include_defaults=true`,
+        {
+          method: "GET",
+          headers: {
+            accept: "application/json",
+            "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${backendAccessToken}`,
+          },
         },
-      });
+      );
 
       if (metricsResponse.ok) {
         const updatedMetrics: MetricData[] = await metricsResponse.json();
@@ -726,7 +768,7 @@ function MetricsPageInner() {
     } catch (err) {
       console.error("Error updating metric:", err);
       setCreateError(
-        err instanceof Error ? err.message : "Failed to update metric",
+        err instanceof Error ? err.message : "Failed to update evaluator",
       );
     } finally {
       setIsCreating(false);
@@ -1166,10 +1208,15 @@ function MetricsPageInner() {
                       type="text"
                       value={metricName}
                       placeholder="e.g., Follows Refund Policy"
-                      onChange={(e) => setMetricName(e.target.value)}
+                      onChange={(e) => {
+                        setMetricName(e.target.value);
+                        setCreateNameError(null);
+                      }}
                       className={`w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border bg-background dark:bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
                         validationAttempted &&
-                        (!metricName.trim() || isNameDuplicate(metricName))
+                        (!metricName.trim() ||
+                          isNameDuplicate(metricName) ||
+                          createNameError)
                           ? "border-red-500"
                           : "border-border"
                       }`}
@@ -1177,6 +1224,11 @@ function MetricsPageInner() {
                     {validationAttempted && isNameDuplicate(metricName) && (
                       <p className="text-xs md:text-sm text-red-500 mt-1">
                         An evaluator with this name already exists
+                      </p>
+                    )}
+                    {createNameError && (
+                      <p className="text-xs md:text-sm text-red-500 mt-1">
+                        {createNameError}
                       </p>
                     )}
                   </div>
@@ -1708,6 +1760,7 @@ function DuplicateMetricDialog({
   );
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
   const maxLength = 50;
 
   // Check if the name already exists
@@ -1722,6 +1775,7 @@ function DuplicateMetricDialog({
     try {
       setIsDuplicating(true);
       setError(null);
+      setNameError(null);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
         throw new Error("BACKEND_URL environment variable is not set");
@@ -1729,7 +1783,7 @@ function DuplicateMetricDialog({
 
       // Call the duplicate endpoint
       const response = await fetch(
-        `${backendUrl}/metrics/${originalMetric.uuid}/duplicate`,
+        `${backendUrl}/evaluators/${originalMetric.uuid}/duplicate`,
         {
           method: "POST",
           headers: {
@@ -1750,7 +1804,15 @@ function DuplicateMetricDialog({
       }
 
       if (!response.ok) {
-        throw new Error("Failed to duplicate metric");
+        const message = await getEvaluatorErrorMessage(
+          response,
+          "Failed to duplicate evaluator",
+        );
+        if (isEvaluatorNameConflict(response, message)) {
+          setNameError(message);
+          return;
+        }
+        throw new Error(message);
       }
 
       const data = await response.json();
@@ -1767,7 +1829,7 @@ function DuplicateMetricDialog({
     } catch (err) {
       console.error("Error duplicating metric:", err);
       setError(
-        err instanceof Error ? err.message : "Failed to duplicate metric",
+        err instanceof Error ? err.message : "Failed to duplicate evaluator",
       );
     } finally {
       setIsDuplicating(false);
@@ -1786,17 +1848,17 @@ function DuplicateMetricDialog({
         {/* Header */}
         <div className="mb-4 md:mb-6">
           <h2 className="text-xl md:text-2xl font-semibold tracking-tight mb-1">
-            Duplicate metric
+            Duplicate evaluator
           </h2>
           <p className="text-muted-foreground text-sm md:text-[15px]">
-            Choose a name for the duplicated metric
+            Choose a name for the duplicated evaluator
           </p>
         </div>
 
-        {/* Metric Name Input */}
+        {/* Evaluator Name Input */}
         <div className="mb-6">
           <label className="block text-[13px] font-medium text-foreground mb-2">
-            Metric Name <span className="text-red-500">*</span>
+            Evaluator Name <span className="text-red-500">*</span>
           </label>
           <div className="relative">
             <input
@@ -1806,11 +1868,12 @@ function DuplicateMetricDialog({
                 if (e.target.value.length <= maxLength) {
                   setMetricName(e.target.value);
                   setError(null);
+                  setNameError(null);
                 }
               }}
               placeholder="Enter metric name"
               className={`w-full h-10 px-3 pr-16 rounded-md text-[13px] border bg-background dark:bg-muted text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
-                metricName.trim() && isNameDuplicate(metricName)
+                (metricName.trim() && isNameDuplicate(metricName)) || nameError
                   ? "border-red-500"
                   : "border-border"
               }`}
@@ -1824,8 +1887,11 @@ function DuplicateMetricDialog({
           </div>
           {metricName.trim() && isNameDuplicate(metricName) && (
             <p className="text-sm text-red-500 mt-1">
-              A metric with this name already exists
+              An evaluator with this name already exists
             </p>
+          )}
+          {nameError && (
+            <p className="text-sm text-red-500 mt-1">{nameError}</p>
           )}
         </div>
 

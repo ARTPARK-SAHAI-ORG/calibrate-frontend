@@ -33,6 +33,24 @@ function extractVariableNames(prompt: string): string[] {
   return result;
 }
 
+async function getEvaluatorErrorMessage(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  const contentType = response.headers.get("content-type");
+  if (contentType?.includes("application/json")) {
+    const data = await response.json().catch(() => null);
+    if (data && typeof data.detail === "string") return data.detail;
+  }
+
+  const text = await response.text().catch(() => "");
+  return text || fallback;
+}
+
+function isEvaluatorNameConflict(response: Response, message: string): boolean {
+  return response.status === 409 && message === "Evaluator name already exists";
+}
+
 const JUDGE_PROVIDER_SLUGS = [
   "openai",
   "anthropic",
@@ -104,6 +122,7 @@ export default function EvaluatorDetailPage() {
   const [editDescription, setEditDescription] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [editNameError, setEditNameError] = useState<string | null>(null);
 
   // New version dialog state
   const [newVersionOpen, setNewVersionOpen] = useState(false);
@@ -237,6 +256,7 @@ export default function EvaluatorDetailPage() {
     setEditName(evaluator.name ?? "");
     setEditDescription(evaluator.description ?? "");
     setEditError(null);
+    setEditNameError(null);
     setEditOpen(true);
   };
 
@@ -249,6 +269,7 @@ export default function EvaluatorDetailPage() {
     try {
       setEditSaving(true);
       setEditError(null);
+      setEditNameError(null);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) throw new Error("BACKEND_URL is not set");
 
@@ -270,8 +291,15 @@ export default function EvaluatorDetailPage() {
         return;
       }
       if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(text || "Failed to save evaluator");
+        const message = await getEvaluatorErrorMessage(
+          res,
+          "Failed to save evaluator",
+        );
+        if (isEvaluatorNameConflict(res, message)) {
+          setEditNameError(message);
+          return;
+        }
+        throw new Error(message);
       }
       const data: EvaluatorDetail = await res.json();
       setEvaluator((prev) =>
@@ -793,14 +821,22 @@ export default function EvaluatorDetailPage() {
                 <input
                   type="text"
                   value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
+                  onChange={(e) => {
+                    setEditName(e.target.value);
+                    setEditNameError(null);
+                  }}
                   placeholder="Evaluator name"
                   className={`w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
-                    !editName.trim() && editError
+                    (!editName.trim() && editError) || editNameError
                       ? "border-red-500"
                       : "border-border"
                   }`}
                 />
+                {editNameError && (
+                  <p className="text-xs md:text-sm text-red-500 mt-1">
+                    {editNameError}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-xs md:text-sm font-medium mb-2">
