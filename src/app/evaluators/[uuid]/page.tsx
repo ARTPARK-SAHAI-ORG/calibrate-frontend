@@ -333,10 +333,19 @@ export default function EvaluatorDetailPage() {
       evaluator.output_type === "binary" ||
       (newVersionScale.length >= 2 &&
         newVersionScale.every((r) => r.name.trim().length > 0));
+    const existingVariables = evaluator.live_version?.variables ?? [];
+    const variableDescriptionsValid =
+      evaluator.evaluator_type !== "llm" ||
+      existingVariables.every(
+        (v) =>
+          (newVersionVariableDescriptions[v.name] ?? v.description ?? "").trim()
+            .length > 0,
+      );
     if (
       !newVersionJudgeModel ||
       !newVersionSystemPrompt.trim() ||
-      !scaleValid
+      !scaleValid ||
+      !variableDescriptionsValid
     ) {
       return;
     }
@@ -1017,42 +1026,53 @@ export default function EvaluatorDetailPage() {
                             <span>
                               Variable names cannot be added, renamed, or
                               removed on a new version, but you can update each
-                              variable&apos;s description below — that&apos;s
-                              the hint shown to users when they fill the
-                              variable in an LLM test.
+                              variable&apos;s description below
                             </span>
                           </div>
                           <div className="border border-border rounded-md overflow-hidden">
-                            {existingVariables.map((variable, i) => (
-                              <div
-                                key={variable.name}
-                                className={`p-3 md:p-4 bg-background dark:bg-muted flex flex-col md:flex-row md:items-start gap-2 md:gap-3 ${
-                                  i > 0 ? "border-t border-border" : ""
-                                }`}
-                              >
-                                <code className="self-start inline-flex items-center px-2 py-0.5 rounded-md text-sm font-mono font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 md:flex-shrink-0 md:mt-1.5">
-                                  {`{{${variable.name}}}`}
-                                </code>
-                                <input
-                                  type="text"
-                                  value={
-                                    newVersionVariableDescriptions[
-                                      variable.name
-                                    ] ?? ""
-                                  }
-                                  onChange={(e) =>
-                                    setNewVersionVariableDescriptions(
-                                      (prev) => ({
-                                        ...prev,
-                                        [variable.name]: e.target.value,
-                                      }),
-                                    )
-                                  }
-                                  placeholder="Short description shown when filling this variable in tests (optional)"
-                                  className="flex-1 px-3 py-2 rounded-md text-sm bg-background dark:bg-muted text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent"
-                                />
-                              </div>
-                            ))}
+                            {existingVariables.map((variable, i) => {
+                              const missingDescription =
+                                newVersionValidated &&
+                                !(
+                                  newVersionVariableDescriptions[
+                                    variable.name
+                                  ] ?? ""
+                                ).trim();
+                              return (
+                                <div
+                                  key={variable.name}
+                                  className={`p-3 md:p-4 bg-background dark:bg-muted flex flex-col md:flex-row md:items-start gap-2 md:gap-3 ${
+                                    i > 0 ? "border-t border-border" : ""
+                                  }`}
+                                >
+                                  <code className="self-start inline-flex items-center px-2 py-0.5 rounded-md text-sm font-mono font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 md:flex-shrink-0 md:mt-1.5">
+                                    {`{{${variable.name}}}`}
+                                  </code>
+                                  <input
+                                    type="text"
+                                    value={
+                                      newVersionVariableDescriptions[
+                                        variable.name
+                                      ] ?? ""
+                                    }
+                                    onChange={(e) =>
+                                      setNewVersionVariableDescriptions(
+                                        (prev) => ({
+                                          ...prev,
+                                          [variable.name]: e.target.value,
+                                        }),
+                                      )
+                                    }
+                                    placeholder="Short description explaining the purpose of the variable"
+                                    className={`flex-1 px-3 py-2 rounded-md text-sm bg-background dark:bg-muted text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                                      missingDescription
+                                        ? "border-red-500"
+                                        : "border-border"
+                                    }`}
+                                  />
+                                </div>
+                              );
+                            })}
                           </div>
                           {newNames.length > 0 && (
                             <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs md:text-sm text-amber-700 dark:text-amber-300">

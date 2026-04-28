@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import {
   TestCaseOutput,
   TestCaseData,
+  JudgeResult,
   StatusIcon,
   TestDetailView,
   EmptyStateView,
@@ -14,6 +15,10 @@ export type BenchmarkTestResult = {
   reasoning?: string;
   output?: TestCaseOutput;
   test_case?: TestCaseData;
+  /** Per-evaluator verdicts for response (next-reply) tests. Null for
+   * tool-call tests; legacy rows omit the field and fall back to the
+   * legacy single-reasoning UI. */
+  judge_results?: JudgeResult[] | null;
 };
 
 export type BenchmarkModelResult = {
@@ -42,6 +47,9 @@ type BenchmarkOutputsPanelProps = {
   /** Show spinner for running tests */
   showRunningSpinner?: boolean;
   height?: string;
+  /** Optional rating-evaluator scale lookup (uuid → scale_max). Fallback
+   * only — newer judge_results entries carry `scale_max` inline. */
+  scaleByEvaluatorUuid?: Record<string, number | undefined>;
 };
 
 export function BenchmarkOutputsPanel({
@@ -57,6 +65,7 @@ export function BenchmarkOutputsPanel({
   showControls = true,
   showRunningSpinner = false,
   height,
+  scaleByEvaluatorUuid,
 }: BenchmarkOutputsPanelProps) {
   const [statusFilter, setStatusFilter] = useState<"all" | "passed" | "failed">("all");
 
@@ -186,6 +195,8 @@ export function BenchmarkOutputsPanel({
                 output={selectedTestResult.output}
                 passed={selectedTestResult.passed ?? false}
                 reasoning={selectedTestResult.reasoning}
+                judgeResults={selectedTestResult.judge_results}
+                scaleByEvaluatorUuid={scaleByEvaluatorUuid}
               />
             )
           ) : (
@@ -194,11 +205,18 @@ export function BenchmarkOutputsPanel({
         </div>
       </div>
 
-      {/* Right Panel - Evaluation Criteria */}
+      {/* Right Panel - Evaluators / Expected Tool Calls (desktop only).
+          On mobile this content is rendered inline by `TestDetailView`. */}
       {selectedTestResult && selectedTestResult.passed !== null && (
-        <div className="hidden md:flex w-72 border-l border-border flex-col overflow-hidden">
+        <div className="hidden md:flex w-80 border-l border-border flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto">
-            <EvaluationCriteriaPanel evaluation={selectedTestResult.test_case?.evaluation} />
+            <EvaluationCriteriaPanel
+              evaluation={selectedTestResult.test_case?.evaluation}
+              testCaseEvaluators={selectedTestResult.test_case?.evaluators}
+              judgeResults={selectedTestResult.judge_results}
+              reasoning={selectedTestResult.reasoning}
+              scaleByEvaluatorUuid={scaleByEvaluatorUuid}
+            />
           </div>
         </div>
       )}

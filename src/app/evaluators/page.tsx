@@ -183,8 +183,10 @@ function MetricsPageInner() {
   // Per-variable description (`VariableSpec.description`) keyed by variable
   // name. Stays populated for variables the user removes from the prompt so
   // re-adding the same `{{name}}` later restores the description.
-  const [newEvaluatorVariableDescriptions, setNewEvaluatorVariableDescriptions] =
-    useState<Record<string, string>>({});
+  const [
+    newEvaluatorVariableDescriptions,
+    setNewEvaluatorVariableDescriptions,
+  ] = useState<Record<string, string>>({});
   const [llmModalOpen, setLlmModalOpen] = useState(false);
   const [newEvaluatorOutputType, setNewEvaluatorOutputType] = useState<
     "binary" | "rating"
@@ -499,13 +501,21 @@ function MetricsPageInner() {
       newEvaluatorOutputType === "binary" ||
       (newEvaluatorScale.length >= 2 &&
         newEvaluatorScale.every((row) => row.name.trim().length > 0));
+    const detectedVars = extractVariableNames(newEvaluatorSystemPrompt);
+    const variableDescriptionsValid =
+      newEvaluatorType !== "llm" ||
+      detectedVars.every(
+        (name) =>
+          (newEvaluatorVariableDescriptions[name] ?? "").trim().length > 0,
+      );
     if (
       !metricName.trim() ||
       isNameDuplicate(metricName) ||
       !newEvaluatorType ||
       !newEvaluatorJudgeModel ||
       !newEvaluatorSystemPrompt.trim() ||
-      !scaleValid
+      !scaleValid ||
+      !variableDescriptionsValid
     ) {
       return;
     }
@@ -1459,42 +1469,52 @@ function MetricsPageInner() {
                               />
                             </svg>
                             <span>
-                              When this evaluator is added to an LLM test, the
-                              user will fill in a value for each variable. The
-                              short description below each variable is the hint
-                              they&apos;ll see at that point.
+                              When this evaluator is added to an LLM test, you
+                              will be able to fill in the value of each variable
+                              for that test
                             </span>
                           </div>
                           <div className="border border-border rounded-md overflow-hidden">
-                            {detectedPromptVariables.map((name, i) => (
-                              <div
-                                key={name}
-                                className={`p-3 md:p-4 bg-background dark:bg-muted flex flex-col md:flex-row md:items-start gap-2 md:gap-3 ${
-                                  i > 0 ? "border-t border-border" : ""
-                                }`}
-                              >
-                                <code className="self-start inline-flex items-center px-2 py-0.5 rounded-md text-sm font-mono font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 md:flex-shrink-0 md:mt-1.5">
-                                  {`{{${name}}}`}
-                                </code>
-                                <input
-                                  type="text"
-                                  value={
-                                    newEvaluatorVariableDescriptions[name] ??
-                                    ""
-                                  }
-                                  onChange={(e) =>
-                                    setNewEvaluatorVariableDescriptions(
-                                      (prev) => ({
-                                        ...prev,
-                                        [name]: e.target.value,
-                                      }),
-                                    )
-                                  }
-                                  placeholder="Short description shown when filling this variable in tests (optional)"
-                                  className="flex-1 px-3 py-2 rounded-md text-sm bg-background dark:bg-muted text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent"
-                                />
-                              </div>
-                            ))}
+                            {detectedPromptVariables.map((name, i) => {
+                              const missingDescription =
+                                validationAttempted &&
+                                !(
+                                  newEvaluatorVariableDescriptions[name] ?? ""
+                                ).trim();
+                              return (
+                                <div
+                                  key={name}
+                                  className={`p-3 md:p-4 bg-background dark:bg-muted flex flex-col md:flex-row md:items-start gap-2 md:gap-3 ${
+                                    i > 0 ? "border-t border-border" : ""
+                                  }`}
+                                >
+                                  <code className="self-start inline-flex items-center px-2 py-0.5 rounded-md text-sm font-mono font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 md:flex-shrink-0 md:mt-1.5">
+                                    {`{{${name}}}`}
+                                  </code>
+                                  <input
+                                    type="text"
+                                    value={
+                                      newEvaluatorVariableDescriptions[name] ??
+                                      ""
+                                    }
+                                    onChange={(e) =>
+                                      setNewEvaluatorVariableDescriptions(
+                                        (prev) => ({
+                                          ...prev,
+                                          [name]: e.target.value,
+                                        }),
+                                      )
+                                    }
+                                    placeholder="Short description explaining the purpose of the variable"
+                                    className={`flex-1 px-3 py-2 rounded-md text-sm bg-background dark:bg-muted text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                                      missingDescription
+                                        ? "border-red-500"
+                                        : "border-border"
+                                    }`}
+                                  />
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}

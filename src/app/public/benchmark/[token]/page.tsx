@@ -107,6 +107,7 @@ export default function PublicBenchmarkPage() {
                         reasoning: tr.reasoning,
                         output: tr.output,
                         testCase: tr.test_case,
+                        judgeResults: tr.judge_results,
                       })),
                     ),
                   )

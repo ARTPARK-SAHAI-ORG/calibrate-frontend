@@ -23,6 +23,7 @@ import {
 } from "@/components/AddTestDialog";
 import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
 import { useSidebarState } from "@/lib/sidebar";
+import { POLLING_INTERVAL_MS } from "@/constants/polling";
 
 // Hydrated evaluator row as returned by GET /tests / GET /tests/{uuid}.evaluators[].
 // `uuid` is the evaluator's id (used as `evaluator_uuid` when writing back).
@@ -266,6 +267,128 @@ function LLMPageInner() {
     fetchAllRuns();
   }, [activeTab, backendAccessToken]);
 
+  // Live-update pending runs on the Runs tab.
+  //
+  // Mirrors the polling pattern from the per-agent Tests tab
+  // (`src/components/agent-tabs/TestsTabContent.tsx`): every
+  // POLLING_INTERVAL_MS, fetch the result endpoint for any run whose
+  // status is still pending/queued/in_progress and patch its row in
+  // `allRuns` in-place. The run currently being viewed in a dialog is
+  // skipped — the dialog runs its own polling and we don't want to
+  // race-update its mirror copy on this page.
+  const pendingRunsPollingRef = useRef<NodeJS.Timeout | null>(null);
+  const allRunsRef = useRef<AllRun[]>([]);
+  const viewingRunTestRef = useRef(false);
+  const viewingRunBenchmarkRef = useRef(false);
+  const selectedRunRef = useRef<AllRun | null>(null);
+
+  // Keep refs in sync with state so the polling closure always sees the
+  // latest values without re-creating the interval on every render.
+  useEffect(() => { allRunsRef.current = allRuns; }, [allRuns]);
+  useEffect(() => { viewingRunTestRef.current = viewingRunTest; }, [viewingRunTest]);
+  useEffect(() => { viewingRunBenchmarkRef.current = viewingRunBenchmark; }, [viewingRunBenchmark]);
+  useEffect(() => { selectedRunRef.current = selectedRun; }, [selectedRun]);
+
+  useEffect(() => {
+    if (activeTab !== "runs" || !backendAccessToken) return;
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl) return;
+
+    if (pendingRunsPollingRef.current) {
+      clearInterval(pendingRunsPollingRef.current);
+      pendingRunsPollingRef.current = null;
+    }
+
+    const pollPendingRuns = async () => {
+      const viewingRunId =
+        (viewingRunTestRef.current || viewingRunBenchmarkRef.current) &&
+        selectedRunRef.current
+          ? selectedRunRef.current.uuid
+          : null;
+
+      const pendingRuns = allRunsRef.current.filter(
+        (run) =>
+          (run.status === "pending" ||
+            run.status === "queued" ||
+            run.status === "in_progress") &&
+          run.uuid !== viewingRunId,
+      );
+
+      if (pendingRuns.length === 0) return;
+
+      for (const run of pendingRuns) {
+        if (
+          (viewingRunTestRef.current || viewingRunBenchmarkRef.current) &&
+          selectedRunRef.current?.uuid === run.uuid
+        ) {
+          continue;
+        }
+
+        try {
+          const endpoint =
+            run.type === "llm-unit-test"
+              ? `${backendUrl}/agent-tests/run/${run.uuid}`
+              : `${backendUrl}/agent-tests/benchmark/${run.uuid}`;
+
+          const response = await fetch(endpoint, {
+            method: "GET",
+            headers: {
+              accept: "application/json",
+              "ngrok-skip-browser-warning": "true",
+              Authorization: `Bearer ${backendAccessToken}`,
+            },
+          });
+
+          if (!response.ok) continue;
+
+          const result = await response.json();
+
+          setAllRuns((prev) =>
+            prev.map((r) => {
+              if (r.uuid !== run.uuid) return r;
+              if (run.type === "llm-unit-test") {
+                return {
+                  ...r,
+                  status: result.status,
+                  total_tests: result.total_tests ?? r.total_tests,
+                  passed: result.passed ?? r.passed,
+                  failed: result.failed ?? r.failed,
+                  results: result.results ?? r.results,
+                  updated_at: new Date().toISOString(),
+                };
+              }
+              return {
+                ...r,
+                status: result.status,
+                model_results: result.model_results ?? r.model_results,
+                updated_at: new Date().toISOString(),
+              };
+            }),
+          );
+        } catch (err) {
+          console.error(`Error polling run ${run.uuid}:`, err);
+          setAllRuns((prev) =>
+            prev.map((r) =>
+              r.uuid === run.uuid
+                ? { ...r, status: "failed", updated_at: new Date().toISOString() }
+                : r,
+            ),
+          );
+        }
+      }
+    };
+
+    pollPendingRuns();
+    pendingRunsPollingRef.current = setInterval(pollPendingRuns, POLLING_INTERVAL_MS);
+
+    return () => {
+      if (pendingRunsPollingRef.current) {
+        clearInterval(pendingRunsPollingRef.current);
+        pendingRunsPollingRef.current = null;
+      }
+    };
+  }, [activeTab, backendAccessToken]);
+
   const handleRunClick = (run: AllRun) => {
     setSelectedRun(run);
     if (run.type === "llm-unit-test") {
@@ -273,7 +396,46 @@ function LLMPageInner() {
     } else {
       setViewingRunBenchmark(true);
     }
+    // Persist the open run on the URL so a reload re-opens the same dialog.
+    // Use replace (not push) so back-button doesn't get cluttered with a
+    // history entry per row click.
+    router.replace(`/tests?tab=runs&runId=${run.uuid}`, { scroll: false });
   };
+
+  // Tracks the last `runId` we already acted on (opened or determined
+  // stale). Used so a re-fetch of `allRuns` doesn't repeatedly re-open
+  // the dialog and stomp the user's manual close, while still letting a
+  // genuine URL change (e.g. the user navigating to a different runId)
+  // re-open the new one.
+  const lastHandledRunIdRef = useRef<string | null>(null);
+
+  // On the Runs tab, open the dialog matching `runId` from the URL once
+  // the run list has loaded. Drives both the page-reload-keeps-dialog-
+  // open behavior and external links into a specific run.
+  useEffect(() => {
+    if (activeTab !== "runs") return;
+    const runId = searchParams.get("runId");
+    if (lastHandledRunIdRef.current === runId) return;
+    if (!runId) {
+      // URL no longer references a run — record that and bail. The dialog
+      // close handlers already drop their state, so there's nothing more
+      // to do here.
+      lastHandledRunIdRef.current = null;
+      return;
+    }
+    if (allRuns.length === 0) return; // wait for the list fetch
+    const run = allRuns.find((r) => r.uuid === runId);
+    if (run) {
+      lastHandledRunIdRef.current = runId;
+      handleRunClick(run);
+    } else {
+      // Stale `runId` (deleted run, wrong tenant, etc.) — strip it so the
+      // URL isn't misleading on subsequent reloads.
+      lastHandledRunIdRef.current = runId;
+      router.replace("/tests?tab=runs", { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, allRuns, searchParams]);
 
   const toggleTestSelection = (uuid: string) => {
     setSelectedTestUuids((prev) => {
@@ -1431,6 +1593,7 @@ function LLMPageInner() {
           onClose={() => {
             setViewingRunTest(false);
             setSelectedRun(null);
+            router.replace("/tests?tab=runs", { scroll: false });
           }}
           agentUuid={selectedRun.agent_id}
           agentName={selectedRun.agent_name}
@@ -1457,6 +1620,7 @@ function LLMPageInner() {
           onClose={() => {
             setViewingRunBenchmark(false);
             setSelectedRun(null);
+            router.replace("/tests?tab=runs", { scroll: false });
           }}
           agentUuid={selectedRun.agent_id}
           agentName={selectedRun.agent_name}

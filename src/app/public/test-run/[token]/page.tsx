@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { TestCaseOutput, TestCaseData } from "@/components/test-results/shared";
+import { TestCaseOutput, TestCaseData, JudgeResult } from "@/components/test-results/shared";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
 import { TestRunOutputsPanel } from "@/components/eval-details";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
@@ -19,6 +19,7 @@ type TestCaseResult = {
   test_case?: TestCaseData | null;
   chat_history?: { role: string; content: string }[];
   evaluation?: { passed: boolean; message?: string; details?: Record<string, any> };
+  judge_results?: JudgeResult[] | null;
   error?: string;
 };
 
@@ -109,6 +110,7 @@ export default function PublicTestRunPage() {
                     output: r.output,
                     testCase: r.test_case,
                     reasoning: r.reasoning,
+                    judgeResults: r.judge_results,
                     error: r.error,
                   })),
                 )
@@ -128,6 +130,7 @@ export default function PublicTestRunPage() {
                 testCase: r.test_case ?? undefined,
                 reasoning: r.reasoning,
                 evaluation: r.evaluation ?? { passed: getStatus(r) === "passed" },
+                judgeResults: r.judge_results ?? null,
                 error: r.error,
               }))}
               selectedId={selectedId}

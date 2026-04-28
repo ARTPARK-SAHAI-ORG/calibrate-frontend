@@ -1013,39 +1013,30 @@ export function AddTestDialog({
 
     if (activeTab === "tool-invocation") {
       if (selectedTools.length > 0) {
-        // Build tool_calls array from all selected tools
+        // Build tool_calls array from all selected tools. The "should not
+        // have been called" expectation is intentionally suppressed for now
+        // — every selected tool is treated as `should-call` regardless of
+        // any pre-existing `expectation` value loaded from the backend, so
+        // the API always receives a positive should-call payload.
         const toolCalls = selectedTools.map((tool) => {
-          // Use tool.id for inbuilt tools, tool.name for custom tools
           const toolIdentifier = tool.isInbuilt ? tool.id : tool.name;
 
-          if (tool.expectation === "should-call") {
-            // Build the expected arguments
-            const expectedArgs: Record<string, any> = {};
-            if (!tool.acceptAnyParameterValues) {
-              for (const param of tool.expectedParameters) {
-                // Try to parse as JSON, otherwise use as string
-                try {
-                  expectedArgs[param.name] = JSON.parse(param.value);
-                } catch {
-                  expectedArgs[param.name] = param.value;
-                }
+          const expectedArgs: Record<string, any> = {};
+          if (!tool.acceptAnyParameterValues) {
+            for (const param of tool.expectedParameters) {
+              try {
+                expectedArgs[param.name] = JSON.parse(param.value);
+              } catch {
+                expectedArgs[param.name] = param.value;
               }
             }
-
-            return {
-              tool: toolIdentifier,
-              arguments: tool.acceptAnyParameterValues ? {} : expectedArgs,
-              accept_any_arguments: tool.acceptAnyParameterValues,
-            };
-          } else {
-            // should-not-call
-            return {
-              tool: toolIdentifier,
-              arguments: {},
-              is_called: false,
-              accept_any_arguments: false,
-            };
           }
+
+          return {
+            tool: toolIdentifier,
+            arguments: tool.acceptAnyParameterValues ? {} : expectedArgs,
+            accept_any_arguments: tool.acceptAnyParameterValues,
+          };
         });
 
         evaluation = {
@@ -1689,36 +1680,19 @@ export function AddTestDialog({
                             </button>
                           </div>
 
-                          {/* Should have been called / Should not have been called tabs */}
-                          <div className="flex rounded-lg overflow-hidden border border-border">
-                            <button
-                              onClick={() =>
-                                updateToolConfig(tool.id, {
-                                  expectation: "should-call",
-                                })
-                              }
-                              className={`flex-1 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
-                                tool.expectation === "should-call"
-                                  ? "bg-foreground text-background"
-                                  : "bg-muted text-muted-foreground hover:text-foreground"
-                              }`}
-                            >
-                              Should have been called
-                            </button>
-                            <button
-                              onClick={() =>
-                                updateToolConfig(tool.id, {
-                                  expectation: "should-not-call",
-                                })
-                              }
-                              className={`flex-1 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
-                                tool.expectation === "should-not-call"
-                                  ? "bg-foreground text-background"
-                                  : "bg-muted text-muted-foreground hover:text-foreground"
-                              }`}
-                            >
-                              Should not have been called
-                            </button>
+                          {/* Expectation indicator. The "should not have been
+                              called" option is intentionally hidden for now
+                              and the dialog assumes "should have been called"
+                              on every save (see the tool_calls payload
+                              builder below). Rendered as a full-width
+                              selected-state pill for visual consistency with
+                              the rest of the dialog rather than a real
+                              segmented control. */}
+                          <div
+                            className="w-full py-2.5 rounded-lg border border-border bg-foreground text-background text-sm font-medium text-center"
+                            aria-label="Expected behaviour"
+                          >
+                            Should have been called
                           </div>
 
                           {/* Accept any parameter values checkbox - show when "should call" is selected and tool has parameters */}

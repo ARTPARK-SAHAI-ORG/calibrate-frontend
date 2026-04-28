@@ -6,6 +6,7 @@ import { useAccessToken } from "@/hooks";
 import {
   TestCaseOutput,
   TestCaseData,
+  JudgeResult,
   CloseIcon,
   TestStats,
 } from "./test-results/shared";
@@ -45,6 +46,9 @@ type TestResult = {
     message?: string;
     details?: Record<string, any>;
   };
+  /** Per-evaluator verdicts for response tests. Null for tool-call tests
+   * and absent for legacy rows. */
+  judgeResults?: JudgeResult[] | null;
   error?: string;
 };
 
@@ -63,6 +67,9 @@ type TestCaseResult = {
     message?: string;
     details?: Record<string, any>;
   };
+  /** Per-evaluator verdicts for response tests. Null for tool-call tests
+   * and absent for legacy rows. */
+  judge_results?: JudgeResult[] | null;
   error?: string;
 };
 
@@ -130,6 +137,12 @@ export function TestRunnerDialog({
   const [isPublic, setIsPublic] = useState(false);
   const [shareToken, setShareToken] = useState<string | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Tracks whether the dialog has already auto-opened a completed test for
+  // this open lifecycle. Set back to false on every dialog open / new run /
+  // past-run-view init, and flipped to true after the auto-open fires once.
+  // Without this guard, clicking the in-dialog "back to list" button would
+  // immediately re-trigger the auto-open, making the list view unreachable.
+  const hasAutoSelectedRef = useRef(false);
 
   // Debug: Log when selectedTestUuid changes
   useEffect(() => {
@@ -139,6 +152,24 @@ export function TestRunnerDialog({
       testResults.map((r) => ({ uuid: r.test.uuid, name: r.test.name })),
     );
   }, [selectedTestUuid, testResults]);
+
+  // Auto-open the first completed test when nothing is selected. Covers both
+  // - live runs: as soon as one test transitions to passed/failed (and the
+  //   user hasn't manually picked anything), open it.
+  // - past completed runs: on dialog open every test is already passed/failed
+  //   so this picks index 0 (i.e. always opens the first test).
+  // Fires at most once per dialog open thanks to `hasAutoSelectedRef`.
+  useEffect(() => {
+    if (hasAutoSelectedRef.current) return;
+    if (selectedTestUuid !== null) return;
+    const firstCompleted = testResults.find(
+      (r) => r.status === "passed" || r.status === "failed",
+    );
+    if (firstCompleted) {
+      hasAutoSelectedRef.current = true;
+      setSelectedTestUuid(firstCompleted.test.uuid);
+    }
+  }, [testResults, selectedTestUuid]);
 
   // Start polling when dialog opens with a taskId (viewing existing run)
   useEffect(() => {
@@ -157,6 +188,7 @@ export function TestRunnerDialog({
 
     // Initialize state for viewing existing run
     setSelectedTestUuid(null);
+    hasAutoSelectedRef.current = false;
     setCurrentTaskId(taskId);
 
     const isInProgress =
@@ -201,6 +233,7 @@ export function TestRunnerDialog({
     }
 
     setSelectedTestUuid(null);
+    hasAutoSelectedRef.current = false;
     setCurrentTaskId(null);
     const initialResults: TestResult[] = tests.map((test) => ({
       test,
@@ -299,6 +332,7 @@ export function TestRunnerDialog({
               output: apiResult.output ?? undefined,
               testCase: apiResult.test_case ?? undefined,
               reasoning: apiResult.reasoning,
+              judgeResults: apiResult.judge_results ?? null,
               evaluation:
                 testStatus !== "running"
                   ? (apiResult.evaluation ?? {
@@ -339,6 +373,7 @@ export function TestRunnerDialog({
               output: apiResult.output ?? undefined,
               testCase: apiResult.test_case ?? undefined,
               reasoning: apiResult.reasoning,
+              judgeResults: apiResult.judge_results ?? null,
               evaluation:
                 testStatus !== "running"
                   ? (apiResult.evaluation ?? {
@@ -849,6 +884,7 @@ export function TestRunnerDialog({
                         output: r.output,
                         testCase: r.testCase,
                         reasoning: r.reasoning,
+                        judgeResults: r.judgeResults,
                         error: r.error,
                       })),
                     )
@@ -917,6 +953,7 @@ export function TestRunnerDialog({
                 testCase: r.testCase,
                 reasoning: r.reasoning,
                 evaluation: r.evaluation,
+                judgeResults: r.judgeResults,
                 error: r.error,
               }))}
               selectedId={selectedTestUuid}

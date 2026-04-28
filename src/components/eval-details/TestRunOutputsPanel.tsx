@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import {
   TestCaseOutput,
   TestCaseData,
+  JudgeResult,
   StatusIcon,
   TestDetailView as SharedTestDetailView,
   EmptyStateView,
@@ -17,6 +18,10 @@ export type TestRunResult = {
   reasoning?: string;
   evaluation?: { passed: boolean; message?: string; details?: Record<string, any> };
   error?: string;
+  /** Per-evaluator verdicts for response (next-reply) tests. Null/absent
+   * for tool-call tests and for legacy rows (which fall back to a single
+   * default-evaluator reasoning). */
+  judgeResults?: JudgeResult[] | null;
 };
 
 type TestRunOutputsPanelProps = {
@@ -25,6 +30,9 @@ type TestRunOutputsPanelProps = {
   onSelect: (id: string) => void;
   onClearSelection?: () => void;
   height?: string;
+  /** Optional rating-evaluator scale lookup (uuid → scale_max). Fallback
+   * only — newer judge_results entries carry `scale_max` inline. */
+  scaleByEvaluatorUuid?: Record<string, number | undefined>;
 };
 
 type StatusGroup = {
@@ -40,6 +48,7 @@ export function TestRunOutputsPanel({
   onSelect,
   onClearSelection,
   height,
+  scaleByEvaluatorUuid,
 }: TestRunOutputsPanelProps) {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
@@ -129,7 +138,10 @@ export function TestRunOutputsPanel({
               </div>
             )}
             <div className="flex-1 overflow-y-auto">
-              <TestResultDetail result={selectedResult} />
+              <TestResultDetail
+                result={selectedResult}
+                scaleByEvaluatorUuid={scaleByEvaluatorUuid}
+              />
             </div>
           </>
         ) : (
@@ -137,12 +149,17 @@ export function TestRunOutputsPanel({
         )}
       </div>
 
-      {/* Right Panel - Evaluation Criteria */}
+      {/* Right Panel - Evaluators / Expected Tool Calls (desktop only).
+          On mobile this content is rendered inline by `TestDetailView`. */}
       {selectedResult && (selectedResult.status === "passed" || selectedResult.status === "failed") && (
-        <div className="hidden md:flex w-72 border-l border-border flex-col overflow-hidden">
+        <div className="hidden md:flex w-80 border-l border-border flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto">
             <EvaluationCriteriaPanel
               evaluation={selectedResult.testCase?.evaluation}
+              testCaseEvaluators={selectedResult.testCase?.evaluators}
+              judgeResults={selectedResult.judgeResults}
+              reasoning={selectedResult.reasoning}
+              scaleByEvaluatorUuid={scaleByEvaluatorUuid}
             />
           </div>
         </div>
@@ -151,7 +168,13 @@ export function TestRunOutputsPanel({
   );
 }
 
-function TestResultDetail({ result }: { result: TestRunResult }) {
+function TestResultDetail({
+  result,
+  scaleByEvaluatorUuid,
+}: {
+  result: TestRunResult;
+  scaleByEvaluatorUuid?: Record<string, number | undefined>;
+}) {
   if (result.status === "pending") {
     return (
       <div className="flex items-center justify-center h-full">
@@ -206,6 +229,8 @@ function TestResultDetail({ result }: { result: TestRunResult }) {
       output={result.output}
       passed={result.evaluation?.passed ?? false}
       reasoning={result.reasoning}
+      judgeResults={result.judgeResults}
+      scaleByEvaluatorUuid={scaleByEvaluatorUuid}
     />
   );
 }

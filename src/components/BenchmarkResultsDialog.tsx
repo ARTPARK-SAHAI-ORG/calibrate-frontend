@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   TestCaseOutput,
   TestCaseData,
+  JudgeResult,
   CloseIcon,
   SpinnerIcon,
 } from "./test-results/shared";
@@ -24,6 +25,9 @@ type BenchmarkTestResult = {
   reasoning?: string;
   output?: TestCaseOutput;
   test_case?: TestCaseData;
+  /** Per-evaluator verdicts for response tests; null for tool-call tests
+   * and absent for legacy rows. */
+  judge_results?: JudgeResult[] | null;
 };
 
 type ModelResult = {
@@ -384,16 +388,16 @@ export function BenchmarkResultsDialog({
       <div className="bg-background rounded-none md:rounded-xl w-full max-w-7xl h-full md:h-[85vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4">
-          <div className="flex items-center gap-2 md:gap-3 min-w-0">
-            <div className="min-w-0">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 md:gap-3 min-w-0">
               <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
                 {runName ?? "Benchmark"}
               </h2>
-              <p className="text-xs text-muted-foreground truncate">{agentName}</p>
+              {!isDone && !isInitialLoading && (
+                <StatusBadge status={taskStatus} showSpinner />
+              )}
             </div>
-            {!isDone && !isInitialLoading && (
-              <StatusBadge status={taskStatus} showSpinner />
-            )}
+            <p className="text-xs text-muted-foreground truncate">{agentName}</p>
           </div>
           <div className="flex items-center gap-2">
             {/* Export results — only shown when benchmark is done */}
@@ -411,6 +415,7 @@ export function BenchmarkResultsDialog({
                           reasoning: tr.reasoning,
                           output: tr.output,
                           testCase: tr.test_case,
+                          judgeResults: tr.judge_results,
                         })),
                       ),
                     )
