@@ -40,6 +40,8 @@ export type {
 export { BenchmarkOutputsPanel } from "./BenchmarkOutputsPanel";
 export type { BenchmarkTestResult, BenchmarkModelResult } from "./BenchmarkOutputsPanel";
 
+export { BenchmarkCombinedLeaderboard } from "./BenchmarkCombinedLeaderboard";
+
 export { TestRunOutputsPanel } from "./TestRunOutputsPanel";
 export type { TestRunResult } from "./TestRunOutputsPanel";
 

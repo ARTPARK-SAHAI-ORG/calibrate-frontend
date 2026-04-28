@@ -3,14 +3,10 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
-import { LeaderboardTab, BenchmarkOutputsPanel } from "@/components/eval-details";
-import type { BenchmarkTestResult, BenchmarkModelResult } from "@/components/eval-details";
+import { BenchmarkCombinedLeaderboard, BenchmarkOutputsPanel } from "@/components/eval-details";
+import type { BenchmarkModelResult } from "@/components/eval-details";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
-import {
-  getPublicDefaultEvaluator,
-  type PublicDefaultEvaluator,
-} from "@/lib/publicEvaluators";
 
 type LeaderboardSummary = {
   model: string;
@@ -37,8 +33,6 @@ export default function PublicBenchmarkPage() {
   const [activeTab, setActiveTab] = useState<"leaderboard" | "outputs">("leaderboard");
   const [expandedModels, setExpandedModels] = useState<Set<string>>(new Set());
   const [selectedTest, setSelectedTest] = useState<{ model: string; testIndex: number } | null>(null);
-  const [defaultEvaluator, setDefaultEvaluator] =
-    useState<PublicDefaultEvaluator | null>(null);
 
   useEffect(() => { document.title = "LLM benchmark | Calibrate"; }, []);
 
@@ -58,12 +52,6 @@ export default function PublicBenchmarkPage() {
         const result: BenchmarkStatusResponse = await res.json();
         if (result.status !== "done" && result.status !== "completed") { setNotFound(true); return; }
 
-        const jobEvaluatorName = getBenchmarkEvaluatorName(result.model_results);
-        const defaultEvaluator = jobEvaluatorName
-          ? null
-          : await getPublicDefaultEvaluator(backendUrl, token, "llm");
-
-        setDefaultEvaluator(defaultEvaluator);
         setData(result);
         if (result.model_results?.length) {
           setExpandedModels(new Set([result.model_results[0].model]));
@@ -80,9 +68,7 @@ export default function PublicBenchmarkPage() {
   if (isLoading) return <PublicPageLayout><PublicLoading /></PublicPageLayout>;
   if (notFound || !data) return <PublicPageLayout><PublicNotFound /></PublicPageLayout>;
 
-  const benchmarkScoreLabel = `${
-    getBenchmarkEvaluatorName(data.model_results) ?? defaultEvaluator?.name ?? "Evaluator"
-  } (%)`;
+  const benchmarkScoreLabel = "Test pass rate (%)";
 
   const toggleModel = (model: string) => {
     setExpandedModels((prev) => {
@@ -134,19 +120,12 @@ export default function PublicBenchmarkPage() {
         </div>
 
         {/* Leaderboard Tab */}
-        {activeTab === "leaderboard" && data.leaderboard_summary && (
-          <LeaderboardTab
-            columns={[
-              { key: "model", header: "Model" },
-              { key: "passed", header: "Passed" },
-              { key: "total", header: "Total" },
-              { key: "pass_rate", header: benchmarkScoreLabel, render: (v) => `${parseFloat(v).toFixed(1)}%` },
-            ]}
-            data={data.leaderboard_summary}
-            charts={[[{ title: benchmarkScoreLabel, dataKey: "pass_rate", yDomain: [0, 100], formatTooltip: (v) => `${v.toFixed(1)}%` }]]}
-            filename="benchmark-leaderboard"
-            getLabel={(key) => key}
-            nameKey="model"
+        {activeTab === "leaderboard" && (
+          <BenchmarkCombinedLeaderboard
+            leaderboardSummary={data.leaderboard_summary}
+            modelResults={data.model_results ?? []}
+            filename={`benchmark-leaderboard-${token.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
+            benchmarkScoreLabel={benchmarkScoreLabel}
           />
         )}
 
@@ -169,16 +148,4 @@ export default function PublicBenchmarkPage() {
       </div>
     </PublicPageLayout>
   );
-}
-
-function getBenchmarkEvaluatorName(
-  modelResults: BenchmarkModelResult[] | undefined,
-): string | null {
-  for (const model of modelResults ?? []) {
-    for (const test of model.test_results ?? []) {
-      const name = test.judge_results?.find((result) => result.name)?.name;
-      if (name) return name;
-    }
-  }
-  return null;
 }

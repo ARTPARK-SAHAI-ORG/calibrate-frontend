@@ -9,6 +9,7 @@ import {
   EvaluationCriteriaPanel,
 } from "@/components/test-results/shared";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
+import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSummary";
 
 export type BenchmarkTestResult = {
   name?: string;
@@ -30,6 +31,8 @@ export type BenchmarkModelResult = {
   passed: number | null;
   failed: number | null;
   test_results: BenchmarkTestResult[] | null;
+  /** Aggregate per evaluator from metrics.json criteria (finished models). Optional / null on older jobs. */
+  evaluator_summary?: BenchmarkEvaluatorSummaryEntry[] | null;
 };
 
 type BenchmarkOutputsPanelProps = {

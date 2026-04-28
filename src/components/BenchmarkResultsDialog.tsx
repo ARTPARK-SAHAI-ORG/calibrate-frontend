@@ -2,16 +2,15 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import {
-  TestCaseOutput,
-  TestCaseData,
-  JudgeResult,
   CloseIcon,
   SpinnerIcon,
 } from "./test-results/shared";
-import { BenchmarkOutputsPanel } from "./eval-details";
+import {
+  BenchmarkOutputsPanel,
+  BenchmarkCombinedLeaderboard,
+  type BenchmarkModelResult,
+} from "./eval-details";
 import { StatusBadge } from "@/components/ui";
-import { LeaderboardBarChart, getColorMap } from "./charts/LeaderboardBarChart";
-import { DownloadableTable } from "./DownloadableTable";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
@@ -22,27 +21,6 @@ import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
 } from "@/lib/defaultEvaluators";
-
-type BenchmarkTestResult = {
-  name?: string;
-  passed: boolean | null; // null means still running
-  reasoning?: string;
-  output?: TestCaseOutput;
-  test_case?: TestCaseData;
-  /** Per-evaluator verdicts for response tests; null for tool-call tests
-   * and absent for legacy rows. */
-  judge_results?: JudgeResult[] | null;
-};
-
-type ModelResult = {
-  model: string;
-  success: boolean | null; // null means still processing
-  message: string;
-  total_tests: number | null;
-  passed: number | null;
-  failed: number | null;
-  test_results: BenchmarkTestResult[] | null;
-};
 
 type LeaderboardSummary = {
   model: string;
@@ -55,7 +33,7 @@ type BenchmarkStatusResponse = {
   task_id: string;
   name?: string;
   status: string;
-  model_results?: ModelResult[];
+  model_results?: BenchmarkModelResult[];
   leaderboard_summary?: LeaderboardSummary[];
   results_s3_prefix?: string;
   error?: string;
@@ -107,7 +85,7 @@ export function BenchmarkResultsDialog({
   // Loading and data state
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [taskStatus, setTaskStatus] = useState<string>("queued");
-  const [modelResults, setModelResults] = useState<ModelResult[]>([]);
+  const [modelResults, setModelResults] = useState<BenchmarkModelResult[]>([]);
   const [leaderboardSummary, setLeaderboardSummary] = useState<
     LeaderboardSummary[] | undefined
   >(undefined);
@@ -360,7 +338,7 @@ export function BenchmarkResultsDialog({
   };
 
   // Get providers to display (includes placeholders for models without results yet)
-  const getProvidersToDisplay = (): ModelResult[] => {
+  const getProvidersToDisplay = (): BenchmarkModelResult[] => {
     // When in progress and no results yet, show all models as placeholders
     if (!isDone && modelResults.length === 0 && models.length > 0) {
       return models.map((model) => ({
@@ -379,7 +357,7 @@ export function BenchmarkResultsDialog({
       const existingModels = new Set(modelResults.map((m) => m.model));
       const missingModels = models.filter((m) => !existingModels.has(m));
       if (missingModels.length > 0) {
-        const placeholders: ModelResult[] = missingModels.map((model) => ({
+        const placeholders: BenchmarkModelResult[] = missingModels.map((model) => ({
           model,
           success: null,
           message: "",
@@ -399,14 +377,7 @@ export function BenchmarkResultsDialog({
 
   if (!isOpen) return null;
 
-  // Get color map for charts
-  const modelNames = leaderboardSummary?.map((s) => s.model) || [];
-  const colorMap = getColorMap(modelNames);
-  const benchmarkScoreLabel = `${
-    getBenchmarkEvaluatorName(modelResults) ??
-    defaultNextReplyEvaluator?.name ??
-    "Evaluator"
-  } (%)`;
+  const benchmarkScoreLabel = "Test pass rate (%)";
 
   // Check if we have any results to show
   const hasAnyResults = modelResults.some(
@@ -591,48 +562,12 @@ export function BenchmarkResultsDialog({
             {/* Leaderboard Tab - Only when done */}
             {isDone && activeTab === "leaderboard" && (
               <div className="p-4 md:p-6 space-y-4 md:space-y-6 overflow-y-auto h-full">
-                {/* Leaderboard Table */}
-                {leaderboardSummary && leaderboardSummary.length > 0 && (
-                  <DownloadableTable
-                    columns={[
-                      {
-                        key: "model",
-                        header: "Model",
-                        render: (value) => value.replace("__", "/"),
-                      },
-                      { key: "pass_rate", header: benchmarkScoreLabel },
-                    ]}
-                    data={leaderboardSummary.map((s) => ({
-                      model: s.model,
-                      pass_rate: s.pass_rate,
-                    }))}
-                    filename={`benchmark-leaderboard-${agentName}`}
-                  />
-                )}
-
-                {/* Charts Section */}
-                {leaderboardSummary && leaderboardSummary.length > 0 && (
-                  <LeaderboardBarChart
-                    title={benchmarkScoreLabel}
-                    data={leaderboardSummary.map((s) => ({
-                      label: s.model.replace("__", "/"),
-                      value: parseFloat(s.pass_rate),
-                      colorKey: s.model,
-                    }))}
-                    yDomain={[0, 100]}
-                    formatTooltip={(value) => `${value.toFixed(1)}%`}
-                    colorMap={colorMap}
-                  />
-                )}
-
-                {/* Empty State */}
-                {(!leaderboardSummary || leaderboardSummary.length === 0) && (
-                  <div className="text-center py-12">
-                    <p className="text-sm text-muted-foreground">
-                      No leaderboard data available
-                    </p>
-                  </div>
-                )}
+                <BenchmarkCombinedLeaderboard
+                  leaderboardSummary={leaderboardSummary}
+                  modelResults={modelResults}
+                  filename={`benchmark-leaderboard-${agentName.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
+                  benchmarkScoreLabel={benchmarkScoreLabel}
+                />
               </div>
             )}
 
@@ -658,14 +593,4 @@ export function BenchmarkResultsDialog({
       </div>
     </div>
   );
-}
-
-function getBenchmarkEvaluatorName(modelResults: ModelResult[]): string | null {
-  for (const model of modelResults) {
-    for (const test of model.test_results ?? []) {
-      const name = test.judge_results?.find((result) => result.name)?.name;
-      if (name) return name;
-    }
-  }
-  return null;
 }
