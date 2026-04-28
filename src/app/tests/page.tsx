@@ -14,9 +14,27 @@ import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog"
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
 import { RunTestDialog } from "@/components/RunTestDialog";
-import { AddTestDialog, TestConfig } from "@/components/AddTestDialog";
+import {
+  AddTestDialog,
+  TestConfig,
+  AttachedEvaluatorInit,
+  EvaluatorRefPayload,
+  EvaluatorVariableDef,
+} from "@/components/AddTestDialog";
 import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
 import { useSidebarState } from "@/lib/sidebar";
+import { POLLING_INTERVAL_MS } from "@/constants/polling";
+
+// Hydrated evaluator row as returned by GET /tests / GET /tests/{uuid}.evaluators[].
+// `uuid` is the evaluator's id (used as `evaluator_uuid` when writing back).
+type TestEvaluatorRow = {
+  uuid: string;
+  name: string;
+  description?: string | null;
+  slug: string | null;
+  variables?: EvaluatorVariableDef[] | null;
+  variable_values?: Record<string, string> | null;
+};
 
 type TestData = {
   uuid: string;
@@ -24,6 +42,7 @@ type TestData = {
   description: string;
   type: "response" | "tool_call";
   config: Record<string, any>;
+  evaluators?: TestEvaluatorRow[] | null;
   created_at: string;
   updated_at: string;
 };
@@ -147,6 +166,9 @@ function LLMPageInner() {
   const [initialConfig, setInitialConfig] = useState<TestConfig | undefined>(
     undefined
   );
+  const [initialEvaluators, setInitialEvaluators] = useState<
+    AttachedEvaluatorInit[] | undefined
+  >(undefined);
 
   // Selection state for bulk operations
   const [selectedTestUuids, setSelectedTestUuids] = useState<Set<string>>(
@@ -245,6 +267,126 @@ function LLMPageInner() {
     fetchAllRuns();
   }, [activeTab, backendAccessToken]);
 
+  // Live-update pending runs on the Runs tab.
+  //
+  // Mirrors the polling pattern from the per-agent Tests tab
+  // (`src/components/agent-tabs/TestsTabContent.tsx`): every
+  // POLLING_INTERVAL_MS, fetch the result endpoint for any run whose
+  // status is still pending/queued/in_progress and patch its row in
+  // `allRuns` in-place. The run currently being viewed in a dialog is
+  // skipped — the dialog runs its own polling and we don't want to
+  // race-update its mirror copy on this page.
+  const pendingRunsPollingRef = useRef<NodeJS.Timeout | null>(null);
+  const allRunsRef = useRef<AllRun[]>([]);
+  const viewingRunTestRef = useRef(false);
+  const viewingRunBenchmarkRef = useRef(false);
+  const selectedRunRef = useRef<AllRun | null>(null);
+
+  // Keep refs in sync with state so the polling closure always sees the
+  // latest values without re-creating the interval on every render.
+  useEffect(() => { allRunsRef.current = allRuns; }, [allRuns]);
+  useEffect(() => { viewingRunTestRef.current = viewingRunTest; }, [viewingRunTest]);
+  useEffect(() => { viewingRunBenchmarkRef.current = viewingRunBenchmark; }, [viewingRunBenchmark]);
+  useEffect(() => { selectedRunRef.current = selectedRun; }, [selectedRun]);
+
+  useEffect(() => {
+    if (activeTab !== "runs" || !backendAccessToken) return;
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl) return;
+
+    if (pendingRunsPollingRef.current) {
+      clearInterval(pendingRunsPollingRef.current);
+      pendingRunsPollingRef.current = null;
+    }
+
+    const pollPendingRuns = async () => {
+      const viewingRunId =
+        (viewingRunTestRef.current || viewingRunBenchmarkRef.current) &&
+        selectedRunRef.current
+          ? selectedRunRef.current.uuid
+          : null;
+
+      const pendingRuns = allRunsRef.current.filter(
+        (run) =>
+          (run.status === "pending" ||
+            run.status === "queued" ||
+            run.status === "in_progress") &&
+          run.uuid !== viewingRunId,
+      );
+
+      if (pendingRuns.length === 0) return;
+
+      for (const run of pendingRuns) {
+        if (
+          (viewingRunTestRef.current || viewingRunBenchmarkRef.current) &&
+          selectedRunRef.current?.uuid === run.uuid
+        ) {
+          continue;
+        }
+
+        try {
+          const endpoint =
+            run.type === "llm-unit-test"
+              ? `${backendUrl}/agent-tests/run/${run.uuid}`
+              : `${backendUrl}/agent-tests/benchmark/${run.uuid}`;
+
+          const response = await fetch(endpoint, {
+            method: "GET",
+            headers: {
+              accept: "application/json",
+              "ngrok-skip-browser-warning": "true",
+              Authorization: `Bearer ${backendAccessToken}`,
+            },
+          });
+
+          if (response.status === 401) {
+            await signOut({ callbackUrl: "/login" });
+            return;
+          }
+
+          if (!response.ok) continue;
+
+          const result = await response.json();
+
+          setAllRuns((prev) =>
+            prev.map((r) => {
+              if (r.uuid !== run.uuid) return r;
+              if (run.type === "llm-unit-test") {
+                return {
+                  ...r,
+                  status: result.status,
+                  total_tests: result.total_tests ?? r.total_tests,
+                  passed: result.passed ?? r.passed,
+                  failed: result.failed ?? r.failed,
+                  results: result.results ?? r.results,
+                  updated_at: new Date().toISOString(),
+                };
+              }
+              return {
+                ...r,
+                status: result.status,
+                model_results: result.model_results ?? r.model_results,
+                updated_at: new Date().toISOString(),
+              };
+            }),
+          );
+        } catch (err) {
+          console.error(`Error polling run ${run.uuid}:`, err);
+        }
+      }
+    };
+
+    pollPendingRuns();
+    pendingRunsPollingRef.current = setInterval(pollPendingRuns, POLLING_INTERVAL_MS);
+
+    return () => {
+      if (pendingRunsPollingRef.current) {
+        clearInterval(pendingRunsPollingRef.current);
+        pendingRunsPollingRef.current = null;
+      }
+    };
+  }, [activeTab, backendAccessToken]);
+
   const handleRunClick = (run: AllRun) => {
     setSelectedRun(run);
     if (run.type === "llm-unit-test") {
@@ -252,7 +394,46 @@ function LLMPageInner() {
     } else {
       setViewingRunBenchmark(true);
     }
+    // Persist the open run on the URL so a reload re-opens the same dialog.
+    // Use replace (not push) so back-button doesn't get cluttered with a
+    // history entry per row click.
+    router.replace(`/tests?tab=runs&runId=${run.uuid}`, { scroll: false });
   };
+
+  // Tracks the last `runId` we already acted on (opened or determined
+  // stale). Used so a re-fetch of `allRuns` doesn't repeatedly re-open
+  // the dialog and stomp the user's manual close, while still letting a
+  // genuine URL change (e.g. the user navigating to a different runId)
+  // re-open the new one.
+  const lastHandledRunIdRef = useRef<string | null>(null);
+
+  // On the Runs tab, open the dialog matching `runId` from the URL once
+  // the run list has loaded. Drives both the page-reload-keeps-dialog-
+  // open behavior and external links into a specific run.
+  useEffect(() => {
+    if (activeTab !== "runs") return;
+    const runId = searchParams.get("runId");
+    if (lastHandledRunIdRef.current === runId) return;
+    if (!runId) {
+      // URL no longer references a run — record that and bail. The dialog
+      // close handlers already drop their state, so there's nothing more
+      // to do here.
+      lastHandledRunIdRef.current = null;
+      return;
+    }
+    if (allRuns.length === 0) return; // wait for the list fetch
+    const run = allRuns.find((r) => r.uuid === runId);
+    if (run) {
+      lastHandledRunIdRef.current = runId;
+      handleRunClick(run);
+    } else {
+      // Stale `runId` (deleted run, wrong tenant, etc.) — strip it so the
+      // URL isn't misleading on subsequent reloads.
+      lastHandledRunIdRef.current = runId;
+      router.replace("/tests?tab=runs", { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, allRuns, searchParams]);
 
   const toggleTestSelection = (uuid: string) => {
     setSelectedTestUuids((prev) => {
@@ -407,7 +588,10 @@ function LLMPageInner() {
   };
 
   // Create test via POST API
-  const createTest = async (config: TestConfig) => {
+  const createTest = async (
+    config: TestConfig,
+    evaluators: EvaluatorRefPayload[]
+  ) => {
     setValidationAttempted(true);
     if (!newTestName.trim()) return;
 
@@ -419,6 +603,22 @@ function LLMPageInner() {
         throw new Error("BACKEND_URL environment variable is not set");
       }
 
+      // Only attach `evaluators` for next-reply tests. Tool-invocation tests
+      // don't carry evaluators and must not have their links touched server-side.
+      const body: {
+        name: string;
+        type: "response" | "tool_call";
+        config: TestConfig;
+        evaluators?: EvaluatorRefPayload[];
+      } = {
+        name: newTestName.trim(),
+        type: config.evaluation.type,
+        config: config,
+      };
+      if (config.evaluation.type === "response") {
+        body.evaluators = evaluators;
+      }
+
       const response = await fetch(`${backendUrl}/tests`, {
         method: "POST",
         headers: {
@@ -427,11 +627,7 @@ function LLMPageInner() {
           "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
-        body: JSON.stringify({
-          name: newTestName.trim(),
-          type: config.evaluation.type,
-          config: config,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (response.status === 401) {
@@ -520,6 +716,23 @@ function LLMPageInner() {
       if (testData.config) {
         setInitialConfig(testData.config as TestConfig);
       }
+      // Hydrate any evaluators already attached to the test. Each row is the
+      // full joined shape from get_evaluators_for_test(); we map it into the
+      // slim AttachedEvaluatorInit the dialog expects.
+      if (Array.isArray(testData.evaluators)) {
+        setInitialEvaluators(
+          testData.evaluators.map((e) => ({
+            evaluator_uuid: e.uuid,
+            name: e.name,
+            description: e.description ?? null,
+            slug: e.slug,
+            variables: Array.isArray(e.variables) ? e.variables : [],
+            variable_values: e.variable_values ?? null,
+          }))
+        );
+      } else {
+        setInitialEvaluators([]);
+      }
     } catch (err) {
       console.error("Error fetching test:", err);
       setCreateError(
@@ -531,7 +744,10 @@ function LLMPageInner() {
   };
 
   // Update existing test via PUT API
-  const updateTest = async (config: TestConfig) => {
+  const updateTest = async (
+    config: TestConfig,
+    evaluators: EvaluatorRefPayload[]
+  ) => {
     setValidationAttempted(true);
     if (!newTestName.trim() || !editingTestUuid) return;
 
@@ -543,6 +759,23 @@ function LLMPageInner() {
         throw new Error("BACKEND_URL environment variable is not set");
       }
 
+      // For next-reply tests we send `evaluators` so the backend replaces the
+      // whole pivot set. For tool-invocation tests we omit `evaluators`
+      // entirely so existing links (if any) are left untouched.
+      const body: {
+        name: string;
+        type: "response" | "tool_call";
+        config: TestConfig;
+        evaluators?: EvaluatorRefPayload[];
+      } = {
+        name: newTestName.trim(),
+        type: config.evaluation.type,
+        config: config,
+      };
+      if (config.evaluation.type === "response") {
+        body.evaluators = evaluators;
+      }
+
       const response = await fetch(`${backendUrl}/tests/${editingTestUuid}`, {
         method: "PUT",
         headers: {
@@ -551,11 +784,7 @@ function LLMPageInner() {
           "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
-        body: JSON.stringify({
-          name: newTestName.trim(),
-          type: config.evaluation.type,
-          config: config,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (response.status === 401) {
@@ -604,6 +833,7 @@ function LLMPageInner() {
     setValidationAttempted(false);
     setInitialTab(undefined);
     setInitialConfig(undefined);
+    setInitialEvaluators(undefined);
   };
 
   // Filter tests based on search query
@@ -631,7 +861,7 @@ function LLMPageInner() {
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
             <h1 className="text-xl md:text-2xl font-semibold">
-              LLM Evaluation
+              LLM Tests
             </h1>
             <p className="text-muted-foreground text-sm md:text-base leading-relaxed mt-1">
               Create and manage tests to evaluate your LLM
@@ -1304,6 +1534,7 @@ function LLMPageInner() {
           onSubmit={editingTestUuid ? updateTest : createTest}
           initialTab={initialTab}
           initialConfig={initialConfig}
+          initialEvaluators={initialEvaluators}
         />
       )}
 
@@ -1360,6 +1591,7 @@ function LLMPageInner() {
           onClose={() => {
             setViewingRunTest(false);
             setSelectedRun(null);
+            router.replace("/tests?tab=runs", { scroll: false });
           }}
           agentUuid={selectedRun.agent_id}
           agentName={selectedRun.agent_name}
@@ -1386,6 +1618,7 @@ function LLMPageInner() {
           onClose={() => {
             setViewingRunBenchmark(false);
             setSelectedRun(null);
+            router.replace("/tests?tab=runs", { scroll: false });
           }}
           agentUuid={selectedRun.agent_id}
           agentName={selectedRun.agent_name}

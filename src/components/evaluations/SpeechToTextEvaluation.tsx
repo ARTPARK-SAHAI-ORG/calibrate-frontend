@@ -9,6 +9,7 @@ import { sttProviders, STTProvider } from "../agent-tabs/constants/providers";
 import { listDatasets, Dataset } from "@/lib/datasets";
 import { DatasetPicker } from "./DatasetPicker";
 import { STTDatasetEditor, STTDatasetEditorHandle } from "./STTDatasetEditor";
+import { MultiSelectPicker, PickerItem } from "../MultiSelectPicker";
 
 type EvaluationResult = {
   task_id: string;
@@ -112,11 +113,102 @@ export function SpeechToTextEvaluation({
   const [datasetName, setDatasetName] = useState("");
   const [datasetNameInvalid, setDatasetNameInvalid] = useState(false);
 
+  // Evaluators (filtered to STT purpose). Defaults (`owner_user_id == null`)
+  // are pre-selected on first load — see /evaluators page for the same
+  // default vs my-evaluators distinction.
+  const [availableEvaluators, setAvailableEvaluators] = useState<PickerItem[]>([]);
+  const [selectedEvaluators, setSelectedEvaluators] = useState<PickerItem[]>([]);
+  const [evaluatorsLoading, setEvaluatorsLoading] = useState(false);
+  const [evaluatorsInvalid, setEvaluatorsInvalid] = useState(false);
+
+  const handleEvaluatorsChange = (items: PickerItem[]) => {
+    setSelectedEvaluators(items);
+    if (items.length > 0) setEvaluatorsInvalid(false);
+  };
+
   useEffect(() => {
     if (!backendAccessToken) return;
     listDatasets(backendAccessToken, "stt")
       .then(setAvailableDatasets)
       .catch(() => {});
+  }, [backendAccessToken]);
+
+  useEffect(() => {
+    const fetchEvaluators = async () => {
+      if (!backendAccessToken) return;
+      try {
+        setEvaluatorsLoading(true);
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+        if (!backendUrl) return;
+
+        const response = await fetch(
+          `${backendUrl}/evaluators?include_defaults=true`,
+          {
+            method: "GET",
+            headers: {
+              accept: "application/json",
+              "ngrok-skip-browser-warning": "true",
+              Authorization: `Bearer ${backendAccessToken}`,
+            },
+          },
+        );
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch evaluators");
+        }
+
+        const data = await response.json();
+        const sttEvaluators: (PickerItem & { isDefault: boolean })[] =
+          Array.isArray(data)
+            ? data
+                .filter(
+                  (m: { evaluator_type?: string }) =>
+                    m.evaluator_type === "stt",
+                )
+                .map(
+                  (m: {
+                    uuid: string;
+                    name: string;
+                    description?: string;
+                    owner_user_id?: string | null;
+                  }) => ({
+                    uuid: m.uuid,
+                    name: m.name,
+                    description: m.description,
+                    isDefault: !m.owner_user_id,
+                  }),
+                )
+            : [];
+
+        setAvailableEvaluators(
+          sttEvaluators.map(({ uuid, name, description }) => ({
+            uuid,
+            name,
+            description,
+          })),
+        );
+        setSelectedEvaluators(
+          sttEvaluators
+            .filter((e) => e.isDefault)
+            .map(({ uuid, name, description }) => ({
+              uuid,
+              name,
+              description,
+            })),
+        );
+      } catch (err) {
+        console.error("Error fetching evaluators:", err);
+      } finally {
+        setEvaluatorsLoading(false);
+      }
+    };
+
+    fetchEvaluators();
   }, [backendAccessToken]);
 
   // Keep evaluateRef current so the parent can call it
@@ -155,6 +247,13 @@ export function SpeechToTextEvaluation({
       return;
     }
 
+    // Validate evaluators
+    if (selectedEvaluators.length === 0) {
+      setEvaluatorsInvalid(true);
+      setActiveTab("settings");
+      return;
+    }
+
     if (inputMode === "dataset") {
       if (!selectedDatasetId) {
         setActiveTab("input");
@@ -177,6 +276,7 @@ export function SpeechToTextEvaluation({
     }
 
     setProvidersInvalid(false);
+    setEvaluatorsInvalid(false);
     setIsEvaluating(true);
 
     try {
@@ -193,12 +293,15 @@ export function SpeechToTextEvaluation({
         return provider ? provider.value : label;
       });
 
+      const evaluatorUuids = selectedEvaluators.map((e) => e.uuid);
+
       let requestBody: Record<string, unknown>;
       if (inputMode === "dataset") {
         requestBody = {
           dataset_id: selectedDatasetId,
           providers,
           language,
+          evaluator_uuids: evaluatorUuids,
         };
       } else {
         const newRows = editorRef.current?.getNewRows() ?? [];
@@ -207,6 +310,7 @@ export function SpeechToTextEvaluation({
           texts: newRows.map((r) => r.text),
           providers,
           language,
+          evaluator_uuids: evaluatorUuids,
           ...(datasetName.trim() ? { dataset_name: datasetName.trim() } : {}),
         };
       }
@@ -611,6 +715,30 @@ export function SpeechToTextEvaluation({
                 );
               })}
             </div>
+          </div>
+
+          {/* Evaluator Selection */}
+          <div
+            className={`space-y-3 p-4 -m-4 rounded-lg transition-colors ${
+              evaluatorsInvalid ? "bg-red-500/10 border border-red-500" : ""
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <h3 className="text-[13px] font-medium text-foreground">
+                Select evaluators
+              </h3>
+              <span className="text-[12px] text-muted-foreground">
+                ({selectedEvaluators.length} selected)
+              </span>
+            </div>
+            <MultiSelectPicker
+              items={availableEvaluators}
+              selectedItems={selectedEvaluators}
+              onSelectionChange={handleEvaluatorsChange}
+              placeholder="Choose one or more evaluators"
+              searchPlaceholder="Search evaluators"
+              isLoading={evaluatorsLoading}
+            />
           </div>
         </div>
 

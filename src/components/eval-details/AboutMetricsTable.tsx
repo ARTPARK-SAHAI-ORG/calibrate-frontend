@@ -1,8 +1,9 @@
 import React from "react";
 
 export type MetricDescription = {
-  metric: string;
-  description: string;
+  metric: React.ReactNode;
+  key?: string;
+  description: React.ReactNode;
   preference: string;
   range: string;
 };
@@ -27,7 +28,7 @@ export function AboutMetricsTable({ metrics }: AboutMetricsTableProps) {
           </thead>
           <tbody>
             {metrics.map((item, i) => (
-              <tr key={item.metric} className={`border-b border-border ${i === metrics.length - 1 ? "last:border-b-0" : ""}`}>
+              <tr key={item.key ?? String(item.metric)} className={`border-b border-border ${i === metrics.length - 1 ? "last:border-b-0" : ""}`}>
                 <td className="px-4 py-3 text-[13px] font-medium text-foreground">{item.metric}</td>
                 <td className="px-4 py-3 text-[13px] text-foreground">{item.description}</td>
                 <td className="px-4 py-3 text-[13px] text-foreground">{item.preference}</td>
@@ -41,9 +42,9 @@ export function AboutMetricsTable({ metrics }: AboutMetricsTableProps) {
       {/* Mobile: Card layout */}
       <div className="md:hidden space-y-3">
         {metrics.map((item) => (
-          <div key={item.metric} className="border border-border rounded-xl p-4 space-y-2">
+          <div key={item.key ?? String(item.metric)} className="border border-border rounded-xl p-4 space-y-2">
             <h4 className="text-[13px] font-semibold text-foreground">{item.metric}</h4>
-            <p className="text-[13px] text-muted-foreground">{item.description}</p>
+            <div className="text-[13px] text-muted-foreground">{item.description}</div>
             <div className="flex gap-4 pt-1">
               <div>
                 <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Preference</span>

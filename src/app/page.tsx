@@ -17,7 +17,7 @@ const tabs = [
   },
   {
     id: "llm",
-    label: "LLM Evaluation",
+    label: "LLM Tests",
     headingBold: "Choose the best LLM",
     headingLight: "by evaluating multi-turn conversations",
     description:
@@ -577,7 +577,7 @@ export default function HomePage() {
                 </div>
                 <div className="flex-1">
                   <div className="font-medium text-gray-900">
-                    LLM Evaluation
+                    LLM Tests
                   </div>
                   <div className="text-sm text-gray-500">
                     Test tool calling and response quality across models

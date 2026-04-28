@@ -34,9 +34,6 @@ export type TestConfig = {
     }>;
     tool_call_id?: string;
   }>;
-  settings?: {
-    language?: "english" | "hindi" | "kannada";
-  };
   evaluation: {
     type: "tool_call" | "response";
     tool_calls?: Array<{
@@ -49,6 +46,50 @@ export type TestConfig = {
   };
 };
 
+export type EvaluatorVariableDef = {
+  name: string;
+  description?: string;
+  default?: string;
+};
+
+// Hydrated evaluator row as returned by GET /tests/{uuid}.evaluators[]
+// (`uuid` is the evaluator's id; we expose it as `evaluator_uuid` to match the
+// write-side EvaluatorRef shape on POST/PUT bodies)
+export type AttachedEvaluatorInit = {
+  evaluator_uuid: string;
+  name: string;
+  description?: string | null;
+  slug: string | null;
+  variables: EvaluatorVariableDef[];
+  variable_values?: Record<string, string> | null;
+};
+
+export type EvaluatorRefPayload = {
+  evaluator_uuid: string;
+  variable_values?: Record<string, string>;
+};
+
+// The default LLM "Correctness" evaluator. Identified by a stable backend slug.
+const DEFAULT_NEXT_REPLY_EVALUATOR_SLUG = "default-llm-next-reply";
+
+type AttachedEvaluator = {
+  evaluator_uuid: string;
+  name: string;
+  description?: string;
+  slug: string | null;
+  variables: EvaluatorVariableDef[];
+  variable_values: Record<string, string>;
+};
+
+type LLMEvaluatorOption = {
+  uuid: string;
+  name: string;
+  description?: string;
+  slug: string | null;
+  owner_user_id: string | null;
+  variables: EvaluatorVariableDef[];
+};
+
 type AddTestDialogProps = {
   isOpen: boolean;
   onClose: () => void;
@@ -59,9 +100,10 @@ type AddTestDialogProps = {
   testName: string;
   setTestName: (name: string) => void;
   validationAttempted: boolean;
-  onSubmit: (config: TestConfig) => void;
+  onSubmit: (config: TestConfig, evaluators: EvaluatorRefPayload[]) => void;
   initialTab?: "next-reply" | "tool-invocation";
   initialConfig?: TestConfig;
+  initialEvaluators?: AttachedEvaluatorInit[];
 };
 
 export function AddTestDialog({
@@ -77,6 +119,7 @@ export function AddTestDialog({
   onSubmit,
   initialTab,
   initialConfig,
+  initialEvaluators,
 }: AddTestDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
@@ -242,19 +285,12 @@ export function AddTestDialog({
         }
       }
 
-      // Populate settings fields
-      if (initialConfig.settings?.language) {
-        setTestLanguage(initialConfig.settings.language);
-      }
-
-      // Populate evaluation fields
+      // Populate evaluation fields. Note: response-type tests no longer keep a
+      // free-text `criteria` on the config — the value lives in the attached
+      // correctness evaluator's `variable_values.criteria` (handled separately
+      // in the attached-evaluators initialization effect below).
       if (initialConfig.evaluation) {
-        if (
-          initialConfig.evaluation.type === "response" &&
-          initialConfig.evaluation.criteria
-        ) {
-          setExpectedMessage(initialConfig.evaluation.criteria);
-        } else if (initialConfig.evaluation.type === "tool_call") {
+        if (initialConfig.evaluation.type === "tool_call") {
           const toolCalls = initialConfig.evaluation.tool_calls;
 
           // Check if tool_calls is empty array
@@ -305,10 +341,26 @@ export function AddTestDialog({
   }, [initialConfig, toolsFetched, availableTools]);
 
   const [selectedTools, setSelectedTools] = useState<SelectedToolConfig[]>([]);
-  const [expectedMessage, setExpectedMessage] = useState("");
-  const [testLanguage, setTestLanguage] = useState<
-    "english" | "hindi" | "kannada"
-  >("english");
+
+  // Evaluators attached to this test (next-reply tab only).
+  const [attachedEvaluators, setAttachedEvaluators] = useState<
+    AttachedEvaluator[]
+  >([]);
+  // Tracks whether the initial population (from initialEvaluators / legacy
+  // criteria / default-correctness auto-attach) has run. Without this we'd
+  // re-stomp the user's edits every time props update.
+  const [attachedEvaluatorsInitialized, setAttachedEvaluatorsInitialized] =
+    useState(false);
+  // All available LLM evaluators (defaults + user-owned), used by the picker
+  // and for resolving the default-correctness evaluator on init.
+  const [availableLLMEvaluators, setAvailableLLMEvaluators] = useState<
+    LLMEvaluatorOption[]
+  >([]);
+  const [evaluatorsLoading, setEvaluatorsLoading] = useState(false);
+  const [evaluatorsFetched, setEvaluatorsFetched] = useState(false);
+  const [evaluatorPickerOpen, setEvaluatorPickerOpen] = useState(false);
+  const [evaluatorPickerSearch, setEvaluatorPickerSearch] = useState("");
+
   const [localValidationAttempted, setLocalValidationAttempted] =
     useState(false);
   const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
@@ -471,6 +523,232 @@ export function AddTestDialog({
 
     fetchTools();
   }, [isOpen, backendAccessToken]);
+
+  // Fetch available LLM evaluators (defaults + user-owned) when dialog opens.
+  // Used both for the "Add evaluator" picker and to resolve the default
+  // correctness evaluator on initial population.
+  useEffect(() => {
+    const fetchLLMEvaluators = async () => {
+      if (!isOpen || !backendAccessToken) return;
+
+      try {
+        setEvaluatorsLoading(true);
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+        if (!backendUrl) {
+          throw new Error("BACKEND_URL environment variable is not set");
+        }
+
+        const response = await fetch(
+          `${backendUrl}/evaluators?include_defaults=true`,
+          {
+            method: "GET",
+            headers: {
+              accept: "application/json",
+              "ngrok-skip-browser-warning": "true",
+              Authorization: `Bearer ${backendAccessToken}`,
+            },
+          }
+        );
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch evaluators");
+        }
+
+        const raw: Array<{
+          uuid: string;
+          name: string;
+          description?: string;
+          slug: string | null;
+          owner_user_id: string | null;
+          evaluator_type?: string;
+          live_version?: { variables?: EvaluatorVariableDef[] | null } | null;
+        }> = await response.json();
+
+        const llm: LLMEvaluatorOption[] = raw
+          .filter((e) => e.evaluator_type === "llm")
+          .map((e) => ({
+            uuid: e.uuid,
+            name: e.name,
+            description: e.description,
+            slug: e.slug,
+            owner_user_id: e.owner_user_id,
+            variables: Array.isArray(e.live_version?.variables)
+              ? (e.live_version!.variables as EvaluatorVariableDef[])
+              : [],
+          }));
+        setAvailableLLMEvaluators(llm);
+      } catch (err) {
+        console.error("Error fetching evaluators:", err);
+      } finally {
+        setEvaluatorsLoading(false);
+        setEvaluatorsFetched(true);
+      }
+    };
+
+    fetchLLMEvaluators();
+  }, [isOpen, backendAccessToken]);
+
+  // Build initial variable_values for a freshly-attached evaluator: prefer
+  // explicit values, then variable defaults, then empty string.
+  const buildInitialVariableValues = (
+    variables: EvaluatorVariableDef[],
+    explicit?: Record<string, string> | null
+  ): Record<string, string> => {
+    const values: Record<string, string> = {};
+    for (const v of variables) {
+      if (explicit && typeof explicit[v.name] === "string") {
+        values[v.name] = explicit[v.name];
+      } else if (typeof v.default === "string") {
+        values[v.name] = v.default;
+      } else {
+        values[v.name] = "";
+      }
+    }
+    return values;
+  };
+
+  // Initialize attached evaluators once props + evaluator list have settled.
+  // Three cases:
+  //   1. Edit with hydrated evaluators[] → use as-is.
+  //   2. Edit on a legacy test (no evaluators[] but config.evaluation.criteria
+  //      is a string) → auto-attach default-correctness with that criteria
+  //      pre-filled into its `criteria` variable.
+  //   3. New test → auto-attach default-correctness with empty values.
+  // Re-runs only until initialized; the user's subsequent edits are preserved.
+  useEffect(() => {
+    if (attachedEvaluatorsInitialized) return;
+    if (!evaluatorsFetched) return;
+    // For edit, also wait for the parent's GET to finish so initialConfig /
+    // initialEvaluators are settled.
+    if (isEditing && isLoading) return;
+
+    if (initialEvaluators && initialEvaluators.length > 0) {
+      setAttachedEvaluators(
+        initialEvaluators.map((e) => ({
+          evaluator_uuid: e.evaluator_uuid,
+          name: e.name,
+          description: e.description ?? undefined,
+          slug: e.slug,
+          variables: e.variables ?? [],
+          variable_values: buildInitialVariableValues(
+            e.variables ?? [],
+            e.variable_values ?? undefined
+          ),
+        }))
+      );
+      setAttachedEvaluatorsInitialized(true);
+      return;
+    }
+
+    const correctness = availableLLMEvaluators.find(
+      (e) => e.slug === DEFAULT_NEXT_REPLY_EVALUATOR_SLUG
+    );
+
+    // Legacy edit: pre-fill criteria from the old free-text field.
+    if (
+      isEditing &&
+      initialConfig?.evaluation?.type === "response" &&
+      typeof initialConfig.evaluation.criteria === "string" &&
+      initialConfig.evaluation.criteria.length > 0 &&
+      correctness
+    ) {
+      setAttachedEvaluators([
+        {
+          evaluator_uuid: correctness.uuid,
+          name: correctness.name,
+          description: correctness.description,
+          slug: correctness.slug,
+          variables: correctness.variables,
+          variable_values: buildInitialVariableValues(correctness.variables, {
+            criteria: initialConfig.evaluation.criteria,
+          }),
+        },
+      ]);
+      setAttachedEvaluatorsInitialized(true);
+      return;
+    }
+
+    // New test (or edit with no usable initial state): auto-attach default
+    // correctness only on the next-reply tab. Tool-invocation tests are
+    // unchanged and don't carry evaluators today.
+    if (!isEditing && activeTab === "next-reply" && correctness) {
+      setAttachedEvaluators([
+        {
+          evaluator_uuid: correctness.uuid,
+          name: correctness.name,
+          description: correctness.description,
+          slug: correctness.slug,
+          variables: correctness.variables,
+          variable_values: buildInitialVariableValues(correctness.variables),
+        },
+      ]);
+      setAttachedEvaluatorsInitialized(true);
+      return;
+    }
+
+    // Nothing to attach; mark initialized so manual adds can proceed.
+    setAttachedEvaluatorsInitialized(true);
+  }, [
+    attachedEvaluatorsInitialized,
+    evaluatorsFetched,
+    availableLLMEvaluators,
+    initialEvaluators,
+    initialConfig,
+    isEditing,
+    isLoading,
+    activeTab,
+  ]);
+
+  const updateEvaluatorVariableValue = (
+    evaluatorUuid: string,
+    variableName: string,
+    value: string
+  ) => {
+    setAttachedEvaluators((prev) =>
+      prev.map((e) =>
+        e.evaluator_uuid === evaluatorUuid
+          ? {
+              ...e,
+              variable_values: { ...e.variable_values, [variableName]: value },
+            }
+          : e
+      )
+    );
+  };
+
+  const removeAttachedEvaluator = (evaluatorUuid: string) => {
+    setAttachedEvaluators((prev) =>
+      prev.filter((e) => e.evaluator_uuid !== evaluatorUuid)
+    );
+  };
+
+  const closeEvaluatorPicker = () => {
+    setEvaluatorPickerOpen(false);
+    setEvaluatorPickerSearch("");
+  };
+
+  const attachEvaluatorFromOption = (option: LLMEvaluatorOption) => {
+    setAttachedEvaluators((prev) => {
+      if (prev.some((e) => e.evaluator_uuid === option.uuid)) return prev;
+      return [
+        ...prev,
+        {
+          evaluator_uuid: option.uuid,
+          name: option.name,
+          description: option.description,
+          slug: option.slug,
+          variables: option.variables,
+          variable_values: buildInitialVariableValues(option.variables),
+        },
+      ];
+    });
+    closeEvaluatorPicker();
+  };
 
   const addToolFromSelection = (tool: AvailableTool) => {
     // Check if tool is a webhook type - default to accept any arguments for webhooks
@@ -735,39 +1013,30 @@ export function AddTestDialog({
 
     if (activeTab === "tool-invocation") {
       if (selectedTools.length > 0) {
-        // Build tool_calls array from all selected tools
+        // Build tool_calls array from all selected tools. The "should not
+        // have been called" expectation is intentionally suppressed for now
+        // — every selected tool is treated as `should-call` regardless of
+        // any pre-existing `expectation` value loaded from the backend, so
+        // the API always receives a positive should-call payload.
         const toolCalls = selectedTools.map((tool) => {
-          // Use tool.id for inbuilt tools, tool.name for custom tools
           const toolIdentifier = tool.isInbuilt ? tool.id : tool.name;
 
-          if (tool.expectation === "should-call") {
-            // Build the expected arguments
-            const expectedArgs: Record<string, any> = {};
-            if (!tool.acceptAnyParameterValues) {
-              for (const param of tool.expectedParameters) {
-                // Try to parse as JSON, otherwise use as string
-                try {
-                  expectedArgs[param.name] = JSON.parse(param.value);
-                } catch {
-                  expectedArgs[param.name] = param.value;
-                }
+          const expectedArgs: Record<string, any> = {};
+          if (!tool.acceptAnyParameterValues) {
+            for (const param of tool.expectedParameters) {
+              try {
+                expectedArgs[param.name] = JSON.parse(param.value);
+              } catch {
+                expectedArgs[param.name] = param.value;
               }
             }
-
-            return {
-              tool: toolIdentifier,
-              arguments: tool.acceptAnyParameterValues ? {} : expectedArgs,
-              accept_any_arguments: tool.acceptAnyParameterValues,
-            };
-          } else {
-            // should-not-call
-            return {
-              tool: toolIdentifier,
-              arguments: {},
-              is_called: false,
-              accept_any_arguments: false,
-            };
           }
+
+          return {
+            tool: toolIdentifier,
+            arguments: tool.acceptAnyParameterValues ? {} : expectedArgs,
+            accept_any_arguments: tool.acceptAnyParameterValues,
+          };
         });
 
         evaluation = {
@@ -782,22 +1051,45 @@ export function AddTestDialog({
         };
       }
     } else {
-      // next-reply test
+      // next-reply test. The legacy free-text `criteria` field is no longer
+      // sent — the user-supplied criteria now lives on the attached
+      // correctness evaluator's `variable_values.criteria` (sent separately
+      // on the POST/PUT body's `evaluators` array).
       evaluation = {
         type: "response",
-        criteria: expectedMessage,
       };
     }
 
-    // Build settings object (only for next-reply tests)
-    const settings =
-      activeTab === "next-reply"
-        ? {
-            language: testLanguage,
-          }
-        : undefined;
+    return { history, evaluation };
+  };
 
-    return { history, settings, evaluation };
+  // Build the EvaluatorRef[] payload sent alongside `config` on POST/PUT
+  // /tests. Only relevant for next-reply tests. We omit `variable_values`
+  // entirely when the evaluator has no variables to keep the payload lean.
+  const buildEvaluatorsPayload = (): EvaluatorRefPayload[] => {
+    if (activeTab !== "next-reply") return [];
+    return attachedEvaluators.map((e) => {
+      const ref: EvaluatorRefPayload = { evaluator_uuid: e.evaluator_uuid };
+      if (e.variables.length > 0) {
+        ref.variable_values = { ...e.variable_values };
+      }
+      return ref;
+    });
+  };
+
+  // Returns true if any attached evaluator has at least one variable whose
+  // value is empty (after trim). Used to gate the Save button.
+  const hasUnfilledEvaluatorVariables = () => {
+    if (activeTab !== "next-reply") return false;
+    for (const e of attachedEvaluators) {
+      for (const v of e.variables) {
+        const value = e.variable_values[v.name];
+        if (typeof value !== "string" || value.trim().length === 0) {
+          return true;
+        }
+      }
+    }
+    return false;
   };
 
   // Helper to check if tool call messages have empty params
@@ -828,8 +1120,16 @@ export function AddTestDialog({
 
     // Validate required fields based on test type
     if (activeTab === "next-reply") {
-      if (!testName.trim() || !expectedMessage.trim()) {
+      if (!testName.trim()) {
         return; // Don't submit if validation fails
+      }
+      // At least one evaluator and every variable on every attached evaluator
+      // must have a non-empty value.
+      if (attachedEvaluators.length === 0) {
+        return;
+      }
+      if (hasUnfilledEvaluatorVariables()) {
+        return;
       }
       // Validate that all tool_response messages have valid JSON
       const toolResponses = chatMessages.filter(
@@ -876,7 +1176,8 @@ export function AddTestDialog({
     }
 
     const config = buildConfig();
-    onSubmit(config);
+    const evaluators = buildEvaluatorsPayload();
+    onSubmit(config, evaluators);
   };
 
   const handleBackdropClick = () => {
@@ -1009,50 +1310,267 @@ export function AddTestDialog({
                   />
                 </div>
 
-                {/* Describe expected next message */}
-                <div>
-                  <label className="block text-base font-medium text-foreground mb-2">
-                    Describe expected next reply
-                  </label>
-                  <textarea
-                    value={expectedMessage}
-                    onChange={(e) => setExpectedMessage(e.target.value)}
-                    placeholder="Describe the ideal response of the agent given the conversation history on the right to pass this test (e.g., provides a correct answer, uses a specific tone, includes key information)."
-                    rows={4}
-                    className={`w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent resize-none ${
-                      localValidationAttempted &&
-                      activeTab === "next-reply" &&
-                      !expectedMessage.trim()
-                        ? "border-red-500"
-                        : "border-border"
-                    }`}
-                  />
-                </div>
-
-                {/* Language */}
-                <div>
-                  <label className="block text-base font-medium text-foreground mb-2">
-                    Language
-                  </label>
-                  <div className="flex rounded-lg border border-border overflow-hidden w-fit">
-                    {(["english", "hindi", "kannada"] as const).map(
-                      (lang, index) => (
+                {/* Evaluators (next-reply tab only) */}
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-base font-medium text-foreground">
+                      Evaluators
+                    </label>
+                    {(() => {
+                      const remainingOptions = availableLLMEvaluators.filter(
+                        (o) =>
+                          !attachedEvaluators.some(
+                            (a) => a.evaluator_uuid === o.uuid
+                          )
+                      );
+                      const noOptionsLeft = remainingOptions.length === 0;
+                      return (
                         <button
-                          key={lang}
-                          type="button"
-                          onClick={() => setTestLanguage(lang)}
-                          className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
-                            index > 0 ? "border-l border-border" : ""
-                          } ${
-                            testLanguage === lang
-                              ? "bg-foreground text-background"
-                              : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted"
+                          onClick={() => {
+                            if (evaluatorPickerOpen) {
+                              closeEvaluatorPicker();
+                            } else {
+                              setEvaluatorPickerOpen(true);
+                            }
+                          }}
+                          disabled={
+                            evaluatorsLoading || isLoading || noOptionsLeft
+                          }
+                          className={`px-3 py-1.5 text-sm font-medium bg-background text-foreground rounded-lg hover:bg-muted transition-colors cursor-pointer border border-border disabled:opacity-50 disabled:cursor-not-allowed ${
+                            localValidationAttempted &&
+                            activeTab === "next-reply" &&
+                            attachedEvaluators.length === 0
+                              ? "border-red-500 text-red-400"
+                              : ""
                           }`}
                         >
-                          {lang.charAt(0).toUpperCase() + lang.slice(1)}
+                          Add evaluator
                         </button>
-                      )
+                      );
+                    })()}
+                  </div>
+
+                  {/* Evaluator picker dropdown */}
+                  {evaluatorPickerOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-[99]"
+                        onClick={closeEvaluatorPicker}
+                      />
+                      <div className="absolute right-0 top-9 mt-1 w-80 max-h-80 flex flex-col bg-background border border-border rounded-xl shadow-2xl z-[100] overflow-hidden">
+                        {/* Sticky search bar */}
+                        <div className="p-2 border-b border-border bg-background">
+                          <input
+                            type="text"
+                            value={evaluatorPickerSearch}
+                            onChange={(e) =>
+                              setEvaluatorPickerSearch(e.target.value)
+                            }
+                            placeholder="Search evaluators..."
+                            autoFocus
+                            className="w-full h-9 px-3 rounded-md text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-1 focus:ring-accent"
+                          />
+                        </div>
+                        <div className="flex-1 overflow-y-auto">
+                          {(() => {
+                            const remaining = availableLLMEvaluators.filter(
+                              (o) =>
+                                !attachedEvaluators.some(
+                                  (a) => a.evaluator_uuid === o.uuid
+                                )
+                            );
+                            if (remaining.length === 0) {
+                              return (
+                                <div className="px-4 py-6 text-sm text-muted-foreground text-center">
+                                  No more LLM evaluators to add.
+                                </div>
+                              );
+                            }
+                            // Case-insensitive substring match against both
+                            // name and description so users can search by
+                            // either label or rubric snippet.
+                            const query = evaluatorPickerSearch
+                              .trim()
+                              .toLowerCase();
+                            const matches = query
+                              ? remaining.filter((o) => {
+                                  const name = o.name.toLowerCase();
+                                  const desc = (
+                                    o.description ?? ""
+                                  ).toLowerCase();
+                                  return (
+                                    name.includes(query) ||
+                                    desc.includes(query)
+                                  );
+                                })
+                              : remaining;
+                            if (matches.length === 0) {
+                              return (
+                                <div className="px-4 py-6 text-sm text-muted-foreground text-center">
+                                  No evaluators match &ldquo;
+                                  {evaluatorPickerSearch}&rdquo;.
+                                </div>
+                              );
+                            }
+                            const defaults = matches.filter(
+                              (o) => o.owner_user_id === null
+                            );
+                            const mine = matches.filter(
+                              (o) => o.owner_user_id !== null
+                            );
+                            const renderRow = (o: LLMEvaluatorOption) => (
+                              <button
+                                key={o.uuid}
+                                onClick={() => attachEvaluatorFromOption(o)}
+                                className="w-full text-left px-4 py-2.5 hover:bg-muted transition-colors cursor-pointer"
+                              >
+                                <div className="text-sm font-medium text-foreground">
+                                  {o.name}
+                                </div>
+                                {o.description && (
+                                  <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                                    {o.description}
+                                  </div>
+                                )}
+                              </button>
+                            );
+                            return (
+                              <>
+                                {defaults.length > 0 && (
+                                  <div>
+                                    <div className="px-4 pt-3 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                                      Default
+                                    </div>
+                                    {defaults.map(renderRow)}
+                                  </div>
+                                )}
+                                {mine.length > 0 && (
+                                  <div>
+                                    <div className="px-4 pt-3 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                                      My evaluators
+                                    </div>
+                                    {mine.map(renderRow)}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Empty / loading state */}
+                  {evaluatorsLoading && attachedEvaluators.length === 0 && (
+                    <div className="text-sm text-muted-foreground py-4">
+                      Loading evaluators...
+                    </div>
+                  )}
+                  {!evaluatorsLoading &&
+                    attachedEvaluators.length === 0 && (
+                      <div
+                        className={`text-sm py-4 ${
+                          localValidationAttempted &&
+                          activeTab === "next-reply"
+                            ? "text-red-500"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        Add at least one evaluator to grade the agent&apos;s
+                        next reply.
+                      </div>
                     )}
+
+                  {/* Attached evaluator cards */}
+                  <div className="space-y-4">
+                    {attachedEvaluators.map((ev) => (
+                      <div
+                        key={ev.evaluator_uuid}
+                        className="border border-border rounded-lg p-4 bg-background"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-semibold text-foreground">
+                              {ev.name}
+                            </div>
+                            {ev.description && (
+                              <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                                {ev.description}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() =>
+                              removeAttachedEvaluator(ev.evaluator_uuid)
+                            }
+                            className="text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
+                            aria-label={`Remove ${ev.name}`}
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+
+                        {ev.variables.length > 0 && (
+                          <div className="space-y-3">
+                            {ev.variables.map((v) => {
+                              // Uniform rendering for every evaluator variable:
+                              // a small `{{name}}` monospace hint + textarea
+                              // whose placeholder is the variable's
+                              // `description` (falling back to `default`, then
+                              // a generic prompt). No special-case label —
+                              // the description carries the user-facing copy.
+                              const placeholder =
+                                v.description && v.description.length > 0
+                                  ? v.description
+                                  : v.default && v.default.length > 0
+                                  ? v.default
+                                  : `Enter value for {{${v.name}}}`;
+                              const value = ev.variable_values[v.name] ?? "";
+                              const isMissing =
+                                localValidationAttempted &&
+                                activeTab === "next-reply" &&
+                                value.trim().length === 0;
+                              return (
+                                <div key={v.name}>
+                                  <div className="text-xs text-muted-foreground mb-1.5">
+                                    <code className="font-mono">{`{{${v.name}}}`}</code>
+                                  </div>
+                                  <textarea
+                                    value={value}
+                                    onChange={(e) =>
+                                      updateEvaluatorVariableValue(
+                                        ev.evaluator_uuid,
+                                        v.name,
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder={placeholder}
+                                    rows={4}
+                                    className={`w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent resize-none ${
+                                      isMissing
+                                        ? "border-red-500"
+                                        : "border-border"
+                                    }`}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -1162,36 +1680,19 @@ export function AddTestDialog({
                             </button>
                           </div>
 
-                          {/* Should have been called / Should not have been called tabs */}
-                          <div className="flex rounded-lg overflow-hidden border border-border">
-                            <button
-                              onClick={() =>
-                                updateToolConfig(tool.id, {
-                                  expectation: "should-call",
-                                })
-                              }
-                              className={`flex-1 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
-                                tool.expectation === "should-call"
-                                  ? "bg-foreground text-background"
-                                  : "bg-muted text-muted-foreground hover:text-foreground"
-                              }`}
-                            >
-                              Should have been called
-                            </button>
-                            <button
-                              onClick={() =>
-                                updateToolConfig(tool.id, {
-                                  expectation: "should-not-call",
-                                })
-                              }
-                              className={`flex-1 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
-                                tool.expectation === "should-not-call"
-                                  ? "bg-foreground text-background"
-                                  : "bg-muted text-muted-foreground hover:text-foreground"
-                              }`}
-                            >
-                              Should not have been called
-                            </button>
+                          {/* Expectation indicator. The "should not have been
+                              called" option is intentionally hidden for now
+                              and the dialog assumes "should have been called"
+                              on every save (see the tool_calls payload
+                              builder below). Rendered as a full-width
+                              selected-state pill for visual consistency with
+                              the rest of the dialog rather than a real
+                              segmented control. */}
+                          <div
+                            className="w-full py-2.5 rounded-lg border border-border bg-foreground text-background text-sm font-medium text-center"
+                            aria-label="Expected behaviour"
+                          >
+                            Should have been called
                           </div>
 
                           {/* Accept any parameter values checkbox - show when "should call" is selected and tool has parameters */}

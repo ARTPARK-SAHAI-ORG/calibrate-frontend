@@ -3,8 +3,10 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
-import { LeaderboardTab, BenchmarkOutputsPanel } from "@/components/eval-details";
-import type { BenchmarkTestResult, BenchmarkModelResult } from "@/components/eval-details";
+import { BenchmarkCombinedLeaderboard, BenchmarkOutputsPanel } from "@/components/eval-details";
+import type { BenchmarkModelResult } from "@/components/eval-details";
+import { ExportResultsButton } from "@/components/ExportResultsButton";
+import { buildBenchmarkCsv } from "@/lib/exportTestResults";
 
 type LeaderboardSummary = {
   model: string;
@@ -66,6 +68,8 @@ export default function PublicBenchmarkPage() {
   if (isLoading) return <PublicPageLayout><PublicLoading /></PublicPageLayout>;
   if (notFound || !data) return <PublicPageLayout><PublicNotFound /></PublicPageLayout>;
 
+  const benchmarkScoreLabel = "Test pass rate (%)";
+
   const toggleModel = (model: string) => {
     setExpandedModels((prev) => {
       const next = new Set(prev);
@@ -76,41 +80,58 @@ export default function PublicBenchmarkPage() {
   };
 
   return (
-    <PublicPageLayout title="LLM benchmark">
+    <PublicPageLayout title="LLM benchmark" contentClassName="max-w-[92rem]">
       <div className="space-y-4 md:space-y-6">
         {/* Tab nav */}
-        <div className="flex gap-2 border-b border-border">
-          {(["leaderboard", "outputs"] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer capitalize ${activeTab === tab ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-            >
-              {tab}
-            </button>
-          ))}
+        <div className="flex items-end justify-between gap-2 border-b border-border">
+          <div className="flex gap-2">
+            {(["leaderboard", "outputs"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer capitalize ${activeTab === tab ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+          {data.model_results && data.model_results.length > 0 && (
+            <div className="pb-2">
+              <ExportResultsButton
+                filename={`benchmark-${token}`}
+                getRows={() =>
+                  buildBenchmarkCsv(
+                    (data.model_results ?? []).flatMap((m) =>
+                      (m.test_results ?? []).map((tr) => ({
+                        model: m.model,
+                        name: tr.name,
+                        passed: tr.passed,
+                        reasoning: tr.reasoning,
+                        output: tr.output,
+                        testCase: tr.test_case,
+                        judgeResults: tr.judge_results,
+                      })),
+                    ),
+                  )
+                }
+              />
+            </div>
+          )}
         </div>
 
         {/* Leaderboard Tab */}
-        {activeTab === "leaderboard" && data.leaderboard_summary && (
-          <LeaderboardTab
-            columns={[
-              { key: "model", header: "Model" },
-              { key: "passed", header: "Passed" },
-              { key: "total", header: "Total" },
-              { key: "pass_rate", header: "Test pass rate (%)", render: (v) => `${parseFloat(v).toFixed(1)}%` },
-            ]}
-            data={data.leaderboard_summary}
-            charts={[[{ title: "Pass Rate by Model", dataKey: "pass_rate", yDomain: [0, 100], formatTooltip: (v) => `${v.toFixed(1)}%` }]]}
-            filename="benchmark-leaderboard"
-            getLabel={(key) => key}
-            nameKey="model"
+        {activeTab === "leaderboard" && (
+          <BenchmarkCombinedLeaderboard
+            leaderboardSummary={data.leaderboard_summary}
+            modelResults={data.model_results ?? []}
+            filename={`benchmark-leaderboard-${token.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
+            benchmarkScoreLabel={benchmarkScoreLabel}
           />
         )}
 
         {/* Outputs Tab */}
         {activeTab === "outputs" && data.model_results && data.model_results.length > 0 && (
-          <div className="border border-border rounded-xl overflow-hidden" style={{ height: "calc(100vh - 260px)", minHeight: 520 }}>
+          <div className="border border-border rounded-xl overflow-hidden" style={{ height: "calc(100vh - 220px)", minHeight: 620 }}>
             <BenchmarkOutputsPanel
               modelResults={data.model_results}
               expandedModels={expandedModels}
@@ -120,6 +141,7 @@ export default function PublicBenchmarkPage() {
               onSelectTest={(model, testIndex) => setSelectedTest({ model, testIndex })}
               onClearSelection={() => setSelectedTest(null)}
               showControls={true}
+              enableEvaluatorLinks={false}
             />
           </div>
         )}

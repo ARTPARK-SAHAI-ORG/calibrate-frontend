@@ -455,7 +455,7 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
   - **Mobile** (below `md`): Stacked layout (`flex-col`) with no fixed height
     - **Provider list**: Horizontal scrollable row (`overflow-x-auto`, `flex` with `min-w-max`) with `whitespace-nowrap` items, separated by bottom border
     - **Details panel** (`p-4`): Full-width below providers
-    - **Results**: Card layout instead of table — each row is a bordered card showing Ground Truth, Prediction, WER, Similarity, and LLM Judge reasoning inline
+    - **Results**: Card layout instead of table — each row is a bordered card showing Ground Truth, Prediction, WER, and one labeled section per attached evaluator (Pass/Fail badge or numeric value + reasoning text). The legacy `String Similarity` field and single-evaluator reasoning block only render when `evaluatorColumns` is omitted.
   - **Provider status icons** (both layouts):
     - Yellow pulsing dot when `success === null` (in progress)
     - Green checkmark when `success === true` AND no empty predictions
@@ -463,7 +463,7 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
   - First provider is selected by default
   - **Auto-scroll**: Clicking a provider with empty predictions scrolls to the first empty row
 - **About tab responsive**: Desktop shows 4-column table (Metric, Description, Preference, Range). Mobile shows stacked cards with metric name, description, and Preference/Range side by side
-- **Metrics**: WER, String Similarity, LLM Judge (Pass/Fail)
+- **Metrics**: WER + one column per attached evaluator (Pass/Fail for binary, numeric value for rating). The authenticated `/stt/[uuid]` page no longer renders `String Similarity`; the public STT page still does (legacy single-column path).
 
 ### 4. Text-to-Speech Evaluation (`/tts`)
 
@@ -523,12 +523,12 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
   - **About**: Desktop table / mobile card layout for metric descriptions
 - **Outputs tab layout** (responsive, same structure as STT):
   - **Desktop** (`md+`): Two-panel side-by-side layout with vertical provider sidebar (`md:w-64`) + details panel with results table and audio players
-  - **Mobile** (below `md`): Stacked — horizontal scrollable provider row on top, then card-based results below. Each card shows Text, Audio player (full-width), and LLM Judge reasoning inline
+  - **Mobile** (below `md`): Stacked — horizontal scrollable provider row on top, then card-based results below. Each card shows Text, Audio player (full-width), and one labeled section per attached evaluator (Pass/Fail badge or numeric value + reasoning text). The legacy single-evaluator reasoning block only renders when `evaluatorColumns` is omitted.
   - **Provider status icons**: Yellow dot (in progress), green checkmark (success), red X (failed)
   - First provider is selected by default
   - Clicking a provider shows its details
-- **Metrics**: LLM Judge (Pass/Fail), TTFB
-- **Intermediate results structure**: `results` array contains `id`, `text`, `audio_path`; `llm_judge_score` and `llm_judge_reasoning` are only present when complete
+- **Metrics**: One column / metric / chart per attached evaluator (Pass/Fail badge for binary, numeric value for rating), plus TTFB latency. See "Dynamic per-evaluator columns" under the STT/TTS Detail Page section below for how the columns are derived.
+- **Intermediate results structure**: `results` array contains `id`, `text`, `audio_path`; per-evaluator score / reasoning columns (in the new format `result[name]` + `result[`${name}_reasoning`]`; legacy `_info` jobs use `result[`${name}_score`]` + `result[`${name}_reasoning`]`; truly legacy single-evaluator jobs use `result.llm_judge_score` + `result.llm_judge_reasoning`) are only present once each row is complete
 
 ### 5. LLM Tests (`/tests`)
 
@@ -541,6 +541,7 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
   - Test type: "response" (check agent response) or "tool_call" (check tool invocation)
   - Test configuration
   - **Tool invocation defaults**: When selecting a webhook tool, "Accept any parameter values" is enabled by default (since webhook responses are unpredictable). Structured output tools default to requiring specific parameter values
+  - **Tool-invocation expectation (suppressed)**: the per-tool "Should have been called / Should not have been called" segmented control is intentionally **hidden for now** — the dialog renders only a full-width selected-state pill (`bg-foreground text-background`, no click handler) labelled `Should have been called` so the layout stays visually consistent without exposing the should-not-call branch. The `SelectedToolConfig.expectation: "should-call" | "should-not-call"` type and the hydration logic that reads `is_called === false` from existing tests are both kept intact, but the **submit path always emits the should-call payload** (`{ tool, arguments, accept_any_arguments }`) for every selected tool — the legacy should-not-call branch in the `tool_calls` builder is gone, so any pre-existing should-not-call test that the user re-saves through this dialog migrates to should-call. Treat this as a temporary product call: don't reintroduce the toggle UI and don't add new code paths that emit `is_called: false`. The bulk-upload helper / README follow the same convention (see "Bulk upload tests via CSV" → CSV format for Tool Call).
   - **Conversation history** (before evaluation):
     - Message types: `agent`, `user`, `tool_call`, `tool_response`
     - Add messages via dropdown menu on last message
@@ -555,7 +556,23 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
     - **Structured output tool calls**: Show flat parameter list as inputs (no tool response added - only the tool call is sent to backend)
     - **Tool call param validation**: All tool call parameters in conversation history must have non-empty values. On save attempt, empty params are highlighted with `border-red-500` with error message "This field cannot be empty". Validation only triggers on `localValidationAttempted` (set when clicking Save), not the parent's `validationAttempted` prop - this prevents showing errors when a new tool call message is first added
     - **Backend history format**: Webhook tool calls include both the tool call AND linked tool response in history. Structured output tool calls only include the tool call (no fake response injected)
-  - **Loading saved tests** (when `initialConfig` is provided):
+  - **Evaluators (next-reply tab only)**: Each next-reply test attaches one or more LLM evaluators that score the agent's reply. Evaluators are stored server-side in the `test_evaluators` join table (separate from the test's `config`) and are returned hydrated on `GET /tests` / `GET /tests/{uuid}` as a top-level `evaluators[]` array (joined evaluator + pinned-version row from `get_evaluators_for_test()`).
+    - **Default correctness evaluator** (slug **`default-llm-next-reply`**, name "Correctness", `evaluator_type: "llm"`, `output_type: "binary"`) is the canonical "did the reply meet the user-defined criteria?" judge. It declares a single variable `criteria` and its system prompt templates `{{criteria}}` into the rubric. The frontend resolves it by **slug**, not by name or UUID — both are tenant-mutable.
+    - **Auto-attach on new tests**: when the AddTestDialog opens for a brand-new next-reply test, the dialog auto-attaches the `default-llm-next-reply` evaluator with empty variable values (gated until both `GET /evaluators?include_defaults=true` and any pending edit-GET have settled, via the `attachedEvaluatorsInitialized` one-shot flag).
+    - **Legacy test migration (edit flow)**: tests created before this contract have `evaluators: []` in the GET response and only a free-text `config.evaluation.criteria` string. The dialog detects this case and auto-attaches the correctness evaluator with `variable_values.criteria` pre-filled from the legacy string, transparently migrating on the next save. There is no offline backfill — old tests "upgrade" the first time their author re-saves them.
+    - **Attached-evaluator card layout**: the card header shows the evaluator's `name` as a heading with the evaluator's one-line `description` (`text-xs text-muted-foreground line-clamp-2`) directly underneath, plus a remove (X) button on the right. `description` is threaded through `AttachedEvaluatorInit.description` (from the hydrated GET row), `LLMEvaluatorOption.description` (from the `/evaluators` list response when adding via picker), and the auto-attach paths (correctness on new tests, correctness on legacy edits) so it never needs a re-fetch. If an evaluator has zero variables (e.g. Helpfulness, Safety), the card is **just** name + description — no placeholder text, no empty stub.
+    - **Per-evaluator variable inputs**: each attached evaluator's `live_version.variables: [{ name, description?, default? }]` (sourced from the GET list endpoint or the hydrated test row) renders one textarea per variable inside the evaluator's card. **Uniform layout — no special cases per evaluator/variable**: above each textarea, a small monospace `{{name}}` hint (`text-xs text-muted-foreground font-mono`) identifies the variable; the textarea's placeholder is the variable's `description` (falling back to `default`, then to `Enter value for {{name}}` if both are empty). The variable's description is the canonical user-facing copy — author it on the evaluator (see "Variables — overall rules" §2/§3 for the create / new-version edit flows), not in dialog code. There is no longer a "Describe expected next reply" label or any `criteria`-specific override; if the correctness evaluator's description ever needs to change, ship a new version of the evaluator with the new variable description rather than special-casing it in `AddTestDialog`.
+    - **Add more evaluators**: an "Add evaluator" button in the Evaluators section header opens a dropdown listing the remaining LLM evaluators (filtered to `evaluator_type === "llm"`, with currently-attached ones excluded), grouped under **Default** (`owner_user_id === null`) and **My evaluators** (`owner_user_id !== null`). The dropdown has a sticky `autoFocus` search input at the top (case-insensitive substring match against both `name` AND `description`); the empty-state copy switches to `No evaluators match "<query>".` when the search returns nothing, vs `No more LLM evaluators to add.` when there's nothing to show even before searching. The search box is reset (cleared back to `""`) by the `closeEvaluatorPicker()` helper whenever the picker is dismissed — clicking the toggle, clicking the backdrop, or selecting an evaluator. Selecting a row appends it with values seeded from each variable's `default` (falls back to empty string) and propagates the option's `description` onto the attached card.
+    - **Validation gating** (next-reply only): Save is rejected if (a) zero evaluators are attached or (b) any variable on any attached evaluator has an empty trimmed value. Empty cells are highlighted with `border-red-500` after `localValidationAttempted` is set. Tool-invocation tests skip this entirely.
+    - **Write contract** (`POST /tests` and `PUT /tests/{uuid}`): the dialog emits `evaluators: [{ evaluator_uuid, variable_values? }]` to the parent's `onSubmit(config, evaluators)` callback (`AddTestDialog`'s new `EvaluatorRefPayload[]` type). `variable_values` is omitted when the evaluator has no variables. The parent (`src/app/tests/page.tsx`) only attaches `evaluators` to the request body when `config.evaluation.type === "response"` — for tool-invocation tests `evaluators` is **omitted entirely** so the backend's `set_test_evaluators` is not invoked and any existing pivot rows are left untouched. Including `evaluators` on a PUT replaces the whole pivot set (soft-delete + insert) — there is no patch-style "add one" call.
+    - **`config.evaluation.criteria` is no longer sent** on next-reply POST/PUT bodies: the user-supplied criteria now lives in `variable_values.criteria` on the attached correctness evaluator. The legacy field is still readable for edit-flow migration (see above) and for older run snapshots that captured it. Don't reintroduce the legacy `criteria` writer in the dialog.
+    - **Result-side counterpart — `judge_results`**: the run result endpoints (`GET /agent-tests/run/{task_id}`, `GET /agent-tests/benchmark/{task_id}`, and the corresponding `/public/test-run/{token}` / `/public/benchmark/{token}` shares) now expose a `judge_results: JudgeResult[] | null` field on each `TestCaseResult`, with one entry per evaluator referenced by the test (see `JudgeResult` shape under "Test Results Components"). For benchmarks the same array hangs off `model_results[i].test_results[j].judge_results` and the same evaluator UUIDs appear across all models in the run (the snapshot is per-test, not per-model). Tool-call tests always have `judge_results: null` — the verdict is a deterministic tool-call diff and the legacy single-`reasoning` UI continues to render for them. New response rows render evaluator cards (name/link + `description` when present + binary/rating verdict + variable values + reasoning); the top-level inline `reasoning` is suppressed in this case to avoid duplication. The `description` is snapshotted at job creation time and may be null for older jobs; render it with normal wrapping (`whitespace-normal break-words`), not `line-clamp-*`, and do not fetch live evaluator metadata just to fill it.
+    - **Legacy run-result rendering**: response rows that pre-date `judge_results` but still carry `test_case.evaluation.criteria` are rendered as a synthetic default-correctness evaluator card, not as a standalone "Criteria" block. `TestRunnerDialog` and `BenchmarkResultsDialog` fetch `default-llm-next-reply` via `src/lib/defaultEvaluators.ts` (`GET /evaluators?include_defaults=true`, resolved by slug) and pass it to `TestRunOutputsPanel` / `BenchmarkOutputsPanel` as `legacyDefaultEvaluator`. The shared `EvaluationCriteriaPanel` / mobile `TestDetailView` then maps `criteria` to `variable_values.criteria` and uses the fetched evaluator `uuid`/`name`/`description` so authenticated dialogs can link to `/evaluators/{uuid}`. If the fetch fails or the evaluator is missing, the UI still shows the variable value under a generic non-linked evaluator label. Public share pages must keep evaluator links disabled and use public-safe endpoints only.
+    - **Benchmark leaderboard label**: benchmark `leaderboard_summary.pass_rate` uses the same labels as `main`: table header and primary chart title **`Test pass rate (%)`** in both authenticated `BenchmarkResultsDialog` and `/public/benchmark/{token}`. Keep evaluator names/descriptions in the per-test output cards; do not use the default next-reply evaluator name as the leaderboard table/chart title.
+    - **Benchmark `model_results[].evaluator_summary` (additive)**: optional per-model array when that model’s run folder finished with a Calibrate `metrics.json` that includes a **criteria** object (response judges only). Absent/`null` while the model is queued, running, or only partial; absent on jobs completed before the backend stored this field. Each element mirrors **one evaluator key** from `metrics.json.criteria`: `metric_key` (column key), `name` / `description` / `evaluator_uuid` / `type` (`binary` | `rating`). **Binary**: `passed`, `total`, `pass_rate` (0–100). **Rating**: `mean`, `min`, `max`, `count`, `scale_min`, `scale_max` — use mean vs scale for cross-model comparison (not a fake “%”). Top-level `passed` / `total_tests` / `failed`, `leaderboard_summary`, and per-test `test_results` / `judge_results` are unchanged. The frontend merges overall **`leaderboard_summary`** with per-evaluator columns via **`buildBenchmarkCombinedLeaderboardPayload`** (`src/lib/benchmarkEvaluatorSummary.ts`) and renders a single **`BenchmarkCombinedLeaderboard`** (`@/components/eval-details`): one **`LeaderboardTab`** table (Model, optional Passed/Total, **`Test pass rate (%)`**, then one column per evaluator) and one chart grid (**two charts per row** — overall first, then per-evaluator). Per-evaluator **header text and chart titles** are short labels only (**`name ?? metric_key`**); details in Shared Components ▸ **`BenchmarkCombinedLeaderboard`**. Missing `evaluator_summary` everywhere → only the overall columns/charts appear. Evaluator summaries without `leaderboard_summary` → evaluator-only columns/charts.
+    - **Bulk upload (`POST /tests/bulk`)** uses the same `evaluators: [{ evaluator_uuid, variable_values? }]` shape per test as the single-test write. The CSV's `evaluators` column is resolved client-side in `BulkUploadTestsModal` (see "Bulk upload tests via CSV" below) — names are looked up against `GET /evaluators?include_defaults=true` (LLM only) and the cell can be either a JSON array of `{name, variables}` objects or a plain criteria string that's auto-mapped to the `default-llm-next-reply` evaluator's `criteria` variable. Plain-string-criteria rows therefore arrive at the backend already wrapped in the same evaluator-attachment shape as the JSON-array form, not as the legacy free-text `criteria` field.
+    - **Versions are pinned server-side**: the dialog never sends `evaluator_version_id`. The backend always pins `evaluators.live_version_id` at link time, so on the next GET the test surfaces the version that was live when the user clicked Save (this is what `system_prompt` / `variables` / `output_config` on each `evaluators[i]` row reflect — a snapshot, not "live today"). When previewing an attached evaluator's prompt, prefer the row's pinned fields over re-fetching `GET /evaluators/{uuid}`.
+  - **Loading saved tests** (when `initialConfig` and/or `initialEvaluators` are provided):
     - Parses `history` array and converts to chatMessages format
     - **Waits for tools fetch to complete**: Uses a `toolsFetched` state flag that's set to `true` in the `finally` block of the tools API call. The useEffect depends on `initialConfig`, `toolsFetched`, and `availableTools` - it only processes when `toolsFetched` is true. This ensures the form populates even if no tools exist or the tools API fails
     - **Webhook tool call detection**: Looks up the tool by name in `availableTools` and checks `tool?.config?.type === "webhook"`. This is more reliable than checking for body/query argument keys (which could misclassify structured-output tools with params named "body" or "query")
@@ -563,21 +580,41 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
     - **Tool response parsing**: `role: "tool"` messages are included as `tool_response` type, linked to their corresponding tool call via `tool_call_id`
     - Non-webhook tools show params as flat list without group containers
     - **Param update matching**: `updateToolCallParam` matches by both `name` AND `group` to avoid updating params with the same name across different groups (e.g., "id" in both body and query)
+    - **Evaluator hydration**: `src/app/tests/page.tsx`'s `openEditTest` reads the GET response's top-level `evaluators[]` (joined rows from `get_evaluators_for_test()`) and maps each row's `uuid` → `evaluator_uuid`, plus `name`, `description`, `slug`, `variables`, and `variable_values`, into the dialog's `initialEvaluators: AttachedEvaluatorInit[]` prop. `description` is also threaded through so the attached-evaluator card can show the one-line description below the evaluator name without a re-fetch. The dialog's initialization effect prefers `initialEvaluators` over the legacy-criteria fallback. An empty array (`evaluators: []`) is the legacy-test signal, not "the user removed all evaluators".
 - **Bulk upload tests** via CSV:
   - Opens `BulkUploadTestsModal` from "Bulk upload" button beside "Add test"
-  - **Step 1**: "Select the type of test" — "Next Reply" or "Tool Call" (toggle buttons, same style as language toggle)
-  - **Step 2**: Upload CSV file (drag-and-drop or click-to-browse). A brief paragraph describes the expected CSV format (adapts to selected test type). "Download sample CSV" button generates a ZIP file (via `jszip`) containing the sample CSV and a `README.txt` with detailed column descriptions, value formats, JSON escaping rules, and examples
-  - **CSV format for Next Reply**: columns `name`, `conversation_history` (OpenAI chat format JSON array), `criteria`
-  - **CSV format for Tool Call**: columns `name`, `conversation_history` (OpenAI chat format JSON array), `tool_calls` (JSON array matching `TestConfig.evaluation.tool_calls` format — supports `tool`, `arguments`, `is_called`, `accept_any_arguments`)
-  - **Validation**: Checks required columns, unique test names, valid JSON in `conversation_history` and `tool_calls`/`criteria` fields, and enforces a **max 500 tests per upload** limit. Shows errors with row numbers (up to 5 shown, rest summarized)
+  - **Step 1**: "Select the type of test" — "Next Reply" or "Tool Call" (segmented toggle buttons: `flex rounded-lg border border-border overflow-hidden w-fit`, active = `bg-foreground text-background`)
+  - **Backing-list prefetch (silent, gates parsing)**: as soon as the user picks a test type, the modal fires the corresponding list fetch — `GET /evaluators?include_defaults=true` for "Next Reply" (filtered to `evaluator_type === "llm"`, stored as `{ uuid, name, slug, variables }` in `availableLLMEvaluators`) or `GET /tools` for "Tool Call" (stored in `availableTools`, combined with `INBUILT_TOOLS` to form the `knownToolNames` `Set`). Both are required for CSV validation, so parsing is **gated on the relevant `*Fetched` flag** and follows an identical "deferred parse" pattern: the fetch runs silently in the background (no visible "Loading…" indicator), a CSV dropped while it's still in flight is stashed on a single `pendingFile` slot by `handleFileChange`, and a deferred-parse `useEffect` watching `[pendingFile, evaluatorsFetched, toolsFetched, isResponseType]` re-invokes `handleFileChange(pendingFile)` exactly once when the right gate flips — `evaluatorsFetched` for response uploads, `toolsFetched` for tool-call uploads. The only state surfaced inline is a hard fetch failure (`evaluatorsFetchError` / `toolsFetchError` → red message under the format description), which blocks parsing until the user refreshes. `pendingFile` is reset on modal close, on every test-type toggle (so a stale Next-Reply drop never gets re-parsed in Tool-Call mode), on file-remove, and at the top of every `handleFileChange` call (so a fresh drop supersedes any stashed file). Each list is only fetched for the test type that needs it — response uploads never hit `/tools`, and tool-call uploads never hit `/evaluators`.
+  - **What `availableLLMEvaluators` is for**: name lookup + variable-completeness check during CSV validation, and the plain-string-criteria fallback (resolved by `slug === "default-llm-next-reply"`, never by name).
+  - **What `knownToolNames` is for**: parser-level validation that every `tool_calls[].tool` value matches a tool the tenant can actually run, plus the parsed-tests preview's known/unknown link rendering. The set is `availableTools.map(t => t.name) ∪ INBUILT_TOOLS.map(t => t.id)`, `useMemo`-stabilised so the preview doesn't recompute on every render.
+  - **Step 2**: Upload CSV file (drag-and-drop or click-to-browse). Above the dropzone, a structured bulleted overview describes the expected CSV format and adapts to the selected test type — one bullet per column (`name` / `conversation_history` / `evaluators` for next-reply; `name` / `conversation_history` / `tool_calls` for tool-call), with column names rendered as inline `<code>` chips bumped to `text-foreground` so they stand out from the otherwise muted body copy. The `evaluators` and `tool_calls` bullets nest a sub-list to lay out their accepted forms / per-entry fields (next-reply: plain string vs JSON array; tool-call: `tool` / `arguments` / `accept_any_arguments`). The tool-call helper deliberately does **NOT** mention `is_called` even though the parser still accepts it — see "Tool-invocation expectation" under AddTestDialog for the wider product call to suppress the should-not-call assertion in user-facing surfaces; the bulk-upload README and in-modal helper follow the same convention. The detailed column documentation lives in the bundled `README.txt`, not in this in-modal helper. The next-reply helper inlines two `next/link` anchors styled via the shared `HELPER_LINK_CLASS` constant (`text-foreground` + subtle `decoration-foreground/30` underline that darkens on hover): "Evaluators" → `/evaluators`, and "Correctness" → `/evaluators/{correctnessEvaluatorUuid}` where the UUID is resolved from `availableLLMEvaluators` by slug `default-llm-next-reply`. Both links use `target="_blank" rel="noopener noreferrer"` so clicking them doesn't blow away the in-progress upload. The Correctness anchor **gracefully degrades** to a plain `text-foreground` span when the slug lookup returns nothing (fetch still in flight, or tenant has removed the default evaluator) — never render `/evaluators/undefined`. "Download sample CSV" button generates a ZIP file (via `jszip`) containing the sample CSV(s) and a `README.txt` with detailed column descriptions, value formats, JSON escaping rules, and examples. For **Next Reply**, the ZIP ships **two** CSVs side-by-side — `sample_next_reply_tests_basic.csv` (plain-string `evaluators` cell) and `sample_next_reply_tests_advanced.csv` (JSON-array `evaluators` cell, where evaluators with no declared variables are written as just `{"name":"..."}` — variables key omitted, not `"variables":{}` — to demonstrate the parser's tolerated-shape) — plus the README; for **Tool Call** the ZIP has the single sample + README.
+  - **Collapsible format helper**: the helper bullet list above the dropzone auto-collapses as soon as a CSV parses successfully (`parsedTests.length > 0`) so the parsed-tests preview can own the screen. State lives on a `formatHelpOpen` boolean (default `true`) that a single `useEffect` driven by `parsedTests.length` flips on every transition: empty → expanded, non-empty → collapsed. When collapsed, a small disclosure button (chevron + `Show CSV format details` / `Hide CSV format details`) renders in place of the help body and toggles `formatHelpOpen` manually so the user can re-open the spec without clearing the upload. `formatHelpOpen` is also reset to `true` on modal close so each fresh open lands in the help-visible state.
+  - **CSV format for Next Reply**: columns `name`, `conversation_history` (OpenAI chat format JSON array), `evaluators`. The `evaluators` cell accepts EITHER:
+    - **A plain-text criteria string** — auto-mapped to a single attached evaluator: the LLM next-reply default (resolved by stable slug `default-llm-next-reply`) with `variable_values.criteria` set to the cell value. If that evaluator isn't present in the tenant's evaluators list, the row errors out with a hint to use the JSON-array form instead.
+    - **A JSON array** of `{ "name": <evaluator name>, "variables"?: { <var>: <string>, ... } }` objects. Each `name` is matched against `availableLLMEvaluators` by exact name (names are unique in the user's visible namespace: their custom evaluators plus visible seeded defaults). For evaluators that declare variables in their pinned `live_version.variables`, every variable name must be present in the row's `variables` object with a non-empty string value; missing values, unknown extras, duplicate evaluator entries, and non-object cells all fail the row with a specific error message. Evaluators with zero variables can pass `"variables": {}` or omit the field.
+    - The form is detected by the cell's first non-whitespace character: leading `[` ⇒ JSON-array path (strict parse), otherwise plain-string path. Criteria strings that genuinely start with `[` need to be expressed via the JSON-array form.
+  - **CSV format for Tool Call**: columns `name`, `conversation_history` (OpenAI chat format JSON array), `tool_calls` (JSON array matching `TestConfig.evaluation.tool_calls` format — documented fields are `tool`, `arguments`, `accept_any_arguments`). The parser also accepts the legacy `is_called: false` flag so existing should-not-call rows keep round-tripping, but it is **not** documented in either the in-modal helper or the bundled `README.txt` — new tests should never set it (consistent with the AddTestDialog change that suppresses the should-not-call expectation in the UI).
+  - **Validation**: Checks required columns, unique test names, valid JSON in `conversation_history` and `tool_calls` fields, and enforces a **max 500 tests per upload** limit. For Next Reply, also: (a) every evaluator name must exist in the tenant's evaluators list, (b) every variable declared by each evaluator must be filled with a non-empty string, and (c) **all rows must attach the same set of evaluators** (compared by sorted resolved UUIDs against the first successfully-parsed row — variable VALUES can vary per row, but the evaluator set cannot). For Tool Call, also: every concrete `tool` value referenced in any row's `tool_calls` array must be present in `knownToolNames` — rows referencing unknown tools fail with a per-row error (`Row N: tool(s) "X", "Y" not found in your Tools tab`), and the parse error is **prefixed with a single clear summary line** listing every distinct unknown tool collected across the entire CSV and instructing the user to add them under the Tools tab before uploading. Empty / missing `tool` values are intentionally not flagged here (left to the backend's payload validation) so we only complain about concretely-named tools that don't exist. Errors with row numbers are shown up to 5 at a time, with the rest summarized as `...and N more errors`. The summary preamble (when present) sits above the per-row list, separated by a blank line — both render together inside the same `parseError` red panel via `whitespace-pre-line`.
+  - **Parsed-tests preview (table view)**: Once `parsedTests.length > 0`, the modal pivots from a compact upload UI to a wide preview-and-confirm UI. Three coordinated changes happen at this point:
+    - **Animated width expansion**: the modal container's `max-w-xl` flips to `max-w-5xl` with `transition-[max-width] duration-300 ease-out`, so the dialog noticeably grows to accommodate the per-row table. The `mx-4` margin and `max-h-[85vh]` height cap stay put.
+    - **Evaluators section** (response only): rendered as a **standalone borderless section** between the dropzone and the parsed-preview card — explicitly NOT nested inside the same `bg-muted/50 border` container as the "Found N tests" header and the per-row table. The intent is for it to read as upload-level metadata ("here's the set of evaluators every row attaches") rather than a striped header on the preview itself. Markup is `<div className="mt-4">` containing a section title `<h4 className="text-sm font-semibold text-foreground mb-2">Evaluators</h4>` (no trailing colon — it's a heading, not an inline label, so it doesn't fade into the layout the way a muted-text label would) followed by a `<div className="flex items-center gap-1.5 flex-wrap">` of pill chips below it. No internal divider/border between this section and the preview card. The set comes from `previewEvaluators` — a `useMemo` derived from `parsedTests[0].evaluators` hydrated against `availableLLMEvaluators` (we trust the parser invariant that all rows attach the same evaluators and don't re-check the rest). Each pill is a `next/link` chip → `/evaluators/{uuid}` (new tab) with a small external-link glyph; the whole section is gated on `parsedTests.length > 0 && isResponseType && previewEvaluators.length > 0` and hides entirely otherwise (e.g. tool-call uploads, or response uploads where evaluator hydration somehow returned empty).
+    - **Per-test table** with sticky header, `overflow-x-auto`, and a `max-h-[420px]` vertical scroll cap (so a 500-row CSV doesn't blow out the dialog). Columns:
+      - `#` / `Name` / `Conversation history` for both test types.
+      - **Next-reply only** — one extra column **per evaluator that declares variables** (heading = evaluator name). Cells render the row's `variable_values` for that evaluator: if the evaluator declares a single variable (the default-correctness `criteria` case) the value is dumped directly with `line-clamp-4 whitespace-pre-wrap`; multi-variable evaluators show each value labelled with a tiny `text-[10px] font-mono text-muted-foreground` `varName` prefix. Evaluators with **zero** variables intentionally do not get a column — they're already represented by the pill row, so a column would just be a permanently-empty stripe.
+      - **Tool-call only** — a single `Expected tool calls` column rendered by `renderToolCallsCell`. For each entry: the `tool` value is matched against `knownToolNames` (custom tool names ∪ inbuilt tool ids) and rendered as one of three states:
+        - **known** → `next/link` to `/tools` (new tab) with `HELPER_LINK_CLASS`-styled monospace text.
+        - **unknown** → red `bg-red-500/10 text-red-600` pill with a warning glyph and a `title` tooltip nudging the user to add the tool under Tools first. **Defensive guard only** — parser-level validation now rejects rows referencing unknown tools (see "Validation" above), so a fully-parsed test should never hit this branch in practice. The render path is kept so the preview is robust to any future loosening of parser validation.
+        - **loading** → plain `font-mono` text (no link, no error styling). Also defensive-only now that parsing is gated on `toolsFetched`: the preview only renders for parsed tests, and parsed tests only exist after the fetch lands. Kept as a flicker-safe fallback in case `parsedTests` is ever populated by some other code path while `toolsFetched` is still false.
+        - In addition: `accept_any_arguments: true` renders an italic `any arguments accepted`; otherwise the `arguments` object is laid out as inline `key="value"` monospace pairs. The preview still flags any legacy `is_called: false` row with an uppercase red `should NOT be called` badge so users can spot the deprecated assertion in pre-existing CSVs, but `is_called` is no longer documented in the helper or README and `AddTestDialog` no longer emits it. An empty `tool_calls: []` array renders as italic red `empty tool_calls array` — there is **no** "empty array means no tools should be called" assertion in the platform; the row would be a misconfigured test, so we surface it visibly in the preview rather than silently styling it as a valid assertion.
+    - **Conversation-history rendering** is shared by both branches. `renderConversationHistory` parses the cell, then stacks each message as `[ROLE-BADGE] content`, where the badge is `text-[10px] uppercase tracking-wide` styled (user = blue tint, assistant/other = neutral) and the content uses `line-clamp-3` so long messages don't blow out the row. Defensive `try`/`catch` around the JSON parse keeps a row from crashing the whole table even though parser validation has already accepted it.
   - **Step 3** (optional): Checkbox "Assign tests to agents" → uses `MultiAgentPicker` component from `AgentPicker.tsx` for multi-select agent selection. Agent state lives inside `MultiAgentPicker` — when the modal closes, the component unmounts and state is naturally reset (no stale agent cache)
-  - **API**: `POST /tests/bulk` with body `{ type, tests: [...], language?, agent_uuids? }`. Response: `{ uuids, count, message, warnings }`. `warnings` is `null` on full success, or an array of strings when some agent linking failed (test creation itself is all-or-nothing)
+  - **API**: `POST /tests/bulk` with body `{ type, tests: [...], agent_uuids? }`. Response: `{ uuids, count, message, warnings }`. `warnings` is `null` on full success, or an array of strings when some agent linking failed (test creation itself is all-or-nothing)
   - **Warnings handling**: If the response contains `warnings`, the modal stays open showing a yellow warning banner listing each warning, with a "Done" button to dismiss. If no warnings, the modal auto-closes
-  - **Language**: UI toggle (English/Hindi/Kannada, same style as AddTestDialog) applies to all tests in the batch. Only sent when not "english" (the default). Backend stores it as `settings.language` in each test's config
-  - **Bulk API structure differs from single-test API**: The `type` is top-level (applies to all tests in the batch), not per-test. Type values are `"response"` and `"tool_call"` (same as `POST /tests`). Each test is a flat object with `name`, `conversation_history`, and `criteria`/`tool_calls` — not wrapped in the nested `config.evaluation` structure used by `POST /tests`
+  - **Bulk API structure differs from single-test API**: The `type` is top-level (applies to all tests in the batch), not per-test. Type values are `"response"` and `"tool_call"` (same as `POST /tests`). Each test is a flat object with `name`, `conversation_history`, and either `evaluators` (response) or `tool_calls` (tool_call) — not wrapped in the nested `config.evaluation` structure used by `POST /tests`. The per-test `evaluators` field is the same `[{ evaluator_uuid, variable_values? }]` shape as the single-test write contract — names from the CSV are resolved to UUIDs client-side before submit. The legacy per-test `criteria` field is no longer sent.
   - **Error handling**: Status-specific fallback messages for 400 (duplicate names/missing fields/batch > 500), 403 (agent not owned), 404 (agent not found). Backend's `detail` field (FastAPI standard) is preferred, then `message`, then fallback
   - **Bulk API is atomic for test creation**: If any test name conflicts (within batch or with existing tests), none are created. Agent linking is best-effort — tests are created first, then linking is attempted per-agent. Partial linking failures produce `warnings` in the response, not errors
   - Uses `papaparse` for robust CSV parsing (handles quoted fields containing JSON with commas/quotes)
+  - **Type imports**: `BulkUploadTestsModal` re-uses the `EvaluatorRefPayload` type from `@/components/AddTestDialog` for its resolved per-test evaluators payload, the `AvailableTool` type from `@/components/ToolPicker` for the tool-call preview's tool list, and `INBUILT_TOOLS` from `@/constants/inbuilt-tools` to seed `knownToolNames` with platform-built-ins. Keep all three in sync with their canonical definitions rather than duplicating shapes.
   - **Data refresh**: The tests page uses a shared `fetchTests` function (wrapped in `useCallback`) for both initial load and post-upload refresh, with consistent 401 handling and loading/error states
 - **View all tests**
 - **Edit/delete tests** (single or bulk — checkbox selection with "Delete selected (N)" button)
@@ -632,20 +669,126 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
 - **List view**: Desktop table with mobile card view (see "List Page Structure" section)
 - **Add/Edit sidebar**: Full-page responsive slide-in panel with form fields (full-width on mobile, 40% width on desktop). See "Comprehensive Dialog & Sidebar Responsive Patterns" section.
 
-### 8. Metrics Management (`/metrics`)
+### 8. Evaluators Management (`/evaluators`)
 
 **What you can do:**
 
-- **Define evaluation criteria** for simulations
+- **Define evaluation criteria** for simulations and tests
 - **Configure pass/fail thresholds**
-- **Set up custom metrics**
-- **Duplicate existing metrics** with a new name
+- **Set up custom evaluators**
+- **Duplicate existing evaluators** with a new name
+
+**Evaluator type (use case)** — every evaluator is scoped to one of four use cases via the `evaluator_type` field on the create payload and the GET response:
+
+| `evaluator_type` | Label          | Purpose                                                                        | Derived `data_type` |
+| ---------------- | -------------- | ------------------------------------------------------------------------------ | ------------------- |
+| `tts`            | Text to Speech | Evaluate the quality of generated audio (naturalness, pronunciation, clarity). | `audio`             |
+| `stt`            | Speech to Text | Evaluate the accuracy of transcribed text from an audio input.                 | `audio`             |
+| `llm`            | LLM Response   | Given a conversation history, evaluate the agent's next response.              | `text`              |
+| `simulation`     | Simulation     | Evaluate an entire conversation history.                                       | `text`              |
+
+The backend uses `stt` (not `speech_to_text`) as the wire value for the speech-to-text use case — keep the `EvaluatorType` union in `src/components/EvaluatorPills.tsx` aligned with this, and never reintroduce `speech_to_text` as a frontend identifier.
+
+`data_type` (`"text" | "audio"`) is derived from `evaluator_type` on POST and is no longer chosen directly in the UI. The `EVALUATOR_TYPE_TO_DATA_TYPE` map in `src/app/evaluators/page.tsx` is the single source of truth for this backend persistence mapping.
+
+**Judge model modality** is a *separate* concern from `data_type`. Only `tts` requires an audio-capable judge model — every other use case (including `stt`) reads text, so `LLMSelectorModal` is opened with `requiredInputModality="audio"` only when `evaluator_type === "tts"`, and `"text"` otherwise. On the detail page (new-version flow), legacy evaluators without `evaluator_type` fall back to `data_type === "audio" ? "audio" : "text"` so older audio evaluators keep their original judge-model filter.
+
+**Kind is hard-coded to `"single"`** for now. The create flow does not render a Single / Side-by-side picker, and `createEvaluator` always sends `kind: "single"` in the POST body. The `KindPill` component is still exported from `EvaluatorPills.tsx` but is not rendered on the list page or the detail header. If side-by-side support is brought back, restore the picker UI, the `newEvaluatorKind` state, and the validation check, and re-add `<KindPill />` next to `<EvaluatorTypePill />` / `<OutputTypePill />`.
+
+**Create flow** — clicking "Add evaluator" opens a `UseCasePickerDialog` *before* the create sidebar:
+
+1. **Use case picker** (centered modal): four cards (Text to Speech / Speech to Text / LLM response / Simulation) with one-line descriptions explaining each. User picks one, clicks "Continue".
+2. **Default-prompt prefill** — on use-case select, the page calls `GET /evaluators/default-prompt?purpose=<llm|stt|tts|simulation>` and seeds the form: `evaluatorName` from `data.name` (`null` for `simulation` ⇒ left blank for the user to type), `newEvaluatorSystemPrompt` from `data.system_prompt`, `newEvaluatorOutputType` from `data.output_type`, `newEvaluatorJudgeModel` looked up via `findModelInProviders(llmProviders, data.judge_model)` (with a `{ id, name: id }` stub fallback that a follow-up `useEffect` upgrades once OpenRouter providers finish loading — same pattern as `AgentDetail.tsx`), and `newEvaluatorScale` from `data.output_config.scale` *only when* `output_type === "rating"` (binary keeps the placeholder 1/2/3 rows so the form still looks sensible if the user later flips the toggle). Per-row `color` from the API response is intentionally dropped — the form doesn't track it. Prefill is best-effort: a non-401 failure logs and leaves the fields blank rather than blocking the create flow. **Re-selecting the same purpose** via the "Change" link is a no-op — prefill (and the `setNewEvaluatorJudgeModel(null)` clear) only fires when `prevType !== value` so the user's edits survive a round-trip through the picker.
+3. **Create sidebar opens** with the chosen use case shown as a read-only "Use case" row at the top with a "Change" link that re-opens the picker (closes the sidebar while picker is open). The audio/text data-type toggle is no longer rendered.
+4. The rest of the sidebar (name, description, output type, judge model, judge prompt, rating scale) is unchanged. There is no kind picker — `kind` is hard-coded to `"single"` in the POST body.
+
+**Evaluator API contract** — the frontend should use the `/evaluators` API family for evaluator CRUD flows. The list/refetch endpoint is `GET /evaluators?include_defaults=true`; the detail page loads with `GET /evaluators/{evaluator_uuid}`; updates use `PUT /evaluators/{evaluator_uuid}`; deletion uses `DELETE /evaluators/{evaluator_uuid}`; duplication uses `POST /evaluators/{evaluator_uuid}/duplicate`. Do not call the legacy `/metrics` endpoints from evaluator UI — those routes are no longer part of the active evaluator contract and will 404.
+
+**Name uniqueness** — evaluator names are unique within the user's visible evaluator namespace. `POST /evaluators`, `PUT /evaluators/{evaluator_uuid}`, and `POST /evaluators/{evaluator_uuid}/duplicate` reject empty names and reject names that collide with either one of the user's custom evaluators or a seeded default evaluator visible to that user. Different users may still use the same custom evaluator name. Duplicate-name conflicts return HTTP `409` with `{ "detail": "Evaluator name already exists" }`; UI flows should parse that response and show the detail as an inline name-field error, not as a generic footer/dialog error. The frontend still keeps local duplicate checks for quick feedback, but backend 409 handling is authoritative because the visible namespace can change after the list was fetched.
+
+List rows navigate to `/evaluators/{uuid}`; editing is handled on the detail page, not by clicking a list row into an edit drawer. The list page owns create, duplicate, delete, filtering, and navigation only — don't add edit state, edit-loading spinners, or PUT handlers back to `src/app/evaluators/page.tsx`. The detail-page Edit dialog skips the picker *and* default-prompt prefill — `evaluator_type` is fixed once created, existing field values come from `GET /evaluators/{uuid}`, and save sends `PUT /evaluators/{uuid}`. `EVALUATOR_TYPE_OPTIONS` (in `src/app/evaluators/page.tsx`) is the canonical option list for the create picker; copy lives in `EVALUATOR_TYPE_LABELS` and `EVALUATOR_TYPE_TOOLTIPS` exported from `src/components/EvaluatorPills.tsx`.
+
+**Evaluator component boundaries** — large evaluator UI blocks live under `src/components/evaluators/` instead of being defined inline inside the app routes:
+
+- `CreateEvaluatorSidebar` owns the create-only slide-in form UI. The list page keeps the fetch/save state and passes values/setters down as props.
+- `UseCasePickerDialog` owns the pre-create use-case modal and accepts the page's `EVALUATOR_TYPE_OPTIONS` array.
+- `VersionCard` owns rendering of each evaluator version on `/evaluators/[uuid]`, including variables, rating output config, default-evaluator chrome hiding, and "Set as current".
+- `RatingScaleEditor` is shared by the create sidebar and the detail-page new-version dialog. Use this instead of duplicating rating-scale row JSX; callers provide the row array, `onChange`, validation flag, and copy for the helper/description placeholder.
+
+Keep route files focused on data loading, API calls, URL state, and orchestration. When adding evaluator UI, prefer extending these components before adding another large local JSX block to `src/app/evaluators/page.tsx` or `src/app/evaluators/[uuid]/page.tsx`.
+
+**Pills** (`src/components/EvaluatorPills.tsx`) — list rows and the detail header show small status pills near the evaluator name. Components:
+
+- `EvaluatorTypePill` — shows `Text to Speech` / `Speech to Text` / `LLM Response` / `Simulation` with a hover `Tooltip` containing the `EVALUATOR_TYPE_TOOLTIPS` blurb. Use this whenever `evaluator.evaluator_type` is present.
+- `DataTypePill` — legacy `audio`/`text` pill. Kept as a fallback for evaluators returned without `evaluator_type` (e.g. older defaults). Pattern: `evaluator.evaluator_type ? <EvaluatorTypePill /> : <DataTypePill />`.
+- `KindPill` — `Single` / `Side by side` (with tooltip). **Currently unused on the list and detail pages** while kind is hard-coded to `"single"`; left in place for future use.
+- `OutputTypePill` — `Binary` / `Rating` (with tooltip).
+- `DefaultPill` — solid `Default` badge for system-owned evaluators (no `owner_user_id`).
+
+**Detail header layout** (`src/app/evaluators/[uuid]/page.tsx`) — the name and `DefaultPill` sit on the first row; `EvaluatorTypePill` and `OutputTypePill` sit on a separate row below the name (`mt-2`), with the description rendered below that. The list page (`src/app/evaluators/page.tsx`) renders the same pills inline next to each evaluator's name.
+
+**Default vs user-owned** — `isDefault` is computed as `!evaluator.owner_user_id` (the only check; backend returns `owner_user_id: null` for system-seeded evaluators). On the detail page this hides the Edit button, the New version button, the Prompts tab strip, and the per-version chrome (`v#` pill, `Current` pill, "Set as current" button, timestamp), and removes the delete button on the list row. The list page partitions evaluators into the **Default** tab (`!e.owner_user_id`) and **My evaluators** tab (`!!e.owner_user_id`). The list fetch passes `?include_defaults=true` to `/evaluators`; without that query param the backend would return only the caller's evaluators and the **Default** tab would be empty.
+
+**Active tab persistence** — the selected tab is mirrored to the URL as `?tab=default|mine` so it survives page reloads and back-navigation from `/evaluators/[uuid]`. The pattern: `activeTab` is lazily initialized from `useSearchParams().get("tab")` (falling back to `"default"`); a `useEffect` on `searchParams` re-syncs state if the URL changes (browser back/forward); a `changeActiveTab(tab)` helper wraps `setActiveTab` + `router.replace("/evaluators?tab=" + tab)`. Use `changeActiveTab` everywhere the tab needs to flip — never call the raw `setActiveTab` (this includes the post-create switch to "mine" after a successful POST). `replace` (not `push`) is intentional: each tab toggle should not produce a new history entry, but pressing a list row's `router.push("/evaluators/[uuid]")` will snapshot the current `?tab=...` URL into the history stack so browser-back lands on the same tab.
+
+**Version timeline** — the `versions` `useMemo` in `[uuid]/page.tsx` builds the list from `evaluator.versions` (preferred) or falls back to `[evaluator.live_version]`, then sorts by `version_number` descending so the most recent is index 0. **For default evaluators it slices to `[0]` so only the most recent version of the prompt is ever rendered**, regardless of how many versions the backend returns. User-owned evaluators get the full sorted timeline. If you add new per-version actions (e.g. compare, rollback) keep this slicing rule in mind — it must remain applied for defaults. Existing non-live versions can still be promoted with `POST /evaluators/{uuid}/versions/live` and `{ version_uuid }`; the `VersionCard` action is intentionally styled as a prominent emerald secondary button labeled "Mark as current" so it stands out in the timeline without competing with the black primary "New version" button.
+
+**Variables — overall rules**
+
+Variables are **only supported for `evaluator_type === "llm"`**. The variable **name set** is pinned by the live version's variables — names cannot be added, renamed, or removed across versions of the same evaluator (the frontend enforces this with an amber-callout gate against newly-typed placeholders). **`description` and `default`, however, can be updated on every new version** — they're forwarded with each `POST /evaluators/{uuid}/versions` body. **`description` is required** in the create and new-version flows (validation gates in §2 and §3 below); on the wire it remains an optional field on the backend `VariableSpec` shape, so the POST body still defensively drops it when blank, but the frontend gate prevents that branch from being reached for LLM evaluators in normal flow. The frontend mirrors this contract in four places:
+
+1. **Detail-page version display** (`src/app/evaluators/[uuid]/page.tsx`) — when `v.variables?.length` is truthy, a blue-tinted info callout (`bg-blue-500/5` / `border-blue-500/20`) sits between the `Variables` label and the variable list. It reads "When this evaluator is added to an LLM test, you will be able to fill in the value of each variable for that test." This is purely informational; it does not render for evaluators with no variables (e.g. `pronunciation`, `Helpfulness`). Don't move this callout into the variable rows themselves — it's a one-time hint, not per-variable copy.
+
+2. **Create flow** (`src/components/evaluators/CreateEvaluatorSidebar.tsx`, orchestrated by `src/app/evaluators/page.tsx`) — `extractVariableNames(prompt)` from `src/lib/evaluatorVariables.ts` (regex `/\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g`, dedup, first-seen order) is invoked by the page on every render of `newEvaluatorSystemPrompt` and passed into the sidebar. The result powers a **Variables** section that lives **inside the Judge prompt block, between the helper description and the `<textarea>`** — so the user can see the detected variables in the same viewport as the textarea they're editing, without scrolling. Placement order: label → helper description → Variables section (when populated) → textarea. There is intentionally no auto-scroll behaviour on this section; rendering it above the textarea means it's always already in view as the user types.
+   - **Header description (LLM only)**: directly under the "Judge prompt" label a muted helper line explains the feature: *"You can build reusable prompts by adding `{{ variable }}` placeholders so the same evaluator can be applied to multiple LLM tests while customising the value for each test."* The `{{ variable }}` token is wrapped in a `<code>` with `bg-muted` so it reads as syntax. The line only renders when `variablesSupported` — TTS / STT / Simulation already get the amber warning below the textarea if they try to use placeholders, and don't need this hint.
+   - **LLM** (`variablesSupported === true`): the section renders only when at least one placeholder is detected. Each detected variable is rendered as a row containing a `{{name}}` monospace badge **and an editable single-line `<input>` next to it** for the variable's `description` — keyed in `newEvaluatorVariableDescriptions: Record<string, string>` so the description is preserved if the user momentarily removes the placeholder from the prompt and re-adds it. Layout is `flex-col` on mobile / `md:flex-row` on `md+` so the badge sits above the input on small screens. **Variable description is required**: `createEvaluator` rejects submission if any detected variable has an empty trimmed description (`variableDescriptionsValid` check inside the validation gate — only enforced when `newEvaluatorType === "llm"`). After `validationAttempted` is set, each input with an empty trimmed value gets `border-red-500` (same pattern as the Name / Judge prompt / rating-scale label fields). The placeholder copy reads "Short description shown when filling this variable in tests" (no "(optional)" suffix — that copy was removed when descriptions became required). The detected names + descriptions are persisted on POST as `version.variables: [{ name, description? }, ...]` — the POST body still drops `description` from each entry when its trimmed value is empty (preserved as a defensive fallback; in normal flow the validation gate prevents this branch from being reached for LLM evaluators). `default` is not user-editable in this flow.
+   - **Other types** (TTS / STT / Simulation): no Variables section and no description line. If the user nonetheless types `{{...}}`, an **amber callout** (`bg-amber-500/10` / `border-amber-500/30`) is rendered **below** the textarea (outside the prompt block, sibling of the spacer) stating variables aren't supported for that evaluator type and that the placeholders will be treated as literal text.
+
+3. **New version dialog** (`src/app/evaluators/[uuid]/page.tsx`) — uses the same shared `extractVariableNames` helper from `src/lib/evaluatorVariables.ts` as the create flow. Keep the recognized placeholder shape centralized there; don't add page-local copies. The dialog is wide (`max-w-5xl`) and uses a two-column layout on `lg+`: the Judge prompt textarea owns the left column (`lg:h-[560px]`), while Summary of change, live-version checkbox, Judge model, rating scale, and variable-description controls live in the right column. On smaller screens it stacks into one column. The editable Variables section's **name set** is sourced from `evaluator.live_version?.variables` (NOT from the prompt being edited — names are pinned), but its **descriptions** are user-editable via `newVersionVariableDescriptions: Record<string, string>` (seeded in `openNewVersionDialog` from each existing variable's `description`). The dialog also includes a default-checked `newVersionMarkLive` checkbox labeled "Mark the new version as the live version"; its value is sent directly on the create request as `make_live`. This checkbox card uses the same emerald color family as the timeline `VersionCard` "Mark as current" button (`emerald` border/background/text/accent) because both controls promote a version to live. When `make_live` is true, the backend promotes the newly-created version in the same `POST /evaluators/{uuid}/versions` call. Do **not** add a second frontend `/versions/live` request after creating a version — reserve that endpoint for promoting an already-existing version from the timeline. Each variable row uses the same `{{name}}` badge + description `<input>` layout as the create flow. The blue callout reads: *"Variable names cannot be added, renamed, or removed on a new version, but you can update each variable's description below — that's the hint shown to users when they fill the variable in an LLM test."* Three branches inside an inline IIFE:
+   - LLM with existing variables → render the editable list + callout. If the user types any placeholder *not* in the existing set, an amber warning lists the unknown placeholders and explains they'll be treated as literal text (the new POST does NOT extend the variable set even if the user types `{{newvar}}`).
+   - LLM with no existing variables but the user typed `{{...}}` → amber warning explaining variables can only be defined at create time.
+   - Non-LLM with `{{...}}` in the prompt → amber warning explaining variables aren't supported for that evaluator type.
+
+   **Variable description is required** on the new-version flow too: `createNewVersion` rejects submission if any existing variable has an empty trimmed description (`variableDescriptionsValid` check inside the validation gate, only enforced for LLM evaluators). The check uses `newVersionVariableDescriptions[v.name] ?? v.description ?? ""` so a description that already exists on the live version satisfies the gate even if the user hasn't touched the input — only inputs the user has explicitly cleared (or live versions that somehow shipped with empty descriptions) will block submission. After `newVersionValidated` is set, each input with an empty trimmed value gets `border-red-500`. The placeholder copy is "Short description shown when filling this variable in tests" (no "(optional)" suffix).
+
+The new-version POST body **does** include `variables` for LLM evaluators with at least one existing variable: `body.variables = evaluator.live_version.variables.map(v => ({ name: v.name, description?: edited-or-existing, default?: v.default-if-non-empty }))`. It also includes `make_live: newVersionMarkLive` for every output type. The variable **name** comes verbatim from the live version (never from the prompt the user is editing in the dialog), `description` is taken from `newVersionVariableDescriptions[v.name] ?? v.description ?? ""` (dropped from the entry when its trimmed value is empty — preserved as a defensive fallback now that the validation gate above requires non-empty descriptions in normal flow), and the existing `default` is forwarded unchanged when non-empty. For non-LLM evaluators, or LLM evaluators with zero existing variables, the `variables` field is omitted entirely. Don't widen this to "modify variable names" — the amber-callout gate is the design intent and the backend will treat any newly-introduced placeholder as literal text.
+
+4. **Test-attachment input rendering** (`src/components/AddTestDialog.tsx`) — the consumer side of the callout copy. When an LLM evaluator is attached to a next-reply test the dialog renders one textarea per `live_version.variables[]` entry inside the evaluator's card; the user-supplied values are sent on `POST` / `PUT /tests` as `evaluators[i].variable_values: Record<string, string>` (sibling to `evaluator_uuid`). Save is gated on every variable having a non-empty trimmed value. **Every variable input renders identically** — a small monospace `{{name}}` hint above a textarea whose placeholder is the variable's `description` (no per-evaluator or per-variable special cases). This means the `description` field on the evaluator is the user-facing copy at attachment time — author it in the create / new-version flows above (sections 2 and 3) so it reads as a clear instruction (e.g. correctness's `criteria.description` is "Natural-language description of what the reply should satisfy."). See section 5 "Evaluators (next-reply tab only)" for the full lifecycle (auto-attach, legacy migration, picker, validation).
+
+**List page filters** (`src/app/evaluators/page.tsx`) — the search input is followed by two filter dropdowns on the same row (`md:flex-row`, stacked on mobile). The `<select>` elements use `appearance-none` to suppress the native browser arrow and render a custom chevron SVG positioned at `right-3` with `pointer-events-none` so clicks still hit the underlying select; the select itself has `pl-3 pr-9` so option text never overlaps the chevron. Re-use this pattern (relative wrapper + appearance-none select + absolutely positioned chevron) anywhere you add a styled select on this page so the visual stays consistent.
+
+- **Purpose** (`purposeFilter` state, `EvaluatorType | "all"`): options driven by `EVALUATOR_TYPE_OPTIONS` and labeled with `EVALUATOR_TYPE_LABELS`, so adding a new use case automatically extends this dropdown. Filters on `evaluator.evaluator_type === purposeFilter`.
+- **Output** (`outputTypeFilter` state, `"binary" | "rating" | "all"`): filters on `evaluator.output_type`.
+
+Filters compose AND-style with the search query and the Default / My evaluators tab inside the single `filteredEvaluators` reducer. Empty-state copy switches to "No evaluators match your filters" when *any* of `searchQuery` / `purposeFilter !== "all"` / `outputTypeFilter !== "all"` is active, and the inline "Add evaluator" CTA in the empty state only shows when none of those are active (and the user is on the **My evaluators** tab).
+
+**Dark-mode surface elevation** — Tailwind v4 sets `--background: #0f0f0f`, `--muted: #1a1a1a`, and `--accent: #1f1f1f` in dark mode (see `src/app/globals.css`). On the evaluators list, sidebar, picker, duplicate, and new-version dialog forms we use a three-step elevation hierarchy via `dark:` overrides only — light mode is unchanged because white-on-white surfaces are already separated by `border-border`:
+
+| Layer                                                                             | Light bg                  | Dark bg (override) | Used for                                                                                                                                                                                                                                                                                                                                                          |
+| --------------------------------------------------------------------------------- | ------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Page / sidebar / dialog                                                           | `bg-background` (#fff)    | `#0f0f0f`          | Sidebar shell, dialog shell, page background                                                                                                                                                                                                                                                                                                                      |
+| Inputs, buttons, selects, list-row cards, sub-cards directly in a sidebar/dialog  | `bg-background`           | `dark:bg-muted` (#1a1a1a) | List row cards (`/evaluators`), search & filter dropdowns on the list page, every editable field in the Add evaluator sidebar (Name, Description, Use-case readonly box, Judge model selector, Judge prompt, Variables list rows), every editable field in the detail-page Edit and New version dialogs, the dashed "Add row" rating-scale button, the use-case picker option cards, every secondary Cancel button, the duplicate dialog name input |
+| Inputs nested **inside** a `dark:bg-muted` row card (rating-scale row inputs)     | `bg-background`           | `dark:bg-accent` (#1f1f1f) | Value/label inputs and description textarea inside each rating scale row in both create flow and new-version dialog                                                                                                                                                                                                                                               |
+| Hover for layer-2 secondary controls (Cancel buttons, Judge model selector, etc.) | `hover:bg-muted/50`       | `dark:hover:bg-accent` | Required because plain `hover:bg-muted/<n>` overlays go *darker* than a `bg-muted` rest state in dark mode (translucent muted on `#0f0f0f` ≈ `#13–15`); explicit `dark:hover:bg-accent` keeps hover one step *lighter* than rest                                                                                                                                |
+| Active state in the use-case picker                                               | `bg-muted/40`             | `dark:bg-accent` + `border-foreground` | The selected purpose card uses `border-foreground` plus an accent fill so the active card is visibly lighter than the inactive `dark:bg-muted` siblings; without `dark:bg-accent`, a translucent `bg-muted/40` on a `dark:bg-muted` rest sibling would read *darker* than the unselected siblings                                                                  |
+
+The same convention applies to the rating-scale **row container** itself: `bg-muted/10 dark:bg-muted` (the `bg-muted/10` light tint preserves the existing card look in light mode; `dark:bg-muted` gives it the layer-2 fill in dark mode so the row reads as a nested card).
+
+When adding a new control on `/evaluators` or `/evaluators/[uuid]`, follow the same pattern:
+
+- Default for any input/button/select/sub-card sitting directly in the sidebar or dialog body: add `dark:bg-muted` to the existing `bg-background`.
+- If the new control hovers, also add `dark:hover:bg-accent` so hover stays brighter than rest.
+- If the control sits *inside* another `dark:bg-muted` card (e.g. a rating-scale row), use `dark:bg-accent` instead of `dark:bg-muted` so the nested layer is one step elevated again.
+- Don't add light-mode overrides — every change here is `dark:` only. Pre-existing light-mode styling is correct and breaking it is a regression.
+
+Don't introduce new pill colors here; reuse the per-type Tailwind classes already defined in `EvaluatorPills.tsx`.
 
 **UI Patterns:**
 
 - **List view**: Desktop table with mobile card view showing duplicate and delete actions (see "List Page Structure" section)
-- **Add/Edit sidebar**: Full-page responsive slide-in panel with form fields (full-width on mobile, max-width on desktop). See "Comprehensive Dialog & Sidebar Responsive Patterns" section.
-- **Duplicate dialog**: Centered modal dialog for entering new metric name (fully responsive). See "Comprehensive Dialog & Sidebar Responsive Patterns" section.
+- **Add evaluator sidebar**: Full-page responsive slide-in panel with create-only fields (full-width on mobile, max-width on desktop). Implemented as `CreateEvaluatorSidebar`; see "Comprehensive Dialog & Sidebar Responsive Patterns" section.
+- **Use case picker dialog**: Centered modal (`max-w-2xl`) with a 2-column card grid on `sm:` and above, single column on mobile. Implemented as `UseCasePickerDialog` and opened from the "Add evaluator" buttons (header + empty-state) on the list page. Uses `useHideFloatingButton(true)` to hide the floating "Talk to Us" button while open.
+- **Duplicate dialog**: Centered modal dialog for entering new evaluator name (fully responsive). See "Comprehensive Dialog & Sidebar Responsive Patterns" section.
 
 ### 9. Simulations (`/simulations`)
 
@@ -674,6 +817,13 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
 - **Verification error popover**: When the Verify button is clicked and fails, a dropdown popover appears beneath the Verify button (not in the config tab) with a "Verification Failed" header, close button, error message, and optional sample response in a scrollable `<pre>` block. Dismissed by clicking outside or the X button. State (`verifyError`, `verifySampleResponse`) lives in the simulation page and is cleared on each new verify attempt.
 - **Voice simulation restriction**: When a connection agent is selected, a blue info banner explains that voice simulations are only supported for built agents. Uses theme-aware colors: `text-blue-600 dark:text-blue-300/90` for text, `text-blue-500 dark:text-blue-400` for the icon
 - The simulation detail page (`/simulations/[uuid]/page.tsx`) pre-populates `selectedAgent` from the simulation's agent data. Agent type is read directly from `data.agent.type` (the backend returns `"agent"` or `"connection"`). The `verified` field is derived from `data.agent.config?.connection_verified` for connection agents; built agents are always considered verified. **Important**: Always use the backend-provided `type` field — never infer agent type from the presence/absence of config fields like `agent_url`.
+
+**Config Tab — Evaluators Picker:**
+
+- The evaluators picker on the simulation Config tab fetches `GET /evaluators?include_defaults=true` (not the legacy `/metrics` endpoint) and **filters client-side to `evaluator_type === "simulation"`** before mapping to `PickerItem`s. This keeps LLM / TTS / STT evaluators out of the simulation picker since they can't run against a full conversation. The fetch lives in `src/app/simulations/[uuid]/page.tsx` (the `fetchMetrics` effect; the local state variables and `SimulationConfigTab` props are still named `metrics` / `selectedMetrics` / `onMetricsChange` for internal naming continuity — only the API surface uses `evaluators`).
+- **Save payload (`PUT /simulations/{uuid}`) is `evaluators: selectedMetrics.map((m) => ({ evaluator_uuid: m.uuid }))`**. The backend's `SimulationUpdate` / `SimulationCreate` / `EvaluatorRef` use `model_config = ConfigDict(extra="forbid")`, so any other key (the legacy `metric_uuids`, plain `metrics`, a flat `metric_uuid` array, etc.) now produces a **422** instead of being silently dropped. `m.uuid` here is already the evaluator's UUID — the picker is populated from `/evaluators?include_defaults=true`, so we never accidentally send a legacy `metrics.uuid` row. Sending one (e.g. via stale local state) returns a **400** with the migrated `evaluator_uuid` to use.
+- **Hydration on load** reads from `data.evaluators` on the `GET /simulations/{uuid}` response (the response field renamed from `metrics` → `evaluators` to match the new join table `simulation_evaluators`). Each row has `{ uuid, name, description, ... }` where `uuid` is the evaluator's stable UUID — the same value that gets sent back as `evaluator_uuid` on the next PUT. The local row type is `EvaluatorData` (was `MetricData`).
+- **Already-selected evaluators on existing simulations are preserved** even if they don't pass the new `evaluator_type === "simulation"` filter: `selectedMetrics` is hydrated from `data.evaluators` on load (separate from the picker list), so legacy non-simulation evaluators that were saved on a simulation before this filter existed are still rendered as selected chips. Only the *available-to-add* list is filtered.
 
 **Selection Limits:**
 
@@ -742,20 +892,35 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
 
   - Displays below status pills and above simulation results
   - **Tab structure**: For voice simulations with metrics, shows Results/Performance/Latency tabs on mobile, Performance/Latency tabs on desktop
-  - **Metrics shown**:
-    - Performance: Tool calls accuracy, answer completeness, assistant behavior, question_completeness, stt_llm_judge (percentage display)
-    - Latency: STT/LLM/TTS TTFB and processing time (millisecond/second display)
-  - Calculated from `runData.metrics` or derived from individual simulation `evaluation_results`
+  - **Metrics shown** (cards rendered from `runData.metrics`):
+    - Performance: one card per attached evaluator. Card label is the evaluator name (the dict key in `runData.metrics`); card value depends on `metric.type`:
+      - `rating` → **`{mean}/{scale_max}`** (e.g. `3.0/5`); falls back to just `parseFloat(mean.toFixed(2))` if `scale_max` is missing.
+      - `binary` and anything else / older runs without `type` → **`Math.round(mean * 100)%`** (e.g. `0%`, `100%`). Binary intentionally renders as a percent, not `passCount/total`, to keep parity with the legacy display and with built-ins like `tool_calls` / `answer_completeness` / `stt_llm_judge` that ship without a `type`.
+    - Latency: STT/LLM/TTS TTFB and processing time (millisecond/second display) — unchanged, driven by hardcoded `latencyKeys` and unaffected by `metric.type`.
+  - **Evaluator descriptions and linking**: when an evaluator description is available, overall metric cards show an info-icon `Tooltip` beside the evaluator/metric name (same pattern as the built-in `stt_llm_judge` description), not a muted text line inside the card. Descriptions are resolved from `runData.evaluators[].description` first, then `simulation_results[].evaluation_results[].description`; both are job snapshot fields and may be null for older runs. Missing descriptions render as no icon. Authenticated pages also wrap the entire card in `<Link href="/evaluators/{uuid}">` when an evaluator UUID is resolvable for a metric name (not just the label). The card adds `group block hover:border-foreground/40 hover:bg-muted/30 transition-colors cursor-pointer` for the hover affordance, and a small external-link arrow SVG pinned to `ml-auto` in the label row darkens on `group-hover:text-foreground`. Built-in keys like `stt_llm_judge` (no UUID) keep the plain `<div>` rendering — no arrow, no hover, no link. The shared `SimulationMetricsGrid` mirrors this behaviour when a caller passes `evaluatorUuidByName`; the public `/public/simulation-run/{token}` page intentionally omits the prop (the `/evaluators/{uuid}` route is authenticated and would 404 anonymous viewers) but still passes `evaluatorDescriptionByName`.
+  - **`evaluatorUuidByName` resolution** (auth page, `useMemo` over `runData` + the parent-simulation fetch). Resolution priority:
+    1. **`runData.evaluators?: { evaluator_uuid, name }[]`** (top-level, newer runs) — rename-safe live `name` keyed to a stable `evaluator_uuid`.
+    2. **`simulation_results[i].evaluation_results[].evaluator_uuid`** (per-row, newer runs) — scanned for any name not yet in the map.
+    3. **`simulationEvaluatorUuidByName`** — populated from the parent simulation's config (`GET /simulations/{uuid}` → `data.evaluators[].{ uuid, name }`, the same fetch used to set the page title). This is the only path that works for **older runs that have neither (1) nor (2)** and is the reason the run page already calls `/simulations/{uuid}` — it's an existing fetch, not a new round-trip.
+    4. Older runs whose backend doesn't return any of (1)–(3), or whose evaluators were detached after the run, fall through to plain-text labels (no arrow, no hover, no link).
+    - **Gotcha**: paths (2) and (3) are matched by **name**, so renaming an evaluator after a run was created can mis-link to the *current* evaluator with that name. Path (1) is rename-safe (uses the live `evaluator_uuid` field directly).
+  - **Defensive numeric coercion** (gotcha): `metric.mean`, `metric.values[]`, and `evaluation_results[].value` are typed as `number` but the backend has been observed to serialize decimal columns as **strings** on some responses. `formatOverviewMetricValue` (auth page) and `formatMetricCardValue` (`SimulationMetricsGrid`) therefore wrap every read with `Number(...)` + `Number.isFinite(...)` before calling `.toFixed(...)` or comparing against `1`. Without this, the public page crashed at runtime with `val.toFixed is not a function` (rating branch) and binary `Pass/Fail` mis-rendered because `"1" === 1` is `false`. Apply the same coercion if you add new arithmetic over these fields.
+  - Calculated from `runData.metrics` or derived from individual simulation `evaluation_results` for legacy latency-only fallbacks
 
 - **Per-Simulation Results Table** (shows intermediate results as each simulation completes):
+
+  - **Per-cell value formatter** (shared between desktop and mobile, lives as the `formatRowMetricValue` callback on the page):
+    - `metric.type === "rating"` → numeric `value/scale_max` chip with neutral `text-foreground` styling (e.g. `4.0/5`); falls back to just `value.toFixed(2)` if `scale_max` is missing. Pass/Fail does not apply to scalar scores.
+    - `metric.type === "binary"` (or older runs without `type`) → green `Pass` / red `Fail` badge based on `value === 1`. This preserves the legacy rendering for runs predating the typed-metrics migration.
+    - `stt_llm_judge` / `stt_llm_judge_score` is handled by the caller (special-cased above this formatter) and renders as `{percentage}%`. Keep that local `isSttLlmJudge` branch in both desktop rows and mobile cards even if description rendering changes; otherwise mobile cards can crash at runtime or fall through to Pass/Fail rendering. The mobile view reuses the same chip but rewrites `px-2.5 py-1 rounded-md` → `px-2 py-0.5 rounded` for the tighter compact card layout.
 
   - **Desktop** (`hidden md:block`): Table with columns for play button, persona, scenario, and metric columns
 
     - Persona + Scenario combination
-    - Individual metric scores (Pass/Fail with tooltips showing reasoning)
-    - Metric columns derived from `runData.metrics` keys, or from `simulation_results[].evaluation_results` when metrics is null
+    - Individual metric scores rendered via `formatRowMetricValue` with reasoning tooltips
+    - Metric columns derived from `runData.metrics` keys, or from `simulation_results[].evaluation_results` when metrics is null. Column headers show metric keys only; do not render evaluator descriptions in desktop table headers or mobile result-card metric rows. Evaluator descriptions belong only in the Overall Metrics cards as tooltip icons.
     - Latency metrics (stt/ttft, llm/ttft, etc.) are excluded from the table (shown in latency tab instead)
-    - `stt_llm_judge_score` displayed as percentage, other metrics as Pass/Fail
+    - `stt_llm_judge_score` displayed as percentage; rating evaluators displayed as `value/max`; binary / legacy evaluators as Pass/Fail
     - View transcript button (only shown for rows with transcript history; available even while evaluation is pending)
     - Audio playback (for voice simulations)
     - **Processing state**: Rows with `evaluation_results: null` (and not aborted) show spinners in metric cells (yellow if has transcript/processing, gray if waiting) and a spinner beside the play button. Aborted rows show "N/A" in metric cells instead
@@ -766,7 +931,7 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
     - **Scenario section**: "Scenario" label (text-xs muted) with value below (text-sm font-medium)
     - Visual separator (border-bottom) between info sections and metrics
     - **Metrics section**: "Metrics" heading (text-xs font-semibold) followed by metric list
-    - Each metric shows: spinner (if processing), "N/A" (if aborted), percentage (for stt_llm_judge), or Pass/Fail badge with info icon
+    - Each metric shows: spinner (if processing), "N/A" (if aborted), percentage (for stt_llm_judge), `value/max` chip (rating), or Pass/Fail badge with info icon (binary / legacy)
     - Metrics displayed as list items with label/value pairs (border-bottom separators)
     - "View Transcript" button at bottom (full-width, only shown when transcript exists)
     - Processing state indicator: button text changes to "Processing..." when evaluation pending
@@ -2002,7 +2167,7 @@ Key styling:
 
 // TestRunnerDialog / BenchmarkResultsDialog - Three-panel with mobile navigation
 <div className="fixed inset-0 z-50 flex items-center p-0 md:p-4">
-  <div className="w-full max-w-7xl h-full md:h-[80vh] rounded-none md:rounded-xl flex flex-col">
+  <div className="w-full max-w-[92rem] h-full md:h-[92vh] rounded-none md:rounded-xl flex flex-col">
     {/* Header with stats (desktop only) */}
     <div className="px-4 md:px-6 py-3 md:py-4 border-b">
       <h2>Test Status</h2>
@@ -2031,11 +2196,22 @@ Key styling:
         </div>
       </div>
 
-      {/* Right panel - evaluation criteria (w-72), desktop only, shown only after test completes */}
+      {/* Right panel - evaluators / expected tool calls (w-[32rem]), desktop only,
+          shown only after test completes. On mobile this content is rendered
+          inline at the bottom of the middle panel by `TestDetailView`
+          (md:hidden) so small screens don't lose per-evaluator detail. */}
       {selectedResult && (selectedResult.status === "passed" || selectedResult.status === "failed") && (
-        <div className="hidden md:flex w-72 border-l border-border flex-col overflow-hidden">
+        <div className="hidden md:flex w-[32rem] border-l border-border flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto">
-            <EvaluationCriteriaPanel evaluation={testCase?.evaluation} testType={testCase?.evaluation?.type} />
+            <EvaluationCriteriaPanel
+              evaluation={testCase?.evaluation}
+              testCaseEvaluators={testCase?.evaluators}
+              judgeResults={result.judge_results}
+              reasoning={result.reasoning}
+              scaleByEvaluatorUuid={scaleByEvaluatorUuid}
+              legacyDefaultEvaluator={defaultNextReplyEvaluator}
+              enableEvaluatorLinks={!isPublicSharePage}
+            />
           </div>
         </div>
       )}
@@ -2046,11 +2222,11 @@ Key styling:
 
 **Key patterns:**
 
-- **Dialog height**: `h-[95vh]` on mobile (more space), `h-[85vh]` on desktop
+- **Dialog height**: `h-[95vh]` on mobile (more space), `h-[85vh]` on desktop for create/edit form dialogs; runner dialogs use full mobile height and `md:h-[92vh]`
 - **Dialog margin**: `mx-2` on mobile (tight), `mx-4` on desktop
 - **Border radius**: `rounded-xl` on mobile, `rounded-2xl` on desktop
 - **Layout direction**: `flex-col` on mobile (vertical), `flex-row` on desktop (horizontal)
-- **Panel widths**: `w-full` on mobile, fractional widths on desktop (`w-2/5`, `w-3/5`)
+- **Panel widths**: `w-full` on mobile, fractional widths on desktop for form dialogs (`w-2/5`, `w-3/5`); runner dialogs use fixed `md:w-80` left column, flexible middle column, and fixed `w-[32rem]` evaluator column
 - **Padding**: `p-4 md:p-6` throughout
 - **Button sizing**: `h-9 md:h-10`, `px-4 md:px-5`
 - **Text sizing**: `text-sm md:text-base`
@@ -2068,7 +2244,7 @@ Key styling:
 - **Metrics sidebar**: Full-page slide-in for add/edit metrics
 - **AddToolDialog**: Full-page slide-in for add/edit tools
 - **AddTestDialog**: Large centered modal for add/edit tests (fully responsive)
-- **BulkUploadTestsModal**: Centered modal for bulk CSV upload of tests (type selection, file upload with drag-and-drop, optional agent assignment with multi-select)
+- **BulkUploadTestsModal**: Centered modal for bulk CSV upload of tests (type selection, file upload with drag-and-drop, parsed-tests preview with per-row table, optional agent assignment with multi-select). The dialog grows from `max-w-xl` → `max-w-5xl` with a `transition-[max-width]` animation once the CSV parses successfully so the rich preview table has room to breathe — see "Bulk upload tests via CSV" in section 5 for the full contract.
 - **TestRunnerDialog**: Test results viewer with three-panel layout on desktop (test list | conversation | evaluation criteria), two-panel mobile navigation
 - **Simulation Run Page**: `/simulations/[uuid]/runs/[runId]` - Responsive tabs (3 tabs on mobile: Results/Performance/Latency, 2 tabs on desktop: Performance/Latency), conditional content display, reduced font sizes on mobile
 - **BenchmarkResultsDialog**: Benchmark results viewer with three-panel layout on desktop (providers/tests | conversation | evaluation criteria), two-panel mobile navigation (same patterns as TestRunnerDialog)
@@ -2088,7 +2264,7 @@ Key styling:
 - For multi-panel views, implement mobile navigation with hide/show panels and back buttons
 - Stats/summary info should show in header on desktop only (mobile stats removed for cleaner UI in TestRunnerDialog)
 - Middle panel in three-panel layouts needs proper flex structure: `flex-col overflow-hidden` parent, `flex-shrink-0` for fixed sections, `flex-1 overflow-y-auto` for scrollable content
-- Third column (evaluation criteria) is desktop-only (`hidden md:flex`), fixed width `w-72`, with `border-l border-border`; only rendered when a test is selected
+- Third column (evaluators / expected tool calls) is desktop-only (`hidden md:flex`), fixed width `w-[32rem]`, with `border-l border-border`; only rendered when a test is selected. The left list stays `md:w-80`, and when the runner shell grows wider the extra width should go to the third column, not the first two. On mobile the same content is inlined at the bottom of the middle panel by `TestDetailView` via a `md:hidden` `JudgeResultsList` block, so per-evaluator detail isn't lost on small screens
 - Use `useSidebarState()` hook from `@/lib/sidebar` for sidebar state - handles hydration-safe initialization (prevents SSR mismatch and mobile flash)
 - **Mobile touch handling for interactive lists**: Use `<button>` elements instead of `<div>` with `onClick` for list items to ensure reliable touch events on mobile. Add both `onClick` and `onTouchEnd` handlers for maximum compatibility. Include `type="button"` to prevent form submission and `w-full` to make entire area tappable. Example: TestRunnerDialog's TestListItem component
 
@@ -2166,7 +2342,7 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
 - **Tabs**: Settings and Dataset tabs use `text-sm md:text-base` with `gap-4 md:gap-6`
 - **Tab state preservation**: Both tab panels stay mounted in the DOM using `className="hidden"` to toggle visibility (not conditional rendering). This prevents uploaded files and entered data from being lost when switching between Dataset and Settings tabs
 - Both components use the same tab layout:
-  - **Settings tab**: Language selection dropdown + provider selection (responsive: table on desktop, cards on mobile)
+  - **Settings tab**: Language selection dropdown + provider selection (responsive: table on desktop, cards on mobile) + evaluator selection (`MultiSelectPicker`)
   - **Dataset tab**: Sample rows + add sample button (TTS also has CSV upload with OR divider and sample download)
 - **Provider selection UI** (responsive):
   - **Desktop** (`hidden md:block`): Table with border, rounded corners (`border border-border rounded-lg`)
@@ -2181,6 +2357,12 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
     - Each card shows checkbox + provider label + website link icon in a row, with model name (`font-mono truncate`) below
     - Selected state uses `border-foreground/30 bg-muted/30`, unselected uses `border-border hover:bg-muted/20`
   - Shows "(X selected)" count next to the header title
+- **Evaluator selection** (sits below provider selection in the Settings tab):
+  - Both `SpeechToTextEvaluation` and `TextToSpeechEvaluation` fetch `GET /evaluators?include_defaults=true` on mount and **filter client-side to `evaluator_type === "stt"`** (or `"tts"` for TTS) before mapping to `PickerItem`s. Same pattern as the simulation Config tab metrics picker, except the filter type is per-page. Other evaluator types (LLM, simulation, and the opposite of stt/tts) are excluded.
+  - Rendered using the shared `MultiSelectPicker` component (the same one used for personas/scenarios/metrics on the simulation Config tab) with `placeholder="Choose one or more evaluators"` and `searchPlaceholder="Search evaluators"`. Header reads "Select evaluators" with an inline "(X selected)" count, matching the providers section pattern.
+  - **Defaults pre-selected on first load**: after the fetch resolves, `selectedEvaluators` is initialized to all evaluators with `!owner_user_id` (the same "is default" check used by the `/evaluators` page tab partition). User-owned ("My") evaluators of the matching type are listed but unselected.
+  - **At least one evaluator required**: clicking Evaluate with zero selected sets `evaluatorsInvalid`, switches to the Settings tab, and renders a red border around the section (`bg-red-500/10 border border-red-500`) — same visual treatment used for the providers section. The `MultiSelectPicker`'s `onSelectionChange` is wrapped (`handleEvaluatorsChange`) to clear the invalid state as soon as the user adds one back. The validation runs *after* the providers check, so the red border appears one-at-a-time.
+  - **Sent to the backend** as `evaluator_uuids: string[]` on `POST /[stt|tts]/evaluate` in both inline and dataset input modes.
 - **STT Dataset rows** (responsive, DRY pattern):
   - **Desktop** (`hidden md:flex`): Single horizontal row with row number, audio player/upload, text input, delete button
   - **Mobile** (`md:hidden`): Stacked layout — row number + delete button on top, full-width audio upload/player, full-width text input
@@ -2191,8 +2373,9 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
 - **STT ZIP upload section**: `w-full md:w-2/3 md:mx-auto` — full width on mobile, 2/3 centered on desktop. Buttons stack vertically on small screens (`flex-col sm:flex-row`)
 - **TTS CSV upload section**: Buttons stack vertically on small screens (`flex-col sm:flex-row`)
 - **Providers start unselected by default** - user must select at least 1 provider before evaluating
-- Evaluate button always enabled; clicking without providers shows red border around provider selection and switches to Settings tab
-- On submit: calls `POST /[tts|stt]/evaluate`, then redirects to `/[tts|stt]/{uuid}` using the returned `task_id`
+- **Evaluators start with the type-matching defaults pre-selected** (see "Evaluator selection" above) — at least 1 is required to evaluate
+- Evaluate button always enabled; clicking without providers (or without evaluators) shows a red border around the offending section and switches to the Settings tab. Providers are checked first, so the red border appears on one section at a time.
+- On submit: calls `POST /[tts|stt]/evaluate` with `providers`, `language`, `evaluator_uuids`, and either `dataset_id` or (`audio_paths`/`texts` + optional `dataset_name`); then redirects to `/[tts|stt]/{uuid}` using the returned `task_id`
 - Uses `BackHeader` component for back navigation to list page
 
 **Detail Page:**
@@ -2203,75 +2386,143 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
 - Uses `BackHeader` component for back navigation
 - Uses `StatusBadge` component with `showSpinner` for status display
 - Results are at **top level** (`provider_results`, `leaderboard_summary`) - different from `/jobs` API!
-- Displays results in tabs (Leaderboard, Outputs, About) when done
+- Displays results in tabs once provider results exist. `Outputs` is always available; `Leaderboard` and `About` are only shown once leaderboard data is available (`status === "done"` with `leaderboard_summary`). If the URL contains `?tab=leaderboard` or `?tab=about` before those tabs are available, derive a displayed tab that falls back to `outputs` so the page doesn't render an empty tab state.
+- **Shared result rendering**: Authenticated (`/stt/[uuid]`, `/tts/[uuid]`) and public share (`/public/stt/[token]`, `/public/tts/[token]`) pages now reuse the same render components from `src/components/eval-details/EvaluationRunDetails.tsx`. Use `STTEvaluationLeaderboard` / `TTSEvaluationLeaderboard`, `STTEvaluationOutputs` / `TTSEvaluationOutputs`, and `STTEvaluationAbout` / `TTSEvaluationAbout` for result UI instead of duplicating page-local Leaderboard / Outputs / About JSX. The pages should only own shell concerns (auth vs public layout, data fetching, title/pills, tab state) and small page-specific row shaping such as making evaluator names clickable on private pages but plain text on public pages.
+- **Dynamic per-evaluator columns** — every section that previously rendered a single generic judge column / chart / metric is now driven by an `evaluatorColumns: { key, label, outputType, scoreField, reasoningField }[]` array, exported from `@/components/eval-details` as `STTEvaluatorColumn` / `TTSEvaluatorColumn`. Each column carries the live `label` (the evaluator's `name` from the API), the cell-renderer `outputType` (`"binary"` | `"rating"`), and explicit `scoreField` / `reasoningField` row-data column names so the shared output tables don't need to know which API format produced the row. Resolution rules (in priority order):
+  1. **`evaluator_runs` (new format, preferred)**: take the first provider's non-empty `evaluator_runs` array. One column per entry — `key = run.metric_key`, `label = run.name ?? run.metric_key`, `outputType` from `run.aggregate?.type`, `scoreField = run.metric_key` (the new CSV column has **no** `_score` suffix), `reasoningField = `${run.metric_key}_reasoning``. No fetch is required: the live name, snapshotted description, stable UUID, type and `aggregate.scale_min` / `scale_max` all come straight from the response.
+  2. **Legacy `_info` format**: scan the first provider's `metrics` for `${prefix}_info` keys (skipping the well-known scalar/latency fields — `wer` / `string_similarity` / `llm_judge_score` for STT; `llm_judge_score` / `ttfb` / `processing_time` for TTS). Each match becomes one column with `key = prefix`, `outputType` from `info.type`, `label` resolved by name from `aboutEvaluators` (raw `prefix` while the about-fetch is still in flight, then upgraded once it lands), and `scoreField = `${prefix}_score`` / `reasoningField = `${prefix}_reasoning``.
+  3. **Legacy single-evaluator fallback** (no `evaluator_runs`, no `*_info` keys): emit one synthetic column with `key: "llm_judge"` and `scoreField: "llm_judge_score"` / `reasoningField: "llm_judge_reasoning"`. Authenticated pages label this with the default evaluator's `name` from `GET /evaluators?include_defaults=true`; public pages fetch public-safe default evaluator metadata via `getPublicDefaultEvaluator(backendUrl, shareToken, "stt" | "tts")`. Use API-provided `name`, `description`, `output_type`, and rating scale config for this fallback. Do not hardcode default evaluator names or descriptions in STT/TTS pages; if neither the job payload nor the default-evaluator endpoint provides a description, render the description as empty.
+
+  These columns drive:
+  - the shared **Leaderboard** components (`STTEvaluationLeaderboard` / `TTSEvaluationLeaderboard`) — one column/chart per evaluator; STT puts `WER` first, TTS puts `TTFB (s)` last,
+  - the shared **Leaderboard charts** — one bar chart per evaluator with `dataKey: col.scoreField ?? `${col.key}_score`` (which equals `metric_key` in the new format, `${prefix}_score` in legacy `_info`, `llm_judge_score` in legacy single-evaluator), `yDomain: [0, 1]` for binary evaluators and auto-fit for rating evaluators, plus the latency charts (paired into rows of 2 via a small `for (let i = 0; i < charts.length; i += 2)` packing),
+  - the per-provider `ProviderMetricsCard` rows rendered by `STTEvaluationOutputs` / `TTSEvaluationOutputs` — one row per evaluator (alongside the latency rows). The mean is resolved by `readProviderEvaluatorMean(col, providerResult)` from `src/lib/evaluatorMetrics.ts`, which walks three sources in order: `provider_results[i].evaluator_runs[*].aggregate.mean` where `metric_key === col.key`, then `metrics[col.scoreField]` as a flat number, then `metrics[col.key].mean` for the new-format nested object,
+  - the **Outputs** per-provider results-table columns inside `STTResultsTable` / `TTSResultsTable` (see the `evaluatorColumns?: STTEvaluatorColumn[]` / `TTSEvaluatorColumn[]` props below).
+
+  `STTResultsTable` / `TTSResultsTable` accept the same shape — `{ key, label, outputType, scoreField?, reasoningField? }[]`. When passed, each evaluator gets its own `<th>` and `<td>` (plus a per-evaluator section in the mobile card), routed through a shared `EvaluatorScoreCell`: a Pass/Fail badge for binary evaluators and a 4-dp numeric value for rating evaluators. The cell reads `result[col.scoreField ?? `${col.key}_score`]` and `result[col.reasoningField ?? `${col.key}_reasoning`]`, so callers pick the column convention (new format passes `metric_key` directly; legacy `_info` and the synthetic `llm_judge` fallback rely on the templated default). Both tables still expose the legacy `judgeLabel?: string` prop (defaulting to a generic `"Evaluator"`) which is **only** used when `evaluatorColumns` is omitted entirely; pages should pass the default evaluator's API-derived name whenever they are in the legacy single-evaluator path. The chip row above the tabs (language / dataset / status / share) intentionally **does not** render any evaluator pill — evaluators are surfaced via these columns and via the About-tab rows (below).
+
+- **`showMetrics` gating** — the metrics columns / per-row Pass/Fail rendering only kicks in once every dynamic evaluator column has produced a non-empty score in the row (read at `r[col.scoreField ?? `${col.key}_score`]`, so it covers `metric_key` in the new format, `${prefix}_score` in legacy `_info`, and `llm_judge_score` in legacy single-evaluator). STT additionally requires `wer` to be populated; TTS doesn't require any non-evaluator field. Status `"done"` short-circuits this check. While polling, partially completed rows therefore defer their evaluator columns until the whole batch lands.
+
+- **About-tab evaluators (one row per attached evaluator)** — the About tab no longer hardcodes a single generic judge row. After the eval result has loaded, an effect computes the rendered evaluator list from the most authoritative source available, in priority order:
+  1. **`evaluator_runs` (new format, preferred)**: derive `aboutEvaluators` directly from the first provider's non-empty `evaluator_runs`. Each entry becomes one `EvaluatorAbout` with `uuid = run.evaluator_uuid`, `name = run.name ?? run.metric_key`, `description = run.description ?? ""`, `outputType` from `aggregate.type`, and `scaleValues` synthesized from `aggregate.scale_min` / `aggregate.scale_max` (a 2-element array, or 1-element when min === max). No `/evaluators/{uuid}` fetch is required — the response already carries the live name, stable UUID, one-line description and rating bounds.
+  2. **Legacy `_info` / `evaluator_uuids` paths**: take the **union** of UUIDs from `evaluationResult.evaluator_uuids` (filtered against the already-fetched `EvaluatorSummary[]` to drop deleted-or-not-fetched evaluators) and UUIDs resolved by **name** from each `${prefix}_info` key in the first provider's `metrics` (using the same key skip-list as `evaluatorColumns`). This is the only path that needs to hit `GET /evaluators/{uuid}` in parallel via `Promise.all` — to read `description`, `output_type` and `live_version.output_config.scale`, which the list endpoint isn't guaranteed to include.
+  3. **Truly legacy fallback** (no `evaluator_runs`, no `evaluator_uuids`, no `*_info` keys): the default STT/TTS evaluators (`sttEvaluators.filter(e => e.isDefault)` / `ttsEvaluators.filter(e => e.isDefault)`) so the tab still has at least one row.
+
+  The reduced shape stored in `aboutEvaluators: EvaluatorAbout[]` is `{ uuid, name, description, outputType, scaleValues: number[] }`. For the legacy fetch path, `scaleValues` is `scale[].value` mapped through `Number()` and filtered to drop non-numeric entries (string-valued rating scales fall through to the `"-"` fallback below). Each evaluator becomes one row in `AboutMetricsTable` with:
+    - **metric**: on authenticated pages, the evaluator name rendered as `<Link href="/evaluators/[uuid]">`; on public share pages, plain evaluator text only (anonymous users should not be sent to authenticated evaluator routes),
+    - **description**: the evaluator's one-line `description` from the job snapshot when present, then default-evaluator API metadata for legacy default fallback rows, otherwise `""`. Do not introduce hardcoded fallback sentences such as semantic-match / TTS correctness copy.
+    - **preference**: `"Pass is better"` for binary, `"Higher is better"` for rating,
+    - **range**: `"Pass / Fail"` for binary, otherwise the result of `ratingRange(scaleValues)` — which returns `"min - max"` (or just `"5"` when min === max, or `"-"` when no numeric scale entries exist).
+
+  The non-evaluator rows around these dynamic rows are owned by the shared About components: `STTEvaluationAbout` always prepends the **WER** row, and `TTSEvaluationAbout` always appends the **TTFB** row. Public STT/TTS pages should not reintroduce their old legacy About rows (`String Similarity`, STT `TTFB`, STT/TTS `Processing Time`) because that would diverge from the private result view. `MetricDescription.metric` and `MetricDescription.description` in `src/components/eval-details/AboutMetricsTable.tsx` are both typed as `React.ReactNode`; pass `key` when `metric` is JSX so desktop rows and mobile cards have a stable React key.
+
+- **Note:** `evaluatorColumns` (drives the per-row / per-provider / leaderboard rendering) and `aboutEvaluators` (drives the About-tab rows) describe the same set of evaluators. In the new format both are derived from the same `evaluator_runs` source so they stay in sync automatically; in the legacy paths they're computed independently and rely on the column derivation seeing the same `*_info` keys that the About-tab UUID union sees. The legacy `defaultEvaluator` / `judgeLabel` derived from default evaluator APIs is only used as the **fallback** label/description source for legacy single-evaluator jobs (no `evaluator_runs`, no `*_info` keys).
 - **Responsive design**: Uses `space-y-4 md:space-y-6` throughout, chart grids are `grid-cols-1 md:grid-cols-2`, leaderboard sections use full-width responsive containers (see "Evaluation & Simulation Pages Responsive Spacing" section above). Outputs tab uses `flex-col md:flex-row` for stacked-on-mobile / side-by-side-on-desktop. About tab uses `hidden md:block` table + `md:hidden` card layout. Results use desktop table (`hidden md:block`) + mobile cards (`md:hidden`) pattern
 
 **Key differences between TTS and STT:**
 
 - **STT Input tab**: Audio file upload (.wav) + reference transcription text field
 - **TTS Input tab**: Text input field + CSV upload option with "OR" divider and sample CSV download
-- **STT metrics**: WER, String Similarity, LLM Judge (NO latency metrics)
-- **TTS metrics**: LLM Judge, TTFB (latency metrics are objects with `mean`, `std`, `values`; Processing Time removed from UI)
-- **Null-safe metric rendering**: Numeric metrics (string_similarity, wer, llm_judge_score, ttfb.mean) can be null. Always check before formatting: `value != null ? parseFloat(value.toFixed(4)) : "-"`. Use `parseFloat()` wrapper to remove trailing zeros. Max 4 decimal places for all metrics to prevent column overflow
-- **STT Outputs tab**: Shows Ground Truth vs Prediction text; metrics columns (WER, String Similarity, LLM Judge) shown when status is "done" OR when all rows have metrics available. Rows with empty predictions are highlighted with `bg-red-500/10` and show "No transcript generated" in muted text
-  - **Desktop table layout**: Uses `table-fixed` with explicit column widths — ID: `w-12`, Ground Truth/Prediction: dynamic widths based on `showMetrics` (`w-[30%]` when metrics visible, `w-[calc(50%-24px)]` when hidden so columns expand to fill space during streaming). Text columns use `break-words` for wrapping. Wrapped in `hidden md:block`
-  - **Mobile card layout**: `md:hidden` card list — each result is a bordered `rounded-xl` card showing: row number + Pass/Fail badge header, Ground Truth section, Prediction section, then WER/Similarity metrics and LLM Judge reasoning below a border separator
-  - **Empty prediction detection**: Helper functions `hasEmptyPredictions()` and `getFirstEmptyPredictionIndex()` check for rows without transcripts. Provider status shows red X if any empty, and clicking scrolls to first empty row via `data-row-index` attribute
-- **TTS Outputs tab**: Shows text input with audio playback; LLM Judge column shown when status is "done" OR when all rows have metrics available
-  - **Desktop table layout**: Uses `table-fixed` with explicit column widths — ID: `w-12`, Text: `w-[25%]` when LLM Judge visible, Audio: `w-[50%]` when LLM Judge visible (wider to give audio player more room), both `w-[calc(50%-24px)]` when hidden so columns expand during streaming. Audio uses `min-w-[280px]`. Wrapped in `hidden md:block`
-  - **Mobile card layout**: `md:hidden` card list — each result card shows: row number + Pass/Fail badge header, Text section, Audio player (full-width, no min-width constraint), and LLM Judge reasoning inline
-- **LLM Judge display**:
-  - **Desktop**: Pass/Fail badges (green/red) with info icon button (ⓘ) that shows reasoning via `Tooltip` component on hover (falls back to "Score: X" if no reasoning)
-  - **Mobile**: Pass/Fail badge shown in card header (top-right). LLM Judge reasoning is displayed directly as inline text below the metrics/audio in each card (labeled "LLM Judge Reasoning"), since hover tooltips don't work on touch devices. Only shown when `llm_judge_reasoning` exists
-  - **Parsing**: Backend returns `"True"`/`"False"` strings (or `"1"`/`"0"`). Convert to lowercase, Pass when value is `"true"` or `"1"`
+- **STT metrics**: WER + one column per attached evaluator (NO latency metrics). Both authenticated and public STT result pages now go through `STTEvaluationOutputs`, which passes `showSimilarity={false}` to `STTResultsTable`; don't add `String Similarity` back to the public page as a one-off.
+- **TTS metrics**: One column per attached evaluator + TTFB (TTFB / Processing Time are `LatencyMetric` objects with `mean`, `std`, `values`; Processing Time is excluded from the UI)
+- **Null-safe metric rendering**: Numeric metrics (`wer`, `${name}_score` per evaluator, `ttfb.mean`) can be null. Always check before formatting: `value != null ? parseFloat(value.toFixed(4)) : "-"`. Use `parseFloat()` wrapper to remove trailing zeros. Max 4 decimal places for all metrics to prevent column overflow. Shared formatting helpers live in `src/lib/evaluatorMetrics.ts` (`formatMetricValue`, `readProviderEvaluatorMean`) and are consumed by `EvaluationRunDetails.tsx`; don't add page-local copies.
+- **STT Outputs tab**: Shows Ground Truth vs Prediction text; metrics columns (WER + one column per attached evaluator) shown when status is "done" OR when all rows have metrics available (see "`showMetrics` gating" above). Rows with empty predictions are highlighted with `bg-red-500/10` and show "No transcript generated" in muted text
+  - **Desktop table layout**: Uses `table-fixed` + `w-full` with **fixed pixel widths** for every column (set via inline `style={{ width }}` from a single `STT_COL_WIDTHS` constant inside `STTResultsTable`): `id: 40`, `audio: 180` (when present), `text: 280` (Ground Truth and Prediction each — no longer percentage-based), `wer: 80`, `similarity: 110` (when shown), `evaluator: 130` (per attached evaluator), `llmJudge: 110` (legacy single-evaluator fallback). Text columns use `break-words` for wrapping. The table also carries `style={{ minWidth: tableMinWidth }}` computed as the sum of the visible column widths, so the table grows past the container when there are many evaluators and the wrapping `<div className="overflow-x-auto">` (parent `<div className="border rounded-xl overflow-hidden">`) scrolls header + body together horizontally. When the container is wider than `tableMinWidth`, `w-full` makes the table fill the container and column widths stretch proportionally. Wrapped in `hidden md:block`.
+  - **Mobile card layout**: `md:hidden` card list — each result is a bordered `rounded-xl` card showing: row number + (legacy-mode only) Pass/Fail badge header, Ground Truth, Prediction, then WER/Similarity metrics and one labeled per-evaluator section per `evaluatorColumns` entry below a border separator (rendered via `EvaluatorScoreCell` with `hideTooltipButton`, plus the reasoning text inline). The legacy single-evaluator reasoning block only renders when `evaluatorColumns` is omitted and uses the API-derived `judgeLabel`.
+  - **Empty prediction detection**: Shared helper functions `hasSTTEmptyPredictions()` and `getFirstSTTEmptyPredictionIndex()` check for rows without transcripts. Provider status shows red X if any empty. The private STT page keeps a small `onProviderSelect` wrapper around `STTEvaluationOutputs` to scroll to the first empty row via `data-row-index`; the public page uses the shared selection behavior without the auto-scroll wrapper.
+- **TTS Outputs tab**: Shows text input with audio playback; per-evaluator score column(s) shown when status is "done" OR when all rows have metrics available (see "`showMetrics` gating" above)
+  - **Desktop table layout**: Uses `table-fixed` + `w-full` with **fixed pixel widths** for every column (set via inline `style={{ width }}` from a single `TTS_COL_WIDTHS` constant inside `TTSResultsTable`): `id: 48`, `text: 240`, `audio: 300` (down from the old 50% to leave room for evaluator columns; the `<audio>` element uses just `w-full` and stretches to fill this cell — the old `min-w-[280px]` was dropped because it would force horizontal overflow inside a 300px cell), `evaluator: 140` (per attached evaluator, also used for the legacy single-evaluator fallback). The table carries `style={{ minWidth: tableMinWidth }}` computed as `id + text + audio + N * evaluator`, so the table grows past the container when there are many evaluators and the wrapping `<div className="overflow-x-auto">` (parent `<div className="border rounded-xl overflow-hidden">`) scrolls header + body together horizontally. When the container is wider than `tableMinWidth`, `w-full` makes the table fill the container and column widths stretch proportionally. Wrapped in `hidden md:block`.
+  - **Mobile card layout**: `md:hidden` card list — each result card shows: row number + (legacy-mode only) Pass/Fail badge header, Text section, Audio player (full-width, no min-width constraint), and one labeled per-evaluator section per `evaluatorColumns` entry below a border separator. The legacy single-evaluator reasoning block only renders when `evaluatorColumns` is omitted and uses the API-derived `judgeLabel`.
+- **Per-evaluator score display**:
+  - **Desktop**: Each evaluator column renders an `EvaluatorScoreCell`. Binary evaluators show a Pass/Fail badge (green/red) with the same info icon button (ⓘ) and `Tooltip`-on-hover for reasoning (falls back to `"Score: X"` if no reasoning); rating evaluators show the numeric score formatted via `parseFloat(numeric.toFixed(4))` plus the same info button. The legacy single-evaluator badge component is still present in both result tables and is used only when `evaluatorColumns` is omitted.
+  - **Mobile**: Each evaluator surfaces its own labeled section inline below the metrics block (since hover tooltips don't work on touch devices). The legacy single-evaluator reasoning sub-label only renders for the legacy-mode card (i.e. `evaluatorColumns` omitted). When `evaluatorColumns` is provided, the header pill (top-right) is intentionally suppressed — the per-evaluator pills inside the metrics block are sufficient.
+  - **Parsing**: Binary evaluators ship `"True"`/`"False"` strings per row and `1`/`0` integers in aggregate metrics. Convert to lowercase, Pass when value is `"true"` or `"1"`. Rating evaluators ship a numeric string per row and a `mean` number in aggregates — coerce via `Number(score)` then `Number.isFinite` before rendering.
 
 **Metrics Data Structure:**
 
-The `metrics` field in `ProviderResult` is a dict (not an array):
+The `metrics` field in `ProviderResult` is a dict (not an array). The shapes are intentionally open-ended via index signatures so dynamic per-evaluator keys typecheck alongside the well-known scalar / latency fields. Three on-the-wire formats exist:
+
+- **New format (preferred)** — `metrics[name]` is a nested object (`{ type, mean, scale_min?, scale_max? }`); per-row score column is just the evaluator name (no `_score` suffix); the response also carries `provider_results[i].evaluator_runs` with the live `name` / `evaluator_uuid` / `metric_key` / `aggregate`.
+- **Legacy `_info` format** — flat `metrics["{name}_score"]` (number) plus `metrics["{name}_info"]` (`{ type, mean }`); per-row column is `${name}_score`.
+- **Legacy single-evaluator format** — only `metrics.llm_judge_score`; per-row `result.llm_judge_score` / `result.llm_judge_reasoning`.
 
 ```tsx
-// STT ProviderMetrics - no latency metrics
+// One entry per attached evaluator on the provider. Only present in the
+// new format — older jobs omit `evaluator_runs` entirely.
+type EvaluatorRunAggregate = {
+  type?: "binary" | "rating" | string;
+  mean?: number;
+  scale_min?: number;            // rating evaluators only
+  scale_max?: number;            // rating evaluators only
+  [k: string]: unknown;
+};
+
+type EvaluatorRun = {
+  evaluator_uuid: string;        // stable ID — links to /evaluators/{uuid}
+  metric_key: string;            // artefact column name (== per-row CSV col, leaderboard col, metrics-dict key in the new format)
+  aggregate?: EvaluatorRunAggregate | null;
+  name?: string;                 // current human-readable name; reflects renames after the run
+};
+
+// STT ProviderMetrics — wer is a fixed scalar; every attached evaluator
+// adds either a nested `metrics[name]` object (new format) or a flat
+// `metrics["${name}_score"]` + sibling `metrics["${name}_info"]` pair
+// (legacy `_info` format). `string_similarity` / `llm_judge_score` are
+// kept typed so the public STT and legacy single-evaluator paths still
+// typecheck without `unknown` casts.
 type ProviderMetrics = {
-  wer: number;
-  string_similarity: number;
-  llm_judge_score: number;
+  wer?: number;
+  string_similarity?: number;
+  llm_judge_score?: number;
+  [k: string]:
+    | number
+    | { type?: string; mean?: number; scale_min?: number; scale_max?: number }
+    | undefined;
 };
 
-// TTS ProviderMetrics - includes latency metrics as nested objects
-type LatencyMetric = {
-  mean: number;
-  std: number;
-  values: number[];
-};
+// TTS ProviderMetrics — ttfb / processing_time are LatencyMetric objects.
+// The index signature has to allow `LatencyMetric` alongside the
+// per-evaluator scalar (`*_score`) and nested-object (`{ type, mean, ... }`)
+// shapes.
+type LatencyMetric = { mean: number; std: number; values: number[] };
 
 type ProviderMetrics = {
-  llm_judge_score: number;
-  ttfb: LatencyMetric;
-  processing_time: LatencyMetric;
+  llm_judge_score?: number;          // legacy single-evaluator fallback
+  ttfb?: LatencyMetric;
+  processing_time?: LatencyMetric;
+  [k: string]:
+    | number
+    | LatencyMetric
+    | { type?: string; mean?: number; scale_min?: number; scale_max?: number }
+    | undefined;
 };
 
-// STT LeaderboardSummary - no latency fields
+// LeaderboardSummary — one entry per provider. The dynamic per-evaluator
+// score key matches the per-row CSV column name (no `_score` suffix in the
+// new format, `${prefix}_score` in legacy `_info`, `llm_judge_score` in
+// legacy single-evaluator). STT has no TTFB/Processing Time fields; TTS
+// keeps `ttfb` / `processing_time` as direct numbers (NOT `LatencyMetric`
+// here).
 type LeaderboardSummary = {
   run: string;
   count: number;
-  wer: number;
-  string_similarity: number;
-  llm_judge_score: number;
-};
-
-// TTS LeaderboardSummary - includes latency as direct numbers
-type LeaderboardSummary = {
-  run: string;
-  count: number;
-  llm_judge_score: number;
-  ttfb: number;
-  processing_time: number;
+  // STT scalars
+  wer?: number;
+  string_similarity?: number;
+  // legacy single-evaluator fallback (both STT and TTS)
+  llm_judge_score?: number;
+  // TTS latency scalars
+  ttfb?: number;
+  processing_time?: number;
+  [k: string]: string | number | undefined;
 };
 ```
 
-- Access metrics directly: `providerResult.metrics.wer`, `providerResult.metrics.ttfb?.mean`
-- STT leaderboard has no TTFB/Processing Time charts (metrics not available)
-- TTS leaderboard includes LLM Judge Score and TTFB bar charts (Processing Time removed from UI)
+- **Aggregate reads**: prefer `evaluator_runs[i].aggregate.mean` (new format). The detail pages use `readProviderEvaluatorMean(col, providerResult)` from `src/lib/evaluatorMetrics.ts`, which walks three sources in order: `evaluator_runs` match by `metric_key === col.key`, then `metrics[col.scoreField]` as a flat number, then `metrics[col.key].mean` for the new-format nested object. Pipe the result through `formatMetricValue` from the same module for safe rendering.
+- **Per-row reads**: read at `result[col.scoreField ?? `${col.key}_score`]` and `result[col.reasoningField ?? `${col.key}_reasoning`]` — the column carries the right field names for whichever format produced it.
+- **Linking artefacts vs. UI copy**: `metric_key` is for linking to CLI/S3 artefacts (it's stable across renames); `name` is for UI copy (updates with renames). In the new format the auth detail page uses `name` for column headers and About-tab rows, and uses `evaluator_uuid` to link the About-tab pill.
+- STT leaderboard has no TTFB/Processing Time charts (metrics not available).
+- TTS leaderboard renders one bar chart per evaluator + a TTFB chart at the end (Processing Time excluded from UI).
 
 **Language-based Provider Filtering:**
 
@@ -2389,22 +2640,30 @@ const getFilteredProviders = (language: LanguageOption) => {
      - Dropdown contains: user info (name, email), theme switcher, logout button
      - Logout button clears localStorage (`access_token`, `user`), cookie (`access_token`), then calls `signOut({ callbackUrl: "/login" })`
      - Click outside closes dropdown (uses `useRef` + `mousedown` event)
-7. **Downloadable Tables**: Reusable `DownloadableTable` component for data tables with CSV export
-   - Props: `columns` (array of `{key, header, render?}`), `data`, `filename`, `title`
-   - Includes "Download CSV" button in top-right corner
-   - Used in: BenchmarkResultsDialog, STT/TTS detail pages (`/stt/[uuid]`, `/tts/[uuid]`)
-   - Custom cell rendering via optional `render` function in column definition
+7. **CSV Export**: Two complementary patterns for exporting tabular data as CSV.
+   - **`DownloadableTable`** (`@/components/DownloadableTable`): A full table component with a built-in "Download CSV" button in the top-right corner. Use when the same data should both render as a visible table and be exportable.
+     - Props: `columns` (array of `{key, header, render?}`), `data`, `filename`, `title`
+     - Custom cell rendering via optional `render` function in column definition
+     - Used in: `LeaderboardTab` (embeds the download control — STT/TTS evaluation flows on `/stt/[uuid]`, `/tts/[uuid]`, and public STT/TTS pages; **benchmark** Leaderboard tab via `BenchmarkCombinedLeaderboard` in `BenchmarkResultsDialog` and `/public/benchmark/[token]`), and other pages that need a visible grid + CSV without the chart strip
+   - **`ExportResultsButton`** (`@/components/ExportResultsButton`): A standalone CSV download button (no inline table). Use when the data is too nested/complex to render as a flat table but users still need a flat-file export — e.g. test/benchmark output with chat history and tool calls.
+     - Props: `filename`, `getRows: () => { columns, rows }` (callback evaluated at click time so the export always reflects the latest polling state), optional `disabled`, `label`, `className`
+     - Quotes/escapes commas, double quotes, and newlines per RFC 4180; `null`/`undefined` becomes empty cell; objects are JSON-stringified before quoting
+     - Shared CSV column shapes for LLM test runs and benchmarks live in `@/lib/exportTestResults` (`buildTestRunCsv`, `buildBenchmarkCsv`) so the in-app dialogs and the public share pages export identical schemas. Column order — unit-test runs: `Test name | Status | Conversation history | Agent response | Tool calls | Next reply | Error`; benchmarks: same with `Model` prepended and `Error` dropped. Two columns are populated **mutually exclusively** based on test type (`testCase.evaluation.type`, falling back to "tool_call when `output.tool_calls` is non-empty, else response"): tool-call tests fill **Tool calls** and leave Next reply empty; response tests fill **Next reply** and leave Tool calls empty. The standalone `Reasoning` column is gone — for response tests it's folded into the per-evaluator blocks in Next reply, and tool-call reasoning is intentionally not exported. Cell formats: **Conversation history** stays JSON-stringified (`historyToString`); **Tool calls** is multi-line plain text — one block per call, `Tool: <name>` + `Arguments: <json>`, blocks separated by blank lines (uses `normalizeToolCall` so historical `{name, arguments}` / `{tool, arguments}` / `{function: {…}}` shapes all render identically); **Next reply** is multi-line plain text — one block per `JudgeResult`, with a `<name>: <verdict>` line (`Pass`/`Fail` for binary; `<score> / <scale_max>` or `Score: N` for rating), an indented `Variables:` list when `variable_values` is non-empty (`  <name>: <value>` per line), and a final `Reasoning: <text>` line. Legacy response runs without `judge_results` fall back to a single `Reasoning: <top-level reasoning>` block (the historical default-`default-llm-next-reply` reasoning). Callers must pass `judgeResults` (`r.judgeResults` from `TestResult` / `tr.judge_results` from the API) into `ExportTestRow.judgeResults` / `ExportBenchmarkRow.judgeResults` so the per-evaluator structure renders.
+     - Used in: `TestRunnerDialog` and `BenchmarkResultsDialog` headers (next to `ShareButton`, desktop only via `hidden md:block`); public share pages `/public/test-run/[token]` and `/public/benchmark/[token]`.
+     - Visibility rules: only render once results exist (`testResults.length > 0` / `hasAnyResults`) and the run is done — never during loading/in-progress, since CSV columns key off the final per-test outputs.
 8. **Charts with PNG Export**: `LeaderboardBarChart` component includes built-in PNG download
    - Props: `title`, `data`, `height?`, `yDomain?`, `formatTooltip?`, `colorMap?`, `filename?`
    - "PNG" download button in top-right corner of chart card
    - Exports at 2x resolution with white background for quality
-   - Used in: BenchmarkResultsDialog, SpeechToTextEvaluation, TextToSpeechEvaluation
+   - Used in: `LeaderboardTab` (which maps each chart row to one or two `LeaderboardBarChart` instances). Benchmark UI does **not** import `LeaderboardBarChart` at the page/dialog level — it uses `BenchmarkCombinedLeaderboard` → `LeaderboardTab`. STT/TTS evaluation UIs use `STTEvaluationLeaderboard` / `TTSEvaluationLeaderboard` → `LeaderboardTab` (see `EvaluationRunDetails`). Older/alternate paths may still reference charts from `SpeechToTextEvaluation` / `TextToSpeechEvaluation` where those modules compose bar charts directly.
 9. **LLM Selector Modal**: `LLMSelectorModal` from `@/components/agent-tabs/LLMSelectorModal`
-   - Props: `isOpen`, `onClose`, `selectedLLM`, `onSelect`, `availableProviders?`
+   - Props: `isOpen`, `onClose`, `selectedLLM`, `onSelect`, `availableProviders?`, `allowedProviderSlugs?`, `requiredInputModality?`
    - Internally uses `useOpenRouterModels` hook to fetch models from OpenRouter API as the default model list
    - Shows "Loading models..." while fetching; shows error message with "Retry" button on failure. These states show whenever the effective provider list is empty (`providers.length === 0`), so they work correctly both with and without `availableProviders`
    - Optional `availableProviders` prop for filtered models (used in BenchmarkDialog to exclude already-selected models)
-   - Used in: AgentTabContent (settings), BenchmarkDialog (model comparison)
+   - `allowedProviderSlugs?: string[]` restricts the picker to a fixed list of providers (e.g. evaluator pages pass `JUDGE_PROVIDER_SLUGS` to scope judge selection to OpenAI/Anthropic/Google/Meta/Mistral/xAI/Qwen/Moonshot).
+   - `requiredInputModality?: "text" | "audio" | "image" | "video" | "file"` filters models to those whose `inputModalities` include the given modality. The evaluators pages set this to `"audio"` only for `evaluator_type === "tts"` and `"text"` otherwise (including `evaluator_type === "stt"`) — see "Judge model modality" under Evaluators (`/evaluators`) for the full rule, including the legacy fallback used on the detail page.
+   - Used in: AgentTabContent (settings), BenchmarkDialog (model comparison), Evaluators create flow (`/evaluators`), Evaluator detail new-version flow (`/evaluators/[uuid]`)
 10. **Benchmark Dialog**: `BenchmarkDialog` from `@/components/BenchmarkDialog`
     - Model selection dialog for running benchmarks comparing multiple LLM models
     - Props: `isOpen`, `onClose`, `agentUuid`, `agentName`, `tests`, `onBenchmarkCreated?`, `agentType?`, `benchmarkModelsVerified?`, `benchmarkProvider?`
@@ -2450,9 +2709,11 @@ const getFilteredProviders = (language: LanguageOption) => {
     - **BenchmarkResultsDialog intermediate results**:
       - **When in progress**: Shows Outputs view directly (no tabs visible), all providers displayed immediately
       - **When done**: Shows both Leaderboard and Outputs tabs, auto-switches to Leaderboard tab
+      - **Leaderboard tab layout**: Matches STT/TTS: one **`LeaderboardTab`** with **`Test pass rate (%)`** plus **one column per evaluator** from `model_results[].evaluator_summary` (first-seen `metric_key` order). Evaluator **`<th>` labels** and per-evaluator **chart titles** are **`name ?? metric_key`** only (no “Pass rate (%)” / “Mean …” suffix — see Shared Components ▸ **`BenchmarkCombinedLeaderboard`**). One chart grid, **two charts per row** (overall pass rate first, then per-evaluator charts; binary y-domain 0–100, rating `[scale_min, scale_max]` when finite, else `[0, 5]`). Implemented by **`BenchmarkCombinedLeaderboard`** + **`buildBenchmarkCombinedLeaderboardPayload`**. **Model** rows are deduped when **`leaderboard_summary`** and **`model_results`** use different strings for the same model (**`benchmarkCanonicalModelId`** — see Shared Components ▸ **`benchmarkEvaluatorSummary`**). Models missing a given evaluator show **—** in that column; charts only plot finite numeric values per metric (empty chart slot shows a short empty-state message when every model lacks that value).
+      - **Hooks vs early return**: `BenchmarkResultsDialog` uses `if (!isOpen) return null` after setup. Any **`useMemo` / `useCallback` / other hooks** that depend on benchmark state must run **above** that guard so the hook list is identical when the dialog is closed vs open — otherwise React reports a change in hook order. Gate memo contents with `isOpen && …` inside the hook instead of placing the hook after the return. (There is no longer a separate memo for stacked per-evaluator leaderboard sections — combined payload is derived inside `BenchmarkCombinedLeaderboard` / `buildBenchmarkCombinedLeaderboardPayload`, but the rule still applies to any future benchmark hooks.)
       - **Fully responsive**: Three-panel layout on desktop, mobile navigation (same pattern as TestRunnerDialog)
         - Mobile: Left panel (providers) and middle panel (test details) toggle visibility, back button to return to provider list; evaluation criteria panel hidden
-        - Desktop: All three panels visible — providers list (w-80) | conversation (flex-1) | evaluation criteria (w-72)
+        - Desktop: All three panels visible — providers list (`md:w-80`) | conversation (`flex-1`) | evaluators / expected tool calls (`w-[32rem]`)
         - Uses `w-full md:w-80` for left panel, conditional hiding with `${selectedTest ? 'hidden md:flex' : 'flex'}`
       - Uses expandable provider toggles (not a dropdown) in the left panel
       - Each provider section shows: provider name, processing spinner (if still running), passed/failed counts (when complete)
@@ -2498,6 +2759,7 @@ const getFilteredProviders = (language: LanguageOption) => {
       - Without proper UUIDs, React's key prop receives empty strings, causing "duplicate key" console errors
       - Solution: Generate a unique fallback key using the array index and test name: `apiResult.test_uuid || \`generated-${index}-${testName}\``
       - This ensures unique keys even when the backend doesn't provide UUIDs, while preserving real UUIDs when available
+    - **Per-evaluator verdicts** (response tests): both dialogs thread the `judge_results: JudgeResult[] | null` field straight through from the API to `TestRunOutputsPanel` / `BenchmarkOutputsPanel`, which in turn pass it (along with the top-level `reasoning`, the `test_case.evaluators` echo, and an optional `scaleByEvaluatorUuid` fallback map) to **both** `EvaluationCriteriaPanel` (the third / right column on desktop) **and** `TestDetailView` (which renders a mobile-only `JudgeResultsList` via `md:hidden` so small screens don't lose the data). Field naming: `TestRunResult.judgeResults` (camel) and `BenchmarkTestResult.judge_results` (snake to match the API). Tool-call tests have `judge_results: null` — the right column renders the expected tool calls + the top-level `reasoning` (success/failure summary), and the middle panel's tool-call output renders without an inline reasoning block (the right column already covers it). The right column dropped the visible "Type" badge — section structure (`Evaluators` heading vs `Expected Tool Calls` heading) makes the test type self-evident. Each per-evaluator card renders the evaluator name as a `next/link` to `/evaluators/{evaluator_uuid}` (legacy rows with `evaluator_uuid: null` render plain text — see `EvaluatorNameLink` in `shared.tsx`); the evaluator's one-line description is intentionally **not** rendered on the card — the link is the affordance. Per-test variable values and the rating scale are read inline from each `JudgeResult` (`result.variable_values`, `result.scale_max`); the panel keeps a single fallback to `test_case.evaluators[i].variable_values` and the caller-supplied `scaleByEvaluatorUuid` map for older snapshots that pre-date the inline-fields backend rollout. Neither dialog currently populates `scaleByEvaluatorUuid`, so rating chips for legacy snapshots fall through to amber `Score: N`; new snapshots colour green / red because `scale_max` is on the entry itself.
     - Used for: clicking past run rows in Tests tab to view historical results
 
 ### Data Fetching Pattern
@@ -2996,7 +3258,7 @@ Unit test evaluations for:
 
 - **STT**: Upload audio + transcription, compare providers
 - **TTS**: Upload text, compare provider outputs
-- Metrics: STT (WER, String Similarity, LLM Judge), TTS (LLM Judge, TTFB)
+- Metrics: STT (WER + one column per attached evaluator), TTS (one column per attached evaluator + TTFB). Each STT/TTS run can attach one or more evaluators (system-default or user-owned, binary or rating); columns/charts/About-tab rows are derived dynamically per run.
 
 ---
 
@@ -3012,10 +3274,10 @@ All endpoints are relative to `NEXT_PUBLIC_BACKEND_URL`:
 | Tools           | `GET/POST /tools`, `GET/PUT/DELETE /tools/{uuid}`                                                                                                                                                                                                                 |
 | Personas        | `GET/POST /personas`, `GET/PUT/DELETE /personas/{uuid}`                                                                                                                                                                                                           |
 | Scenarios       | `GET/POST /scenarios`, `GET/PUT/DELETE /scenarios/{uuid}`                                                                                                                                                                                                         |
-| Metrics         | `GET/POST /metrics`, `GET/PUT/DELETE /metrics/{uuid}`, `POST /metrics/{uuid}/duplicate`                                                                                                                                                                           |
+| Evaluators      | `GET /evaluators?include_defaults=true`, `POST /evaluators`, `GET/PUT/DELETE /evaluators/{uuid}`, `POST /evaluators/{uuid}/duplicate`, `GET /evaluators/default-prompt?purpose=<llm\|stt\|tts\|simulation>`, `POST /evaluators/{uuid}/versions` (`make_live?: boolean`), `POST /evaluators/{uuid}/versions/live` |
 | Simulations     | `GET/POST /simulations`, `GET/DELETE /simulations/{uuid}`                                                                                                                                                                                                         |
 | Simulation Runs | `GET /simulations/run/{runId}`, `POST /simulations/{uuid}/run`, `POST /simulations/run/{runId}/abort`                                                                                                                                                             |
-| Tests           | `GET/POST /tests`, `GET/PUT/DELETE /tests/{uuid}`, `POST /tests/bulk`                                                                                                                                                                                            |
+| Tests           | `GET/POST /tests`, `GET/PUT/DELETE /tests/{uuid}`, `POST /tests/bulk`. **`POST` / `PUT` body** for next-reply (`type: "response"`) tests includes a top-level `evaluators: [{ evaluator_uuid, variable_values? }]` array (sibling to `name` / `type` / `config`); `PUT` replaces the whole pivot set when present and leaves it untouched when omitted. Tool-call tests omit `evaluators` entirely. **`GET` response** carries hydrated `evaluators[]` rows joined with the pinned evaluator version (see "Evaluators (next-reply tab only)" under section 5). **`POST /tests/bulk`** also takes the same per-test `evaluators` shape for response uploads (resolved client-side from the CSV's `evaluators` column — see "Bulk upload tests via CSV" in section 5); the legacy per-test `criteria` field is no longer sent. |
 | Agent Tests     | `GET /agent-tests/agent/{uuid}/tests`, `GET /agent-tests/agent/{uuid}/runs`, `POST/DELETE /agent-tests`, `POST /agent-tests/agent/{uuid}/run`, `GET /agent-tests/run/{taskId}`, `POST /agent-tests/agent/{uuid}/benchmark`, `GET /agent-tests/benchmark/{taskId}` |
 | STT Evaluation  | `POST /stt/evaluate`, `GET /stt/evaluate/{uuid}`                                                                                                                                                                                                                  |
 | TTS Evaluation  | `POST /tts/evaluate`, `GET /tts/evaluate/{uuid}`                                                                                                                                                                                                                  |
@@ -3069,13 +3331,50 @@ The `/tts/evaluate/{uuid}` and `/stt/evaluate/{uuid}` endpoints return a **diffe
 {
   "task_id": "1d8db518-d209-4365-a77e-45a8ec3abcee",
   "status": "done",
-  "provider_results": [...],
+  "language": "english",
+  "dataset_id": "...",
+  "dataset_name": "...",
+  "evaluator_uuids": ["..."],
+  "provider_results": [
+    {
+      "provider": "openai",
+      "metrics": {
+        "wer": 0.1,
+        "semantic_match": { "type": "binary", "mean": 0.85 }
+      },
+      "results": [
+        { "audio_path": "...", "semantic_match": 1, "semantic_match_reasoning": "..." }
+      ],
+      "evaluator_runs": [
+        {
+          "evaluator_uuid": "5c9f...",
+          "metric_key": "semantic_match",
+          "name": "semantic_match",
+          "aggregate": { "type": "binary", "mean": 0.85 }
+        }
+      ]
+    }
+  ],
   "leaderboard_summary": [...],
   "error": null
 }
 ```
 
 **Key difference:** Results are at the **top level** (not nested under `results`).
+
+**`evaluator_runs`** (per-provider, optional) is the **preferred source of truth** in the new format: one entry per attached evaluator carrying `evaluator_uuid` (stable ID), `metric_key` (the artefact column name — same key used in `metrics`, the per-row CSV, and the leaderboard summary), `aggregate` (nested `{ type, mean, scale_min?, scale_max? }` from `metrics.json`), and `name` (current human-readable name from the DB at response time — reflects renames after the run while `metric_key` stays pinned to the artefact).
+
+**`evaluator_uuids`** (top-level, optional) is the list of evaluators attached at job creation. Both `evaluator_runs` and `evaluator_uuids` (and the legacy `metrics["{name}_info"]` keys) drive the **dynamic per-evaluator columns** in the Leaderboard, `ProviderMetricsCard`, and Outputs results tables, **and** the **About-tab rows** (see "Dynamic per-evaluator columns" and "About-tab evaluators" under the Detail Page section for the exact priority order). When `evaluator_runs` is present the auth detail page reads names directly from it and skips per-UUID `GET /evaluators/{uuid}` fetches; legacy jobs (no `evaluator_runs`) still fall back to the union of `evaluator_uuids` + `*_info` prefixes plus a final default-evaluator path when both sources are empty.
+
+**Per-row CSV columns** (`provider_results[i].results[j]`):
+- New format: `result[name]` for the score (no `_score` suffix), `result[`${name}_reasoning`]` for the reasoning.
+- Legacy `_info` format: `result[`${name}_score`]`, `result[`${name}_reasoning`]`.
+- Legacy single-evaluator format: `result.llm_judge_score`, `result.llm_judge_reasoning`.
+
+**`metrics` shape per evaluator**:
+- New format: `metrics[name] = { type, mean, scale_min?, scale_max? }` (object — identifiable by presence of `"type"`).
+- Legacy `_info` format: `metrics[`${name}_score`]` (number) plus `metrics[`${name}_info`] = { type, mean }`.
+- Scalar metrics like `wer` stay plain numbers in both formats.
 
 | Endpoint                   | ID Field  | Results Location               |
 | -------------------------- | --------- | ------------------------------ |
@@ -3180,14 +3479,16 @@ The `GET /agent-tests/benchmark/{taskId}` endpoint returns intermediate results 
 ```tsx
 // Benchmark LeaderboardSummary (BenchmarkResultsDialog)
 type LeaderboardSummary = {
-  model: string; // e.g. "anthropic__claude-opus-4.5" (double underscore, not slash)
+  model: string; // backend-defined identifier (may be short e.g. "gpt-4.1", OpenRouter-style "openai/gpt-4.1", or legacy "provider__model")
   passed: string; // e.g. "1" (string, not number)
   total: string; // e.g. "2" (string, not number)
   pass_rate: string; // e.g. "50.0" (string, not number)
 };
 ```
 
-Note: The `model` field uses double underscores (`__`) as separator; the UI replaces them with `/` for display.
+Note: **`leaderboard_summary[].model`** and **`model_results[].model`** are not guaranteed to use the same string for the same logical model (e.g. short id vs `provider/model`). The merged leaderboard uses **`benchmarkCanonicalModelId`** (see **`benchmarkEvaluatorSummary`**) to dedupe rows and attach **`leaderboard_summary`** cells to the canonical **`model_results`** id when unambiguous. The Leaderboard **Model** column shows that canonical **`model`** string by default (no automatic **`__` → `/`** transform); other surfaces (e.g. outputs panels) may still format model ids for readability.
+
+- **`model_results[].evaluator_summary`** (optional): when present (finished model + `metrics.json` criteria), each entry is one response evaluator aggregate (`metric_key`, `name`, `description`, `evaluator_uuid`, `type`, plus binary or rating numeric fields per backend contract). Omitted or `null` for in-flight models or older jobs. Does not replace `leaderboard_summary`; the app merges both into one **`BenchmarkCombinedLeaderboard`** table + chart grid (see `benchmarkEvaluatorSummary` in Shared Components).
 
 ### JWT Authentication
 
@@ -3283,6 +3584,92 @@ isActiveStatus("in_progress"); // true
 isActiveStatus("done"); // false
 ```
 
+### Evaluator Metrics Utilities (`@/lib/evaluatorMetrics`)
+
+STT/TTS result pages share evaluator aggregate formatting helpers in `src/lib/evaluatorMetrics.ts`:
+
+- `readProviderEvaluatorMean(col, providerResult)` resolves an evaluator column's provider-level mean from the new `evaluator_runs[*].aggregate.mean` format first, then legacy flat `metrics[col.scoreField]`, then nested `metrics[col.key].mean`.
+- `formatMetricValue(value)` renders finite numbers rounded to 4 decimals and returns `"-"` for missing or non-numeric values.
+
+Use these helpers through the shared STT/TTS evaluation detail components instead of adding page-local `readProviderMean` / `formatMetricValue` copies. This keeps the new `evaluator_runs`, legacy `_info`, and legacy single-evaluator fallback behavior consistent across `/stt/[uuid]`, `/tts/[uuid]`, `/public/stt/[token]`, and `/public/tts/[token]`.
+
+### Default Evaluator Lookup (`@/lib/defaultEvaluators`)
+
+Authenticated LLM test-result dialogs use `src/lib/defaultEvaluators.ts` when they need seeded default evaluator identity outside the test payload:
+
+- `DEFAULT_LLM_NEXT_REPLY_SLUG` is the stable slug for the default next-reply correctness evaluator. Resolve this evaluator by slug, not by name or UUID.
+- `fetchDefaultLLMNextReplyEvaluator(backendUrl, accessToken)` calls `GET /evaluators?include_defaults=true` with the user's bearer token and returns the matching LLM evaluator summary (`uuid`, `name`, `description`, `slug`, `evaluator_type`) or `null`.
+- `TestRunnerDialog` and `BenchmarkResultsDialog` fetch this once while open and pass it to the shared result panels as `legacyDefaultEvaluator`. This is only for rendering legacy response runs that have `evaluation.criteria` but no `judge_results`, so the old criteria appears as the default evaluator's `criteria` variable in the same card UI as modern evaluator results.
+- `BenchmarkResultsDialog` does **not** use this helper for the benchmark leaderboard label; `pass_rate` keeps the main-branch label `Test pass rate (%)`. The helper is for legacy output detail cards only.
+- Keep this helper out of public share pages. Public pages cannot call authenticated evaluator endpoints and should either use data already in the shared payload or public-safe helpers such as `@/lib/publicEvaluators`.
+
+### Benchmark evaluator aggregates (`@/lib/benchmarkEvaluatorSummary`)
+
+- Types **`BenchmarkEvaluatorSummaryBinary`** / **`BenchmarkEvaluatorSummaryRating`** / **`BenchmarkEvaluatorSummaryEntry`** describe optional `model_results[].evaluator_summary[]` entries returned by benchmark status APIs when the backend persists Calibrate `metrics.json` criteria aggregates.
+- **`BenchmarkLeaderboardSummaryRow`** types rows from **`leaderboard_summary`** (`model`, `passed`, `total`, `pass_rate` strings as returned by the API).
+- **Why merged**: The benchmark Leaderboard tab matches STT/TTS — **one** downloadable table and **one** chart grid (two charts per row) — instead of repeating a full table+chart stack per evaluator metric. Overall pass rate and per-evaluator aggregates share the same model rows and color keys (`nameKey="model"`).
+- **`benchmarkMetricKeyOrder(modelResults)`** returns evaluator **`metric_key`** values in first-seen order across models (same ordering as the old per-section builder).
+- **`benchmarkEvaluatorColumnKey(metric_key)`** returns stable row/column keys such as `ev_<sanitized_metric>` so headers and chart `dataKey`s stay alphanumeric-safe.
+- **`benchmarkCanonicalModelId(raw, modelResults)`** resolves a **`leaderboard_summary.model`** string to the matching **`model_results[].model`** when the backend uses mismatched shapes for the same run (e.g. **`gpt-4.1`** vs **`openai/gpt-4.1`**): exact match on **`model_results`** wins; if **`raw`** contains no **`/`**, a **unique** suffix match (`model === raw` or `model.endsWith('/' + raw)`) returns that **`model_results`** id; otherwise **`raw`** is returned unchanged (ambiguous or no match).
+- **`benchmarkRatingEvaluatorCaption(label, scale_min, scale_max)`** formats rating column/chart labels as **`label (min–max)`** when **`scale_min`** and **`scale_max`** are finite; otherwise returns **`label`** unchanged (fallback chart domain **`[0, 5]`** still applies in the payload).
+- **`buildBenchmarkCombinedLeaderboardPayload(leaderboardSummary, modelResults, benchmarkScoreLabel)`** returns **`rows`**, **`chartRows`** (arrays of **`ChartConfig`** packed two per row), and a small **`plan`** describing which columns exist. It imports the **`ChartConfig`** type from **`LeaderboardTab`** (type-only; no runtime cycle). Behavior:
+  - **Overall block**: When **`leaderboard_summary`** is non-empty, rows include **`passed`**, **`total`**, and numeric **`pass_rate`** (parsed from strings); the first chart uses **`benchmarkScoreLabel`** (typically **`Test pass rate (%)`**) and y-domain **0–100**.
+  - **Evaluator block**: One column + one chart per **`metric_key`**. **Binary**: **`ChartConfig.title`** is **`ev.label`** (**`name ?? metric_key`**) — no separate “Pass rate (%)” suffix (the y-axis is 0–100). **Rating**: **`ChartConfig.title`** uses **`benchmarkRatingEvaluatorCaption(label, scale_min, scale_max)`** → **`Name (min–max)`** with an en dash when both bounds are finite; otherwise **`label`** only (same helper drives the table **`header`** in **`BenchmarkCombinedLeaderboard`**). Binary → cells **`toFixed(1)%`**, chart domain **0–100**, tooltip **`v.toFixed(1)%`**; rating → cells **`toFixed(2)`**, chart domain **`[scale_min, scale_max]`** when both finite, else **`[0, 5]`**.
+  - **Model rows**: Row **`model`** keys are built by **`orderedCanonicalModels`**: walk **`leaderboard_summary`** in order, map each **`s.model`** through **`benchmarkCanonicalModelId`**, dedupe by canonical id; then append any **`model_results`** **`model`** not yet seen. **`leaderboard_summary`** rows are joined with **`find((s) => benchmarkCanonicalModelId(s.model, modelResults) === model)`** so pass-rate columns align with **`model_results`** rows. This avoids duplicate table rows when the API repeats the same model under two strings.
+  - **Empty / missing**: If there is no leaderboard and no evaluator keys, the payload is **`null`**. Missing evaluator cells are **`undefined`** in row data; the UI shows **—** for those cells. Chart rendering details (**LeaderboardTab** finite-value filter + empty-slot placeholder) are documented under **`BenchmarkCombinedLeaderboard`** below.
+
+### `BenchmarkCombinedLeaderboard` (`@/components/eval-details`)
+
+- Client component that memoizes **`buildBenchmarkCombinedLeaderboardPayload`** and feeds **`LeaderboardTab`** with derived **`LeaderboardColumn`** definitions (`%` / fixed-decimal evaluator cells; **Model** column uses **`formatModelName`**).
+- **Optional `formatModelName`**: Defaults to the identity **`(m) => m`** so the **Model** column and bar-chart labels show the **canonical `model` string** from the payload (typically the **`model_results`** id after **`benchmarkCanonicalModelId`**). Pass a custom formatter only if a surface needs legacy display rules (e.g. **`__` → `/`**).
+- **Evaluator column titles**: **Binary** evaluators use **`ev.label`** only for **`LeaderboardColumn.header`** and chart title — the overall column is already **`Test pass rate (%)`**, so duplicating “Pass rate” on binary headers was redundant. **Rating** evaluators use **`benchmarkRatingEvaluatorCaption`** so **`header`** and chart **`title`** show **`Name (scale_min–scale_max)`** when bounds are finite (en dash), surfacing the rubric range beside the name without repeating “Mean”. **Cells**: binary → **`NN.N%`**; rating → two decimal places, no **`%`**.
+- **`getLabel`** forwards **`model`** through **`formatModelName`** for chart axis labels (defaults to raw API/canonical string).
+- Used in **`BenchmarkResultsDialog`** (Leaderboard tab, when the run has finished) and **`/public/benchmark/[token]`** (`model_results ?? []` so leaderboard-only jobs still render when the array is absent).
+- When the payload is **`null`** or there are no rows, shows the shared **“No leaderboard data available”** empty state (e.g. completed job with neither **`leaderboard_summary`** nor **`evaluator_summary`**).
+- CSV **`filename`** props are sanitized in callers (agent name or share token) for safe downloads.
+- Chart rows use the same **`LeaderboardTab`** implementation as STT/TTS: each series is filtered to **finite** numeric **`value`**s before **`LeaderboardBarChart`**; if every model is missing that metric, the slot shows a bordered placeholder (title + short empty copy) instead of an empty Recharts series.
+- **Gotcha — duplicate titles**: **`LeaderboardTab`** uses **`chart.title`** as the React **`key`** for each chart card. Two evaluators with the same resolved **`name`** (and neither falling back to distinct **`metric_key`** labels) could produce duplicate keys; in practice **`metric_key`** differs per column and is used when **`name`** is missing, which avoids most collisions.
+- **`BenchmarkModelResult`** in **`BenchmarkOutputsPanel`** includes optional **`evaluator_summary`** so TypeScript matches the API everywhere **`model_results`** is typed.
+
+### Evaluation Detail Components (`@/components/eval-details`)
+
+STT/TTS result pages share result rendering through `src/components/eval-details/EvaluationRunDetails.tsx`:
+
+- `STTEvaluationLeaderboard` / `TTSEvaluationLeaderboard` render the comparative leaderboard table and charts (single **`LeaderboardTab`**: combined metric columns + chart rows packed two wide; STT/TTS chart **`title`**s still use full metric labels such as **`WER`** or evaluator **`label`** from **`evaluatorColumns`**). **`BenchmarkCombinedLeaderboard`** follows the same layout pattern for benchmark runs; evaluator titles differ slightly (**binary** → short **`ev.label`**; **rating** → **`benchmarkRatingEvaluatorCaption`** with scale — see **`benchmarkEvaluatorSummary`**); data comes from **`leaderboard_summary`** + **`model_results[].evaluator_summary`** instead of provider evaluation summaries.
+- `STTEvaluationOutputs` / `TTSEvaluationOutputs` render the provider sidebar, provider metrics card, loading/error states, and result table.
+- `STTEvaluationAbout` / `TTSEvaluationAbout` render the normalized About table rows. STT always includes WER plus evaluator rows; TTS always includes evaluator rows plus TTFB.
+- `findFirstEvaluatorRuns`, `evaluatorColumnsFromRuns`, and `evaluatorDescriptionMapFromRuns` centralize public-page handling for the new `evaluator_runs` payload so STT/TTS public pages don't each hand-roll the same conversion.
+- Public/private pages should pass page-specific evaluator labels into these shared components: private pages pass `<Link href="/evaluators/[uuid]">name</Link>` for About metric names; public pages pass plain strings because `/evaluators/[uuid]` is authenticated.
+
+### Public Evaluator Metadata (`@/lib/publicEvaluators`)
+
+Public share pages use `src/lib/publicEvaluators.ts` to fetch default evaluator metadata for legacy result payloads:
+
+- `getPublicDefaultEvaluator(backendUrl, shareToken, type)` calls `GET /public/evaluators/defaults?share_token=<token>&types=<stt|tts|llm|simulation>`.
+- The backend validates that `share_token` belongs to a currently public shared job and returns only seeded default evaluators with public-safe fields: `uuid`, `name`, `description`, `evaluator_type`, `output_type`, and `live_version.output_config`.
+- Public STT/TTS pages use this metadata when the result payload lacks enough evaluator metadata and must synthesize the legacy `llm_judge_score` column. Public benchmark share pages do **not** call this helper for leaderboard titles (`Test pass rate (%)` / chart title stay fixed; see benchmark leaderboard label above). Do not hardcode default evaluator names or descriptions in public pages where snapshot/API data should drive copy; use job snapshot fields first, then this helper where applicable, then render empty/generic UI only if both are unavailable.
+- For rating defaults, public pages derive the About-tab range from `live_version.output_config.scale` using the shared `ratingRange()` helper.
+
+### Public Page Layout (`@/components/PublicPageLayout`)
+
+Public share pages use `src/components/PublicPageLayout.tsx` for the Calibrate top bar, theme toggle, auth link, centered content area, and footer.
+
+- Default content width is `max-w-7xl`.
+- `contentClassName` can override only the content max-width while preserving the same padding / `w-full mx-auto` wrapper. Use this sparingly for result pages whose shared panels need more horizontal room.
+- Public LLM test-run and benchmark pages pass `contentClassName="max-w-[92rem]"` so their shared `TestRunOutputsPanel` / `BenchmarkOutputsPanel` match the private runner layout: left list `md:w-80`, flexible conversation column, evaluator column `w-[32rem]`.
+- Their panel containers use a taller public-page height (`height: calc(100vh - 220px)`, `minHeight: 620`) because they live inside a page layout instead of a modal shell.
+
+### Evaluator UI Components (`@/components/evaluators`)
+
+Evaluator-specific route UI lives in `src/components/evaluators/`:
+
+- `CreateEvaluatorSidebar` — create-only sidebar used by `/evaluators`; parent page owns API calls and form state.
+- `UseCasePickerDialog` — use-case picker modal shown before the sidebar.
+- `VersionCard` — per-version display on `/evaluators/[uuid]`, including variables, rating output config, default-evaluator chrome rules, and "Set as current".
+- `RatingScaleEditor` — shared rating-scale row editor used by evaluator create and new-version flows.
+
+Keep these components prop-driven. The app route files should orchestrate auth, routing, API calls, and URL state; avoid re-growing large inline JSX blocks for these concerns inside `src/app/evaluators/page.tsx` or `src/app/evaluators/[uuid]/page.tsx`.
+
 ### Tooltip Component (`@/components/Tooltip`)
 
 Custom tooltip component with viewport-aware positioning:
@@ -3303,7 +3690,7 @@ import { Tooltip } from "@/components/Tooltip";
 
 **Positions**: `top` (default), `bottom`, `left`, `right`
 
-**Viewport clamping**: The tooltip automatically clamps its position to stay within viewport boundaries (12px padding from edges). This prevents long content (like LLM Judge reasoning) from going off-screen.
+**Viewport clamping**: The tooltip automatically clamps its position to stay within viewport boundaries (12px padding from edges). This prevents long content (like evaluator reasoning) from going off-screen.
 
 **Styling**: White background, rounded corners, shadow, 256px max width (`w-64`), text wraps within the container. Arrow indicator points to trigger element.
 
@@ -3495,11 +3882,14 @@ import {
   StatusIcon,
   SmallStatusBadge,
   ToolCallCard,
+  normalizeToolCall,
   TestDetailView,
+  JudgeResultsList,
   EmptyStateView,
   TestStats,
   EvaluationCriteriaPanel,
 } from "@/components/test-results/shared";
+import type { JudgeResult } from "@/components/test-results/shared";
 
 // Status indicator (passed/failed/running/queued/pending)
 <StatusIcon status="passed" />
@@ -3517,16 +3907,58 @@ import {
 // - Object/array values are pretty-printed as JSON with 2-space indentation
 // - Labels use `text-sm font-medium text-muted-foreground`, values use `text-foreground`
 // - Parameter values use `whitespace-pre-wrap break-all` to show full content (no truncation)
+// IMPORTANT: ToolCallCard requires `toolName: string` and `args: Record<string, any>`.
+// Never pass raw API tool-call entries directly — backend payloads have shipped in several
+// shapes over time (`{tool, arguments}`, OpenAI `{name, arguments}`, nested `{tool: {name, arguments}}`,
+// or OpenAI history `{function: {name, arguments}}` with `arguments` as a JSON string). Passing
+// any of these directly will crash React with "Objects are not valid as a React child" the
+// moment `toolName` ends up being an object. Always go through `normalizeToolCall` first.
 <ToolCallCard toolName="get_weather" args={{ body: { city: "London" }, query: { units: "metric" } }} />
 // Shows "body" field with JSON content, "query" field with JSON content
+
+// Defensive shape adapter for any tool-call-shaped value. Returns `{ toolName, args }`,
+// falling back to `{ toolName: "Unknown tool", args: {} }` for malformed/missing entries.
+// Use at every iteration site (chat history `message.tool_calls`, `output.tool_calls`,
+// `evaluation.tool_calls`) — `TestDetailView` and `EvaluationCriteriaPanel` both already
+// route through this internally. JSON-string `arguments` (OpenAI history format) are
+// auto-parsed; non-object parsed values are dropped to `{}`.
+const { toolName, args } = normalizeToolCall(rawToolCallFromApi);
 
 // Full test conversation view (fully responsive)
 // - Padding: `p-4 md:p-6`
 // - Message bubbles: `w-[70%] md:w-1/2` (70% width on mobile for visual differentiation, half on desktop)
 // - User messages aligned right, agent messages aligned left for clear visual distinction
 // - Status indicators: responsive padding `pl-2 md:pl-3`
-// - `reasoning` (optional): LLM evaluator's reasoning for the pass/fail decision, displayed in the detail view
-<TestDetailView history={history} output={output} passed={passed} reasoning={reasoning} />
+// - `reasoning` (optional): top-level reasoning string. For tool-call tests this is the deterministic
+//   diff/match summary and is rendered inline next to the tool-call output. For RESPONSE tests, the
+//   inline reasoning is suppressed when `judgeResults` is populated (the per-evaluator panel below
+//   already covers it; the top-level string is just the first failing evaluator's reasoning anyway).
+//   Legacy response rows that pre-date judge_results capture still fall back to inline reasoning.
+// - `judgeResults` (optional, response tests only): array of per-evaluator verdicts. When present
+//   and non-empty, renders a `JudgeResultsList` panel below the agent response with one card per
+//   evaluator. Tool-call tests always pass `null` here; the legacy single-reasoning UI handles them.
+// - `scaleByEvaluatorUuid` (optional): uuid → scale_max map for rating evaluators. When provided,
+//   rating cards render `score / max`; when absent, they render `Score: N`. The shared component
+//   never fetches scales itself — callers that want `score / max` must supply this map (typically
+//   built from `GET /evaluators?include_defaults=true`'s `output_config.scale`).
+<TestDetailView
+  history={history}
+  output={output}
+  passed={passed}
+  reasoning={reasoning}
+  judgeResults={result.judge_results}
+  scaleByEvaluatorUuid={scaleByEvaluatorUuid}
+/>
+
+// Per-evaluator verdict list (used internally by TestDetailView, exported for re-use).
+// Renders nothing when `results` is null/empty — caller falls back to legacy single-reasoning UI.
+// Each card: evaluator name (rendered as a link to `/evaluators/{evaluator_uuid}` via
+// `EvaluatorNameLink` when uuid is non-null; plain text for legacy snapshots) + verdict
+// badge. Binary → Pass/Fail. Rating → `score / max` (or `Score: N` when no scale) coloured
+// **green** only when `score === scale_max`, **red** only when `score === scale_min`,
+// otherwise **amber** (anything in between, or either bound unknown). + per-evaluator
+// reasoning underneath.
+<JudgeResultsList results={judgeResults} scaleByEvaluatorUuid={scaleByEvaluatorUuid} />
 
 // Stats bar - shows passed/failed counts
 // In TestRunnerDialog: show in header on desktop, at top of list on mobile
@@ -3542,8 +3974,36 @@ import {
 // The hydration path for completed runs sets all placeholder tests to type:"response", which causes
 // tool-call tests to be misrendered as "Next Reply Text". Always prefer testCase.evaluation.type.
 // Fallback chain inside the component: testType -> evaluation.type -> infer from evaluation.tool_calls
+// Defensive rendering: `criteria` is rendered only when `typeof === "string"` (some legacy/new
+// payloads have shipped non-string criteria; guarding prevents the "Objects are not valid as a
+// React child" crash). `tool_calls` entries are routed through `normalizeToolCall` so any of
+// the historical shapes documented above render correctly.
 <EvaluationCriteriaPanel evaluation={testCase?.evaluation} testType={testCase?.evaluation?.type} />
 ```
+
+**`JudgeResult` shape** (per-evaluator verdict, response tests only):
+
+```ts
+type JudgeResult = {
+  evaluator_uuid?: string | null;  // stable link target; `null` for legacy pre-snapshot runs
+  name: string;                    // CURRENT DB display name (refreshed by backend on every read)
+  reasoning?: string;
+  match?: boolean | null;          // BINARY evaluators only; null for rating
+  score?: number | null;           // RATING evaluators only; null for binary
+  // The three fields below were added after the initial judge_results
+  // rollout. Optional/null on older snapshots, populated inline going
+  // forward — the cards prefer these over the per-panel fallback maps.
+  variable_values?: Record<string, string> | null;  // {{var}} substitutions used for THIS evaluator on THIS test case (frozen at submission); empty maps normalised to null
+  scale_min?: number | null;        // RATING evaluators only; null for binary or legacy
+  scale_max?: number | null;        // RATING evaluators only; null for binary or legacy
+};
+```
+
+- `match` and `score` are mutually exclusive — exactly one is set on a completed entry.
+- `name` is refreshed server-side on every read of the run, so a rename in the evaluator settings UI surfaces on the next poll without a re-run. **Don't cache `name` long-term** — store `evaluator_uuid` as the stable key.
+- `evaluator_uuid` may be `null` for legacy runs that pre-date snapshot capture; treat as "no canonical link, just display the name" (no clickable evaluator link). When non-null, the cards render the name as a `next/link` to `/evaluators/{uuid}` via the shared `EvaluatorNameLink` helper in `shared.tsx`.
+- A test passes only when **all** judge entries pass: binary entries pass when `match === true`, rating entries pass when `score === scale_max`. The frontend can rely on the top-level `result.passed` for this — no need to recompute. Rating cards resolve `scale_max` inline from `result.scale_max` first (newer snapshots), falling back to the caller's `scaleByEvaluatorUuid` map; without either, they render a neutral amber `Score: N` chip.
+- `variable_values` shown on the right-column card resolve in the same priority order: inline `result.variable_values` first, then `test_case.evaluators[i].variable_values` matched by `evaluator_uuid` for older snapshots. Empty objects are normalised to `null` server-side, so an evaluator with zero variables simply renders no variables section.
 
 ---
 
@@ -4091,7 +4551,7 @@ Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When ena
 - **Multiple date formats**: When creating optimistic UI updates (e.g., adding a pending run to a table), use `new Date().toISOString()` which produces `"2026-01-18T09:30:00.000Z"`. The `formatRelativeTime` helper in `TestsTabContent.tsx` handles both formats - check if the string already has a timezone indicator before appending "Z" to avoid invalid dates like `"...ZZ"` which produce NaN
 - **Optional date fields with fallbacks**: Some API responses may not include all date fields. The `SimulationRunsTab` uses `created_at` for sorting/display but falls back to `updated_at` if `created_at` is undefined. Pattern: `const dateStr = item.created_at || item.updated_at || ""`; `formatDate` functions should handle empty strings gracefully (return `"-"` instead of "Invalid Date")
 - **Hooks need accessToken**: `useCrudResource` and `useFetchResource` require `accessToken` to be passed from the component (they don't call `useSession` internally)
-- **LLM Judge score format varies**: Backend returns `llm_judge_score` as `"True"`/`"False"` strings in individual result rows, but as `1`/`0` integers in aggregate metrics and leaderboard summaries. When parsing for Pass/Fail display, convert to lowercase string and check for both: `const passed = scoreStr === "true" || scoreStr === "1"`
+- **Binary evaluator score format varies**: Backend returns binary evaluator scores as `"True"`/`"False"` strings in individual result rows, but as `1`/`0` integers in aggregate metrics and leaderboard summaries. The per-row column name itself depends on the API format — `result[name]` (no `_score` suffix) in the new `evaluator_runs` format, `result[`${name}_score`]` in the legacy `_info` format, `result.llm_judge_score` in the legacy single-evaluator format. The page-level `evaluatorColumns` array hides this difference: read `result[col.scoreField ?? `${col.key}_score`]`. When parsing the value for Pass/Fail display, convert to lowercase string and check for both: `const passed = scoreStr === "true" || scoreStr === "1"`. Rating evaluators ship a numeric string per row and a `mean` number in aggregates — coerce via `Number(score)` then `Number.isFinite` before formatting via `parseFloat(numeric.toFixed(4))` (the `EvaluatorScoreCell` in `STTResultsTable` / `TTSResultsTable` already handles both shapes).
 
 ### State Management
 
@@ -4354,7 +4814,7 @@ Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When ena
 ### Navigation
 
 - **Home redirect**: Root page (`/`) redirects to `/agents`
-- **Tab persistence**: Agent detail and simulation detail tabs persist in URL (`?tab=...`) so refreshing maintains tab state
+- **Tab persistence**: Agent detail, simulation detail, and the Evaluators list page (`/evaluators?tab=default|mine`) persist their active tab in the URL (`?tab=...`) so refreshing maintains tab state. Agent/simulation detail use `window.history.replaceState`; the evaluators list uses `router.replace` plus a `useSearchParams`-driven re-sync (see the "Active tab persistence" note in section 8).
 - **Back navigation**: Detail pages include back button to list view
 
 ### Page Titles
@@ -4395,7 +4855,8 @@ export default function ToolsLayout({
 | `/tests`                   | "Tests \| Calibrate"                                          |
 | `/personas`                | "Personas \| Calibrate"                                       |
 | `/scenarios`               | "Scenarios \| Calibrate"                                      |
-| `/metrics`                 | "Metrics \| Calibrate"                                        |
+| `/evaluators`              | "Evaluators \| Calibrate"                                     |
+| `/evaluators/[uuid]`       | "Evaluator \| Calibrate"                                      |
 | `/simulations`             | "Simulations \| Calibrate"                                    |
 | `/simulations/[uuid]`      | "Simulation \| Calibrate"                                     |
 | `/simulations/[uuid]/runs` | "Simulation Run \| Calibrate"                                 |

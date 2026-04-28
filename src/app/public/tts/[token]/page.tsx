@@ -1,23 +1,57 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { ttsProviders } from "@/components/agent-tabs/constants/providers";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
 import {
-  ProviderSidebar,
-  ProviderMetricsCard,
-  TTSResultsTable,
-  LeaderboardTab,
-  AboutMetricsTable,
+  TTSEvaluationAbout,
+  TTSEvaluationLeaderboard,
+  TTSEvaluationOutputs,
+  findFirstEvaluatorRuns,
+  evaluatorColumnsFromRuns,
+  evaluatorDescriptionMapFromRuns,
+  ratingRange,
+  type TTSEvaluatorColumn,
 } from "@/components/eval-details";
+import {
+  getPublicDefaultEvaluator,
+  type PublicDefaultEvaluator,
+} from "@/lib/publicEvaluators";
 
 type LatencyMetric = { mean: number; std: number; values: number[] };
 
+// Mirrors the auth TTS page: the response now optionally carries
+// `evaluator_runs` per provider with the live evaluator `name`, stable
+// `evaluator_uuid`, the artefact `metric_key` (== per-row CSV column with no
+// `_score` suffix) and an `aggregate` block (`type`, `mean`, optional
+// `scale_min` / `scale_max`). Older shareable links still ship the flat
+// `llm_judge_score` scheme — both paths are handled below.
+type EvaluatorRunAggregate = {
+  type?: "binary" | "rating" | string;
+  mean?: number;
+  scale_min?: number;
+  scale_max?: number;
+  [k: string]: unknown;
+};
+
+type EvaluatorRun = {
+  evaluator_uuid: string;
+  metric_key: string;
+  aggregate?: EvaluatorRunAggregate | null;
+  name?: string;
+  description?: string;
+};
+
 type ProviderMetrics = {
-  llm_judge_score: number;
-  ttfb: LatencyMetric;
-  processing_time: LatencyMetric;
+  llm_judge_score?: number;
+  ttfb?: LatencyMetric;
+  processing_time?: LatencyMetric;
+  [k: string]:
+    | number
+    | LatencyMetric
+    | { type?: string; mean?: number; scale_min?: number; scale_max?: number }
+    | undefined;
 };
 
 type ProviderResult = {
@@ -31,15 +65,18 @@ type ProviderResult = {
     audio_path: string;
     llm_judge_score?: string;
     llm_judge_reasoning?: string;
+    [k: string]: unknown;
   }> | null;
+  evaluator_runs?: EvaluatorRun[] | null;
 };
 
 type LeaderboardSummary = {
   run: string;
   count: number;
-  llm_judge_score: number;
-  ttfb: number;
-  processing_time: number;
+  llm_judge_score?: number;
+  ttfb?: number;
+  processing_time?: number;
+  [k: string]: string | number | undefined;
 };
 
 type EvaluationResult = {
@@ -57,12 +94,6 @@ const getProviderLabel = (value: string): string => {
   return provider ? provider.label : value;
 };
 
-const TTS_ABOUT_METRICS = [
-  { metric: "LLM Judge", description: "Evaluates whether synthesized audio accurately matches the reference text, returning Pass if the audio correctly represents the input.", preference: "Pass is better", range: "Pass / Fail" },
-  { metric: "TTFB (Time To First Byte)", description: "Latency from when a request is sent until the first byte of the response is received.", preference: "Lower is better", range: "0 - ∞" },
-  { metric: "Processing Time", description: "Total time taken to synthesize the audio.", preference: "Lower is better", range: "0 - ∞" },
-];
-
 export default function PublicTTSPage() {
   const params = useParams();
   const token = params.token as string;
@@ -72,6 +103,8 @@ export default function PublicTTSPage() {
   const [notFound, setNotFound] = useState(false);
   const [activeTab, setActiveTab] = useState<"leaderboard" | "outputs" | "about">("leaderboard");
   const [activeProviderTab, setActiveProviderTab] = useState<string | null>(null);
+  const [defaultEvaluator, setDefaultEvaluator] =
+    useState<PublicDefaultEvaluator | null>(null);
 
   useEffect(() => { document.title = "Text-to-speech evaluation | Calibrate"; }, []);
 
@@ -91,6 +124,8 @@ export default function PublicTTSPage() {
         const result: EvaluationResult = await res.json();
         if (result.status !== "done") { setNotFound(true); return; }
 
+        const defaultEvaluator = await getPublicDefaultEvaluator(backendUrl, token, "tts");
+        setDefaultEvaluator(defaultEvaluator);
         setData(result);
         if (result.provider_results?.length) {
           setActiveProviderTab(result.provider_results[0].provider);
@@ -104,11 +139,44 @@ export default function PublicTTSPage() {
     fetchData();
   }, [token]);
 
+  // Derive the per-evaluator columns. Prefers `evaluator_runs` (new format)
+  // and falls back to a single legacy `llm_judge_*` column when the
+  // response is from an older job, using the public default evaluator
+  // metadata endpoint for the fallback label/type.
+  const evaluatorColumns: TTSEvaluatorColumn[] = useMemo(() => {
+    const providerResults = data?.provider_results ?? [];
+    const firstRuns = findFirstEvaluatorRuns(providerResults);
+
+    if (firstRuns) {
+      return evaluatorColumnsFromRuns<TTSEvaluatorColumn>(firstRuns);
+    }
+
+    return [
+      {
+        key: "llm_judge",
+        label: defaultEvaluator?.name ?? "Evaluator",
+        outputType: defaultEvaluator?.output_type ?? "binary",
+        scoreField: "llm_judge_score",
+        reasoningField: "llm_judge_reasoning",
+      },
+    ];
+  }, [data, defaultEvaluator]);
+
+  const evaluatorDescriptions = useMemo(() => {
+    const providerResults = data?.provider_results ?? [];
+    return evaluatorDescriptionMapFromRuns(findFirstEvaluatorRuns(providerResults));
+  }, [data]);
+
+  const defaultEvaluatorRange = useMemo(() => {
+    if (defaultEvaluator?.output_type !== "rating") return "Pass / Fail";
+    const scaleValues = (defaultEvaluator.live_version?.output_config?.scale ?? [])
+      .map((s) => Number(s.value))
+      .filter((v) => !Number.isNaN(v));
+    return ratingRange(scaleValues);
+  }, [defaultEvaluator]);
+
   if (isLoading) return <PublicPageLayout><PublicLoading /></PublicPageLayout>;
   if (notFound || !data) return <PublicPageLayout><PublicNotFound /></PublicPageLayout>;
-
-  const selectedProvider = activeProviderTab ?? data.provider_results?.[0]?.provider;
-  const providerResult = data.provider_results?.find((p) => p.provider === selectedProvider);
 
   return (
     <PublicPageLayout
@@ -141,65 +209,46 @@ export default function PublicTTSPage() {
 
             {/* Leaderboard Tab */}
             {activeTab === "leaderboard" && data.leaderboard_summary && (
-              <LeaderboardTab
-                columns={[
-                  { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
-                  { key: "llm_judge_score", header: "LLM Judge Score" },
-                  { key: "ttfb", header: "TTFB (s)", render: (v) => v != null ? parseFloat(v.toFixed(4)) : "-" },
-                ]}
-                data={data.leaderboard_summary}
-                charts={[[
-                  { title: "LLM Judge Score", dataKey: "llm_judge_score", yDomain: [0, 1] },
-                  { title: "TTFB (s)", dataKey: "ttfb" },
-                ]]}
-                filename="tts-evaluation-leaderboard"
-                getLabel={getProviderLabel}
+              <TTSEvaluationLeaderboard
+                leaderboardSummary={data.leaderboard_summary}
+                evaluatorColumns={evaluatorColumns}
+                getProviderLabel={getProviderLabel}
               />
             )}
 
             {/* Outputs Tab */}
             {activeTab === "outputs" && (
-              <div className="flex flex-col md:flex-row border border-border rounded-xl overflow-hidden" style={{ minHeight: 480 }}>
-                <ProviderSidebar
-                  items={data.provider_results.map((pr) => ({
-                    key: pr.provider,
-                    label: getProviderLabel(pr.provider),
-                    success: pr.success,
-                  }))}
-                  activeKey={selectedProvider ?? null}
-                  onSelect={setActiveProviderTab}
-                />
-
-                <div className="flex-1 overflow-y-auto p-4 md:p-6">
-                  {!providerResult ? (
-                    <p className="text-muted-foreground">Select a provider</p>
-                  ) : providerResult.success === false ? (
-                    <div className="flex items-center justify-center h-full min-h-[200px]">
-                      <div className="border border-red-500/50 bg-red-500/10 rounded-lg p-4 max-w-md text-center">
-                        <div className="text-red-500 text-[14px] font-medium">There was an error running this provider.</div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-4 md:space-y-6">
-                      {providerResult.metrics && (
-                        <ProviderMetricsCard
-                          metrics={[
-                            { label: "LLM Judge Score", value: providerResult.metrics.llm_judge_score ?? "-" },
-                            { label: "TTFB (s)", value: providerResult.metrics.ttfb?.mean != null ? parseFloat(providerResult.metrics.ttfb.mean.toFixed(4)) : "-" },
-                          ]}
-                        />
-                      )}
-                      {providerResult.results && providerResult.results.length > 0 && (
-                        <TTSResultsTable results={providerResult.results} />
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <TTSEvaluationOutputs
+                providerResults={data.provider_results}
+                activeProviderKey={activeProviderTab}
+                onProviderSelect={setActiveProviderTab}
+                status={data.status}
+                evaluatorColumns={evaluatorColumns}
+                getProviderLabel={getProviderLabel}
+                className="flex flex-col md:flex-row border border-border rounded-xl overflow-hidden min-h-[480px]"
+              />
             )}
 
             {/* About Tab */}
-            {activeTab === "about" && <AboutMetricsTable metrics={TTS_ABOUT_METRICS} />}
+            {activeTab === "about" && (
+              <TTSEvaluationAbout
+                evaluatorRows={evaluatorColumns.map((col) => ({
+                  key: col.key,
+                  metric: col.label,
+                  description:
+                    evaluatorDescriptions.get(col.key) ??
+                    defaultEvaluator?.description ??
+                    "",
+                  outputType: col.outputType,
+                  range:
+                    col.key === "llm_judge"
+                      ? defaultEvaluatorRange
+                      : col.outputType === "binary"
+                        ? "Pass / Fail"
+                        : "-",
+                }))}
+              />
+            )}
           </>
         )}
       </div>

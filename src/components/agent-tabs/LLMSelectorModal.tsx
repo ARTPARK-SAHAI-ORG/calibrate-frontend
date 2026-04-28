@@ -1,15 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import type { LLMModel } from "./constants/providers";
+import type { LLMModel, LLMProvider } from "./constants/providers";
 import { ChevronLeftIcon, CloseIcon } from "@/components/icons";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { useOpenRouterModels } from "@/hooks";
-
-type LLMProvider = {
-  name: string;
-  models: LLMModel[];
-};
 
 type LLMSelectorModalProps = {
   isOpen: boolean;
@@ -17,6 +12,10 @@ type LLMSelectorModalProps = {
   selectedLLM: LLMModel | null;
   onSelect: (model: LLMModel) => void;
   availableProviders?: LLMProvider[];
+  /** Restrict to these provider slugs (e.g. ["openai","anthropic"]). */
+  allowedProviderSlugs?: string[];
+  /** Only show models that accept this input modality. */
+  requiredInputModality?: "text" | "audio" | "image" | "video" | "file";
 };
 
 export function LLMSelectorModal({
@@ -25,6 +24,8 @@ export function LLMSelectorModal({
   selectedLLM,
   onSelect,
   availableProviders,
+  allowedProviderSlugs,
+  requiredInputModality,
 }: LLMSelectorModalProps) {
   useHideFloatingButton(isOpen);
 
@@ -46,15 +47,30 @@ export function LLMSelectorModal({
     onClose();
   };
 
-  // Filter providers and models by search query
+  const allowedSlugSet = allowedProviderSlugs
+    ? new Set(allowedProviderSlugs)
+    : null;
+
+  // Filter providers and models by search query + props
   const filteredProviders = providers
+    .filter((provider) =>
+      allowedSlugSet ? allowedSlugSet.has(provider.slug) : true,
+    )
     .map((provider) => ({
       ...provider,
-      models: provider.models.filter(
-        (model) =>
+      models: provider.models.filter((model) => {
+        if (
+          requiredInputModality &&
+          model.inputModalities &&
+          !model.inputModalities.includes(requiredInputModality)
+        ) {
+          return false;
+        }
+        return (
           model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           provider.name.toLowerCase().includes(searchQuery.toLowerCase())
-      ),
+        );
+      }),
     }))
     .filter((provider) => provider.models.length > 0);
 

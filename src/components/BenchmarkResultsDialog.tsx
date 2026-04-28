@@ -2,37 +2,25 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import {
-  TestCaseOutput,
-  TestCaseData,
   CloseIcon,
   SpinnerIcon,
 } from "./test-results/shared";
-import { BenchmarkOutputsPanel } from "./eval-details";
+import {
+  BenchmarkOutputsPanel,
+  BenchmarkCombinedLeaderboard,
+  type BenchmarkModelResult,
+} from "./eval-details";
 import { StatusBadge } from "@/components/ui";
-import { LeaderboardBarChart, getColorMap } from "./charts/LeaderboardBarChart";
-import { DownloadableTable } from "./DownloadableTable";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
+import { ExportResultsButton } from "@/components/ExportResultsButton";
+import { buildBenchmarkCsv } from "@/lib/exportTestResults";
 import { useAccessToken } from "@/hooks";
-
-type BenchmarkTestResult = {
-  name?: string;
-  passed: boolean | null; // null means still running
-  reasoning?: string;
-  output?: TestCaseOutput;
-  test_case?: TestCaseData;
-};
-
-type ModelResult = {
-  model: string;
-  success: boolean | null; // null means still processing
-  message: string;
-  total_tests: number | null;
-  passed: number | null;
-  failed: number | null;
-  test_results: BenchmarkTestResult[] | null;
-};
+import {
+  fetchDefaultLLMNextReplyEvaluator,
+  type DefaultEvaluatorSummary,
+} from "@/lib/defaultEvaluators";
 
 type LeaderboardSummary = {
   model: string;
@@ -45,7 +33,7 @@ type BenchmarkStatusResponse = {
   task_id: string;
   name?: string;
   status: string;
-  model_results?: ModelResult[];
+  model_results?: BenchmarkModelResult[];
   leaderboard_summary?: LeaderboardSummary[];
   results_s3_prefix?: string;
   error?: string;
@@ -97,7 +85,7 @@ export function BenchmarkResultsDialog({
   // Loading and data state
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [taskStatus, setTaskStatus] = useState<string>("queued");
-  const [modelResults, setModelResults] = useState<ModelResult[]>([]);
+  const [modelResults, setModelResults] = useState<BenchmarkModelResult[]>([]);
   const [leaderboardSummary, setLeaderboardSummary] = useState<
     LeaderboardSummary[] | undefined
   >(undefined);
@@ -106,6 +94,8 @@ export function BenchmarkResultsDialog({
   const [runName, setRunName] = useState<string | null>(null);
   const [isPublic, setIsPublic] = useState(false);
   const [shareToken, setShareToken] = useState<string | null>(null);
+  const [defaultNextReplyEvaluator, setDefaultNextReplyEvaluator] =
+    useState<DefaultEvaluatorSummary | null>(null);
   const backendAccessToken = useAccessToken();
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -113,6 +103,25 @@ export function BenchmarkResultsDialog({
     taskStatus === "completed" ||
     taskStatus === "done" ||
     taskStatus === "failed";
+
+  useEffect(() => {
+    if (!isOpen || !backendAccessToken) return;
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl) return;
+
+    let cancelled = false;
+    fetchDefaultLLMNextReplyEvaluator(backendUrl, backendAccessToken)
+      .then((evaluator) => {
+        if (!cancelled) setDefaultNextReplyEvaluator(evaluator);
+      })
+      .catch(() => {
+        if (!cancelled) setDefaultNextReplyEvaluator(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, backendAccessToken]);
 
   // Start benchmark when dialog opens
   useEffect(() => {
@@ -329,7 +338,7 @@ export function BenchmarkResultsDialog({
   };
 
   // Get providers to display (includes placeholders for models without results yet)
-  const getProvidersToDisplay = (): ModelResult[] => {
+  const getProvidersToDisplay = (): BenchmarkModelResult[] => {
     // When in progress and no results yet, show all models as placeholders
     if (!isDone && modelResults.length === 0 && models.length > 0) {
       return models.map((model) => ({
@@ -348,7 +357,7 @@ export function BenchmarkResultsDialog({
       const existingModels = new Set(modelResults.map((m) => m.model));
       const missingModels = models.filter((m) => !existingModels.has(m));
       if (missingModels.length > 0) {
-        const placeholders: ModelResult[] = missingModels.map((model) => ({
+        const placeholders: BenchmarkModelResult[] = missingModels.map((model) => ({
           model,
           success: null,
           message: "",
@@ -368,9 +377,7 @@ export function BenchmarkResultsDialog({
 
   if (!isOpen) return null;
 
-  // Get color map for charts
-  const modelNames = leaderboardSummary?.map((s) => s.model) || [];
-  const colorMap = getColorMap(modelNames);
+  const benchmarkScoreLabel = "Test pass rate (%)";
 
   // Check if we have any results to show
   const hasAnyResults = modelResults.some(
@@ -379,21 +386,44 @@ export function BenchmarkResultsDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-background rounded-none md:rounded-xl w-full max-w-7xl h-full md:h-[85vh] flex flex-col shadow-2xl">
+      <div className="bg-background rounded-none md:rounded-xl w-full max-w-[92rem] h-full md:h-[92vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4">
-          <div className="flex items-center gap-2 md:gap-3 min-w-0">
-            <div className="min-w-0">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 md:gap-3 min-w-0">
               <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
                 {runName ?? "Benchmark"}
               </h2>
-              <p className="text-xs text-muted-foreground truncate">{agentName}</p>
+              {!isDone && !isInitialLoading && (
+                <StatusBadge status={taskStatus} showSpinner />
+              )}
             </div>
-            {!isDone && !isInitialLoading && (
-              <StatusBadge status={taskStatus} showSpinner />
-            )}
+            <p className="text-xs text-muted-foreground truncate">{agentName}</p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Export results — only shown when benchmark is done */}
+            {isDone && !error && hasAnyResults && (
+              <div className="hidden md:block">
+                <ExportResultsButton
+                  filename={`${runName ?? "benchmark"}-${agentName}`}
+                  getRows={() =>
+                    buildBenchmarkCsv(
+                      modelResults.flatMap((m) =>
+                        (m.test_results ?? []).map((tr) => ({
+                          model: m.model,
+                          name: tr.name,
+                          passed: tr.passed,
+                          reasoning: tr.reasoning,
+                          output: tr.output,
+                          testCase: tr.test_case,
+                          judgeResults: tr.judge_results,
+                        })),
+                      ),
+                    )
+                  }
+                />
+              </div>
+            )}
             {/* Share button — only shown when benchmark is done */}
             {isDone && !error && currentTaskId && backendAccessToken && (
               <div className="hidden md:block">
@@ -532,48 +562,12 @@ export function BenchmarkResultsDialog({
             {/* Leaderboard Tab - Only when done */}
             {isDone && activeTab === "leaderboard" && (
               <div className="p-4 md:p-6 space-y-4 md:space-y-6 overflow-y-auto h-full">
-                {/* Leaderboard Table */}
-                {leaderboardSummary && leaderboardSummary.length > 0 && (
-                  <DownloadableTable
-                    columns={[
-                      {
-                        key: "model",
-                        header: "Model",
-                        render: (value) => value.replace("__", "/"),
-                      },
-                      { key: "pass_rate", header: "Test pass rate (%)" },
-                    ]}
-                    data={leaderboardSummary.map((s) => ({
-                      model: s.model,
-                      pass_rate: s.pass_rate,
-                    }))}
-                    filename={`benchmark-leaderboard-${agentName}`}
-                  />
-                )}
-
-                {/* Charts Section */}
-                {leaderboardSummary && leaderboardSummary.length > 0 && (
-                  <LeaderboardBarChart
-                    title="Test pass rate (%)"
-                    data={leaderboardSummary.map((s) => ({
-                      label: s.model.replace("__", "/"),
-                      value: parseFloat(s.pass_rate),
-                      colorKey: s.model,
-                    }))}
-                    yDomain={[0, 100]}
-                    formatTooltip={(value) => `${value.toFixed(1)}%`}
-                    colorMap={colorMap}
-                  />
-                )}
-
-                {/* Empty State */}
-                {(!leaderboardSummary || leaderboardSummary.length === 0) && (
-                  <div className="text-center py-12">
-                    <p className="text-sm text-muted-foreground">
-                      No leaderboard data available
-                    </p>
-                  </div>
-                )}
+                <BenchmarkCombinedLeaderboard
+                  leaderboardSummary={leaderboardSummary}
+                  modelResults={modelResults}
+                  filename={`benchmark-leaderboard-${agentName.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
+                  benchmarkScoreLabel={benchmarkScoreLabel}
+                />
               </div>
             )}
 
@@ -591,6 +585,7 @@ export function BenchmarkResultsDialog({
                 formatModelName={(n) => n.replace("__", "/")}
                 showControls={isDone}
                 showRunningSpinner={true}
+                legacyDefaultEvaluator={defaultNextReplyEvaluator}
               />
             )}
           </div>

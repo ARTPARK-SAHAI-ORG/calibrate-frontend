@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { TestCaseOutput, TestCaseData } from "@/components/test-results/shared";
+import { TestCaseOutput, TestCaseData, JudgeResult } from "@/components/test-results/shared";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
 import { TestRunOutputsPanel } from "@/components/eval-details";
+import { ExportResultsButton } from "@/components/ExportResultsButton";
+import { buildTestRunCsv } from "@/lib/exportTestResults";
 
 type TestCaseResult = {
   test_uuid?: string;
@@ -17,6 +19,7 @@ type TestCaseResult = {
   test_case?: TestCaseData | null;
   chat_history?: { role: string; content: string }[];
   evaluation?: { passed: boolean; message?: string; details?: Record<string, any> };
+  judge_results?: JudgeResult[] | null;
   error?: string;
 };
 
@@ -81,23 +84,43 @@ export default function PublicTestRunPage() {
   const failed = results.filter((r) => getStatus(r) === "failed").length;
 
   return (
-    <PublicPageLayout title="LLM unit test">
+    <PublicPageLayout title="LLM unit test" contentClassName="max-w-[92rem]">
       <div className="space-y-4 md:space-y-6">
         {/* Summary stats */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400">
-              {passed} passed
-            </span>
-            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400">
-              {failed} failed
-            </span>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400">
+                {passed} passed
+              </span>
+              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400">
+                {failed} failed
+              </span>
+            </div>
+            <span className="text-[13px] text-muted-foreground">{results.length} total tests</span>
           </div>
-          <span className="text-[13px] text-muted-foreground">{results.length} total tests</span>
+          {results.length > 0 && (
+            <ExportResultsButton
+              filename={`test-run-${token}`}
+              getRows={() =>
+                buildTestRunCsv(
+                  results.map((r) => ({
+                    name: r.name || r.test_case?.name || r.test_name,
+                    status: getStatus(r),
+                    output: r.output,
+                    testCase: r.test_case,
+                    reasoning: r.reasoning,
+                    judgeResults: r.judge_results,
+                    error: r.error,
+                  })),
+                )
+              }
+            />
+          )}
         </div>
 
         {results.length > 0 && (
-          <div className="border border-border rounded-xl overflow-hidden" style={{ height: "calc(100vh - 260px)", minHeight: 480 }}>
+          <div className="border border-border rounded-xl overflow-hidden" style={{ height: "calc(100vh - 220px)", minHeight: 620 }}>
             <TestRunOutputsPanel
               results={results.map((r, i) => ({
                 id: `test-${i}`,
@@ -107,11 +130,13 @@ export default function PublicTestRunPage() {
                 testCase: r.test_case ?? undefined,
                 reasoning: r.reasoning,
                 evaluation: r.evaluation ?? { passed: getStatus(r) === "passed" },
+                judgeResults: r.judge_results ?? null,
                 error: r.error,
               }))}
               selectedId={selectedId}
               onSelect={setSelectedId}
               onClearSelection={() => setSelectedId(null)}
+              enableEvaluatorLinks={false}
             />
           </div>
         )}

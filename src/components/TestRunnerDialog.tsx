@@ -6,13 +6,20 @@ import { useAccessToken } from "@/hooks";
 import {
   TestCaseOutput,
   TestCaseData,
+  JudgeResult,
   CloseIcon,
   TestStats,
 } from "./test-results/shared";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
+import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { TestRunOutputsPanel } from "./eval-details";
+import { buildTestRunCsv } from "@/lib/exportTestResults";
+import {
+  fetchDefaultLLMNextReplyEvaluator,
+  type DefaultEvaluatorSummary,
+} from "@/lib/defaultEvaluators";
 
 type TestData = {
   uuid: string;
@@ -43,6 +50,9 @@ type TestResult = {
     message?: string;
     details?: Record<string, any>;
   };
+  /** Per-evaluator verdicts for response tests. Null for tool-call tests
+   * and absent for legacy rows. */
+  judgeResults?: JudgeResult[] | null;
   error?: string;
 };
 
@@ -61,6 +71,9 @@ type TestCaseResult = {
     message?: string;
     details?: Record<string, any>;
   };
+  /** Per-evaluator verdicts for response tests. Null for tool-call tests
+   * and absent for legacy rows. */
+  judge_results?: JudgeResult[] | null;
   error?: string;
 };
 
@@ -127,7 +140,15 @@ export function TestRunnerDialog({
   const [runName, setRunName] = useState<string | null>(null);
   const [isPublic, setIsPublic] = useState(false);
   const [shareToken, setShareToken] = useState<string | null>(null);
+  const [defaultNextReplyEvaluator, setDefaultNextReplyEvaluator] =
+    useState<DefaultEvaluatorSummary | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Tracks whether the dialog has already auto-opened a completed test for
+  // this open lifecycle. Set back to false on every dialog open / new run /
+  // past-run-view init, and flipped to true after the auto-open fires once.
+  // Without this guard, clicking the in-dialog "back to list" button would
+  // immediately re-trigger the auto-open, making the list view unreachable.
+  const hasAutoSelectedRef = useRef(false);
 
   // Debug: Log when selectedTestUuid changes
   useEffect(() => {
@@ -137,6 +158,43 @@ export function TestRunnerDialog({
       testResults.map((r) => ({ uuid: r.test.uuid, name: r.test.name })),
     );
   }, [selectedTestUuid, testResults]);
+
+  // Auto-open the first completed test when nothing is selected. Covers both
+  // - live runs: as soon as one test transitions to passed/failed (and the
+  //   user hasn't manually picked anything), open it.
+  // - past completed runs: on dialog open every test is already passed/failed
+  //   so this picks index 0 (i.e. always opens the first test).
+  // Fires at most once per dialog open thanks to `hasAutoSelectedRef`.
+  useEffect(() => {
+    if (hasAutoSelectedRef.current) return;
+    if (selectedTestUuid !== null) return;
+    const firstCompleted = testResults.find(
+      (r) => r.status === "passed" || r.status === "failed",
+    );
+    if (firstCompleted) {
+      hasAutoSelectedRef.current = true;
+      setSelectedTestUuid(firstCompleted.test.uuid);
+    }
+  }, [testResults, selectedTestUuid]);
+
+  useEffect(() => {
+    if (!isOpen || !backendAccessToken) return;
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl) return;
+
+    let cancelled = false;
+    fetchDefaultLLMNextReplyEvaluator(backendUrl, backendAccessToken)
+      .then((evaluator) => {
+        if (!cancelled) setDefaultNextReplyEvaluator(evaluator);
+      })
+      .catch(() => {
+        if (!cancelled) setDefaultNextReplyEvaluator(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, backendAccessToken]);
 
   // Start polling when dialog opens with a taskId (viewing existing run)
   useEffect(() => {
@@ -155,6 +213,7 @@ export function TestRunnerDialog({
 
     // Initialize state for viewing existing run
     setSelectedTestUuid(null);
+    hasAutoSelectedRef.current = false;
     setCurrentTaskId(taskId);
 
     const isInProgress =
@@ -199,6 +258,7 @@ export function TestRunnerDialog({
     }
 
     setSelectedTestUuid(null);
+    hasAutoSelectedRef.current = false;
     setCurrentTaskId(null);
     const initialResults: TestResult[] = tests.map((test) => ({
       test,
@@ -297,6 +357,7 @@ export function TestRunnerDialog({
               output: apiResult.output ?? undefined,
               testCase: apiResult.test_case ?? undefined,
               reasoning: apiResult.reasoning,
+              judgeResults: apiResult.judge_results ?? null,
               evaluation:
                 testStatus !== "running"
                   ? (apiResult.evaluation ?? {
@@ -337,6 +398,7 @@ export function TestRunnerDialog({
               output: apiResult.output ?? undefined,
               testCase: apiResult.test_case ?? undefined,
               reasoning: apiResult.reasoning,
+              judgeResults: apiResult.judge_results ?? null,
               evaluation:
                 testStatus !== "running"
                   ? (apiResult.evaluation ?? {
@@ -813,7 +875,7 @@ export function TestRunnerDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-0 md:p-4">
-      <div className="bg-background rounded-none md:rounded-xl w-full max-w-7xl h-full md:h-[85vh] flex flex-col shadow-2xl">
+      <div className="bg-background rounded-none md:rounded-xl w-full max-w-[92rem] h-full md:h-[92vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-border">
           <div className="min-w-0">
@@ -834,6 +896,27 @@ export function TestRunnerDialog({
                   />
                 </div>
               )}
+            {/* Export results — only shown when run is done */}
+            {runStatus === "done" && testResults.length > 0 && (
+              <div className="hidden md:block">
+                <ExportResultsButton
+                  filename={`${runName ?? "test-run"}-${agentName}`}
+                  getRows={() =>
+                    buildTestRunCsv(
+                      testResults.map((r) => ({
+                        name: r.test.name,
+                        status: r.status,
+                        output: r.output,
+                        testCase: r.testCase,
+                        reasoning: r.reasoning,
+                        judgeResults: r.judgeResults,
+                        error: r.error,
+                      })),
+                    )
+                  }
+                />
+              </div>
+            )}
             {/* Share button — only shown when run is done and we have a taskId */}
             {runStatus === "done" && (currentTaskId || taskId) && backendAccessToken && (
               <div className="hidden md:block">
@@ -895,11 +978,13 @@ export function TestRunnerDialog({
                 testCase: r.testCase,
                 reasoning: r.reasoning,
                 evaluation: r.evaluation,
+                judgeResults: r.judgeResults,
                 error: r.error,
               }))}
               selectedId={selectedTestUuid}
               onSelect={setSelectedTestUuid}
               onClearSelection={() => setSelectedTestUuid(null)}
+              legacyDefaultEvaluator={defaultNextReplyEvaluator}
             />
           </div>
         )}

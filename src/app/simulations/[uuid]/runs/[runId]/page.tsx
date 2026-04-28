@@ -7,6 +7,7 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
@@ -18,10 +19,23 @@ import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useSidebarState } from "@/lib/sidebar";
 import { ShareButton } from "@/components/ShareButton";
 
+// `type`, `scale_min`, `scale_max` are present on newer runs (per the
+// evaluator migration). Older runs only carry `mean`/`std`/`values` — we
+// fall back to legacy Pass/Fail + percent rendering when `type` is
+// absent.
 type MetricData = {
   mean: number;
   std: number;
   values: number[];
+  type?: "binary" | "rating" | string;
+  scale_min?: number;
+  scale_max?: number;
+};
+
+type RunEvaluator = {
+  evaluator_uuid: string;
+  name: string;
+  description?: string | null;
 };
 
 type Persona = {
@@ -40,6 +54,12 @@ type EvaluationResult = {
   name: string;
   value: number;
   reasoning: string;
+  description?: string | null;
+  // `evaluator_uuid` is added on newer runs and is the rename-safe key
+  // for routing. `name` is still the CSV column name from run time and
+  // can drift from `RunData.evaluators[].name` after an evaluator is
+  // renamed.
+  evaluator_uuid?: string;
 };
 
 type TranscriptEntry = {
@@ -67,14 +87,17 @@ type RunData = {
   type: "text" | "voice";
   updated_at: string;
   total_simulations: number;
-  metrics: {
-    tool_calls?: MetricData;
-    answer_completeness?: MetricData;
-    assistant_behavior?: MetricData;
-    question_completeness?: MetricData;
-  } | null;
+  // Backend now keys metrics by evaluator name (e.g. "Empathy & Tone")
+  // rather than fixed metric ids. Index signature keeps backward compat
+  // with old shape.
+  metrics: Record<string, MetricData | undefined> | null;
   simulation_results: SimulationResult[];
   results_s3_prefix: string;
+  // Top-level evaluators list — present on newer runs; null for runs
+  // started before the migration. `name` is the *current* DB name
+  // (rename-safe for display labels); `evaluator_uuid` is the stable id
+  // for routing.
+  evaluators?: RunEvaluator[] | null;
   error: string | null;
   is_public?: boolean;
   share_token?: string | null;
@@ -89,6 +112,13 @@ export default function SimulationRunPage() {
   const [sidebarOpen, setSidebarOpen] = useSidebarState();
   const [runData, setRunData] = useState<RunData | null>(null);
   const [simulationName, setSimulationName] = useState<string | null>(null);
+  // Map of evaluator name → uuid pulled from the parent simulation's
+  // config (`GET /simulations/{uuid}` → `data.evaluators[]`). Used as a
+  // fallback for the overview-card link affordance when the run
+  // response itself doesn't include the new top-level `evaluators`
+  // field or per-row `evaluator_uuid`s (older runs / partial backends).
+  const [simulationEvaluatorUuidByName, setSimulationEvaluatorUuidByName] =
+    useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<401 | 403 | 404 | null>(null);
@@ -216,6 +246,20 @@ export default function SimulationRunPage() {
         if (response.ok) {
           const data = await response.json();
           setSimulationName(data.name);
+          // Pull evaluator UUIDs from the simulation config so the run
+          // page can still render evaluator links even when the run
+          // response itself doesn't include `evaluators` / per-row
+          // `evaluator_uuid` (e.g. older runs).
+          if (Array.isArray(data?.evaluators)) {
+            const map: Record<string, string> = {};
+            for (const ev of data.evaluators as Array<{
+              uuid?: string;
+              name?: string;
+            }>) {
+              if (ev?.name && ev?.uuid) map[ev.name] = ev.uuid;
+            }
+            setSimulationEvaluatorUuidByName(map);
+          }
         }
       } catch (err) {
         console.error("Error fetching simulation name:", err);
@@ -371,6 +415,131 @@ export default function SimulationRunPage() {
     );
     return result?.reasoning ?? "";
   };
+
+  // Map of metric name → evaluator UUID, used to render evaluator-card
+  // labels as links to `/evaluators/{uuid}`. Resolution priority:
+  //   1. `runData.evaluators[]` (top-level, newer runs) — rename-safe
+  //      live `name` keyed to a stable `evaluator_uuid`.
+  //   2. `simulation_results[i].evaluation_results[].evaluator_uuid` —
+  //      per-row fallback for runs that don't carry the top-level
+  //      `evaluators` field but do carry per-row uuids.
+  //   3. `simulationEvaluatorUuidByName` from the parent simulation
+  //      config (`GET /simulations/{uuid}` → `data.evaluators[]`) — last
+  //      resort for older runs that have neither (1) nor (2). The
+  //      mapping is by name, so renaming an evaluator after the run
+  //      could mis-link, but this is the best we can do without per-run
+  //      uuids.
+  const evaluatorUuidByName = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (runData?.evaluators) {
+      for (const ev of runData.evaluators) {
+        if (ev?.name && ev?.evaluator_uuid) map[ev.name] = ev.evaluator_uuid;
+      }
+    }
+    if (runData?.simulation_results) {
+      for (const sim of runData.simulation_results) {
+        if (!sim.evaluation_results) continue;
+        for (const r of sim.evaluation_results) {
+          if (r?.name && r?.evaluator_uuid && !(r.name in map)) {
+            map[r.name] = r.evaluator_uuid;
+          }
+        }
+      }
+    }
+    for (const [name, uuid] of Object.entries(simulationEvaluatorUuidByName)) {
+      if (!(name in map)) map[name] = uuid;
+    }
+    return map;
+  }, [runData, simulationEvaluatorUuidByName]);
+
+  const evaluatorDescriptionByName = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (runData?.evaluators) {
+      for (const ev of runData.evaluators) {
+        if (ev?.name && ev.description) map[ev.name] = ev.description;
+      }
+    }
+    if (runData?.simulation_results) {
+      for (const sim of runData.simulation_results) {
+        if (!sim.evaluation_results) continue;
+        for (const result of sim.evaluation_results) {
+          if (result?.name && result.description && !(result.name in map)) {
+            map[result.name] = result.description;
+          }
+          if (
+            result?.name === "stt_llm_judge_score" &&
+            result.description &&
+            !("stt_llm_judge" in map)
+          ) {
+            map.stt_llm_judge = result.description;
+          }
+        }
+      }
+    }
+    return map;
+  }, [runData]);
+
+  // Per-row formatter for an individual evaluation result. Returns a JSX
+  // node so the caller can drop it straight into the table cell. Rules:
+  //  - rating  → numeric `value/max` (or just value if no scale_max)
+  //  - binary  → green Pass / red Fail badge
+  //  - default → legacy Pass/Fail (keeps older runs without `type`
+  //              behaving as before)
+  // `stt_llm_judge_score` is intentionally handled by the caller before
+  // this since it has its own percent display.
+  const formatRowMetricValue = useCallback(
+    (metricKey: string, value: number) => {
+      const info = runData?.metrics?.[metricKey];
+      // Defensively coerce `value` to a number — the API has been
+      // observed to emit numeric fields as strings, in which case
+      // `value.toFixed(...)` would throw "is not a function" and
+      // `value === 1` would always be false (e.g. `"1" === 1`).
+      const numericValue = Number(value);
+      const safeNumeric = Number.isFinite(numericValue) ? numericValue : NaN;
+      if (info?.type === "rating") {
+        const rounded = Number.isFinite(safeNumeric)
+          ? parseFloat(safeNumeric.toFixed(2))
+          : value;
+        const display =
+          typeof info.scale_max === "number"
+            ? `${rounded}/${info.scale_max}`
+            : `${rounded}`;
+        return {
+          text: display,
+          className:
+            "inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium text-foreground",
+        };
+      }
+      const passed = safeNumeric === 1;
+      return {
+        text: passed ? "Pass" : "Fail",
+        className: `inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
+          passed
+            ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
+            : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
+        }`,
+      };
+    },
+    [runData]
+  );
+
+  // Aggregate (overview-card) formatter. Binary aggregates show pass
+  // count / total, rating aggregates show mean / scale_max, and
+  // anything else falls through to the legacy percent rendering.
+  const formatOverviewMetricValue = useCallback((metric: MetricData) => {
+    // Coerce numerics defensively — `mean` and `values[]` may come back as
+    // strings on some responses (decimal columns serialized as strings),
+    // which would break `mean.toFixed(...)`.
+    const numericMean = Number(metric.mean);
+    const safeMean = Number.isFinite(numericMean) ? numericMean : 0;
+    if (metric.type === "rating" && typeof metric.scale_max === "number") {
+      return `${parseFloat(safeMean.toFixed(2))}/${metric.scale_max}`;
+    }
+    // Binary and legacy/typeless metrics both render as a percentage of
+    // the mean — same display as before the typed-evaluator migration so
+    // existing dashboards keep their familiar look.
+    return `${Math.round(safeMean * 100)}%`;
+  }, []);
 
   // Check if a simulation row is still processing (has transcript but no evaluation results) - yellow spinner
   const isSimulationProcessing = (simulation: SimulationResult) => {
@@ -845,16 +1014,26 @@ export default function SimulationRunPage() {
                         regularMetrics.length > 0)) && (
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {regularMetrics.map(([key, metric]) => {
-                          const mean = metric.mean;
-                          const isSttLlmJudge =
-                            key === "stt_llm_judge" ||
-                            key === "stt_llm_judge_score";
-                          return (
-                            <div key={key} className="border border-border rounded-xl p-4 bg-muted/10">
-                              <div className="text-[12px] text-muted-foreground mb-1 flex items-center gap-1.5">
-                                {key}
-                                {isSttLlmJudge && (
-                                  <Tooltip content="This is the speech to text accuracy for the text spoken by the simulated user calculated by comparing it with the transcribed text by the agent">
+                          const evaluatorUuid = evaluatorUuidByName[key];
+                          const evaluatorDescription =
+                            evaluatorDescriptionByName[key] ||
+                            (key === "stt_llm_judge" ||
+                            key === "stt_llm_judge_score"
+                              ? "This is the speech to text accuracy for the text spoken by the simulated user calculated by comparing it with the transcribed text by the agent"
+                              : "");
+                          // When we have an evaluator UUID, the entire
+                          // card becomes a Link so the affordance is
+                          // obvious (hover-highlight + arrow icon).
+                          // Built-in keys like `stt_llm_judge` aren't
+                          // user evaluators and render as plain divs.
+                          const cardInner = (
+                            <>
+                              <div className="mb-1 flex items-center gap-1.5">
+                                <span className="text-[12px] text-muted-foreground">
+                                  {key}
+                                </span>
+                                {evaluatorDescription && (
+                                  <Tooltip content={evaluatorDescription}>
                                     <svg
                                       className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                                       fill="none"
@@ -870,10 +1049,42 @@ export default function SimulationRunPage() {
                                     </svg>
                                   </Tooltip>
                                 )}
+                                {evaluatorUuid && (
+                                  <svg
+                                    className="ml-auto w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                    aria-hidden="true"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                                    />
+                                  </svg>
+                                )}
                               </div>
                               <div className="text-[18px] font-semibold text-foreground">
-                                {Math.round(mean * 100)}%
+                                {formatOverviewMetricValue(metric)}
                               </div>
+                            </>
+                          );
+                          if (evaluatorUuid) {
+                            return (
+                              <Link
+                                key={key}
+                                href={`/evaluators/${evaluatorUuid}`}
+                                className="group block border border-border rounded-xl p-4 bg-muted/10 hover:border-foreground/40 hover:bg-muted/30 transition-colors cursor-pointer"
+                              >
+                                {cardInner}
+                              </Link>
+                            );
+                          }
+                          return (
+                            <div key={key} className="border border-border rounded-xl p-4 bg-muted/10">
+                              {cardInner}
                             </div>
                           );
                         })}
@@ -1192,8 +1403,6 @@ export default function SimulationRunPage() {
                                         );
                                       }
 
-                                      const passed = value === 1;
-
                                       // For stt_llm_judge, show percentage
                                       if (isSttLlmJudge) {
                                         const percentage = parseFloat(
@@ -1221,7 +1430,13 @@ export default function SimulationRunPage() {
                                         );
                                       }
 
-                                      // For other metrics, show Pass/Fail
+                                      // Rating evaluators render as
+                                      // value/max; binary (and legacy
+                                      // typeless) render as Pass/Fail.
+                                      const rowDisplay = formatRowMetricValue(
+                                        metricKey,
+                                        value
+                                      );
                                       return (
                                         <td
                                           key={metricKey}
@@ -1230,25 +1445,13 @@ export default function SimulationRunPage() {
                                           <div className="flex justify-center">
                                             {reasoning ? (
                                               <Tooltip content={reasoning}>
-                                                <span
-                                                  className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
-                                                    passed
-                                                      ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
-                                                      : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
-                                                  }`}
-                                                >
-                                                  {passed ? "Pass" : "Fail"}
+                                                <span className={rowDisplay.className}>
+                                                  {rowDisplay.text}
                                                 </span>
                                               </Tooltip>
                                             ) : (
-                                              <span
-                                                className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
-                                                  passed
-                                                    ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
-                                                    : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
-                                                }`}
-                                              >
-                                                {passed ? "Pass" : "Fail"}
+                                              <span className={rowDisplay.className}>
+                                                {rowDisplay.text}
                                               </span>
                                             )}
                                           </div>
@@ -1347,9 +1550,11 @@ export default function SimulationRunPage() {
                                             key={metricKey}
                                             className="flex items-center justify-between py-2 border-b border-border/50 last:border-b-0"
                                           >
-                                            <span className="text-xs text-muted-foreground">
-                                              {metricKey}
-                                            </span>
+                                            <div className="min-w-0 pr-3">
+                                              <span className="text-xs text-muted-foreground">
+                                                {metricKey}
+                                              </span>
+                                            </div>
                                             <div className="flex items-center gap-2">
                                               {value === null ? (
                                                 simulation.aborted ? (
@@ -1389,38 +1594,43 @@ export default function SimulationRunPage() {
                                                   %
                                                 </span>
                                               ) : (
-                                                <div className="flex items-center gap-1.5">
-                                                  <span
-                                                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                                                      value === 1
-                                                        ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
-                                                        : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
-                                                    }`}
-                                                  >
-                                                    {value === 1
-                                                      ? "Pass"
-                                                      : "Fail"}
-                                                  </span>
-                                                  {reasoning && (
-                                                    <Tooltip
-                                                      content={reasoning}
-                                                    >
-                                                      <svg
-                                                        className="w-3.5 h-3.5 text-muted-foreground cursor-pointer"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                        strokeWidth={2}
-                                                      >
-                                                        <path
-                                                          strokeLinecap="round"
-                                                          strokeLinejoin="round"
-                                                          d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-                                                        />
-                                                      </svg>
-                                                    </Tooltip>
-                                                  )}
-                                                </div>
+                                                (() => {
+                                                  const rowDisplay =
+                                                    formatRowMetricValue(
+                                                      metricKey,
+                                                      value
+                                                    );
+                                                  const compactClass = rowDisplay.className.replace(
+                                                    "px-2.5 py-1 rounded-md",
+                                                    "px-2 py-0.5 rounded"
+                                                  );
+                                                  return (
+                                                    <div className="flex items-center gap-1.5">
+                                                      <span className={compactClass}>
+                                                        {rowDisplay.text}
+                                                      </span>
+                                                      {reasoning && (
+                                                        <Tooltip
+                                                          content={reasoning}
+                                                        >
+                                                          <svg
+                                                            className="w-3.5 h-3.5 text-muted-foreground cursor-pointer"
+                                                            fill="none"
+                                                            viewBox="0 0 24 24"
+                                                            stroke="currentColor"
+                                                            strokeWidth={2}
+                                                          >
+                                                            <path
+                                                              strokeLinecap="round"
+                                                              strokeLinejoin="round"
+                                                              d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                                                            />
+                                                          </svg>
+                                                        </Tooltip>
+                                                      )}
+                                                    </div>
+                                                  );
+                                                })()
                                               )}
                                             </div>
                                           </div>

@@ -46,20 +46,43 @@ export function LeaderboardTab({
 
       {charts.map((row, rowIndex) => (
         <div key={rowIndex} className={`grid grid-cols-1 ${row.length >= 2 ? "md:grid-cols-2" : ""} gap-4 md:gap-6`}>
-          {row.map((chart) => (
-            <LeaderboardBarChart
-              key={chart.title}
-              title={chart.title}
-              data={data.map((s) => ({
+          {row.map((chart) => {
+            const chartData = data
+              .map((s) => ({
                 label: getLabel(s[nameKey]),
                 value: s[chart.dataKey],
                 colorKey: s[nameKey],
-              }))}
-              colorMap={colorMap}
-              yDomain={chart.yDomain}
-              formatTooltip={chart.formatTooltip}
-            />
-          ))}
+              }))
+              .filter(
+                (d) =>
+                  typeof d.value === "number" && Number.isFinite(d.value),
+              );
+
+            if (chartData.length === 0) {
+              return (
+                <div
+                  key={chart.title}
+                  className="border rounded-xl p-4 bg-muted/10 flex flex-col min-h-[200px]"
+                >
+                  <h3 className="text-[15px] font-semibold mb-2">{chart.title}</h3>
+                  <p className="text-xs text-muted-foreground mt-auto mb-auto text-center py-8">
+                    No chart data (all models missing values for this metric).
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <LeaderboardBarChart
+                key={chart.title}
+                title={chart.title}
+                data={chartData}
+                colorMap={colorMap}
+                yDomain={chart.yDomain}
+                formatTooltip={chart.formatTooltip}
+              />
+            );
+          })}
         </div>
       ))}
     </div>

@@ -1,7 +1,16 @@
 import React from "react";
 import { Tooltip } from "@/components/Tooltip";
 
-export type EvaluationResult = { name: string; value: number; reasoning: string };
+// `evaluator_uuid` is added on newer runs (rename-safe link target). `name`
+// on each row is still the CSV column name from run time and may drift
+// from the live evaluator name after renames.
+export type EvaluationResult = {
+  name: string;
+  value: number;
+  reasoning: string;
+  evaluator_uuid?: string;
+  description?: string | null;
+};
 export type Persona = { label: string; characteristics: string; gender: string; language: string };
 export type Scenario = { name: string; description: string };
 export type TranscriptEntry = { role: string; content?: string; tool_calls?: any[] | null; tool_call_id?: string };
@@ -17,10 +26,21 @@ export type SimulationResult = {
   conversation_wav_url?: string;
 };
 
+// Per-metric display info derived from `runData.metrics[key]`. Used to
+// switch the per-row cell between Pass/Fail (binary) and `value/max`
+// (rating). Older runs that don't carry `type` fall through to the
+// legacy Pass/Fail rendering so existing share links keep working.
+export type MetricDisplayInfo = {
+  type?: "binary" | "rating" | string;
+  scale_max?: number;
+};
+
 type SimulationResultsTableProps = {
   simulations: SimulationResult[];
   metricKeys: string[];
   onSelectSimulation: (sim: SimulationResult) => void;
+  /** Optional per-metric type / scale info, keyed by metric name. */
+  metricInfo?: Record<string, MetricDisplayInfo | undefined>;
 };
 
 const getEvaluationResult = (sim: SimulationResult, key: string): number | null => {
@@ -32,11 +52,17 @@ const getEvaluationResult = (sim: SimulationResult, key: string): number | null 
 
 const getEvaluationReasoning = (sim: SimulationResult, key: string): string | null => {
   if (!sim.evaluation_results) return null;
-  const found = sim.evaluation_results.find((r) => r.name === key);
+  const mapped = key === "stt_llm_judge" ? "stt_llm_judge_score" : key;
+  const found = sim.evaluation_results.find((r) => r.name === key || r.name === mapped);
   return found?.reasoning ?? null;
 };
 
-export function SimulationResultsTable({ simulations, metricKeys, onSelectSimulation }: SimulationResultsTableProps) {
+export function SimulationResultsTable({
+  simulations,
+  metricKeys,
+  onSelectSimulation,
+  metricInfo,
+}: SimulationResultsTableProps) {
   return (
     <div>
       <div className="flex items-baseline gap-3 mb-3 md:mb-4">
@@ -54,7 +80,9 @@ export function SimulationResultsTable({ simulations, metricKeys, onSelectSimula
                 <th className="px-4 py-3 text-left text-[12px] font-medium text-muted-foreground uppercase tracking-wider">Persona</th>
                 <th className="px-4 py-3 text-left text-[12px] font-medium text-muted-foreground uppercase tracking-wider">Scenario</th>
                 {metricKeys.map((k) => (
-                  <th key={k} className="px-4 py-3 text-left text-[12px] font-medium text-muted-foreground tracking-wider whitespace-nowrap">{k}</th>
+                  <th key={k} className="px-4 py-3 text-left text-[12px] font-medium text-muted-foreground tracking-wider whitespace-nowrap">
+                    {k}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -84,7 +112,43 @@ export function SimulationResultsTable({ simulations, metricKeys, onSelectSimula
                         {sim.aborted ? <span className="text-xs text-muted-foreground">N/A</span> : <span className="text-xs text-muted-foreground">&mdash;</span>}
                       </td>
                     );
-                    const isPass = val === 1;
+                    const info = metricInfo?.[key];
+                    // Rating evaluators render as `value/max` (or just the
+                    // numeric value if `scale_max` is missing) — Pass/Fail
+                    // doesn't apply to scalar scores like 4.0 / 5. Defensively
+                    // coerce to Number — backend has been observed to emit
+                    // these as strings on some responses, and `val.toFixed` on
+                    // a string throws "val.toFixed is not a function".
+                    if (info?.type === "rating") {
+                      const numericVal = Number(val);
+                      const rounded = Number.isFinite(numericVal)
+                        ? parseFloat(numericVal.toFixed(2))
+                        : val;
+                      const display = typeof info.scale_max === "number"
+                        ? `${rounded}/${info.scale_max}`
+                        : `${rounded}`;
+                      return (
+                        <td key={key} className="px-4 py-4">
+                          <div className="flex items-center gap-1.5">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium text-foreground">
+                              {display}
+                            </span>
+                            {reasoning && (
+                              <Tooltip content={reasoning}>
+                                <button type="button" className="p-1 rounded-md hover:bg-muted transition-colors cursor-pointer">
+                                  <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                </button>
+                              </Tooltip>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    }
+                    // `val` may arrive as a string from the backend; coerce
+                    // before the equality check so `"1"` still maps to Pass.
+                    const isPass = Number(val) === 1;
                     return (
                       <td key={key} className="px-4 py-4">
                         <div className="flex items-center gap-1.5">

@@ -2,11 +2,14 @@ import React, { useState } from "react";
 import {
   TestCaseOutput,
   TestCaseData,
+  JudgeResult,
   StatusIcon,
   TestDetailView,
   EmptyStateView,
   EvaluationCriteriaPanel,
 } from "@/components/test-results/shared";
+import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
+import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSummary";
 
 export type BenchmarkTestResult = {
   name?: string;
@@ -14,6 +17,10 @@ export type BenchmarkTestResult = {
   reasoning?: string;
   output?: TestCaseOutput;
   test_case?: TestCaseData;
+  /** Per-evaluator verdicts for response (next-reply) tests. Null for
+   * tool-call tests; legacy rows omit the field and fall back to the
+   * legacy single-reasoning UI. */
+  judge_results?: JudgeResult[] | null;
 };
 
 export type BenchmarkModelResult = {
@@ -24,6 +31,8 @@ export type BenchmarkModelResult = {
   passed: number | null;
   failed: number | null;
   test_results: BenchmarkTestResult[] | null;
+  /** Aggregate per evaluator from metrics.json criteria (finished models). Optional / null on older jobs. */
+  evaluator_summary?: BenchmarkEvaluatorSummaryEntry[] | null;
 };
 
 type BenchmarkOutputsPanelProps = {
@@ -42,6 +51,13 @@ type BenchmarkOutputsPanelProps = {
   /** Show spinner for running tests */
   showRunningSpinner?: boolean;
   height?: string;
+  /** Optional rating-evaluator scale lookup (uuid → scale_max). Fallback
+   * only — newer judge_results entries carry `scale_max` inline. */
+  scaleByEvaluatorUuid?: Record<string, number | undefined>;
+  /** Disable evaluator detail links for public share pages. */
+  enableEvaluatorLinks?: boolean;
+  /** Default correctness evaluator used for legacy next-reply criteria. */
+  legacyDefaultEvaluator?: DefaultEvaluatorSummary | null;
 };
 
 export function BenchmarkOutputsPanel({
@@ -57,6 +73,9 @@ export function BenchmarkOutputsPanel({
   showControls = true,
   showRunningSpinner = false,
   height,
+  scaleByEvaluatorUuid,
+  enableEvaluatorLinks = true,
+  legacyDefaultEvaluator,
 }: BenchmarkOutputsPanelProps) {
   const [statusFilter, setStatusFilter] = useState<"all" | "passed" | "failed">("all");
 
@@ -186,6 +205,11 @@ export function BenchmarkOutputsPanel({
                 output={selectedTestResult.output}
                 passed={selectedTestResult.passed ?? false}
                 reasoning={selectedTestResult.reasoning}
+                evaluation={selectedTestResult.test_case?.evaluation}
+                judgeResults={selectedTestResult.judge_results}
+                scaleByEvaluatorUuid={scaleByEvaluatorUuid}
+                enableEvaluatorLinks={enableEvaluatorLinks}
+                legacyDefaultEvaluator={legacyDefaultEvaluator}
               />
             )
           ) : (
@@ -194,11 +218,20 @@ export function BenchmarkOutputsPanel({
         </div>
       </div>
 
-      {/* Right Panel - Evaluation Criteria */}
+      {/* Right Panel - Evaluators / Expected Tool Calls (desktop only).
+          On mobile this content is rendered inline by `TestDetailView`. */}
       {selectedTestResult && selectedTestResult.passed !== null && (
-        <div className="hidden md:flex w-72 border-l border-border flex-col overflow-hidden">
+        <div className="hidden md:flex w-[32rem] border-l border-border flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto">
-            <EvaluationCriteriaPanel evaluation={selectedTestResult.test_case?.evaluation} />
+            <EvaluationCriteriaPanel
+              evaluation={selectedTestResult.test_case?.evaluation}
+              testCaseEvaluators={selectedTestResult.test_case?.evaluators}
+              judgeResults={selectedTestResult.judge_results}
+              reasoning={selectedTestResult.reasoning}
+              scaleByEvaluatorUuid={scaleByEvaluatorUuid}
+              enableEvaluatorLinks={enableEvaluatorLinks}
+              legacyDefaultEvaluator={legacyDefaultEvaluator}
+            />
           </div>
         </div>
       )}

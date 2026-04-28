@@ -1,21 +1,54 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { sttProviders } from "@/components/agent-tabs/constants/providers";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
 import {
-  ProviderSidebar,
-  ProviderMetricsCard,
-  STTResultsTable,
-  LeaderboardTab,
-  AboutMetricsTable,
+  STTEvaluationAbout,
+  STTEvaluationLeaderboard,
+  STTEvaluationOutputs,
+  findFirstEvaluatorRuns,
+  evaluatorColumnsFromRuns,
+  evaluatorDescriptionMapFromRuns,
+  ratingRange,
+  type STTEvaluatorColumn,
 } from "@/components/eval-details";
+import {
+  getPublicDefaultEvaluator,
+  type PublicDefaultEvaluator,
+} from "@/lib/publicEvaluators";
+
+// Mirrors the auth STT page: the response now optionally carries
+// `evaluator_runs` per provider with the live evaluator `name`, stable
+// `evaluator_uuid`, the artefact `metric_key` (== per-row CSV column with no
+// `_score` suffix) and an `aggregate` block (`type`, `mean`, optional
+// `scale_min` / `scale_max`). Older shareable links still ship the flat
+// `llm_judge_score` scheme — both paths are handled below.
+type EvaluatorRunAggregate = {
+  type?: "binary" | "rating" | string;
+  mean?: number;
+  scale_min?: number;
+  scale_max?: number;
+  [k: string]: unknown;
+};
+
+type EvaluatorRun = {
+  evaluator_uuid: string;
+  metric_key: string;
+  aggregate?: EvaluatorRunAggregate | null;
+  name?: string;
+  description?: string;
+};
 
 type ProviderMetrics = {
-  wer: number;
-  string_similarity: number;
-  llm_judge_score: number;
+  wer?: number;
+  string_similarity?: number;
+  llm_judge_score?: number;
+  [k: string]:
+    | number
+    | { type?: string; mean?: number; scale_min?: number; scale_max?: number }
+    | undefined;
 };
 
 type ProviderResult = {
@@ -28,18 +61,21 @@ type ProviderResult = {
     gt: string;
     pred: string;
     wer: string;
-    string_similarity: string;
-    llm_judge_score: string;
-    llm_judge_reasoning: string;
+    string_similarity?: string;
+    llm_judge_score?: string;
+    llm_judge_reasoning?: string;
+    [k: string]: unknown;
   }>;
+  evaluator_runs?: EvaluatorRun[] | null;
 };
 
 type LeaderboardSummary = {
   run: string;
   count: number;
-  wer: number;
-  string_similarity: number;
-  llm_judge_score: number;
+  wer?: number;
+  string_similarity?: number;
+  llm_judge_score?: number;
+  [k: string]: string | number | undefined;
 };
 
 type EvaluationResult = {
@@ -56,14 +92,6 @@ const getProviderLabel = (value: string): string => {
   return provider ? provider.label : value;
 };
 
-const STT_ABOUT_METRICS = [
-  { metric: "WER", description: "Word error rate measures the percentage of words that differ between reference and predicted transcription.", preference: "Lower is better", range: "0 - \u221E" },
-  { metric: "String Similarity", description: "Measures similarity between reference and predicted strings using string matching algorithms.", preference: "Higher is better", range: "0 - 1" },
-  { metric: "LLM Judge", description: "Evaluates semantic equivalence rather than exact string matching, returning Pass if the transcription is semantically correct.", preference: "Pass is better", range: "Pass / Fail" },
-  { metric: "TTFB", description: "Time to first byte measures the latency from when a request is sent until the first byte of the response is received.", preference: "Lower is better", range: "0 - \u221E" },
-  { metric: "Processing Time", description: "Total time taken to process the audio and generate the transcription.", preference: "Lower is better", range: "0 - \u221E" },
-];
-
 export default function PublicSTTPage() {
   const params = useParams();
   const token = params.token as string;
@@ -73,6 +101,8 @@ export default function PublicSTTPage() {
   const [notFound, setNotFound] = useState(false);
   const [activeTab, setActiveTab] = useState<"leaderboard" | "outputs" | "about">("leaderboard");
   const [activeProviderTab, setActiveProviderTab] = useState<string | null>(null);
+  const [defaultEvaluator, setDefaultEvaluator] =
+    useState<PublicDefaultEvaluator | null>(null);
 
   useEffect(() => { document.title = "Speech-to-text evaluation | Calibrate"; }, []);
 
@@ -92,6 +122,8 @@ export default function PublicSTTPage() {
         const result: EvaluationResult = await res.json();
         if (result.status !== "done") { setNotFound(true); return; }
 
+        const defaultEvaluator = await getPublicDefaultEvaluator(backendUrl, token, "stt");
+        setDefaultEvaluator(defaultEvaluator);
         setData(result);
         if (result.provider_results?.length) {
           setActiveProviderTab(result.provider_results[0].provider);
@@ -105,11 +137,44 @@ export default function PublicSTTPage() {
     fetchData();
   }, [token]);
 
+  // Derive the per-evaluator columns. Prefers `evaluator_runs` (new format)
+  // and falls back to a single legacy `llm_judge_*` column when the
+  // response is from an older job, using the public default evaluator
+  // metadata endpoint for the fallback label/type.
+  const evaluatorColumns: STTEvaluatorColumn[] = useMemo(() => {
+    const providerResults = data?.provider_results ?? [];
+    const firstRuns = findFirstEvaluatorRuns(providerResults);
+
+    if (firstRuns) {
+      return evaluatorColumnsFromRuns<STTEvaluatorColumn>(firstRuns);
+    }
+
+    return [
+      {
+        key: "llm_judge",
+        label: defaultEvaluator?.name ?? "Evaluator",
+        outputType: defaultEvaluator?.output_type ?? "binary",
+        scoreField: "llm_judge_score",
+        reasoningField: "llm_judge_reasoning",
+      },
+    ];
+  }, [data, defaultEvaluator]);
+
+  const evaluatorDescriptions = useMemo(() => {
+    const providerResults = data?.provider_results ?? [];
+    return evaluatorDescriptionMapFromRuns(findFirstEvaluatorRuns(providerResults));
+  }, [data]);
+
+  const defaultEvaluatorRange = useMemo(() => {
+    if (defaultEvaluator?.output_type !== "rating") return "Pass / Fail";
+    const scaleValues = (defaultEvaluator.live_version?.output_config?.scale ?? [])
+      .map((s) => Number(s.value))
+      .filter((v) => !Number.isNaN(v));
+    return ratingRange(scaleValues);
+  }, [defaultEvaluator]);
+
   if (isLoading) return <PublicPageLayout><PublicLoading /></PublicPageLayout>;
   if (notFound || !data) return <PublicPageLayout><PublicNotFound /></PublicPageLayout>;
-
-  const selectedProvider = activeProviderTab ?? data.provider_results?.[0]?.provider;
-  const providerResult = data.provider_results?.find((p) => p.provider === selectedProvider);
 
   return (
     <PublicPageLayout
@@ -142,67 +207,46 @@ export default function PublicSTTPage() {
 
             {/* Leaderboard Tab */}
             {activeTab === "leaderboard" && data.leaderboard_summary && (
-              <LeaderboardTab
-                columns={[
-                  { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
-                  { key: "wer", header: "WER" },
-                  { key: "string_similarity", header: "String Similarity", render: (v) => v != null ? parseFloat(v.toFixed(4)) : "-" },
-                  { key: "llm_judge_score", header: "LLM Judge Score" },
-                ]}
-                data={data.leaderboard_summary}
-                charts={[
-                  [{ title: "WER", dataKey: "wer" }, { title: "String Similarity", dataKey: "string_similarity", yDomain: [0, 1] }],
-                  [{ title: "LLM Judge Score", dataKey: "llm_judge_score", yDomain: [0, 1] }],
-                ]}
-                filename="stt-evaluation-leaderboard"
-                getLabel={getProviderLabel}
+              <STTEvaluationLeaderboard
+                leaderboardSummary={data.leaderboard_summary}
+                evaluatorColumns={evaluatorColumns}
+                getProviderLabel={getProviderLabel}
               />
             )}
 
             {/* Outputs Tab */}
             {activeTab === "outputs" && (
-              <div className="flex flex-col md:flex-row border border-border rounded-xl overflow-hidden" style={{ minHeight: 480 }}>
-                <ProviderSidebar
-                  items={data.provider_results.map((pr) => ({
-                    key: pr.provider,
-                    label: getProviderLabel(pr.provider),
-                    success: pr.success,
-                  }))}
-                  activeKey={selectedProvider ?? null}
-                  onSelect={setActiveProviderTab}
-                />
-
-                <div className="flex-1 overflow-y-auto p-4 md:p-6">
-                  {!providerResult ? (
-                    <p className="text-muted-foreground">Select a provider</p>
-                  ) : !providerResult.success ? (
-                    <div className="flex items-center justify-center h-full min-h-[200px]">
-                      <div className="border border-red-500/50 bg-red-500/10 rounded-lg p-4 max-w-md text-center">
-                        <div className="text-red-500 text-[14px] font-medium">There was an error running this provider.</div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-4 md:space-y-6">
-                      {providerResult.metrics && (
-                        <ProviderMetricsCard
-                          metrics={[
-                            { label: "WER", value: providerResult.metrics.wer != null ? parseFloat(providerResult.metrics.wer.toFixed(4)) : "-" },
-                            { label: "String Similarity", value: providerResult.metrics.string_similarity != null ? parseFloat(providerResult.metrics.string_similarity.toFixed(4)) : "-" },
-                            { label: "LLM Judge Score", value: providerResult.metrics.llm_judge_score ?? "-" },
-                          ]}
-                        />
-                      )}
-                      {providerResult.results && providerResult.results.length > 0 && (
-                        <STTResultsTable results={providerResult.results} />
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <STTEvaluationOutputs
+                providerResults={data.provider_results}
+                activeProviderKey={activeProviderTab}
+                onProviderSelect={setActiveProviderTab}
+                status={data.status}
+                evaluatorColumns={evaluatorColumns}
+                getProviderLabel={getProviderLabel}
+                className="flex flex-col md:flex-row border border-border rounded-xl overflow-hidden min-h-[480px]"
+              />
             )}
 
             {/* About Tab */}
-            {activeTab === "about" && <AboutMetricsTable metrics={STT_ABOUT_METRICS} />}
+            {activeTab === "about" && (
+              <STTEvaluationAbout
+                evaluatorRows={evaluatorColumns.map((col) => ({
+                  key: col.key,
+                  metric: col.label,
+                  description:
+                    evaluatorDescriptions.get(col.key) ??
+                    defaultEvaluator?.description ??
+                    "",
+                  outputType: col.outputType,
+                  range:
+                    col.key === "llm_judge"
+                      ? defaultEvaluatorRange
+                      : col.outputType === "binary"
+                        ? "Pass / Fail"
+                        : "-",
+                }))}
+              />
+            )}
           </>
         )}
       </div>
