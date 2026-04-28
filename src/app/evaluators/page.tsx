@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
@@ -103,6 +103,14 @@ const JUDGE_PROVIDER_SLUGS = [
 ];
 
 export default function MetricsPage() {
+  return (
+    <Suspense fallback={null}>
+      <MetricsPageInner />
+    </Suspense>
+  );
+}
+
+function MetricsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const backendAccessToken = useAccessToken();
