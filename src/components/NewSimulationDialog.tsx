@@ -45,7 +45,6 @@ export function NewSimulationDialog({
         },
         body: JSON.stringify({
           name: simulationName.trim(),
-          description: "",
         }),
       });
 

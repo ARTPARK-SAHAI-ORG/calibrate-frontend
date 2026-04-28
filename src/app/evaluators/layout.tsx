@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Metrics | Calibrate",
+  title: "Evaluators | Calibrate",
 };
 
 export default function MetricsLayout({

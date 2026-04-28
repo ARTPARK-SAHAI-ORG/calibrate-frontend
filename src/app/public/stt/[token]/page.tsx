@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { sttProviders } from "@/components/agent-tabs/constants/providers";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
@@ -10,12 +10,39 @@ import {
   STTResultsTable,
   LeaderboardTab,
   AboutMetricsTable,
+  type STTEvaluatorColumn,
+  type ChartConfig,
 } from "@/components/eval-details";
 
+// Mirrors the auth STT page: the response now optionally carries
+// `evaluator_runs` per provider with the live evaluator `name`, stable
+// `evaluator_uuid`, the artefact `metric_key` (== per-row CSV column with no
+// `_score` suffix) and an `aggregate` block (`type`, `mean`, optional
+// `scale_min` / `scale_max`). Older shareable links still ship the flat
+// `llm_judge_score` scheme — both paths are handled below.
+type EvaluatorRunAggregate = {
+  type?: "binary" | "rating" | string;
+  mean?: number;
+  scale_min?: number;
+  scale_max?: number;
+  [k: string]: unknown;
+};
+
+type EvaluatorRun = {
+  evaluator_uuid: string;
+  metric_key: string;
+  aggregate?: EvaluatorRunAggregate | null;
+  name?: string;
+};
+
 type ProviderMetrics = {
-  wer: number;
-  string_similarity: number;
-  llm_judge_score: number;
+  wer?: number;
+  string_similarity?: number;
+  llm_judge_score?: number;
+  [k: string]:
+    | number
+    | { type?: string; mean?: number; scale_min?: number; scale_max?: number }
+    | undefined;
 };
 
 type ProviderResult = {
@@ -28,18 +55,21 @@ type ProviderResult = {
     gt: string;
     pred: string;
     wer: string;
-    string_similarity: string;
-    llm_judge_score: string;
-    llm_judge_reasoning: string;
+    string_similarity?: string;
+    llm_judge_score?: string;
+    llm_judge_reasoning?: string;
+    [k: string]: unknown;
   }>;
+  evaluator_runs?: EvaluatorRun[] | null;
 };
 
 type LeaderboardSummary = {
   run: string;
   count: number;
-  wer: number;
-  string_similarity: number;
-  llm_judge_score: number;
+  wer?: number;
+  string_similarity?: number;
+  llm_judge_score?: number;
+  [k: string]: string | number | undefined;
 };
 
 type EvaluationResult = {
@@ -105,6 +135,69 @@ export default function PublicSTTPage() {
     fetchData();
   }, [token]);
 
+  // Derive the per-evaluator columns. Prefers `evaluator_runs` (new format)
+  // and falls back to a single legacy `llm_judge_*` column when the
+  // response is from an older job. Public pages don't have access to the
+  // user's evaluator catalogue, so for legacy jobs the column header keeps
+  // the historical "LLM Judge" label rather than trying to look up a
+  // default evaluator name.
+  const evaluatorColumns: STTEvaluatorColumn[] = useMemo(() => {
+    const providerResults = data?.provider_results ?? [];
+
+    const firstRuns = providerResults
+      .map((pr) => pr.evaluator_runs)
+      .find((er): er is EvaluatorRun[] => Array.isArray(er) && er.length > 0);
+
+    if (firstRuns) {
+      return firstRuns.map((run) => ({
+        key: run.metric_key,
+        label: run.name ?? run.metric_key,
+        outputType: run.aggregate?.type === "rating" ? "rating" : "binary",
+        scoreField: run.metric_key,
+        reasoningField: `${run.metric_key}_reasoning`,
+      }));
+    }
+
+    return [
+      {
+        key: "llm_judge",
+        label: "LLM Judge",
+        outputType: "binary",
+        scoreField: "llm_judge_score",
+        reasoningField: "llm_judge_reasoning",
+      },
+    ];
+  }, [data]);
+
+  // Resolve the aggregate `mean` for a column on a specific provider. The
+  // new format ships `aggregate.mean` directly on `evaluator_runs`; the
+  // legacy format ships a flat number at `metrics[scoreField]`; the
+  // new-format mid-state may have nested `metrics[name]` with `mean` inside.
+  const readProviderMean = (col: STTEvaluatorColumn, pr: ProviderResult): number | undefined => {
+    const run = pr.evaluator_runs?.find((r) => r.metric_key === col.key);
+    if (run && typeof run.aggregate?.mean === "number") return run.aggregate.mean;
+
+    const scoreField = col.scoreField ?? `${col.key}_score`;
+    const m = pr.metrics?.[scoreField];
+    if (typeof m === "number") return m;
+
+    const nested = pr.metrics?.[col.key];
+    if (
+      nested &&
+      typeof nested === "object" &&
+      "mean" in nested &&
+      typeof (nested as { mean: unknown }).mean === "number"
+    ) {
+      return (nested as { mean: number }).mean;
+    }
+    return undefined;
+  };
+
+  const formatMetricValue = (v: unknown): string | number => {
+    if (typeof v === "number" && Number.isFinite(v)) return parseFloat(v.toFixed(4));
+    return "-";
+  };
+
   if (isLoading) return <PublicPageLayout><PublicLoading /></PublicPageLayout>;
   if (notFound || !data) return <PublicPageLayout><PublicNotFound /></PublicPageLayout>;
 
@@ -141,23 +234,37 @@ export default function PublicSTTPage() {
             </div>
 
             {/* Leaderboard Tab */}
-            {activeTab === "leaderboard" && data.leaderboard_summary && (
-              <LeaderboardTab
-                columns={[
-                  { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
-                  { key: "wer", header: "WER" },
-                  { key: "string_similarity", header: "String Similarity", render: (v) => v != null ? parseFloat(v.toFixed(4)) : "-" },
-                  { key: "llm_judge_score", header: "LLM Judge Score" },
-                ]}
-                data={data.leaderboard_summary}
-                charts={[
-                  [{ title: "WER", dataKey: "wer" }, { title: "String Similarity", dataKey: "string_similarity", yDomain: [0, 1] }],
-                  [{ title: "LLM Judge Score", dataKey: "llm_judge_score", yDomain: [0, 1] }],
-                ]}
-                filename="stt-evaluation-leaderboard"
-                getLabel={getProviderLabel}
-              />
-            )}
+            {activeTab === "leaderboard" && data.leaderboard_summary && (() => {
+              const evaluatorCharts: ChartConfig[] = evaluatorColumns.map((col) => ({
+                title: col.label,
+                dataKey: col.scoreField ?? `${col.key}_score`,
+                yDomain: col.outputType === "binary" ? ([0, 1] as [number, number]) : undefined,
+              }));
+              return (
+                <LeaderboardTab
+                  columns={[
+                    { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
+                    { key: "wer", header: "WER" },
+                    { key: "string_similarity", header: "String Similarity", render: (v) => v != null ? parseFloat(v.toFixed(4)) : "-" },
+                    ...evaluatorColumns.map((col) => ({
+                      key: col.scoreField ?? `${col.key}_score`,
+                      header: col.label,
+                    })),
+                  ]}
+                  data={data.leaderboard_summary!}
+                  charts={[
+                    [{ title: "WER", dataKey: "wer" }, { title: "String Similarity", dataKey: "string_similarity", yDomain: [0, 1] }],
+                    ...(() => {
+                      const rows: ChartConfig[][] = [];
+                      for (let i = 0; i < evaluatorCharts.length; i += 2) rows.push(evaluatorCharts.slice(i, i + 2));
+                      return rows;
+                    })(),
+                  ]}
+                  filename="stt-evaluation-leaderboard"
+                  getLabel={getProviderLabel}
+                />
+              );
+            })()}
 
             {/* Outputs Tab */}
             {activeTab === "outputs" && (
@@ -188,12 +295,18 @@ export default function PublicSTTPage() {
                           metrics={[
                             { label: "WER", value: providerResult.metrics.wer != null ? parseFloat(providerResult.metrics.wer.toFixed(4)) : "-" },
                             { label: "String Similarity", value: providerResult.metrics.string_similarity != null ? parseFloat(providerResult.metrics.string_similarity.toFixed(4)) : "-" },
-                            { label: "LLM Judge Score", value: providerResult.metrics.llm_judge_score ?? "-" },
+                            ...evaluatorColumns.map((col) => ({
+                              label: col.label,
+                              value: formatMetricValue(readProviderMean(col, providerResult)),
+                            })),
                           ]}
                         />
                       )}
                       {providerResult.results && providerResult.results.length > 0 && (
-                        <STTResultsTable results={providerResult.results} />
+                        <STTResultsTable
+                          results={providerResult.results}
+                          evaluatorColumns={evaluatorColumns}
+                        />
                       )}
                     </div>
                   )}

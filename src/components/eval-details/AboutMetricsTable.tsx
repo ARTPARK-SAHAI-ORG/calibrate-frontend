@@ -2,7 +2,7 @@ import React from "react";
 
 export type MetricDescription = {
   metric: string;
-  description: string;
+  description: React.ReactNode;
   preference: string;
   range: string;
 };

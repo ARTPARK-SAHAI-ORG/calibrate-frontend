@@ -14,9 +14,26 @@ import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog"
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
 import { RunTestDialog } from "@/components/RunTestDialog";
-import { AddTestDialog, TestConfig } from "@/components/AddTestDialog";
+import {
+  AddTestDialog,
+  TestConfig,
+  AttachedEvaluatorInit,
+  EvaluatorRefPayload,
+  EvaluatorVariableDef,
+} from "@/components/AddTestDialog";
 import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
 import { useSidebarState } from "@/lib/sidebar";
+
+// Hydrated evaluator row as returned by GET /tests / GET /tests/{uuid}.evaluators[].
+// `uuid` is the evaluator's id (used as `evaluator_uuid` when writing back).
+type TestEvaluatorRow = {
+  uuid: string;
+  name: string;
+  description?: string | null;
+  slug: string | null;
+  variables?: EvaluatorVariableDef[] | null;
+  variable_values?: Record<string, string> | null;
+};
 
 type TestData = {
   uuid: string;
@@ -24,6 +41,7 @@ type TestData = {
   description: string;
   type: "response" | "tool_call";
   config: Record<string, any>;
+  evaluators?: TestEvaluatorRow[] | null;
   created_at: string;
   updated_at: string;
 };
@@ -147,6 +165,9 @@ function LLMPageInner() {
   const [initialConfig, setInitialConfig] = useState<TestConfig | undefined>(
     undefined
   );
+  const [initialEvaluators, setInitialEvaluators] = useState<
+    AttachedEvaluatorInit[] | undefined
+  >(undefined);
 
   // Selection state for bulk operations
   const [selectedTestUuids, setSelectedTestUuids] = useState<Set<string>>(
@@ -407,7 +428,10 @@ function LLMPageInner() {
   };
 
   // Create test via POST API
-  const createTest = async (config: TestConfig) => {
+  const createTest = async (
+    config: TestConfig,
+    evaluators: EvaluatorRefPayload[]
+  ) => {
     setValidationAttempted(true);
     if (!newTestName.trim()) return;
 
@@ -419,6 +443,22 @@ function LLMPageInner() {
         throw new Error("BACKEND_URL environment variable is not set");
       }
 
+      // Only attach `evaluators` for next-reply tests. Tool-invocation tests
+      // don't carry evaluators and must not have their links touched server-side.
+      const body: {
+        name: string;
+        type: "response" | "tool_call";
+        config: TestConfig;
+        evaluators?: EvaluatorRefPayload[];
+      } = {
+        name: newTestName.trim(),
+        type: config.evaluation.type,
+        config: config,
+      };
+      if (config.evaluation.type === "response") {
+        body.evaluators = evaluators;
+      }
+
       const response = await fetch(`${backendUrl}/tests`, {
         method: "POST",
         headers: {
@@ -427,11 +467,7 @@ function LLMPageInner() {
           "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
-        body: JSON.stringify({
-          name: newTestName.trim(),
-          type: config.evaluation.type,
-          config: config,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (response.status === 401) {
@@ -520,6 +556,23 @@ function LLMPageInner() {
       if (testData.config) {
         setInitialConfig(testData.config as TestConfig);
       }
+      // Hydrate any evaluators already attached to the test. Each row is the
+      // full joined shape from get_evaluators_for_test(); we map it into the
+      // slim AttachedEvaluatorInit the dialog expects.
+      if (Array.isArray(testData.evaluators)) {
+        setInitialEvaluators(
+          testData.evaluators.map((e) => ({
+            evaluator_uuid: e.uuid,
+            name: e.name,
+            description: e.description ?? null,
+            slug: e.slug,
+            variables: Array.isArray(e.variables) ? e.variables : [],
+            variable_values: e.variable_values ?? null,
+          }))
+        );
+      } else {
+        setInitialEvaluators([]);
+      }
     } catch (err) {
       console.error("Error fetching test:", err);
       setCreateError(
@@ -531,7 +584,10 @@ function LLMPageInner() {
   };
 
   // Update existing test via PUT API
-  const updateTest = async (config: TestConfig) => {
+  const updateTest = async (
+    config: TestConfig,
+    evaluators: EvaluatorRefPayload[]
+  ) => {
     setValidationAttempted(true);
     if (!newTestName.trim() || !editingTestUuid) return;
 
@@ -543,6 +599,23 @@ function LLMPageInner() {
         throw new Error("BACKEND_URL environment variable is not set");
       }
 
+      // For next-reply tests we send `evaluators` so the backend replaces the
+      // whole pivot set. For tool-invocation tests we omit `evaluators`
+      // entirely so existing links (if any) are left untouched.
+      const body: {
+        name: string;
+        type: "response" | "tool_call";
+        config: TestConfig;
+        evaluators?: EvaluatorRefPayload[];
+      } = {
+        name: newTestName.trim(),
+        type: config.evaluation.type,
+        config: config,
+      };
+      if (config.evaluation.type === "response") {
+        body.evaluators = evaluators;
+      }
+
       const response = await fetch(`${backendUrl}/tests/${editingTestUuid}`, {
         method: "PUT",
         headers: {
@@ -551,11 +624,7 @@ function LLMPageInner() {
           "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
-        body: JSON.stringify({
-          name: newTestName.trim(),
-          type: config.evaluation.type,
-          config: config,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (response.status === 401) {
@@ -604,6 +673,7 @@ function LLMPageInner() {
     setValidationAttempted(false);
     setInitialTab(undefined);
     setInitialConfig(undefined);
+    setInitialEvaluators(undefined);
   };
 
   // Filter tests based on search query
@@ -631,7 +701,7 @@ function LLMPageInner() {
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
             <h1 className="text-xl md:text-2xl font-semibold">
-              LLM Evaluation
+              LLM Tests
             </h1>
             <p className="text-muted-foreground text-sm md:text-base leading-relaxed mt-1">
               Create and manage tests to evaluate your LLM
@@ -1304,6 +1374,7 @@ function LLMPageInner() {
           onSubmit={editingTestUuid ? updateTest : createTest}
           initialTab={initialTab}
           initialConfig={initialConfig}
+          initialEvaluators={initialEvaluators}
         />
       )}
 

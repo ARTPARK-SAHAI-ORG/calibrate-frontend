@@ -12,7 +12,9 @@ import {
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
+import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { TestRunOutputsPanel } from "./eval-details";
+import { buildTestRunCsv } from "@/lib/exportTestResults";
 
 type TestData = {
   uuid: string;
@@ -834,6 +836,26 @@ export function TestRunnerDialog({
                   />
                 </div>
               )}
+            {/* Export results — only shown when run is done */}
+            {runStatus === "done" && testResults.length > 0 && (
+              <div className="hidden md:block">
+                <ExportResultsButton
+                  filename={`${runName ?? "test-run"}-${agentName}`}
+                  getRows={() =>
+                    buildTestRunCsv(
+                      testResults.map((r) => ({
+                        name: r.test.name,
+                        status: r.status,
+                        output: r.output,
+                        testCase: r.testCase,
+                        reasoning: r.reasoning,
+                        error: r.error,
+                      })),
+                    )
+                  }
+                />
+              </div>
+            )}
             {/* Share button — only shown when run is done and we have a taskId */}
             {runStatus === "done" && (currentTaskId || taskId) && backendAccessToken && (
               <div className="hidden md:block">

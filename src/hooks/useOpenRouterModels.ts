@@ -54,6 +54,13 @@ function getProviderDisplayName(slug: string): string {
     .join(" ");
 }
 
+function isDeprecated(model: { expiration_date?: string | null }): boolean {
+  if (!model.expiration_date) return false;
+  const ts = Date.parse(model.expiration_date);
+  if (Number.isNaN(ts)) return false;
+  return ts < Date.now();
+}
+
 async function fetchModelsFromOpenRouter(): Promise<LLMProvider[]> {
   const response = await fetch("https://openrouter.ai/api/v1/models");
   if (!response.ok) throw new Error(`OpenRouter API error: ${response.status}`);
@@ -68,18 +75,37 @@ async function fetchModelsFromOpenRouter(): Promise<LLMProvider[]> {
 
   for (const model of json.data) {
     if (typeof model.id !== "string" || typeof model.name !== "string") continue;
+    if (isDeprecated(model)) continue;
 
     const slashIndex = model.id.indexOf("/");
     const providerSlug = slashIndex !== -1 ? model.id.slice(0, slashIndex) : "other";
 
+    const arch = model.architecture ?? {};
+    const inputModalities = Array.isArray(arch.input_modalities)
+      ? (arch.input_modalities as unknown[]).filter(
+          (m): m is string => typeof m === "string",
+        )
+      : undefined;
+    const outputModalities = Array.isArray(arch.output_modalities)
+      ? (arch.output_modalities as unknown[]).filter(
+          (m): m is string => typeof m === "string",
+        )
+      : undefined;
+
     if (!grouped.has(providerSlug)) {
       grouped.set(providerSlug, []);
     }
-    grouped.get(providerSlug)!.push({ id: model.id, name: model.name });
+    grouped.get(providerSlug)!.push({
+      id: model.id,
+      name: model.name,
+      inputModalities,
+      outputModalities,
+    });
   }
 
   return Array.from(grouped.entries())
     .map(([slug, models]) => ({
+      slug,
       name: getProviderDisplayName(slug),
       models: models.sort((a, b) => a.name.localeCompare(b.name)),
     }))

@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
 import { LeaderboardTab, BenchmarkOutputsPanel } from "@/components/eval-details";
 import type { BenchmarkTestResult, BenchmarkModelResult } from "@/components/eval-details";
+import { ExportResultsButton } from "@/components/ExportResultsButton";
+import { buildBenchmarkCsv } from "@/lib/exportTestResults";
 
 type LeaderboardSummary = {
   model: string;
@@ -79,16 +81,39 @@ export default function PublicBenchmarkPage() {
     <PublicPageLayout title="LLM benchmark">
       <div className="space-y-4 md:space-y-6">
         {/* Tab nav */}
-        <div className="flex gap-2 border-b border-border">
-          {(["leaderboard", "outputs"] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer capitalize ${activeTab === tab ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-            >
-              {tab}
-            </button>
-          ))}
+        <div className="flex items-end justify-between gap-2 border-b border-border">
+          <div className="flex gap-2">
+            {(["leaderboard", "outputs"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer capitalize ${activeTab === tab ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+          {data.model_results && data.model_results.length > 0 && (
+            <div className="pb-2">
+              <ExportResultsButton
+                filename={`benchmark-${token}`}
+                getRows={() =>
+                  buildBenchmarkCsv(
+                    (data.model_results ?? []).flatMap((m) =>
+                      (m.test_results ?? []).map((tr) => ({
+                        model: m.model,
+                        name: tr.name,
+                        passed: tr.passed,
+                        reasoning: tr.reasoning,
+                        output: tr.output,
+                        testCase: tr.test_case,
+                      })),
+                    ),
+                  )
+                }
+              />
+            </div>
+          )}
         </div>
 
         {/* Leaderboard Tab */}

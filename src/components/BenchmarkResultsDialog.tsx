@@ -14,6 +14,8 @@ import { DownloadableTable } from "./DownloadableTable";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
+import { ExportResultsButton } from "@/components/ExportResultsButton";
+import { buildBenchmarkCsv } from "@/lib/exportTestResults";
 import { useAccessToken } from "@/hooks";
 
 type BenchmarkTestResult = {
@@ -394,6 +396,28 @@ export function BenchmarkResultsDialog({
             )}
           </div>
           <div className="flex items-center gap-2">
+            {/* Export results — only shown when benchmark is done */}
+            {isDone && !error && hasAnyResults && (
+              <div className="hidden md:block">
+                <ExportResultsButton
+                  filename={`${runName ?? "benchmark"}-${agentName}`}
+                  getRows={() =>
+                    buildBenchmarkCsv(
+                      modelResults.flatMap((m) =>
+                        (m.test_results ?? []).map((tr) => ({
+                          model: m.model,
+                          name: tr.name,
+                          passed: tr.passed,
+                          reasoning: tr.reasoning,
+                          output: tr.output,
+                          testCase: tr.test_case,
+                        })),
+                      ),
+                    )
+                  }
+                />
+              </div>
+            )}
             {/* Share button — only shown when benchmark is done */}
             {isDone && !error && currentTaskId && backendAccessToken && (
               <div className="hidden md:block">

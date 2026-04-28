@@ -1,9 +1,12 @@
 export type LLMModel = {
   id: string;
   name: string;
+  inputModalities?: string[];
+  outputModalities?: string[];
 };
 
 export type LLMProvider = {
+  slug: string;
   name: string;
   models: LLMModel[];
 };

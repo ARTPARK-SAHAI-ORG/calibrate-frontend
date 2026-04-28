@@ -20,6 +20,11 @@ type RunData = {
   total_simulations: number;
   metrics: Record<string, MetricData | undefined> | null;
   simulation_results: SimulationResult[];
+  // Top-level evaluator list (newer runs only). Public page intentionally
+  // doesn't render links to /evaluators/{uuid} since that route is
+  // authenticated — but the type is here so the field doesn't disappear
+  // from `data` if we ever need it.
+  evaluators?: Array<{ evaluator_uuid: string; name: string }> | null;
   error: string | null;
 };
 
@@ -96,6 +101,7 @@ export default function PublicSimulationRunPage() {
             simulations={data.simulation_results}
             metricKeys={displayMetricKeys}
             onSelectSimulation={setSelectedSim}
+            metricInfo={data.metrics ?? undefined}
           />
         )}
       </div>

@@ -5,10 +5,10 @@ export { ProviderMetricsCard } from "./ProviderMetricsCard";
 export type { MetricItem } from "./ProviderMetricsCard";
 
 export { TTSResultsTable } from "./TTSResultsTable";
-export type { TTSResultRow } from "./TTSResultsTable";
+export type { TTSResultRow, TTSEvaluatorColumn } from "./TTSResultsTable";
 
 export { STTResultsTable } from "./STTResultsTable";
-export type { STTResultRow } from "./STTResultsTable";
+export type { STTResultRow, STTEvaluatorColumn } from "./STTResultsTable";
 
 export { LeaderboardTab } from "./LeaderboardTab";
 export type { LeaderboardColumn, ChartConfig } from "./LeaderboardTab";

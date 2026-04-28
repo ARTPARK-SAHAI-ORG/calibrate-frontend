@@ -169,9 +169,6 @@ export function BulkUploadTestsModal({
   const [parseError, setParseError] = useState<string | null>(null);
   const [assignToAgents, setAssignToAgents] = useState(false);
   const [selectedAgentUuids, setSelectedAgentUuids] = useState<string[]>([]);
-  const [language, setLanguage] = useState<"english" | "hindi" | "kannada">(
-    "english"
-  );
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadWarnings, setUploadWarnings] = useState<string[] | null>(null);
@@ -182,7 +179,6 @@ export function BulkUploadTestsModal({
       setCsvFile(null);
       setParsedTests([]);
       setParseError(null);
-      setLanguage("english");
       setAssignToAgents(false);
       setSelectedAgentUuids([]);
       setIsUploading(false);
@@ -391,12 +387,8 @@ export function BulkUploadTestsModal({
       const body: {
         type: TestType;
         tests: typeof tests;
-        language?: "english" | "hindi" | "kannada";
         agent_uuids?: string[];
       } = { type: testType, tests };
-      if (language !== "english") {
-        body.language = language;
-      }
       if (assignToAgents && selectedAgentUuids.length > 0) {
         body.agent_uuids = selectedAgentUuids;
       }
@@ -428,7 +420,7 @@ export function BulkUploadTestsModal({
           errorData?.detail ||
             errorData?.message ||
             fallbackMessages[response.status] ||
-            "Failed to bulk upload tests"
+            "Failed to bulk upload tests",
         );
       }
 
@@ -539,35 +531,6 @@ export function BulkUploadTestsModal({
             </div>
           </div>
 
-          {/* Language */}
-          {testType && (
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-3">
-                Language
-              </label>
-              <div className="flex rounded-lg border border-border overflow-hidden w-fit">
-                {(["english", "hindi", "kannada"] as const).map(
-                  (lang, index) => (
-                    <button
-                      key={lang}
-                      type="button"
-                      onClick={() => setLanguage(lang)}
-                      className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
-                        index > 0 ? "border-l border-border" : ""
-                      } ${
-                        language === lang
-                          ? "bg-foreground text-background"
-                          : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted"
-                      }`}
-                    >
-                      {lang.charAt(0).toUpperCase() + lang.slice(1)}
-                    </button>
-                  )
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Step 2: CSV Upload (only if type selected) */}
           {testType && (
             <div>
@@ -599,8 +562,8 @@ export function BulkUploadTestsModal({
               {/* Format description */}
               <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
                 {isResponseType
-                  ? "Your CSV should have three columns: a unique test name, the conversation history as a JSON array of OpenAI-format chat messages, and the evaluation criteria describing the expected agent response. Download the sample CSV for the exact format — it includes a README with detailed column descriptions."
-                  : "Your CSV should have three columns: a unique test name, the conversation history as a JSON array of OpenAI-format chat messages, and the expected tool calls as a JSON array specifying which tools should (or should not) be called and their expected arguments. Download the sample CSV for the exact format — it includes a README with detailed column descriptions."}
+                  ? "Your CSV should have three columns: a unique test name, the conversation history as a JSON array of OpenAI-format chat messages, and the evaluation criteria describing the expected agent response. Download the sample CSV for the exact format which includes a README with detailed column descriptions."
+                  : "Your CSV should have three columns: a unique test name, the conversation history as a JSON array of OpenAI-format chat messages, and the expected tool calls as a JSON array specifying which tools should (or should not) be called and their expected arguments. Download the sample CSV for the exact format which includes a README with detailed column descriptions."}
               </p>
 
               {/* Drop zone */}

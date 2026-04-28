@@ -38,7 +38,12 @@ type ScenarioData = {
   updated_at: string;
 };
 
-type MetricData = {
+// One row from `simulation.evaluators` on `GET /simulations/{uuid}`. Each
+// row carries the evaluator's stable `uuid` (which is what the PUT body
+// expects as `evaluator_uuid` — see `handleCreate` below) plus the usual
+// display fields. `metrics` was the legacy field name; the backend now
+// stores and returns these rows under `evaluators`.
+type EvaluatorData = {
   uuid: string;
   name: string;
   description: string;
@@ -66,7 +71,7 @@ type SimulationData = {
   agent?: AgentData;
   personas?: PersonaData[];
   scenarios?: ScenarioData[];
-  metrics?: MetricData[];
+  evaluators?: EvaluatorData[];
 };
 
 export default function SimulationDetailPage() {
@@ -231,12 +236,17 @@ export default function SimulationDetailPage() {
         throw new Error("BACKEND_URL environment variable is not set");
       }
 
+      // `SimulationUpdate` on the backend uses `model_config = ConfigDict(extra="forbid")`,
+      // so any extra keys (including the legacy `metric_uuids`) now produce a
+      // 422. Evaluator rows must be sent under `evaluators` as
+      // `[{ evaluator_uuid: <evaluators.uuid> }, ...]` — passing a legacy
+      // metric UUID here returns a 400 with the migrated evaluator UUID.
       const payload = {
         name: simulation.name,
         agent_uuid: selectedAgent?.uuid,
         persona_uuids: selectedPersonas.map((p) => p.uuid),
         scenario_uuids: selectedScenarios.map((s) => s.uuid),
-        metric_uuids: selectedMetrics.map((m) => m.uuid),
+        evaluators: selectedMetrics.map((m) => ({ evaluator_uuid: m.uuid })),
       };
 
       const response = await fetch(`${backendUrl}/simulations/${uuid}`, {
@@ -319,9 +329,9 @@ export default function SimulationDetailPage() {
         // Check if simulation is already configured (has personas, scenarios, or metrics)
         const hasPersonas = data.personas && data.personas.length > 0;
         const hasScenarios = data.scenarios && data.scenarios.length > 0;
-        const hasMetrics = data.metrics && data.metrics.length > 0;
+        const hasEvaluators = data.evaluators && data.evaluators.length > 0;
 
-        if (hasPersonas || hasScenarios || hasMetrics) {
+        if (hasPersonas || hasScenarios || hasEvaluators) {
           setIsConfigured(true);
 
           // Pre-populate selected items from the simulation data
@@ -343,9 +353,9 @@ export default function SimulationDetailPage() {
               }))
             );
           }
-          if (data.metrics) {
+          if (data.evaluators) {
             setSelectedMetrics(
-              data.metrics.map((m) => ({
+              data.evaluators.map((m) => ({
                 uuid: m.uuid,
                 name: m.name,
                 description: m.description,
@@ -462,7 +472,10 @@ export default function SimulationDetailPage() {
     fetchScenarios();
   }, [backendAccessToken]);
 
-  // Fetch metrics
+  // Fetch evaluators — only `evaluator_type === "simulation"` is offered as a
+  // metric for simulations. Other use cases (LLM, TTS, STT) are filtered out
+  // here so the picker doesn't expose evaluators that can't run on a full
+  // conversation.
   useEffect(() => {
     const fetchMetrics = async () => {
       if (!backendAccessToken) return;
@@ -472,14 +485,17 @@ export default function SimulationDetailPage() {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
         if (!backendUrl) return;
 
-        const response = await fetch(`${backendUrl}/metrics`, {
-          method: "GET",
-          headers: {
-            accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
-            Authorization: `Bearer ${backendAccessToken}`,
+        const response = await fetch(
+          `${backendUrl}/evaluators?include_defaults=true`,
+          {
+            method: "GET",
+            headers: {
+              accept: "application/json",
+              "ngrok-skip-browser-warning": "true",
+              Authorization: `Bearer ${backendAccessToken}`,
+            },
           },
-        });
+        );
 
         if (response.status === 401) {
           await signOut({ callbackUrl: "/login" });
@@ -487,20 +503,31 @@ export default function SimulationDetailPage() {
         }
 
         if (!response.ok) {
-          throw new Error("Failed to fetch metrics");
+          throw new Error("Failed to fetch evaluators");
         }
 
         const data = await response.json();
         const formattedMetrics: PickerItem[] = Array.isArray(data)
-          ? data.map((m: any) => ({
-              uuid: m.uuid,
-              name: m.name,
-              description: m.description,
-            }))
+          ? data
+              .filter(
+                (m: { evaluator_type?: string }) =>
+                  m.evaluator_type === "simulation",
+              )
+              .map(
+                (m: {
+                  uuid: string;
+                  name: string;
+                  description?: string;
+                }) => ({
+                  uuid: m.uuid,
+                  name: m.name,
+                  description: m.description,
+                }),
+              )
           : [];
         setMetrics(formattedMetrics);
       } catch (err) {
-        console.error("Error fetching metrics:", err);
+        console.error("Error fetching evaluators:", err);
       } finally {
         setMetricsLoading(false);
       }

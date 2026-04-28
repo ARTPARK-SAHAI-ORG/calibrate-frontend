@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { ttsProviders } from "@/components/agent-tabs/constants/providers";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
@@ -10,14 +10,42 @@ import {
   TTSResultsTable,
   LeaderboardTab,
   AboutMetricsTable,
+  type TTSEvaluatorColumn,
+  type ChartConfig,
 } from "@/components/eval-details";
 
 type LatencyMetric = { mean: number; std: number; values: number[] };
 
+// Mirrors the auth TTS page: the response now optionally carries
+// `evaluator_runs` per provider with the live evaluator `name`, stable
+// `evaluator_uuid`, the artefact `metric_key` (== per-row CSV column with no
+// `_score` suffix) and an `aggregate` block (`type`, `mean`, optional
+// `scale_min` / `scale_max`). Older shareable links still ship the flat
+// `llm_judge_score` scheme — both paths are handled below.
+type EvaluatorRunAggregate = {
+  type?: "binary" | "rating" | string;
+  mean?: number;
+  scale_min?: number;
+  scale_max?: number;
+  [k: string]: unknown;
+};
+
+type EvaluatorRun = {
+  evaluator_uuid: string;
+  metric_key: string;
+  aggregate?: EvaluatorRunAggregate | null;
+  name?: string;
+};
+
 type ProviderMetrics = {
-  llm_judge_score: number;
-  ttfb: LatencyMetric;
-  processing_time: LatencyMetric;
+  llm_judge_score?: number;
+  ttfb?: LatencyMetric;
+  processing_time?: LatencyMetric;
+  [k: string]:
+    | number
+    | LatencyMetric
+    | { type?: string; mean?: number; scale_min?: number; scale_max?: number }
+    | undefined;
 };
 
 type ProviderResult = {
@@ -31,15 +59,18 @@ type ProviderResult = {
     audio_path: string;
     llm_judge_score?: string;
     llm_judge_reasoning?: string;
+    [k: string]: unknown;
   }> | null;
+  evaluator_runs?: EvaluatorRun[] | null;
 };
 
 type LeaderboardSummary = {
   run: string;
   count: number;
-  llm_judge_score: number;
-  ttfb: number;
-  processing_time: number;
+  llm_judge_score?: number;
+  ttfb?: number;
+  processing_time?: number;
+  [k: string]: string | number | undefined;
 };
 
 type EvaluationResult = {
@@ -104,6 +135,69 @@ export default function PublicTTSPage() {
     fetchData();
   }, [token]);
 
+  // Derive the per-evaluator columns. Prefers `evaluator_runs` (new format)
+  // and falls back to a single legacy `llm_judge_*` column when the
+  // response is from an older job. Public pages don't have access to the
+  // user's evaluator catalogue, so for legacy jobs the column header keeps
+  // the historical "LLM Judge" label rather than trying to look up a
+  // default evaluator name.
+  const evaluatorColumns: TTSEvaluatorColumn[] = useMemo(() => {
+    const providerResults = data?.provider_results ?? [];
+
+    const firstRuns = providerResults
+      .map((pr) => pr.evaluator_runs)
+      .find((er): er is EvaluatorRun[] => Array.isArray(er) && er.length > 0);
+
+    if (firstRuns) {
+      return firstRuns.map((run) => ({
+        key: run.metric_key,
+        label: run.name ?? run.metric_key,
+        outputType: run.aggregate?.type === "rating" ? "rating" : "binary",
+        scoreField: run.metric_key,
+        reasoningField: `${run.metric_key}_reasoning`,
+      }));
+    }
+
+    return [
+      {
+        key: "llm_judge",
+        label: "LLM Judge",
+        outputType: "binary",
+        scoreField: "llm_judge_score",
+        reasoningField: "llm_judge_reasoning",
+      },
+    ];
+  }, [data]);
+
+  // Resolve the aggregate `mean` for a column on a specific provider. The
+  // new format ships `aggregate.mean` directly on `evaluator_runs`; the
+  // legacy format ships a flat number at `metrics[scoreField]`; the
+  // new-format mid-state may have nested `metrics[name]` with `mean` inside.
+  const readProviderMean = (col: TTSEvaluatorColumn, pr: ProviderResult): number | undefined => {
+    const run = pr.evaluator_runs?.find((r) => r.metric_key === col.key);
+    if (run && typeof run.aggregate?.mean === "number") return run.aggregate.mean;
+
+    const scoreField = col.scoreField ?? `${col.key}_score`;
+    const m = pr.metrics?.[scoreField];
+    if (typeof m === "number") return m;
+
+    const nested = pr.metrics?.[col.key];
+    if (
+      nested &&
+      typeof nested === "object" &&
+      "mean" in nested &&
+      typeof (nested as { mean: unknown }).mean === "number"
+    ) {
+      return (nested as { mean: number }).mean;
+    }
+    return undefined;
+  };
+
+  const formatMetricValue = (v: unknown): string | number => {
+    if (typeof v === "number" && Number.isFinite(v)) return parseFloat(v.toFixed(4));
+    return "-";
+  };
+
   if (isLoading) return <PublicPageLayout><PublicLoading /></PublicPageLayout>;
   if (notFound || !data) return <PublicPageLayout><PublicNotFound /></PublicPageLayout>;
 
@@ -140,22 +234,34 @@ export default function PublicTTSPage() {
             </div>
 
             {/* Leaderboard Tab */}
-            {activeTab === "leaderboard" && data.leaderboard_summary && (
-              <LeaderboardTab
-                columns={[
-                  { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
-                  { key: "llm_judge_score", header: "LLM Judge Score" },
-                  { key: "ttfb", header: "TTFB (s)", render: (v) => v != null ? parseFloat(v.toFixed(4)) : "-" },
-                ]}
-                data={data.leaderboard_summary}
-                charts={[[
-                  { title: "LLM Judge Score", dataKey: "llm_judge_score", yDomain: [0, 1] },
-                  { title: "TTFB (s)", dataKey: "ttfb" },
-                ]]}
-                filename="tts-evaluation-leaderboard"
-                getLabel={getProviderLabel}
-              />
-            )}
+            {activeTab === "leaderboard" && data.leaderboard_summary && (() => {
+              const allCharts: ChartConfig[] = [
+                ...evaluatorColumns.map((col) => ({
+                  title: col.label,
+                  dataKey: col.scoreField ?? `${col.key}_score`,
+                  yDomain: col.outputType === "binary" ? ([0, 1] as [number, number]) : undefined,
+                })),
+                { title: "TTFB (s)", dataKey: "ttfb" },
+              ];
+              const chartRows: ChartConfig[][] = [];
+              for (let i = 0; i < allCharts.length; i += 2) chartRows.push(allCharts.slice(i, i + 2));
+              return (
+                <LeaderboardTab
+                  columns={[
+                    { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
+                    ...evaluatorColumns.map((col) => ({
+                      key: col.scoreField ?? `${col.key}_score`,
+                      header: col.label,
+                    })),
+                    { key: "ttfb", header: "TTFB (s)", render: (v) => v != null ? parseFloat(v.toFixed(4)) : "-" },
+                  ]}
+                  data={data.leaderboard_summary!}
+                  charts={chartRows}
+                  filename="tts-evaluation-leaderboard"
+                  getLabel={getProviderLabel}
+                />
+              );
+            })()}
 
             {/* Outputs Tab */}
             {activeTab === "outputs" && (
@@ -184,13 +290,19 @@ export default function PublicTTSPage() {
                       {providerResult.metrics && (
                         <ProviderMetricsCard
                           metrics={[
-                            { label: "LLM Judge Score", value: providerResult.metrics.llm_judge_score ?? "-" },
+                            ...evaluatorColumns.map((col) => ({
+                              label: col.label,
+                              value: formatMetricValue(readProviderMean(col, providerResult)),
+                            })),
                             { label: "TTFB (s)", value: providerResult.metrics.ttfb?.mean != null ? parseFloat(providerResult.metrics.ttfb.mean.toFixed(4)) : "-" },
                           ]}
                         />
                       )}
                       {providerResult.results && providerResult.results.length > 0 && (
-                        <TTSResultsTable results={providerResult.results} />
+                        <TTSResultsTable
+                          results={providerResult.results}
+                          evaluatorColumns={evaluatorColumns}
+                        />
                       )}
                     </div>
                   )}
