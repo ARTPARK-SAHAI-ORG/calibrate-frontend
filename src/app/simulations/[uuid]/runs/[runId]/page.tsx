@@ -1014,11 +1014,13 @@ export default function SimulationRunPage() {
                         regularMetrics.length > 0)) && (
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {regularMetrics.map(([key, metric]) => {
-                          const isSttLlmJudge =
-                            key === "stt_llm_judge" ||
-                            key === "stt_llm_judge_score";
                           const evaluatorUuid = evaluatorUuidByName[key];
-                          const evaluatorDescription = evaluatorDescriptionByName[key];
+                          const evaluatorDescription =
+                            evaluatorDescriptionByName[key] ||
+                            (key === "stt_llm_judge" ||
+                            key === "stt_llm_judge_score"
+                              ? "This is the speech to text accuracy for the text spoken by the simulated user calculated by comparing it with the transcribed text by the agent"
+                              : "");
                           // When we have an evaluator UUID, the entire
                           // card becomes a Link so the affordance is
                           // obvious (hover-highlight + arrow icon).
@@ -1030,8 +1032,8 @@ export default function SimulationRunPage() {
                                 <span className="text-[12px] text-muted-foreground">
                                   {key}
                                 </span>
-                                {isSttLlmJudge && (
-                                  <Tooltip content="This is the speech to text accuracy for the text spoken by the simulated user calculated by comparing it with the transcribed text by the agent">
+                                {evaluatorDescription && (
+                                  <Tooltip content={evaluatorDescription}>
                                     <svg
                                       className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                                       fill="none"
@@ -1064,11 +1066,6 @@ export default function SimulationRunPage() {
                                   </svg>
                                 )}
                               </div>
-                              {evaluatorDescription && (
-                                <p className="text-xs text-muted-foreground line-clamp-1 mb-2">
-                                  {evaluatorDescription}
-                                </p>
-                              )}
                               <div className="text-[18px] font-semibold text-foreground">
                                 {formatOverviewMetricValue(metric)}
                               </div>
@@ -1220,11 +1217,6 @@ export default function SimulationRunPage() {
                                     <div className="whitespace-nowrap">
                                       {metricKey}
                                     </div>
-                                    {evaluatorDescriptionByName[metricKey] && (
-                                      <div className="mt-1 max-w-40 whitespace-normal normal-case tracking-normal line-clamp-2">
-                                        {evaluatorDescriptionByName[metricKey]}
-                                      </div>
-                                    )}
                                   </div>
                                 </th>
                               ))}
@@ -1552,8 +1544,6 @@ export default function SimulationRunPage() {
                                             simulation,
                                             metricKey
                                           );
-                                        const evaluatorDescription =
-                                          evaluatorDescriptionByName[metricKey];
 
                                         return (
                                           <div
@@ -1564,11 +1554,6 @@ export default function SimulationRunPage() {
                                               <span className="text-xs text-muted-foreground">
                                                 {metricKey}
                                               </span>
-                                              {evaluatorDescription && (
-                                                <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-                                                  {evaluatorDescription}
-                                                </p>
-                                              )}
                                             </div>
                                             <div className="flex items-center gap-2">
                                               {value === null ? (

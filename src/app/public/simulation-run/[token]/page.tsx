@@ -129,7 +129,6 @@ export default function PublicSimulationRunPage() {
             metricKeys={displayMetricKeys}
             onSelectSimulation={setSelectedSim}
             metricInfo={data.metrics ?? undefined}
-            evaluatorDescriptionByName={evaluatorDescriptionByName}
           />
         )}
       </div>

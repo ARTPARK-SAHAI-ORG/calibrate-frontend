@@ -41,8 +41,6 @@ type SimulationResultsTableProps = {
   onSelectSimulation: (sim: SimulationResult) => void;
   /** Optional per-metric type / scale info, keyed by metric name. */
   metricInfo?: Record<string, MetricDisplayInfo | undefined>;
-  /** Optional metric-name → snapshotted evaluator description map. */
-  evaluatorDescriptionByName?: Record<string, string>;
 };
 
 const getEvaluationResult = (sim: SimulationResult, key: string): number | null => {
@@ -64,7 +62,6 @@ export function SimulationResultsTable({
   metricKeys,
   onSelectSimulation,
   metricInfo,
-  evaluatorDescriptionByName,
 }: SimulationResultsTableProps) {
   return (
     <div>
@@ -82,19 +79,11 @@ export function SimulationResultsTable({
                 <th className="w-10 px-4 py-3 text-left text-[12px] font-medium text-muted-foreground"></th>
                 <th className="px-4 py-3 text-left text-[12px] font-medium text-muted-foreground uppercase tracking-wider">Persona</th>
                 <th className="px-4 py-3 text-left text-[12px] font-medium text-muted-foreground uppercase tracking-wider">Scenario</th>
-                {metricKeys.map((k) => {
-                  const description = evaluatorDescriptionByName?.[k];
-                  return (
-                    <th key={k} className="px-4 py-3 text-left text-[12px] font-medium text-muted-foreground tracking-wider whitespace-nowrap">
-                      <div>{k}</div>
-                      {description && (
-                        <div className="mt-1 max-w-40 whitespace-normal normal-case tracking-normal line-clamp-2">
-                          {description}
-                        </div>
-                      )}
-                    </th>
-                  );
-                })}
+                {metricKeys.map((k) => (
+                  <th key={k} className="px-4 py-3 text-left text-[12px] font-medium text-muted-foreground tracking-wider whitespace-nowrap">
+                    {k}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-border">

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import Link from "next/link";
+import { Tooltip } from "@/components/Tooltip";
 
 // `MetricData` represents one entry in `runData.metrics`. Newer simulation
 // runs include `type` (`"binary" | "rating"`) plus rating bounds
@@ -74,6 +75,22 @@ export function SimulationMetricsGrid({
   if (regularMetrics.length === 0 && latencyMetrics.length === 0) return null;
 
   const isTextType = type === "text";
+  const descriptionIcon = (
+    <svg
+      className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+      />
+    </svg>
+  );
 
   return (
     <div>
@@ -110,6 +127,9 @@ export function SimulationMetricsGrid({
               <>
                 <div className="text-[12px] text-muted-foreground mb-1 flex items-center gap-1.5">
                   <span>{key}</span>
+                  {description && (
+                    <Tooltip content={description}>{descriptionIcon}</Tooltip>
+                  )}
                   {evaluatorUuid && (
                     <svg
                       className="ml-auto w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors"
@@ -127,11 +147,6 @@ export function SimulationMetricsGrid({
                     </svg>
                   )}
                 </div>
-                {description && (
-                  <p className="text-xs text-muted-foreground line-clamp-1 mb-2">
-                    {description}
-                  </p>
-                )}
                 <div className="text-[18px] font-semibold text-foreground">{formatMetricCardValue(metric)}</div>
               </>
             );
