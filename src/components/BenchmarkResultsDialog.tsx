@@ -18,6 +18,10 @@ import { ShareButton } from "@/components/ShareButton";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
 import { useAccessToken } from "@/hooks";
+import {
+  fetchDefaultLLMNextReplyEvaluator,
+  type DefaultEvaluatorSummary,
+} from "@/lib/defaultEvaluators";
 
 type BenchmarkTestResult = {
   name?: string;
@@ -112,6 +116,8 @@ export function BenchmarkResultsDialog({
   const [runName, setRunName] = useState<string | null>(null);
   const [isPublic, setIsPublic] = useState(false);
   const [shareToken, setShareToken] = useState<string | null>(null);
+  const [defaultNextReplyEvaluator, setDefaultNextReplyEvaluator] =
+    useState<DefaultEvaluatorSummary | null>(null);
   const backendAccessToken = useAccessToken();
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -119,6 +125,25 @@ export function BenchmarkResultsDialog({
     taskStatus === "completed" ||
     taskStatus === "done" ||
     taskStatus === "failed";
+
+  useEffect(() => {
+    if (!isOpen || !backendAccessToken) return;
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl) return;
+
+    let cancelled = false;
+    fetchDefaultLLMNextReplyEvaluator(backendUrl, backendAccessToken)
+      .then((evaluator) => {
+        if (!cancelled) setDefaultNextReplyEvaluator(evaluator);
+      })
+      .catch(() => {
+        if (!cancelled) setDefaultNextReplyEvaluator(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, backendAccessToken]);
 
   // Start benchmark when dialog opens
   useEffect(() => {
@@ -377,6 +402,11 @@ export function BenchmarkResultsDialog({
   // Get color map for charts
   const modelNames = leaderboardSummary?.map((s) => s.model) || [];
   const colorMap = getColorMap(modelNames);
+  const benchmarkScoreLabel = `${
+    getBenchmarkEvaluatorName(modelResults) ??
+    defaultNextReplyEvaluator?.name ??
+    "Evaluator"
+  } (%)`;
 
   // Check if we have any results to show
   const hasAnyResults = modelResults.some(
@@ -385,7 +415,7 @@ export function BenchmarkResultsDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-background rounded-none md:rounded-xl w-full max-w-7xl h-full md:h-[85vh] flex flex-col shadow-2xl">
+      <div className="bg-background rounded-none md:rounded-xl w-full max-w-[92rem] h-full md:h-[92vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4">
           <div className="min-w-0">
@@ -570,7 +600,7 @@ export function BenchmarkResultsDialog({
                         header: "Model",
                         render: (value) => value.replace("__", "/"),
                       },
-                      { key: "pass_rate", header: "Test pass rate (%)" },
+                      { key: "pass_rate", header: benchmarkScoreLabel },
                     ]}
                     data={leaderboardSummary.map((s) => ({
                       model: s.model,
@@ -583,7 +613,7 @@ export function BenchmarkResultsDialog({
                 {/* Charts Section */}
                 {leaderboardSummary && leaderboardSummary.length > 0 && (
                   <LeaderboardBarChart
-                    title="Test pass rate (%)"
+                    title={benchmarkScoreLabel}
                     data={leaderboardSummary.map((s) => ({
                       label: s.model.replace("__", "/"),
                       value: parseFloat(s.pass_rate),
@@ -620,6 +650,7 @@ export function BenchmarkResultsDialog({
                 formatModelName={(n) => n.replace("__", "/")}
                 showControls={isDone}
                 showRunningSpinner={true}
+                legacyDefaultEvaluator={defaultNextReplyEvaluator}
               />
             )}
           </div>
@@ -627,4 +658,14 @@ export function BenchmarkResultsDialog({
       </div>
     </div>
   );
+}
+
+function getBenchmarkEvaluatorName(modelResults: ModelResult[]): string | null {
+  for (const model of modelResults) {
+    for (const test of model.test_results ?? []) {
+      const name = test.judge_results?.find((result) => result.name)?.name;
+      if (name) return name;
+    }
+  }
+  return null;
 }

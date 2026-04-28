@@ -7,6 +7,10 @@ import { LeaderboardTab, BenchmarkOutputsPanel } from "@/components/eval-details
 import type { BenchmarkTestResult, BenchmarkModelResult } from "@/components/eval-details";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
+import {
+  getPublicDefaultEvaluator,
+  type PublicDefaultEvaluator,
+} from "@/lib/publicEvaluators";
 
 type LeaderboardSummary = {
   model: string;
@@ -33,6 +37,8 @@ export default function PublicBenchmarkPage() {
   const [activeTab, setActiveTab] = useState<"leaderboard" | "outputs">("leaderboard");
   const [expandedModels, setExpandedModels] = useState<Set<string>>(new Set());
   const [selectedTest, setSelectedTest] = useState<{ model: string; testIndex: number } | null>(null);
+  const [defaultEvaluator, setDefaultEvaluator] =
+    useState<PublicDefaultEvaluator | null>(null);
 
   useEffect(() => { document.title = "LLM benchmark | Calibrate"; }, []);
 
@@ -52,6 +58,12 @@ export default function PublicBenchmarkPage() {
         const result: BenchmarkStatusResponse = await res.json();
         if (result.status !== "done" && result.status !== "completed") { setNotFound(true); return; }
 
+        const jobEvaluatorName = getBenchmarkEvaluatorName(result.model_results);
+        const defaultEvaluator = jobEvaluatorName
+          ? null
+          : await getPublicDefaultEvaluator(backendUrl, token, "llm");
+
+        setDefaultEvaluator(defaultEvaluator);
         setData(result);
         if (result.model_results?.length) {
           setExpandedModels(new Set([result.model_results[0].model]));
@@ -68,6 +80,10 @@ export default function PublicBenchmarkPage() {
   if (isLoading) return <PublicPageLayout><PublicLoading /></PublicPageLayout>;
   if (notFound || !data) return <PublicPageLayout><PublicNotFound /></PublicPageLayout>;
 
+  const benchmarkScoreLabel = `${
+    getBenchmarkEvaluatorName(data.model_results) ?? defaultEvaluator?.name ?? "Evaluator"
+  } (%)`;
+
   const toggleModel = (model: string) => {
     setExpandedModels((prev) => {
       const next = new Set(prev);
@@ -78,7 +94,7 @@ export default function PublicBenchmarkPage() {
   };
 
   return (
-    <PublicPageLayout title="LLM benchmark">
+    <PublicPageLayout title="LLM benchmark" contentClassName="max-w-[92rem]">
       <div className="space-y-4 md:space-y-6">
         {/* Tab nav */}
         <div className="flex items-end justify-between gap-2 border-b border-border">
@@ -124,10 +140,10 @@ export default function PublicBenchmarkPage() {
               { key: "model", header: "Model" },
               { key: "passed", header: "Passed" },
               { key: "total", header: "Total" },
-              { key: "pass_rate", header: "Test pass rate (%)", render: (v) => `${parseFloat(v).toFixed(1)}%` },
+              { key: "pass_rate", header: benchmarkScoreLabel, render: (v) => `${parseFloat(v).toFixed(1)}%` },
             ]}
             data={data.leaderboard_summary}
-            charts={[[{ title: "Pass Rate by Model", dataKey: "pass_rate", yDomain: [0, 100], formatTooltip: (v) => `${v.toFixed(1)}%` }]]}
+            charts={[[{ title: benchmarkScoreLabel, dataKey: "pass_rate", yDomain: [0, 100], formatTooltip: (v) => `${v.toFixed(1)}%` }]]}
             filename="benchmark-leaderboard"
             getLabel={(key) => key}
             nameKey="model"
@@ -136,7 +152,7 @@ export default function PublicBenchmarkPage() {
 
         {/* Outputs Tab */}
         {activeTab === "outputs" && data.model_results && data.model_results.length > 0 && (
-          <div className="border border-border rounded-xl overflow-hidden" style={{ height: "calc(100vh - 260px)", minHeight: 520 }}>
+          <div className="border border-border rounded-xl overflow-hidden" style={{ height: "calc(100vh - 220px)", minHeight: 620 }}>
             <BenchmarkOutputsPanel
               modelResults={data.model_results}
               expandedModels={expandedModels}
@@ -146,10 +162,23 @@ export default function PublicBenchmarkPage() {
               onSelectTest={(model, testIndex) => setSelectedTest({ model, testIndex })}
               onClearSelection={() => setSelectedTest(null)}
               showControls={true}
+              enableEvaluatorLinks={false}
             />
           </div>
         )}
       </div>
     </PublicPageLayout>
   );
+}
+
+function getBenchmarkEvaluatorName(
+  modelResults: BenchmarkModelResult[] | undefined,
+): string | null {
+  for (const model of modelResults ?? []) {
+    for (const test of model.test_results ?? []) {
+      const name = test.judge_results?.find((result) => result.name)?.name;
+      if (name) return name;
+    }
+  }
+  return null;
 }

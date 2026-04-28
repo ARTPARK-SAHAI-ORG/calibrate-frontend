@@ -10,22 +10,23 @@ import {
   DocumentIcon,
   CloseIcon,
 } from "@/components/icons";
+import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
 
-// Renders the evaluator name. When `uuid` is present we render a link to
-// the evaluator detail page so the user can jump straight to the rubric;
-// for legacy snapshots without a uuid we render plain text. Used by both
-// the mobile `JudgeResultCard` and the desktop `EvaluatorPanelCard` so
-// the link affordance is consistent across viewports.
+// Renders the evaluator name. Authenticated result pages can link to the
+// evaluator detail page; public share pages must render plain text because
+// `/evaluators/{uuid}` is an authenticated route.
 function EvaluatorNameLink({
   uuid,
   name,
   className,
+  enableLink,
 }: {
   uuid?: string | null;
   name: string;
   className: string;
+  enableLink: boolean;
 }) {
-  if (uuid) {
+  if (uuid && enableLink) {
     return (
       <Link
         href={`/evaluators/${uuid}`}
@@ -105,6 +106,8 @@ export type TestCaseData = {
 // `evaluator_uuid` may be `null` for legacy runs that pre-date snapshot
 // capture; treat as "no canonical link, just display the name".
 // `name` is the CURRENT DB display name (refreshed on every read).
+// `description` is the snapshotted one-line evaluator description used by
+// the job; it may be null/absent for older snapshots.
 //
 // `variable_values`, `scale_min`, `scale_max` were added by the backend
 // after the initial judge_results rollout. They are surfaced inline on
@@ -118,6 +121,7 @@ export type TestCaseData = {
 export type JudgeResult = {
   evaluator_uuid?: string | null;
   name: string;
+  description?: string | null;
   reasoning?: string;
   match?: boolean | null;
   score?: number | null;
@@ -125,6 +129,29 @@ export type JudgeResult = {
   scale_min?: number | null;
   scale_max?: number | null;
 };
+
+function buildLegacyNextReplyJudgeResults({
+  evaluation,
+  reasoning,
+  defaultEvaluator,
+}: {
+  evaluation?: TestCaseEvaluation;
+  reasoning?: string;
+  defaultEvaluator?: DefaultEvaluatorSummary | null;
+}): JudgeResult[] | null {
+  const criteria = evaluation?.criteria;
+  if (evaluation?.type === "tool_call" || !criteria) return null;
+
+  return [
+    {
+      evaluator_uuid: defaultEvaluator?.uuid ?? null,
+      name: defaultEvaluator?.name ?? "Correctness",
+      description: defaultEvaluator?.description ?? null,
+      reasoning,
+      variable_values: { criteria },
+    },
+  ];
+}
 
 // Shared Status Icon Component
 export function StatusIcon({
@@ -306,9 +333,11 @@ export function ToolCallCard({
 function JudgeResultCard({
   result,
   scaleMax,
+  enableEvaluatorLinks,
 }: {
   result: JudgeResult;
   scaleMax?: number;
+  enableEvaluatorLinks: boolean;
 }) {
   const isRating = result.score !== null && result.score !== undefined;
   const isBinary = result.match !== null && result.match !== undefined;
@@ -328,11 +357,19 @@ function JudgeResultCard({
     <div className="rounded-lg border border-border bg-background px-3 py-2.5 space-y-1.5">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <EvaluatorNameLink
-            uuid={result.evaluator_uuid}
-            name={result.name}
-            className="text-sm font-medium text-foreground truncate"
-          />
+          <div className="min-w-0">
+            <EvaluatorNameLink
+              uuid={result.evaluator_uuid}
+              name={result.name}
+              className="text-sm font-medium text-foreground truncate block"
+              enableLink={enableEvaluatorLinks}
+            />
+            {result.description && (
+              <p className="text-xs text-muted-foreground whitespace-normal break-words">
+                {result.description}
+              </p>
+            )}
+          </div>
         </div>
         <div className="flex-shrink-0">
           {isBinary && (
@@ -383,9 +420,11 @@ function JudgeResultCard({
 export function JudgeResultsList({
   results,
   scaleByEvaluatorUuid,
+  enableEvaluatorLinks = true,
 }: {
   results?: JudgeResult[] | null;
   scaleByEvaluatorUuid?: Record<string, number | undefined>;
+  enableEvaluatorLinks?: boolean;
 }) {
   if (!results || results.length === 0) return null;
   return (
@@ -403,6 +442,7 @@ export function JudgeResultsList({
                 ? scaleByEvaluatorUuid?.[r.evaluator_uuid]
                 : undefined
             }
+            enableEvaluatorLinks={enableEvaluatorLinks}
           />
         ))}
       </div>
@@ -416,13 +456,17 @@ export function TestDetailView({
   output,
   passed,
   reasoning,
+  evaluation,
   judgeResults,
   scaleByEvaluatorUuid,
+  legacyDefaultEvaluator,
+  enableEvaluatorLinks = true,
 }: {
   history: TestCaseHistory[];
   output?: TestCaseOutput;
   passed: boolean;
   reasoning?: string;
+  evaluation?: TestCaseEvaluation;
   /** Per-evaluator verdicts for response (next-reply) tests. Null/absent
    * for tool-call tests and for legacy response tests that pre-date
    * judge_results — those fall back to the legacy single-reasoning UI. */
@@ -430,9 +474,22 @@ export function TestDetailView({
   /** Optional rating-evaluator scale lookup (uuid → scale_max). When
    * provided, rating cards render `score / max` instead of just `score`. */
   scaleByEvaluatorUuid?: Record<string, number | undefined>;
+  /** Default correctness evaluator used to render legacy response criteria
+   * as evaluator variable values when `judgeResults` is absent. */
+  legacyDefaultEvaluator?: DefaultEvaluatorSummary | null;
+  /** Disable on public share pages because evaluator detail routes require auth. */
+  enableEvaluatorLinks?: boolean;
 }) {
+  const effectiveJudgeResults =
+    Array.isArray(judgeResults) && judgeResults.length > 0
+      ? judgeResults
+      : buildLegacyNextReplyJudgeResults({
+          evaluation,
+          reasoning,
+          defaultEvaluator: legacyDefaultEvaluator,
+        });
   const hasJudgeResults =
-    Array.isArray(judgeResults) && judgeResults.length > 0;
+    Array.isArray(effectiveJudgeResults) && effectiveJudgeResults.length > 0;
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       {/* Chat History from test_case.history */}
@@ -582,8 +639,9 @@ export function TestDetailView({
       {hasJudgeResults && (
         <div className="md:hidden w-full">
           <JudgeResultsList
-            results={judgeResults}
+            results={effectiveJudgeResults}
             scaleByEvaluatorUuid={scaleByEvaluatorUuid}
+            enableEvaluatorLinks={enableEvaluatorLinks}
           />
         </div>
       )}
@@ -631,10 +689,12 @@ function EvaluatorPanelCard({
   result,
   variableValues,
   scaleMax,
+  enableEvaluatorLinks,
 }: {
   result: JudgeResult;
   variableValues?: Record<string, string> | null;
   scaleMax?: number;
+  enableEvaluatorLinks: boolean;
 }) {
   const isRating = result.score !== null && result.score !== undefined;
   const isBinary = result.match !== null && result.match !== undefined;
@@ -672,7 +732,13 @@ function EvaluatorPanelCard({
             uuid={result.evaluator_uuid}
             name={result.name}
             className="text-sm font-medium text-foreground break-words block"
+            enableLink={enableEvaluatorLinks}
           />
+          {result.description && (
+            <p className="text-xs text-muted-foreground whitespace-normal break-words mt-0.5">
+              {result.description}
+            </p>
+          )}
         </div>
         <div className="flex-shrink-0">
           {isBinary && (
@@ -755,8 +821,9 @@ function EvaluatorPanelCard({
 //     string (the deterministic match/diff summary — there are no
 //     per-evaluator entries for tool-call tests).
 //  3. Legacy fallback (no judge_results, no tool_calls): the old free-text
-//     `evaluation.criteria` rendering, kept around for runs that pre-date
-//     evaluator-snapshot capture.
+//     `evaluation.criteria` rendered as the default next-reply evaluator's
+//     `criteria` variable, kept around for runs that pre-date evaluator
+//     snapshot capture.
 //
 // The `testType` prop is no longer surfaced as a visible badge — the
 // section structure makes the test type self-evident — but it's still
@@ -768,6 +835,8 @@ export function EvaluationCriteriaPanel({
   reasoning,
   testCaseEvaluators,
   scaleByEvaluatorUuid,
+  legacyDefaultEvaluator,
+  enableEvaluatorLinks = true,
 }: {
   evaluation?: TestCaseEvaluation;
   testType?: string;
@@ -786,6 +855,11 @@ export function EvaluationCriteriaPanel({
    * entry has `scale_max` inline on the `JudgeResult` (newer payloads)
    * that takes priority. Optional. */
   scaleByEvaluatorUuid?: Record<string, number | undefined>;
+  /** Default correctness evaluator used to render legacy response criteria
+   * as evaluator variable values when `judgeResults` is absent. */
+  legacyDefaultEvaluator?: DefaultEvaluatorSummary | null;
+  /** Disable on public share pages because evaluator detail routes require auth. */
+  enableEvaluatorLinks?: boolean;
 }) {
   const resolvedType =
     testType ||
@@ -794,6 +868,15 @@ export function EvaluationCriteriaPanel({
   const isToolCall = resolvedType === "tool_call";
   const hasJudgeResults =
     Array.isArray(judgeResults) && judgeResults.length > 0;
+  const legacyJudgeResults = hasJudgeResults
+    ? null
+    : buildLegacyNextReplyJudgeResults({
+        evaluation,
+        reasoning,
+        defaultEvaluator: legacyDefaultEvaluator,
+      });
+  const hasLegacyJudgeResults =
+    Array.isArray(legacyJudgeResults) && legacyJudgeResults.length > 0;
   const hasExpectedToolCalls =
     !!evaluation?.tool_calls && evaluation.tool_calls.length > 0;
   const hasLegacyCriteria =
@@ -866,37 +949,29 @@ export function EvaluationCriteriaPanel({
                   ? scaleByEvaluatorUuid?.[jr.evaluator_uuid]
                   : undefined
               }
+              enableEvaluatorLinks={enableEvaluatorLinks}
             />
           ))}
         </div>
       )}
 
-      {/* Response test, legacy fallback (pre-judge_results runs). Keep the
-          old free-text criteria rendering so historical runs still surface
-          something useful. */}
+      {/* Response test, legacy fallback (pre-judge_results runs): render the
+          old free-text criteria as the default next-reply evaluator's
+          `criteria` variable. */}
       {!isToolCall && !hasJudgeResults && hasLegacyCriteria && (
-        <div>
-          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-            Criteria
-          </label>
-          <p className="text-sm text-foreground whitespace-pre-wrap">
-            {evaluation!.criteria}
-          </p>
-          {reasoning && (
-            <div className="mt-3">
-              <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1 block">
-                Reasoning
-              </label>
-              <p className="text-xs text-foreground whitespace-pre-wrap break-words">
-                {reasoning}
-              </p>
-            </div>
-          )}
+        <div className="space-y-3">
+          {legacyJudgeResults!.map((jr, i) => (
+            <EvaluatorPanelCard
+              key={jr.evaluator_uuid ?? `${jr.name}-${i}`}
+              result={jr}
+              enableEvaluatorLinks={enableEvaluatorLinks}
+            />
+          ))}
         </div>
       )}
 
       {/* Final empty state */}
-      {!isToolCall && !hasJudgeResults && !hasLegacyCriteria && (
+      {!isToolCall && !hasJudgeResults && !hasLegacyJudgeResults && (
         <p className="text-xs text-muted-foreground">
           No evaluator details available
         </p>

@@ -4,7 +4,13 @@ import { Tooltip } from "@/components/Tooltip";
 // `evaluator_uuid` is added on newer runs (rename-safe link target). `name`
 // on each row is still the CSV column name from run time and may drift
 // from the live evaluator name after renames.
-export type EvaluationResult = { name: string; value: number; reasoning: string; evaluator_uuid?: string };
+export type EvaluationResult = {
+  name: string;
+  value: number;
+  reasoning: string;
+  evaluator_uuid?: string;
+  description?: string | null;
+};
 export type Persona = { label: string; characteristics: string; gender: string; language: string };
 export type Scenario = { name: string; description: string };
 export type TranscriptEntry = { role: string; content?: string; tool_calls?: any[] | null; tool_call_id?: string };
@@ -35,6 +41,8 @@ type SimulationResultsTableProps = {
   onSelectSimulation: (sim: SimulationResult) => void;
   /** Optional per-metric type / scale info, keyed by metric name. */
   metricInfo?: Record<string, MetricDisplayInfo | undefined>;
+  /** Optional metric-name → snapshotted evaluator description map. */
+  evaluatorDescriptionByName?: Record<string, string>;
 };
 
 const getEvaluationResult = (sim: SimulationResult, key: string): number | null => {
@@ -46,11 +54,18 @@ const getEvaluationResult = (sim: SimulationResult, key: string): number | null 
 
 const getEvaluationReasoning = (sim: SimulationResult, key: string): string | null => {
   if (!sim.evaluation_results) return null;
-  const found = sim.evaluation_results.find((r) => r.name === key);
+  const mapped = key === "stt_llm_judge" ? "stt_llm_judge_score" : key;
+  const found = sim.evaluation_results.find((r) => r.name === key || r.name === mapped);
   return found?.reasoning ?? null;
 };
 
-export function SimulationResultsTable({ simulations, metricKeys, onSelectSimulation, metricInfo }: SimulationResultsTableProps) {
+export function SimulationResultsTable({
+  simulations,
+  metricKeys,
+  onSelectSimulation,
+  metricInfo,
+  evaluatorDescriptionByName,
+}: SimulationResultsTableProps) {
   return (
     <div>
       <div className="flex items-baseline gap-3 mb-3 md:mb-4">
@@ -67,9 +82,19 @@ export function SimulationResultsTable({ simulations, metricKeys, onSelectSimula
                 <th className="w-10 px-4 py-3 text-left text-[12px] font-medium text-muted-foreground"></th>
                 <th className="px-4 py-3 text-left text-[12px] font-medium text-muted-foreground uppercase tracking-wider">Persona</th>
                 <th className="px-4 py-3 text-left text-[12px] font-medium text-muted-foreground uppercase tracking-wider">Scenario</th>
-                {metricKeys.map((k) => (
-                  <th key={k} className="px-4 py-3 text-left text-[12px] font-medium text-muted-foreground tracking-wider whitespace-nowrap">{k}</th>
-                ))}
+                {metricKeys.map((k) => {
+                  const description = evaluatorDescriptionByName?.[k];
+                  return (
+                    <th key={k} className="px-4 py-3 text-left text-[12px] font-medium text-muted-foreground tracking-wider whitespace-nowrap">
+                      <div>{k}</div>
+                      {description && (
+                        <div className="mt-1 max-w-40 whitespace-normal normal-case tracking-normal line-clamp-2">
+                          {description}
+                        </div>
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-y divide-border">

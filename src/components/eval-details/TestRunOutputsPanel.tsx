@@ -8,6 +8,7 @@ import {
   EmptyStateView,
   EvaluationCriteriaPanel,
 } from "@/components/test-results/shared";
+import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
 
 export type TestRunResult = {
   id: string;
@@ -33,6 +34,10 @@ type TestRunOutputsPanelProps = {
   /** Optional rating-evaluator scale lookup (uuid → scale_max). Fallback
    * only — newer judge_results entries carry `scale_max` inline. */
   scaleByEvaluatorUuid?: Record<string, number | undefined>;
+  /** Disable evaluator detail links for public share pages. */
+  enableEvaluatorLinks?: boolean;
+  /** Default correctness evaluator used for legacy next-reply criteria. */
+  legacyDefaultEvaluator?: DefaultEvaluatorSummary | null;
 };
 
 type StatusGroup = {
@@ -49,6 +54,8 @@ export function TestRunOutputsPanel({
   onClearSelection,
   height,
   scaleByEvaluatorUuid,
+  enableEvaluatorLinks = true,
+  legacyDefaultEvaluator,
 }: TestRunOutputsPanelProps) {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
@@ -141,6 +148,8 @@ export function TestRunOutputsPanel({
               <TestResultDetail
                 result={selectedResult}
                 scaleByEvaluatorUuid={scaleByEvaluatorUuid}
+                enableEvaluatorLinks={enableEvaluatorLinks}
+                legacyDefaultEvaluator={legacyDefaultEvaluator}
               />
             </div>
           </>
@@ -152,7 +161,7 @@ export function TestRunOutputsPanel({
       {/* Right Panel - Evaluators / Expected Tool Calls (desktop only).
           On mobile this content is rendered inline by `TestDetailView`. */}
       {selectedResult && (selectedResult.status === "passed" || selectedResult.status === "failed") && (
-        <div className="hidden md:flex w-80 border-l border-border flex-col overflow-hidden">
+        <div className="hidden md:flex w-[32rem] border-l border-border flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto">
             <EvaluationCriteriaPanel
               evaluation={selectedResult.testCase?.evaluation}
@@ -160,6 +169,8 @@ export function TestRunOutputsPanel({
               judgeResults={selectedResult.judgeResults}
               reasoning={selectedResult.reasoning}
               scaleByEvaluatorUuid={scaleByEvaluatorUuid}
+              enableEvaluatorLinks={enableEvaluatorLinks}
+              legacyDefaultEvaluator={legacyDefaultEvaluator}
             />
           </div>
         </div>
@@ -171,9 +182,13 @@ export function TestRunOutputsPanel({
 function TestResultDetail({
   result,
   scaleByEvaluatorUuid,
+  enableEvaluatorLinks,
+  legacyDefaultEvaluator,
 }: {
   result: TestRunResult;
   scaleByEvaluatorUuid?: Record<string, number | undefined>;
+  enableEvaluatorLinks: boolean;
+  legacyDefaultEvaluator?: DefaultEvaluatorSummary | null;
 }) {
   if (result.status === "pending") {
     return (
@@ -229,8 +244,11 @@ function TestResultDetail({
       output={result.output}
       passed={result.evaluation?.passed ?? false}
       reasoning={result.reasoning}
+      evaluation={result.testCase?.evaluation}
       judgeResults={result.judgeResults}
       scaleByEvaluatorUuid={scaleByEvaluatorUuid}
+      enableEvaluatorLinks={enableEvaluatorLinks}
+      legacyDefaultEvaluator={legacyDefaultEvaluator}
     />
   );
 }

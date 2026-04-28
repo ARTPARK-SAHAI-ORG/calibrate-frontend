@@ -35,6 +35,7 @@ type MetricData = {
 type RunEvaluator = {
   evaluator_uuid: string;
   name: string;
+  description?: string | null;
 };
 
 type Persona = {
@@ -53,6 +54,7 @@ type EvaluationResult = {
   name: string;
   value: number;
   reasoning: string;
+  description?: string | null;
   // `evaluator_uuid` is added on newer runs and is the rename-safe key
   // for routing. `name` is still the CSV column name from run time and
   // can drift from `RunData.evaluators[].name` after an evaluator is
@@ -449,6 +451,33 @@ export default function SimulationRunPage() {
     }
     return map;
   }, [runData, simulationEvaluatorUuidByName]);
+
+  const evaluatorDescriptionByName = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (runData?.evaluators) {
+      for (const ev of runData.evaluators) {
+        if (ev?.name && ev.description) map[ev.name] = ev.description;
+      }
+    }
+    if (runData?.simulation_results) {
+      for (const sim of runData.simulation_results) {
+        if (!sim.evaluation_results) continue;
+        for (const result of sim.evaluation_results) {
+          if (result?.name && result.description && !(result.name in map)) {
+            map[result.name] = result.description;
+          }
+          if (
+            result?.name === "stt_llm_judge_score" &&
+            result.description &&
+            !("stt_llm_judge" in map)
+          ) {
+            map.stt_llm_judge = result.description;
+          }
+        }
+      }
+    }
+    return map;
+  }, [runData]);
 
   // Per-row formatter for an individual evaluation result. Returns a JSX
   // node so the caller can drop it straight into the table cell. Rules:
@@ -989,6 +1018,7 @@ export default function SimulationRunPage() {
                             key === "stt_llm_judge" ||
                             key === "stt_llm_judge_score";
                           const evaluatorUuid = evaluatorUuidByName[key];
+                          const evaluatorDescription = evaluatorDescriptionByName[key];
                           // When we have an evaluator UUID, the entire
                           // card becomes a Link so the affordance is
                           // obvious (hover-highlight + arrow icon).
@@ -1034,6 +1064,11 @@ export default function SimulationRunPage() {
                                   </svg>
                                 )}
                               </div>
+                              {evaluatorDescription && (
+                                <p className="text-xs text-muted-foreground line-clamp-1 mb-2">
+                                  {evaluatorDescription}
+                                </p>
+                              )}
                               <div className="text-[18px] font-semibold text-foreground">
                                 {formatOverviewMetricValue(metric)}
                               </div>
@@ -1185,6 +1220,11 @@ export default function SimulationRunPage() {
                                     <div className="whitespace-nowrap">
                                       {metricKey}
                                     </div>
+                                    {evaluatorDescriptionByName[metricKey] && (
+                                      <div className="mt-1 max-w-40 whitespace-normal normal-case tracking-normal line-clamp-2">
+                                        {evaluatorDescriptionByName[metricKey]}
+                                      </div>
+                                    )}
                                   </div>
                                 </th>
                               ))}
@@ -1512,15 +1552,24 @@ export default function SimulationRunPage() {
                                             simulation,
                                             metricKey
                                           );
+                                        const evaluatorDescription =
+                                          evaluatorDescriptionByName[metricKey];
 
                                         return (
                                           <div
                                             key={metricKey}
                                             className="flex items-center justify-between py-2 border-b border-border/50 last:border-b-0"
                                           >
-                                            <span className="text-xs text-muted-foreground">
-                                              {metricKey}
-                                            </span>
+                                            <div className="min-w-0 pr-3">
+                                              <span className="text-xs text-muted-foreground">
+                                                {metricKey}
+                                              </span>
+                                              {evaluatorDescription && (
+                                                <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+                                                  {evaluatorDescription}
+                                                </p>
+                                              )}
+                                            </div>
                                             <div className="flex items-center gap-2">
                                               {value === null ? (
                                                 simulation.aborted ? (

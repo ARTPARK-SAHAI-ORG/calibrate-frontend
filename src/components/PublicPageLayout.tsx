@@ -8,6 +8,7 @@ interface PublicPageLayoutProps {
   children: React.ReactNode;
   title?: string;
   pills?: React.ReactNode;
+  contentClassName?: string;
 }
 
 type Theme = "light" | "dark" | "device";
@@ -30,7 +31,12 @@ function resolvedIsDark(theme: Theme): boolean {
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
-export function PublicPageLayout({ children, title, pills }: PublicPageLayoutProps) {
+export function PublicPageLayout({
+  children,
+  title,
+  pills,
+  contentClassName = "max-w-7xl",
+}: PublicPageLayoutProps) {
   const { isAuthenticated, isLoading } = useAuth();
   const [mounted, setMounted] = React.useState(false);
   const [isDark, setIsDark] = React.useState(false);
@@ -124,7 +130,7 @@ export function PublicPageLayout({ children, title, pills }: PublicPageLayoutPro
       </header>
 
       {/* Page content */}
-      <main className="flex-1 px-4 md:px-8 py-6 md:py-8 max-w-7xl w-full mx-auto">
+      <main className={`flex-1 px-4 md:px-8 py-6 md:py-8 ${contentClassName} w-full mx-auto`}>
         {children}
       </main>
 

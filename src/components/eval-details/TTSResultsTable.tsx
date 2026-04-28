@@ -56,7 +56,7 @@ export type TTSEvaluatorColumn = {
 type TTSResultsTableProps = {
   results: TTSResultRow[];
   showMetrics?: boolean;
-  /** Header label for the LLM-judge score column. Defaults to `"LLM Judge"` so the public TTS page (which doesn't know the default evaluator) keeps its existing label. The authenticated page passes the default evaluator's `name`. Ignored when `evaluatorColumns` is provided. */
+  /** Header label for the legacy single-evaluator score column. Ignored when `evaluatorColumns` is provided. */
   judgeLabel?: string;
   /** When provided, replaces the single LLM-judge column with one column per entry. Each evaluator's score/reasoning is read from `result[col.scoreField ?? `${col.key}_score`]` and `result[col.reasoningField ?? `${col.key}_reasoning`]`. */
   evaluatorColumns?: TTSEvaluatorColumn[];
@@ -73,7 +73,7 @@ const TTS_COL_WIDTHS = {
   evaluator: 140,
 } as const;
 
-export function TTSResultsTable({ results, showMetrics = true, judgeLabel = "LLM Judge", evaluatorColumns }: TTSResultsTableProps) {
+export function TTSResultsTable({ results, showMetrics = true, judgeLabel = "Evaluator", evaluatorColumns }: TTSResultsTableProps) {
   // When `evaluatorColumns` is provided, each evaluator gets its own column;
   // the legacy `llm_judge_*` rendering branch is skipped.
   const useDynamic = Array.isArray(evaluatorColumns) && evaluatorColumns.length > 0;
@@ -200,7 +200,7 @@ export function TTSResultsTable({ results, showMetrics = true, judgeLabel = "LLM
                     })
                   : (result.llm_judge_reasoning && (
                       <div className="pt-1 border-t border-border">
-                        <span className="text-[11px] text-muted-foreground uppercase tracking-wide">LLM Judge Reasoning</span>
+                        <span className="text-[11px] text-muted-foreground uppercase tracking-wide">{judgeLabel} Reasoning</span>
                         <p className="text-[12px] text-muted-foreground mt-0.5">{result.llm_judge_reasoning}</p>
                       </div>
                     ))

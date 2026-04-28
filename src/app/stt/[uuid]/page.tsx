@@ -10,13 +10,13 @@ import { BackHeader, StatusBadge, NotFoundState } from "@/components/ui";
 import { sttProviders } from "@/components/agent-tabs/constants/providers";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import {
-  ProviderSidebar,
-  ProviderMetricsCard,
-  STTResultsTable,
-  LeaderboardTab,
-  AboutMetricsTable,
+  STTEvaluationAbout,
+  STTEvaluationLeaderboard,
+  STTEvaluationOutputs,
+  ratingRange,
+  hasSTTEmptyPredictions,
+  getFirstSTTEmptyPredictionIndex,
   type STTEvaluatorColumn,
-  type ChartConfig,
 } from "@/components/eval-details";
 import { useSidebarState } from "@/lib/sidebar";
 import { getDataset } from "@/lib/datasets";
@@ -62,6 +62,7 @@ type EvaluatorRun = {
   aggregate?: EvaluatorRunAggregate | null;
   /** Current human-readable evaluator name from the DB at response time. May lag the artefact `metric_key` after a rename. */
   name?: string;
+  description?: string;
 };
 
 type ProviderMetrics = {
@@ -122,6 +123,7 @@ type EvaluationResult = {
 type EvaluatorSummary = {
   uuid: string;
   name: string;
+  description?: string | null;
   isDefault: boolean;
 };
 
@@ -131,6 +133,7 @@ type EvaluatorSummary = {
 type EvaluatorAbout = {
   uuid: string;
   name: string;
+  description: string;
   outputType: "binary" | "rating";
   /** Numeric values from `live_version.output_config.scale` for `rating` evaluators. Empty for binary. */
   scaleValues: number[];
@@ -140,34 +143,6 @@ type EvaluatorAbout = {
 const getProviderLabel = (value: string): string => {
   const provider = sttProviders.find((p) => p.value === value);
   return provider ? provider.label : value;
-};
-
-// Compute the "min - max" range string for a rating evaluator's scale.
-// Falls back to "-" when the scale is empty or has no numeric entries (e.g.
-// a string-valued scale we don't know how to summarise).
-const ratingRange = (scaleValues: number[]): string => {
-  if (scaleValues.length === 0) return "-";
-  const min = Math.min(...scaleValues);
-  const max = Math.max(...scaleValues);
-  return min === max ? String(min) : `${min} - ${max}`;
-};
-
-// Helper function to check if a provider has any empty predictions
-const hasEmptyPredictions = (providerResult: ProviderResult): boolean => {
-  return (
-    providerResult.results?.some((r) => !r.pred || r.pred.trim() === "") ??
-    false
-  );
-};
-
-// Helper function to get the index of the first empty prediction
-const getFirstEmptyPredictionIndex = (
-  providerResult: ProviderResult,
-): number => {
-  return (
-    providerResult.results?.findIndex((r) => !r.pred || r.pred.trim() === "") ??
-    -1
-  );
 };
 
 type ActiveTab = "leaderboard" | "outputs" | "about";
@@ -186,12 +161,7 @@ export default function STTEvaluationDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<401 | 403 | 404 | null>(null);
   // Persist the active tab across reloads via the `?tab=` query param.
-  // Default to "outputs" when the param is missing or invalid; the
-  // `Leaderboard` tab is only shown when the job is `done`, but keeping it
-  // in the URL while the run is still in progress is harmless — the tab bar
-  // simply won't render the Leaderboard button until then, and the
-  // `activeTab === "leaderboard"` check below already requires
-  // `leaderboard_summary` to be present before rendering content.
+  // Tabs that are not available yet fall back visually to Outputs below.
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
     const tabParam = searchParams.get("tab");
     return tabParam && (ACTIVE_TABS as readonly string[]).includes(tabParam)
@@ -272,10 +242,12 @@ export default function STTEvaluationDetailPage() {
                 (m: {
                   uuid: string;
                   name: string;
+                  description?: string | null;
                   owner_user_id?: string | null;
                 }) => ({
                   uuid: m.uuid,
                   name: m.name,
+                  description: m.description ?? null,
                   isDefault: !m.owner_user_id,
                 }),
               )
@@ -330,6 +302,7 @@ export default function STTEvaluationDetailPage() {
           byUuid.set(run.evaluator_uuid, {
             uuid: run.evaluator_uuid,
             name: run.name ?? run.metric_key,
+            description: run.description ?? "",
             outputType: a.type === "rating" ? "rating" : "binary",
             scaleValues,
           });
@@ -393,6 +366,7 @@ export default function STTEvaluationDetailPage() {
             const data: {
               uuid: string;
               name: string;
+              description?: string | null;
               output_type: "binary" | "rating";
               live_version?: {
                 output_config?: {
@@ -408,6 +382,7 @@ export default function STTEvaluationDetailPage() {
             return {
               uuid: data.uuid,
               name: data.name,
+              description: data.description ?? "",
               outputType: data.output_type,
               scaleValues,
             } satisfies EvaluatorAbout;
@@ -576,12 +551,11 @@ export default function STTEvaluationDetailPage() {
     }
   };
 
-  // The default STT evaluator drives the column / metric label that replaces
-  // the previous generic "LLM Judge Score" everywhere on the page, and powers
-  // the clickable pill embedded in the About-tab description column.
+  // The default STT evaluator drives the column / metric label for legacy
+  // single-evaluator jobs when the job payload doesn't carry evaluator_runs.
   const defaultEvaluator: EvaluatorSummary | null =
     sttEvaluators.find((e) => e.isDefault) ?? null;
-  const judgeLabel = defaultEvaluator?.name ?? "LLM Judge Score";
+  const judgeLabel = defaultEvaluator?.name ?? "Evaluator";
 
   // Derive the per-evaluator columns rendered in the Outputs results table,
   // the per-provider metrics card and the Leaderboard chart/columns. Three
@@ -672,46 +646,12 @@ export default function STTEvaluationDetailPage() {
     ];
   }, [aboutEvaluators, evaluationResult, defaultEvaluator, judgeLabel]);
 
-  // Resolve the aggregate `mean` for an evaluator column on a specific
-  // provider. Tries the most authoritative source first:
-  //   1) New format: `provider_results[i].evaluator_runs[*].aggregate.mean`
-  //      where `metric_key === col.key`.
-  //   2) Legacy formats: `metrics[col.scoreField]` is a flat number
-  //      (`*_score` / `llm_judge_score`).
-  //   3) New-format mid-state where `metrics[name]` arrived as a nested
-  //      object before `evaluator_runs` populated.
-  const readProviderMean = (
-    col: STTEvaluatorColumn,
-    pr: ProviderResult,
-  ): number | undefined => {
-    const run = pr.evaluator_runs?.find((r) => r.metric_key === col.key);
-    if (run && typeof run.aggregate?.mean === "number") return run.aggregate.mean;
-
-    const scoreField = col.scoreField ?? `${col.key}_score`;
-    const m = pr.metrics?.[scoreField];
-    if (typeof m === "number") return m;
-
-    const nested = pr.metrics?.[col.key];
-    if (
-      nested &&
-      typeof nested === "object" &&
-      "mean" in nested &&
-      typeof (nested as { mean: unknown }).mean === "number"
-    ) {
-      return (nested as { mean: number }).mean;
-    }
-    return undefined;
-  };
-
-  // Format a metric value the same way WER is formatted (rounded to 4 dp);
-  // returns "-" for missing or non-numeric values so the metrics card and
-  // leaderboard cells render a sensible placeholder while polling.
-  const formatMetricValue = (v: unknown): string | number => {
-    if (typeof v === "number" && Number.isFinite(v)) {
-      return parseFloat(v.toFixed(4));
-    }
-    return "-";
-  };
+  const canShowLeaderboard =
+    evaluationResult?.status === "done" && !!evaluationResult.leaderboard_summary;
+  const displayedActiveTab =
+    (activeTab === "leaderboard" || activeTab === "about") && !canShowLeaderboard
+      ? "outputs"
+      : activeTab;
 
   const customHeader = (
     <BackHeader label="Back" onBack={() => router.push("/stt")} title="Back" />
@@ -818,12 +758,12 @@ export default function STTEvaluationDetailPage() {
                 <>
                   {/* Tab Navigation */}
                   <div className="flex gap-2 border-b border-border">
-                    {/* Only show Leaderboard tab when done */}
-                    {evaluationResult.status === "done" && (
+                    {/* Only show Leaderboard and About tabs once leaderboard data is available */}
+                    {canShowLeaderboard && (
                       <button
                         onClick={() => handleTabChange("leaderboard")}
                         className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
-                          activeTab === "leaderboard"
+                          displayedActiveTab === "leaderboard"
                             ? "border-foreground text-foreground"
                             : "border-transparent text-muted-foreground hover:text-foreground"
                         }`}
@@ -845,202 +785,85 @@ export default function STTEvaluationDetailPage() {
                         }
                       }}
                       className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
-                        activeTab === "outputs"
+                        displayedActiveTab === "outputs"
                           ? "border-foreground text-foreground"
                           : "border-transparent text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       Outputs
                     </button>
-                    <button
-                      onClick={() => handleTabChange("about")}
-                      className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
-                        activeTab === "about"
-                          ? "border-foreground text-foreground"
-                          : "border-transparent text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      About
-                    </button>
+                    {canShowLeaderboard && (
+                      <button
+                        onClick={() => handleTabChange("about")}
+                        className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
+                          displayedActiveTab === "about"
+                            ? "border-foreground text-foreground"
+                            : "border-transparent text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        About
+                      </button>
+                    )}
                   </div>
 
                   {/* About Tab */}
-                  {activeTab === "about" && (
-                    <AboutMetricsTable
-                      metrics={[
-                        { metric: "WER (Word Error Rate)", description: "Word error rate measures the percentage of words that differ between the reference transcription and the predicted transcription.", preference: "Lower is better", range: "0 - \u221E" },
-                        ...aboutEvaluators.map((e) => ({
-                          metric: e.name,
-                          description: (
+                  {displayedActiveTab === "about" && canShowLeaderboard && (
+                    <STTEvaluationAbout
+                      evaluatorRows={aboutEvaluators.map((e) => ({
+                          key: e.uuid,
+                          metric: (
                             <Link
                               href={`/evaluators/${e.uuid}`}
-                              className="inline-flex items-center gap-1.5 px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground hover:bg-muted/70 transition-colors"
+                              className="text-foreground underline-offset-2 hover:underline"
                               title={`Open evaluator: ${e.name}`}
                             >
-                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
                               {e.name}
                             </Link>
                           ),
-                          preference: e.outputType === "binary" ? "Pass is better" : "Higher is better",
+                          description:
+                            e.description ||
+                            (e.uuid === defaultEvaluator?.uuid
+                              ? (defaultEvaluator.description ?? "")
+                              : ""),
+                          outputType: e.outputType,
                           range: e.outputType === "binary" ? "Pass / Fail" : ratingRange(e.scaleValues),
-                        })),
-                      ]}
+                        }))}
                     />
                   )}
 
                   {/* Leaderboard Tab */}
-                  {activeTab === "leaderboard" && evaluationResult.leaderboard_summary && (() => {
-                    // Build the leaderboard columns and chart rows from the
-                    // dynamic evaluator list. WER stays first; every
-                    // evaluator gets its own column reading
-                    // `summary[col.scoreField]` (which equals the artefact
-                    // column name — `metric_key` in the new format,
-                    // `${prefix}_score` in legacy `_info`, `llm_judge_score`
-                    // in legacy single-evaluator) and a matching bar chart
-                    // (clamped to [0, 1] for binary evaluators, auto-fit
-                    // for rating evaluators where the scale can vary).
-                    const allCharts: ChartConfig[] = [
-                      { title: "WER", dataKey: "wer" },
-                      ...evaluatorColumns.map((col) => ({
-                        title: col.label,
-                        dataKey: col.scoreField ?? `${col.key}_score`,
-                        yDomain:
-                          col.outputType === "binary"
-                            ? ([0, 1] as [number, number])
-                            : undefined,
-                      })),
-                    ];
-                    const chartRows: ChartConfig[][] = [];
-                    for (let i = 0; i < allCharts.length; i += 2) {
-                      chartRows.push(allCharts.slice(i, i + 2));
-                    }
-                    return (
-                      <LeaderboardTab
-                        className="-mx-4 md:-mx-8 px-4 md:px-8 w-[calc(100vw-32px)] md:w-[calc(100vw-56px)] ml-[calc((32px-100vw)/2+50%)] md:ml-[calc((56px-100vw)/2+50%)] relative"
-                        columns={[
-                          { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
-                          { key: "wer", header: "WER" },
-                          ...evaluatorColumns.map((col) => ({
-                            key: col.scoreField ?? `${col.key}_score`,
-                            header: col.label,
-                          })),
-                        ]}
-                        data={evaluationResult.leaderboard_summary!}
-                        charts={chartRows}
-                        filename="stt-evaluation-leaderboard"
-                        getLabel={getProviderLabel}
-                      />
-                    );
-                  })()}
+                  {displayedActiveTab === "leaderboard" && evaluationResult.leaderboard_summary && (
+                    <STTEvaluationLeaderboard
+                      className="-mx-4 md:-mx-8 px-4 md:px-8 w-[calc(100vw-32px)] md:w-[calc(100vw-56px)] ml-[calc((32px-100vw)/2+50%)] md:ml-[calc((56px-100vw)/2+50%)] relative"
+                      leaderboardSummary={evaluationResult.leaderboard_summary}
+                      evaluatorColumns={evaluatorColumns}
+                      getProviderLabel={getProviderLabel}
+                    />
+                  )}
 
                   {/* Outputs Tab */}
-                  {activeTab === "outputs" && (
-                    <div className="flex flex-col md:flex-row border border-border rounded-xl overflow-hidden md:h-[calc(100vh-220px)]">
-                      <ProviderSidebar
-                        items={evaluationResult.provider_results!.map((pr) => ({
-                          key: pr.provider,
-                          label: getProviderLabel(pr.provider),
-                          success: pr.success === true && !hasEmptyPredictions(pr) ? true : pr.success === null ? null : false,
-                        }))}
-                        activeKey={activeProviderTab || evaluationResult.provider_results![0]?.provider}
-                        onSelect={(key) => {
-                          setActiveProviderTab(key);
-                          const pr = evaluationResult.provider_results!.find((p) => p.provider === key);
-                          if (pr && hasEmptyPredictions(pr)) {
-                            setTimeout(() => {
-                              const firstEmptyIndex = getFirstEmptyPredictionIndex(pr);
-                              if (firstEmptyIndex >= 0 && tableContainerRef.current) {
-                                const row = tableContainerRef.current.querySelector(`[data-row-index="${firstEmptyIndex}"]`);
-                                row?.scrollIntoView({ behavior: "smooth", block: "center" });
-                              }
-                            }, 100);
-                          }
-                        }}
-                      />
-
-                      <div className="flex-1 overflow-y-auto p-4 md:p-6">
-                        {(() => {
-                          const selectedProvider =
-                            activeProviderTab || evaluationResult.provider_results![0]?.provider;
-                          const providerResult =
-                            evaluationResult.provider_results!.find((pr) => pr.provider === selectedProvider);
-
-                          if (!providerResult) {
-                            return (
-                              <div className="flex items-center justify-center h-full">
-                                <p className="text-muted-foreground">Select a provider to view details</p>
-                              </div>
-                            );
-                          }
-
-                          if (providerResult.success === null && (!providerResult.results || providerResult.results.length === 0)) {
-                            return (
-                              <div className="flex items-center justify-center h-full min-h-[200px]">
-                                <svg className="w-5 h-5 animate-spin text-muted-foreground" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                              </div>
-                            );
-                          }
-
-                          if (providerResult.success === false) {
-                            return (
-                              <div className="flex items-center justify-center h-full min-h-[200px]">
-                                <div className="border border-red-500/50 bg-red-500/10 rounded-lg p-4 max-w-md text-center">
-                                  <div className="text-red-500 text-[14px] font-medium mb-1">
-                                    There was an error running this provider. Please contact us by posting your issue to help us help you.
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          }
-
-                          // A row "has metrics" when WER is populated and
-                          // every dynamic evaluator column has produced a
-                          // score for it. While polling, partially completed
-                          // rows defer the metrics columns until the whole
-                          // batch completes (matches the old behaviour, just
-                          // generalised over evaluator columns).
-                          const showMetrics =
-                            evaluationResult.status === "done" ||
-                            (providerResult.results?.every((r) => {
-                              if (r.wer === undefined || r.wer === "") return false;
-                              return evaluatorColumns.every((col) => {
-                                const v = r[col.scoreField ?? `${col.key}_score`];
-                                return v !== undefined && v !== null && v !== "";
-                              });
-                            }) ?? false);
-
-                          return (
-                            <div className="space-y-4 md:space-y-6">
-                              {providerResult.success && providerResult.metrics && (
-                                <ProviderMetricsCard
-                                  metrics={[
-                                    { label: "WER", value: providerResult.metrics.wer != null ? parseFloat(providerResult.metrics.wer.toFixed(4)) : "-" },
-                                    ...evaluatorColumns.map((col) => ({
-                                      label: col.label,
-                                      value: formatMetricValue(readProviderMean(col, providerResult)),
-                                    })),
-                                  ]}
-                                />
-                              )}
-                              {providerResult.results && providerResult.results.length > 0 && (
-                                <STTResultsTable
-                                  results={providerResult.results}
-                                  showMetrics={showMetrics}
-                                  showSimilarity={false}
-                                  evaluatorColumns={evaluatorColumns}
-                                  tableRef={tableContainerRef}
-                                />
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </div>
+                  {displayedActiveTab === "outputs" && (
+                    <STTEvaluationOutputs
+                      providerResults={evaluationResult.provider_results!}
+                      activeProviderKey={activeProviderTab}
+                      onProviderSelect={(key) => {
+                        setActiveProviderTab(key);
+                        const pr = evaluationResult.provider_results!.find((p) => p.provider === key);
+                        if (pr && hasSTTEmptyPredictions(pr)) {
+                          setTimeout(() => {
+                            const firstEmptyIndex = getFirstSTTEmptyPredictionIndex(pr);
+                            if (firstEmptyIndex >= 0 && tableContainerRef.current) {
+                              const row = tableContainerRef.current.querySelector(`[data-row-index="${firstEmptyIndex}"]`);
+                              row?.scrollIntoView({ behavior: "smooth", block: "center" });
+                            }
+                          }, 100);
+                        }
+                      }}
+                      status={evaluationResult.status}
+                      evaluatorColumns={evaluatorColumns}
+                      getProviderLabel={getProviderLabel}
+                      tableRef={tableContainerRef}
+                    />
                   )}
                 </>
               )}

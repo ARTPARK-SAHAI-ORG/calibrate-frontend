@@ -16,6 +16,10 @@ import { ShareButton } from "@/components/ShareButton";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { TestRunOutputsPanel } from "./eval-details";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
+import {
+  fetchDefaultLLMNextReplyEvaluator,
+  type DefaultEvaluatorSummary,
+} from "@/lib/defaultEvaluators";
 
 type TestData = {
   uuid: string;
@@ -136,6 +140,8 @@ export function TestRunnerDialog({
   const [runName, setRunName] = useState<string | null>(null);
   const [isPublic, setIsPublic] = useState(false);
   const [shareToken, setShareToken] = useState<string | null>(null);
+  const [defaultNextReplyEvaluator, setDefaultNextReplyEvaluator] =
+    useState<DefaultEvaluatorSummary | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   // Tracks whether the dialog has already auto-opened a completed test for
   // this open lifecycle. Set back to false on every dialog open / new run /
@@ -170,6 +176,25 @@ export function TestRunnerDialog({
       setSelectedTestUuid(firstCompleted.test.uuid);
     }
   }, [testResults, selectedTestUuid]);
+
+  useEffect(() => {
+    if (!isOpen || !backendAccessToken) return;
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl) return;
+
+    let cancelled = false;
+    fetchDefaultLLMNextReplyEvaluator(backendUrl, backendAccessToken)
+      .then((evaluator) => {
+        if (!cancelled) setDefaultNextReplyEvaluator(evaluator);
+      })
+      .catch(() => {
+        if (!cancelled) setDefaultNextReplyEvaluator(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, backendAccessToken]);
 
   // Start polling when dialog opens with a taskId (viewing existing run)
   useEffect(() => {
@@ -850,7 +875,7 @@ export function TestRunnerDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-0 md:p-4">
-      <div className="bg-background rounded-none md:rounded-xl w-full max-w-7xl h-full md:h-[85vh] flex flex-col shadow-2xl">
+      <div className="bg-background rounded-none md:rounded-xl w-full max-w-[92rem] h-full md:h-[92vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-border">
           <div className="min-w-0">
@@ -959,6 +984,7 @@ export function TestRunnerDialog({
               selectedId={selectedTestUuid}
               onSelect={setSelectedTestUuid}
               onClearSelection={() => setSelectedTestUuid(null)}
+              legacyDefaultEvaluator={defaultNextReplyEvaluator}
             />
           </div>
         )}

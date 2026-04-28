@@ -61,7 +61,7 @@ type STTResultsTableProps = {
   showMetrics?: boolean;
   /** Show the String Similarity column / mobile field. Defaults to `true` so existing callers (e.g. the public STT page) keep their column. The authenticated `/stt/[uuid]` page passes `false` to hide it. */
   showSimilarity?: boolean;
-  /** Header label for the LLM-judge score column (and the mobile reasoning section). Defaults to `"LLM Judge"` so the public STT page (which doesn't know the default evaluator) keeps its existing label. The authenticated page passes the default evaluator's `name`. Ignored when `evaluatorColumns` is provided. */
+  /** Header label for the legacy single-evaluator score column. Ignored when `evaluatorColumns` is provided. */
   judgeLabel?: string;
   /** When provided, replaces the single LLM-judge column with one column per entry. Each evaluator's score/reasoning is read from `result[col.scoreField ?? `${col.key}_score`]` and `result[col.reasoningField ?? `${col.key}_reasoning`]`. */
   evaluatorColumns?: STTEvaluatorColumn[];
@@ -83,7 +83,7 @@ const STT_COL_WIDTHS = {
   llmJudge: 110,
 } as const;
 
-export function STTResultsTable({ results, showMetrics = true, showSimilarity = true, judgeLabel = "LLM Judge", evaluatorColumns, tableRef }: STTResultsTableProps) {
+export function STTResultsTable({ results, showMetrics = true, showSimilarity = true, judgeLabel = "Evaluator", evaluatorColumns, tableRef }: STTResultsTableProps) {
   const hasAudio = results.some((r) => !!r.audio_url);
   // When `evaluatorColumns` is provided, each evaluator gets its own column;
   // the legacy `llm_judge_*` rendering branch is skipped.
@@ -281,7 +281,7 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                       })
                     : (result.llm_judge_reasoning && (
                         <div>
-                          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">LLM Judge Reasoning</span>
+                          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">{judgeLabel} Reasoning</span>
                           <p className="text-[12px] text-muted-foreground mt-0.5">{result.llm_judge_reasoning}</p>
                         </div>
                       ))}

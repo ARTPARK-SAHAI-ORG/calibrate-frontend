@@ -21,13 +21,17 @@ type ExportResultsButtonProps = {
 
 function escapeCell(value: unknown): string {
   if (value === null || value === undefined) return "";
-  const s =
+  const raw =
     typeof value === "string"
       ? value
       : typeof value === "object"
         ? JSON.stringify(value)
         : String(value);
-  if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+
+  // Prevent spreadsheet apps from interpreting exported user-controlled
+  // values as formulas when a CSV is opened in Excel/Sheets.
+  const s = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+  if (s.includes(",") || s.includes('"') || s.includes("\n") || s.includes("\r")) {
     return `"${s.replace(/"/g, '""')}"`;
   }
   return s;
@@ -45,7 +49,7 @@ export function ExportResultsButton({
     if (rows.length === 0) return;
 
     const csvLines = [
-      columns.map((c) => c.header).join(","),
+      columns.map((c) => escapeCell(c.header)).join(","),
       ...rows.map((r) => columns.map((c) => escapeCell(r[c.key])).join(",")),
     ];
     const csv = csvLines.join("\n");

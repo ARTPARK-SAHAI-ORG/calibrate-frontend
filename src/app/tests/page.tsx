@@ -339,6 +339,11 @@ function LLMPageInner() {
             },
           });
 
+          if (response.status === 401) {
+            await signOut({ callbackUrl: "/login" });
+            return;
+          }
+
           if (!response.ok) continue;
 
           const result = await response.json();
@@ -367,13 +372,6 @@ function LLMPageInner() {
           );
         } catch (err) {
           console.error(`Error polling run ${run.uuid}:`, err);
-          setAllRuns((prev) =>
-            prev.map((r) =>
-              r.uuid === run.uuid
-                ? { ...r, status: "failed", updated_at: new Date().toISOString() }
-                : r,
-            ),
-          );
         }
       }
     };

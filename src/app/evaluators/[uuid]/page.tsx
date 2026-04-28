@@ -14,24 +14,9 @@ import {
 } from "@/components/EvaluatorPills";
 import { LLMSelectorModal } from "@/components/agent-tabs/LLMSelectorModal";
 import type { LLMModel } from "@/components/agent-tabs/constants/providers";
-
-// Extracts unique `{{var_name}}` placeholders from a system prompt, preserving
-// first-seen order. Mirrors the helper in `src/app/evaluators/page.tsx` — keep
-// the two in sync if you change the recognized identifier shape.
-function extractVariableNames(prompt: string): string[] {
-  const regex = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
-  const seen = new Set<string>();
-  const result: string[] = [];
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(prompt)) !== null) {
-    const name = match[1];
-    if (!seen.has(name)) {
-      seen.add(name);
-      result.push(name);
-    }
-  }
-  return result;
-}
+import { RatingScaleEditor } from "@/components/evaluators/RatingScaleEditor";
+import { VersionCard } from "@/components/evaluators/VersionCard";
+import { extractVariableNames } from "@/lib/evaluatorVariables";
 
 async function getEvaluatorErrorMessage(
   response: Response,
@@ -137,6 +122,7 @@ export default function EvaluatorDetailPage() {
   const [newVersionError, setNewVersionError] = useState<string | null>(null);
   const [newVersionValidated, setNewVersionValidated] = useState(false);
   const [newVersionChangelog, setNewVersionChangelog] = useState("");
+  const [newVersionMarkLive, setNewVersionMarkLive] = useState(true);
   // Editable per-variable descriptions for the new version (keyed by variable
   // name). Variable names are pinned to the live version's variable set —
   // descriptions can be updated, but new placeholders the user types in the
@@ -344,6 +330,7 @@ export default function EvaluatorDetailPage() {
     setNewVersionError(null);
     setNewVersionValidated(false);
     setNewVersionChangelog("");
+    setNewVersionMarkLive(true);
     // Seed variable descriptions from the live version so users start from
     // what's already there and only edit what they want to change.
     const seededDescriptions: Record<string, string> = {};
@@ -386,6 +373,7 @@ export default function EvaluatorDetailPage() {
       const body: Record<string, unknown> = {
         judge_model: newVersionJudgeModel.id,
         system_prompt: newVersionSystemPrompt.trim(),
+        make_live: newVersionMarkLive,
       };
       if (newVersionChangelog.trim()) {
         body.changelog = newVersionChangelog.trim();
@@ -447,7 +435,7 @@ export default function EvaluatorDetailPage() {
         const text = await res.text().catch(() => "");
         throw new Error(text || "Failed to create version");
       }
-      // Refresh evaluator so the new version appears and stays non-live
+      // Refresh evaluator so the new version appears with the selected live state
       const refreshed = await fetch(`${backendUrl}/evaluators/${uuid}`, {
         headers: {
           accept: "application/json",
@@ -620,154 +608,18 @@ export default function EvaluatorDetailPage() {
             {/* Versions */}
             {versions.length > 0 ? (
               <div className="space-y-3 md:space-y-4">
-                {versions.map((v) => {
-                  const isLive = v.uuid === evaluator.live_version_id;
-                  const isSettingThis = settingLiveUuid === v.uuid;
-                  return (
-                    <div
-                      key={v.uuid}
-                      className={
-                        isDefault
-                          ? "space-y-3"
-                          : "border border-border rounded-xl p-4 md:p-5 bg-background space-y-3"
-                      }
-                    >
-                      {/* Version header */}
-                      <div className="flex items-start justify-between gap-3 flex-wrap">
-                        <div className="flex items-center gap-2 flex-wrap min-w-0">
-                          {!isDefault && (
-                            <>
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-muted text-foreground">
-                                v{v.version_number}
-                              </span>
-                              {isLive && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] md:text-[11px] font-medium uppercase tracking-wide bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                                  Current
-                                </span>
-                              )}
-                            </>
-                          )}
-                          <code className="text-xs md:text-sm font-mono text-muted-foreground truncate">
-                            {v.judge_model}
-                          </code>
-                        </div>
-                        {!isDefault && (
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            {!isLive && (
-                              <button
-                                onClick={() => setVersionLive(v.uuid)}
-                                disabled={isSettingThis}
-                                className="h-8 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {isSettingThis
-                                  ? "Setting..."
-                                  : "Set as current"}
-                              </button>
-                            )}
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">
-                              {formatDateTime(v.created_at)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* System prompt */}
-                      <pre className="border border-border rounded-md p-3 md:p-4 bg-muted/10 text-sm text-foreground whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">
-                        {v.system_prompt}
-                      </pre>
-
-                      {/* Variables */}
-                      {v.variables?.length ? (
-                        <div className="space-y-2">
-                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                            Variables
-                          </div>
-                          <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs md:text-sm text-muted-foreground">
-                            <svg
-                              className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600 dark:text-blue-400"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={1.75}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-                              />
-                            </svg>
-                            <span>
-                              When this evaluator is added to an LLM test, you
-                              will be able to fill in the value of each variable
-                              for that test
-                            </span>
-                          </div>
-                          <div className="border border-border rounded-md overflow-hidden">
-                            {v.variables.map((variable, i) => (
-                              <div
-                                key={variable.name}
-                                className={`p-3 md:p-4 bg-background ${
-                                  i > 0 ? "border-t border-border" : ""
-                                }`}
-                              >
-                                <code className="text-sm font-mono font-semibold text-foreground">
-                                  {`{{${variable.name}}}`}
-                                </code>
-                                {variable.description && (
-                                  <p className="text-sm text-muted-foreground mt-1">
-                                    {variable.description}
-                                  </p>
-                                )}
-                                {variable.default ? (
-                                  <div className="mt-2">
-                                    <div className="text-[11px] text-muted-foreground mb-1">
-                                      Default
-                                    </div>
-                                    <pre className="text-xs text-foreground whitespace-pre-wrap font-mono bg-muted/30 rounded-md p-2">
-                                      {variable.default}
-                                    </pre>
-                                  </div>
-                                ) : null}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {/* Output (rating only — rubric is version-owned) */}
-                      {evaluator.output_type === "rating" &&
-                      v.output_config?.scale?.length ? (
-                        <div className="space-y-2">
-                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                            Output
-                          </div>
-                          <div className="border border-border rounded-md p-3 md:p-4 bg-muted/10 space-y-2">
-                            {v.output_config.scale.map((entry) => (
-                              <div
-                                key={`${String(entry.value)}-${entry.name}`}
-                                className="flex items-start gap-3"
-                              >
-                                <span className="inline-flex items-center justify-center min-w-[28px] h-6 px-2 rounded-md text-xs font-semibold bg-muted text-foreground">
-                                  {String(entry.value)}
-                                </span>
-                                <div className="min-w-0">
-                                  <div className="text-sm font-medium text-foreground">
-                                    {entry.name}
-                                  </div>
-                                  {entry.description && (
-                                    <div className="text-xs text-muted-foreground mt-0.5">
-                                      {entry.description}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
+                {versions.map((v) => (
+                  <VersionCard
+                    key={v.uuid}
+                    version={v}
+                    outputType={evaluator.output_type}
+                    isDefault={isDefault}
+                    isLive={v.uuid === evaluator.live_version_id}
+                    isSettingLive={settingLiveUuid === v.uuid}
+                    onSetLive={setVersionLive}
+                    formatDateTime={formatDateTime}
+                  />
+                ))}
               </div>
             ) : (
               <div className="border border-border rounded-xl p-8 md:p-12 flex flex-col items-center justify-center bg-muted/20">
@@ -901,9 +753,7 @@ export default function EvaluatorDetailPage() {
       {newVersionOpen && evaluator && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div
-            className={`bg-background border border-border rounded-xl w-full shadow-2xl flex flex-col max-h-[90vh] ${
-              evaluator.output_type === "rating" ? "max-w-4xl" : "max-w-xl"
-            }`}
+            className="bg-background border border-border rounded-xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[90vh]"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-5 md:px-6 py-4 border-b border-border">
@@ -935,33 +785,66 @@ export default function EvaluatorDetailPage() {
 
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-5 md:px-6 py-4 md:py-5 space-y-4 md:space-y-5">
-              {/* Changelog — summary of the change */}
-              <div>
-                <label className="block text-xs md:text-sm font-medium mb-2">
-                  Summary of change{" "}
-                  <span className="font-normal text-muted-foreground">
-                    (optional)
-                  </span>
-                </label>
-                <input
-                  type="text"
-                  value={newVersionChangelog}
-                  onChange={(e) => setNewVersionChangelog(e.target.value)}
-                  placeholder="Briefly describe what changed in this version"
-                  className="w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border border-border bg-background dark:bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                />
-              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] gap-4 md:gap-6">
+                {/* Left column — Prompt */}
+                <div>
+                  <label className="block text-xs md:text-sm font-medium mb-2">
+                    Judge prompt <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={newVersionSystemPrompt}
+                    onChange={(e) =>
+                      setNewVersionSystemPrompt(e.target.value)
+                    }
+                    placeholder={
+                      evaluator.evaluator_type === "llm"
+                        ? "Describe how the judge should grade a response. Reference existing variables with {{name}}."
+                        : "Describe how the judge should grade a response"
+                    }
+                    className={`w-full px-4 py-3 rounded-md text-sm md:text-base border bg-background dark:bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none h-[360px] lg:h-[560px] ${
+                      newVersionValidated && !newVersionSystemPrompt.trim()
+                        ? "border-red-500"
+                        : "border-border"
+                    }`}
+                  />
+                </div>
 
-              <div
-                className={
-                  evaluator.output_type === "rating"
-                    ? "grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6"
-                    : "space-y-4 md:space-y-5"
-                }
-              >
-                {/* Left column — Judge model + prompt */}
+                {/* Right column — Version settings */}
                 <div className="space-y-4 md:space-y-5">
-                  {/* Judge model */}
+                  <div>
+                    <label className="block text-xs md:text-sm font-medium mb-2">
+                      Summary of change{" "}
+                      <span className="font-normal text-muted-foreground">
+                        (optional)
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      value={newVersionChangelog}
+                      onChange={(e) => setNewVersionChangelog(e.target.value)}
+                      placeholder="Briefly describe what changed in this version"
+                      className="w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border border-border bg-background dark:bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                    />
+                  </div>
+
+                  <label className="flex items-center gap-3 rounded-md border border-emerald-500/30 bg-emerald-500/10 dark:border-emerald-400/30 dark:bg-emerald-500/15 px-3 md:px-4 py-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newVersionMarkLive}
+                      onChange={(e) => setNewVersionMarkLive(e.target.checked)}
+                      disabled={newVersionSaving}
+                      className="h-4 w-4 shrink-0 rounded border-emerald-500/50 accent-emerald-600 cursor-pointer disabled:cursor-not-allowed"
+                    />
+                    <span className="flex flex-col gap-0.5 min-w-0">
+                      <span className="text-sm md:text-base font-medium text-emerald-700 dark:text-emerald-300">
+                        Mark the new version as the live version
+                      </span>
+                      <span className="text-xs md:text-sm text-emerald-700/75 dark:text-emerald-300/75">
+                        New tests will use this prompt version after it is created
+                      </span>
+                    </span>
+                  </label>
+
                   <div>
                     <label className="block text-xs md:text-sm font-medium mb-2">
                       Judge model <span className="text-red-500">*</span>
@@ -1002,28 +885,15 @@ export default function EvaluatorDetailPage() {
                     </button>
                   </div>
 
-                  {/* Judge prompt */}
-                  <div>
-                    <label className="block text-xs md:text-sm font-medium mb-2">
-                      Judge prompt <span className="text-red-500">*</span>
-                    </label>
-                    <textarea
-                      value={newVersionSystemPrompt}
-                      onChange={(e) =>
-                        setNewVersionSystemPrompt(e.target.value)
-                      }
-                      placeholder={
-                        evaluator.evaluator_type === "llm"
-                          ? "Describe how the judge should grade a response. Reference existing variables with {{name}}."
-                          : "Describe how the judge should grade a response"
-                      }
-                      className={`w-full px-4 py-3 rounded-md text-sm md:text-base border bg-background dark:bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none h-[240px] ${
-                        newVersionValidated && !newVersionSystemPrompt.trim()
-                          ? "border-red-500"
-                          : "border-border"
-                      }`}
+                  {evaluator.output_type === "rating" && (
+                    <RatingScaleEditor
+                      rows={newVersionScale}
+                      onChange={setNewVersionScale}
+                      validationAttempted={newVersionValidated}
+                      description="At least two rows. Description is optional rubric text sent to the judge."
+                      descriptionPlaceholder="Description (optional) - criteria for this level, shown to the judge"
                     />
-                  </div>
+                  )}
 
                   {(() => {
                     const existingVariables =
@@ -1208,151 +1078,7 @@ export default function EvaluatorDetailPage() {
                     return null;
                   })()}
                 </div>
-                {/* end left column */}
-
-                {/* Right column — Rating scale (rating only) */}
-                {evaluator.output_type === "rating" && (
-                  <div>
-                    <label className="block text-xs md:text-sm font-medium mb-1">
-                      Rating scale <span className="text-red-500">*</span>
-                    </label>
-                    <p className="text-xs md:text-sm text-muted-foreground mb-2">
-                      At least two rows. Description is optional rubric text
-                      sent to the judge.
-                    </p>
-                    <div className="space-y-2">
-                      {newVersionScale.map((row, idx) => {
-                        const missingLabel =
-                          newVersionValidated && !row.name.trim();
-                        return (
-                          <div
-                            key={idx}
-                            className="border border-border rounded-md p-2 md:p-3 bg-muted/10 dark:bg-muted"
-                          >
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="number"
-                                value={
-                                  typeof row.value === "number"
-                                    ? row.value
-                                    : Number(row.value) || 0
-                                }
-                                onChange={(e) => {
-                                  const next = [...newVersionScale];
-                                  next[idx] = {
-                                    ...next[idx],
-                                    value: Number(e.target.value),
-                                  };
-                                  setNewVersionScale(next);
-                                }}
-                                className="w-20 h-9 md:h-10 px-2 rounded-md text-sm md:text-base border border-border bg-background dark:bg-accent text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent text-center"
-                              />
-                              <input
-                                type="text"
-                                value={row.name}
-                                onChange={(e) => {
-                                  const next = [...newVersionScale];
-                                  next[idx] = {
-                                    ...next[idx],
-                                    name: e.target.value,
-                                  };
-                                  setNewVersionScale(next);
-                                }}
-                                placeholder={
-                                  ["Bad", "Average", "Good"][idx] ?? "Label"
-                                }
-                                className={`flex-1 h-9 md:h-10 px-3 rounded-md text-sm md:text-base border bg-background dark:bg-accent text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
-                                  missingLabel
-                                    ? "border-red-500"
-                                    : "border-border"
-                                }`}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (newVersionScale.length <= 2) return;
-                                  setNewVersionScale(
-                                    newVersionScale.filter((_, i) => i !== idx),
-                                  );
-                                }}
-                                disabled={newVersionScale.length <= 2}
-                                title={
-                                  newVersionScale.length <= 2
-                                    ? "At least two rows are required"
-                                    : "Remove row"
-                                }
-                                className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
-                              >
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={2}
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M6 18L18 6M6 6l12 12"
-                                  />
-                                </svg>
-                              </button>
-                            </div>
-                            <textarea
-                              value={row.description}
-                              onChange={(e) => {
-                                const next = [...newVersionScale];
-                                next[idx] = {
-                                  ...next[idx],
-                                  description: e.target.value,
-                                };
-                                setNewVersionScale(next);
-                              }}
-                              placeholder="Description (optional) — criteria for this level, shown to the judge"
-                              rows={2}
-                              className="mt-2 w-full px-3 py-2 rounded-md text-sm border border-border bg-background dark:bg-accent text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none"
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const maxVal = newVersionScale.reduce((m, r) => {
-                          const n =
-                            typeof r.value === "number"
-                              ? r.value
-                              : Number(r.value) || 0;
-                          return Math.max(m, n);
-                        }, 0);
-                        setNewVersionScale([
-                          ...newVersionScale,
-                          { value: maxVal + 1, name: "", description: "" },
-                        ]);
-                      }}
-                      className="mt-2 h-9 md:h-10 px-3 rounded-md text-sm md:text-base font-medium border border-dashed border-border bg-background dark:bg-muted hover:bg-muted/30 dark:hover:bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M12 4v16m8-8H4"
-                        />
-                      </svg>
-                      Add row
-                    </button>
-                  </div>
-                )}
-                {/* end right column */}
               </div>
-              {/* end top grid */}
 
               {newVersionError && (
                 <p className="text-sm text-red-500">{newVersionError}</p>
@@ -1396,7 +1122,13 @@ export default function EvaluatorDetailPage() {
                     ></path>
                   </svg>
                 )}
-                {newVersionSaving ? "Creating..." : "Create version"}
+                {newVersionSaving
+                  ? newVersionMarkLive
+                    ? "Creating and marking live..."
+                    : "Creating..."
+                  : newVersionMarkLive
+                    ? "Create and mark live"
+                    : "Create version"}
               </button>
             </div>
           </div>

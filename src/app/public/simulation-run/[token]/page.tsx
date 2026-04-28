@@ -24,7 +24,11 @@ type RunData = {
   // doesn't render links to /evaluators/{uuid} since that route is
   // authenticated — but the type is here so the field doesn't disappear
   // from `data` if we ever need it.
-  evaluators?: Array<{ evaluator_uuid: string; name: string }> | null;
+  evaluators?: Array<{
+    evaluator_uuid: string;
+    name: string;
+    description?: string | null;
+  }> | null;
   error: string | null;
 };
 
@@ -84,6 +88,25 @@ export default function PublicSimulationRunPage() {
     displayMetricKeys = Array.from(metricSet);
   }
 
+  const evaluatorDescriptionByName: Record<string, string> = {};
+  data.evaluators?.forEach((e) => {
+    if (e.name && e.description) evaluatorDescriptionByName[e.name] = e.description;
+  });
+  data.simulation_results.forEach((sim) => {
+    sim.evaluation_results?.forEach((result) => {
+      if (result.name && result.description && !(result.name in evaluatorDescriptionByName)) {
+        evaluatorDescriptionByName[result.name] = result.description;
+      }
+      if (
+        result.name === "stt_llm_judge_score" &&
+        result.description &&
+        !("stt_llm_judge" in evaluatorDescriptionByName)
+      ) {
+        evaluatorDescriptionByName.stt_llm_judge = result.description;
+      }
+    });
+  });
+
   return (
     <PublicPageLayout
       title={`Simulation | ${data.name}`}
@@ -94,7 +117,11 @@ export default function PublicSimulationRunPage() {
       }
     >
       <div className="space-y-6 md:space-y-8">
-        <SimulationMetricsGrid metrics={data.metrics} type={data.type} />
+        <SimulationMetricsGrid
+          metrics={data.metrics}
+          type={data.type}
+          evaluatorDescriptionByName={evaluatorDescriptionByName}
+        />
 
         {data.simulation_results.length > 0 && (
           <SimulationResultsTable
@@ -102,6 +129,7 @@ export default function PublicSimulationRunPage() {
             metricKeys={displayMetricKeys}
             onSelectSimulation={setSelectedSim}
             metricInfo={data.metrics ?? undefined}
+            evaluatorDescriptionByName={evaluatorDescriptionByName}
           />
         )}
       </div>

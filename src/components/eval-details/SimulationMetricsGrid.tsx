@@ -24,6 +24,8 @@ type SimulationMetricsGridProps = {
    * authenticated and would 404 anonymous users).
    */
   evaluatorUuidByName?: Record<string, string>;
+  /** Optional metric-name → snapshotted evaluator description map. */
+  evaluatorDescriptionByName?: Record<string, string>;
 };
 
 const LATENCY_KEYS = ["stt/ttft", "llm/ttft", "tts/ttft", "stt/processing_time", "llm/processing_time", "tts/processing_time"];
@@ -51,7 +53,12 @@ export function formatMetricCardValue(metric: MetricData): string {
   return `${Math.round(safeMean * 100)}%`;
 }
 
-export function SimulationMetricsGrid({ metrics, type, evaluatorUuidByName }: SimulationMetricsGridProps) {
+export function SimulationMetricsGrid({
+  metrics,
+  type,
+  evaluatorUuidByName,
+  evaluatorDescriptionByName,
+}: SimulationMetricsGridProps) {
   const [activeTab, setActiveTab] = useState<"performance" | "latency">("performance");
 
   if (!metrics) return null;
@@ -95,6 +102,7 @@ export function SimulationMetricsGrid({ metrics, type, evaluatorUuidByName }: Si
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {regularMetrics.map(([key, metric]) => {
             const evaluatorUuid = evaluatorUuidByName?.[key];
+            const description = evaluatorDescriptionByName?.[key];
             // When linkable, the entire card becomes a `<Link>` (with
             // hover-highlight + arrow icon) so the affordance is
             // obvious. Otherwise it's a plain div.
@@ -119,6 +127,11 @@ export function SimulationMetricsGrid({ metrics, type, evaluatorUuidByName }: Si
                     </svg>
                   )}
                 </div>
+                {description && (
+                  <p className="text-xs text-muted-foreground line-clamp-1 mb-2">
+                    {description}
+                  </p>
+                )}
                 <div className="text-[18px] font-semibold text-foreground">{formatMetricCardValue(metric)}</div>
               </>
             );

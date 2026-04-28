@@ -16,6 +16,27 @@ export type { LeaderboardColumn, ChartConfig } from "./LeaderboardTab";
 export { AboutMetricsTable } from "./AboutMetricsTable";
 export type { MetricDescription } from "./AboutMetricsTable";
 
+export {
+  STTEvaluationAbout,
+  TTSEvaluationAbout,
+  STTEvaluationLeaderboard,
+  TTSEvaluationLeaderboard,
+  STTEvaluationOutputs,
+  TTSEvaluationOutputs,
+  ratingRange,
+  hasSTTEmptyPredictions,
+  getFirstSTTEmptyPredictionIndex,
+  findFirstEvaluatorRuns,
+  evaluatorColumnsFromRuns,
+  evaluatorDescriptionMapFromRuns,
+} from "./EvaluationRunDetails";
+export type {
+  EvaluatorAboutMetricRow,
+  LeaderboardSummaryForDetails,
+  STTProviderResultForDetails,
+  TTSProviderResultForDetails,
+} from "./EvaluationRunDetails";
+
 export { BenchmarkOutputsPanel } from "./BenchmarkOutputsPanel";
 export type { BenchmarkTestResult, BenchmarkModelResult } from "./BenchmarkOutputsPanel";
 

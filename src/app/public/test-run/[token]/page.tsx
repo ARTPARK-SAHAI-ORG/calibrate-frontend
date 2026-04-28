@@ -84,7 +84,7 @@ export default function PublicTestRunPage() {
   const failed = results.filter((r) => getStatus(r) === "failed").length;
 
   return (
-    <PublicPageLayout title="LLM unit test">
+    <PublicPageLayout title="LLM unit test" contentClassName="max-w-[92rem]">
       <div className="space-y-4 md:space-y-6">
         {/* Summary stats */}
         <div className="flex items-center justify-between gap-4">
@@ -120,7 +120,7 @@ export default function PublicTestRunPage() {
         </div>
 
         {results.length > 0 && (
-          <div className="border border-border rounded-xl overflow-hidden" style={{ height: "calc(100vh - 260px)", minHeight: 480 }}>
+          <div className="border border-border rounded-xl overflow-hidden" style={{ height: "calc(100vh - 220px)", minHeight: 620 }}>
             <TestRunOutputsPanel
               results={results.map((r, i) => ({
                 id: `test-${i}`,
@@ -136,6 +136,7 @@ export default function PublicTestRunPage() {
               selectedId={selectedId}
               onSelect={setSelectedId}
               onClearSelection={() => setSelectedId(null)}
+              enableEvaluatorLinks={false}
             />
           </div>
         )}
