@@ -1,5 +1,6 @@
-import React from "react";
-import type { SimulationResult, TranscriptEntry } from "./SimulationResultsTable";
+import React, { useMemo } from "react";
+import type { SimulationResult } from "./SimulationResultsTable";
+import { getVoiceSimulationAudioLayout, getVoiceSimulationAudioUrlForEntry } from "@/lib/simulationVoiceAudio";
 
 type SimulationTranscriptDialogProps = {
   simulation: SimulationResult;
@@ -8,34 +9,12 @@ type SimulationTranscriptDialogProps = {
   onAudioError?: () => void;
 };
 
-function getAudioUrlForEntry(
-  entry: TranscriptEntry,
-  entryIndex: number,
-  audioUrls: string[] | undefined,
-  filteredTranscript: TranscriptEntry[],
-  runType: "text" | "voice",
-): string | null {
-  if (!audioUrls || runType !== "voice") return null;
-  if (entry.role === "tool" || entry.tool_calls) return null;
-
-  let userCount = 0;
-  let assistantCount = 0;
-  for (let i = 0; i < entryIndex; i++) {
-    const msg = filteredTranscript[i];
-    if (msg?.role === "user") userCount++;
-    else if (msg?.role === "assistant" && !msg.tool_calls) assistantCount++;
-  }
-
-  let audioPattern: string;
-  if (entry.role === "user") audioPattern = `${userCount + 1}_user.wav`;
-  else if (entry.role === "assistant") audioPattern = `${assistantCount + 1}_bot.wav`;
-  else return null;
-
-  return audioUrls.find((url) => url.includes(audioPattern)) ?? null;
-}
-
 export function SimulationTranscriptDialog({ simulation, runType, onClose, onAudioError }: SimulationTranscriptDialogProps) {
   const fullTranscript = simulation.transcript ?? [];
+  const voiceAudioLayout = useMemo(
+    () => getVoiceSimulationAudioLayout(simulation.audio_urls),
+    [simulation.audio_urls],
+  );
   const filteredTranscript = fullTranscript.filter((entry) => {
     if (entry.role === "end_reason") return false;
     if (entry.role === "tool") {
@@ -89,7 +68,16 @@ export function SimulationTranscriptDialog({ simulation, runType, onClose, onAud
               </div>
             ) : (
               filteredTranscript.map((entry, index) => {
-                const audioUrl = getAudioUrlForEntry(entry, index, simulation.audio_urls, filteredTranscript, runType);
+                const audioUrl =
+                  runType === "voice"
+                    ? getVoiceSimulationAudioUrlForEntry(
+                        entry,
+                        index,
+                        simulation.audio_urls,
+                        filteredTranscript,
+                        voiceAudioLayout,
+                      )
+                    : null;
                 return (
                   <div key={index} className={`space-y-2 ${entry.role === "user" ? "flex flex-col items-end" : ""}`}>
                     {entry.role === "assistant" && (
@@ -201,10 +189,10 @@ export function SimulationTranscriptDialog({ simulation, runType, onClose, onAud
             {endedDueToMaxTurns && (
               <div className="flex items-center justify-center py-4 mt-2">
                 <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-                  <svg className="w-4 h-4 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className="w-4 h-4 shrink-0 text-amber-900 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
                   </svg>
-                  <span className="text-sm text-yellow-500">Maximum number of assistant turns reached</span>
+                  <span className="text-sm font-medium text-foreground">Maximum number of assistant turns reached</span>
                 </div>
               </div>
             )}
