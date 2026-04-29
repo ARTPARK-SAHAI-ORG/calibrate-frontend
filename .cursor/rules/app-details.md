@@ -215,8 +215,8 @@ Provider website links (external link icons) are shown only on the new evaluatio
 
 - **Two-column layout**: When the tab shows the main tests UI (not the **complete** empty state below), the layout is tests table on the left, Past runs panel (560px at `xl`) on the right — `flex flex-col lg:flex-row`.
 - **Empty states (`TestsTabContent`)**:
-  - **Complete empty** (no attached tests, past runs finished loading with **zero** runs): single full-width card — icon, "No tests attached", short description, outline **Add test** — **no** Past runs panel.
-  - **No tests but history or loading** (`agentTests.length === 0` and (`pastRunsLoading` **or** `pastRuns.length > 0`)): same two-column shell as when tests exist — left: outline **Add test** (`renderAddTestOutlineControl()`) plus a card explaining past runs are on the right; right: shared **`pastRunsPanel`** (so past runs stay visible after tests are removed or while runs are still loading).
+  - **Complete empty** (no attached tests, past runs finished loading with **zero** runs): single full-width card — icon, "No tests attached", short description, **primary** **Add test** (`renderAddTestControl("primary")`) — **no** Past runs panel.
+  - **No tests but history or loading** (`agentTests.length === 0` and (`pastRunsLoading` **or** `pastRuns.length > 0`)): two-column shell — left: a single empty-state **card** (icon + copy) with **primary** **Add test** centered **below** the description text (`renderAddTestControl("primary")`); there is **no** duplicate Add control in a row above the card; right: shared **`pastRunsPanel`** (past runs stay visible after tests are removed or while runs are still loading).
   - **Has tests**: header with Add / Run all / Compare (when applicable), search, table or cards, plus **`pastRunsPanel`** on the right.
 - **Tests table**: Shows attached tests with name, type (Tool Call/Next Reply), run button, delete button
   - **Desktop grid columns**: `grid-cols-[40px_minmax(0,1fr)_120px_auto_auto]` — Checkbox (40px), Name (fills remaining space, horizontally scrollable via `overflow-x-auto whitespace-nowrap` when text overflows), Type (fixed 120px), Run button (auto), Delete button (auto)
@@ -2317,6 +2317,17 @@ STT/TTS evaluation detail pages and simulation run detail pages use these respon
 - Text sizes scale: `text-base md:text-lg` for headings, `text-xl md:text-2xl` for titles
 - Margins scale: `mb-3 md:mb-4` for consistent spacing
 
+### Dataset detail page (`/datasets/[id]`)
+
+**Implementation**: `src/app/datasets/[id]/page.tsx`. Loads the dataset with `getDataset`; renders **`STTDatasetEditor`** or **`TTSDatasetEditor`** depending on `dataset_type`, with sorted `savedItems`, `onDeleteSavedItem` (API delete + parent `item_count` / `items` update), **`onHasPendingChangesChange`** → `hasPendingChanges`, and **`maxRowsPerEval`** from **`useMaxRowsPerEval`**. **`AppLayout`** uses **`activeItem={dataset.dataset_type}`** (`"stt"` or `"tts"`) so the sidebar highlights the STT or TTS area.
+
+**Header actions** (same row as the title, right-aligned):
+
+- **Save** — Rendered only when **`hasPendingChanges`**. It is the **primary** action (`bg-foreground text-background`, **`font-semibold`**, **`shadow-sm`**) so unsaved edits draw attention before starting an evaluation.
+- **New evaluation** — Navigates to **`/{stt|tts}/new?dataset={uuid}`**. **Disabled** when **`item_count === 0`** (nothing persisted to run against) **or** **`hasPendingChanges`** (the create flow uses saved dataset rows; draft edits must be saved first). When enabled, it uses the same **primary** solid styling; when disabled, **outline / muted** styling. **Tooltip on disabled state**: use shared **`@/components/Tooltip`** with **`position="top"`** (not the native `title` attribute), following the same **disabled-button + `pointer-events-none`** wrapper pattern documented under the Tooltip component — otherwise hover never reaches the trigger. Tooltip copy: if there are pending changes, explain **save first**; else explain **add at least one row**.
+
+**Order**: **Save** (when visible), then **New evaluation**.
+
 ### Evaluation Page Pattern (TTS/STT)
 
 Both TTS and STT evaluation pages follow the same list → new → detail pattern:
@@ -2349,6 +2360,7 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
 - Both components use the same tab layout:
   - **Settings tab**: Language selection dropdown + provider selection (responsive: table on desktop, cards on mobile) + evaluator selection (`MultiSelectPicker`)
   - **Dataset tab**: Sample rows + add sample button (TTS also has CSV upload with OR divider and sample download)
+  - **Choosing a saved dataset** (`DatasetPicker`, `src/components/evaluations/DatasetPicker.tsx`): Shared by **`SpeechToTextEvaluation`** and **`TextToSpeechEvaluation`** when picking an existing dataset. Datasets with **`item_count === 0`** are not selectable (disabled row styling). The reason is shown with **`@/components/Tooltip`** (`position="top"`), not secondary text under the name — same tooltip shell as elsewhere. **`SpeechToTextEvaluation`** and **`TextToSpeechEvaluation`** both clear **`selectedDatasetId`** when a refetch of **`listDatasets`** shows the current selection has **`item_count === 0`** (covers deleting all rows or stale URL state).
 - **Provider selection UI** (responsive):
   - **Desktop** (`hidden md:block`): Table with border, rounded corners (`border border-border rounded-lg`)
     - Header row with select-all checkbox and column titles (`bg-muted/50 border-b`)
@@ -3702,6 +3714,8 @@ import { Tooltip } from "@/components/Tooltip";
 **Viewport clamping**: The tooltip automatically clamps its position to stay within viewport boundaries (12px padding from edges). This prevents long content (like evaluator reasoning) from going off-screen.
 
 **Styling**: White background, rounded corners, shadow, 256px max width (`w-64`), text wraps within the container. Arrow indicator points to trigger element.
+
+**Disabled controls and hover**: Disabled native **`<button>`** elements often do not receive pointer events, so wrapping only the button breaks hover for the tooltip. Use this pattern when the trigger must stay a real button (e.g. disabled row in **`DatasetPicker`**, disabled **New evaluation** on **`/datasets/[id]`**): **`Tooltip`** → inner wrapper **`div`** → **`button`** with **`disabled`**, **`tabIndex={-1}`**, **`aria-disabled`**, and **`pointer-events-none`** on the button so the tooltip’s outer wrapper receives **`mouseenter` / `mouseleave`**. Do not rely on the **`title`** attribute for these explanations if the product standard is the shared tooltip.
 
 ### UI Components (`@/components/ui`)
 

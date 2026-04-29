@@ -21,6 +21,7 @@ import {
   TTSDatasetEditorHandle,
 } from "@/components/evaluations/TTSDatasetEditor";
 import { toast } from "sonner";
+import { Tooltip } from "@/components/Tooltip";
 
 export default function DatasetDetailPage() {
   const router = useRouter();
@@ -89,9 +90,16 @@ export default function DatasetDetailPage() {
     const isStt = dataset.dataset_type === "stt";
     const editorRef = isStt ? sttEditorRef : ttsEditorRef;
 
+    if (isStt && sttEditorRef.current && !sttEditorRef.current.validate()) {
+      toast.error(
+        "Enter reference transcription for every row with uploaded audio.",
+      );
+      return;
+    }
+
     const dirtyUpdates = editorRef.current?.getDirtyUpdates() ?? [];
-    const newRows = editorRef.current?.getNewRows() ?? [];
-    if (dirtyUpdates.length === 0 && newRows.length === 0) return;
+    const newRowsPayload = editorRef.current?.getNewRows() ?? [];
+    if (dirtyUpdates.length === 0 && newRowsPayload.length === 0) return;
 
     setIsSaving(true);
     try {
@@ -100,8 +108,8 @@ export default function DatasetDetailPage() {
           updateDatasetItem(accessToken, dataset.uuid, u.uuid, u.text),
         ),
       );
-      if (newRows.length > 0) {
-        await addDatasetItems(accessToken, dataset.uuid, newRows);
+      if (newRowsPayload.length > 0) {
+        await addDatasetItems(accessToken, dataset.uuid, newRowsPayload);
       }
       editorRef.current?.clearDirtyUpdates();
       editorRef.current?.clearNewRows();
@@ -111,9 +119,9 @@ export default function DatasetDetailPage() {
         parts.push(
           `${dirtyUpdates.length} item${dirtyUpdates.length !== 1 ? "s" : ""} updated`,
         );
-      if (newRows.length > 0)
+      if (newRowsPayload.length > 0)
         parts.push(
-          `${newRows.length} item${newRows.length !== 1 ? "s" : ""} added`,
+          `${newRowsPayload.length} item${newRowsPayload.length !== 1 ? "s" : ""} added`,
         );
       toast.success(parts.join(", ") + ".");
     } catch (err) {
@@ -194,21 +202,46 @@ export default function DatasetDetailPage() {
                   <button
                     onClick={handleSave}
                     disabled={isSaving}
-                    className="h-9 px-4 rounded-md text-sm font-medium border border-border hover:bg-muted/50 transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="h-9 px-4 rounded-md text-sm font-semibold bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                   >
                     {isSaving ? "Saving..." : "Save"}
                   </button>
                 )}
-                <button
-                  onClick={() =>
-                    router.push(
-                      `/${dataset.dataset_type}/new?dataset=${dataset.uuid}`,
-                    )
-                  }
-                  className="h-9 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
-                >
-                  New evaluation
-                </button>
+                {dataset.item_count > 0 && !hasPendingChanges ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      router.push(
+                        `/${dataset.dataset_type}/new?dataset=${dataset.uuid}`,
+                      )
+                    }
+                    className="h-9 px-4 rounded-md text-sm font-medium flex-shrink-0 bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+                  >
+                    New evaluation
+                  </button>
+                ) : (
+                  <Tooltip
+                    content={
+                      hasPendingChanges
+                        ? "Save your changes before starting an evaluation."
+                        : "Add at least one row to run an evaluation."
+                    }
+                    position="top"
+                    className="flex-shrink-0"
+                  >
+                    <div className="inline-flex flex-shrink-0">
+                      <button
+                        type="button"
+                        disabled
+                        tabIndex={-1}
+                        aria-disabled="true"
+                        className="h-9 px-4 rounded-md text-sm font-medium flex-shrink-0 border border-border bg-background text-foreground opacity-60 cursor-not-allowed pointer-events-none"
+                      >
+                        New evaluation
+                      </button>
+                    </div>
+                  </Tooltip>
+                )}
               </div>
             </div>
 

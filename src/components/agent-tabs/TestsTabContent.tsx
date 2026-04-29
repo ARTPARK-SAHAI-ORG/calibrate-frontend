@@ -156,7 +156,7 @@ export function TestsTabContent({
 
   // Selection state for bulk operations
   const [selectedTestUuids, setSelectedTestUuids] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
 
   // Delete confirmation state
@@ -173,8 +173,10 @@ export function TestsTabContent({
   // Benchmark dialog state
   const [benchmarkDialogOpen, setBenchmarkDialogOpen] = useState(false);
 
-  const isConnectionUnverified = agentType === "connection" && connectionVerified === false;
-  const isBenchmarkDisabled = agentType === "connection" && supportsBenchmark !== true;
+  const isConnectionUnverified =
+    agentType === "connection" && connectionVerified === false;
+  const isBenchmarkDisabled =
+    agentType === "connection" && supportsBenchmark !== true;
 
   // Past test runs state
   const [pastRuns, setPastRuns] = useState<TestRun[]>([]);
@@ -233,7 +235,7 @@ export function TestsTabContent({
               "ngrok-skip-browser-warning": "true",
               Authorization: `Bearer ${backendAccessToken}`,
             },
-          }
+          },
         );
 
         if (response.status === 401) {
@@ -250,7 +252,7 @@ export function TestsTabContent({
       } catch (err) {
         console.error("Error fetching agent tests:", err);
         setAgentTestsError(
-          err instanceof Error ? err.message : "Failed to load agent tests"
+          err instanceof Error ? err.message : "Failed to load agent tests",
         );
       } finally {
         setAgentTestsLoading(false);
@@ -346,7 +348,7 @@ export function TestsTabContent({
               "ngrok-skip-browser-warning": "true",
               Authorization: `Bearer ${backendAccessToken}`,
             },
-          }
+          },
         );
 
         if (response.status === 401) {
@@ -400,7 +402,7 @@ export function TestsTabContent({
           (run.status === "pending" ||
             run.status === "queued" ||
             run.status === "in_progress") &&
-          run.uuid !== viewingRunId
+          run.uuid !== viewingRunId,
       );
 
       // If no pending runs to poll, skip this poll cycle
@@ -458,7 +460,7 @@ export function TestsTabContent({
                   updated_at: new Date().toISOString(),
                 };
               }
-            })
+            }),
           );
         } catch (err) {
           console.error(`Error polling run ${run.uuid}:`, err);
@@ -471,8 +473,8 @@ export function TestsTabContent({
                     status: "failed",
                     updated_at: new Date().toISOString(),
                   }
-                : r
-            )
+                : r,
+            ),
           );
         }
       }
@@ -482,7 +484,7 @@ export function TestsTabContent({
     pollPendingRuns(); // Poll immediately on mount/dependency change
     pendingRunsPollingRef.current = setInterval(
       pollPendingRuns,
-      POLLING_INTERVAL_MS
+      POLLING_INTERVAL_MS,
     );
 
     return () => {
@@ -501,7 +503,7 @@ export function TestsTabContent({
   // Filter out tests already attached to the agent
   const agentTestUuids = new Set(agentTests.map((t) => t.uuid));
   const availableTests = allTests.filter(
-    (test) => !agentTestUuids.has(test.uuid)
+    (test) => !agentTestUuids.has(test.uuid),
   );
 
   // Filter available tests based on search query
@@ -509,7 +511,7 @@ export function TestsTabContent({
     (test) =>
       test.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (test.description &&
-        test.description.toLowerCase().includes(searchQuery.toLowerCase()))
+        test.description.toLowerCase().includes(searchQuery.toLowerCase())),
   );
 
   // Filter agent tests based on search query
@@ -517,7 +519,9 @@ export function TestsTabContent({
     (test) =>
       test.name.toLowerCase().includes(testsSearchQuery.toLowerCase()) ||
       (test.description &&
-        test.description.toLowerCase().includes(testsSearchQuery.toLowerCase()))
+        test.description
+          .toLowerCase()
+          .includes(testsSearchQuery.toLowerCase())),
   );
 
   // Add test to agent
@@ -664,7 +668,7 @@ export function TestsTabContent({
       status: string,
       results?: TestRunResult[],
       passed?: number | null,
-      failed?: number | null
+      failed?: number | null,
     ) => {
       setPastRuns((prev) =>
         prev.map((run) => {
@@ -677,10 +681,10 @@ export function TestsTabContent({
             failed: failed ?? run.failed,
             updated_at: new Date().toISOString(),
           };
-        })
+        }),
       );
     },
-    []
+    [],
   );
 
   // Remove test(s) from agent
@@ -689,8 +693,8 @@ export function TestsTabContent({
       testsToDeleteBulk.length > 0
         ? testsToDeleteBulk
         : testToDelete
-        ? [testToDelete.uuid]
-        : [];
+          ? [testToDelete.uuid]
+          : [];
     if (uuidsToRemove.length === 0) return;
 
     try {
@@ -736,11 +740,16 @@ export function TestsTabContent({
     }
   };
 
-  const renderAddTestOutlineControl = () => (
+  const renderAddTestControl = (variant: "outline" | "primary" = "outline") => (
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setShowTestDropdown(!showTestDropdown)}
-        className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+        type="button"
+        className={
+          variant === "primary"
+            ? "h-9 md:h-10 px-4 md:px-5 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+            : "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+        }
       >
         Add test
       </button>
@@ -799,9 +808,7 @@ export function TestsTabContent({
             ) : filteredAvailableTests.length === 0 ? (
               <div className="py-8 text-center">
                 <p className="text-sm text-muted-foreground">
-                  {searchQuery
-                    ? "No tests found"
-                    : "No tests available"}
+                  {searchQuery ? "No tests found" : "No tests available"}
                 </p>
               </div>
             ) : (
@@ -820,9 +827,7 @@ export function TestsTabContent({
                     </p>
                   )}
                   <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">
-                    {test.type === "tool_call"
-                      ? "Tool Call"
-                      : "Next Reply"}
+                    {test.type === "tool_call" ? "Tool Call" : "Next Reply"}
                   </span>
                 </button>
               ))
@@ -1076,7 +1081,9 @@ export function TestsTabContent({
                 onClick={() => {
                   if (isConnectionUnverified) return;
                   if (agentTests.length > maxRowsPerEval) {
-                    showLimitToast(`You can only run up to ${maxRowsPerEval} tests at a time.`);
+                    showLimitToast(
+                      `You can only run up to ${maxRowsPerEval} tests at a time.`,
+                    );
                     return;
                   }
                   setTestsToRun(agentTests);
@@ -1150,7 +1157,8 @@ export function TestsTabContent({
               )}
               {!isConnectionUnverified && isBenchmarkDisabled && (
                 <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/compare:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
-                  You have turned off benchmarking models in connection settings — turn it on to enable this
+                  You have turned off benchmarking models in connection settings
+                  — turn it on to enable this
                 </div>
               )}
             </div>
@@ -1196,8 +1204,8 @@ export function TestsTabContent({
           </button>
         </div>
       ) : agentTests.length === 0 &&
-          !pastRunsLoading &&
-          pastRuns.length === 0 ? (
+        !pastRunsLoading &&
+        pastRuns.length === 0 ? (
         <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
           <div className="w-12 md:w-14 h-12 md:h-14 rounded-xl bg-muted flex items-center justify-center mb-3 md:mb-4">
             <svg
@@ -1215,13 +1223,12 @@ export function TestsTabContent({
             This agent doesn&apos;t have any tests attached to it.
           </p>
           <div className="flex items-center gap-2 md:gap-3">
-            {renderAddTestOutlineControl()}
+            {renderAddTestControl("primary")}
           </div>
         </div>
       ) : agentTests.length === 0 ? (
         <div className="flex-1 flex flex-col lg:flex-row gap-4 md:gap-6">
           <div className="flex-1 flex flex-col min-w-0">
-            <div className="mb-3 md:mb-4">{renderAddTestOutlineControl()}</div>
             <div className="flex-1 border border-border rounded-xl p-6 md:p-10 flex flex-col items-center justify-center bg-muted/20 min-h-[220px] md:min-h-[280px]">
               <div className="w-12 md:w-14 h-12 md:h-14 rounded-xl bg-muted flex items-center justify-center mb-3 md:mb-4">
                 <svg
@@ -1235,11 +1242,12 @@ export function TestsTabContent({
               <h3 className="text-base md:text-lg font-semibold text-foreground mb-1 text-center">
                 No tests attached
               </h3>
-              <p className="text-sm md:text-base text-muted-foreground text-center max-w-md">
-                This agent doesn&apos;t have any tests linked right now. Past runs
-                from earlier sessions are on the right — add a test here to run new
-                ones from this tab.
+              <p className="text-sm md:text-base text-muted-foreground text-center max-w-md mb-0">
+                This agent doesn&apos;t have any tests linked right now
               </p>
+              <div className="flex justify-center mt-3 md:mt-4 w-full">
+                {renderAddTestControl("primary")}
+              </div>
             </div>
           </div>
           {pastRunsPanel}
@@ -1296,7 +1304,8 @@ export function TestsTabContent({
                         type="button"
                         onClick={toggleSelectAll}
                         className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
-                          selectedTestUuids.size === filteredAgentTests.length &&
+                          selectedTestUuids.size ===
+                            filteredAgentTests.length &&
                           filteredAgentTests.length > 0
                             ? "bg-foreground border-foreground"
                             : "border-border hover:border-muted-foreground"
@@ -1582,7 +1591,9 @@ export function TestsTabContent({
 
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmationDialog
-        isOpen={deleteDialogOpen && (!!testToDelete || testsToDeleteBulk.length > 0)}
+        isOpen={
+          deleteDialogOpen && (!!testToDelete || testsToDeleteBulk.length > 0)
+        }
         onClose={closeDeleteDialog}
         onConfirm={handleRemoveTest}
         title={testsToDeleteBulk.length > 0 ? "Remove tests" : "Remove test"}

@@ -121,6 +121,14 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange, initia
   }, [backendAccessToken]);
 
   useEffect(() => {
+    if (!selectedDatasetId) return;
+    const sel = availableDatasets.find((d) => d.uuid === selectedDatasetId);
+    if (sel && (sel.item_count ?? 0) === 0) {
+      setSelectedDatasetId("");
+    }
+  }, [availableDatasets, selectedDatasetId]);
+
+  useEffect(() => {
     const fetchEvaluators = async () => {
       if (!backendAccessToken) return;
       try {
