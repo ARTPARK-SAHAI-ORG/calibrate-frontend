@@ -98,6 +98,8 @@ export function BenchmarkResultsDialog({
     useState<DefaultEvaluatorSummary | null>(null);
   const backendAccessToken = useAccessToken();
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  /** Once per dialog open: select first test of `models[0]` when its row exists. */
+  const hasAutoSelectedFirstBenchmarkTestRef = useRef(false);
 
   const isDone =
     taskStatus === "completed" ||
@@ -139,6 +141,7 @@ export function BenchmarkResultsDialog({
       setError(null);
       setExpandedProviders(new Set(models.length > 0 ? [models[0]] : []));
       setSelectedTest(null);
+      hasAutoSelectedFirstBenchmarkTestRef.current = false;
       setActiveTab("outputs");
       setIsPublic(false);
       setShareToken(null);
@@ -179,6 +182,52 @@ export function BenchmarkResultsDialog({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, taskId]);
+
+  // Default selection: first test (index 0) of the first model that has
+  // `test_results`. When `models` is populated (new run), prefer that order
+  // and match by `model` id. When `models` is empty (e.g. past run opened
+  // with only `taskId`), use the first API row that has results — the parent
+  // often passes `models={[]}` in that case.
+  useEffect(() => {
+    if (!isOpen || hasAutoSelectedFirstBenchmarkTestRef.current) return;
+    if (modelResults.length === 0) return;
+
+    const pickDefaultSelection = (): {
+      model: string;
+      testIndex: number;
+    } | null => {
+      if (models.length > 0) {
+        for (const modelId of models) {
+          const mr = modelResults.find((m) => m.model === modelId);
+          if (mr?.test_results && mr.test_results.length > 0) {
+            return { model: modelId, testIndex: 0 };
+          }
+        }
+        // Config order vs API label mismatch — first row with results
+        const firstWith = modelResults.find(
+          (m) => m.test_results && m.test_results.length > 0,
+        );
+        if (firstWith) return { model: firstWith.model, testIndex: 0 };
+        return null;
+      }
+      const firstWith = modelResults.find(
+        (m) => m.test_results && m.test_results.length > 0,
+      );
+      if (firstWith) return { model: firstWith.model, testIndex: 0 };
+      return null;
+    };
+
+    const sel = pickDefaultSelection();
+    if (!sel) return;
+
+    hasAutoSelectedFirstBenchmarkTestRef.current = true;
+    setSelectedTest(sel);
+    setExpandedProviders((prev) => {
+      const next = new Set(prev);
+      next.add(sel.model);
+      return next;
+    });
+  }, [isOpen, models, modelResults]);
 
   const pollBenchmarkStatus = async (taskId: string, backendUrl: string) => {
     try {

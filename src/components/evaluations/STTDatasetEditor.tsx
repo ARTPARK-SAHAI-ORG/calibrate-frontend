@@ -111,11 +111,15 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
 
     // Notify parent when there are pending changes (new rows or dirty transcripts)
     useEffect(() => {
-      const hasNewRows = newRows.some((r) => r.s3Path && r.text.trim());
       const hasDirty = savedItems.some(
-        (item) => editedTexts[item.uuid] !== undefined && editedTexts[item.uuid] !== item.text,
+        (item) =>
+          editedTexts[item.uuid] !== undefined &&
+          editedTexts[item.uuid] !== item.text,
       );
-      onHasPendingChangesChange?.(hasNewRows || hasDirty);
+      const hasNewWork = newRows.some(
+        (r) => r.s3Path || r.audioFile || r.text.trim(),
+      );
+      onHasPendingChangesChange?.(hasDirty || hasNewWork);
     }, [newRows, editedTexts, savedItems, onHasPendingChangesChange]);
 
     // ── Imperative handle ──────────────────────────────────────────────────
@@ -124,9 +128,11 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
       validate() {
         const invalid = new Set<string>();
         newRows.forEach((row) => {
-          if (!row.audioFile || !row.text.trim() || !row.s3Path) {
-            invalid.add(row.id);
-          }
+          const isBlank =
+            !row.audioFile && !row.text.trim() && !row.s3Path;
+          if (isBlank) return;
+          const complete = !!(row.s3Path && row.text.trim());
+          if (!complete) invalid.add(row.id);
         });
         setInvalidRowIds(invalid);
         return invalid.size === 0;
@@ -208,10 +214,16 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
       }
       const invalid = new Set<string>();
       newRows.forEach((row) => {
-        if (!row.audioFile || !row.text.trim() || !row.s3Path) invalid.add(row.id);
+        const isBlank =
+          !row.audioFile && !row.text.trim() && !row.s3Path;
+        if (isBlank) return;
+        const complete = !!(row.s3Path && row.text.trim());
+        if (!complete) invalid.add(row.id);
       });
       if (invalid.size > 0) {
-        setInvalidRowIds(invalid);
+        toast.error(
+          "Finish or clear incomplete rows before adding another sample.",
+        );
         return;
       }
       setInvalidRowIds(new Set());
@@ -221,11 +233,28 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
       ]);
     };
 
-    const deleteNewRow = (id: string) => {
-      if (newRows.length === 1) return;
+    const clearNewRowContents = (id: string) => {
       const row = newRows.find((r) => r.id === id);
       if (row?.audioUrl) URL.revokeObjectURL(row.audioUrl);
-      setNewRows((prev) => prev.filter((r) => r.id !== id));
+      const input = fileInputRefs.current[id];
+      if (input) input.value = "";
+      setNewRows((prev) =>
+        prev.map((r) =>
+          r.id === id
+            ? { ...r, audioFile: null, audioUrl: null, text: "", s3Path: null }
+            : r,
+        ),
+      );
+      setUploadStatus((prev) => {
+        const n = { ...prev };
+        delete n[id];
+        return n;
+      });
+      setInvalidRowIds((prev) => {
+        const n = new Set(prev);
+        n.delete(id);
+        return n;
+      });
       setDeleteNewRowId(null);
     };
 
@@ -237,6 +266,11 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
           prev.map((r) => (r.id === id ? { ...r, audioFile: null, audioUrl: null, s3Path: null } : r)),
         );
         setUploadStatus((prev) => { const n = { ...prev }; delete n[id]; return n; });
+        setInvalidRowIds((prev) => {
+          const n = new Set(prev);
+          n.delete(id);
+          return n;
+        });
         return;
       }
 
@@ -263,12 +297,20 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
       const s3Path = await uploadFileToS3(file);
 
       if (s3Path) {
+        const prevRow = newRows.find((r) => r.id === id);
+        const hadText = !!prevRow?.text.trim();
         const audioUrl = URL.createObjectURL(file);
         setNewRows((prev) =>
           prev.map((r) => (r.id === id ? { ...r, audioFile: file, audioUrl, s3Path } : r)),
         );
         setUploadStatus((prev) => ({ ...prev, [id]: "success" }));
-        setInvalidRowIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+        if (hadText) {
+          setInvalidRowIds((prev) => {
+            const n = new Set(prev);
+            n.delete(id);
+            return n;
+          });
+        }
       } else {
         setUploadStatus((prev) => ({ ...prev, [id]: "error" }));
       }
@@ -277,7 +319,11 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
     const handleTextChange = (id: string, text: string) => {
       setNewRows((prev) => prev.map((r) => (r.id === id ? { ...r, text } : r)));
       if (text.trim()) {
-        setInvalidRowIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+        setInvalidRowIds((prevInv) => {
+          const n = new Set(prevInv);
+          n.delete(id);
+          return n;
+        });
       }
     };
 
@@ -453,7 +499,6 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
     // ── Render ─────────────────────────────────────────────────────────────
 
     const savedCount = savedItems.length;
-    const startIndex = savedCount + 1;
 
     return (
       <div className="space-y-4">
@@ -570,8 +615,14 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
             const rowNumber = savedCount + index + 1;
 
             const handleDelete = () => {
-              if (!row.audioFile && !row.text.trim()) deleteNewRow(row.id);
-              else setDeleteNewRowId(row.id);
+              const hasContent =
+                !!row.s3Path ||
+                !!row.audioFile ||
+                !!row.text.trim() ||
+                uploadStatus[row.id] === "uploading" ||
+                uploadStatus[row.id] === "error";
+              if (!hasContent) return;
+              setDeleteNewRowId(row.id);
             };
 
             const triggerFileInput = () => fileInputRefs.current[row.id]?.click();
@@ -619,13 +670,20 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
               </button>
             );
 
+            const referenceTextMissing =
+              invalidRowIds.has(row.id) && !!row.s3Path && !row.text.trim();
+
             const textInput = (
               <input
                 type="text"
                 value={row.text}
                 onChange={(e) => handleTextChange(row.id, e.target.value)}
                 placeholder="Enter reference transcription"
-                className="w-full h-8 px-2 rounded text-[13px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                className={`w-full h-8 px-2 rounded text-[13px] border bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
+                  referenceTextMissing
+                    ? "border-red-500 ring-1 ring-red-500/30"
+                    : "border-border"
+                }`}
               />
             );
 
@@ -782,14 +840,16 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
           </div>
         </div>
 
-        {/* Delete new row dialog */}
+        {/* Clear unsaved new row (no API — resets audio + text in place) */}
         <DeleteConfirmationDialog
           isOpen={deleteNewRowId !== null}
           onClose={() => setDeleteNewRowId(null)}
-          onConfirm={() => { if (deleteNewRowId) deleteNewRow(deleteNewRowId); }}
-          title="Delete row"
-          message="Are you sure you want to delete this row?"
-          confirmText="Delete"
+          onConfirm={() => {
+            if (deleteNewRowId) clearNewRowContents(deleteNewRowId);
+          }}
+          title="Clear row"
+          message="Remove the uploaded audio and reference text from this row? Nothing is saved to the server until you choose Save."
+          confirmText="Clear"
         />
 
         {/* Delete saved item dialog */}

@@ -131,8 +131,8 @@ export function ShareButton({
           disabled={isLoading}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
             isPublic
-              ? "bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20"
-              : "bg-muted border-border text-muted-foreground hover:text-foreground hover:bg-muted/70"
+              ? "bg-sky-500/18 border-sky-500/50 text-sky-900 dark:text-sky-100 hover:bg-sky-500/30 dark:hover:bg-sky-500/25"
+              : "bg-violet-500/14 border-violet-500/45 text-violet-900 dark:text-violet-200 hover:bg-violet-500/26 dark:hover:bg-violet-500/20"
           }`}
         >
           {isLoading ? (
@@ -194,13 +194,17 @@ export function ShareButton({
       {isPublic && publicUrl && (
         <button
           onClick={copyLink}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium bg-muted border border-border text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors cursor-pointer dark:bg-accent/20 dark:border-accent/40 dark:text-accent-foreground dark:hover:bg-accent/30"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border transition-colors cursor-pointer ${
+            copied
+              ? "bg-rose-500/16 border-rose-500/48 text-rose-950 dark:text-rose-50 hover:bg-rose-500/24 dark:hover:bg-rose-500/22"
+              : "bg-amber-500/16 border-amber-500/50 text-amber-950 dark:text-amber-100 hover:bg-amber-500/28 dark:hover:bg-amber-500/22"
+          }`}
           title="Copy public link"
         >
           {copied ? (
             <>
               <svg
-                className="w-3.5 h-3.5 text-green-500"
+                className="w-3.5 h-3.5 text-rose-600 dark:text-rose-300"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -212,7 +216,7 @@ export function ShareButton({
                   d="M4.5 12.75l6 6 9-13.5"
                 />
               </svg>
-              <span className="text-green-600 dark:text-green-400">Copied</span>
+              <span>Copied</span>
             </>
           ) : (
             <>

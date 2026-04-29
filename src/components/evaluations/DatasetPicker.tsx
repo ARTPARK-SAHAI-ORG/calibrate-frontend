@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { Dataset } from "@/lib/datasets";
+import { Tooltip } from "@/components/Tooltip";
+
+const EMPTY_DATASET_TOOLTIP =
+  "This dataset has no items. Add a few rows to it before running an evaluation.";
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", {
@@ -74,21 +78,24 @@ export function DatasetPicker({ datasets, selectedId, onSelect }: Props) {
           </div>
         ) : (
           filtered.map((ds, i) => {
-            const isSelected = ds.uuid === selectedId;
-            return (
-              <button
-                key={ds.uuid}
-                type="button"
-                onClick={() => onSelect(ds.uuid)}
-                className={`w-full grid grid-cols-[2fr_70px_1fr] items-center px-4 py-3 text-left transition-colors cursor-pointer ${
-                  i < filtered.length - 1 ? "border-b border-border" : ""
-                } ${isSelected ? "bg-foreground/5" : "hover:bg-muted/40"}`}
-              >
-                {/* Name + checkmark */}
-                <div className="flex items-center gap-2 min-w-0">
-                  {isSelected ? (
+            const hasItems = (ds.item_count ?? 0) > 0;
+            const isSelected = hasItems && ds.uuid === selectedId;
+            const rowClass = `w-full grid grid-cols-[2fr_70px_1fr] items-start px-4 py-3 text-left transition-colors ${
+              i < filtered.length - 1 ? "border-b border-border" : ""
+            } ${
+              !hasItems
+                ? "cursor-not-allowed bg-muted/25 opacity-[0.65] hover:bg-muted/25"
+                : `cursor-pointer ${
+                    isSelected ? "bg-foreground/5" : "hover:bg-muted/40"
+                  }`
+            }`;
+
+            const rowBody = (
+              <>
+                <div className="flex items-start gap-2 min-w-0">
+                  {hasItems && isSelected ? (
                     <svg
-                      className="w-3.5 h-3.5 text-foreground shrink-0"
+                      className="w-3.5 h-3.5 text-foreground shrink-0 mt-0.5"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -101,29 +108,77 @@ export function DatasetPicker({ datasets, selectedId, onSelect }: Props) {
                       />
                     </svg>
                   ) : (
-                    <div className="w-3.5 h-3.5 shrink-0" />
+                    <div className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
                   )}
-                  <span
-                    className={`text-sm truncate ${
-                      isSelected
-                        ? "font-medium text-foreground"
-                        : "text-foreground"
-                    }`}
-                  >
-                    {ds.name}
-                  </span>
+                  <div className="flex flex-col min-w-0 text-left">
+                    <span
+                      className={`text-sm truncate ${
+                        isSelected
+                          ? "font-medium text-foreground"
+                          : hasItems
+                            ? "text-foreground"
+                            : "text-muted-foreground"
+                      }`}
+                    >
+                      {ds.name}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Item count */}
-                <span className="text-sm text-muted-foreground text-right">
+                <span
+                  className={`text-sm text-right tabular-nums ${
+                    hasItems
+                      ? "text-muted-foreground"
+                      : "text-muted-foreground/70"
+                  }`}
+                >
                   {ds.item_count}
                 </span>
 
-                {/* Updated date */}
-                <span className="text-sm text-muted-foreground text-right">
+                <span
+                  className={`text-sm text-right ${
+                    hasItems
+                      ? "text-muted-foreground"
+                      : "text-muted-foreground/70"
+                  }`}
+                >
                   {formatDate(ds.updated_at)}
                 </span>
-              </button>
+              </>
+            );
+
+            if (hasItems) {
+              return (
+                <button
+                  key={ds.uuid}
+                  type="button"
+                  onClick={() => onSelect(ds.uuid)}
+                  className={rowClass}
+                >
+                  {rowBody}
+                </button>
+              );
+            }
+
+            return (
+              <Tooltip
+                key={ds.uuid}
+                content={EMPTY_DATASET_TOOLTIP}
+                position="top"
+                className="w-full block"
+              >
+                <div className="w-full">
+                  <button
+                    type="button"
+                    disabled
+                    tabIndex={-1}
+                    aria-disabled="true"
+                    className={`${rowClass} pointer-events-none`}
+                  >
+                    {rowBody}
+                  </button>
+                </div>
+              </Tooltip>
             );
           })
         )}

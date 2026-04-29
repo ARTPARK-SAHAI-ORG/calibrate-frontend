@@ -156,7 +156,7 @@ export function TestsTabContent({
 
   // Selection state for bulk operations
   const [selectedTestUuids, setSelectedTestUuids] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
 
   // Delete confirmation state
@@ -173,8 +173,10 @@ export function TestsTabContent({
   // Benchmark dialog state
   const [benchmarkDialogOpen, setBenchmarkDialogOpen] = useState(false);
 
-  const isConnectionUnverified = agentType === "connection" && connectionVerified === false;
-  const isBenchmarkDisabled = agentType === "connection" && supportsBenchmark !== true;
+  const isConnectionUnverified =
+    agentType === "connection" && connectionVerified === false;
+  const isBenchmarkDisabled =
+    agentType === "connection" && supportsBenchmark !== true;
 
   // Past test runs state
   const [pastRuns, setPastRuns] = useState<TestRun[]>([]);
@@ -233,7 +235,7 @@ export function TestsTabContent({
               "ngrok-skip-browser-warning": "true",
               Authorization: `Bearer ${backendAccessToken}`,
             },
-          }
+          },
         );
 
         if (response.status === 401) {
@@ -250,7 +252,7 @@ export function TestsTabContent({
       } catch (err) {
         console.error("Error fetching agent tests:", err);
         setAgentTestsError(
-          err instanceof Error ? err.message : "Failed to load agent tests"
+          err instanceof Error ? err.message : "Failed to load agent tests",
         );
       } finally {
         setAgentTestsLoading(false);
@@ -346,7 +348,7 @@ export function TestsTabContent({
               "ngrok-skip-browser-warning": "true",
               Authorization: `Bearer ${backendAccessToken}`,
             },
-          }
+          },
         );
 
         if (response.status === 401) {
@@ -400,7 +402,7 @@ export function TestsTabContent({
           (run.status === "pending" ||
             run.status === "queued" ||
             run.status === "in_progress") &&
-          run.uuid !== viewingRunId
+          run.uuid !== viewingRunId,
       );
 
       // If no pending runs to poll, skip this poll cycle
@@ -458,7 +460,7 @@ export function TestsTabContent({
                   updated_at: new Date().toISOString(),
                 };
               }
-            })
+            }),
           );
         } catch (err) {
           console.error(`Error polling run ${run.uuid}:`, err);
@@ -471,8 +473,8 @@ export function TestsTabContent({
                     status: "failed",
                     updated_at: new Date().toISOString(),
                   }
-                : r
-            )
+                : r,
+            ),
           );
         }
       }
@@ -482,7 +484,7 @@ export function TestsTabContent({
     pollPendingRuns(); // Poll immediately on mount/dependency change
     pendingRunsPollingRef.current = setInterval(
       pollPendingRuns,
-      POLLING_INTERVAL_MS
+      POLLING_INTERVAL_MS,
     );
 
     return () => {
@@ -501,7 +503,7 @@ export function TestsTabContent({
   // Filter out tests already attached to the agent
   const agentTestUuids = new Set(agentTests.map((t) => t.uuid));
   const availableTests = allTests.filter(
-    (test) => !agentTestUuids.has(test.uuid)
+    (test) => !agentTestUuids.has(test.uuid),
   );
 
   // Filter available tests based on search query
@@ -509,7 +511,7 @@ export function TestsTabContent({
     (test) =>
       test.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (test.description &&
-        test.description.toLowerCase().includes(searchQuery.toLowerCase()))
+        test.description.toLowerCase().includes(searchQuery.toLowerCase())),
   );
 
   // Filter agent tests based on search query
@@ -517,7 +519,9 @@ export function TestsTabContent({
     (test) =>
       test.name.toLowerCase().includes(testsSearchQuery.toLowerCase()) ||
       (test.description &&
-        test.description.toLowerCase().includes(testsSearchQuery.toLowerCase()))
+        test.description
+          .toLowerCase()
+          .includes(testsSearchQuery.toLowerCase())),
   );
 
   // Add test to agent
@@ -664,7 +668,7 @@ export function TestsTabContent({
       status: string,
       results?: TestRunResult[],
       passed?: number | null,
-      failed?: number | null
+      failed?: number | null,
     ) => {
       setPastRuns((prev) =>
         prev.map((run) => {
@@ -677,10 +681,10 @@ export function TestsTabContent({
             failed: failed ?? run.failed,
             updated_at: new Date().toISOString(),
           };
-        })
+        }),
       );
     },
-    []
+    [],
   );
 
   // Remove test(s) from agent
@@ -689,8 +693,8 @@ export function TestsTabContent({
       testsToDeleteBulk.length > 0
         ? testsToDeleteBulk
         : testToDelete
-        ? [testToDelete.uuid]
-        : [];
+          ? [testToDelete.uuid]
+          : [];
     if (uuidsToRemove.length === 0) return;
 
     try {
@@ -735,6 +739,224 @@ export function TestsTabContent({
       setIsDeleting(false);
     }
   };
+
+  const renderAddTestControl = (variant: "outline" | "primary" = "outline") => (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setShowTestDropdown(!showTestDropdown)}
+        type="button"
+        className={
+          variant === "primary"
+            ? "h-9 md:h-10 px-4 md:px-5 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+            : "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+        }
+      >
+        Add test
+      </button>
+      {showTestDropdown && (
+        <div className="absolute top-full left-0 mt-2 w-80 bg-background border border-border rounded-lg shadow-lg z-50">
+          <div className="p-3 border-b border-border">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <svg
+                  className="w-4 h-4 text-muted-foreground"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                  />
+                </svg>
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search tests"
+                className="w-full h-9 pl-9 pr-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                autoFocus
+              />
+            </div>
+          </div>
+          <div className="max-h-64 overflow-y-auto">
+            {allTestsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <svg
+                  className="w-5 h-5 animate-spin text-muted-foreground"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+              </div>
+            ) : filteredAvailableTests.length === 0 ? (
+              <div className="py-8 text-center">
+                <p className="text-sm text-muted-foreground">
+                  {searchQuery ? "No tests found" : "No tests available"}
+                </p>
+              </div>
+            ) : (
+              filteredAvailableTests.map((test) => (
+                <button
+                  key={test.uuid}
+                  onClick={() => handleSelectTest(test)}
+                  className="w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors cursor-pointer border-b border-border last:border-b-0"
+                >
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {test.name}
+                  </p>
+                  {test.description && (
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                      {test.description}
+                    </p>
+                  )}
+                  <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">
+                    {test.type === "tool_call" ? "Tool Call" : "Next Reply"}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const pastRunsPanel = (
+    <div className="w-full lg:w-[400px] xl:w-[560px] flex-shrink-0 border border-border rounded-xl overflow-hidden bg-muted/30">
+      <div className="px-3 md:px-4 py-2 md:py-3">
+        <h3 className="text-sm md:text-base font-semibold text-foreground">
+          Past runs
+        </h3>
+      </div>
+
+      <div className="overflow-y-auto max-h-[300px] lg:max-h-[500px]">
+        {pastRunsLoading ? (
+          <div className="flex items-center justify-center py-6 md:py-8">
+            <svg
+              className="w-5 h-5 animate-spin text-muted-foreground"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+          </div>
+        ) : pastRuns.length === 0 ? (
+          <div className="py-6 md:py-8 text-center">
+            <p className="text-xs md:text-sm text-muted-foreground">
+              No test runs yet
+            </p>
+          </div>
+        ) : (
+          pastRuns.map((run) => (
+            <div
+              key={run.uuid}
+              onClick={() => handlePastRunClick(run)}
+              className="flex flex-col sm:grid sm:grid-cols-[minmax(0,1fr)_5.75rem_5rem_9.25rem] sm:items-start sm:justify-items-stretch gap-2 sm:gap-2 xl:grid-cols-[minmax(0,1fr)_6.25rem_5.75rem_11.5rem] xl:gap-3 px-3 md:px-4 py-2 md:py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer"
+            >
+              <div className="flex items-start justify-between gap-2 sm:block min-w-0">
+                <span className="text-xs md:text-sm font-medium text-foreground block min-w-0 break-words">
+                  {getTestRunDisplayName(run)}
+                </span>
+                <span className="sm:hidden text-xs text-muted-foreground">
+                  {formatRelativeTime(run.updated_at)}
+                </span>
+              </div>
+              <span
+                className={`hidden sm:flex sm:w-full sm:min-w-0 sm:items-center sm:justify-center px-2 py-0.5 rounded text-xs font-medium ${
+                  run.type === "llm-unit-test"
+                    ? "bg-blue-500/20 text-blue-400"
+                    : "bg-purple-500/20 text-purple-400"
+                }`}
+              >
+                {run.type === "llm-unit-test" ? "Test" : "Benchmark"}
+              </span>
+              <span className="hidden sm:block sm:w-full sm:min-w-0 text-sm text-muted-foreground text-right tabular-nums">
+                {formatRelativeTime(run.updated_at)}
+              </span>
+              <div className="flex flex-wrap items-center sm:justify-end gap-2 sm:flex-nowrap sm:justify-self-end">
+                {run.status === "pending" ||
+                run.status === "queued" ||
+                run.status === "in_progress" ? (
+                  <span className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium bg-yellow-500/20 text-yellow-500">
+                    <svg
+                      className="w-3 h-3 animate-spin mr-1"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Running
+                  </span>
+                ) : run.status === "failed" ? (
+                  <span className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-500">
+                    Error
+                  </span>
+                ) : run.type === "llm-unit-test" ? (
+                  <>
+                    {run.passed !== null && run.passed > 0 && (
+                      <span className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-500">
+                        {run.passed} Success
+                      </span>
+                    )}
+                    {run.failed !== null && run.failed > 0 && (
+                      <span className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-500">
+                        {run.failed} Fail
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-500">
+                    Complete
+                  </span>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex flex-col">
@@ -859,7 +1081,9 @@ export function TestsTabContent({
                 onClick={() => {
                   if (isConnectionUnverified) return;
                   if (agentTests.length > maxRowsPerEval) {
-                    showLimitToast(`You can only run up to ${maxRowsPerEval} tests at a time.`);
+                    showLimitToast(
+                      `You can only run up to ${maxRowsPerEval} tests at a time.`,
+                    );
                     return;
                   }
                   setTestsToRun(agentTests);
@@ -933,7 +1157,8 @@ export function TestsTabContent({
               )}
               {!isConnectionUnverified && isBenchmarkDisabled && (
                 <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/compare:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
-                  You have turned off benchmarking models in connection settings — turn it on to enable this
+                  You have turned off benchmarking models in connection settings
+                  — turn it on to enable this
                 </div>
               )}
             </div>
@@ -978,7 +1203,9 @@ export function TestsTabContent({
             Retry
           </button>
         </div>
-      ) : agentTests.length === 0 ? (
+      ) : agentTests.length === 0 &&
+        !pastRunsLoading &&
+        pastRuns.length === 0 ? (
         <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
           <div className="w-12 md:w-14 h-12 md:h-14 rounded-xl bg-muted flex items-center justify-center mb-3 md:mb-4">
             <svg
@@ -996,106 +1223,34 @@ export function TestsTabContent({
             This agent doesn&apos;t have any tests attached to it.
           </p>
           <div className="flex items-center gap-2 md:gap-3">
-            <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => setShowTestDropdown(!showTestDropdown)}
-                className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-              >
-                Add test
-              </button>
-
-              {/* Test Selection Dropdown */}
-              {showTestDropdown && (
-                <div className="absolute top-full left-0 mt-2 w-80 bg-background border border-border rounded-lg shadow-lg z-50">
-                  {/* Search Input */}
-                  <div className="p-3 border-b border-border">
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                        <svg
-                          className="w-4 h-4 text-muted-foreground"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                          />
-                        </svg>
-                      </div>
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search tests"
-                        className="w-full h-9 pl-9 pr-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                        autoFocus
-                      />
-                    </div>
-                  </div>
-
-                  {/* Tests List */}
-                  <div className="max-h-64 overflow-y-auto">
-                    {allTestsLoading ? (
-                      <div className="flex items-center justify-center py-8">
-                        <svg
-                          className="w-5 h-5 animate-spin text-muted-foreground"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          ></circle>
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          ></path>
-                        </svg>
-                      </div>
-                    ) : filteredAvailableTests.length === 0 ? (
-                      <div className="py-8 text-center">
-                        <p className="text-sm text-muted-foreground">
-                          {searchQuery
-                            ? "No tests found"
-                            : "No tests available"}
-                        </p>
-                      </div>
-                    ) : (
-                      filteredAvailableTests.map((test) => (
-                        <button
-                          key={test.uuid}
-                          onClick={() => handleSelectTest(test)}
-                          className="w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors cursor-pointer border-b border-border last:border-b-0"
-                        >
-                          <p className="text-sm font-medium text-foreground truncate">
-                            {test.name}
-                          </p>
-                          {test.description && (
-                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                              {test.description}
-                            </p>
-                          )}
-                          <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">
-                            {test.type === "tool_call"
-                              ? "Tool Call"
-                              : "Next Reply"}
-                          </span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
+            {renderAddTestControl("primary")}
+          </div>
+        </div>
+      ) : agentTests.length === 0 ? (
+        <div className="flex-1 flex flex-col lg:flex-row gap-4 md:gap-6">
+          <div className="flex-1 flex flex-col min-w-0">
+            <div className="flex-1 border border-border rounded-xl p-6 md:p-10 flex flex-col items-center justify-center bg-muted/20 min-h-[220px] md:min-h-[280px]">
+              <div className="w-12 md:w-14 h-12 md:h-14 rounded-xl bg-muted flex items-center justify-center mb-3 md:mb-4">
+                <svg
+                  className="w-7 h-7 text-muted-foreground"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path d="M9 3h6v2h-1v4.5l4.5 7.5c.5.83.5 1.5-.17 2.17-.67.67-1.34.83-2.33.83H8c-1 0-1.67-.17-2.33-.83-.67-.67-.67-1.34-.17-2.17L10 9.5V5H9V3zm3 8.5L8.5 17h7L12 11.5z" />
+                </svg>
+              </div>
+              <h3 className="text-base md:text-lg font-semibold text-foreground mb-1 text-center">
+                No tests attached
+              </h3>
+              <p className="text-sm md:text-base text-muted-foreground text-center max-w-md mb-0">
+                This agent doesn&apos;t have any tests linked right now
+              </p>
+              <div className="flex justify-center mt-3 md:mt-4 w-full">
+                {renderAddTestControl("primary")}
+              </div>
             </div>
           </div>
+          {pastRunsPanel}
         </div>
       ) : (
         <div className="flex-1 flex flex-col lg:flex-row gap-4 md:gap-6">
@@ -1149,7 +1304,8 @@ export function TestsTabContent({
                         type="button"
                         onClick={toggleSelectAll}
                         className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
-                          selectedTestUuids.size === filteredAgentTests.length &&
+                          selectedTestUuids.size ===
+                            filteredAgentTests.length &&
                           filteredAgentTests.length > 0
                             ? "bg-foreground border-foreground"
                             : "border-border hover:border-muted-foreground"
@@ -1429,132 +1585,15 @@ export function TestsTabContent({
             )}
           </div>
 
-          {/* Right Panel - Past Runs */}
-          <div className="w-full lg:w-[400px] xl:w-[560px] flex-shrink-0 border border-border rounded-xl overflow-hidden bg-muted/30">
-            {/* Past Runs Title */}
-            <div className="px-3 md:px-4 py-2 md:py-3">
-              <h3 className="text-sm md:text-base font-semibold text-foreground">
-                Past runs
-              </h3>
-            </div>
-
-            {/* Past Runs List */}
-            <div className="overflow-y-auto max-h-[300px] lg:max-h-[500px]">
-              {pastRunsLoading ? (
-                <div className="flex items-center justify-center py-6 md:py-8">
-                  <svg
-                    className="w-5 h-5 animate-spin text-muted-foreground"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                </div>
-              ) : pastRuns.length === 0 ? (
-                <div className="py-6 md:py-8 text-center">
-                  <p className="text-xs md:text-sm text-muted-foreground">
-                    No test runs yet
-                  </p>
-                </div>
-              ) : (
-                pastRuns.map((run) => (
-                  <div
-                    key={run.uuid}
-                    onClick={() => handlePastRunClick(run)}
-                    className="flex flex-col sm:grid sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-2 sm:gap-4 px-3 md:px-4 py-2 md:py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center justify-between sm:block min-w-0">
-                      <span className="text-xs md:text-sm font-medium text-foreground truncate block">
-                        {getTestRunDisplayName(run)}
-                      </span>
-                      <span className="sm:hidden text-xs text-muted-foreground">
-                        {formatRelativeTime(run.updated_at)}
-                      </span>
-                    </div>
-                    <span
-                      className={`hidden sm:inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        run.type === "llm-unit-test"
-                          ? "bg-blue-500/20 text-blue-400"
-                          : "bg-purple-500/20 text-purple-400"
-                      }`}
-                    >
-                      {run.type === "llm-unit-test" ? "Test" : "Benchmark"}
-                    </span>
-                    <span className="hidden sm:block text-sm text-muted-foreground w-24 text-right">
-                      {formatRelativeTime(run.updated_at)}
-                    </span>
-                    <div className="flex items-center sm:justify-end gap-2 sm:w-32">
-                      {run.status === "pending" ||
-                      run.status === "queued" ||
-                      run.status === "in_progress" ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-500/20 text-yellow-500">
-                          <svg
-                            className="w-3 h-3 animate-spin mr-1"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            ></circle>
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                            ></path>
-                          </svg>
-                          Running
-                        </span>
-                      ) : run.status === "failed" ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-500">
-                          Error
-                        </span>
-                      ) : run.type === "llm-unit-test" ? (
-                        <>
-                          {run.passed !== null && run.passed > 0 && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-500">
-                              {run.passed} Success
-                            </span>
-                          )}
-                          {run.failed !== null && run.failed > 0 && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-500">
-                              {run.failed} Fail
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-500">
-                          Complete
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+          {pastRunsPanel}
         </div>
       )}
 
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmationDialog
-        isOpen={deleteDialogOpen && (!!testToDelete || testsToDeleteBulk.length > 0)}
+        isOpen={
+          deleteDialogOpen && (!!testToDelete || testsToDeleteBulk.length > 0)
+        }
         onClose={closeDeleteDialog}
         onConfirm={handleRemoveTest}
         title={testsToDeleteBulk.length > 0 ? "Remove tests" : "Remove test"}

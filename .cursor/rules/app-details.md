@@ -213,19 +213,24 @@ Provider website links (external link icons) are shown only on the new evaluatio
 
 **Tests Tab Features:**
 
-- **Two-column layout**: Tests table on left, Past runs panel (560px) on right
+- **Two-column layout**: When the tab shows the main tests UI (not the **complete** empty state below), the layout is tests table on the left, Past runs panel (560px at `xl`) on the right — `flex flex-col lg:flex-row`.
+- **Empty states (`TestsTabContent`)**:
+  - **Complete empty** (no attached tests, past runs finished loading with **zero** runs): single full-width card — icon, "No tests attached", short description, **primary** **Add test** (`renderAddTestControl("primary")`) — **no** Past runs panel.
+  - **No tests but history or loading** (`agentTests.length === 0` and (`pastRunsLoading` **or** `pastRuns.length > 0`)): two-column shell — left: a single empty-state **card** (icon + copy) with **primary** **Add test** centered **below** the description text (`renderAddTestControl("primary")`); there is **no** duplicate Add control in a row above the card; right: shared **`pastRunsPanel`** (past runs stay visible after tests are removed or while runs are still loading).
+  - **Has tests**: header with Add / Run all / Compare (when applicable), search, table or cards, plus **`pastRunsPanel`** on the right.
 - **Tests table**: Shows attached tests with name, type (Tool Call/Next Reply), run button, delete button
   - **Desktop grid columns**: `grid-cols-[40px_minmax(0,1fr)_120px_auto_auto]` — Checkbox (40px), Name (fills remaining space, horizontally scrollable via `overflow-x-auto whitespace-nowrap` when text overflows), Type (fixed 120px), Run button (auto), Delete button (auto)
   - **Individual run button**: Play button on each test row runs only that specific test (not all tests)
 - **Past runs panel**: Has "Past runs" heading with `bg-muted/30` background, showing history of test runs (no column headers):
   - **Row content**: Name/count, Run Type pill, Time, Result badges
+  - **Row layout (`TestsTabContent`)**: From `sm` breakpoint up, each row is a 4-column CSS grid with **fixed-width tracks** for Type, Time, and Status so those columns stay aligned when the first column (name) varies in length: `sm:grid-cols-[minmax(0,1fr)_5.75rem_5rem_9.25rem]` and **`xl:grid-cols-[minmax(0,1fr)_6.25rem_5.75rem_11.5rem]`** (fixed columns are slightly tighter than the maximum pill/time text needs so **`minmax(0, 1fr)` on column 1 gets more space** for long test names). **`sm:items-start`** (top-align so multi-line names don’t vertically center the other columns), **`sm:justify-items-stretch`**. Gaps: **`sm:gap-2`**, **`xl:gap-3`** (tighter gaps help the name column on the `lg:w-[400px]` past-runs panel). **Column 1 markup**: outer **`flex items-start justify-between gap-2 sm:block min-w-0`**; display name in a **`span`** with **`block min-w-0 break-words`** (wraps long test names and aggregate labels like `N tests` instead of the old **`truncate`** ellipsis). The Type pill is **`hidden sm:flex`** with **`sm:justify-center`** in its cell so "Test" / "Benchmark" stay centered in the fixed type column. Time uses **`text-right tabular-nums`** (no per-cell `w-24` — width comes from the grid track). The result column is a flex row with **`sm:flex-nowrap`** and **`whitespace-nowrap` on each status pill**. Below `sm`, the row stacks with `flex flex-col`. **Gotcha**: Do not use **`auto`** for grid columns 2–4 — that made Type/Time stagger between rows. Do not add a **narrow `w-32` / `sm:w-32`** on the badges flex wrapper (forces pill wrapping); the grid column supplies width. **`break-words`** breaks at word boundaries; unbroken long strings (e.g. no spaces) may still need **`break-all`** if that ever shows up in display names.
   - **Name display logic** (via `getTestRunDisplayName` helper):
     - Single-test runs: Shows `results[0].name` (in-progress) or `results[0].test_case.name` (completed)
     - Multi-test runs: Shows "N tests" (e.g., "2 tests")
     - Benchmarks: Shows "N models" (e.g., "3 models")
   - **Run Type**: "Test" (blue pill) or "Benchmark" (purple pill) based on `type` field
   - **Time**: Short relative time format (e.g., "now", "5 min ago", "7h ago", "2d ago", "3w ago", "2m ago", "1y ago")
-  - **Result**: "Running" (yellow, with spinner) for pending/queued/in_progress; "Failed" (red) for `status === "failed"` (entire run errored); "N Success" and/or "M Fail" badges for completed `llm-unit-test`; "Complete" for completed `llm-benchmark`
+  - **Result**: "Running" (yellow, with spinner) for pending/queued/in_progress; **"Error"** (red) for `status === "failed"` (entire run errored); "N Success" and/or "M Fail" badges for completed `llm-unit-test`; "Complete" for completed `llm-benchmark`
 - **Clickable rows**: Clicking a past run row opens the appropriate results dialog:
   - `llm-unit-test` → Opens `TestRunnerDialog` in view mode with `taskId`, `tests` (from `results`), and `initialRunStatus`
   - `llm-benchmark` → Opens `BenchmarkResultsDialog` in view mode (with `taskId` prop)
@@ -950,7 +955,7 @@ Don't introduce new pill colors here; reuse the per-type Tailwind classes alread
     - **Mobile**: Full-screen dialog (`w-full`), padding reduced to `px-4 py-4`, all message bubbles use `w-full` (simulation transcripts need full width due to audio players)
     - **Desktop**: 40% width sidebar (`md:w-[40%] md:min-w-[500px]`), standard padding `md:px-6 md:py-4`, message bubbles use `md:w-1/2`
     - Smooth transition between layouts as viewport changes
-    - **Note**: Simulation transcript bubbles use full width on mobile, unlike test runner messages which use 70% width for visual differentiation
+    - **Note**: Simulation transcript bubbles use full width on mobile. **Test / benchmark result** conversation (`TestDetailView` in `shared.tsx` — middle column of `TestRunnerDialog` / `BenchmarkOutputsPanel`) uses **`w-[88%] md:w-3/4`** for user/agent/tool bubbles (wider than the previous 70% / half-column pattern). **`AddTestDialog`**’s conversation editor preview still uses **`w-1/2`** where its layout defines message columns — not the same width tokens as `TestDetailView`.
 
   - **Live updates with freeze-on-complete**: Dialog stays in sync with polling while simulation is in progress, then freezes:
 
@@ -2312,6 +2317,17 @@ STT/TTS evaluation detail pages and simulation run detail pages use these respon
 - Text sizes scale: `text-base md:text-lg` for headings, `text-xl md:text-2xl` for titles
 - Margins scale: `mb-3 md:mb-4` for consistent spacing
 
+### Dataset detail page (`/datasets/[id]`)
+
+**Implementation**: `src/app/datasets/[id]/page.tsx`. Loads the dataset with `getDataset`; renders **`STTDatasetEditor`** or **`TTSDatasetEditor`** depending on `dataset_type`, with sorted `savedItems`, `onDeleteSavedItem` (API delete + parent `item_count` / `items` update), **`onHasPendingChangesChange`** → `hasPendingChanges`, and **`maxRowsPerEval`** from **`useMaxRowsPerEval`**. **`AppLayout`** uses **`activeItem={dataset.dataset_type}`** (`"stt"` or `"tts"`) so the sidebar highlights the STT or TTS area.
+
+**Header actions** (same row as the title, right-aligned):
+
+- **Save** — Rendered only when **`hasPendingChanges`**. It is the **primary** action (`bg-foreground text-background`, **`font-semibold`**, **`shadow-sm`**) so unsaved edits draw attention before starting an evaluation.
+- **New evaluation** — Navigates to **`/{stt|tts}/new?dataset={uuid}`**. **Disabled** when **`item_count === 0`** (nothing persisted to run against) **or** **`hasPendingChanges`** (the create flow uses saved dataset rows; draft edits must be saved first). When enabled, it uses the same **primary** solid styling; when disabled, **outline / muted** styling. **Tooltip on disabled state**: use shared **`@/components/Tooltip`** with **`position="top"`** (not the native `title` attribute), following the same **disabled-button + `pointer-events-none`** wrapper pattern documented under the Tooltip component — otherwise hover never reaches the trigger. Tooltip copy: if there are pending changes, explain **save first**; else explain **add at least one row**.
+
+**Order**: **Save** (when visible), then **New evaluation**.
+
 ### Evaluation Page Pattern (TTS/STT)
 
 Both TTS and STT evaluation pages follow the same list → new → detail pattern:
@@ -2344,6 +2360,7 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
 - Both components use the same tab layout:
   - **Settings tab**: Language selection dropdown + provider selection (responsive: table on desktop, cards on mobile) + evaluator selection (`MultiSelectPicker`)
   - **Dataset tab**: Sample rows + add sample button (TTS also has CSV upload with OR divider and sample download)
+  - **Choosing a saved dataset** (`DatasetPicker`, `src/components/evaluations/DatasetPicker.tsx`): Shared by **`SpeechToTextEvaluation`** and **`TextToSpeechEvaluation`** when picking an existing dataset. Datasets with **`item_count === 0`** are not selectable (disabled row styling). The reason is shown with **`@/components/Tooltip`** (`position="top"`), not secondary text under the name — same tooltip shell as elsewhere. **`SpeechToTextEvaluation`** and **`TextToSpeechEvaluation`** both clear **`selectedDatasetId`** when a refetch of **`listDatasets`** shows the current selection has **`item_count === 0`** (covers deleting all rows or stale URL state).
 - **Provider selection UI** (responsive):
   - **Desktop** (`hidden md:block`): Table with border, rounded corners (`border border-border rounded-lg`)
     - Header row with select-all checkbox and column titles (`bg-muted/50 border-b`)
@@ -2640,7 +2657,7 @@ const getFilteredProviders = (language: LanguageOption) => {
      - Dropdown contains: user info (name, email), theme switcher, logout button
      - Logout button clears localStorage (`access_token`, `user`), cookie (`access_token`), then calls `signOut({ callbackUrl: "/login" })`
      - Click outside closes dropdown (uses `useRef` + `mousedown` event)
-7. **CSV Export**: Two complementary patterns for exporting tabular data as CSV.
+7. **CSV export and share header actions**:
    - **`DownloadableTable`** (`@/components/DownloadableTable`): A full table component with a built-in "Download CSV" button in the top-right corner. Use when the same data should both render as a visible table and be exportable.
      - Props: `columns` (array of `{key, header, render?}`), `data`, `filename`, `title`
      - Custom cell rendering via optional `render` function in column definition
@@ -2650,7 +2667,9 @@ const getFilteredProviders = (language: LanguageOption) => {
      - Quotes/escapes commas, double quotes, and newlines per RFC 4180; `null`/`undefined` becomes empty cell; objects are JSON-stringified before quoting
      - Shared CSV column shapes for LLM test runs and benchmarks live in `@/lib/exportTestResults` (`buildTestRunCsv`, `buildBenchmarkCsv`) so the in-app dialogs and the public share pages export identical schemas. Column order — unit-test runs: `Test name | Status | Conversation history | Agent response | Tool calls | Next reply | Error`; benchmarks: same with `Model` prepended and `Error` dropped. Two columns are populated **mutually exclusively** based on test type (`testCase.evaluation.type`, falling back to "tool_call when `output.tool_calls` is non-empty, else response"): tool-call tests fill **Tool calls** and leave Next reply empty; response tests fill **Next reply** and leave Tool calls empty. The standalone `Reasoning` column is gone — for response tests it's folded into the per-evaluator blocks in Next reply, and tool-call reasoning is intentionally not exported. Cell formats: **Conversation history** stays JSON-stringified (`historyToString`); **Tool calls** is multi-line plain text — one block per call, `Tool: <name>` + `Arguments: <json>`, blocks separated by blank lines (uses `normalizeToolCall` so historical `{name, arguments}` / `{tool, arguments}` / `{function: {…}}` shapes all render identically); **Next reply** is multi-line plain text — one block per `JudgeResult`, with a `<name>: <verdict>` line (`Pass`/`Fail` for binary; `<score> / <scale_max>` or `Score: N` for rating), an indented `Variables:` list when `variable_values` is non-empty (`  <name>: <value>` per line), and a final `Reasoning: <text>` line. Legacy response runs without `judge_results` fall back to a single `Reasoning: <top-level reasoning>` block (the historical default-`default-llm-next-reply` reasoning). Callers must pass `judgeResults` (`r.judgeResults` from `TestResult` / `tr.judge_results` from the API) into `ExportTestRow.judgeResults` / `ExportBenchmarkRow.judgeResults` so the per-evaluator structure renders.
      - Used in: `TestRunnerDialog` and `BenchmarkResultsDialog` headers (next to `ShareButton`, desktop only via `hidden md:block`); public share pages `/public/test-run/[token]` and `/public/benchmark/[token]`.
+     - **Default styling** (`ExportResultsButton`): **teal**-tinted border/background/text (download/export — distinct from share/copy hues).
      - Visibility rules: only render once results exist (`testResults.length > 0` / `hasAnyResults`) and the run is done — never during loading/in-progress, since CSV columns key off the final per-test outputs.
+   - **`ShareButton`** (`@/components/ShareButton`) — **not CSV**; sits beside export on finished test/benchmark runs. PATCHes public visibility per entity (`stt` | `tts` | `test-run` | `benchmark` | `simulation-run`); when public, shows **Copy link** (copies `/public/{segment}/{share_token}`). **Styling**: private → **violet**; public → **sky**; **Copy link** → **amber**; **Copied** → **rose** (brief success — distinct from **ExportResultsButton** **teal**, **Share** violet/sky, and **Copy link** amber).
 8. **Charts with PNG Export**: `LeaderboardBarChart` component includes built-in PNG download
    - Props: `title`, `data`, `height?`, `yDomain?`, `formatTooltip?`, `colorMap?`, `filename?`
    - "PNG" download button in top-right corner of chart card
@@ -2726,6 +2745,7 @@ const getFilteredProviders = (language: LanguageOption) => {
         - Uses `Math.max(totalTests, testNames.length, resultsCount)` to determine expected test count, ensuring tests don't disappear during polling
       - As results arrive from API, running indicators update to green checkmarks or red X marks
       - **Auto-expand behavior**: First provider (from `models` prop) is expanded immediately when dialog opens, not waiting for results
+      - **Outputs tab — default selected test**: When polling first returns a `model_results` row with non-empty `test_results`, the dialog auto-selects **`testIndex: 0`** for a qualifying model so the middle/detail panel is populated without an extra click. **Selection order**: walk the **`models` prop** in order and pick the first model id that appears on a `model_results` entry with results; if none match (configured id vs API `model` string mismatch), fall back to the **first** API row that has `test_results`. If **`models` is empty** — e.g. **view past benchmark** from the Tests tab or `/tests` Runs, where parents pass **`models={[]}`** and only **`taskId`** — use that API-order fallback only. A ref (`hasAutoSelectedFirstBenchmarkTestRef`) ensures this runs **once per dialog open**. The chosen model id is also merged into **`expandedProviders`** so that provider section stays open in the left list.
       - **Merged providers**: `getProvidersToDisplay()` function merges `modelResults` from API with placeholders for any models that don't have results yet
       - Types support null values: `success: boolean | null`, `test_results: BenchmarkTestResult[] | null`, `passed: boolean | null`
       - **Header status badge**: Uses `StatusBadge` component (same as STT/TTS evaluation pages) to show task status ("Queued" with gray badge, "Running" with yellow badge) plus spinner while benchmark is in progress
@@ -2735,6 +2755,7 @@ const getFilteredProviders = (language: LanguageOption) => {
       - `taskId`: The run UUID to fetch results for
       - `tests`: Array converted from `pastRun.results` to show test names while loading (TestRunnerDialog only)
       - `initialRunStatus`: Determines initialization behavior (TestRunnerDialog only)
+      - **BenchmarkResultsDialog**: Parents that only have the run id (e.g. Tests tab / `/tests` past benchmark row) may pass **`models={[]}`** and **`testNames={[]}`** — polling supplies `model_results` and test rows; default Outputs selection and placeholders must not depend on those props being non-empty (see **Outputs tab — default selected test** above).
     - **Callback props for coordinated updates**:
       - `onRunCreated` / `onBenchmarkCreated`: Notifies parent when a new run/benchmark is created
       - `onStatusUpdate`: Called during polling (only when `isRunning` is true) to sync status changes back to parent (TestRunnerDialog only)
@@ -2759,7 +2780,7 @@ const getFilteredProviders = (language: LanguageOption) => {
       - Without proper UUIDs, React's key prop receives empty strings, causing "duplicate key" console errors
       - Solution: Generate a unique fallback key using the array index and test name: `apiResult.test_uuid || \`generated-${index}-${testName}\``
       - This ensures unique keys even when the backend doesn't provide UUIDs, while preserving real UUIDs when available
-    - **Per-evaluator verdicts** (response tests): both dialogs thread the `judge_results: JudgeResult[] | null` field straight through from the API to `TestRunOutputsPanel` / `BenchmarkOutputsPanel`, which in turn pass it (along with the top-level `reasoning`, the `test_case.evaluators` echo, and an optional `scaleByEvaluatorUuid` fallback map) to **both** `EvaluationCriteriaPanel` (the third / right column on desktop) **and** `TestDetailView` (which renders a mobile-only `JudgeResultsList` via `md:hidden` so small screens don't lose the data). Field naming: `TestRunResult.judgeResults` (camel) and `BenchmarkTestResult.judge_results` (snake to match the API). Tool-call tests have `judge_results: null` — the right column renders the expected tool calls + the top-level `reasoning` (success/failure summary), and the middle panel's tool-call output renders without an inline reasoning block (the right column already covers it). The right column dropped the visible "Type" badge — section structure (`Evaluators` heading vs `Expected Tool Calls` heading) makes the test type self-evident. Each per-evaluator card renders the evaluator name as a `next/link` to `/evaluators/{evaluator_uuid}` (legacy rows with `evaluator_uuid: null` render plain text — see `EvaluatorNameLink` in `shared.tsx`); the evaluator's one-line description is intentionally **not** rendered on the card — the link is the affordance. Per-test variable values and the rating scale are read inline from each `JudgeResult` (`result.variable_values`, `result.scale_max`); the panel keeps a single fallback to `test_case.evaluators[i].variable_values` and the caller-supplied `scaleByEvaluatorUuid` map for older snapshots that pre-date the inline-fields backend rollout. Neither dialog currently populates `scaleByEvaluatorUuid`, so rating chips for legacy snapshots fall through to amber `Score: N`; new snapshots colour green / red because `scale_max` is on the entry itself.
+    - **Per-evaluator verdicts** (response tests): both dialogs thread the `judge_results: JudgeResult[] | null` field straight through from the API to `TestRunOutputsPanel` / `BenchmarkOutputsPanel`, which in turn pass it (along with the top-level `reasoning`, the `test_case.evaluators` echo, and an optional `scaleByEvaluatorUuid` fallback map) to **both** `EvaluationCriteriaPanel` (the third / right column on desktop) **and** `TestDetailView` (which renders a mobile-only `JudgeResultsList` via `md:hidden` so small screens don't lose the data). Field naming: `TestRunResult.judgeResults` (camel) and `BenchmarkTestResult.judge_results` (snake to match the API). Tool-call tests have `judge_results: null` — the right column renders the expected tool calls + the top-level `reasoning` (success/failure summary; **`CollapsibleReasoningStrip`** expands it — hidden by default), and the middle panel's tool-call output renders without an inline reasoning block (the right column already covers it). The right column dropped the visible "Type" badge — section structure (`Evaluators` heading vs `Expected Tool Calls` heading) makes the test type self-evident. Each per-evaluator card links the evaluator name to `/evaluators/{evaluator_uuid}` when the UUID is present (`EvaluatorNameLink` in `shared.tsx`; legacy `evaluator_uuid: null` → plain text). A snapshotted one-line **description** may appear under the name on both the desktop panel cards and the mobile `JudgeResultCard` list when the API provides it. Per-test variable values and the rating scale are read inline from each `JudgeResult` (`result.variable_values`, `result.scale_max`); the panel keeps a single fallback to `test_case.evaluators[i].variable_values` and the caller-supplied `scaleByEvaluatorUuid` map for older snapshots that pre-date the inline-fields backend rollout. Neither dialog currently populates `scaleByEvaluatorUuid`, so rating chips for legacy snapshots fall through to amber `Score: N`; new snapshots colour green / red because `scale_max` is on the entry itself. See **Reasoning disclosure** under Test Results Components for the collapsible UI pattern.
     - Used for: clicking past run rows in Tests tab to view historical results
 
 ### Data Fetching Pattern
@@ -3694,6 +3715,8 @@ import { Tooltip } from "@/components/Tooltip";
 
 **Styling**: White background, rounded corners, shadow, 256px max width (`w-64`), text wraps within the container. Arrow indicator points to trigger element.
 
+**Disabled controls and hover**: Disabled native **`<button>`** elements often do not receive pointer events, so wrapping only the button breaks hover for the tooltip. Use this pattern when the trigger must stay a real button (e.g. disabled row in **`DatasetPicker`**, disabled **New evaluation** on **`/datasets/[id]`**): **`Tooltip`** → inner wrapper **`div`** → **`button`** with **`disabled`**, **`tabIndex={-1}`**, **`aria-disabled`**, and **`pointer-events-none`** on the button so the tooltip’s outer wrapper receives **`mouseenter` / `mouseleave`**. Do not rely on the **`title`** attribute for these explanations if the product standard is the shared tooltip.
+
 ### UI Components (`@/components/ui`)
 
 Reusable UI primitives:
@@ -3926,14 +3949,16 @@ const { toolName, args } = normalizeToolCall(rawToolCallFromApi);
 
 // Full test conversation view (fully responsive)
 // - Padding: `p-4 md:p-6`
-// - Message bubbles: `w-[70%] md:w-1/2` (70% width on mobile for visual differentiation, half on desktop)
+// - Message bubbles: `w-[88%] md:w-3/4` (runner/benchmark middle column — ~88% on small screens, 75% from `md` up)
 // - User messages aligned right, agent messages aligned left for clear visual distinction
 // - Status indicators: responsive padding `pl-2 md:pl-3`
 // - `reasoning` (optional): top-level reasoning string. For tool-call tests this is the deterministic
-//   diff/match summary and is rendered inline next to the tool-call output. For RESPONSE tests, the
+//   diff/match summary — shown in `EvaluationCriteriaPanel` behind **See reasoning** (collapsed by default),
+//   same as per-evaluator rows. For RESPONSE tests, the
 //   inline reasoning is suppressed when `judgeResults` is populated (the per-evaluator panel below
 //   already covers it; the top-level string is just the first failing evaluator's reasoning anyway).
-//   Legacy response rows that pre-date judge_results capture still fall back to inline reasoning.
+//   Legacy response rows that pre-date judge_results capture still fall back to inline reasoning
+//   (also **See reasoning**, italic body when expanded).
 // - `judgeResults` (optional, response tests only): array of per-evaluator verdicts. When present
 //   and non-empty, renders a `JudgeResultsList` panel below the agent response with one card per
 //   evaluator. Tool-call tests always pass `null` here; the legacy single-reasoning UI handles them.
@@ -3956,8 +3981,13 @@ const { toolName, args } = normalizeToolCall(rawToolCallFromApi);
 // `EvaluatorNameLink` when uuid is non-null; plain text for legacy snapshots) + verdict
 // badge. Binary → Pass/Fail. Rating → `score / max` (or `Score: N` when no scale) coloured
 // **green** only when `score === scale_max`, **red** only when `score === scale_min`,
-// otherwise **amber** (anything in between, or either bound unknown). + per-evaluator
-// reasoning underneath.
+// otherwise **amber** (anything in between, or either bound unknown). Per-evaluator
+// **reasoning** is collapsed by default: internal **`ReasoningToggleIconButton`** + **`ReasoningExpandedContent`**
+// in `shared.tsx` (**See reasoning** / **Hide reasoning** text, cyan vs fuchsia by state). The right-column
+// **`EvaluatorPanelCard`** nests **`{{variable}}` values and reasoning in one collapsible block** (expand
+// shows variables first, then reasoning when present; variables-only evaluators still use the same toggle).
+// **`JudgeResultCard`** (mobile `JudgeResultsList`) shares the toggle + verdict-tinted card surfaces; clicking
+// the card toggles reasoning except on links, verdict chips, the toggle button, or inside the expanded body.
 <JudgeResultsList results={judgeResults} scaleByEvaluatorUuid={scaleByEvaluatorUuid} />
 
 // Stats bar - shows passed/failed counts
@@ -3965,7 +3995,8 @@ const { toolName, args } = normalizeToolCall(rawToolCallFromApi);
 <TestStats passedCount={5} failedCount={2} />
 
 // Evaluation criteria panel - third column in test/benchmark runner dialogs
-// Shows test type badge ("Next Reply Text" blue / "Tool Call" purple), criteria text, expected tool calls
+// Shows expected tool calls (tool-call tests) or per-evaluator cards (response tests). Tool-call
+// top-level `reasoning` uses **`CollapsibleReasoningStrip`** in `shared.tsx` (same See/Hide control).
 // Desktop only (hidden on mobile), w-72, border-l
 // IMPORTANT: Both TestRunnerDialog and BenchmarkResultsDialog import this from shared — no local copies
 // IMPORTANT: Only rendered after test completes (status "passed" or "failed"). During running/pending/queued,
@@ -4003,7 +4034,9 @@ type JudgeResult = {
 - `name` is refreshed server-side on every read of the run, so a rename in the evaluator settings UI surfaces on the next poll without a re-run. **Don't cache `name` long-term** — store `evaluator_uuid` as the stable key.
 - `evaluator_uuid` may be `null` for legacy runs that pre-date snapshot capture; treat as "no canonical link, just display the name" (no clickable evaluator link). When non-null, the cards render the name as a `next/link` to `/evaluators/{uuid}` via the shared `EvaluatorNameLink` helper in `shared.tsx`.
 - A test passes only when **all** judge entries pass: binary entries pass when `match === true`, rating entries pass when `score === scale_max`. The frontend can rely on the top-level `result.passed` for this — no need to recompute. Rating cards resolve `scale_max` inline from `result.scale_max` first (newer snapshots), falling back to the caller's `scaleByEvaluatorUuid` map; without either, they render a neutral amber `Score: N` chip.
-- `variable_values` shown on the right-column card resolve in the same priority order: inline `result.variable_values` first, then `test_case.evaluators[i].variable_values` matched by `evaluator_uuid` for older snapshots. Empty objects are normalised to `null` server-side, so an evaluator with zero variables simply renders no variables section.
+- `variable_values` shown on the right-column card resolve in the same priority order: inline `result.variable_values` first, then `test_case.evaluators[i].variable_values` matched by `evaluator_uuid` for older snapshots. Empty objects are normalised to `null` server-side. On **`EvaluatorPanelCard`**, variable rows render **inside the same collapsible region as reasoning** (not above the header); expand when either variables or reasoning exist.
+
+**Reasoning disclosure** (`src/components/test-results/shared.tsx`, not exported): Reasoning is **collapsed by default**. **`ReasoningToggleIconButton`** shows **See reasoning** / **Hide reasoning** plus a chevron; closed state uses **cyan** accents, open state **fuchsia** (not gray-only chrome). **`ReasoningExpandedContent`** renders the paragraph; **`showReasoningLabel`** adds the small uppercase **Reasoning** label (used in the right-column panel when expanded). **`CollapsibleReasoningStrip`** (tool-call / some strips) is a bordered row with a leading label + the same toggle, expanded body below. **Per-evaluator cards** (`JudgeResultCard`, `EvaluatorPanelCard`): local `useState` per card; **`getEvaluatorVerdictTone`** + **`evaluatorVerdictCardSurfaceClass`** apply **green / red / amber / neutral** tinted backgrounds, borders, and a **left accent stripe** from the verdict (not flat `bg-muted` only). **Card click** toggles the collapsible when the card has expandable content (`hasReasoning` on mobile cards; **`hasCollapsibleBody`** = reasoning **or** variables on **`EvaluatorPanelCard`**): ignored targets include **`button`**, **`a[href]`**, **`[data-evaluator-verdict-chips]`** (Pass/Fail/score chips), **`[data-reasoning-body]`** (expanded copy — avoids collapsing while selecting text), and the toggle uses **`stopPropagation`** so it does not double-fire. **Legacy** single `reasoning` under the agent bubble (no `judge_results`): toggle sits on the **Agent** header row (`justify-between`); **`italic`** + muted body on the expanded line. **Tool-call** top-level `reasoning` in **`EvaluationCriteriaPanel`**: **`CollapsibleReasoningStrip`**. Empty **`reasoning`** on **`JudgeResultCard`** (no text) hides the collapsible; **`EvaluatorPanelCard`** can still expand when only **`variable_values`** exist (**`hasCollapsibleBody`**). **`aria-expanded`** is set on the toggle **button**.
 
 ---
 
@@ -4214,7 +4247,7 @@ This prevents infinite polling when the backend is unreachable and gives users i
 - `src/app/stt/[uuid]/page.tsx` - STT evaluation detail page
 - `src/app/tts/[uuid]/page.tsx` - TTS evaluation detail page
 - `src/app/simulations/[uuid]/runs/[runId]/page.tsx` - Simulation run detail page
-- `src/components/agent-tabs/TestsTabContent.tsx` - Background polling for past runs
+- `src/components/agent-tabs/TestsTabContent.tsx` - Past runs (`pastRunsPanel`, polling, empty vs split layout, wrapped display names)
 - `src/components/TestRunnerDialog.tsx` - Test run polling
 - `src/components/BenchmarkResultsDialog.tsx` - Benchmark polling
 
@@ -4782,7 +4815,7 @@ Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When ena
 - **Checkboxes need visible borders**: Use `border-muted-foreground` (not `border-border`) and `border-2` for custom checkbox buttons to ensure visibility in both light and dark modes
 - **Spinners in flex containers**: Always add `flex-shrink-0` to spinner SVGs to prevent them from shrinking. Standard spinner class: `w-5 h-5 flex-shrink-0 animate-spin`
 - **Icon action buttons** (play, edit, etc.): Use `bg-foreground/90 text-background hover:bg-foreground` for solid icon buttons that need to be visible in both light and dark modes. Never use `text-white` alone as icons become invisible on light backgrounds. **Avoid `hover:opacity-*`** on buttons with child tooltips - opacity affects all children including tooltips, making them translucent. Use `bg-foreground/90 hover:bg-foreground` instead to only affect the background
-- **Chat message bubbles**: Consistent styling across AddTestDialog and TestDetailView (test results). User messages use `bg-muted border border-border text-foreground` (gray background, right-aligned). Agent messages use `bg-background border border-border text-foreground` (white/light background, left-aligned). Tool call cards use `bg-muted border border-border`. All use `rounded-xl` corners. **Width pattern**: `w-[70%] md:w-1/2` (70% width on mobile for better visual differentiation between user/agent messages, 50% on desktop). This prevents full-width message bubbles on mobile that look monotonous. See `@/components/test-results/shared.tsx` for the pattern
+- **Chat message bubbles (test results)**: **`TestDetailView`** (`@/components/test-results/shared.tsx`) drives the middle column in **TestRunnerDialog**, **BenchmarkOutputsPanel**, and public test/benchmark pages. User, assistant, history tool-call, and final output bubbles share **`w-[88%] md:w-3/4`** so the transcript uses most of the column without going edge-to-edge. Alignment: user right (`items-end`), agent left. Colors: user `bg-muted border border-border`, agent `bg-background border border-border`, tool output matches tool-call card styling; **`rounded-xl`**. **`AddTestDialog`** preview rows use **`w-1/2`** in the editor — different layout from result view; update docs in both places if you change width conventions.
 - **Info banners (colored text on tinted bg)**: When using colored text on a semi-transparent background (e.g., blue info notices, yellow warnings), always provide separate light and dark mode classes. Light mode needs darker shades for readability. Pattern: `text-blue-600 dark:text-blue-300/90` for text, `text-blue-500 dark:text-blue-400` for icons. Never use only a light shade like `text-blue-300` — it's invisible on light backgrounds. **Yellow/cream warning strips** (e.g., `bg-yellow-500/10`): prefer **`text-foreground`** for the banner body so contrast holds on the pale tint; pair with a darker icon in light mode, e.g. **`text-amber-900 dark:text-amber-400`**, instead of mid yellow on yellow (`text-yellow-500` on `bg-yellow-500/10` fails WCAG in light mode)
 
 ### Forms
