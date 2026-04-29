@@ -17,6 +17,7 @@ import { NotFoundState } from "@/components/ui";
 import { formatStatus, getStatusBadgeClass } from "@/lib/status";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useSidebarState } from "@/lib/sidebar";
+import { getVoiceSimulationAudioLayout, getVoiceSimulationAudioUrlForEntry } from "@/lib/simulationVoiceAudio";
 import { ShareButton } from "@/components/ShareButton";
 
 // `type`, `scale_min`, `scale_max` are present on newer runs (per the
@@ -196,6 +197,11 @@ export default function SimulationRunPage() {
     // Still in progress, return current (live updates)
     return currentSim;
   }, [selectedSimulationKey, runData?.simulation_results]);
+
+  const selectedVoiceAudioLayout = useMemo(
+    () => getVoiceSimulationAudioLayout(selectedSimulation?.audio_urls),
+    [selectedSimulation?.audio_urls],
+  );
 
   const [activeMetricsTab, setActiveMetricsTab] = useState<
     "results" | "performance" | "latency"
@@ -638,41 +644,13 @@ export default function SimulationRunPage() {
     if (!audioUrls || !runData || runData.type !== "voice") {
       return null;
     }
-
-    // Skip tool calls and tool responses — audio only applies to text messages
-    if (entry.role === "tool" || entry.tool_calls) {
-      return null;
-    }
-
-    // Count user and assistant text messages up to this entry
-    // Only count assistant messages without tool_calls (text-only)
-    let userCount = 0;
-    let assistantCount = 0;
-
-    for (let i = 0; i < entryIndex; i++) {
-      const msg = filteredTranscript[i];
-      if (msg?.role === "user") {
-        userCount++;
-      } else if (msg?.role === "assistant" && !msg.tool_calls) {
-        assistantCount++;
-      }
-    }
-
-    // Determine audio pattern based on role
-    let audioPattern: string;
-    if (entry.role === "user") {
-      // User messages: 1_user, 2_user, 3_user, etc. (1-indexed)
-      audioPattern = `${userCount + 1}_user.wav`;
-    } else if (entry.role === "assistant") {
-      // Assistant messages: 1_bot, 2_bot, 3_bot, etc. (1-indexed)
-      audioPattern = `${assistantCount + 1}_bot.wav`;
-    } else {
-      return null;
-    }
-
-    // Find matching audio URL
-    const audioUrl = audioUrls.find((url) => url.includes(audioPattern));
-    return audioUrl || null;
+    return getVoiceSimulationAudioUrlForEntry(
+      entry,
+      entryIndex,
+      audioUrls,
+      filteredTranscript,
+      selectedVoiceAudioLayout,
+    );
   };
 
   // Custom header with back button and title
@@ -2052,7 +2030,7 @@ export default function SimulationRunPage() {
                       <div className="flex items-center justify-center py-4 mt-2">
                         <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
                           <svg
-                            className="w-4 h-4 text-yellow-500"
+                            className="w-4 h-4 shrink-0 text-amber-900 dark:text-amber-400"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
@@ -2064,7 +2042,7 @@ export default function SimulationRunPage() {
                               d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
                             />
                           </svg>
-                          <span className="text-sm text-yellow-500">
+                          <span className="text-sm font-medium text-foreground">
                             Maximum number of assistant turns reached
                           </span>
                         </div>
