@@ -1174,7 +1174,7 @@ export default function SimulationRunPage() {
                     </div>
 
                     {/* Desktop Table View */}
-                    <div className="hidden md:block border border-border rounded-xl overflow-hidden bg-muted/20">
+                    <div className="hidden md:block border border-border rounded-xl overflow-hidden">
                       <div className="overflow-x-auto">
                         <table className="w-full table-fixed">
                           <thead className="bg-background border-t border-border">

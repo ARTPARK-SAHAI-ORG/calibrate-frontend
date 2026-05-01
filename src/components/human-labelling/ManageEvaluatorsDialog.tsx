@@ -164,17 +164,17 @@ export function ManageEvaluatorsDialog({
             <h2 className="text-base md:text-lg font-semibold text-foreground">
               Manage evaluators
             </h2>
-            <p className="text-xs md:text-sm text-muted-foreground mt-1">
+            <div className="text-xs md:text-sm text-muted-foreground mt-1">
               {taskType ? (
-                <span className="inline-flex flex-wrap items-center gap-1.5">
+                <div className="inline-flex flex-wrap items-center gap-1.5">
                   Choose which
                   <EvaluatorTypePill evaluatorType={taskType} />
                   evaluators need to be aligned with humans
-                </span>
+                </div>
               ) : (
                 "Choose which evaluators need to be aligned with humans"
               )}
-            </p>
+            </div>
           </div>
           <button
             onClick={onClose}

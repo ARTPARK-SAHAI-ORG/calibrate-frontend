@@ -180,9 +180,7 @@ function HumanLabellingPageInner() {
   const [tasksLoading, setTasksLoading] = useState(false);
   const [tasksError, setTasksError] = useState<string | null>(null);
 
-  const sortedTasks = [...tasks].sort((a, b) =>
-    a.name.localeCompare(b.name),
-  );
+  const sortedTasks = [...tasks].sort((a, b) => a.name.localeCompare(b.name));
 
   const [selectedTaskId, setSelectedTaskId] = useState<string>(ALL_TASKS);
   const [bucket] = useState<Bucket>(DEFAULT_BUCKET);
@@ -297,9 +295,7 @@ function HumanLabellingPageInner() {
         }),
       );
       if (cancelled) return;
-      setTasksWithAgreement(
-        new Set(results.filter((u): u is string => !!u)),
-      );
+      setTasksWithAgreement(new Set(results.filter((u): u is string => !!u)));
     })();
     return () => {
       cancelled = true;
@@ -1013,6 +1009,22 @@ function AgreementOverview({
   })();
 
   const sorted = [...rows].sort((a, b) => {
+    // Pin the inter-rater (human ↔ human) row to the top regardless of
+    // sort — it's the baseline every evaluator row is compared against.
+    if (a.key === "human_human" && b.key !== "human_human") return -1;
+    if (b.key === "human_human" && a.key !== "human_human") return 1;
+
+    // Group evaluators by type so all of the same type sit together.
+    // Rows missing a type sort after typed groups; within a group the
+    // user's chosen sort applies.
+    const aType = a.evaluatorType ?? "";
+    const bType = b.evaluatorType ?? "";
+    if (aType !== bType) {
+      if (!aType) return 1;
+      if (!bType) return -1;
+      return aType.localeCompare(bType);
+    }
+
     const dir = sortDir === "desc" ? -1 : 1;
     const cmp = (x: number | null, y: number | null) => {
       if (x == null && y == null) return 0;
@@ -1027,8 +1039,7 @@ function AgreementOverview({
   const buildChartData = (series: AgreementSeriesPoint[]) =>
     series.map((p) => ({
       month: formatBucketLabel(p.bucket_end, bucket),
-      agreement:
-        p.agreement == null ? null : Math.round(p.agreement * 100),
+      agreement: p.agreement == null ? null : Math.round(p.agreement * 100),
     }));
 
   const toggleRow = (key: string) => {
@@ -1049,6 +1060,10 @@ function AgreementOverview({
     }
   };
 
+  const hasNoAgreementData =
+    rows.length === 0 ||
+    rows.every((r) => r.current == null && r.pairCount === 0);
+
   return (
     <div className="space-y-4 md:space-y-6">
       {agreementError && (
@@ -1057,36 +1072,34 @@ function AgreementOverview({
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h2 className="text-sm font-semibold">Agreement summary</h2>
-          <p className="text-xs text-muted-foreground">
-            Agreement between annotators, and how closely each evaluator aligns
-            with the annotators
-          </p>
+      {!agreementLoading && !hasNoAgreementData && (
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-sm font-semibold">Agreement summary</h2>
+            <p className="text-xs text-muted-foreground">
+              Agreement between annotators, and how closely each evaluator
+              aligns with the annotators
+            </p>
+          </div>
+          <Select
+            value={selectedTaskId}
+            onChange={(e) => onSelectTask(e.target.value)}
+            wrapperClassName="w-48"
+            className="h-9"
+          >
+            <option value={ALL_TASKS}>All tasks</option>
+            {taskOptions.map((task) => (
+              <option key={task.uuid} value={task.uuid}>
+                {task.name}
+              </option>
+            ))}
+          </Select>
         </div>
-        <Select
-          value={selectedTaskId}
-          onChange={(e) => onSelectTask(e.target.value)}
-          wrapperClassName="w-48"
-          className="h-9"
-        >
-          <option value={ALL_TASKS}>All tasks</option>
-          {taskOptions.map((task) => (
-            <option key={task.uuid} value={task.uuid}>
-              {task.name}
-            </option>
-          ))}
-        </Select>
-      </div>
+      )}
 
       {agreementLoading ? (
         <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
-          <svg
-            className="w-4 h-4 animate-spin"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
+          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle
               className="opacity-25"
               cx="12"
@@ -1103,15 +1116,33 @@ function AgreementOverview({
           </svg>
           Loading agreement
         </div>
-      ) : rows.length === 0 ? (
-        <div className="flex flex-col items-center justify-center text-center border border-border rounded-xl py-12 px-6">
-          <p className="text-sm font-medium text-foreground">
-            No agreement data yet
-          </p>
-          <p className="text-xs text-muted-foreground mt-1.5 max-w-md">
-            Agreement will appear here once annotators have labelled overlapping items
-          </p>
-        </div>
+      ) : hasNoAgreementData ? (
+        <EmptyState
+          icon={
+            <svg
+              className="w-7 h-7 text-muted-foreground"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"
+              />
+            </svg>
+          }
+          title="No agreement data yet"
+          description={
+            <>
+              Agreement between annotators and evaluators will appear here
+              <br />
+              once annotators start labelling and evaluators are run on the
+              task items
+            </>
+          }
+        />
       ) : (
         <>
           {/* Desktop table */}
@@ -1169,13 +1200,9 @@ function AgreementOverview({
                       {row.key === "human_human" ? (
                         <HumanTypePill />
                       ) : row.evaluatorType ? (
-                        <EvaluatorTypePill
-                          evaluatorType={row.evaluatorType}
-                        />
+                        <EvaluatorTypePill evaluatorType={row.evaluatorType} />
                       ) : (
-                        <span className="text-sm text-muted-foreground">
-                          —
-                        </span>
+                        <span className="text-sm text-muted-foreground">—</span>
                       )}
                     </div>
                     <div
@@ -1331,7 +1358,9 @@ function SortHeader({
       type="button"
       onClick={onClick}
       className={`flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer w-fit ${
-        active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+        active
+          ? "text-foreground"
+          : "text-muted-foreground hover:text-foreground"
       } ${align === "right" ? "justify-self-end" : ""}`}
     >
       {label}

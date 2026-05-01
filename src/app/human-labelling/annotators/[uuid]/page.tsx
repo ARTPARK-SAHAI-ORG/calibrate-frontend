@@ -62,7 +62,7 @@ type AnnotatorJob = {
   created_at: string;
   completed_at: string | null;
   item_count: number;
-  annotation_count: number;
+  completed_item_count: number;
 };
 
 type AnnotatorDetailResponse = {
@@ -527,7 +527,7 @@ function AnnotatorJobsList({ jobs }: { jobs: AnnotatorJob[] }) {
               </span>
             </div>
             <div className="text-sm text-muted-foreground tabular-nums">
-              {job.annotation_count} / {job.item_count}
+              {job.completed_item_count} / {job.item_count}
             </div>
           </div>
         );

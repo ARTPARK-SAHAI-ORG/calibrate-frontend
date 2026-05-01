@@ -30,6 +30,11 @@ type CommonProps = {
   name: string;
   /** Short evaluator description, shown under the name. */
   description?: string | null;
+  /** Optional version label (e.g. "v3") shown as a small monospace pill
+   * next to the name. Use this when annotators are evaluating against a
+   * specific evaluator version so it stays visually distinct from the
+   * evaluator's display name. */
+  versionLabel?: string | null;
   /** "binary" → Correct/Wrong, "rating" → 1..scaleMax buttons. */
   outputType: EvaluatorOutputType;
   /** Evaluator uuid — used for linking the name to its detail page. */
@@ -142,40 +147,48 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
         isReadCollapsibleClickable ? " cursor-pointer" : ""
       }`}
     >
-      {/* Header: name + description + verdict pill (read) + toggle (read) */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <NameLabel
-            name={props.name}
-            uuid={props.evaluatorUuid}
-            enableLink={props.enableLink}
-          />
-          {props.description && (
-            <p className="text-xs text-muted-foreground whitespace-normal break-words mt-0.5">
-              {props.description}
-            </p>
-          )}
-        </div>
-        <div
-          className="flex-shrink-0 flex items-center gap-1.5"
-          data-evaluator-verdict-chips
-        >
-          {props.mode === "read" && (
-            <ReadVerdictPill
-              outputType={props.outputType}
-              match={props.match}
-              score={props.score}
-              scaleMin={props.scaleMin}
-              scaleMax={props.scaleMax}
+      {/* Header: name + verdict pill + toggle on one row; description
+          on its own row below so it can use the full card width. */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+            <NameLabel
+              name={props.name}
+              uuid={props.evaluatorUuid}
+              enableLink={props.enableLink}
             />
-          )}
-          {hasCollapsibleBody && (
-            <ReasoningToggleButton
-              open={open}
-              onToggle={() => setOpen((o) => !o)}
-            />
-          )}
+            {props.versionLabel && (
+              <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground">
+                {props.versionLabel}
+              </span>
+            )}
+          </div>
+          <div
+            className="flex-shrink-0 flex items-center gap-1.5"
+            data-evaluator-verdict-chips
+          >
+            {props.mode === "read" && (
+              <ReadVerdictPill
+                outputType={props.outputType}
+                match={props.match}
+                score={props.score}
+                scaleMin={props.scaleMin}
+                scaleMax={props.scaleMax}
+              />
+            )}
+            {hasCollapsibleBody && (
+              <ReasoningToggleButton
+                open={open}
+                onToggle={() => setOpen((o) => !o)}
+              />
+            )}
+          </div>
         </div>
+        {props.description && (
+          <p className="text-xs text-muted-foreground whitespace-normal break-words">
+            {props.description}
+          </p>
+        )}
       </div>
 
       {props.mode === "write" && (

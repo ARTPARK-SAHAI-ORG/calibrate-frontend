@@ -27,13 +27,116 @@ import {
 } from "@/components/human-labelling/JobsCreatedDialog";
 import { ManageEvaluatorsDialog } from "@/components/human-labelling/ManageEvaluatorsDialog";
 import { EmptyState } from "@/components/ui/LoadingState";
+import {
+  MultiSelectPicker,
+  type PickerItem,
+} from "@/components/MultiSelectPicker";
 import { useAccessToken } from "@/hooks";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 
-type Tab = "items" | "jobs" | "runs";
+type Tab = "overview" | "items" | "jobs" | "runs";
 
-const TABS: Tab[] = ["items", "jobs", "runs"];
+type AgreementBlock = {
+  current: number | null;
+  pair_count: number;
+};
+
+type TaskAgreementResponse = {
+  human_human: AgreementBlock;
+  evaluators: (AgreementBlock & { evaluator_id: string; name: string })[];
+};
+
+// Denormalized one-row-per-(item × linked evaluator) view from
+// /annotation-tasks/{uuid}/summary. `annotators[]` provides the column
+// order (union of every annotator with ≥1 annotation on the task);
+// each `rows[i].annotations[annotator_uuid]` is that annotator's
+// latest annotation for the slot, or null when they didn't label it.
+type SummaryAnnotator = { uuid: string; name: string };
+type SummaryEvaluator = {
+  evaluator_id: string;
+  name: string;
+  output_type: "binary" | "rating";
+};
+type SummaryAnnotation = {
+  value: boolean | number | null;
+  reasoning?: string | null;
+};
+type SummaryRow = {
+  item_id: string;
+  payload: Record<string, unknown> | null;
+  evaluator_id: string;
+  evaluator_name: string;
+  output_type: "binary" | "rating";
+  evaluator_version_id?: string | null;
+  evaluator_version_number?: number | null;
+  evaluator_value: boolean | number | null;
+  evaluator_reasoning?: string | null;
+  // Aggregate agreement scores in [0, 1] for this (item, evaluator) slot.
+  // human_agreement: null when <2 annotators labelled the slot.
+  // evaluator_agreement: null when no evaluator run / no annotators / types incomparable.
+  human_agreement: number | null;
+  evaluator_agreement: number | null;
+  annotations: Record<string, SummaryAnnotation | null>;
+};
+type TaskSummaryResponse = {
+  task_id: string;
+  task_type: "stt" | "llm" | "simulation";
+  evaluators: SummaryEvaluator[];
+  annotators: SummaryAnnotator[];
+  rows: SummaryRow[];
+};
+
+function formatVerdictValue(
+  v: boolean | number | null | undefined,
+): string {
+  if (v === null || v === undefined) return "—";
+  if (typeof v === "boolean") return v ? "Correct" : "Wrong";
+  if (typeof v === "number") return String(v);
+  return "—";
+}
+
+function verdictTextClass(
+  v: boolean | number | null | undefined,
+): string {
+  if (v === null || v === undefined) return "text-muted-foreground";
+  if (v === true) return "text-green-600 dark:text-green-400";
+  if (v === false) return "text-red-600 dark:text-red-400";
+  return "text-foreground";
+}
+
+function agreementColor(v: number | null | undefined): string {
+  if (v == null) return "text-muted-foreground";
+  const pct = v * 100;
+  if (pct >= 75) return "text-green-600 dark:text-green-400";
+  if (pct <= 50) return "text-red-600 dark:text-red-400";
+  return "text-yellow-600 dark:text-yellow-400";
+}
+
+function AgreementStatCard({
+  label,
+  value,
+  valueClassName = "",
+}: {
+  label: string;
+  value: string;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="border border-border rounded-lg px-4 py-3 bg-background min-w-[160px]">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div
+        className={`text-2xl font-semibold tabular-nums ${valueClassName}`}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+const TABS: Tab[] = ["overview", "items", "jobs", "runs"];
 
 type EvaluatorRunMetricEntry = number | { type?: string; mean?: number | null };
 
@@ -90,7 +193,7 @@ type LabellingJob = {
   created_at: string;
   completed_at: string | null;
   item_count: number;
-  annotation_count: number;
+  completed_item_count: number;
 };
 
 type LabellingTask = {
@@ -334,7 +437,7 @@ function EvaluatorRunsList({
                   return (
                     <span
                       key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-background text-foreground"
                     >
                       <span className="truncate max-w-[140px]">{name}</span>
                       {label && (
@@ -630,7 +733,7 @@ function JobsList({ jobs }: { jobs: LabellingJob[] }) {
               </span>
             </div>
             <div className="text-sm text-muted-foreground tabular-nums">
-              {job.annotation_count} / {job.item_count}
+              {job.completed_item_count} / {job.item_count}
             </div>
           </div>
         );
@@ -658,7 +761,7 @@ function LabellingTaskPageInner() {
 
   const initialTab = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState<Tab>(
-    isTab(initialTab) ? initialTab : "items",
+    isTab(initialTab) ? initialTab : "overview",
   );
 
   const handleTabChange = useCallback(
@@ -718,6 +821,73 @@ function LabellingTaskPageInner() {
   const [runs, setRuns] = useState<EvaluatorRunJob[]>([]);
   const [runsLoading, setRunsLoading] = useState(false);
   const [runsError, setRunsError] = useState<string | null>(null);
+
+  const [agreement, setAgreement] = useState<TaskAgreementResponse | null>(
+    null,
+  );
+  const [agreementLoading, setAgreementLoading] = useState(false);
+  const [agreementError, setAgreementError] = useState<string | null>(null);
+
+  const fetchAgreement = useCallback(async () => {
+    if (!accessToken || !uuid) return;
+    setAgreementLoading(true);
+    setAgreementError(null);
+    try {
+      const data = await apiClient<TaskAgreementResponse>(
+        `/annotation-tasks/${uuid}/agreement?bucket=month&days=180`,
+        accessToken,
+      );
+      setAgreement(data);
+    } catch (err) {
+      setAgreementError(parseApiError(err, "Failed to load agreement"));
+    } finally {
+      setAgreementLoading(false);
+    }
+  }, [accessToken, uuid]);
+
+  useEffect(() => {
+    if (activeTab === "overview") fetchAgreement();
+  }, [activeTab, fetchAgreement]);
+
+  const [taskSummary, setTaskSummary] = useState<TaskSummaryResponse | null>(
+    null,
+  );
+  const [taskSummaryLoading, setTaskSummaryLoading] = useState(false);
+  const [taskSummaryError, setTaskSummaryError] = useState<string | null>(
+    null,
+  );
+  const [summaryEvaluatorFilter, setSummaryEvaluatorFilter] = useState<
+    PickerItem[]
+  >([]);
+  // sortColKey: "evaluator" for the evaluator-value column, or an annotator
+  // uuid for that annotator's column. null → keep API order.
+  const [summarySortColKey, setSummarySortColKey] = useState<string | null>(
+    null,
+  );
+  const [summarySortDir, setSummarySortDir] = useState<"asc" | "desc">(
+    "desc",
+  );
+
+  const fetchTaskSummary = useCallback(async () => {
+    if (!accessToken || !uuid) return;
+    setTaskSummaryLoading(true);
+    setTaskSummaryError(null);
+    try {
+      const data = await apiClient<TaskSummaryResponse>(
+        `/annotation-tasks/${uuid}/summary`,
+        accessToken,
+      );
+      setTaskSummary(data);
+    } catch (err) {
+      setTaskSummaryError(parseApiError(err, "Failed to load task summary"));
+    } finally {
+      setTaskSummaryLoading(false);
+    }
+  }, [accessToken, uuid]);
+
+  useEffect(() => {
+    if (activeTab === "overview") fetchTaskSummary();
+  }, [activeTab, fetchTaskSummary]);
   // Map evaluator_id -> { version_id: "v1" }, populated on demand from
   // /evaluators/{uuid}/versions so we can label runs by version number.
   const [versionLabels, setVersionLabels] = useState<
@@ -1345,6 +1515,7 @@ function LabellingTaskPageInner() {
         {/* Tabs */}
         <div className="border-b border-border flex items-center gap-1">
           {[
+            { id: "overview" as Tab, label: "Overview" },
             {
               id: "items" as Tab,
               label: itemsCount > 0 ? `Items (${itemsCount})` : "Items",
@@ -1377,6 +1548,449 @@ function LabellingTaskPageInner() {
             </button>
           ))}
         </div>
+
+        {activeTab === "overview" && (
+          <div className="space-y-4 md:space-y-6">
+            {agreementError && (
+              <div className="rounded-md border border-border bg-muted/20 p-4 text-sm text-red-500">
+                {agreementError}
+              </div>
+            )}
+
+            {agreementLoading && !agreement ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                <svg
+                  className="w-4 h-4 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                Loading agreement
+              </div>
+            ) : !agreement ||
+              ((agreement.human_human?.pair_count ?? 0) === 0 &&
+                (agreement.evaluators ?? []).every(
+                  (e) => (e.pair_count ?? 0) === 0,
+                )) ? (
+              <EmptyState
+                icon={
+                  <svg
+                    className="w-7 h-7 text-muted-foreground"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"
+                    />
+                  </svg>
+                }
+                title="No agreement data yet"
+                description={
+                  <>
+                    Agreement will appear here once annotators
+                    <br />
+                    have labelled overlapping items
+                  </>
+                }
+              />
+            ) : (
+              <div className="flex flex-wrap items-stretch gap-3">
+                <AgreementStatCard
+                  label="Annotator agreement"
+                  value={
+                    agreement.human_human?.current != null
+                      ? `${Math.round(agreement.human_human.current * 100)}%`
+                      : "—"
+                  }
+                  valueClassName={agreementColor(
+                    agreement.human_human?.current,
+                  )}
+                />
+                {(agreement.evaluators ?? []).map((ev) => (
+                  <AgreementStatCard
+                    key={ev.evaluator_id}
+                    label={ev.name}
+                    value={
+                      ev.current != null
+                        ? `${Math.round(ev.current * 100)}%`
+                        : "—"
+                    }
+                    valueClassName={agreementColor(ev.current)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Per-item × per-evaluator summary table */}
+            {taskSummaryError && (
+              <div className="rounded-md border border-border bg-muted/20 p-4 text-sm text-red-500">
+                {taskSummaryError}
+              </div>
+            )}
+            {taskSummaryLoading && !taskSummary ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                <svg
+                  className="w-4 h-4 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                Loading labels
+              </div>
+            ) : !taskSummary || taskSummary.rows.length === 0 ? (
+              <EmptyState
+                icon={
+                  <svg
+                    className="w-7 h-7 text-muted-foreground"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"
+                    />
+                  </svg>
+                }
+                title="No labels yet"
+                description={
+                  <>
+                    Detailed labels will appear here
+                    <br />
+                    once items have been evaluated and annotated
+                  </>
+                }
+              />
+            ) : (
+              (() => {
+                const annotators = taskSummary.annotators ?? [];
+                const evaluators = taskSummary.evaluators ?? [];
+                const summaryTaskType = taskSummary.task_type;
+                const itemColumns =
+                  summaryTaskType === "stt"
+                    ? [
+                        { key: "ref", label: "Reference transcript" },
+                        { key: "pred", label: "Predicted transcript" },
+                      ]
+                    : [{ key: "name", label: "Name" }];
+                const itemColTpl = itemColumns
+                  .map(() => "minmax(180px,1.4fr)")
+                  .join(" ");
+                const evalColTpl = "minmax(180px,1fr) 170px 170px 140px";
+                const annotatorColTpl =
+                  annotators.length > 0
+                    ? annotators.map(() => "120px").join(" ")
+                    : "";
+                const gridTemplate = [itemColTpl, evalColTpl, annotatorColTpl]
+                  .filter(Boolean)
+                  .join(" ");
+
+                const itemCellValues = (
+                  payload: Record<string, unknown> | null,
+                ): string[] => {
+                  const p = payload ?? {};
+                  if (summaryTaskType === "stt") {
+                    const ref =
+                      typeof p.reference_transcript === "string"
+                        ? (p.reference_transcript as string)
+                        : "";
+                    const pred =
+                      typeof p.predicted_transcript === "string"
+                        ? (p.predicted_transcript as string)
+                        : "";
+                    return [ref || "—", pred || "—"];
+                  }
+                  const name =
+                    typeof p.name === "string" ? (p.name as string) : "";
+                  return [name || "—"];
+                };
+
+                // Filter rows by selected evaluator, then sort by the
+                // active value column. Null verdicts always sink to the
+                // bottom regardless of asc/desc; booleans sort false<true.
+                const selectedEvaluatorIds = new Set(
+                  summaryEvaluatorFilter.map((i) => i.uuid),
+                );
+                const filteredRows =
+                  selectedEvaluatorIds.size === 0
+                    ? taskSummary.rows
+                    : taskSummary.rows.filter((r) =>
+                        selectedEvaluatorIds.has(r.evaluator_id),
+                      );
+
+                const valueRank = (
+                  v: boolean | number | null | undefined,
+                ): number | null => {
+                  if (v === null || v === undefined) return null;
+                  if (typeof v === "boolean") return v ? 1 : 0;
+                  if (typeof v === "number") return v;
+                  return null;
+                };
+                const cellValueForSort = (
+                  row: SummaryRow,
+                ): boolean | number | null => {
+                  if (!summarySortColKey) return null;
+                  if (summarySortColKey === "evaluator")
+                    return row.evaluator_value;
+                  if (summarySortColKey === "human_agreement")
+                    return row.human_agreement;
+                  if (summarySortColKey === "evaluator_agreement")
+                    return row.evaluator_agreement;
+                  return row.annotations?.[summarySortColKey]?.value ?? null;
+                };
+                const sortedRows = summarySortColKey
+                  ? [...filteredRows].sort((a, b) => {
+                      const av = valueRank(cellValueForSort(a));
+                      const bv = valueRank(cellValueForSort(b));
+                      if (av === null && bv === null) return 0;
+                      if (av === null) return 1; // nulls last
+                      if (bv === null) return -1;
+                      const dir = summarySortDir === "desc" ? -1 : 1;
+                      return av === bv ? 0 : av < bv ? -1 * dir : 1 * dir;
+                    })
+                  : filteredRows;
+
+                const onSortClick = (key: string) => {
+                  if (summarySortColKey === key) {
+                    setSummarySortDir((d) =>
+                      d === "desc" ? "asc" : "desc",
+                    );
+                  } else {
+                    setSummarySortColKey(key);
+                    setSummarySortDir("desc");
+                  }
+                };
+
+                const sortIndicator = (key: string) => {
+                  if (summarySortColKey !== key) {
+                    return (
+                      <svg
+                        className="w-3 h-3 opacity-40"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M8.25 15L12 18.75 15.75 15M8.25 9L12 5.25 15.75 9"
+                        />
+                      </svg>
+                    );
+                  }
+                  return (
+                    <svg
+                      className="w-3 h-3"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d={
+                          summarySortDir === "desc"
+                            ? "M19.5 8.25l-7.5 7.5-7.5-7.5"
+                            : "M4.5 15.75l7.5-7.5 7.5 7.5"
+                        }
+                      />
+                    </svg>
+                  );
+                };
+
+                return (
+                  <>
+                    <div className="w-64">
+                      <MultiSelectPicker
+                        items={evaluators.map((ev) => ({
+                          uuid: ev.evaluator_id,
+                          name: ev.name,
+                        }))}
+                        selectedItems={summaryEvaluatorFilter}
+                        onSelectionChange={setSummaryEvaluatorFilter}
+                        placeholder="All evaluators"
+                        searchPlaceholder="Search evaluators..."
+                      />
+                    </div>
+                    <div className="border border-border rounded-xl overflow-x-auto">
+                    <div
+                      className="grid gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center min-w-fit"
+                      style={{ gridTemplateColumns: gridTemplate }}
+                    >
+                      {itemColumns.map((c) => (
+                        <div
+                          key={c.key}
+                          className="text-sm font-medium text-muted-foreground truncate"
+                        >
+                          {c.label}
+                        </div>
+                      ))}
+                      <div className="text-sm font-medium text-muted-foreground">
+                        Evaluator
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onSortClick("human_agreement")}
+                        className={`flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer w-fit whitespace-nowrap ${
+                          summarySortColKey === "human_agreement"
+                            ? "text-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Annotator agreement
+                        {sortIndicator("human_agreement")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onSortClick("evaluator_agreement")}
+                        className={`flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer w-fit whitespace-nowrap ${
+                          summarySortColKey === "evaluator_agreement"
+                            ? "text-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Evaluator agreement
+                        {sortIndicator("evaluator_agreement")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onSortClick("evaluator")}
+                        className={`flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer w-fit ${
+                          summarySortColKey === "evaluator"
+                            ? "text-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Evaluator value
+                        {sortIndicator("evaluator")}
+                      </button>
+                      {annotators.map((a) => (
+                        <button
+                          key={a.uuid}
+                          type="button"
+                          onClick={() => onSortClick(a.uuid)}
+                          title={a.name}
+                          className={`flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer w-fit truncate ${
+                            summarySortColKey === a.uuid
+                              ? "text-foreground"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <span className="truncate">{a.name}</span>
+                          {sortIndicator(a.uuid)}
+                        </button>
+                      ))}
+                    </div>
+                    {sortedRows.map((row, idx) => {
+                      const cells = itemCellValues(row.payload);
+                      const versionLabel =
+                        typeof row.evaluator_version_number === "number"
+                          ? `v${row.evaluator_version_number}`
+                          : null;
+                      return (
+                        <div
+                          key={`${row.item_id}-${row.evaluator_id}-${row.evaluator_version_id ?? ""}-${idx}`}
+                          className="grid gap-4 px-4 py-3 border-b border-border last:border-b-0 items-center min-w-fit"
+                          style={{ gridTemplateColumns: gridTemplate }}
+                        >
+                          {cells.map((c, i) => (
+                            <p
+                              key={`item-${i}`}
+                              className="text-sm text-foreground line-clamp-2"
+                            >
+                              {c}
+                            </p>
+                          ))}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Link
+                              href={`/evaluators/${row.evaluator_id}`}
+                              title={`Open ${row.evaluator_name}`}
+                              className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate max-w-full"
+                            >
+                              <span className="truncate">
+                                {row.evaluator_name}
+                              </span>
+                            </Link>
+                            {versionLabel && (
+                              <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground flex-shrink-0">
+                                {versionLabel}
+                              </span>
+                            )}
+                          </div>
+                          <div
+                            className={`text-sm font-semibold tabular-nums ${agreementColor(row.human_agreement)}`}
+                          >
+                            {row.human_agreement != null
+                              ? `${Math.round(row.human_agreement * 100)}%`
+                              : "—"}
+                          </div>
+                          <div
+                            className={`text-sm font-semibold tabular-nums ${agreementColor(row.evaluator_agreement)}`}
+                          >
+                            {row.evaluator_agreement != null
+                              ? `${Math.round(row.evaluator_agreement * 100)}%`
+                              : "—"}
+                          </div>
+                          <div
+                            className={`text-sm font-medium tabular-nums ${verdictTextClass(row.evaluator_value)}`}
+                          >
+                            {formatVerdictValue(row.evaluator_value)}
+                          </div>
+                          {annotators.map((a) => {
+                            const v = row.annotations?.[a.uuid] ?? null;
+                            return (
+                              <div
+                                key={a.uuid}
+                                className={`text-sm font-medium tabular-nums ${verdictTextClass(v?.value ?? null)}`}
+                              >
+                                {formatVerdictValue(v?.value ?? null)}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                    </div>
+                  </>
+                );
+              })()
+            )}
+          </div>
+        )}
 
         {activeTab === "items" &&
           (itemsLoading ? (

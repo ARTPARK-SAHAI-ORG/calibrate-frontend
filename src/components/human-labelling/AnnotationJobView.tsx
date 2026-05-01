@@ -648,10 +648,18 @@ function AnnotateView({
             // evaluator controls stay visible while the annotator scrolls
             // through history.
             <>
-              <div className="md:flex-[7] md:min-h-0 md:overflow-y-auto md:border-r border-border p-4 md:p-6">
+              <div
+                className={`${
+                  isAdmin ? "md:flex-[6]" : "md:flex-[7]"
+                } md:min-h-0 md:overflow-y-auto md:border-r border-border p-4 md:p-6`}
+              >
                 <ItemPane item={currentItem} taskType={data.task.type} />
               </div>
-              <div className="md:flex-[3] md:min-h-0 md:overflow-y-auto p-4 md:p-6">
+              <div
+                className={`${
+                  isAdmin ? "md:flex-[4]" : "md:flex-[3]"
+                } md:min-h-0 md:overflow-y-auto p-4 md:p-6`}
+              >
                 <EvaluatorsPane
                   evaluators={evaluators}
                   itemId={currentItem.uuid}

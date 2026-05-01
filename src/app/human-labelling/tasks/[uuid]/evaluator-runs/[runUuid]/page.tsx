@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
+import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import {
   ItemPane,
   type Item,
@@ -88,22 +89,6 @@ function statusLabel(status: EvaluatorRunJob["status"]): string {
   if (status === "completed") return "Completed";
   if (status === "failed") return "Failed";
   return status;
-}
-
-function formatValueDisplay(v: unknown): string {
-  if (v === true) return "Correct";
-  if (v === false) return "Wrong";
-  if (typeof v === "number") return String(v);
-  if (typeof v === "string") return v;
-  return "—";
-}
-
-function valuePillClass(v: unknown): string {
-  if (v === true)
-    return "border-green-200 bg-green-100 text-green-700 dark:border-green-500/30 dark:bg-green-500/20 dark:text-green-400";
-  if (v === false)
-    return "border-red-200 bg-red-100 text-red-700 dark:border-red-500/30 dark:bg-red-500/20 dark:text-red-400";
-  return "border-border bg-muted/40 text-foreground";
 }
 
 export default function EvaluatorRunDetailPage() {
@@ -201,18 +186,23 @@ export default function EvaluatorRunDetailPage() {
   }, [fetchJob]);
 
   // Lazily fetch version labels for evaluators referenced by the run.
+  // Keyed on the sorted list of evaluator IDs so the effect doesn't
+  // re-fire when the run polls — `job` changes every 2.5s while the
+  // job is in-progress, but the evaluator set is fixed at run creation.
+  const evaluatorIdsKey = (job?.details?.evaluators ?? [])
+    .map((e) => e.evaluator_id)
+    .filter(Boolean)
+    .slice()
+    .sort()
+    .join(",");
   useEffect(() => {
-    if (!accessToken || !job) return;
-    const evIds = new Set<string>();
-    for (const e of job.details?.evaluators ?? []) {
-      if (e.evaluator_id) evIds.add(e.evaluator_id);
-    }
-    if (evIds.size === 0) return;
+    if (!accessToken || !evaluatorIdsKey) return;
+    const evIds = evaluatorIdsKey.split(",");
     let cancelled = false;
     (async () => {
       const merged: Record<string, string> = {};
       await Promise.all(
-        Array.from(evIds).map(async (evaluatorId) => {
+        evIds.map(async (evaluatorId) => {
           try {
             const versions = await apiClient<
               Array<{ uuid: string; version_number: number }>
@@ -230,7 +220,7 @@ export default function EvaluatorRunDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, job]);
+  }, [accessToken, evaluatorIdsKey]);
 
   // Limit the items displayed to those actually in this run.
   // Source of truth (in priority order):
@@ -514,18 +504,35 @@ function EvaluatorResultsPane({
             (!ev.evaluator_version_id ||
               x.evaluator_version_id === ev.evaluator_version_id),
         );
-        const value = r?.value?.value;
         const reasoning =
           typeof r?.value?.reasoning === "string"
             ? (r.value.reasoning as string)
-            : "";
-        return (
-          <div
-            key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
-            className="border border-border rounded-xl p-4 space-y-3"
-          >
-            <div className="flex items-start justify-between gap-3 min-w-0">
-              <div className="min-w-0 flex items-center gap-2 flex-wrap">
+            : null;
+
+        let match: boolean | null = null;
+        let score: number | null = null;
+        let outputType: "binary" | "rating" = "binary";
+
+        if (r) {
+          const v = r.value?.value;
+          if (typeof v === "boolean") {
+            outputType = "binary";
+            match = v;
+          } else if (typeof v === "number") {
+            outputType = "rating";
+            score = v;
+          }
+        }
+
+        const stillRunning =
+          !r && (jobStatus === "in_progress" || jobStatus === "queued");
+        if (stillRunning) {
+          return (
+            <div
+              key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
+              className="border border-border rounded-xl p-4 space-y-2"
+            >
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
                 <h3 className="text-sm font-semibold truncate">
                   {ev.name || ev.evaluator_id.slice(0, 8)}
                 </h3>
@@ -535,32 +542,6 @@ function EvaluatorResultsPane({
                   </span>
                 )}
               </div>
-            </div>
-
-            {r ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium border ${valuePillClass(
-                      value,
-                    )}`}
-                  >
-                    {formatValueDisplay(value)}
-                  </span>
-                </div>
-                <div className="space-y-1.5">
-                  <div className="text-xs font-medium text-muted-foreground">
-                    Reasoning
-                  </div>
-                  <textarea
-                    value={reasoning}
-                    readOnly
-                    rows={2}
-                    className="w-full text-sm rounded-md border border-border bg-background px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  />
-                </div>
-              </>
-            ) : jobStatus === "in_progress" || jobStatus === "queued" ? (
               <div className="flex items-center gap-3 py-1">
                 <svg
                   className="w-5 h-5 animate-spin text-muted-foreground"
@@ -585,12 +566,50 @@ function EvaluatorResultsPane({
                   Running evaluator
                 </p>
               </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                No result for this item.
+            </div>
+          );
+        }
+
+        const evaluatorName = ev.name || ev.evaluator_id.slice(0, 8);
+
+        // Job is done (or failed) but no row exists for this item — that's
+        // a real error state now that the backend always populates runs[].
+        if (!r) {
+          return (
+            <div
+              key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
+              className="border border-red-500/30 bg-red-500/5 rounded-xl p-4 space-y-1.5"
+            >
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <h3 className="text-sm font-semibold truncate">
+                  {evaluatorName}
+                </h3>
+                {versionLabel && (
+                  <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground">
+                    {versionLabel}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-red-600 dark:text-red-400">
+                No result recorded for this item.
               </p>
-            )}
-          </div>
+            </div>
+          );
+        }
+
+        return (
+          <EvaluatorVerdictCard
+            key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
+            mode="read"
+            name={evaluatorName}
+            versionLabel={versionLabel}
+            outputType={outputType}
+            evaluatorUuid={ev.evaluator_id}
+            enableLink
+            match={match}
+            score={score}
+            reasoning={reasoning}
+          />
         );
       })}
     </div>

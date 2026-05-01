@@ -88,7 +88,9 @@ export function MultiSelectPicker({
         >
           <div className="flex-1 flex flex-wrap gap-2 items-center">
             {selectedItems.length === 0 ? (
-              <span className="text-muted-foreground">{placeholder}</span>
+              <span className="text-muted-foreground">
+                {placeholder}
+              </span>
             ) : (
               selectedItems.map((item) => (
                 <span
