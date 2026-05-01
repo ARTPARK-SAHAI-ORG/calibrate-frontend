@@ -115,7 +115,7 @@ export function Tooltip({
         transform: position === "top" || position === "bottom" ? "translateX(-50%)" : "translateY(-50%)",
       }}
     >
-      <div className="px-3 py-2 text-xs text-gray-900 bg-white rounded-lg shadow-lg whitespace-normal break-words w-64">
+      <div className="px-3 py-2 text-xs text-gray-900 bg-white rounded-lg shadow-lg whitespace-normal break-words max-w-64 w-max">
         {content}
         {/* Arrow */}
         <div className={`absolute ${arrowClasses[position]}`}></div>

@@ -521,7 +521,7 @@ export function BenchmarkResultsDialog({
           <div className="flex-1 flex items-center justify-center">
             <div className="flex flex-col items-center gap-4">
               <SpinnerIcon className="w-8 h-8 animate-spin text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Loading...</p>
+              <p className="text-sm text-muted-foreground">Loading</p>
             </div>
           </div>
         )}

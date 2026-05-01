@@ -1,6 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  EvaluatorVerdictCard,
+  ReasoningExpandedContent,
+  ReasoningToggleButton,
+} from "@/components/EvaluatorVerdictCard";
 import Link from "next/link";
 import {
   CheckIcon,
@@ -322,68 +327,6 @@ export function ToolCallCard({
 }
 
 /** Text + chevron toggle for evaluator / tool-call reasoning (compact header control). */
-function ReasoningToggleIconButton({
-  open,
-  onToggle,
-}: {
-  open: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        onToggle();
-      }}
-      aria-expanded={open}
-      className={`inline-flex items-center gap-1.5 max-w-[min(100%,14rem)] rounded-md border px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer shrink-0 ${
-        open
-          ? "border-fuchsia-500/50 bg-fuchsia-500/16 text-fuchsia-950 dark:border-fuchsia-500/45 dark:bg-fuchsia-500/18 dark:text-fuchsia-100 hover:bg-fuchsia-500/26 dark:hover:bg-fuchsia-500/28"
-          : "border-cyan-500/50 bg-cyan-500/14 text-cyan-950 dark:border-cyan-500/45 dark:bg-cyan-500/16 dark:text-cyan-100 hover:bg-cyan-500/24 dark:hover:bg-cyan-500/22"
-      }`}
-    >
-      <span className="truncate">
-        {open ? "Hide reasoning" : "See reasoning"}
-      </span>
-      <ChevronDownIcon
-        className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-      />
-    </button>
-  );
-}
-
-function ReasoningExpandedContent({
-  text,
-  showReasoningLabel = false,
-  mutedBody = true,
-  italic = false,
-}: {
-  text: string;
-  showReasoningLabel?: boolean;
-  mutedBody?: boolean;
-  italic?: boolean;
-}) {
-  return (
-    <div className="space-y-1">
-      {showReasoningLabel && (
-        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide block">
-          Reasoning
-        </span>
-      )}
-      <p
-        className={`${
-          mutedBody
-            ? "text-xs text-muted-foreground whitespace-pre-wrap break-words"
-            : "text-xs text-foreground whitespace-pre-wrap break-words"
-        }${italic ? " italic" : ""}`}
-      >
-        {text}
-      </p>
-    </div>
-  );
-}
-
 /** Tool-call verdict: one header row (label + chevron), body when expanded. */
 function CollapsibleReasoningStrip({
   text,
@@ -404,7 +347,7 @@ function CollapsibleReasoningStrip({
         <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
           {leadingLabel}
         </span>
-        <ReasoningToggleIconButton
+        <ReasoningToggleButton
           open={open}
           onToggle={() => setOpen((o) => !o)}
         />
@@ -424,55 +367,6 @@ function CollapsibleReasoningStrip({
 }
 
 /** Surface styles for per-evaluator cards: tinted fill + border + left stripe by outcome. */
-type EvaluatorVerdictTone = "green" | "red" | "amber" | "neutral";
-
-function getEvaluatorVerdictTone(
-  result: JudgeResult,
-  scaleMax?: number
-): EvaluatorVerdictTone {
-  const isRating = result.score !== null && result.score !== undefined;
-  const isBinary = result.match !== null && result.match !== undefined;
-  const effectiveScaleMax =
-    typeof result.scale_max === "number" ? result.scale_max : scaleMax;
-  const effectiveScaleMin =
-    typeof result.scale_min === "number" ? result.scale_min : undefined;
-
-  if (isBinary) {
-    return result.match ? "green" : "red";
-  }
-  if (isRating) {
-    if (
-      effectiveScaleMax !== undefined &&
-      result.score === effectiveScaleMax
-    ) {
-      return "green";
-    }
-    if (
-      effectiveScaleMin !== undefined &&
-      result.score === effectiveScaleMin
-    ) {
-      return "red";
-    }
-    return "amber";
-  }
-  return "neutral";
-}
-
-function evaluatorVerdictCardSurfaceClass(tone: EvaluatorVerdictTone): string {
-  const base =
-    "rounded-lg border shadow-md dark:shadow-lg transition-colors";
-  switch (tone) {
-    case "green":
-      return `${base} border-green-500/40 bg-green-500/[0.14] border-l-4 border-l-green-600 dark:border-green-500/45 dark:bg-green-500/[0.16] dark:shadow-green-950/35`;
-    case "red":
-      return `${base} border-red-500/40 bg-red-500/[0.12] border-l-4 border-l-red-600 dark:border-red-500/45 dark:bg-red-500/[0.14] dark:shadow-red-950/30`;
-    case "amber":
-      return `${base} border-amber-500/40 bg-amber-500/[0.12] border-l-4 border-l-amber-600 dark:border-amber-500/45 dark:bg-amber-500/[0.13] dark:shadow-amber-950/30`;
-    default:
-      return `${base} border-border bg-muted/30 border-l-4 border-l-muted-foreground/40 dark:bg-muted/40 dark:border-border dark:shadow-black/25`;
-  }
-}
-
 // Per-evaluator verdict card. Binary evaluators render a ✓/✗ badge; rating
 // evaluators render `score / scale_max` when the scale is known.
 //
@@ -492,107 +386,25 @@ function JudgeResultCard({
   scaleMax?: number;
   enableEvaluatorLinks: boolean;
 }) {
-  const [reasoningOpen, setReasoningOpen] = useState(false);
-  const hasReasoning = !!result.reasoning?.trim();
   const isRating = result.score !== null && result.score !== undefined;
-  const isBinary = result.match !== null && result.match !== undefined;
   const effectiveScaleMax =
     typeof result.scale_max === "number" ? result.scale_max : scaleMax;
   const effectiveScaleMin =
     typeof result.scale_min === "number" ? result.scale_min : undefined;
-  const ratingTone: "green" | "red" | "amber" = !isRating
-    ? "amber"
-    : effectiveScaleMax !== undefined && result.score === effectiveScaleMax
-      ? "green"
-      : effectiveScaleMin !== undefined && result.score === effectiveScaleMin
-        ? "red"
-        : "amber";
-  const verdictTone = getEvaluatorVerdictTone(result, scaleMax);
-
-  const onCardClick = (e: React.MouseEvent) => {
-    if (!hasReasoning) return;
-    const el = e.target as HTMLElement;
-    if (el.closest("button") || el.closest("a[href]")) return;
-    if (el.closest("[data-reasoning-body]")) return;
-    if (el.closest("[data-evaluator-verdict-chips]")) return;
-    setReasoningOpen((o) => !o);
-  };
-
   return (
-    <div
-      onClick={hasReasoning ? onCardClick : undefined}
-      className={`${evaluatorVerdictCardSurfaceClass(verdictTone)} px-3 py-2.5 space-y-1.5${hasReasoning ? " cursor-pointer" : ""}`}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="min-w-0">
-            <EvaluatorNameLink
-              uuid={result.evaluator_uuid}
-              name={result.name}
-              className="text-sm font-medium text-foreground truncate inline-block max-w-full align-top"
-              enableLink={enableEvaluatorLinks}
-            />
-            {result.description && (
-              <p className="text-xs text-muted-foreground whitespace-normal break-words">
-                {result.description}
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="flex-shrink-0 flex items-center gap-1.5">
-          <div
-            className="flex items-center gap-1.5"
-            data-evaluator-verdict-chips
-          >
-            {isBinary && (
-              <span
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium ${
-                  result.match
-                    ? "bg-green-500/15 text-green-600 dark:text-green-400"
-                    : "bg-red-500/15 text-red-600 dark:text-red-400"
-                }`}
-              >
-                {result.match ? (
-                  <CheckIcon className="w-3 h-3" />
-                ) : (
-                  <XIcon className="w-3 h-3" />
-                )}
-                {result.match ? "Pass" : "Fail"}
-              </span>
-            )}
-            {isRating && (
-              <span
-                className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium ${
-                  ratingTone === "green"
-                    ? "bg-green-500/15 text-green-600 dark:text-green-400"
-                    : ratingTone === "red"
-                      ? "bg-red-500/15 text-red-600 dark:text-red-400"
-                      : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                }`}
-              >
-                {effectiveScaleMax !== undefined
-                  ? `${result.score} / ${effectiveScaleMax}`
-                  : `Score: ${result.score}`}
-              </span>
-            )}
-          </div>
-          {hasReasoning && (
-            <ReasoningToggleIconButton
-              open={reasoningOpen}
-              onToggle={() => setReasoningOpen((o) => !o)}
-            />
-          )}
-        </div>
-      </div>
-      {hasReasoning && reasoningOpen && (
-        <div
-          data-reasoning-body
-          className="mt-1.5 pt-1.5 border-t border-border/60"
-        >
-          <ReasoningExpandedContent text={result.reasoning!} mutedBody />
-        </div>
-      )}
-    </div>
+    <EvaluatorVerdictCard
+      mode="read"
+      name={result.name}
+      description={result.description ?? null}
+      outputType={isRating ? "rating" : "binary"}
+      evaluatorUuid={result.evaluator_uuid ?? undefined}
+      enableLink={enableEvaluatorLinks}
+      scaleMin={effectiveScaleMin}
+      scaleMax={effectiveScaleMax}
+      match={result.match}
+      score={result.score}
+      reasoning={result.reasoning}
+    />
   );
 }
 
@@ -643,6 +455,7 @@ export function TestDetailView({
   scaleByEvaluatorUuid,
   legacyDefaultEvaluator,
   enableEvaluatorLinks = true,
+  highlightEvalTarget = false,
 }: {
   history: TestCaseHistory[];
   output?: TestCaseOutput;
@@ -661,7 +474,28 @@ export function TestDetailView({
   legacyDefaultEvaluator?: DefaultEvaluatorSummary | null;
   /** Disable on public share pages because evaluator detail routes require auth. */
   enableEvaluatorLinks?: boolean;
+  /** When true, the trailing assistant message (text reply or tool call)
+   * in `history` is rendered with a blue left border + "Evaluation
+   * target" pill. Used by the LLM labelling pane to indicate which
+   * message annotators are scoring. */
+  highlightEvalTarget?: boolean;
 }) {
+  const evalTargetIndex = highlightEvalTarget
+    ? (() => {
+        for (let i = history.length - 1; i >= 0; i--) {
+          if (history[i].role === "assistant") return i;
+        }
+        return -1;
+      })()
+    : -1;
+
+  // Auto-scroll to the most recent message whenever the list grows or
+  // changes. The sentinel sits after the output section so the last
+  // visible chunk is whatever the agent's final reply is.
+  const bottomRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: "end" });
+  }, [history.length, output?.response]);
   const effectiveJudgeResults =
     Array.isArray(judgeResults) && judgeResults.length > 0
       ? judgeResults
@@ -681,11 +515,17 @@ export function TestDetailView({
       {history.length > 0 && (
         <div className="space-y-4">
           <div className="space-y-4">
-            {history.map((message, index) => (
+            {history.map((message, index) => {
+              const isEvalTarget = index === evalTargetIndex;
+              return (
               <div
                 key={index}
                 className={`space-y-1 ${
                   message.role === "user" ? "flex flex-col items-end" : ""
+                } ${
+                  isEvalTarget
+                    ? "border-l-2 border-blue-500 pl-4 -ml-4"
+                    : ""
                 }`}
               >
                 {/* User Message */}
@@ -706,6 +546,11 @@ export function TestDetailView({
                       <span className="text-sm font-medium text-foreground">
                         Agent
                       </span>
+                      {isEvalTarget && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                          Evaluation target
+                        </span>
+                      )}
                     </div>
                     <div className="w-[88%] md:w-3/4">
                       <div className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-background border border-border">
@@ -726,6 +571,11 @@ export function TestDetailView({
                         <span className="text-sm font-medium text-foreground">
                           Agent Tool Call
                         </span>
+                        {isEvalTarget && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                            Evaluation target
+                          </span>
+                        )}
                       </div>
                       <div className="w-[88%] md:w-3/4">
                         {message.tool_calls.map((toolCall, tcIndex) => {
@@ -743,7 +593,8 @@ export function TestDetailView({
                     </>
                   )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -768,7 +619,7 @@ export function TestDetailView({
                   <SmallStatusBadge passed={passed} />
                 </div>
                 {showLegacyReasoningToggle && (
-                  <ReasoningToggleIconButton
+                  <ReasoningToggleButton
                     open={legacyReasoningOpen}
                     onToggle={() => setLegacyReasoningOpen((o) => !o)}
                   />
@@ -848,6 +699,7 @@ export function TestDetailView({
           </p>
         </div>
       )}
+      <div ref={bottomRef} />
     </div>
   );
 }
@@ -890,10 +742,7 @@ function EvaluatorPanelCard({
   scaleMax?: number;
   enableEvaluatorLinks: boolean;
 }) {
-  const [reasoningOpen, setReasoningOpen] = useState(false);
-  const hasReasoning = !!result.reasoning?.trim();
   const isRating = result.score !== null && result.score !== undefined;
-  const isBinary = result.match !== null && result.match !== undefined;
   const effectiveScaleMax =
     typeof result.scale_max === "number" ? result.scale_max : scaleMax;
   const effectiveScaleMin =
@@ -901,138 +750,22 @@ function EvaluatorPanelCard({
   const effectiveVariables =
     result.variable_values && typeof result.variable_values === "object"
       ? result.variable_values
-      : variableValues;
-  // Rating chip color: green only when the score equals scale_max, red
-  // only when it equals scale_min, amber for everything in between or
-  // when either bound is unknown. See `JudgeResultCard` for the same
-  // logic on mobile.
-  const ratingTone: "green" | "red" | "amber" = !isRating
-    ? "amber"
-    : effectiveScaleMax !== undefined && result.score === effectiveScaleMax
-      ? "green"
-      : effectiveScaleMin !== undefined && result.score === effectiveScaleMin
-        ? "red"
-        : "amber";
-
-  const hasVariables =
-    effectiveVariables &&
-    typeof effectiveVariables === "object" &&
-    Object.keys(effectiveVariables).length > 0;
-  const hasCollapsibleBody = hasReasoning || !!hasVariables;
-  const verdictTone = getEvaluatorVerdictTone(result, scaleMax);
-
-  const onCardClick = (e: React.MouseEvent) => {
-    if (!hasCollapsibleBody) return;
-    const el = e.target as HTMLElement;
-    if (el.closest("button") || el.closest("a[href]")) return;
-    if (el.closest("[data-reasoning-body]")) return;
-    if (el.closest("[data-evaluator-verdict-chips]")) return;
-    setReasoningOpen((o) => !o);
-  };
-
+      : variableValues ?? null;
   return (
-    <div
-      onClick={hasCollapsibleBody ? onCardClick : undefined}
-      className={`${evaluatorVerdictCardSurfaceClass(verdictTone)} p-3 space-y-2.5${hasCollapsibleBody ? " cursor-pointer" : ""}`}
-    >
-      {/* Name + verdict header */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <EvaluatorNameLink
-            uuid={result.evaluator_uuid}
-            name={result.name}
-            className="text-sm font-medium text-foreground break-words inline-block max-w-full align-top"
-            enableLink={enableEvaluatorLinks}
-          />
-          {result.description && (
-            <p className="text-xs text-muted-foreground whitespace-normal break-words mt-0.5">
-              {result.description}
-            </p>
-          )}
-        </div>
-        <div className="flex-shrink-0 flex items-center gap-1.5">
-          <div
-            className="flex items-center gap-1.5"
-            data-evaluator-verdict-chips
-          >
-            {isBinary && (
-              <span
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium ${
-                  result.match
-                    ? "bg-green-500/15 text-green-600 dark:text-green-400"
-                    : "bg-red-500/15 text-red-600 dark:text-red-400"
-                }`}
-              >
-                {result.match ? (
-                  <CheckIcon className="w-3 h-3" />
-                ) : (
-                  <XIcon className="w-3 h-3" />
-                )}
-                {result.match ? "Pass" : "Fail"}
-              </span>
-            )}
-            {isRating && (
-              <span
-                className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium ${
-                  ratingTone === "green"
-                    ? "bg-green-500/15 text-green-600 dark:text-green-400"
-                    : ratingTone === "red"
-                      ? "bg-red-500/15 text-red-600 dark:text-red-400"
-                      : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                }`}
-              >
-                {effectiveScaleMax !== undefined
-                  ? `${result.score} / ${effectiveScaleMax}`
-                  : `Score: ${result.score}`}
-              </span>
-            )}
-          </div>
-          {hasCollapsibleBody && (
-            <ReasoningToggleIconButton
-              open={reasoningOpen}
-              onToggle={() => setReasoningOpen((o) => !o)}
-            />
-          )}
-        </div>
-      </div>
-
-      {reasoningOpen && hasCollapsibleBody && (
-        <div
-          data-reasoning-body
-          className="mt-1.5 pt-1.5 border-t border-border/60 space-y-3"
-        >
-          {hasVariables && (
-            <div className="space-y-2">
-              {Object.entries(effectiveVariables!).map(([name, value]) => (
-                <div key={name}>
-                  <span className="font-mono text-[10px] text-muted-foreground">
-                    {`{{${name}}}`}
-                  </span>
-                  <p className="text-xs text-foreground whitespace-pre-wrap break-words mt-0.5">
-                    {String(value)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-          {hasReasoning && (
-            <div
-              className={
-                hasVariables
-                  ? "pt-3 border-t border-border/60"
-                  : undefined
-              }
-            >
-              <ReasoningExpandedContent
-                text={result.reasoning!}
-                showReasoningLabel
-                mutedBody={false}
-              />
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+    <EvaluatorVerdictCard
+      mode="read"
+      name={result.name}
+      description={result.description ?? null}
+      outputType={isRating ? "rating" : "binary"}
+      evaluatorUuid={result.evaluator_uuid ?? undefined}
+      enableLink={enableEvaluatorLinks}
+      variableValues={effectiveVariables}
+      scaleMin={effectiveScaleMin}
+      scaleMax={effectiveScaleMax}
+      match={result.match}
+      score={result.score}
+      reasoning={result.reasoning}
+    />
   );
 }
 
