@@ -1,6 +1,13 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import {
+  Fragment,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -16,16 +23,17 @@ import { EvaluatorTypePill } from "@/components/EvaluatorPills";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { AddSttItemsDialog } from "@/components/human-labelling/AddSttItemsDialog";
+import { BulkUploadSttItemsDialog } from "@/components/human-labelling/BulkUploadSttItemsDialog";
+import { BulkUploadSimulationItemsDialog } from "@/components/human-labelling/BulkUploadSimulationItemsDialog";
+import { BulkUploadLlmItemsDialog } from "@/components/human-labelling/BulkUploadLlmItemsDialog";
 import { AssignAnnotatorsDialog } from "@/components/human-labelling/AssignAnnotatorsDialog";
 import { EditTaskDialog } from "@/components/human-labelling/EditTaskDialog";
-import {
-  ItemResultsDialog,
-} from "@/components/human-labelling/ItemResultsDialog";
 import {
   JobsCreatedDialog,
   type CreatedJob,
 } from "@/components/human-labelling/JobsCreatedDialog";
 import { ManageEvaluatorsDialog } from "@/components/human-labelling/ManageEvaluatorsDialog";
+import { RunEvaluatorsDialog } from "@/components/human-labelling/RunEvaluatorsDialog";
 import { EmptyState } from "@/components/ui/LoadingState";
 import {
   MultiSelectPicker,
@@ -87,18 +95,26 @@ type TaskSummaryResponse = {
   rows: SummaryRow[];
 };
 
-function formatVerdictValue(
-  v: boolean | number | null | undefined,
-): string {
+// A summary row is "empty" when no value column has anything to show:
+// no evaluator value, no agreement scores, and no annotator label.
+function summaryRowHasAnyValue(r: SummaryRow): boolean {
+  if (r.evaluator_value !== null) return true;
+  if (r.human_agreement !== null) return true;
+  if (r.evaluator_agreement !== null) return true;
+  for (const v of Object.values(r.annotations ?? {})) {
+    if (v && v.value !== null && v.value !== undefined) return true;
+  }
+  return false;
+}
+
+function formatVerdictValue(v: boolean | number | null | undefined): string {
   if (v === null || v === undefined) return "—";
   if (typeof v === "boolean") return v ? "Correct" : "Wrong";
   if (typeof v === "number") return String(v);
   return "—";
 }
 
-function verdictTextClass(
-  v: boolean | number | null | undefined,
-): string {
+function verdictTextClass(v: boolean | number | null | undefined): string {
   if (v === null || v === undefined) return "text-muted-foreground";
   if (v === true) return "text-green-600 dark:text-green-400";
   if (v === false) return "text-red-600 dark:text-red-400";
@@ -127,9 +143,7 @@ function AgreementStatCard({
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
         {label}
       </div>
-      <div
-        className={`text-2xl font-semibold tabular-nums ${valueClassName}`}
-      >
+      <div className={`text-2xl font-semibold tabular-nums ${valueClassName}`}>
         {value}
       </div>
     </div>
@@ -330,11 +344,7 @@ function EvaluatorRunsList({
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-        <svg
-          className="w-4 h-4 animate-spin"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
+        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
           <circle
             className="opacity-25"
             cx="12"
@@ -411,7 +421,10 @@ function EvaluatorRunsList({
         const evaluatorTitle = evaluators
           .map((e) => {
             const name = e.name || e.evaluator_id.slice(0, 8);
-            const label = versionLabelFor(e.evaluator_id, e.evaluator_version_id);
+            const label = versionLabelFor(
+              e.evaluator_id,
+              e.evaluator_version_id,
+            );
             return label ? `${name} (${label})` : name;
           })
           .join(", ");
@@ -508,6 +521,9 @@ function ItemRowActions({
   onLabel,
   playDisabled,
   playLoadingForUuid,
+  isResultsOpen,
+  viewResultsDisabled,
+  viewResultsDisabledTooltip,
 }: {
   itemUuid: string;
   onDelete: (uuid: string) => void | Promise<void>;
@@ -516,6 +532,9 @@ function ItemRowActions({
   onLabel?: (uuid: string) => void;
   playDisabled?: boolean;
   playLoadingForUuid?: string | null;
+  isResultsOpen?: boolean;
+  viewResultsDisabled?: boolean;
+  viewResultsDisabledTooltip?: string;
 }) {
   const isLoading = playLoadingForUuid === itemUuid;
   return (
@@ -533,33 +552,79 @@ function ItemRowActions({
           Label
         </button>
       )}
-      {/* View results (analytics) */}
-      <button
-        type="button"
-        onClick={() => onViewResults(itemUuid)}
-        aria-label="View results"
-        className="h-8 px-3 inline-flex items-center gap-1.5 rounded-md text-sm font-semibold border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 hover:bg-fuchsia-500/20 hover:border-fuchsia-500/60 transition-colors cursor-pointer"
-      >
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={1.8}
+      {/* View / Hide results (toggle) */}
+      {viewResultsDisabled ? (
+        <Tooltip
+          content={
+            viewResultsDisabledTooltip ??
+            "Results can be seen once annotators label the data or evaluator is run for this item"
+          }
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
-          />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-          />
-        </svg>
-        View results
-      </button>
+          <button
+            type="button"
+            disabled
+            aria-label="View results"
+            className="h-8 px-3 inline-flex items-center gap-1.5 rounded-md text-sm font-semibold border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 transition-colors disabled:opacity-50 cursor-not-allowed"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.8}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+            View results
+          </button>
+        </Tooltip>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onViewResults(itemUuid)}
+          aria-label={isResultsOpen ? "Hide results" : "View results"}
+          className="h-8 px-3 inline-flex items-center gap-1.5 rounded-md text-sm font-semibold border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 hover:bg-fuchsia-500/20 hover:border-fuchsia-500/60 transition-colors cursor-pointer"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.8}
+          >
+            {isResultsOpen ? (
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"
+              />
+            ) : (
+              <>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </>
+            )}
+          </svg>
+          {isResultsOpen ? "Hide results" : "View results"}
+        </button>
+      )}
       {/* Run evaluators */}
       <button
         type="button"
@@ -853,9 +918,7 @@ function LabellingTaskPageInner() {
     null,
   );
   const [taskSummaryLoading, setTaskSummaryLoading] = useState(false);
-  const [taskSummaryError, setTaskSummaryError] = useState<string | null>(
-    null,
-  );
+  const [taskSummaryError, setTaskSummaryError] = useState<string | null>(null);
   const [summaryEvaluatorFilter, setSummaryEvaluatorFilter] = useState<
     PickerItem[]
   >([]);
@@ -864,17 +927,20 @@ function LabellingTaskPageInner() {
   const [summarySortColKey, setSummarySortColKey] = useState<string | null>(
     null,
   );
-  const [summarySortDir, setSummarySortDir] = useState<"asc" | "desc">(
-    "desc",
-  );
+  const [summarySortDir, setSummarySortDir] = useState<"asc" | "desc">("desc");
+  // Toggle next to the evaluator filter that constrains the summary table
+  // to each evaluator's live version. Sent as ?live_only=true on the
+  // /summary endpoint when checked.
+  const [summaryLiveOnly, setSummaryLiveOnly] = useState(true);
 
   const fetchTaskSummary = useCallback(async () => {
     if (!accessToken || !uuid) return;
     setTaskSummaryLoading(true);
     setTaskSummaryError(null);
     try {
+      const qs = summaryLiveOnly ? "?live_only=true" : "";
       const data = await apiClient<TaskSummaryResponse>(
-        `/annotation-tasks/${uuid}/summary`,
+        `/annotation-tasks/${uuid}/summary${qs}`,
         accessToken,
       );
       setTaskSummary(data);
@@ -883,11 +949,23 @@ function LabellingTaskPageInner() {
     } finally {
       setTaskSummaryLoading(false);
     }
-  }, [accessToken, uuid]);
+  }, [accessToken, uuid, summaryLiveOnly]);
 
   useEffect(() => {
-    if (activeTab === "overview") fetchTaskSummary();
+    if (activeTab === "overview" || activeTab === "items") fetchTaskSummary();
   }, [activeTab, fetchTaskSummary]);
+
+  // Set of item uuids that have at least one summary row with a value
+  // worth displaying. Used to disable the per-item "View results" button
+  // when there's nothing to show.
+  const itemsWithResults = useMemo(() => {
+    const set = new Set<string>();
+    if (!taskSummary) return set;
+    for (const row of taskSummary.rows) {
+      if (summaryRowHasAnyValue(row)) set.add(row.item_id);
+    }
+    return set;
+  }, [taskSummary]);
   // Map evaluator_id -> { version_id: "v1" }, populated on demand from
   // /evaluators/{uuid}/versions so we can label runs by version number.
   const [versionLabels, setVersionLabels] = useState<
@@ -1003,9 +1081,17 @@ function LabellingTaskPageInner() {
   const [startingRunForItem, setStartingRunForItem] = useState<string | null>(
     null,
   );
-  const handleRunEvaluators = async (
-    itemUuids?: string[] | string,
-  ) => {
+  // Run evaluators dialog state. itemUuids: null = all items in task,
+  // []/non-empty = the specific items to run for.
+  const [runDialogOpen, setRunDialogOpen] = useState(false);
+  const [runDialogItemUuids, setRunDialogItemUuids] = useState<string[] | null>(
+    null,
+  );
+  const [runDialogSubmitError, setRunDialogSubmitError] = useState<
+    string | null
+  >(null);
+
+  const handleRunEvaluators = (itemUuids?: string[] | string) => {
     if (!accessToken || !uuid || startingRun) return;
     const linked = task?.evaluators ?? [];
     if (linked.length === 0) {
@@ -1017,14 +1103,21 @@ function LabellingTaskPageInner() {
       : itemUuids
         ? [itemUuids]
         : null;
+    setRunDialogItemUuids(ids);
+    setRunDialogSubmitError(null);
+    setRunDialogOpen(true);
+  };
+
+  const submitRunEvaluators = async (
+    selections: { evaluator_id: string; evaluator_version_id: string }[],
+  ) => {
+    if (!accessToken || !uuid || startingRun) return;
+    const ids = runDialogItemUuids;
     setStartingRun(true);
-    setStartingRunForItem(
-      ids && ids.length === 1 ? ids[0] : null,
-    );
+    setStartingRunForItem(ids && ids.length === 1 ? ids[0] : null);
+    setRunDialogSubmitError(null);
     try {
-      const body: Record<string, unknown> = {
-        evaluators: linked.map((e) => ({ evaluator_id: e.uuid })),
-      };
+      const body: Record<string, unknown> = { evaluators: selections };
       if (ids && ids.length > 0) body.item_ids = ids;
       const result = await apiClient<{
         job_uuid: string;
@@ -1035,11 +1128,14 @@ function LabellingTaskPageInner() {
         method: "POST",
         body,
       });
+      setRunDialogOpen(false);
       router.push(
         `/human-labelling/tasks/${uuid}/evaluator-runs/${result.job_uuid}`,
       );
     } catch (err) {
-      toast.error(parseApiError(err, "Failed to start evaluation run"));
+      const msg = parseApiError(err, "Failed to start evaluation run");
+      setRunDialogSubmitError(msg);
+      toast.error(msg);
       setStartingRun(false);
       setStartingRunForItem(null);
     }
@@ -1307,8 +1403,175 @@ function LabellingTaskPageInner() {
 
   const [createdJobs, setCreatedJobs] = useState<CreatedJob[]>([]);
   const [jobsCreatedOpen, setJobsCreatedOpen] = useState(false);
-  const [resultsForItemUuid, setResultsForItemUuid] = useState<string | null>(
-    null,
+  // Inline expanded "results" panel below an item row. Backed by a
+  // per-item GET /summary?item_id=<uuid> fetch, cached by item uuid so
+  // toggling open the same row twice doesn't re-fetch.
+  const [expandedResultsItemId, setExpandedResultsItemId] = useState<
+    string | null
+  >(null);
+  const [itemSummaryByUuid, setItemSummaryByUuid] = useState<
+    Record<string, TaskSummaryResponse>
+  >({});
+  const [itemSummaryLoadingId, setItemSummaryLoadingId] = useState<
+    string | null
+  >(null);
+  const [itemSummaryError, setItemSummaryError] = useState<string | null>(null);
+
+  const renderItemResultsExpansion = (itemUuid: string) => {
+    const summary = itemSummaryByUuid[itemUuid];
+    if (itemSummaryLoadingId === itemUuid && !summary) {
+      return (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
+          </svg>
+          Loading results
+        </div>
+      );
+    }
+    if (itemSummaryError && !summary) {
+      return <p className="text-sm text-red-500">{itemSummaryError}</p>;
+    }
+    const visibleRows = summary?.rows.filter(summaryRowHasAnyValue) ?? [];
+    if (!summary || visibleRows.length === 0) {
+      return (
+        <p className="text-sm text-muted-foreground">
+          No results recorded for this item yet.
+        </p>
+      );
+    }
+    const annotators = summary.annotators ?? [];
+    const evalColTpl = "minmax(180px,1fr) 170px 170px 140px";
+    const annotatorColTpl =
+      annotators.length > 0 ? annotators.map(() => "120px").join(" ") : "";
+    const gridTemplate = [evalColTpl, annotatorColTpl]
+      .filter(Boolean)
+      .join(" ");
+    return (
+      <div className="border border-border rounded-xl overflow-hidden bg-background">
+        <div
+          className="grid gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center min-w-fit"
+          style={{ gridTemplateColumns: gridTemplate }}
+        >
+          <div className="text-sm font-medium text-muted-foreground">
+            Evaluator
+          </div>
+          <div className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+            Annotator agreement
+          </div>
+          <div className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+            Evaluator agreement
+          </div>
+          <div className="text-sm font-medium text-muted-foreground">
+            Evaluator value
+          </div>
+          {annotators.map((a) => (
+            <div
+              key={a.uuid}
+              className="text-sm font-medium text-muted-foreground truncate"
+              title={a.name}
+            >
+              {a.name}
+            </div>
+          ))}
+        </div>
+        {visibleRows.map((row, idx) => {
+          const versionLabel =
+            typeof row.evaluator_version_number === "number"
+              ? `v${row.evaluator_version_number}`
+              : null;
+          return (
+            <div
+              key={`${row.evaluator_id}-${row.evaluator_version_id ?? ""}-${idx}`}
+              className="grid gap-4 px-4 py-3 border-b border-border last:border-b-0 items-center min-w-fit"
+              style={{ gridTemplateColumns: gridTemplate }}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <Link
+                  href={`/evaluators/${row.evaluator_id}`}
+                  title={`Open ${row.evaluator_name}`}
+                  className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate max-w-full"
+                >
+                  <span className="truncate">{row.evaluator_name}</span>
+                </Link>
+                {versionLabel && (
+                  <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground flex-shrink-0">
+                    {versionLabel}
+                  </span>
+                )}
+              </div>
+              <div
+                className={`text-sm font-semibold tabular-nums ${agreementColor(row.human_agreement)}`}
+              >
+                {row.human_agreement != null
+                  ? `${Math.round(row.human_agreement * 100)}%`
+                  : "—"}
+              </div>
+              <div
+                className={`text-sm font-semibold tabular-nums ${agreementColor(row.evaluator_agreement)}`}
+              >
+                {row.evaluator_agreement != null
+                  ? `${Math.round(row.evaluator_agreement * 100)}%`
+                  : "—"}
+              </div>
+              <div
+                className={`text-sm font-medium tabular-nums ${verdictTextClass(row.evaluator_value)}`}
+              >
+                {formatVerdictValue(row.evaluator_value)}
+              </div>
+              {annotators.map((a) => {
+                const v = row.annotations?.[a.uuid] ?? null;
+                return (
+                  <div
+                    key={a.uuid}
+                    className={`text-sm font-medium tabular-nums ${verdictTextClass(v?.value ?? null)}`}
+                  >
+                    {formatVerdictValue(v?.value ?? null)}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const toggleItemResults = useCallback(
+    async (itemUuid: string) => {
+      if (expandedResultsItemId === itemUuid) {
+        setExpandedResultsItemId(null);
+        return;
+      }
+      setExpandedResultsItemId(itemUuid);
+      setItemSummaryError(null);
+      if (itemSummaryByUuid[itemUuid] || !accessToken || !uuid) return;
+      setItemSummaryLoadingId(itemUuid);
+      try {
+        const data = await apiClient<TaskSummaryResponse>(
+          `/annotation-tasks/${uuid}/summary?item_id=${encodeURIComponent(itemUuid)}`,
+          accessToken,
+        );
+        setItemSummaryByUuid((prev) => ({ ...prev, [itemUuid]: data }));
+      } catch (err) {
+        setItemSummaryError(parseApiError(err, "Failed to load results"));
+      } finally {
+        setItemSummaryLoadingId((id) => (id === itemUuid ? null : id));
+      }
+    },
+    [expandedResultsItemId, itemSummaryByUuid, accessToken, uuid],
   );
 
   const handleAssignAnnotators = async (annotatorIds: string[]) => {
@@ -1336,6 +1599,10 @@ function LabellingTaskPageInner() {
   const [editOpen, setEditOpen] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [addSttItemsOpen, setAddSttItemsOpen] = useState(false);
+  const [bulkUploadSttOpen, setBulkUploadSttOpen] = useState(false);
+  const [bulkUploadSimulationOpen, setBulkUploadSimulationOpen] =
+    useState(false);
+  const [bulkUploadLlmOpen, setBulkUploadLlmOpen] = useState(false);
   const [newItemName, setNewItemName] = useState("");
   const [creatingItem, setCreatingItem] = useState(false);
   const [createItemError, setCreateItemError] = useState<string | null>(null);
@@ -1392,30 +1659,30 @@ function LabellingTaskPageInner() {
             {task && (
               <div className="flex flex-wrap items-center gap-1.5 mt-3">
                 <Tooltip content="Manage evaluators" position="top">
-                <button
-                  onClick={() => setManageOpen(true)}
-                  aria-label="Manage evaluators"
-                  className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer"
-                >
-                  <svg
-                    className="w-3 h-3"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
+                  <button
+                    onClick={() => setManageOpen(true)}
+                    aria-label="Manage evaluators"
+                    className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.764-.383.929-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                  </svg>
-                </button>
+                    <svg
+                      className="w-3 h-3"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.764-.383.929-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                    </svg>
+                  </button>
                 </Tooltip>
                 {(task.evaluators ?? []).map((ev) => (
                   <Link
@@ -1489,7 +1756,15 @@ function LabellingTaskPageInner() {
               </button>
               <button
                 onClick={() => {
-                  toast.info("CSV upload isn't supported yet — coming soon.");
+                  if (taskType === "stt") {
+                    setBulkUploadSttOpen(true);
+                  } else if (taskType === "simulation") {
+                    setBulkUploadSimulationOpen(true);
+                  } else if (taskType === "llm") {
+                    setBulkUploadLlmOpen(true);
+                  } else {
+                    toast.info("CSV upload isn't supported yet — coming soon.");
+                  }
                 }}
                 className="h-9 px-3 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1.5"
               >
@@ -1506,7 +1781,7 @@ function LabellingTaskPageInner() {
                     d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
                   />
                 </svg>
-                Upload CSV
+                Bulk upload
               </button>
             </div>
           )}
@@ -1604,9 +1879,10 @@ function LabellingTaskPageInner() {
                 title="No agreement data yet"
                 description={
                   <>
-                    Agreement will appear here once annotators
+                    Agreement between annotators and evaluators will appear here
+                    once annotators
                     <br />
-                    have labelled overlapping items
+                    start labelling and evaluators are run on the task items
                   </>
                 }
               />
@@ -1667,33 +1943,7 @@ function LabellingTaskPageInner() {
                 </svg>
                 Loading labels
               </div>
-            ) : !taskSummary || taskSummary.rows.length === 0 ? (
-              <EmptyState
-                icon={
-                  <svg
-                    className="w-7 h-7 text-muted-foreground"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"
-                    />
-                  </svg>
-                }
-                title="No labels yet"
-                description={
-                  <>
-                    Detailed labels will appear here
-                    <br />
-                    once items have been evaluated and annotated
-                  </>
-                }
-              />
-            ) : (
+            ) : !taskSummary ? null : (
               (() => {
                 const annotators = taskSummary.annotators ?? [];
                 const evaluators = taskSummary.evaluators ?? [];
@@ -1743,10 +1993,14 @@ function LabellingTaskPageInner() {
                 const selectedEvaluatorIds = new Set(
                   summaryEvaluatorFilter.map((i) => i.uuid),
                 );
+                // Skip rows where everything is null — no evaluator run, no
+                // agreement signal, and no annotator has labelled yet.
+                const baseRows = taskSummary.rows.filter(summaryRowHasAnyValue);
+                if (baseRows.length === 0) return null;
                 const filteredRows =
                   selectedEvaluatorIds.size === 0
-                    ? taskSummary.rows
-                    : taskSummary.rows.filter((r) =>
+                    ? baseRows
+                    : baseRows.filter((r) =>
                         selectedEvaluatorIds.has(r.evaluator_id),
                       );
 
@@ -1784,9 +2038,7 @@ function LabellingTaskPageInner() {
 
                 const onSortClick = (key: string) => {
                   if (summarySortColKey === key) {
-                    setSummarySortDir((d) =>
-                      d === "desc" ? "asc" : "desc",
-                    );
+                    setSummarySortDir((d) => (d === "desc" ? "asc" : "desc"));
                   } else {
                     setSummarySortColKey(key);
                     setSummarySortDir("desc");
@@ -1834,156 +2086,192 @@ function LabellingTaskPageInner() {
 
                 return (
                   <>
-                    <div className="w-64">
-                      <MultiSelectPicker
-                        items={evaluators.map((ev) => ({
-                          uuid: ev.evaluator_id,
-                          name: ev.name,
-                        }))}
-                        selectedItems={summaryEvaluatorFilter}
-                        onSelectionChange={setSummaryEvaluatorFilter}
-                        placeholder="All evaluators"
-                        searchPlaceholder="Search evaluators..."
-                      />
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="w-64">
+                        <MultiSelectPicker
+                          items={evaluators.map((ev) => ({
+                            uuid: ev.evaluator_id,
+                            name: ev.name,
+                          }))}
+                          selectedItems={summaryEvaluatorFilter}
+                          onSelectionChange={setSummaryEvaluatorFilter}
+                          placeholder="All evaluators"
+                          searchPlaceholder="Search evaluators..."
+                        />
+                      </div>
+                      <Tooltip content="Show results for only the live versions of each evaluator">
+                        <button
+                          type="button"
+                          onClick={() => setSummaryLiveOnly((v) => !v)}
+                          aria-pressed={summaryLiveOnly}
+                          className={`h-9 px-3 inline-flex items-center gap-1.5 rounded-md text-sm font-medium border transition-colors cursor-pointer ${
+                            summaryLiveOnly
+                              ? "bg-foreground text-background border-foreground"
+                              : "bg-transparent text-muted-foreground border-border hover:border-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {summaryLiveOnly ? (
+                            <svg
+                              className="w-3.5 h-3.5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M4.5 12.75l6 6 9-13.5"
+                              />
+                            </svg>
+                          ) : (
+                            <span
+                              className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground"
+                              aria-hidden
+                            />
+                          )}
+                          Live versions only
+                        </button>
+                      </Tooltip>
                     </div>
                     <div className="border border-border rounded-xl overflow-x-auto">
-                    <div
-                      className="grid gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center min-w-fit"
-                      style={{ gridTemplateColumns: gridTemplate }}
-                    >
-                      {itemColumns.map((c) => (
-                        <div
-                          key={c.key}
-                          className="text-sm font-medium text-muted-foreground truncate"
-                        >
-                          {c.label}
+                      <div
+                        className="grid gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center min-w-fit"
+                        style={{ gridTemplateColumns: gridTemplate }}
+                      >
+                        {itemColumns.map((c) => (
+                          <div
+                            key={c.key}
+                            className="text-sm font-medium text-muted-foreground truncate"
+                          >
+                            {c.label}
+                          </div>
+                        ))}
+                        <div className="text-sm font-medium text-muted-foreground">
+                          Evaluator
                         </div>
-                      ))}
-                      <div className="text-sm font-medium text-muted-foreground">
-                        Evaluator
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => onSortClick("human_agreement")}
-                        className={`flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer w-fit whitespace-nowrap ${
-                          summarySortColKey === "human_agreement"
-                            ? "text-foreground"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        Annotator agreement
-                        {sortIndicator("human_agreement")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onSortClick("evaluator_agreement")}
-                        className={`flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer w-fit whitespace-nowrap ${
-                          summarySortColKey === "evaluator_agreement"
-                            ? "text-foreground"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        Evaluator agreement
-                        {sortIndicator("evaluator_agreement")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onSortClick("evaluator")}
-                        className={`flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer w-fit ${
-                          summarySortColKey === "evaluator"
-                            ? "text-foreground"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        Evaluator value
-                        {sortIndicator("evaluator")}
-                      </button>
-                      {annotators.map((a) => (
                         <button
-                          key={a.uuid}
                           type="button"
-                          onClick={() => onSortClick(a.uuid)}
-                          title={a.name}
-                          className={`flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer w-fit truncate ${
-                            summarySortColKey === a.uuid
+                          onClick={() => onSortClick("human_agreement")}
+                          className={`flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer w-fit whitespace-nowrap ${
+                            summarySortColKey === "human_agreement"
                               ? "text-foreground"
                               : "text-muted-foreground hover:text-foreground"
                           }`}
                         >
-                          <span className="truncate">{a.name}</span>
-                          {sortIndicator(a.uuid)}
+                          Annotator agreement
+                          {sortIndicator("human_agreement")}
                         </button>
-                      ))}
-                    </div>
-                    {sortedRows.map((row, idx) => {
-                      const cells = itemCellValues(row.payload);
-                      const versionLabel =
-                        typeof row.evaluator_version_number === "number"
-                          ? `v${row.evaluator_version_number}`
-                          : null;
-                      return (
-                        <div
-                          key={`${row.item_id}-${row.evaluator_id}-${row.evaluator_version_id ?? ""}-${idx}`}
-                          className="grid gap-4 px-4 py-3 border-b border-border last:border-b-0 items-center min-w-fit"
-                          style={{ gridTemplateColumns: gridTemplate }}
+                        <button
+                          type="button"
+                          onClick={() => onSortClick("evaluator_agreement")}
+                          className={`flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer w-fit whitespace-nowrap ${
+                            summarySortColKey === "evaluator_agreement"
+                              ? "text-foreground"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
                         >
-                          {cells.map((c, i) => (
-                            <p
-                              key={`item-${i}`}
-                              className="text-sm text-foreground line-clamp-2"
-                            >
-                              {c}
-                            </p>
-                          ))}
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Link
-                              href={`/evaluators/${row.evaluator_id}`}
-                              title={`Open ${row.evaluator_name}`}
-                              className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate max-w-full"
-                            >
-                              <span className="truncate">
-                                {row.evaluator_name}
-                              </span>
-                            </Link>
-                            {versionLabel && (
-                              <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground flex-shrink-0">
-                                {versionLabel}
-                              </span>
-                            )}
-                          </div>
-                          <div
-                            className={`text-sm font-semibold tabular-nums ${agreementColor(row.human_agreement)}`}
+                          Evaluator agreement
+                          {sortIndicator("evaluator_agreement")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onSortClick("evaluator")}
+                          className={`flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer w-fit ${
+                            summarySortColKey === "evaluator"
+                              ? "text-foreground"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          Evaluator value
+                          {sortIndicator("evaluator")}
+                        </button>
+                        {annotators.map((a) => (
+                          <button
+                            key={a.uuid}
+                            type="button"
+                            onClick={() => onSortClick(a.uuid)}
+                            title={a.name}
+                            className={`flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer w-fit truncate ${
+                              summarySortColKey === a.uuid
+                                ? "text-foreground"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
                           >
-                            {row.human_agreement != null
-                              ? `${Math.round(row.human_agreement * 100)}%`
-                              : "—"}
-                          </div>
+                            <span className="truncate">{a.name}</span>
+                            {sortIndicator(a.uuid)}
+                          </button>
+                        ))}
+                      </div>
+                      {sortedRows.map((row, idx) => {
+                        const cells = itemCellValues(row.payload);
+                        const versionLabel =
+                          typeof row.evaluator_version_number === "number"
+                            ? `v${row.evaluator_version_number}`
+                            : null;
+                        return (
                           <div
-                            className={`text-sm font-semibold tabular-nums ${agreementColor(row.evaluator_agreement)}`}
+                            key={`${row.item_id}-${row.evaluator_id}-${row.evaluator_version_id ?? ""}-${idx}`}
+                            className="grid gap-4 px-4 py-3 border-b border-border last:border-b-0 items-center min-w-fit"
+                            style={{ gridTemplateColumns: gridTemplate }}
                           >
-                            {row.evaluator_agreement != null
-                              ? `${Math.round(row.evaluator_agreement * 100)}%`
-                              : "—"}
-                          </div>
-                          <div
-                            className={`text-sm font-medium tabular-nums ${verdictTextClass(row.evaluator_value)}`}
-                          >
-                            {formatVerdictValue(row.evaluator_value)}
-                          </div>
-                          {annotators.map((a) => {
-                            const v = row.annotations?.[a.uuid] ?? null;
-                            return (
-                              <div
-                                key={a.uuid}
-                                className={`text-sm font-medium tabular-nums ${verdictTextClass(v?.value ?? null)}`}
+                            {cells.map((c, i) => (
+                              <p
+                                key={`item-${i}`}
+                                className="text-sm text-foreground line-clamp-2"
                               >
-                                {formatVerdictValue(v?.value ?? null)}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })}
+                                {c}
+                              </p>
+                            ))}
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Link
+                                href={`/evaluators/${row.evaluator_id}`}
+                                title={`Open ${row.evaluator_name}`}
+                                className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate max-w-full"
+                              >
+                                <span className="truncate">
+                                  {row.evaluator_name}
+                                </span>
+                              </Link>
+                              {versionLabel && (
+                                <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground flex-shrink-0">
+                                  {versionLabel}
+                                </span>
+                              )}
+                            </div>
+                            <div
+                              className={`text-sm font-semibold tabular-nums ${agreementColor(row.human_agreement)}`}
+                            >
+                              {row.human_agreement != null
+                                ? `${Math.round(row.human_agreement * 100)}%`
+                                : "—"}
+                            </div>
+                            <div
+                              className={`text-sm font-semibold tabular-nums ${agreementColor(row.evaluator_agreement)}`}
+                            >
+                              {row.evaluator_agreement != null
+                                ? `${Math.round(row.evaluator_agreement * 100)}%`
+                                : "—"}
+                            </div>
+                            <div
+                              className={`text-sm font-medium tabular-nums ${verdictTextClass(row.evaluator_value)}`}
+                            >
+                              {formatVerdictValue(row.evaluator_value)}
+                            </div>
+                            {annotators.map((a) => {
+                              const v = row.annotations?.[a.uuid] ?? null;
+                              return (
+                                <div
+                                  key={a.uuid}
+                                  className={`text-sm font-medium tabular-nums ${verdictTextClass(v?.value ?? null)}`}
+                                >
+                                  {formatVerdictValue(v?.value ?? null)}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
                     </div>
                   </>
                 );
@@ -2076,10 +2364,7 @@ function LabellingTaskPageInner() {
                         const selected = Array.from(selectedItemIds);
                         // Omit item_ids when every item is selected; otherwise
                         // send the explicit subset.
-                        if (
-                          totalItems > 0 &&
-                          selected.length === totalItems
-                        ) {
+                        if (totalItems > 0 && selected.length === totalItems) {
                           handleRunEvaluators();
                         } else {
                           handleRunEvaluators(selected);
@@ -2163,36 +2448,47 @@ function LabellingTaskPageInner() {
                         ? p.predicted_transcript
                         : "";
                     const isSelected = selectedItemIds.has(item.uuid);
+                    const isResultsOpen = expandedResultsItemId === item.uuid;
                     return (
-                      <div
-                        key={item.uuid}
-                        className={`grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)_440px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center ${
-                          isSelected ? "bg-muted/30" : "hover:bg-muted/20"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleItem(item.uuid)}
-                          aria-label={`Select item ${item.id}`}
-                          className="w-4 h-4 cursor-pointer accent-foreground"
-                        />
-                        <p className="text-sm text-foreground line-clamp-2">
-                          {ref || "—"}
-                        </p>
-                        <p className="text-sm text-foreground line-clamp-2">
-                          {pred || "—"}
-                        </p>
-                        <ItemRowActions
-                          itemUuid={item.uuid}
-                          onDelete={requestDeleteOneItem}
-                          onPlay={handleRunEvaluators}
-                          onViewResults={setResultsForItemUuid}
-                          onLabel={toggleItem}
-                          playDisabled={startingRun}
-                          playLoadingForUuid={startingRunForItem}
-                        />
-                      </div>
+                      <Fragment key={item.uuid}>
+                        <div
+                          className={`grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)_440px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center ${
+                            isSelected ? "bg-muted/30" : "hover:bg-muted/20"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleItem(item.uuid)}
+                            aria-label={`Select item ${item.id}`}
+                            className="w-4 h-4 cursor-pointer accent-foreground"
+                          />
+                          <p className="text-sm text-foreground line-clamp-2">
+                            {ref || "—"}
+                          </p>
+                          <p className="text-sm text-foreground line-clamp-2">
+                            {pred || "—"}
+                          </p>
+                          <ItemRowActions
+                            itemUuid={item.uuid}
+                            onDelete={requestDeleteOneItem}
+                            onPlay={handleRunEvaluators}
+                            onViewResults={toggleItemResults}
+                            onLabel={toggleItem}
+                            playDisabled={startingRun}
+                            playLoadingForUuid={startingRunForItem}
+                            isResultsOpen={isResultsOpen}
+                            viewResultsDisabled={
+                              !!taskSummary && !itemsWithResults.has(item.uuid)
+                            }
+                          />
+                        </div>
+                        {isResultsOpen && (
+                          <div className="border-b border-border last:border-b-0 bg-muted/10 p-4">
+                            {renderItemResultsExpansion(item.uuid)}
+                          </div>
+                        )}
+                      </Fragment>
                     );
                   })}
                 </div>
@@ -2218,35 +2514,49 @@ function LabellingTaskPageInner() {
                   </div>
                   {items.map((item) => {
                     const isSelected = selectedItemIds.has(item.uuid);
+                    const isResultsOpen = expandedResultsItemId === item.uuid;
                     return (
-                      <div
-                        key={item.uuid}
-                        onClick={() => setEditLlmItemUuid(item.uuid)}
-                        className={`grid grid-cols-[40px_minmax(0,1fr)_440px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
-                          isSelected ? "bg-muted/30" : "hover:bg-muted/20"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleItem(item.uuid)}
-                          onClick={(e) => e.stopPropagation()}
-                          aria-label={`Select item ${item.id}`}
-                          className="w-4 h-4 cursor-pointer accent-foreground"
-                        />
-                        <p className="text-sm text-foreground line-clamp-1">
-                          {previewItemPayload(item.payload, taskType)}
-                        </p>
-                        <ItemRowActions
-                          itemUuid={item.uuid}
-                          onDelete={requestDeleteOneItem}
-                          onPlay={handleRunEvaluators}
-                          onViewResults={setResultsForItemUuid}
-                          onLabel={toggleItem}
-                          playDisabled={startingRun}
-                          playLoadingForUuid={startingRunForItem}
-                        />
-                      </div>
+                      <Fragment key={item.uuid}>
+                        <div
+                          onClick={() => setEditLlmItemUuid(item.uuid)}
+                          className={`grid grid-cols-[40px_minmax(0,1fr)_440px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
+                            isSelected ? "bg-muted/30" : "hover:bg-muted/20"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleItem(item.uuid)}
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Select item ${item.id}`}
+                            className="w-4 h-4 cursor-pointer accent-foreground"
+                          />
+                          <p className="text-sm text-foreground line-clamp-1">
+                            {previewItemPayload(item.payload, taskType)}
+                          </p>
+                          <ItemRowActions
+                            itemUuid={item.uuid}
+                            onDelete={requestDeleteOneItem}
+                            onPlay={handleRunEvaluators}
+                            onViewResults={toggleItemResults}
+                            onLabel={toggleItem}
+                            playDisabled={startingRun}
+                            playLoadingForUuid={startingRunForItem}
+                            isResultsOpen={isResultsOpen}
+                            viewResultsDisabled={
+                              !!taskSummary && !itemsWithResults.has(item.uuid)
+                            }
+                          />
+                        </div>
+                        {isResultsOpen && (
+                          <div
+                            className="border-b border-border last:border-b-0 bg-muted/10 p-4"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {renderItemResultsExpansion(item.uuid)}
+                          </div>
+                        )}
+                      </Fragment>
                     );
                   })}
                 </div>
@@ -2295,208 +2605,237 @@ function LabellingTaskPageInner() {
         )}
       </div>
 
+      {accessToken && (
+        <RunEvaluatorsDialog
+          isOpen={runDialogOpen}
+          accessToken={accessToken}
+          evaluators={(task?.evaluators ?? []).map((e) => ({
+            uuid: e.uuid,
+            name: e.name,
+          }))}
+          submitting={startingRun}
+          submitError={runDialogSubmitError}
+          onClose={() => {
+            if (!startingRun) {
+              setRunDialogOpen(false);
+              setRunDialogSubmitError(null);
+            }
+          }}
+          onConfirm={submitRunEvaluators}
+        />
+      )}
+
       {addItemOpen && (
-      <AddTestDialog
-        isOpen={addItemOpen}
-        onClose={() => {
-          if (!creatingItem) setAddItemOpen(false);
-        }}
-        isEditing={false}
-        isLoading={false}
-        isCreating={creatingItem}
-        createError={createItemError}
-        testName={newItemName}
-        setTestName={setNewItemName}
-        validationAttempted={validationAttempted}
-        mode="labelItem"
-        allowAgentLastMessage={taskType === "simulation"}
-        requireAssistantLastMessage={taskType === "llm"}
-        initialEvaluators={newItemInitialEvaluators}
-        onSubmit={async (
-          config: TestConfig,
-          evaluators: EvaluatorRefPayload[],
-        ) => {
-          setValidationAttempted(true);
-          if (!newItemName.trim()) return;
-          if (!accessToken) return;
+        <AddTestDialog
+          isOpen={addItemOpen}
+          onClose={() => {
+            if (!creatingItem) setAddItemOpen(false);
+          }}
+          isEditing={false}
+          isLoading={false}
+          isCreating={creatingItem}
+          createError={createItemError}
+          testName={newItemName}
+          setTestName={setNewItemName}
+          validationAttempted={validationAttempted}
+          mode="labelItem"
+          allowAgentLastMessage={taskType === "simulation"}
+          requireAssistantLastMessage={taskType === "llm"}
+          initialEvaluators={newItemInitialEvaluators}
+          onSubmit={async (
+            config: TestConfig,
+            evaluators: EvaluatorRefPayload[],
+          ) => {
+            setValidationAttempted(true);
+            if (!newItemName.trim()) return;
+            if (!accessToken) return;
 
-          // Preserve the rich TestConfig.history shape — assistant
-          // messages with `tool_calls`, and `tool` messages with their
-          // `tool_call_id` — the same shape tests are saved with. Drop
-          // only entries that have neither content nor tool_calls.
-          const history = (config.history ?? []).filter((h) => {
-            if (h.role === "assistant") {
-              if (Array.isArray(h.tool_calls) && h.tool_calls.length > 0)
-                return true;
-              return typeof h.content === "string" && h.content.length > 0;
-            }
-            if (h.role === "user") {
-              return typeof h.content === "string" && h.content.length > 0;
-            }
-            if (h.role === "tool") {
-              return typeof h.content === "string";
-            }
-            return false;
-          });
-
-          // Capture per-evaluator variable values entered in the dialog,
-          // keyed by evaluator uuid for easy lookup on edit.
-          const evaluator_variables: Record<
-            string,
-            Record<string, string>
-          > = {};
-          for (const e of evaluators) {
-            if (e.variable_values) {
-              evaluator_variables[e.evaluator_uuid] = { ...e.variable_values };
-            }
-          }
-
-          let payload: Record<string, unknown>;
-          if (taskType === "simulation") {
-            payload = {
-              name: newItemName.trim(),
-              transcript: history,
-              evaluator_variables,
-            };
-          } else {
-            // LLM: split the trailing plain agent reply (no tool_calls)
-            // out as `agent_response`. Tool-call assistant messages stay
-            // in `chat_history` since they aren't a graded reply.
-            let chat_history = history;
-            let agent_response = "";
-            const last = history[history.length - 1];
-            if (
-              last &&
-              last.role === "assistant" &&
-              !(Array.isArray(last.tool_calls) && last.tool_calls.length > 0) &&
-              typeof last.content === "string"
-            ) {
-              chat_history = history.slice(0, -1);
-              agent_response = last.content;
-            }
-            payload = {
-              name: newItemName.trim(),
-              chat_history,
-              agent_response,
-              evaluator_variables,
-            };
-          }
-
-          setCreatingItem(true);
-          setCreateItemError(null);
-          try {
-            await apiClient(`/annotation-tasks/${uuid}/items`, accessToken, {
-              method: "POST",
-              body: { items: [{ payload }] },
+            // Preserve the rich TestConfig.history shape — assistant
+            // messages with `tool_calls`, and `tool` messages with their
+            // `tool_call_id` — the same shape tests are saved with. Drop
+            // only entries that have neither content nor tool_calls.
+            const history = (config.history ?? []).filter((h) => {
+              if (h.role === "assistant") {
+                if (Array.isArray(h.tool_calls) && h.tool_calls.length > 0)
+                  return true;
+                return typeof h.content === "string" && h.content.length > 0;
+              }
+              if (h.role === "user") {
+                return typeof h.content === "string" && h.content.length > 0;
+              }
+              if (h.role === "tool") {
+                return typeof h.content === "string";
+              }
+              return false;
             });
-            setAddItemOpen(false);
-            await fetchTask();
-          } catch (err) {
-            setCreateItemError(parseApiError(err, "Failed to create item"));
-          } finally {
-            setCreatingItem(false);
-          }
-        }}
-      />
+
+            // Capture per-evaluator variable values entered in the dialog,
+            // keyed by evaluator uuid for easy lookup on edit.
+            const evaluator_variables: Record<
+              string,
+              Record<string, string>
+            > = {};
+            for (const e of evaluators) {
+              if (e.variable_values) {
+                evaluator_variables[e.evaluator_uuid] = {
+                  ...e.variable_values,
+                };
+              }
+            }
+
+            let payload: Record<string, unknown>;
+            if (taskType === "simulation") {
+              payload = {
+                name: newItemName.trim(),
+                transcript: history,
+                evaluator_variables,
+              };
+            } else {
+              // LLM: split the trailing plain agent reply (no tool_calls)
+              // out as `agent_response`. Tool-call assistant messages stay
+              // in `chat_history` since they aren't a graded reply.
+              let chat_history = history;
+              let agent_response = "";
+              const last = history[history.length - 1];
+              if (
+                last &&
+                last.role === "assistant" &&
+                !(
+                  Array.isArray(last.tool_calls) && last.tool_calls.length > 0
+                ) &&
+                typeof last.content === "string"
+              ) {
+                chat_history = history.slice(0, -1);
+                agent_response = last.content;
+              }
+              payload = {
+                name: newItemName.trim(),
+                chat_history,
+                agent_response,
+                evaluator_variables,
+              };
+            }
+
+            setCreatingItem(true);
+            setCreateItemError(null);
+            try {
+              await apiClient(`/annotation-tasks/${uuid}/items`, accessToken, {
+                method: "POST",
+                body: { items: [{ payload }] },
+              });
+              setAddItemOpen(false);
+              handleTabChange("items");
+              await fetchTask();
+            } catch (err) {
+              setCreateItemError(parseApiError(err, "Failed to create item"));
+            } finally {
+              setCreatingItem(false);
+            }
+          }}
+        />
       )}
 
       {!!editLlmItemUuid && taskType !== "stt" && (
-      <AddTestDialog
-        key={editLlmItemUuid}
-        isOpen={true}
-        onClose={() => {
-          if (!savingLlmItem) setEditLlmItemUuid(null);
-        }}
-        isEditing={true}
-        isLoading={false}
-        isCreating={savingLlmItem}
-        createError={editLlmError}
-        testName={editLlmItemName}
-        setTestName={setEditLlmItemName}
-        validationAttempted={false}
-        mode="labelItem"
-        allowAgentLastMessage={taskType === "simulation"}
-        requireAssistantLastMessage={taskType === "llm"}
-        initialConfig={editingInitialConfig}
-        initialEvaluators={editingInitialEvaluators}
-        onSubmit={async (
-          config: TestConfig,
-          evaluators: EvaluatorRefPayload[],
-        ) => {
-          if (!editLlmItemUuid || !editLlmItemName.trim() || !accessToken)
-            return;
-          const history = (config.history ?? []).filter((h) => {
-            if (h.role === "assistant") {
-              if (Array.isArray(h.tool_calls) && h.tool_calls.length > 0)
-                return true;
-              return typeof h.content === "string" && h.content.length > 0;
+        <AddTestDialog
+          key={editLlmItemUuid}
+          isOpen={true}
+          onClose={() => {
+            if (!savingLlmItem) setEditLlmItemUuid(null);
+          }}
+          isEditing={true}
+          isLoading={false}
+          isCreating={savingLlmItem}
+          createError={editLlmError}
+          testName={editLlmItemName}
+          setTestName={setEditLlmItemName}
+          validationAttempted={false}
+          mode="labelItem"
+          allowAgentLastMessage={taskType === "simulation"}
+          requireAssistantLastMessage={taskType === "llm"}
+          initialConfig={editingInitialConfig}
+          initialEvaluators={editingInitialEvaluators}
+          onSubmit={async (
+            config: TestConfig,
+            evaluators: EvaluatorRefPayload[],
+          ) => {
+            if (!editLlmItemUuid || !editLlmItemName.trim() || !accessToken)
+              return;
+            const history = (config.history ?? []).filter((h) => {
+              if (h.role === "assistant") {
+                if (Array.isArray(h.tool_calls) && h.tool_calls.length > 0)
+                  return true;
+                return typeof h.content === "string" && h.content.length > 0;
+              }
+              if (h.role === "user") {
+                return typeof h.content === "string" && h.content.length > 0;
+              }
+              if (h.role === "tool") {
+                return typeof h.content === "string";
+              }
+              return false;
+            });
+            const evaluator_variables: Record<
+              string,
+              Record<string, string>
+            > = {};
+            for (const e of evaluators) {
+              if (e.variable_values) {
+                evaluator_variables[e.evaluator_uuid] = {
+                  ...e.variable_values,
+                };
+              }
             }
-            if (h.role === "user") {
-              return typeof h.content === "string" && h.content.length > 0;
+            let payload: Record<string, unknown>;
+            if (taskType === "simulation") {
+              payload = {
+                name: editLlmItemName.trim(),
+                transcript: history,
+                evaluator_variables,
+              };
+            } else {
+              let chat_history = history;
+              let agent_response = "";
+              const last = history[history.length - 1];
+              if (
+                last &&
+                last.role === "assistant" &&
+                !(
+                  Array.isArray(last.tool_calls) && last.tool_calls.length > 0
+                ) &&
+                typeof last.content === "string"
+              ) {
+                chat_history = history.slice(0, -1);
+                agent_response = last.content;
+              }
+              payload = {
+                name: editLlmItemName.trim(),
+                chat_history,
+                agent_response,
+                evaluator_variables,
+              };
             }
-            if (h.role === "tool") {
-              return typeof h.content === "string";
-            }
-            return false;
-          });
-          const evaluator_variables: Record<
-            string,
-            Record<string, string>
-          > = {};
-          for (const e of evaluators) {
-            if (e.variable_values) {
-              evaluator_variables[e.evaluator_uuid] = { ...e.variable_values };
-            }
-          }
-          let payload: Record<string, unknown>;
-          if (taskType === "simulation") {
-            payload = {
-              name: editLlmItemName.trim(),
-              transcript: history,
-              evaluator_variables,
-            };
-          } else {
-            let chat_history = history;
-            let agent_response = "";
-            const last = history[history.length - 1];
-            if (
-              last &&
-              last.role === "assistant" &&
-              !(Array.isArray(last.tool_calls) && last.tool_calls.length > 0) &&
-              typeof last.content === "string"
-            ) {
-              chat_history = history.slice(0, -1);
-              agent_response = last.content;
-            }
-            payload = {
-              name: editLlmItemName.trim(),
-              chat_history,
-              agent_response,
-              evaluator_variables,
-            };
-          }
-          setSavingLlmItem(true);
-          setEditLlmError(null);
-          try {
-            await apiClient<{ updated_count: number }>(
-              `/annotation-tasks/${uuid}/items`,
-              accessToken,
-              {
-                method: "PUT",
-                body: {
-                  updates: [{ uuid: editLlmItemUuid, payload }],
+            setSavingLlmItem(true);
+            setEditLlmError(null);
+            try {
+              await apiClient<{ updated_count: number }>(
+                `/annotation-tasks/${uuid}/items`,
+                accessToken,
+                {
+                  method: "PUT",
+                  body: {
+                    updates: [{ uuid: editLlmItemUuid, payload }],
+                  },
                 },
-              },
-            );
-            setEditLlmItemUuid(null);
-            await fetchTask();
-          } catch (err) {
-            setEditLlmError(parseApiError(err, "Failed to save item"));
-          } finally {
-            setSavingLlmItem(false);
-          }
-        }}
-      />
+              );
+              setEditLlmItemUuid(null);
+              await fetchTask();
+            } catch (err) {
+              setEditLlmError(parseApiError(err, "Failed to save item"));
+            } finally {
+              setSavingLlmItem(false);
+            }
+          }}
+        />
       )}
 
       {accessToken && task && (
@@ -2510,6 +2849,66 @@ function LabellingTaskPageInner() {
           onSaved={() => {
             setEditOpen(false);
             fetchTask();
+          }}
+        />
+      )}
+
+      {accessToken && (
+        <BulkUploadSttItemsDialog
+          isOpen={bulkUploadSttOpen}
+          accessToken={accessToken}
+          taskUuid={uuid}
+          onClose={() => setBulkUploadSttOpen(false)}
+          onSuccess={async (count) => {
+            setBulkUploadSttOpen(false);
+            handleTabChange("items");
+            await fetchTask();
+            toast.success(
+              `Added ${count} ${count === 1 ? "item" : "items"}`,
+            );
+          }}
+        />
+      )}
+
+      {accessToken && (
+        <BulkUploadSimulationItemsDialog
+          isOpen={bulkUploadSimulationOpen}
+          accessToken={accessToken}
+          taskUuid={uuid}
+          onClose={() => setBulkUploadSimulationOpen(false)}
+          onSuccess={async (count) => {
+            setBulkUploadSimulationOpen(false);
+            handleTabChange("items");
+            await fetchTask();
+            toast.success(
+              `Added ${count} ${count === 1 ? "item" : "items"}`,
+            );
+          }}
+        />
+      )}
+
+      {accessToken && (
+        <BulkUploadLlmItemsDialog
+          isOpen={bulkUploadLlmOpen}
+          accessToken={accessToken}
+          taskUuid={uuid}
+          linkedEvaluators={(task?.evaluators ?? []).map((e) => {
+            const hydrated = evaluatorCatalogue[e.uuid];
+            return {
+              uuid: e.uuid,
+              name: hydrated?.name ?? e.name,
+              slug: hydrated?.slug ?? null,
+              variables: hydrated?.variables ?? [],
+            };
+          })}
+          onClose={() => setBulkUploadLlmOpen(false)}
+          onSuccess={async (count) => {
+            setBulkUploadLlmOpen(false);
+            handleTabChange("items");
+            await fetchTask();
+            toast.success(
+              `Added ${count} ${count === 1 ? "item" : "items"}`,
+            );
           }}
         />
       )}
@@ -2530,6 +2929,7 @@ function LabellingTaskPageInner() {
               })),
             },
           });
+          handleTabChange("items");
           await fetchTask();
           setAddSttItemsOpen(false);
         }}
@@ -2595,22 +2995,6 @@ function LabellingTaskPageInner() {
         isOpen={jobsCreatedOpen}
         jobs={createdJobs}
         onClose={() => setJobsCreatedOpen(false)}
-      />
-
-      <ItemResultsDialog
-        isOpen={!!resultsForItemUuid}
-        onClose={() => setResultsForItemUuid(null)}
-        itemName={(() => {
-          const it = items.find((i) => i.uuid === resultsForItemUuid);
-          if (!it) return "";
-          const p = (it.payload ?? {}) as Record<string, unknown>;
-          if (typeof p.name === "string" && p.name) return p.name;
-          return `Item ${it.id}`;
-        })()}
-        evaluators={(task?.evaluators ?? []).map((e) => ({
-          uuid: e.uuid,
-          name: e.name,
-        }))}
       />
 
       <DeleteConfirmationDialog

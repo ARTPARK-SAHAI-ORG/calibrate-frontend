@@ -24,6 +24,14 @@ type EvaluatorRunRow = {
   status: string;
   created_at: string;
   completed_at: string | null;
+  // Backend now embeds the version's scale bounds (numeric min/max for
+  // rating evaluators, null for binary).
+  evaluator_version?: {
+    uuid?: string;
+    version_number?: number;
+    scale_min?: number | null;
+    scale_max?: number | null;
+  } | null;
 };
 
 type EvaluatorRunJob = {
@@ -608,6 +616,16 @@ function EvaluatorResultsPane({
             enableLink
             match={match}
             score={score}
+            scaleMin={
+              typeof r.evaluator_version?.scale_min === "number"
+                ? r.evaluator_version.scale_min
+                : undefined
+            }
+            scaleMax={
+              typeof r.evaluator_version?.scale_max === "number"
+                ? r.evaluator_version.scale_max
+                : undefined
+            }
             reasoning={reasoning}
           />
         );
