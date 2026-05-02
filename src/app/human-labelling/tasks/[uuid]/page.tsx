@@ -2131,7 +2131,7 @@ function LabellingTaskPageInner() {
                             selectedItems={summaryEvaluatorFilter}
                             onSelectionChange={setSummaryEvaluatorFilter}
                             placeholder="All evaluators"
-                            searchPlaceholder="Search evaluators..."
+                            searchPlaceholder="Search evaluators"
                           />
                         </div>
                         <Tooltip content="Show results for only the live versions of each evaluator. Toggle to see the results for all versions.">

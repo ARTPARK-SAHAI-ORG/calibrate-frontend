@@ -7,6 +7,12 @@ import { useAccessToken } from "@/hooks";
 import Papa from "papaparse";
 import JSZip from "jszip";
 import { MultiAgentPicker } from "@/components/AgentPicker";
+import { MultiSelectPicker } from "@/components/MultiSelectPicker";
+import {
+  ChatHistoryPreview,
+  ConversationFormatDetails,
+  type TurnObject,
+} from "@/components/human-labelling/bulk-upload-shared";
 import type { EvaluatorRefPayload } from "@/components/AddTestDialog";
 import type { AvailableTool } from "@/components/ToolPicker";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
@@ -46,125 +52,71 @@ type BulkUploadTestsModalProps = {
   onSuccess: () => void;
 };
 
-// The default LLM next-reply evaluator (the one that exposes a single
-// `criteria` variable). Resolved by stable backend slug so it survives
-// rename. Used as the implicit target when the CSV's `evaluators` cell is a
-// plain string instead of a JSON array.
-const DEFAULT_NEXT_REPLY_EVALUATOR_SLUG = "default-llm-next-reply";
+// Column header for an evaluator variable in the response-type CSV. We
+// use a flat "EvalName/varName" naming scheme — one column per variable,
+// across all selected evaluators — so users can edit values directly
+// instead of hand-authoring JSON.
+function variableColumnName(evalName: string, varName: string): string {
+  return `${evalName}/${varName}`;
+}
 
-const SAMPLE_NEXT_REPLY_BASIC_CSV = `name,conversation_history,evaluators
-"Greeting test","[{""role"":""assistant"",""content"":""Hello, how can I help you today?""},{""role"":""user"",""content"":""What is your return policy?""}]","The agent should clearly explain the return policy in a helpful and friendly tone"
-"Billing question","[{""role"":""user"",""content"":""I was charged twice for my order""}]","The agent should apologize and offer to investigate the duplicate charge"`;
+function csvEscape(s: string): string {
+  return `"${s.replace(/"/g, '""')}"`;
+}
 
-const SAMPLE_NEXT_REPLY_ADVANCED_CSV = `name,conversation_history,evaluators
-"Greeting test","[{""role"":""assistant"",""content"":""Hello, how can I help you today?""},{""role"":""user"",""content"":""What is your return policy?""}]","[{""name"":""Correctness"",""variables"":{""criteria"":""The agent should clearly explain the return policy in a helpful and friendly tone""}},{""name"":""Helpfulness""}]"
-"Billing question","[{""role"":""user"",""content"":""I was charged twice for my order""}]","[{""name"":""Correctness"",""variables"":{""criteria"":""The agent should apologize and offer to investigate the duplicate charge""}},{""name"":""Helpfulness""}]"`;
+// Build the response-type sample CSV against the user's selected
+// evaluators. Always produces `name` + `conversation_history` columns,
+// then one column per variable across all selected evaluators (in the
+// order the user picked them). Evaluators with no variables don't add
+// any columns — they still get attached to every test on submit.
+function buildResponseSampleCsv(selected: LLMEvaluatorOption[]): string {
+  const variableColumns: { evalName: string; varName: string }[] = [];
+  for (const e of selected) {
+    for (const v of e.variables) {
+      variableColumns.push({ evalName: e.name, varName: v.name });
+    }
+  }
+
+  const rows = [
+    {
+      name: "Greeting test",
+      conversation: [
+        { role: "assistant", content: "Hello, how can I help you today?" },
+        { role: "user", content: "What is your return policy?" },
+      ],
+      sampleValue:
+        "The agent should clearly explain the return policy in a helpful and friendly tone",
+    },
+    {
+      name: "Billing question",
+      conversation: [
+        { role: "user", content: "I was charged twice for my order" },
+      ],
+      sampleValue:
+        "The agent should apologize and offer to investigate the duplicate charge",
+    },
+  ];
+
+  const headerCells = [
+    "name",
+    "conversation_history",
+    ...variableColumns.map((c) =>
+      csvEscape(variableColumnName(c.evalName, c.varName)),
+    ),
+  ];
+  const lines = rows.map((r) =>
+    [
+      csvEscape(r.name),
+      csvEscape(JSON.stringify(r.conversation)),
+      ...variableColumns.map(() => csvEscape(r.sampleValue)),
+    ].join(","),
+  );
+  return `${headerCells.join(",")}\n${lines.join("\n")}\n`;
+}
 
 const SAMPLE_TOOL_CALL_CSV = `name,conversation_history,tool_calls
 "Book room test","[{""role"":""user"",""content"":""I want to book room 101 for tomorrow""}]","[{""tool"":""book_room"",""arguments"":{""room"":""101""},""accept_any_arguments"":false}]"
 "Weather lookup","[{""role"":""assistant"",""content"":""How can I help?""},{""role"":""user"",""content"":""What is the weather in Bangalore?""}]","[{""tool"":""get_weather"",""arguments"":{},""accept_any_arguments"":true}]"`;
-
-const NEXT_REPLY_README = `BULK UPLOAD - NEXT REPLY TESTS
-================================
-
-This ZIP contains two sample CSV files for bulk uploading "Next Reply" tests:
-
-  - sample_next_reply_tests_basic.csv
-      Use a plain-text criteria string in the "evaluators" column. This is
-      the simplest format and is equivalent to attaching the default LLM
-      next-reply evaluator (the one with a single "criteria" variable) to
-      every test, with that string filled in as the criteria.
-
-  - sample_next_reply_tests_advanced.csv
-      Use a JSON array in the "evaluators" column to attach one or more
-      evaluators to each test. Use this format when you want to attach
-      evaluators other than the default one, attach multiple evaluators to
-      every test, or fill in custom variable values.
-
-Each row in either CSV creates one test. The CSV must have the following
-columns:
-
-
-COLUMNS
--------
-
-1. name
-   A unique name for the test. This must be different from every other test
-   in the CSV and from any test you have already created.
-   Example: "Greeting test"
-
-2. conversation_history
-   A JSON array of chat messages in OpenAI's chat format. This represents
-   the conversation that has happened so far, before the agent's next reply
-   is evaluated. Each message is an object with a "role" and "content" field.
-
-   Supported roles:
-     - "user"       — A message from the end user
-     - "assistant"  — A message from the agent
-
-   The conversation should end with a user message, since the test evaluates
-   the agent's next reply after this conversation.
-
-   Example:
-     [
-       {"role": "assistant", "content": "Hello, how can I help you today?"},
-       {"role": "user", "content": "What is your return policy?"}
-     ]
-
-   In CSV, JSON must be enclosed in double quotes, and any double quotes
-   inside the JSON must be escaped by doubling them (""). See the sample
-   CSVs for the correct format.
-
-3. evaluators
-   The evaluator(s) to attach to this test. The cell accepts EITHER a
-   plain-text criteria string OR a JSON array of evaluator objects.
-
-   FORMAT A — plain-text criteria (basic CSV):
-     A plain-text description of what the agent's response should contain
-     or how it should behave in order to pass the test. The default LLM
-     next-reply evaluator will be attached to every test, and this string
-     will be used as the value of its "criteria" variable.
-     Example: "The agent should clearly explain the return policy in a
-     helpful and friendly tone"
-
-   FORMAT B — JSON array of evaluators (advanced CSV):
-     A JSON array of objects, where each object describes one evaluator to
-     attach to the test. Each object has the following fields:
-
-       - "name" (required, string)
-         The exact name of an evaluator that already exists in the
-         Evaluators tab (either a default evaluator or one you created).
-         If the name does not match an existing evaluator, the upload is
-         rejected with an error.
-
-       - "variables" (required if the evaluator declares variables, object)
-         An object mapping each of the evaluator's variable names to the
-         value to use for this test. EVERY variable declared by the
-         evaluator must be present and have a non-empty value. For
-         evaluators with no variables, pass an empty object ({}) or omit
-         the field.
-
-     Example (one evaluator with a "criteria" variable plus another with
-     no variables):
-       [
-         {
-           "name": "Correctness",
-           "variables": {
-             "criteria": "The agent should clearly explain the return policy"
-           }
-         },
-         {"name": "Helpfulness"}
-       ]
-
-   IMPORTANT — all rows must use the same set of evaluators. The variable
-   VALUES can vary per row, but the list of evaluator names attached to
-   each test must be identical across the entire CSV. If the rows attach
-   different evaluators, the upload is rejected with an error.
-
-   In CSV, JSON must be enclosed in double quotes, and any double quotes
-   inside the JSON must be escaped by doubling them (""). See the advanced
-   sample CSV for the correct format.
-`;
 
 const TOOL_CALL_README = `BULK UPLOAD - TOOL CALL TESTS
 ==============================
@@ -242,6 +194,7 @@ export function BulkUploadTestsModal({
   const backendAccessToken = useAccessToken();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const assignAgentsSectionRef = useRef<HTMLDivElement>(null);
+  const dialogBodyRef = useRef<HTMLDivElement>(null);
 
   const [testType, setTestType] = useState<TestType | null>(null);
   const isResponseType = testType === "response";
@@ -265,13 +218,29 @@ export function BulkUploadTestsModal({
   // estate, and the user can re-open it manually via the toggle.
   const [formatHelpOpen, setFormatHelpOpen] = useState(true);
 
-  // LLM evaluators (defaults + user-owned) available to the tenant — needed
-  // to resolve names from the CSV's `evaluators` column to UUIDs and to
-  // validate that every variable declared by the evaluator is filled in.
-  // Only fetched / used for next-reply tests; tool-call uploads ignore it.
+  // LLM evaluators (defaults + user-owned) available to the tenant —
+  // populates the picker and gives us the variable definitions we need to
+  // build the per-variable CSV columns. Only fetched / used for next-reply
+  // tests; tool-call uploads ignore it.
   const [availableLLMEvaluators, setAvailableLLMEvaluators] = useState<
     LLMEvaluatorOption[]
   >([]);
+  // Evaluators the user has picked up-front for this batch. `selected…`
+  // tracks the live picker state so check-marks update immediately;
+  // `committed…` only updates once the picker dropdown closes, so the
+  // sections below the picker (sample CSV format, helper text, parsing)
+  // don't reflow under the open dropdown while the user is still
+  // checking and unchecking items.
+  const [selectedEvaluators, setSelectedEvaluators] = useState<
+    LLMEvaluatorOption[]
+  >([]);
+  const [committedEvaluators, setCommittedEvaluators] = useState<
+    LLMEvaluatorOption[]
+  >([]);
+  // Tracks whether the picker dropdown is currently open. When closed,
+  // `onSelectionChange` (e.g. clicking the X on a selected pill) should
+  // commit immediately, mirroring the close-dropdown commit path.
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [evaluatorsLoading, setEvaluatorsLoading] = useState(false);
   const [evaluatorsFetched, setEvaluatorsFetched] = useState(false);
   const [evaluatorsFetchError, setEvaluatorsFetchError] = useState<
@@ -301,6 +270,8 @@ export function BulkUploadTestsModal({
       setUploadError(null);
       setUploadWarnings(null);
       setAvailableLLMEvaluators([]);
+      setSelectedEvaluators([]);
+      setCommittedEvaluators([]);
       setEvaluatorsLoading(false);
       setEvaluatorsFetched(false);
       setEvaluatorsFetchError(null);
@@ -472,15 +443,6 @@ export function BulkUploadTestsModal({
     setFormatHelpOpen(parsedTests.length === 0);
   }, [parsedTests.length]);
 
-  // UUID of the default LLM next-reply evaluator (a.k.a. "Correctness"),
-  // resolved from the fetched evaluators list by stable slug. Undefined
-  // until the response-type fetch lands, or if the tenant has removed the
-  // evaluator — the helper text falls back to plain styling in that case
-  // rather than rendering a broken link.
-  const correctnessEvaluatorUuid = availableLLMEvaluators.find(
-    (e) => e.slug === DEFAULT_NEXT_REPLY_EVALUATOR_SLUG,
-  )?.uuid;
-
   // Lookup set of every tool name the platform recognises for this tenant:
   // the names of all custom tools (from `GET /tools`) plus the ids of every
   // inbuilt tool (e.g. `end_call`). Tool-call CSV entries whose `tool` value
@@ -493,210 +455,66 @@ export function BulkUploadTestsModal({
     return names;
   }, [availableTools]);
 
-  // The set of evaluators attached to every parsed next-reply test.
-  // Parser validation guarantees these are identical across rows, so we
-  // read from the first row and use it as the canonical list for the
-  // preview's pill chips and per-evaluator-with-variables column headers.
-  // We hydrate `name` + `variables` by looking up each ref's UUID in the
-  // already-fetched LLM evaluators list (the lookup is what was used for
-  // CSV-side validation in the first place, so it's guaranteed to hit).
-  const previewEvaluators = useMemo(() => {
-    if (!isResponseType || parsedTests.length === 0) return [];
-    const refs = parsedTests[0].evaluators ?? [];
-    return refs
-      .map((ref) => {
-        const ev = availableLLMEvaluators.find(
-          (e) => e.uuid === ref.evaluator_uuid,
-        );
-        if (!ev) return null;
-        return { uuid: ev.uuid, name: ev.name, variables: ev.variables };
-      })
-      .filter((x): x is NonNullable<typeof x> => x !== null);
-  }, [isResponseType, parsedTests, availableLLMEvaluators]);
+  // Evaluators to render in the preview's pill row and per-variable
+  // column headers. Sourced directly from the user's up-front pick — the
+  // CSV doesn't carry an evaluator list anymore.
+  // Commit a new evaluator selection: update committed snapshot, drop
+  // any uploaded CSV (its columns no longer match), and scroll the
+  // dialog so the freshly-revealed/updated helper + dropzone come into
+  // view. Called both when the picker dropdown closes and when the user
+  // removes a selected pill via its X (which fires while the dropdown
+  // is closed).
+  const commitEvaluatorSelection = (next: LLMEvaluatorOption[]) => {
+    const sameAsCommitted =
+      next.length === committedEvaluators.length &&
+      next.every((e, i) => e.uuid === committedEvaluators[i]?.uuid);
+    if (!sameAsCommitted) {
+      setCommittedEvaluators(next);
+      setCsvFile(null);
+      setParsedTests([]);
+      setParseError(null);
+      setUploadError(null);
+      setPendingFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+    // Always scroll — even if selection didn't change, the user closed
+    // the dropdown and the sections below should come into view.
+    requestAnimationFrame(() => {
+      const el = dialogBodyRef.current;
+      if (el) {
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      }
+    });
+  };
 
   const downloadSampleCsv = async () => {
     if (!testType) return;
 
-    const zip = new JSZip();
     if (isResponseType) {
-      // Next-reply uploads ship two sample CSVs side-by-side: a "basic"
-      // file using a plain-string `evaluators` cell (the default LLM
-      // next-reply evaluator with a `criteria` variable) and an "advanced"
-      // file demonstrating the JSON-array form for attaching multiple
-      // evaluators / custom variables. README explains both.
-      zip.file(
-        "sample_next_reply_tests_basic.csv",
-        SAMPLE_NEXT_REPLY_BASIC_CSV,
-      );
-      zip.file(
-        "sample_next_reply_tests_advanced.csv",
-        SAMPLE_NEXT_REPLY_ADVANCED_CSV,
-      );
-      zip.file("README.txt", NEXT_REPLY_README);
-    } else {
-      zip.file("sample_tool_call_tests.csv", SAMPLE_TOOL_CALL_CSV);
-      zip.file("README.txt", TOOL_CALL_README);
+      // Single-CSV download tailored to the user's selected evaluators.
+      const csv = buildResponseSampleCsv(committedEvaluators);
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "sample_next_reply_tests.csv";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
     }
 
+    const zip = new JSZip();
+    zip.file("sample_tool_call_tests.csv", SAMPLE_TOOL_CALL_CSV);
+    zip.file("README.txt", TOOL_CALL_README);
     const blob = await zip.generateAsync({ type: "blob" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = isResponseType
-      ? "sample_next_reply_tests.zip"
-      : "sample_tool_call_tests.zip";
+    link.download = "sample_tool_call_tests.zip";
     link.click();
     URL.revokeObjectURL(url);
-  };
-
-  // Resolve a single row's `evaluators` cell into the API-shaped
-  // EvaluatorRefPayload[] that the backend expects per test. Accepts either:
-  //   - a plain-text string  → attaches the default LLM next-reply evaluator
-  //                            with that string as the `criteria` variable
-  //   - a JSON array of {name, variables?} → looks each entry up by name in
-  //                            the tenant's evaluator list and validates that
-  //                            every declared variable is filled in
-  // Returns either the resolved refs or a list of human-readable errors
-  // (prefixed by the caller with the row number).
-  const resolveEvaluatorsCell = (
-    cell: string,
-    evaluators: LLMEvaluatorOption[],
-  ): { refs: EvaluatorRefPayload[]; errors: string[] } => {
-    const trimmed = cell.trim();
-    const errors: string[] = [];
-
-    // JSON-array form is detected by leading `[`. Anything else is treated as
-    // a plain criteria string, even if it happens to be parseable as some
-    // other JSON value (a bare number, "true", etc.) — this avoids surprising
-    // users whose criteria string starts with a digit or quote.
-    if (trimmed.startsWith("[")) {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(trimmed);
-      } catch {
-        return {
-          refs: [],
-          errors: ["evaluators is not valid JSON"],
-        };
-      }
-      if (!Array.isArray(parsed)) {
-        return {
-          refs: [],
-          errors: ["evaluators must be a JSON array"],
-        };
-      }
-      if (parsed.length === 0) {
-        return {
-          refs: [],
-          errors: ["evaluators array must contain at least one evaluator"],
-        };
-      }
-
-      const refs: EvaluatorRefPayload[] = [];
-      const seenUuids = new Set<string>();
-      parsed.forEach((entry, i) => {
-        const label = `evaluator #${i + 1}`;
-        if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-          errors.push(`${label}: must be a JSON object`);
-          return;
-        }
-        const obj = entry as Record<string, unknown>;
-        const name = typeof obj.name === "string" ? obj.name.trim() : "";
-        if (!name) {
-          errors.push(`${label}: missing "name"`);
-          return;
-        }
-
-        const evaluator = evaluators.find((e) => e.name === name);
-        if (!evaluator) {
-          errors.push(
-            `evaluator "${name}" does not exist in your Evaluators tab`,
-          );
-          return;
-        }
-        if (seenUuids.has(evaluator.uuid)) {
-          errors.push(`evaluator "${name}" listed more than once`);
-          return;
-        }
-        seenUuids.add(evaluator.uuid);
-
-        // `variables` may be omitted entirely for evaluators that declare
-        // none; for those that do, every declared name must have a
-        // non-empty string value.
-        let providedVars: Record<string, unknown> = {};
-        if (obj.variables !== undefined && obj.variables !== null) {
-          if (
-            typeof obj.variables !== "object" ||
-            Array.isArray(obj.variables)
-          ) {
-            errors.push(`evaluator "${name}": "variables" must be an object`);
-            return;
-          }
-          providedVars = obj.variables as Record<string, unknown>;
-        }
-
-        const expectedNames = evaluator.variables.map((v) => v.name);
-        const variableValues: Record<string, string> = {};
-        const missing: string[] = [];
-        for (const v of evaluator.variables) {
-          const raw = providedVars[v.name];
-          if (typeof raw !== "string" || !raw.trim()) {
-            missing.push(v.name);
-            continue;
-          }
-          variableValues[v.name] = raw;
-        }
-        if (missing.length > 0) {
-          errors.push(
-            `evaluator "${name}": missing variable value(s) for ${missing
-              .map((n) => `"${n}"`)
-              .join(", ")}`,
-          );
-        }
-        const extras = Object.keys(providedVars).filter(
-          (k) => !expectedNames.includes(k),
-        );
-        if (extras.length > 0) {
-          errors.push(
-            `evaluator "${name}": unknown variable(s) ${extras
-              .map((n) => `"${n}"`)
-              .join(", ")}`,
-          );
-        }
-
-        const ref: EvaluatorRefPayload = { evaluator_uuid: evaluator.uuid };
-        if (evaluator.variables.length > 0) {
-          ref.variable_values = variableValues;
-        }
-        refs.push(ref);
-      });
-
-      return { refs, errors };
-    }
-
-    // Plain-string form → default LLM next-reply evaluator with the string
-    // as its `criteria` variable. We resolve by stable slug because the
-    // evaluator's `name` is tenant-mutable.
-    const correctness = evaluators.find(
-      (e) => e.slug === DEFAULT_NEXT_REPLY_EVALUATOR_SLUG,
-    );
-    if (!correctness) {
-      return {
-        refs: [],
-        errors: [
-          `default LLM next-reply evaluator (slug "${DEFAULT_NEXT_REPLY_EVALUATOR_SLUG}") was not found — add it to your evaluators or use the JSON-array form`,
-        ],
-      };
-    }
-    return {
-      refs: [
-        {
-          evaluator_uuid: correctness.uuid,
-          variable_values: { criteria: trimmed },
-        },
-      ],
-      errors: [],
-    };
   };
 
   const handleFileChange = (file: File | null) => {
@@ -752,17 +570,35 @@ export function BulkUploadTestsModal({
           return;
         }
 
-        const requiredColumns = isResponseType
-          ? ["name", "conversation_history", "evaluators"]
-          : ["name", "conversation_history", "tool_calls"];
-
         const headers = Object.keys(data[0]);
-        const missingColumns = requiredColumns.filter(
-          (col) => !headers.includes(col),
-        );
+        const baseColumns = isResponseType
+          ? ["name", "conversation_history"]
+          : ["name", "conversation_history", "tool_calls"];
+        const variableColumns: {
+          evaluator: LLMEvaluatorOption;
+          varName: string;
+          header: string;
+        }[] = [];
+        if (isResponseType) {
+          for (const e of committedEvaluators) {
+            for (const v of e.variables) {
+              variableColumns.push({
+                evaluator: e,
+                varName: v.name,
+                header: variableColumnName(e.name, v.name),
+              });
+            }
+          }
+        }
+        const missingColumns = [
+          ...baseColumns.filter((col) => !headers.includes(col)),
+          ...variableColumns
+            .filter((c) => !headers.includes(c.header))
+            .map((c) => c.header),
+        ];
         if (missingColumns.length > 0) {
           setParseError(
-            `Missing required columns: ${missingColumns.join(", ")}`,
+            `Missing required columns: ${missingColumns.join(", ")}. Download the sample CSV above for the exact format.`,
           );
           return;
         }
@@ -780,10 +616,6 @@ export function BulkUploadTestsModal({
 
         const errors: string[] = [];
         const tests: ParsedTest[] = [];
-        // Tracks the canonical sorted list of evaluator UUIDs from the first
-        // successfully-parsed response row, so we can flag any subsequent
-        // row whose evaluator set differs.
-        let referenceEvaluatorUuids: string[] | null = null;
         // Collected across all rows for tool-call uploads so we can show
         // a single clear "these tools don't exist on the platform — add
         // them under Tools first" guidance message above the per-row
@@ -818,39 +650,40 @@ export function BulkUploadTestsModal({
           }
 
           if (isResponseType) {
-            if (!row.evaluators?.trim()) {
-              errors.push(`Row ${rowNum}: missing evaluators`);
-              return;
-            }
-
-            const { refs, errors: rowErrors } = resolveEvaluatorsCell(
-              row.evaluators,
-              availableLLMEvaluators,
-            );
-            if (rowErrors.length > 0) {
-              for (const err of rowErrors) {
-                errors.push(`Row ${rowNum}: ${err}`);
+            // Build the EvaluatorRefPayload[] from the user's selected
+            // evaluators. Variable values come from the per-variable
+            // columns; evaluators with no variables get attached without
+            // a `variable_values` field.
+            const refs: EvaluatorRefPayload[] = [];
+            let rowFailed = false;
+            for (const e of committedEvaluators) {
+              const ref: EvaluatorRefPayload = { evaluator_uuid: e.uuid };
+              if (e.variables.length > 0) {
+                const variableValues: Record<string, string> = {};
+                const missing: string[] = [];
+                for (const v of e.variables) {
+                  const header = variableColumnName(e.name, v.name);
+                  const raw = (row[header] ?? "").trim();
+                  if (!raw) {
+                    missing.push(header);
+                    continue;
+                  }
+                  variableValues[v.name] = raw;
+                }
+                if (missing.length > 0) {
+                  errors.push(
+                    `Row ${rowNum}: missing value(s) for ${missing
+                      .map((m) => `"${m}"`)
+                      .join(", ")}`,
+                  );
+                  rowFailed = true;
+                  break;
+                }
+                ref.variable_values = variableValues;
               }
-              return;
+              refs.push(ref);
             }
-
-            const sortedUuids = refs
-              .map((r) => r.evaluator_uuid)
-              .slice()
-              .sort();
-            if (referenceEvaluatorUuids === null) {
-              referenceEvaluatorUuids = sortedUuids;
-            } else if (
-              sortedUuids.length !== referenceEvaluatorUuids.length ||
-              sortedUuids.some(
-                (uuid, i) => uuid !== referenceEvaluatorUuids![i],
-              )
-            ) {
-              errors.push(
-                `Row ${rowNum}: evaluators don't match the first row — all rows must attach the same set of evaluators`,
-              );
-              return;
-            }
+            if (rowFailed) return;
 
             tests.push({
               name: row.name.trim(),
@@ -920,9 +753,7 @@ export function BulkUploadTestsModal({
           // clear guidance line so the user immediately knows what to
           // do: add the missing tools under the Tools tab and re-upload.
           if (unknownToolNames.size > 0) {
-            const list = [...unknownToolNames]
-              .map((t) => `"${t}"`)
-              .join(", ");
+            const list = [...unknownToolNames].map((t) => `"${t}"`).join(", ");
             const oneTool = unknownToolNames.size === 1;
             setParseError(
               `${oneTool ? "A tool" : "One or more tools"} referenced in your CSV ${
@@ -1126,9 +957,7 @@ export function BulkUploadTestsModal({
     }
     if (toolCalls.length === 0) {
       return (
-        <span className="italic text-red-500">
-          empty tool_calls array
-        </span>
+        <span className="italic text-red-500">empty tool_calls array</span>
       );
     }
 
@@ -1236,42 +1065,6 @@ export function BulkUploadTestsModal({
     );
   };
 
-  // Render one cell of the per-evaluator-with-variables column. If the
-  // evaluator has a single variable (the common case — e.g. Correctness's
-  // `criteria`) we just dump the value. With multiple variables we prefix
-  // each value with a tiny monospace `varName:` label so the user can tell
-  // which variable's value is which.
-  const renderEvaluatorVariableCell = (
-    test: ParsedTest,
-    evaluator: { uuid: string; variables: EvaluatorVariableDef[] },
-  ) => {
-    const ref = test.evaluators?.find(
-      (r) => r.evaluator_uuid === evaluator.uuid,
-    );
-    const values = ref?.variable_values ?? {};
-    if (evaluator.variables.length === 1) {
-      const v = evaluator.variables[0];
-      return (
-        <div className="line-clamp-4 whitespace-pre-wrap break-words">
-          {values[v.name] ?? ""}
-        </div>
-      );
-    }
-    return (
-      <div className="space-y-1.5">
-        {evaluator.variables.map((v) => (
-          <div key={v.name}>
-            <code className="text-[10px] font-mono text-muted-foreground block">
-              {v.name}
-            </code>
-            <span className="line-clamp-3 whitespace-pre-wrap break-words">
-              {values[v.name] ?? ""}
-            </span>
-          </div>
-        ))}
-      </div>
-    );
-  };
 
   if (!isOpen) return null;
 
@@ -1284,7 +1077,7 @@ export function BulkUploadTestsModal({
 
       <div
         className={`relative w-full mx-4 bg-background rounded-2xl shadow-2xl border border-border flex flex-col max-h-[85vh] transition-[max-width] duration-300 ease-out ${
-          parsedTests.length > 0 ? "max-w-5xl" : "max-w-xl"
+          parsedTests.length > 0 ? "max-w-[80vw]" : "max-w-[50vw]"
         }`}
       >
         {/* Header */}
@@ -1313,7 +1106,10 @@ export function BulkUploadTestsModal({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+        <div
+          ref={dialogBodyRef}
+          className="flex-1 overflow-y-auto px-6 py-5 space-y-6"
+        >
           {/* Step 1: Test Type */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-3">
@@ -1329,6 +1125,8 @@ export function BulkUploadTestsModal({
                   setParseError(null);
                   setUploadError(null);
                   setPendingFile(null);
+                  setSelectedEvaluators([]);
+                  setCommittedEvaluators([]);
                   if (fileInputRef.current) fileInputRef.current.value = "";
                 }}
                 className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
@@ -1348,6 +1146,8 @@ export function BulkUploadTestsModal({
                   setParseError(null);
                   setUploadError(null);
                   setPendingFile(null);
+                  setSelectedEvaluators([]);
+                  setCommittedEvaluators([]);
                   if (fileInputRef.current) fileInputRef.current.value = "";
                 }}
                 className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer border-l border-border ${
@@ -1361,34 +1161,72 @@ export function BulkUploadTestsModal({
             </div>
           </div>
 
-          {/* Step 2: CSV Upload (only if type selected) */}
-          {testType && (
+          {/* Step 1.5: Evaluator picker — response uploads only.
+              The CSV format depends on which evaluators (and which of
+              their variables) the user wants to attach, so we ask for
+              that up-front and don't show the upload section until at
+              least one evaluator is picked. */}
+          {isResponseType && (
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <label className="block text-sm font-medium text-foreground">
-                  Upload CSV
-                </label>
-                <button
-                  onClick={downloadSampleCsv}
-                  className="h-9 px-3 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-                    />
-                  </svg>
-                  Download sample CSV
-                </button>
-              </div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Select evaluators to attach
+              </label>
+              <p className="text-xs text-muted-foreground mb-3">
+                These evaluators will be attached to every test in this upload.
+                Variables they declare become CSV columns.
+              </p>
+              {evaluatorsFetchError && (
+                <p className="text-xs text-red-500 mb-2">
+                  Failed to load evaluators: {evaluatorsFetchError}. Refresh and
+                  try again.
+                </p>
+              )}
+              <MultiSelectPicker
+                items={availableLLMEvaluators.map((e) => ({
+                  uuid: e.uuid,
+                  name: e.name,
+                }))}
+                selectedItems={selectedEvaluators.map((e) => ({
+                  uuid: e.uuid,
+                  name: e.name,
+                }))}
+                onSelectionChange={(items) => {
+                  const next = items
+                    .map((i) =>
+                      availableLLMEvaluators.find((e) => e.uuid === i.uuid),
+                    )
+                    .filter((e): e is LLMEvaluatorOption => e !== undefined);
+                  setSelectedEvaluators(next);
+                  // While the dropdown is open we defer; selection stays
+                  // "live" only in the trigger pills and dropdown checks.
+                  // When the dropdown is closed, the only way to change
+                  // selection is removing a pill via its X — commit
+                  // immediately so the sections below reflect the
+                  // change.
+                  if (pickerOpen) return;
+                  commitEvaluatorSelection(next);
+                }}
+                onOpenChange={(open) => {
+                  setPickerOpen(open);
+                  if (open) return;
+                  commitEvaluatorSelection(selectedEvaluators);
+                }}
+                placeholder={
+                  evaluatorsLoading
+                    ? "Loading evaluators"
+                    : "Select one or more evaluators"
+                }
+                searchPlaceholder="Search evaluators"
+                isLoading={evaluatorsLoading}
+                disabled={evaluatorsLoading || !!evaluatorsFetchError}
+              />
+            </div>
+          )}
 
+          {/* Step 2: CSV Upload (only after type + (for response) at least
+              one evaluator are picked) */}
+          {testType && (!isResponseType || committedEvaluators.length > 0) && (
+            <div>
               {/* Format description — once a CSV has parsed successfully
                   it auto-collapses so the preview owns the screen, but
                   remains togglable via the disclosure button below. */}
@@ -1421,126 +1259,100 @@ export function BulkUploadTestsModal({
               )}
               {formatHelpOpen &&
                 (isResponseType ? (
-                <div className="text-xs text-muted-foreground mb-3 leading-relaxed space-y-2">
-                  <p>Your CSV needs three columns per row:</p>
-                  <ul className="list-disc pl-5 space-y-1.5">
-                    <li>
-                      <code className="font-mono text-foreground">name</code> —
-                      a unique test name
-                    </li>
-                    <li>
-                      <code className="font-mono text-foreground">
-                        conversation_history
-                      </code>{" "}
-                      — JSON array of OpenAI-format chat messages
-                    </li>
-                    <li>
-                      <code className="font-mono text-foreground">
-                        evaluators
-                      </code>{" "}
-                      — accepts either:
-                      <ul className="list-disc pl-5 mt-1.5 space-y-1.5">
-                        <li>
-                          A plain criteria string — attaches the default{" "}
-                          {correctnessEvaluatorUuid ? (
+                  <div className="text-xs text-muted-foreground mb-3 leading-relaxed space-y-2">
+                    <p>Upload a CSV with the following columns:</p>
+                    <ul className="list-disc pl-5 space-y-1.5">
+                      <li>
+                        <code className="font-mono text-foreground">name</code>{" "}
+                        — a unique test name
+                      </li>
+                      <li>
+                        <code className="font-mono text-foreground">
+                          conversation_history
+                        </code>{" "}
+                        — JSON array representing a conversation that an
+                        agent needs to respond to.
+                        <ConversationFormatDetails
+                          example={
+                            '[{"role":"user","content":"What is your return policy?"},{"role":"assistant","content":"You can return any item within 30 days."},{"role":"user","content":"What about defective items?"}]'
+                          }
+                        />
+                      </li>
+                      {committedEvaluators.flatMap((e) =>
+                        e.variables.map((v) => (
+                          <li key={`${e.uuid}-${v.name}`}>
+                            <code className="font-mono text-foreground">
+                              {variableColumnName(e.name, v.name)}
+                            </code>
+                            {v.description ? ` — ${v.description}` : ""} (used
+                            for{" "}
                             <Link
-                              href={`/evaluators/${correctnessEvaluatorUuid}`}
+                              href={`/evaluators/${e.uuid}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className={HELPER_LINK_CLASS}
+                              className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground text-[10px] font-medium hover:opacity-80 transition-opacity cursor-pointer"
                             >
-                              Correctness
+                              {e.name}
                             </Link>
-                          ) : (
-                            <span className="text-foreground">Correctness</span>
-                          )}{" "}
-                          evaluator with that string as its{" "}
-                          <code className="font-mono text-foreground">
-                            criteria
-                          </code>{" "}
-                          variable.
-                        </li>
-                        <li>
-                          A JSON array like{" "}
-                          <code className="font-mono text-foreground">
-                            {`[{"name":"...","variables":{...}}]`}
-                          </code>{" "}
-                          to attach one or more evaluators by name with their
-                          variable values.
-                        </li>
-                      </ul>
-                    </li>
-                  </ul>
-                  <p>
-                    Evaluators must already exist in the{" "}
-                    <Link
-                      href="/evaluators"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={HELPER_LINK_CLASS}
-                    >
-                      Evaluators
-                    </Link>{" "}
-                    tab, every variable they declare must be filled, and all
-                    rows must use the same set of evaluators (variable values
-                    can differ per row).
-                  </p>
-                  <p>
-                    Download the sample CSV ZIP for basic and advanced examples
-                    plus a README with the full format.
-                  </p>
-                </div>
-              ) : (
-                <div className="text-xs text-muted-foreground mb-3 leading-relaxed space-y-2">
-                  <p>Your CSV needs three columns per row:</p>
-                  <ul className="list-disc pl-5 space-y-1.5">
-                    <li>
-                      <code className="font-mono text-foreground">name</code> —
-                      a unique test name
-                    </li>
-                    <li>
-                      <code className="font-mono text-foreground">
-                        conversation_history
-                      </code>{" "}
-                      — JSON array of OpenAI-format chat messages
-                    </li>
-                    <li>
-                      <code className="font-mono text-foreground">
-                        tool_calls
-                      </code>{" "}
-                      — JSON array of expected tool-call objects, each with:
-                      <ul className="list-disc pl-5 mt-1.5 space-y-1.5">
-                        <li>
-                          <code className="font-mono text-foreground">
-                            tool
-                          </code>{" "}
-                          (required) — the tool&apos;s name
-                        </li>
-                        <li>
-                          <code className="font-mono text-foreground">
-                            arguments
-                          </code>{" "}
-                          (optional) — object of expected argument values
-                        </li>
-                        <li>
-                          <code className="font-mono text-foreground">
-                            accept_any_arguments
-                          </code>{" "}
-                          (optional) — set to{" "}
-                          <code className="font-mono text-foreground">
-                            true
-                          </code>{" "}
-                          to skip argument matching
-                        </li>
-                      </ul>
-                    </li>
-                  </ul>
-                  <p>
-                    Download the sample CSV ZIP for an example plus a README
-                    with the full format.
-                  </p>
-                </div>
-              ))}
+                            )
+                          </li>
+                        )),
+                      )}
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground mb-3 leading-relaxed space-y-2">
+                    <p>Upload a CSV with the following columns:</p>
+                    <ul className="list-disc pl-5 space-y-1.5">
+                      <li>
+                        <code className="font-mono text-foreground">name</code>{" "}
+                        — a unique test name
+                      </li>
+                      <li>
+                        <code className="font-mono text-foreground">
+                          conversation_history
+                        </code>{" "}
+                        — JSON array representing a conversation that an
+                        agent needs to respond to.
+                        <ConversationFormatDetails
+                          example={
+                            '[{"role":"user","content":"What is your return policy?"},{"role":"assistant","content":"You can return any item within 30 days."},{"role":"user","content":"What about defective items?"}]'
+                          }
+                        />
+                      </li>
+                      <li>
+                        <code className="font-mono text-foreground">
+                          tool_calls
+                        </code>{" "}
+                        — JSON array of expected tool-call objects, each with:
+                        <ul className="list-disc pl-5 mt-1.5 space-y-1.5">
+                          <li>
+                            <code className="font-mono text-foreground">
+                              tool
+                            </code>{" "}
+                            (required) — the tool&apos;s name
+                          </li>
+                          <li>
+                            <code className="font-mono text-foreground">
+                              arguments
+                            </code>{" "}
+                            (optional) — object of expected argument values
+                          </li>
+                          <li>
+                            <code className="font-mono text-foreground">
+                              accept_any_arguments
+                            </code>{" "}
+                            (optional) — set to{" "}
+                            <code className="font-mono text-foreground">
+                              true
+                            </code>{" "}
+                            to skip argument matching
+                          </li>
+                        </ul>
+                      </li>
+                    </ul>
+                  </div>
+                ))}
 
               {/* Backing-fetch failures are the only state worth
                   surfacing — loading happens silently in the background,
@@ -1656,53 +1468,182 @@ export function BulkUploadTestsModal({
                 </div>
               )}
 
-              {/* Evaluator pills — response uploads only. Rendered as a
-                  standalone row OUTSIDE the parsed-preview card so it
-                  reads as metadata about the upload (which evaluators
-                  every row shares) rather than a header strip stuck to
-                  the table. The pill set is identical for every row
-                  (parser validation guarantees it), so we render them
-                  once and link each to its evaluator detail page. */}
-              {parsedTests.length > 0 &&
-                isResponseType &&
-                previewEvaluators.length > 0 && (
-                  <div className="mt-4">
-                    <h4 className="text-sm font-semibold text-foreground mb-2">
-                      Evaluators
-                    </h4>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {previewEvaluators.map((ev) => (
-                        <Link
-                          key={ev.uuid}
-                          href={`/evaluators/${ev.uuid}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border border-border bg-background text-foreground hover:bg-muted transition-colors"
-                        >
-                          {ev.name}
-                          <svg
-                            className="w-3 h-3 text-muted-foreground"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-                            />
-                          </svg>
-                        </Link>
-                      ))}
-                    </div>
+              {/* Sample CSV — placed below the dropzone, with a tip
+                  callout pointing at it. Hidden once a CSV has parsed
+                  so the preview owns the screen. */}
+              {parsedTests.length === 0 && (
+                <>
+                  <div className="mt-3 flex items-start gap-2 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-foreground">
+                    <svg
+                      className="w-4 h-4 mt-0.5 shrink-0 text-blue-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"
+                      />
+                    </svg>
+                    <span>
+                      <span className="font-semibold">Tip:</span>{" "}
+                      <button
+                        type="button"
+                        onClick={downloadSampleCsv}
+                        className="underline underline-offset-2 hover:opacity-80 transition-opacity cursor-pointer"
+                      >
+                        download the sample CSV
+                      </button>{" "}
+                      and edit it as a starting point
+                    </span>
                   </div>
-                )}
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      onClick={downloadSampleCsv}
+                      className="h-9 px-3 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                        />
+                      </svg>
+                      Download sample CSV
+                    </button>
+                  </div>
+                </>
+              )}
 
               {/* Parsed Preview */}
-              {parsedTests.length > 0 && (
+              {parsedTests.length > 0 && isResponseType && (() => {
+                const variableColumns = committedEvaluators.flatMap((e) =>
+                  e.variables.map((v) => ({
+                    evaluatorUuid: e.uuid,
+                    varName: v.name,
+                    header: variableColumnName(e.name, v.name),
+                  })),
+                );
+                const gridStyle = {
+                  gridTemplateColumns: [
+                    "160px",
+                    "minmax(220px,1fr)",
+                    ...variableColumns.map(() => "minmax(220px,1fr)"),
+                  ].join(" "),
+                };
+                return (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-sm font-medium text-foreground">
+                      {parsedTests.length}{" "}
+                      {parsedTests.length === 1 ? "test" : "tests"} ready to
+                      upload
+                    </p>
+                    <div className="border border-border rounded-xl overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <div
+                          className="grid gap-3 px-4 py-2 border-b border-border bg-muted/30"
+                          style={gridStyle}
+                        >
+                          <div className="text-xs font-medium text-muted-foreground">
+                            Name
+                          </div>
+                          <div className="text-xs font-medium text-muted-foreground">
+                            Chat history
+                          </div>
+                          {variableColumns.map((c) => (
+                            <div
+                              key={`h-${c.evaluatorUuid}-${c.varName}`}
+                              className="text-xs font-medium text-muted-foreground font-mono truncate"
+                              title={c.header}
+                            >
+                              {c.header}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="max-h-[15rem] overflow-y-auto divide-y divide-border">
+                          {parsedTests.slice(0, 50).map((test, idx) => {
+                            let turns: TurnObject[] = [];
+                            try {
+                              const parsed = JSON.parse(
+                                test.conversation_history,
+                              );
+                              if (Array.isArray(parsed)) turns = parsed;
+                            } catch {
+                              // Parsed-tests entries already passed JSON
+                              // validation; this is a defensive fallback.
+                            }
+                            const valuesByKey = new Map<string, string>();
+                            for (const ref of test.evaluators ?? []) {
+                              if (!ref.variable_values) continue;
+                              for (const [varName, value] of Object.entries(
+                                ref.variable_values,
+                              )) {
+                                valuesByKey.set(
+                                  `${ref.evaluator_uuid}/${varName}`,
+                                  value,
+                                );
+                              }
+                            }
+                            return (
+                              <div
+                                key={idx}
+                                className="grid gap-3 px-4 py-2 text-xs items-start"
+                                style={gridStyle}
+                              >
+                                <div
+                                  className="truncate text-foreground"
+                                  title={test.name}
+                                >
+                                  {test.name}
+                                </div>
+                                <div className="min-w-0">
+                                  <ChatHistoryPreview turns={turns} />
+                                </div>
+                                {variableColumns.map((c) => {
+                                  const value =
+                                    valuesByKey.get(
+                                      `${c.evaluatorUuid}/${c.varName}`,
+                                    ) ?? "";
+                                  return (
+                                    <div
+                                      key={`${idx}-${c.evaluatorUuid}-${c.varName}`}
+                                      className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                                    >
+                                      {value || (
+                                        <span className="text-muted-foreground italic">
+                                          (empty)
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                          {parsedTests.length > 50 && (
+                            <div className="px-4 py-2 text-xs text-muted-foreground">
+                              + {parsedTests.length - 50} more rows
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Tool-call preview keeps the existing table layout — its
+                  per-row `tool_calls` column has its own custom rendering. */}
+              {parsedTests.length > 0 && !isResponseType && (
                 <div className="mt-3 rounded-lg bg-muted/50 border border-border overflow-hidden">
-                  {/* "Found N tests" header */}
                   <div className="px-3 py-2.5 flex items-center gap-2 border-b border-border">
                     <svg
                       className="w-4 h-4 text-green-500"
@@ -1723,7 +1664,6 @@ export function BulkUploadTestsModal({
                     </span>
                   </div>
 
-                  {/* Per-test table */}
                   <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
                     <table className="w-full text-xs">
                       <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm">
@@ -1735,22 +1675,9 @@ export function BulkUploadTestsModal({
                           <th className="px-3 py-2 font-medium min-w-[240px]">
                             Conversation history
                           </th>
-                          {isResponseType ? (
-                            previewEvaluators
-                              .filter((ev) => ev.variables.length > 0)
-                              .map((ev) => (
-                                <th
-                                  key={ev.uuid}
-                                  className="px-3 py-2 font-medium min-w-[200px]"
-                                >
-                                  {ev.name}
-                                </th>
-                              ))
-                          ) : (
-                            <th className="px-3 py-2 font-medium min-w-[240px]">
-                              Expected tool calls
-                            </th>
-                          )}
+                          <th className="px-3 py-2 font-medium min-w-[240px]">
+                            Expected tool calls
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1770,22 +1697,9 @@ export function BulkUploadTestsModal({
                                 test.conversation_history,
                               )}
                             </td>
-                            {isResponseType ? (
-                              previewEvaluators
-                                .filter((ev) => ev.variables.length > 0)
-                                .map((ev) => (
-                                  <td
-                                    key={ev.uuid}
-                                    className="px-3 py-2 text-foreground"
-                                  >
-                                    {renderEvaluatorVariableCell(test, ev)}
-                                  </td>
-                                ))
-                            ) : (
-                              <td className="px-3 py-2 text-foreground">
-                                {renderToolCallsCell(test.tool_calls)}
-                              </td>
-                            )}
+                            <td className="px-3 py-2 text-foreground">
+                              {renderToolCallsCell(test.tool_calls)}
+                            </td>
                           </tr>
                         ))}
                       </tbody>

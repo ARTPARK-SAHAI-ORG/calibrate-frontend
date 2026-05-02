@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useHideFloatingButton } from "@/components/AppLayout";
 
 // ─── Shared types ─────────────────────────────────────────────────────────
 
@@ -110,10 +111,10 @@ export function CsvDropzone({
       onDragOver={(e) => e.preventDefault()}
       onDrop={handleDrop}
       onClick={() => inputRef.current?.click()}
-      className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
+      className={`border-2 border-dashed rounded-xl text-center transition-colors cursor-pointer ${
         csvFile
-          ? "border-foreground/30 bg-muted/30"
-          : "border-border hover:border-muted-foreground"
+          ? "border-foreground/30 bg-muted/30 py-3 px-4"
+          : "border-border hover:border-muted-foreground p-8"
       }`}
     >
       <input
@@ -186,6 +187,317 @@ export function CsvDropzone({
           <p className="text-xs text-muted-foreground mt-1">{helperText}</p>
         </>
       )}
+    </div>
+  );
+}
+
+// Vertical preview of a conversation/transcript: each turn rendered as a
+// "Role" pill above its content. Sized so ~2 turns are visible at once;
+// anything beyond that scrolls inside the cell. Shared across the bulk
+// upload dialogs so chat history rendering is identical everywhere.
+export function ChatHistoryPreview({ turns }: { turns: TurnObject[] }) {
+  return (
+    <div className="max-h-24 overflow-y-auto pr-1 space-y-2">
+      {turns.map((t, i) => {
+        const role = typeof t.role === "string" ? t.role : "?";
+        const content = turnContentString(t);
+        return (
+          <div key={`h-${i}`} className="space-y-1 leading-snug">
+            <span
+              className={`inline-flex items-center text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded ${rolePillClass(role)}`}
+            >
+              {roleLabel(role)}
+            </span>
+            <div className="text-foreground break-words whitespace-pre-wrap">
+              {content || (
+                <span className="text-muted-foreground italic">
+                  (no content)
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// "View more" toggle that reveals the role/content schema and a
+// copy-pasteable example for a conversation column. Reused across every
+// bulk-upload dialog that takes a conversation/transcript JSON column so
+// the explanation stays consistent and out of the way until the user
+// asks for it.
+export function ConversationFormatDetails({
+  example,
+}: {
+  example: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-1">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+        aria-expanded={open}
+      >
+        <svg
+          className={`w-3 h-3 transition-transform ${open ? "rotate-90" : ""}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2.5}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M8.25 4.5l7.5 7.5-7.5 7.5"
+          />
+        </svg>
+        {open ? "View less" : "View more"}
+      </button>
+      {open && (
+        <>
+          <div className="mt-1.5">Each turn must have:</div>
+          <ul className="list-disc pl-5 mt-1 space-y-0.5">
+            <li>
+              <code className="font-mono text-foreground">role</code> — either{" "}
+              <code className="font-mono text-foreground">&quot;user&quot;</code>{" "}
+              or{" "}
+              <code className="font-mono text-foreground">
+                &quot;assistant&quot;
+              </code>
+            </li>
+            <li>
+              <code className="font-mono text-foreground">content</code> — the
+              actual message said by that role
+            </li>
+          </ul>
+          <div className="mt-1.5">
+            Example:{" "}
+            <code className="font-mono text-foreground break-all">
+              {example}
+            </code>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Trigger a CSV download from a string. Used by the dialog shell for the
+// "Download sample CSV" button and the inline tip link.
+export function downloadCsvBlob(csv: string, filename: string): void {
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+// Shared shell for the three bulk-upload dialogs (LLM / STT / Simulation).
+// Owns the modal chrome, header, footer, dropzone, format-help toggle, tip
+// callout, and sample-CSV download wiring. Each dialog supplies its own
+// help body, parsing/upload logic, and items preview.
+type BulkUploadDialogShellProps = {
+  isOpen: boolean;
+  title: string;
+  buildSampleCsv: () => string;
+  sampleFilename: string;
+  helpContent: React.ReactNode;
+  csvFile: File | null;
+  onFile: (file: File | null) => void;
+  onClear: () => void;
+  parseError: string | null;
+  uploadError: string | null;
+  isUploading: boolean;
+  itemCount: number;
+  itemsPreview: React.ReactNode;
+  onUpload: () => void;
+  onClose: () => void;
+};
+
+export function BulkUploadDialogShell({
+  isOpen,
+  title,
+  buildSampleCsv,
+  sampleFilename,
+  helpContent,
+  csvFile,
+  onFile,
+  onClear,
+  parseError,
+  uploadError,
+  isUploading,
+  itemCount,
+  itemsPreview,
+  onUpload,
+  onClose,
+}: BulkUploadDialogShellProps) {
+  useHideFloatingButton(isOpen);
+  const [formatHelpOpen, setFormatHelpOpen] = useState(true);
+
+  // Auto-collapse the help block once a CSV has parsed; re-open if the
+  // user clears it.
+  useEffect(() => {
+    setFormatHelpOpen(itemCount === 0);
+  }, [itemCount]);
+
+  if (!isOpen) return null;
+
+  const downloadSample = () =>
+    downloadCsvBlob(buildSampleCsv(), sampleFilename);
+
+  const handleClose = () => {
+    if (!isUploading) onClose();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={handleClose}
+    >
+      <div
+        className={`bg-background border border-border rounded-xl shadow-2xl w-full flex flex-col max-h-[90vh] transition-[max-width] duration-200 ${
+          itemCount > 0 ? "max-w-[80vw]" : "max-w-[50vw]"
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+          <button
+            onClick={handleClose}
+            disabled={isUploading}
+            aria-label="Close"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-medium text-foreground">
+                Upload CSV
+              </label>
+              <button
+                type="button"
+                onClick={downloadSample}
+                className="h-9 px-3 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                  />
+                </svg>
+                Download sample CSV
+              </button>
+            </div>
+
+            {itemCount > 0 && (
+              <FormatHelpToggle
+                open={formatHelpOpen}
+                onToggle={() => setFormatHelpOpen((o) => !o)}
+              />
+            )}
+
+            {formatHelpOpen && (
+              <div className="text-xs text-muted-foreground mb-3 leading-relaxed space-y-2">
+                {helpContent}
+              </div>
+            )}
+
+            {formatHelpOpen && (
+              <div className="mb-3 flex items-start gap-2 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-foreground">
+                <svg
+                  className="w-4 h-4 mt-0.5 shrink-0 text-blue-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"
+                  />
+                </svg>
+                <span>
+                  <span className="font-semibold">Tip:</span>{" "}
+                  <button
+                    type="button"
+                    onClick={downloadSample}
+                    className="underline underline-offset-2 hover:opacity-80 transition-opacity cursor-pointer"
+                  >
+                    download the sample CSV
+                  </button>{" "}
+                  and edit it as a starting point
+                </span>
+              </div>
+            )}
+
+            <CsvDropzone csvFile={csvFile} onFile={onFile} onClear={onClear} />
+
+            {parseError && (
+              <p className="text-xs text-red-500 mt-3">{parseError}</p>
+            )}
+          </div>
+
+          {itemCount > 0 && itemsPreview}
+
+          {uploadError && (
+            <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-500">
+              {uploadError}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
+          <button
+            onClick={handleClose}
+            disabled={isUploading}
+            className="h-10 px-4 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onUpload}
+            disabled={itemCount === 0 || isUploading || !!parseError}
+            className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isUploading
+              ? "Uploading"
+              : itemCount > 1
+                ? `Upload ${itemCount} items`
+                : "Upload item"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

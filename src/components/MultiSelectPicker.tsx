@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
 export type PickerItem = {
   uuid: string;
@@ -18,6 +19,11 @@ type MultiSelectPickerProps = {
   isLoading?: boolean;
   className?: string;
   disabled?: boolean;
+  // Optional callback fired when the dropdown opens or closes. Lets the
+  // parent defer side effects (e.g. resetting an uploaded CSV) until the
+  // user is done picking instead of reacting to every intermediate
+  // toggle.
+  onOpenChange?: (open: boolean) => void;
 };
 
 export function MultiSelectPicker({
@@ -30,10 +36,68 @@ export function MultiSelectPicker({
   isLoading = false,
   className = "",
   disabled = false,
+  onOpenChange,
 }: MultiSelectPickerProps) {
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpenState] = useState(false);
+  // Mirror state in a ref so the wrapper can read the previous value
+  // synchronously (without the setState updater form, which runs during
+  // render — calling parent setState from there triggers React's
+  // "Cannot update a component while rendering" warning).
+  const dropdownOpenRef = useRef(false);
+  // Keep the latest onOpenChange in a ref so handlers captured by
+  // mount-only effects (e.g. the document-level mousedown listener)
+  // call the freshest version, which closes over the parent's current
+  // selection state — not the empty initial state.
+  const onOpenChangeRef = useRef(onOpenChange);
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange;
+  }, [onOpenChange]);
+  const setDropdownOpen = (next: boolean | ((p: boolean) => boolean)) => {
+    const prev = dropdownOpenRef.current;
+    const resolved = typeof next === "function" ? next(prev) : next;
+    if (resolved === prev) return;
+    dropdownOpenRef.current = resolved;
+    setDropdownOpenState(resolved);
+    onOpenChangeRef.current?.(resolved);
+  };
   const [searchQuery, setSearchQuery] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuRect, setMenuRect] = useState<{
+    left: number;
+    top: number;
+    width: number;
+  } | null>(null);
+
+  // Anchor the portaled dropdown to the trigger via fixed positioning.
+  // Recompute on open, on scroll/resize, and whenever surrounding layout
+  // shifts (e.g. a parent renders a new section based on the picker's
+  // selection, pushing the trigger down) — caught via a ResizeObserver
+  // on the trigger and on document.body.
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const updateRect = () => {
+      const el = triggerRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setMenuRect({ left: r.left, top: r.bottom + 8, width: r.width });
+    };
+    updateRect();
+    window.addEventListener("scroll", updateRect, true);
+    window.addEventListener("resize", updateRect);
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(updateRect);
+      if (triggerRef.current) observer.observe(triggerRef.current);
+      if (typeof document !== "undefined") observer.observe(document.body);
+    }
+    return () => {
+      window.removeEventListener("scroll", updateRect, true);
+      window.removeEventListener("resize", updateRect);
+      observer?.disconnect();
+    };
+  }, [dropdownOpen]);
 
   const filteredItems = items.filter((item) =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -55,15 +119,14 @@ export function MultiSelectPicker({
     onSelectionChange(selectedItems.filter((i) => i.uuid !== uuid));
   };
 
-  // Close dropdown when clicking outside
+  // Close dropdown when clicking outside. The menu now lives in a portal
+  // so we have to test against both the trigger container and the menu.
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setDropdownOpen(false);
-      }
+      const target = event.target as Node;
+      if (dropdownRef.current && dropdownRef.current.contains(target)) return;
+      if (menuRef.current && menuRef.current.contains(target)) return;
+      setDropdownOpen(false);
     };
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -77,7 +140,7 @@ export function MultiSelectPicker({
           {label}
         </label>
       )}
-      <div className="relative">
+      <div className="relative" ref={triggerRef}>
         <div
           onClick={() => !disabled && setDropdownOpen(!dropdownOpen)}
           className={`w-full min-h-[44px] px-4 py-2 rounded-xl text-sm bg-background text-foreground border border-border transition-colors flex items-center justify-between gap-2 ${
@@ -141,9 +204,21 @@ export function MultiSelectPicker({
           )}
         </div>
 
-        {/* Dropdown */}
-        {dropdownOpen && !disabled && (
-          <div className="absolute left-0 right-0 top-full mt-2 bg-popover text-foreground border border-border rounded-xl shadow-xl z-[100] overflow-hidden">
+        {/* Dropdown — portaled to <body> with fixed positioning so it
+            escapes any ancestor `overflow: auto` (e.g. a scrolling modal
+            content area) and isn't clipped. */}
+        {dropdownOpen && !disabled && menuRect && typeof document !== "undefined" &&
+          createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              position: "fixed",
+              left: menuRect.left,
+              top: menuRect.top,
+              width: menuRect.width,
+            }}
+            className="bg-popover text-foreground border border-border rounded-xl shadow-xl z-[100] overflow-hidden"
+          >
             {/* Search */}
             <div className="p-3 border-b border-border">
               <input
@@ -229,7 +304,8 @@ export function MultiSelectPicker({
                 ))
               )}
             </div>
-          </div>
+          </div>,
+          document.body,
         )}
       </div>
     </div>
