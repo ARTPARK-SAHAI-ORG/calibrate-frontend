@@ -674,7 +674,7 @@ function AnnotateView({
               >
                 <EvaluatorsPane
                   evaluators={evaluators}
-                  itemId={currentItem.uuid}
+                  item={currentItem}
                   fields={fields}
                   setField={setField}
                   readOnly={isAdmin}
