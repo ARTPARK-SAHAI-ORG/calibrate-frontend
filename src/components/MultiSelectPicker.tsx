@@ -80,7 +80,7 @@ export function MultiSelectPicker({
       <div className="relative">
         <div
           onClick={() => !disabled && setDropdownOpen(!dropdownOpen)}
-          className={`w-full min-h-[44px] px-4 py-2 rounded-xl text-sm bg-transparent text-foreground border border-border transition-colors flex items-center justify-between gap-2 ${
+          className={`w-full min-h-[44px] px-4 py-2 rounded-xl text-sm bg-background text-foreground border border-border transition-colors flex items-center justify-between gap-2 ${
             disabled
               ? "cursor-default"
               : "hover:border-muted-foreground cursor-pointer"
@@ -88,7 +88,7 @@ export function MultiSelectPicker({
         >
           <div className="flex-1 flex flex-wrap gap-2 items-center">
             {selectedItems.length === 0 ? (
-              <span className="text-muted-foreground">
+              <span className="text-foreground/90">
                 {placeholder}
               </span>
             ) : (
@@ -143,7 +143,7 @@ export function MultiSelectPicker({
 
         {/* Dropdown */}
         {dropdownOpen && !disabled && (
-          <div className="absolute left-0 right-0 top-full mt-2 bg-background border border-border rounded-xl shadow-xl z-[100] overflow-hidden">
+          <div className="absolute left-0 right-0 top-full mt-2 bg-popover text-foreground border border-border rounded-xl shadow-xl z-[100] overflow-hidden">
             {/* Search */}
             <div className="p-3 border-b border-border">
               <input
@@ -192,21 +192,27 @@ export function MultiSelectPicker({
                     onClick={() => toggleItem(item)}
                     className={`w-full px-4 py-3 text-left text-sm transition-colors cursor-pointer flex items-center justify-between ${
                       isSelected(item.uuid)
-                        ? "bg-accent text-foreground"
+                        ? "bg-accent text-accent-foreground"
                         : "text-foreground hover:bg-muted"
                     }`}
                   >
                     <div className="flex-1 min-w-0">
                       <span className="block truncate">{item.name}</span>
                       {item.description && (
-                        <span className="block text-xs text-muted-foreground truncate mt-0.5">
+                        <span
+                          className={`block text-xs truncate mt-0.5 ${
+                            isSelected(item.uuid)
+                              ? "text-accent-foreground/75"
+                              : "text-muted-foreground"
+                          }`}
+                        >
                           {item.description}
                         </span>
                       )}
                     </div>
                     {isSelected(item.uuid) && (
                       <svg
-                        className="w-5 h-5 text-foreground flex-shrink-0 ml-2"
+                        className="w-5 h-5 text-accent-foreground flex-shrink-0 ml-2"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"

@@ -1186,14 +1186,19 @@ function AgreementOverview({
                           {row.name}
                         </p>
                       ) : (
-                        <Link
-                          href={`/evaluators/${row.key}`}
-                          onClick={(e) => e.stopPropagation()}
-                          title={`Open ${row.name}`}
-                          className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate max-w-full"
-                        >
-                          <span className="truncate">{row.name}</span>
-                        </Link>
+                        <>
+                          <Link
+                            href={`/evaluators/${row.key}`}
+                            onClick={(e) => e.stopPropagation()}
+                            title={`Open ${row.name}`}
+                            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate max-w-full min-w-0"
+                          >
+                            <span className="truncate">{row.name}</span>
+                          </Link>
+                          <span className="text-sm font-medium text-foreground shrink-0">
+                            alignment
+                          </span>
+                        </>
                       )}
                     </div>
                     <div>
@@ -1268,14 +1273,19 @@ function AgreementOverview({
                           {row.name}
                         </p>
                       ) : (
-                        <Link
-                          href={`/evaluators/${row.key}`}
-                          onClick={(e) => e.stopPropagation()}
-                          title={`Open ${row.name}`}
-                          className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate flex-1 min-w-0"
-                        >
-                          <span className="truncate">{row.name}</span>
-                        </Link>
+                        <>
+                          <Link
+                            href={`/evaluators/${row.key}`}
+                            onClick={(e) => e.stopPropagation()}
+                            title={`Open ${row.name}`}
+                            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate flex-1 min-w-0"
+                          >
+                            <span className="truncate">{row.name}</span>
+                          </Link>
+                          <span className="text-sm font-medium text-foreground shrink-0">
+                            alignment
+                          </span>
+                        </>
                       )}
                       {row.key === "human_human" ? (
                         <HumanTypePill />

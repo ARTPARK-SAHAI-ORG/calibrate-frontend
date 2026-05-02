@@ -988,6 +988,24 @@ Don't introduce new pill colors here; reuse the per-type Tailwind classes alread
   - Implementation uses `window.innerWidth < 768` check combined with `activeMetricsTab` state to conditionally render
   - Prevents duplicate display on mobile when switching between Performance/Latency tabs
 
+### 10. Human Labelling (`/human-labelling`)
+
+**What it is:** Authenticated hub for creating labelling tasks, managing annotators, and viewing cross-task **agreement** metrics (inter-annotator agreement and how each evaluator aligns with human labels). Primary implementation: `src/app/human-labelling/page.tsx` plus nested routes under `src/app/human-labelling/` (task detail, annotator detail, annotation jobs, evaluator run views). Shared UI lives under `src/components/human-labelling/`. **Navigation (`src/components/AppLayout.tsx`):** The sidebar item **`label`** is **`Human alignment`** (what users see in the nav). The **`id`** stays **`human-labelling`**, matching the URL segment and every screen’s `activeItem="human-labelling"` — changing nav labels does not rename routes or folders. **Gotcha:** `document.title`, the hub route `layout.tsx` **metadata** title, and the hub page’s main heading may still say **Human Labelling** unless updated separately; mismatches between sidebar wording and in-page titles are intentional unless product asks for a full rename.
+
+**Tabs** (synced to URL via `?tab=` — valid values: `overview`, `tasks`, `annotators`; default `overview`):
+
+| Tab          | Purpose |
+| ------------ | ------- |
+| **Overview** | **Agreement summary** (`AgreementOverview` in `page.tsx`): task filter dropdown (`All tasks` or one task), desktop table + mobile cards. Rows include a pinned **Annotator agreement** baseline (`human_human`), then one row per evaluator from agreement API data. Columns: **Name**, **Type** (`HumanTypePill` vs `EvaluatorTypePill`), **Current agreement** (%), expandable chart per row. |
+| **Tasks**    | List of labelling tasks; navigates to `/human-labelling/tasks/[uuid]`. |
+| **Annotators** | Annotator list; navigates to `/human-labelling/annotators/[uuid]`. |
+
+**Overview — evaluator row labeling (UX copy):** For each **evaluator** row (not the annotator-agreement row), the **Name** column shows the existing pill-shaped **link** to `/evaluators/{evaluator_id}` containing **only** the evaluator display name, immediately followed by the lowercase word **`alignment`** as plain text (`text-sm font-medium text-foreground`, `shrink-0`). **Why:** Distinguishes human–evaluator alignment from the evaluator’s identity and from the **Type** column pill (LLM/STT/TTS/simulation). **Pattern:** Keep the link wrapping **name only** so `title`/`href` stay evaluator-scoped; do not fold `alignment` into `row.name` for charts (`ExpandedChart` still uses `seriesName={row.name}`) or sort keys (name sort uses API name).
+
+**Layout notes:** Desktop uses a 4-column grid for the agreement table header and rows; mobile overview cards use a flex row for name + type pill + chevron. Evaluator rows use `min-w-0` on the link so truncation still works when the suffix is present.
+
+**Labelling task detail** (`/human-labelling/tasks/[uuid]`, `src/app/human-labelling/tasks/[uuid]/page.tsx`): Tabs include **Overview**, **Items**, **Labelling jobs**, **Evaluation runs** (`?tab=` mirrors hub pattern). The **Overview** tab’s **agreement strip** (when the agreement endpoint returns usable pair counts — not while loading and not in the empty state) renders a row of **`AgreementStatCard`** instances in the same file. **`AgreementStatCard`** takes a **discriminated union**: **`staticPillText`** *or* **`evaluatorPill`**, never both. A shared **`agreementStatPillBase`** class string gives both variants the same bordered **`text-xs`** chip look as the task header evaluator links. **Annotator agreement** (`human_human`): **`staticPillText="Annotator agreement"`** renders that text inside a **`<span>`** shell (`cursor-default`, optional **`title`**) — **not** clickable. **Evaluator** rows: **`evaluatorPill`** → **`Link`** to **`/evaluators/{evaluator_id}`** with **`truncate`** / **`min-w-0`** / **`max-w-full`** on the name, **`hover:bg-muted`**, **`cursor-pointer`**; beside it, lowercase **`alignment`** as plain **`span`** (`text-sm font-medium text-foreground shrink-0`) inside **`flex items-center gap-2 min-w-0 flex-wrap`**, matching the hub overview’s evaluator-row suffix pattern. **Agreement %** sits below with **`mt-2`** and **`agreementColor`**. **Above the cards**, **`h2` Agreement summary** (`text-sm font-semibold`) plus muted intro (`text-xs text-muted-foreground max-w-2xl mt-1`) describing annotators’ agreement and each evaluator’s alignment **with humans**. **Why:** Cards read as the same visual language as header chips while labeling annotator vs evaluator metrics clearly; **`alignment`** ties task overview cards to the hub table copy pattern. **Overview — item × evaluator summary** (same tab, below the cards when summary data exists): toolbar **`MultiSelectPicker`** with **`placeholder="All evaluators"`** filters rows; **`Live versions only`** toggle beside it. Those controls use the shared **`MultiSelectPicker`** surface/contrast rules documented under **Component Patterns**. **Gotchas:** Heading + cards only when stats render — empty state unchanged. **`EvaluatorTypePill`** stays task-level in the header — not repeated per card.
+
 ---
 
 ## Key Concepts Explained
@@ -1088,6 +1106,7 @@ This enables:
 │   │   ├── scenarios/         # Test scenario definitions (has layout.tsx)
 │   │   ├── metrics/           # Evaluation metrics (has layout.tsx)
 │   │   ├── simulations/       # End-to-end simulation testing (has layout.tsx)
+│   │   ├── human-labelling/   # Hub (?tab=overview|tasks|annotators); tasks/[uuid], jobs/[token], annotators/[uuid], evaluator-runs
 │   │   ├── page.tsx           # Landing page (marketing page with features, integrations, community)
 │   │   ├── login/             # Login page with email/password and Google OAuth (has layout.tsx)
 │   │   ├── signup/            # Signup page with registration form and password validation (has layout.tsx)
@@ -1095,6 +1114,7 @@ This enables:
 │   ├── components/
 │   │   ├── agent-tabs/        # Agent detail tab components
 │   │   ├── evaluations/       # Evaluation UI components
+│   │   ├── human-labelling/   # Labelling dialogs, AnnotationJobView, bulk upload helpers
 │   │   ├── charts/            # Recharts visualization components
 │   │   ├── icons/             # Shared SVG icon components
 │   │   ├── providers/         # React context providers (SessionProvider, FloatingButtonProvider)
@@ -2376,7 +2396,7 @@ Both TTS and STT evaluation pages follow the same list → new → detail patter
   - Shows "(X selected)" count next to the header title
 - **Evaluator selection** (sits below provider selection in the Settings tab):
   - Both `SpeechToTextEvaluation` and `TextToSpeechEvaluation` fetch `GET /evaluators?include_defaults=true` on mount and **filter client-side to `evaluator_type === "stt"`** (or `"tts"` for TTS) before mapping to `PickerItem`s. Same pattern as the simulation Config tab metrics picker, except the filter type is per-page. Other evaluator types (LLM, simulation, and the opposite of stt/tts) are excluded.
-  - Rendered using the shared `MultiSelectPicker` component (the same one used for personas/scenarios/metrics on the simulation Config tab) with `placeholder="Choose one or more evaluators"` and `searchPlaceholder="Search evaluators"`. Header reads "Select evaluators" with an inline "(X selected)" count, matching the providers section pattern.
+  - Rendered using the shared `MultiSelectPicker` component (the same one used for personas/scenarios/metrics on the simulation Config tab) with `placeholder="Choose one or more evaluators"` and `searchPlaceholder="Search evaluators"`. Header reads "Select evaluators" with an inline "(X selected)" count, matching the providers section pattern. **Trigger / dropdown styling** follows the shared **`MultiSelectPicker`** rules under **Component Patterns** (`bg-background` trigger, **`bg-popover`** panel, **`accent` / `accent-foreground`** selected rows) so text stays readable on tinted sections and in dark mode.
   - **Defaults pre-selected on first load**: after the fetch resolves, `selectedEvaluators` is initialized to all evaluators with `!owner_user_id` (the same "is default" check used by the `/evaluators` page tab partition). User-owned ("My") evaluators of the matching type are listed but unselected.
   - **At least one evaluator required**: clicking Evaluate with zero selected sets `evaluatorsInvalid`, switches to the Settings tab, and renders a red border around the section (`bg-red-500/10 border border-red-500`) — same visual treatment used for the providers section. The `MultiSelectPicker`'s `onSelectionChange` is wrapped (`handleEvaluatorsChange`) to clear the invalid state as soon as the user adds one back. The validation runs *after* the providers check, so the red border appears one-at-a-time.
   - **Sent to the backend** as `evaluator_uuids: string[]` on `POST /[stt|tts]/evaluate` in both inline and dataset input modes.
@@ -2596,6 +2616,8 @@ const getFilteredProviders = (language: LanguageOption) => {
 - Language arrays are defined in `providers.ts` (e.g., `deepgramSTTSupportedLanguages`, `googleTTSSupportedLanguages`)
 
 ### Component Patterns
+
+**`MultiSelectPicker`** (`src/components/MultiSelectPicker.tsx`): Shared multi-select dropdown (searchable list, chips for selections). Used on **simulation Config** (resource pickers), **new STT/TTS evaluation** Settings tab, **labelling task Overview** item summary (**`All evaluators`** filter), and anywhere else it is imported. **Why opaque surfaces:** An earlier **`bg-transparent`** trigger let placeholder/chip text wash out on tinted strips (e.g. summary header **`bg-muted/30`**). **Conventions:** Closed control **`bg-background text-foreground`** with **`border-border`** (parity with **`Select`**); empty selection placeholder **`text-foreground/90`**; open panel **`bg-popover text-foreground`** so it separates from page **`bg-background`** (especially dark: **`--popover`** `#1a1a1a` vs **`--background`** `#0f0f0f`). Rows: selected **`bg-accent text-accent-foreground`**, checkmark **`text-accent-foreground`**; unselected **`text-foreground hover:bg-muted`**. Optional **`item.description`**: **`text-muted-foreground`** when unselected, **`text-accent-foreground/75`** when selected so secondary lines don’t disappear on the accent fill. Search input inside the panel **`bg-background`** for a visible inset field. **Gotcha:** Tweaks apply to **every** consumer — keep CSS variables in **`globals.css`** (`--popover`, `--accent`, `--accent-foreground`) aligned.
 
 1. **Tab Navigation**: Used in agent detail and simulation detail pages
    - Tabs sync with URL query param (`?tab=agent`, `?tab=tools`, etc.)

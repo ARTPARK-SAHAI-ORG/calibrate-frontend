@@ -87,7 +87,7 @@ const navSections: NavSection[] = [
       },
       {
         id: "human-labelling",
-        label: "Human Labelling",
+        label: "Human alignment",
         icon: (
           <svg
             className="w-4 h-4"
@@ -301,7 +301,9 @@ export function AppLayout({
   }, []);
 
   // Compute user display info from either session or localStorage
-  const userName = session?.user?.name || (localUser ? `${localUser.first_name} ${localUser.last_name}` : "User");
+  const userName =
+    session?.user?.name ||
+    (localUser ? `${localUser.first_name} ${localUser.last_name}` : "User");
   const userEmail = session?.user?.email || localUser?.email || "";
   const userImage = session?.user?.image || null;
 
@@ -323,7 +325,7 @@ export function AppLayout({
     if (newTheme === "device") {
       // Follow system preference
       const prefersDark = window.matchMedia(
-        "(prefers-color-scheme: dark)"
+        "(prefers-color-scheme: dark)",
       ).matches;
       root.classList.add(prefersDark ? "dark" : "light");
     } else {
@@ -556,9 +558,7 @@ export function AppLayout({
           <nav className="flex-1 py-4 px-2 overflow-visible">
             {navSections.map((section, index) => (
               <div key={section.title || index} className="mb-4">
-                {section.title && (
-                  <div className="h-px bg-border mx-1 mb-3" />
-                )}
+                {section.title && <div className="h-px bg-border mx-1 mb-3" />}
                 <ul className="space-y-1">
                   {section.items.map((item) => (
                     <li key={item.id} className="relative group/tip">
@@ -713,7 +713,8 @@ export function AppLayout({
                         localStorage.removeItem("access_token");
                         localStorage.removeItem("user");
                         // Clear cookie
-                        document.cookie = "access_token=; path=/; max-age=0; SameSite=Lax";
+                        document.cookie =
+                          "access_token=; path=/; max-age=0; SameSite=Lax";
                         // Sign out via NextAuth
                         signOut({ callbackUrl: "/login" });
                       }}
