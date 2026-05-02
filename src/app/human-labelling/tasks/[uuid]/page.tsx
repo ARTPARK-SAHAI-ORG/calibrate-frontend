@@ -938,7 +938,13 @@ function LabellingTaskPageInner() {
     setTaskSummaryLoading(true);
     setTaskSummaryError(null);
     try {
-      const qs = summaryLiveOnly ? "?live_only=true" : "";
+      // `live_only` only constrains the *overview* table; the items tab
+      // uses the same summary to decide which rows can show results, and
+      // there it should reflect every version — otherwise toggling the
+      // overview filter would also disable "View results" buttons on the
+      // items tab.
+      const useLiveOnly = activeTab === "overview" && summaryLiveOnly;
+      const qs = useLiveOnly ? "?live_only=true" : "";
       const data = await apiClient<TaskSummaryResponse>(
         `/annotation-tasks/${uuid}/summary${qs}`,
         accessToken,
@@ -949,7 +955,7 @@ function LabellingTaskPageInner() {
     } finally {
       setTaskSummaryLoading(false);
     }
-  }, [accessToken, uuid, summaryLiveOnly]);
+  }, [accessToken, uuid, activeTab, summaryLiveOnly]);
 
   useEffect(() => {
     if (activeTab === "overview" || activeTab === "items") fetchTaskSummary();
@@ -1754,35 +1760,59 @@ function LabellingTaskPageInner() {
                 </svg>
                 {taskType === "stt" ? "Add items" : "Add item"}
               </button>
-              <button
-                onClick={() => {
-                  if (taskType === "stt") {
-                    setBulkUploadSttOpen(true);
-                  } else if (taskType === "simulation") {
-                    setBulkUploadSimulationOpen(true);
-                  } else if (taskType === "llm") {
-                    setBulkUploadLlmOpen(true);
-                  } else {
-                    toast.info("CSV upload isn't supported yet — coming soon.");
-                  }
-                }}
-                className="h-9 px-3 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1.5"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-                  />
-                </svg>
-                Bulk upload
-              </button>
+              {(() => {
+                // LLM bulk upload references evaluators by name in the
+                // CSV; without any linked evaluators the validator will
+                // reject every row. Disable the button instead.
+                const llmNoEvaluators =
+                  taskType === "llm" && (task?.evaluators?.length ?? 0) === 0;
+                const buttonEl = (
+                  <button
+                    onClick={() => {
+                      if (llmNoEvaluators) return;
+                      if (taskType === "stt") {
+                        setBulkUploadSttOpen(true);
+                      } else if (taskType === "simulation") {
+                        setBulkUploadSimulationOpen(true);
+                      } else if (taskType === "llm") {
+                        setBulkUploadLlmOpen(true);
+                      } else {
+                        toast.info(
+                          "CSV upload isn't supported yet — coming soon.",
+                        );
+                      }
+                    }}
+                    disabled={llmNoEvaluators}
+                    className={`h-9 px-3 rounded-md text-sm font-medium bg-foreground text-background flex items-center gap-1.5 transition-opacity ${
+                      llmNoEvaluators
+                        ? "opacity-50 cursor-not-allowed"
+                        : "hover:opacity-90 cursor-pointer"
+                    }`}
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+                      />
+                    </svg>
+                    Bulk upload
+                  </button>
+                );
+                return llmNoEvaluators ? (
+                  <Tooltip content="Link at least one evaluator to this task before bulk uploading">
+                    {buttonEl}
+                  </Tooltip>
+                ) : (
+                  buttonEl
+                );
+              })()}
             </div>
           )}
         </div>

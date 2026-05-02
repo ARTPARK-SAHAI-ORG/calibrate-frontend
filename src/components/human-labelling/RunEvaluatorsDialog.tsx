@@ -97,6 +97,17 @@ export function RunEvaluatorsDialog({
     {},
   );
 
+  // The parent rebuilds the `evaluators` array on every render, so we
+  // depend on a stable string key derived from the actual UUIDs. Without
+  // this, parent re-renders during the dialog's lifetime (e.g. submit
+  // sets `submitting=true`) would re-fire the effect and wipe the user's
+  // picks/version selections back to defaults.
+  const evaluatorIdsKey = evaluators
+    .map((e) => e.uuid)
+    .slice()
+    .sort()
+    .join(",");
+
   useEffect(() => {
     if (!isOpen) return;
     setLoadError(null);
@@ -146,7 +157,11 @@ export function RunEvaluatorsDialog({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, accessToken, evaluators]);
+    // `evaluators` is intentionally excluded — we re-key on the stable
+    // `evaluatorIdsKey` instead. Including the array reference would
+    // re-fire the effect on every parent render and wipe state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, accessToken, evaluatorIdsKey]);
 
   const pickedCount = useMemo(
     () => Object.values(picked).filter(Boolean).length,
@@ -257,17 +272,15 @@ export function RunEvaluatorsDialog({
                 versions[0]?.uuid ??
                 "";
               return (
+                // Plain clickable surface — the real interactive
+                // controls (checkbox + version picker) are inside, so
+                // this wrapper isn't an ARIA "button". Clicking it
+                // toggles the checkbox via its native label-like
+                // behaviour; keyboard users use the inner controls
+                // directly.
                 <div
                   key={ev.uuid}
-                  role="button"
-                  tabIndex={0}
                   onClick={() => togglePicked(ev.uuid)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      togglePicked(ev.uuid);
-                    }
-                  }}
                   className={`flex items-center gap-3 px-3 py-2 rounded-md border transition-colors cursor-pointer hover:bg-muted/30 ${
                     isPicked
                       ? "border-border bg-background"

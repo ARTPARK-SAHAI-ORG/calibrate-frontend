@@ -53,7 +53,7 @@ export function SingleSelectPicker<T>({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [rect, setRect] = useState<Rect | null>(null);
-  const triggerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const selected = items.find((it) => getId(it) === selectedId) ?? null;
   const filtered =
@@ -115,24 +115,18 @@ export function SingleSelectPicker<T>({
         </label>
       )}
       <div className="relative">
-        <div
+        <button
           ref={triggerRef}
-          role="button"
-          tabIndex={disabled ? -1 : 0}
+          type="button"
+          disabled={disabled}
           aria-label={ariaLabel}
           aria-haspopup="listbox"
           aria-expanded={open}
-          onClick={() => !disabled && setOpen((o) => !o)}
+          onClick={() => setOpen((o) => !o)}
           onKeyDown={(e) => {
-            if (disabled) return;
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              setOpen((o) => !o);
-            } else if (e.key === "Escape") {
-              setOpen(false);
-            }
+            if (e.key === "Escape") setOpen(false);
           }}
-          className={`w-full ${triggerSizeClass} text-sm bg-transparent text-foreground border border-border transition-colors flex items-center justify-between gap-2 ${
+          className={`w-full ${triggerSizeClass} text-sm bg-transparent text-foreground border border-border transition-colors flex items-center justify-between gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
             disabled
               ? "cursor-not-allowed opacity-50"
               : "hover:border-muted-foreground cursor-pointer"
@@ -164,7 +158,7 @@ export function SingleSelectPicker<T>({
               />
             </svg>
           )}
-        </div>
+        </button>
       </div>
 
       {open &&
@@ -186,7 +180,14 @@ export function SingleSelectPicker<T>({
                   <input
                     type="text"
                     value={search}
+                    autoFocus
                     onChange={(e) => setSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.stopPropagation();
+                        setOpen(false);
+                      }
+                    }}
                     placeholder={searchPlaceholder}
                     className="w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-1 focus:ring-accent"
                     onClick={(e) => e.stopPropagation()}
