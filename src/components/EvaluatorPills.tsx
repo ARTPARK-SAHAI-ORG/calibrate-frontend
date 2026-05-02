@@ -35,7 +35,7 @@ export const EVALUATOR_TYPE_TOOLTIPS: Record<EvaluatorType, string> = {
 const EVALUATOR_TYPE_COLORS: Record<EvaluatorType, string> = {
   tts: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
   stt: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-  llm: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
+  llm: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
   simulation: "bg-pink-500/10 text-pink-600 dark:text-pink-400",
 };
 

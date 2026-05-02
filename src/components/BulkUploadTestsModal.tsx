@@ -1370,7 +1370,7 @@ export function BulkUploadTestsModal({
                 </label>
                 <button
                   onClick={downloadSampleCsv}
-                  className="h-9 px-3 rounded-md text-xs font-medium border border-border bg-background text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  className="h-9 px-3 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
                 >
                   <svg
                     className="w-4 h-4"
