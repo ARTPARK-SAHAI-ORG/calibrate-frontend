@@ -148,6 +148,19 @@ function resolveEvaluatorsCell(
   const trimmed = cell.trim();
   const errors: string[] = [];
 
+  // A single-object spec (`{"name":"…","variables":{…}}`) is a common
+  // mistake — without the outer `[...]` it would otherwise silently
+  // fall through to the plain-string path below and be treated as a
+  // criteria string for the default evaluator. Reject explicitly.
+  if (trimmed.startsWith("{")) {
+    return {
+      refs: [],
+      errors: [
+        'evaluators must be a JSON array — wrap a single evaluator object in [...] (e.g. [{"name":"…","variables":{…}}])',
+      ],
+    };
+  }
+
   if (trimmed.startsWith("[")) {
     let parsed: unknown;
     try {
