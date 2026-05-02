@@ -48,6 +48,11 @@ type Evaluator = {
   description: string | null;
   evaluator_type: string;
   output_type: "binary" | "rating" | string;
+  // Rating bounds returned by the backend (null/absent for binary
+  // evaluators). Threaded into EvaluatorVerdictCard so the rating
+  // buttons render `scale_min..scale_max` instead of the default 1..5.
+  scale_min?: number | null;
+  scale_max?: number | null;
 };
 
 export type Item = {
@@ -113,7 +118,9 @@ function readSavedComment(v: unknown): string {
 async function publicFetch<T>(
   path: string,
   init?: { method?: string; body?: unknown },
-): Promise<{ ok: true; data: T } | { ok: false; status: number; text: string }> {
+): Promise<
+  { ok: true; data: T } | { ok: false; status: number; text: string }
+> {
   const res = await fetch(`${getBackendUrl()}${path}`, {
     method: init?.method ?? "GET",
     headers: {
@@ -251,15 +258,9 @@ export function AnnotationJobView({
 
   if (state.status === "loading") {
     return (
-      <div
-        className={`${wrapperClass} items-center justify-center p-6`}
-      >
+      <div className={`${wrapperClass} items-center justify-center p-6`}>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <svg
-            className="w-4 h-4 animate-spin"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
+          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle
               className="opacity-25"
               cx="12"
@@ -647,7 +648,7 @@ function AnnotateView({
               <ItemPane item={currentItem} taskType={data.task.type} />
               <EvaluatorsPane
                 evaluators={evaluators}
-                itemId={currentItem.uuid}
+                item={currentItem}
                 fields={fields}
                 setField={setField}
                 readOnly={isAdmin}
@@ -712,13 +713,13 @@ export function ItemPane({
 
 function EvaluatorsPane({
   evaluators,
-  itemId,
+  item,
   fields,
   setField,
   readOnly,
 }: {
   evaluators: Evaluator[];
-  itemId: string;
+  item: Item;
   fields: Record<FieldKey, FieldValue>;
   setField: (key: FieldKey, partial: Partial<FieldValue>) => void;
   readOnly: boolean;
@@ -731,11 +732,35 @@ function EvaluatorsPane({
     );
   }
 
+  // Per-item, per-evaluator variable values live on
+  // `payload.evaluator_variables[<evaluator_uuid>]`. Surface them on
+  // each card so annotators (and admins reviewing) can see the criteria
+  // / variable values they're judging against.
+  const itemPayload = (item.payload ?? {}) as Record<string, unknown>;
+  const itemEvaluatorVariables = (() => {
+    const raw = itemPayload.evaluator_variables;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+    const out: Record<string, Record<string, string>> = {};
+    for (const [evUuid, vals] of Object.entries(
+      raw as Record<string, unknown>,
+    )) {
+      if (!vals || typeof vals !== "object" || Array.isArray(vals)) continue;
+      const inner: Record<string, string> = {};
+      for (const [k, v] of Object.entries(vals as Record<string, unknown>)) {
+        if (typeof v === "string") inner[k] = v;
+        else if (v != null) inner[k] = String(v);
+      }
+      out[evUuid] = inner;
+    }
+    return out;
+  })();
+
   return (
     <div className="space-y-3">
       {evaluators.map((ev) => {
-        const k = fieldKey(itemId, ev.uuid);
+        const k = fieldKey(item.uuid, ev.uuid);
         const f = fields[k];
+        const variableValues = itemEvaluatorVariables[ev.uuid];
         const outputType =
           ev.output_type === "binary" || ev.output_type === "rating"
             ? ev.output_type
@@ -753,6 +778,12 @@ function EvaluatorsPane({
             </div>
           );
         }
+
+        const scaleMin =
+          typeof ev.scale_min === "number" ? ev.scale_min : undefined;
+        const scaleMax =
+          typeof ev.scale_max === "number" ? ev.scale_max : undefined;
+
         if (readOnly) {
           // Admin / "view submitted" surface — show the verdict the
           // annotator picked (and any reasoning) using the read view.
@@ -764,6 +795,9 @@ function EvaluatorsPane({
               description={ev.description}
               outputType={outputType}
               evaluatorUuid={ev.uuid}
+              scaleMin={scaleMin}
+              scaleMax={scaleMax}
+              variableValues={variableValues}
               match={
                 outputType === "binary" && typeof f?.value === "boolean"
                   ? f.value
@@ -774,9 +808,7 @@ function EvaluatorsPane({
                   ? f.value
                   : null
               }
-              reasoning={
-                typeof f?.comment === "string" ? f.comment : null
-              }
+              reasoning={typeof f?.comment === "string" ? f.comment : null}
             />
           );
         }
@@ -788,6 +820,9 @@ function EvaluatorsPane({
             description={ev.description}
             outputType={outputType}
             evaluatorUuid={ev.uuid}
+            scaleMin={scaleMin}
+            scaleMax={scaleMax}
+            variableValues={variableValues}
             value={f?.value as boolean | number | undefined}
             comment={typeof f?.comment === "string" ? f.comment : ""}
             onValueChange={(v) => setField(k, { value: v })}

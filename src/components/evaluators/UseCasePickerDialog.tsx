@@ -10,6 +10,28 @@ export type EvaluatorTypeOption = {
   description: string;
 };
 
+const TYPE_INACTIVE_CLASSES: Record<EvaluatorType, string> = {
+  tts: "border-purple-500/20 bg-purple-500/[0.04] hover:bg-purple-500/10 hover:border-purple-500/40",
+  stt: "border-blue-500/20 bg-blue-500/[0.04] hover:bg-blue-500/10 hover:border-blue-500/40",
+  llm: "border-orange-500/20 bg-orange-500/[0.04] hover:bg-orange-500/10 hover:border-orange-500/40",
+  simulation:
+    "border-pink-500/20 bg-pink-500/[0.04] hover:bg-pink-500/10 hover:border-pink-500/40",
+};
+
+const TYPE_ACTIVE_CLASSES: Record<EvaluatorType, string> = {
+  tts: "border-purple-500/60 bg-purple-500/15 ring-1 ring-purple-500/40",
+  stt: "border-blue-500/60 bg-blue-500/15 ring-1 ring-blue-500/40",
+  llm: "border-orange-500/60 bg-orange-500/15 ring-1 ring-orange-500/40",
+  simulation: "border-pink-500/60 bg-pink-500/15 ring-1 ring-pink-500/40",
+};
+
+const TYPE_TITLE_CLASSES: Record<EvaluatorType, string> = {
+  tts: "text-purple-700 dark:text-purple-300",
+  stt: "text-blue-700 dark:text-blue-300",
+  llm: "text-orange-700 dark:text-orange-300",
+  simulation: "text-pink-700 dark:text-pink-300",
+};
+
 type UseCasePickerDialogProps = {
   initialValue: EvaluatorType | null;
   options: EvaluatorTypeOption[];
@@ -76,11 +98,13 @@ export function UseCasePickerDialog({
                   onClick={() => setSelected(opt.value)}
                   className={`flex flex-col items-start text-left p-4 rounded-md border transition-colors cursor-pointer ${
                     active
-                      ? "border-foreground bg-muted/40 dark:bg-accent"
-                      : "border-border bg-background dark:bg-muted hover:bg-muted/40 dark:hover:bg-accent"
+                      ? TYPE_ACTIVE_CLASSES[opt.value]
+                      : TYPE_INACTIVE_CLASSES[opt.value]
                   }`}
                 >
-                  <div className="text-sm md:text-base font-medium text-foreground">
+                  <div
+                    className={`text-sm md:text-base font-medium ${TYPE_TITLE_CLASSES[opt.value]}`}
+                  >
                     {opt.title}
                   </div>
                   <div className="text-xs md:text-sm text-muted-foreground mt-1 leading-relaxed">
