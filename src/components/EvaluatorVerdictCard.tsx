@@ -195,6 +195,7 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
         <>
           <WriteControls
             outputType={props.outputType}
+            scaleMin={props.scaleMin}
             scaleMax={props.scaleMax}
             value={props.value}
             onChange={(v) => props.onValueChange?.(v)}
@@ -312,12 +313,14 @@ function ReadVerdictPill({
 
 function WriteControls({
   outputType,
+  scaleMin,
   scaleMax,
   value,
   onChange,
   disabled,
 }: {
   outputType: EvaluatorOutputType;
+  scaleMin?: number;
   scaleMax?: number;
   value?: boolean | number;
   onChange: (v: boolean | number) => void;
@@ -355,8 +358,14 @@ function WriteControls({
       </div>
     );
   }
-  const max = typeof scaleMax === "number" && scaleMax > 0 ? scaleMax : 5;
-  const options = Array.from({ length: max }, (_, i) => i + 1);
+  // Build the rating options as `scaleMin..scaleMax` so evaluators with a
+  // non-1 minimum (e.g. 0..5) work correctly. Default to 1..5 when no
+  // bounds are provided. Guard against an inverted range as a sanity
+  // fallback.
+  const min = typeof scaleMin === "number" ? scaleMin : 1;
+  const rawMax = typeof scaleMax === "number" && scaleMax > 0 ? scaleMax : 5;
+  const max = rawMax >= min ? rawMax : min;
+  const options = Array.from({ length: max - min + 1 }, (_, i) => min + i);
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
       {options.map((n) => {

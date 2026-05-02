@@ -165,26 +165,37 @@ export function AnnotationJobView({
   const [submitting, setSubmitting] = useState(false);
   const [topError, setTopError] = useState<string | null>(null);
 
-  const initialise = useCallback((data: JobResponse) => {
-    const next: Record<FieldKey, FieldValue> = {};
-    const saved = new Set<FieldKey>();
-    for (const a of data.annotations) {
-      if (!a.evaluator_id) continue;
-      const k = fieldKey(a.item_id, a.evaluator_id);
-      next[k] = {
-        value: readSavedValue(a.value),
-        comment: readSavedComment(a.value),
-      };
-      saved.add(k);
-    }
-    setFields(next);
-    setSavedKeys(saved);
+  const initialise = useCallback(
+    (data: JobResponse) => {
+      const next: Record<FieldKey, FieldValue> = {};
+      const saved = new Set<FieldKey>();
+      for (const a of data.annotations) {
+        if (!a.evaluator_id) continue;
+        const k = fieldKey(a.item_id, a.evaluator_id);
+        next[k] = {
+          value: readSavedValue(a.value),
+          comment: readSavedComment(a.value),
+        };
+        saved.add(k);
+      }
+      setFields(next);
+      setSavedKeys(saved);
 
-    const firstIncomplete = data.items.findIndex((it) =>
-      data.evaluators.some((ev) => !saved.has(fieldKey(it.uuid, ev.uuid))),
-    );
-    setCurrentIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
-  }, []);
+      // Admin (read-only) view always starts on the first item — admins
+      // are reviewing what's been labelled, not picking up where the
+      // annotator left off. Write mode jumps to the first item that
+      // still has at least one unlabelled evaluator.
+      if (mode === "admin") {
+        setCurrentIndex(0);
+        return;
+      }
+      const firstIncomplete = data.items.findIndex((it) =>
+        data.evaluators.some((ev) => !saved.has(fieldKey(it.uuid, ev.uuid))),
+      );
+      setCurrentIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
+    },
+    [mode],
+  );
 
   useEffect(() => {
     if (!token) return;

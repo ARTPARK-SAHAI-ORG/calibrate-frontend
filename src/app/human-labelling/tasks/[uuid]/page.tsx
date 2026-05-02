@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import Link from "next/link";
@@ -516,27 +517,22 @@ function EvaluatorRunsList({
 function ItemRowActions({
   itemUuid,
   onDelete,
-  onPlay,
   onViewResults,
   onLabel,
-  playDisabled,
-  playLoadingForUuid,
+  onEvaluate,
   isResultsOpen,
   viewResultsDisabled,
   viewResultsDisabledTooltip,
 }: {
   itemUuid: string;
   onDelete: (uuid: string) => void | Promise<void>;
-  onPlay: (uuid: string) => void | Promise<void>;
   onViewResults: (uuid: string) => void;
   onLabel?: (uuid: string) => void;
-  playDisabled?: boolean;
-  playLoadingForUuid?: string | null;
+  onEvaluate?: (uuid: string) => void;
   isResultsOpen?: boolean;
   viewResultsDisabled?: boolean;
   viewResultsDisabledTooltip?: string;
 }) {
-  const isLoading = playLoadingForUuid === itemUuid;
   return (
     <div
       className="flex items-center justify-center gap-2"
@@ -550,6 +546,16 @@ function ItemRowActions({
           className="h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
         >
           Label
+        </button>
+      )}
+      {onEvaluate && (
+        <button
+          type="button"
+          onClick={() => onEvaluate(itemUuid)}
+          aria-label="Evaluate"
+          className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer"
+        >
+          Evaluate
         </button>
       )}
       {/* View / Hide results (toggle) */}
@@ -625,41 +631,6 @@ function ItemRowActions({
           {isResultsOpen ? "Hide results" : "View results"}
         </button>
       )}
-      {/* Run evaluators */}
-      <button
-        type="button"
-        onClick={() => onPlay(itemUuid)}
-        disabled={playDisabled || isLoading}
-        aria-label="Run evaluators"
-        className="h-8 px-3 inline-flex items-center gap-1.5 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {isLoading ? (
-          <svg
-            className="w-3.5 h-3.5 animate-spin"
-            viewBox="0 0 24 24"
-            fill="none"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-            />
-          </svg>
-        ) : (
-          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        )}
-        Run evaluators
-      </button>
       {/* Delete Button */}
       <button
         type="button"
@@ -841,6 +812,12 @@ function LabellingTaskPageInner() {
     [uuid],
   );
 
+  // After landing on the task page for the first time, if the task has
+  // no items yet *and* the URL didn't pin a specific tab, drop the user
+  // straight onto the items tab — that's the next thing they need to
+  // do. Guarded by a ref so we don't fight the user's later tab choices.
+  const autoTabSwitchedRef = useRef(false);
+
   const [task, setTask] = useState<LabellingTask | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -882,6 +859,16 @@ function LabellingTaskPageInner() {
     fetchTask();
   }, [fetchTask]);
 
+  useEffect(() => {
+    if (autoTabSwitchedRef.current) return;
+    if (!task) return;
+    autoTabSwitchedRef.current = true;
+    if (isTab(initialTab)) return; // user pinned a tab via URL
+    if ((task.items?.length ?? 0) === 0) {
+      handleTabChange("items");
+    }
+  }, [task, initialTab, handleTabChange]);
+
   // Evaluator runs.
   const [runs, setRuns] = useState<EvaluatorRunJob[]>([]);
   const [runsLoading, setRunsLoading] = useState(false);
@@ -917,7 +904,10 @@ function LabellingTaskPageInner() {
   const [taskSummary, setTaskSummary] = useState<TaskSummaryResponse | null>(
     null,
   );
-  const [taskSummaryLoading, setTaskSummaryLoading] = useState(false);
+  // setter is kept; the boolean is no longer rendered (the agreement
+  // spinner above stands in for both fetches), but we still flip it so
+  // future code can subscribe if needed.
+  const [, setTaskSummaryLoading] = useState(false);
   const [taskSummaryError, setTaskSummaryError] = useState<string | null>(null);
   const [summaryEvaluatorFilter, setSummaryEvaluatorFilter] = useState<
     PickerItem[]
@@ -1084,9 +1074,6 @@ function LabellingTaskPageInner() {
   }, [items]);
 
   const [startingRun, setStartingRun] = useState(false);
-  const [startingRunForItem, setStartingRunForItem] = useState<string | null>(
-    null,
-  );
   // Run evaluators dialog state. itemUuids: null = all items in task,
   // []/non-empty = the specific items to run for.
   const [runDialogOpen, setRunDialogOpen] = useState(false);
@@ -1120,7 +1107,6 @@ function LabellingTaskPageInner() {
     if (!accessToken || !uuid || startingRun) return;
     const ids = runDialogItemUuids;
     setStartingRun(true);
-    setStartingRunForItem(ids && ids.length === 1 ? ids[0] : null);
     setRunDialogSubmitError(null);
     try {
       const body: Record<string, unknown> = { evaluators: selections };
@@ -1143,11 +1129,10 @@ function LabellingTaskPageInner() {
       setRunDialogSubmitError(msg);
       toast.error(msg);
       setStartingRun(false);
-      setStartingRunForItem(null);
     }
-    // Note: we intentionally keep the spinner state on the success path until
-    // the navigation completes (page unmounts), so the row's play button stays
-    // as a spinner up to the redirect.
+    // Note: we intentionally keep `startingRun=true` on the success path
+    // until the navigation completes (page unmounts), so the bulk
+    // "Evaluate all" button stays in its loading state up to the redirect.
   };
 
   const [deletingRunUuid, setDeletingRunUuid] = useState<string | null>(null);
@@ -1950,30 +1935,7 @@ function LabellingTaskPageInner() {
                 {taskSummaryError}
               </div>
             )}
-            {taskSummaryLoading && !taskSummary ? (
-              <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-                <svg
-                  className="w-4 h-4 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                Loading labels
-              </div>
-            ) : !taskSummary ? null : (
+            {!taskSummary ? null : (
               (() => {
                 const annotators = taskSummary.annotators ?? [];
                 const evaluators = taskSummary.evaluators ?? [];
@@ -2403,7 +2365,7 @@ function LabellingTaskPageInner() {
                       disabled={startingRun}
                       className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
                     >
-                      {startingRun && startingRunForItem === null ? (
+                      {startingRun && (
                         <svg
                           className="w-3.5 h-3.5 animate-spin"
                           viewBox="0 0 24 24"
@@ -2423,22 +2385,14 @@ function LabellingTaskPageInner() {
                             d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
                           />
                         </svg>
-                      ) : (
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
                       )}
-                      Run evaluators
+                      Evaluate selected
                     </button>
                     <button
                       onClick={() => setAssignOpen(true)}
                       className="h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
                     >
-                      Label all
+                      Label selected
                     </button>
                   </div>
                 </div>
@@ -2502,11 +2456,26 @@ function LabellingTaskPageInner() {
                           <ItemRowActions
                             itemUuid={item.uuid}
                             onDelete={requestDeleteOneItem}
-                            onPlay={handleRunEvaluators}
                             onViewResults={toggleItemResults}
-                            onLabel={toggleItem}
-                            playDisabled={startingRun}
-                            playLoadingForUuid={startingRunForItem}
+                            onLabel={(uuid) => {
+                              // Sole row → skip the select-then-bulk
+                              // dance and open the assign dialog
+                              // straight on this item.
+                              if (items.length === 1) {
+                                setSelectedItemIds(new Set([uuid]));
+                                setAssignOpen(true);
+                              } else {
+                                toggleItem(uuid);
+                              }
+                            }}
+                            onEvaluate={(uuid) => {
+                              if (items.length === 1) {
+                                setSelectedItemIds(new Set([uuid]));
+                                handleRunEvaluators([uuid]);
+                              } else {
+                                toggleItem(uuid);
+                              }
+                            }}
                             isResultsOpen={isResultsOpen}
                             viewResultsDisabled={
                               !!taskSummary && !itemsWithResults.has(item.uuid)
@@ -2567,11 +2536,26 @@ function LabellingTaskPageInner() {
                           <ItemRowActions
                             itemUuid={item.uuid}
                             onDelete={requestDeleteOneItem}
-                            onPlay={handleRunEvaluators}
                             onViewResults={toggleItemResults}
-                            onLabel={toggleItem}
-                            playDisabled={startingRun}
-                            playLoadingForUuid={startingRunForItem}
+                            onLabel={(uuid) => {
+                              // Sole row → skip the select-then-bulk
+                              // dance and open the assign dialog
+                              // straight on this item.
+                              if (items.length === 1) {
+                                setSelectedItemIds(new Set([uuid]));
+                                setAssignOpen(true);
+                              } else {
+                                toggleItem(uuid);
+                              }
+                            }}
+                            onEvaluate={(uuid) => {
+                              if (items.length === 1) {
+                                setSelectedItemIds(new Set([uuid]));
+                                handleRunEvaluators([uuid]);
+                              } else {
+                                toggleItem(uuid);
+                              }
+                            }}
                             isResultsOpen={isResultsOpen}
                             viewResultsDisabled={
                               !!taskSummary && !itemsWithResults.has(item.uuid)
