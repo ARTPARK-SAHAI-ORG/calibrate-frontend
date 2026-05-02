@@ -170,7 +170,9 @@ function AgreementStatCard(
           </span>
         </div>
       )}
-      <div className={`text-2xl font-semibold tabular-nums mt-2 ${valueClassName}`}>
+      <div
+        className={`text-2xl font-semibold tabular-nums mt-2 ${valueClassName}`}
+      >
         {value}
       </div>
     </div>
@@ -2132,7 +2134,7 @@ function LabellingTaskPageInner() {
                             searchPlaceholder="Search evaluators..."
                           />
                         </div>
-                        <Tooltip content="Show results for only the live versions of each evaluator">
+                        <Tooltip content="Show results for only the live versions of each evaluator. Toggle to see the results for all versions.">
                           <button
                             type="button"
                             onClick={() => setSummaryLiveOnly((v) => !v)}
