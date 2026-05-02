@@ -120,8 +120,7 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
   // (matches the LLM test output cards). Write mode shows everything
   // inline so annotators can see variables and write reasoning in one
   // pass — no toggle.
-  const hasReasoning =
-    props.mode === "read" && !!props.reasoning?.trim();
+  const hasReasoning = props.mode === "read" && !!props.reasoning?.trim();
   const hasCollapsibleBody =
     props.mode === "read" && (hasVariables || hasReasoning);
 
@@ -358,14 +357,30 @@ function WriteControls({
       </div>
     );
   }
-  // Build the rating options as `scaleMin..scaleMax` so evaluators with a
-  // non-1 minimum (e.g. 0..5) work correctly. Default to 1..5 when no
-  // bounds are provided. Guard against an inverted range as a sanity
-  // fallback.
-  const min = typeof scaleMin === "number" ? scaleMin : 1;
-  const rawMax = typeof scaleMax === "number" && scaleMax > 0 ? scaleMax : 5;
-  const max = rawMax >= min ? rawMax : min;
-  const options = Array.from({ length: max - min + 1 }, (_, i) => min + i);
+  // Build the rating options as `scaleMin..scaleMax`. We refuse to
+  // guess: if the caller didn't provide both bounds we surface an error
+  // rather than rendering a misleading 1..5 default that may not match
+  // the evaluator's actual rubric.
+  if (typeof scaleMin !== "number" || typeof scaleMax !== "number") {
+    return (
+      <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-400">
+        Rating scale is missing for this evaluator. Reload the page; if the
+        problem persists, the evaluator&apos;s scale config wasn&apos;t returned
+        by the backend.
+      </div>
+    );
+  }
+  if (scaleMax < scaleMin) {
+    return (
+      <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-400">
+        Invalid rating scale ({scaleMin}..{scaleMax}) — max is below min.
+      </div>
+    );
+  }
+  const options = Array.from(
+    { length: scaleMax - scaleMin + 1 },
+    (_, i) => scaleMin + i,
+  );
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
       {options.map((n) => {
@@ -512,11 +527,7 @@ function CheckIcon({ className = "" }: { className?: string }) {
       stroke="currentColor"
       strokeWidth={3}
     >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M5 13l4 4L19 7"
-      />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
     </svg>
   );
 }
