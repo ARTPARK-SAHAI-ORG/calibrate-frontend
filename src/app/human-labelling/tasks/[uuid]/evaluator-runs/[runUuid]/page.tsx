@@ -640,9 +640,9 @@ export default function EvaluatorRunDetailPage() {
                               (i) => i.item_id === currentItem.uuid,
                             ) ?? null
                           }
-                          evaluatorVariablesByEvaluatorId={
-                            extractEvaluatorVariables(currentItem.payload)
-                          }
+                          evaluatorVariablesByEvaluatorId={extractEvaluatorVariables(
+                            currentItem.payload,
+                          )}
                         />
                       </div>
                     )}
@@ -813,13 +813,19 @@ function EvaluatorResultsPane({
             : [];
         const hasHumans = annotations.length > 0;
 
-        const selection =
+        const rawSelection =
           selectionByEvaluator[ev.evaluator_id] ?? "evaluator";
         const selectedAnnotation =
-          selection !== "evaluator"
-            ? annotations.find((a) => a.annotation_id === selection)
+          rawSelection !== "evaluator"
+            ? annotations.find((a) => a.annotator_id === rawSelection)
             : undefined;
         const showHuman = !!selectedAnnotation;
+        // If a stored annotator_id has no annotation on this item, fall back
+        // to "evaluator" so the pill row reflects what's actually rendered.
+        const selection: string =
+          rawSelection === "evaluator" || selectedAnnotation
+            ? rawSelection
+            : "evaluator";
 
         const setSelection = (sel: string) =>
           setSelectionByEvaluator((prev) => ({
@@ -888,8 +894,8 @@ function EvaluatorResultsPane({
                     <SourcePill
                       key={a.annotation_id}
                       primaryLabel={annotatorDisplayName(a)}
-                      selected={selection === a.annotation_id}
-                      onClick={() => setSelection(a.annotation_id)}
+                      selected={selection === a.annotator_id}
+                      onClick={() => setSelection(a.annotator_id)}
                       tone={aligned ? "aligned" : "misaligned"}
                     />
                   );
@@ -966,7 +972,11 @@ function AgreementGlyph({
           stroke="currentColor"
           strokeWidth={3}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M5 13l4 4L19 7"
+          />
         </svg>
       </span>
     );
@@ -984,7 +994,11 @@ function AgreementGlyph({
         stroke="currentColor"
         strokeWidth={3}
       >
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M6 18L18 6M6 6l12 12"
+        />
       </svg>
     </span>
   );
@@ -1122,4 +1136,3 @@ function HumanAgreementSummary({
     </div>
   );
 }
-
