@@ -5,11 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
-import {
-  ItemPane,
-  type Item,
-  type Task,
-} from "@/components/human-labelling/AnnotationJobView";
+import { ItemPane, type Item } from "@/components/human-labelling/AnnotationJobView";
 import { useAccessToken } from "@/hooks";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
@@ -34,6 +30,12 @@ type EvaluatorRunRow = {
   } | null;
 };
 
+/** Embedded on GET …/evaluator-runs/{job_uuid} only; join `uuid` ↔ `runs[].item_id`. */
+type EvaluatorRunItemSnapshot = {
+  uuid: string;
+  payload: unknown;
+};
+
 type EvaluatorRunJob = {
   uuid: string;
   task_id: string;
@@ -53,6 +55,8 @@ type EvaluatorRunJob = {
   updated_at: string;
   completed_at: string | null;
   runs: EvaluatorRunRow[];
+  /** Snapshot payloads for this job; preferred over live task items (survives soft-delete). */
+  items?: EvaluatorRunItemSnapshot[];
 };
 
 type LabellingTaskFull = {
@@ -62,6 +66,68 @@ type LabellingTaskFull = {
   description?: string | null;
   items?: Item[];
 };
+
+function snapshotToItem(
+  snap: EvaluatorRunItemSnapshot,
+  taskId: string,
+): Item {
+  return {
+    id: 0,
+    uuid: snap.uuid,
+    task_id: taskId,
+    payload: snap.payload,
+    created_at: "",
+    deleted_at: null,
+  };
+}
+
+/**
+ * Order snapshots for the run UI: explicit `details.item_ids`, else first-seen
+ * `runs[].item_id`, else API order, with `item_count` cap when applicable.
+ */
+function orderedSnapshotsForRun(job: EvaluatorRunJob): EvaluatorRunItemSnapshot[] {
+  const snaps = job.items ?? [];
+  if (snaps.length === 0) return [];
+  const byUuid = new Map(snaps.map((s) => [s.uuid, s]));
+  const seen = new Set<string>();
+  const out: EvaluatorRunItemSnapshot[] = [];
+
+  const pushIds = (ids: string[]) => {
+    for (const id of ids) {
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      const s = byUuid.get(id);
+      out.push(s ?? { uuid: id, payload: {} });
+    }
+  };
+
+  const subset = job.details?.item_ids;
+  if (subset && subset.length > 0) {
+    pushIds(subset);
+  } else {
+    const fromRuns: string[] = [];
+    const runSeen = new Set<string>();
+    for (const r of job.runs ?? []) {
+      if (!r.item_id || runSeen.has(r.item_id)) continue;
+      runSeen.add(r.item_id);
+      fromRuns.push(r.item_id);
+    }
+    if (fromRuns.length > 0) pushIds(fromRuns);
+  }
+
+  for (const s of snaps) {
+    if (!seen.has(s.uuid)) {
+      seen.add(s.uuid);
+      out.push(s);
+    }
+  }
+
+  const cap = job.details?.item_count;
+  if (typeof cap === "number" && cap >= 0 && cap < out.length) {
+    return out.slice(0, cap);
+  }
+  return out;
+}
 
 function parseApiError(err: unknown, fallback: string): string {
   if (!(err instanceof Error)) return fallback;
@@ -150,7 +216,7 @@ export default function EvaluatorRunDetailPage() {
     }
   }, [accessToken, taskUuid, runUuid]);
 
-  // Fetch the task once for items.
+  // Fetch the task for type (and fallback item list when the job has no `items[]`).
   useEffect(() => {
     if (!accessToken || !taskUuid) return;
     let cancelled = false;
@@ -230,28 +296,29 @@ export default function EvaluatorRunDetailPage() {
     };
   }, [accessToken, evaluatorIdsKey]);
 
-  // Limit the items displayed to those actually in this run.
-  // Source of truth (in priority order):
-  //   1. details.item_ids — explicit subset persisted at run creation
-  //   2. unique item_ids from runs[] — once results land
-  //   3. fall back to all task items (only happens for in-progress full-task runs)
+  // Item previews: prefer embedded `job.items` (snapshot, survives soft-delete);
+  // otherwise same ordering rules against live `task.items`.
   const itemsForRun: Item[] = (() => {
+    if (!job) return [];
+    const taskId = task?.uuid ?? job.task_id;
+    const embedded = job.items;
+    if (embedded && embedded.length > 0) {
+      return orderedSnapshotsForRun(job).map((s) => snapshotToItem(s, taskId));
+    }
     if (!task?.items) return [];
-    const subset = job?.details?.item_ids;
+    const subset = job.details?.item_ids;
     if (subset && subset.length > 0) {
       const set = new Set(subset);
       return task.items.filter((i) => set.has(i.uuid));
     }
     const fromRuns = new Set<string>();
-    for (const r of job?.runs ?? []) {
+    for (const r of job.runs ?? []) {
       if (r.item_id) fromRuns.add(r.item_id);
     }
     if (fromRuns.size > 0) {
       return task.items.filter((i) => fromRuns.has(i.uuid));
     }
-    // Cap at item_count when known so an in-progress full-task run shows the
-    // right number even before any rows have been written.
-    const cap = job?.details?.item_count;
+    const cap = job.details?.item_count;
     if (typeof cap === "number" && cap >= 0 && cap < task.items.length) {
       return task.items.slice(0, cap);
     }

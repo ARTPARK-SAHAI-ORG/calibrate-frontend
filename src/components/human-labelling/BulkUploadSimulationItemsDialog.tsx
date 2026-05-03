@@ -445,10 +445,14 @@ export function BulkUploadSimulationItemsDialog({
       : [];
   const simGridStyle = {
     gridTemplateColumns: [
-      "180px",
-      "minmax(280px,1fr)",
-      "60px",
-      ...annotationColumns.map(() => "minmax(180px,1fr)"),
+      "minmax(100px, 152px)",
+      "minmax(140px, 220px)",
+      "48px",
+      ...annotationColumns.map((c) =>
+        c.kind === "value"
+          ? "minmax(64px, 88px)"
+          : "minmax(100px, 176px)",
+      ),
     ].join(" "),
   };
 
@@ -460,8 +464,9 @@ export function BulkUploadSimulationItemsDialog({
       </p>
       <div className="border border-border rounded-xl overflow-hidden">
         <div className="overflow-auto max-h-[20rem]">
+          <div className="min-w-max">
           <div
-            className="grid gap-3 px-4 py-2 border-b border-border bg-muted sticky top-0 z-10"
+            className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
             style={simGridStyle}
           >
             <div className="text-xs font-medium text-muted-foreground">
@@ -487,7 +492,7 @@ export function BulkUploadSimulationItemsDialog({
             {parsedItems.slice(0, 50).map((p, idx) => (
               <div
                 key={idx}
-                className="grid gap-3 px-4 py-2 text-xs items-start"
+                className="grid gap-2 px-3 py-2 text-xs items-start"
                 style={simGridStyle}
               >
                 <div className="truncate text-foreground" title={p.name}>
@@ -529,6 +534,7 @@ export function BulkUploadSimulationItemsDialog({
                 + {parsedItems.length - 50} more rows
               </div>
             )}
+          </div>
           </div>
         </div>
       </div>

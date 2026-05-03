@@ -377,9 +377,13 @@ export function BulkUploadSttItemsDialog({
       : [];
   const sttGridStyle = {
     gridTemplateColumns: [
-      "minmax(220px,1fr)",
-      "minmax(220px,1fr)",
-      ...annotationColumns.map(() => "minmax(180px,1fr)"),
+      "minmax(120px, 200px)",
+      "minmax(120px, 200px)",
+      ...annotationColumns.map((c) =>
+        c.kind === "value"
+          ? "minmax(64px, 88px)"
+          : "minmax(100px, 176px)",
+      ),
     ].join(" "),
   };
 
@@ -391,8 +395,9 @@ export function BulkUploadSttItemsDialog({
       </p>
       <div className="border border-border rounded-xl overflow-hidden">
         <div className="overflow-auto max-h-[20rem]">
+          <div className="min-w-max">
           <div
-            className="grid gap-3 px-4 py-2 border-b border-border bg-muted sticky top-0 z-10"
+            className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
             style={sttGridStyle}
           >
             <div className="text-xs font-medium text-muted-foreground">
@@ -415,7 +420,7 @@ export function BulkUploadSttItemsDialog({
             {parsedItems.slice(0, 50).map((p, idx) => (
               <div
                 key={idx}
-                className="grid gap-3 px-4 py-2 text-xs items-start"
+                className="grid gap-2 px-3 py-2 text-xs items-start"
                 style={sttGridStyle}
               >
                 <div
@@ -460,6 +465,7 @@ export function BulkUploadSttItemsDialog({
                 + {parsedItems.length - 50} more rows
               </div>
             )}
+          </div>
           </div>
         </div>
       </div>

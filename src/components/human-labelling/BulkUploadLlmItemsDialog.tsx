@@ -605,15 +605,19 @@ export function BulkUploadLlmItemsDialog({
           },
         ])
       : [];
-  // Use fixed minimum widths per column so the table can grow wider than
-  // the dialog and scroll horizontally when there are many variables.
+  // Capped column widths so preview cells stay readable without stretching
+  // to fill the dialog; extra columns scroll horizontally.
   const gridStyle = {
     gridTemplateColumns: [
-      "160px",
-      "minmax(220px,1fr)",
-      "minmax(220px,1fr)",
-      ...variableColumns.map(() => "minmax(220px,1fr)"),
-      ...annotationColumns.map(() => "minmax(180px,1fr)"),
+      "minmax(96px, 132px)",
+      "minmax(120px, 200px)",
+      "minmax(120px, 200px)",
+      ...variableColumns.map(() => "minmax(120px, 200px)"),
+      ...annotationColumns.map((c) =>
+        c.kind === "value"
+          ? "minmax(64px, 88px)"
+          : "minmax(100px, 176px)",
+      ),
     ].join(" "),
   };
 
@@ -625,8 +629,9 @@ export function BulkUploadLlmItemsDialog({
       </p>
       <div className="border border-border rounded-xl overflow-hidden">
         <div className="overflow-auto max-h-[20rem]">
+          <div className="min-w-max">
           <div
-            className="grid gap-3 px-4 py-2 border-b border-border bg-muted sticky top-0 z-10"
+            className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
             style={gridStyle}
           >
             <div className="text-xs font-medium text-muted-foreground">
@@ -671,7 +676,7 @@ export function BulkUploadLlmItemsDialog({
               return (
                 <div
                   key={idx}
-                  className="grid gap-3 px-4 py-2 text-xs items-start"
+                  className="grid gap-2 px-3 py-2 text-xs items-start"
                   style={gridStyle}
                 >
                   <div className="truncate text-foreground" title={p.name}>
@@ -726,6 +731,7 @@ export function BulkUploadLlmItemsDialog({
                 + {parsedItems.length - 50} more rows
               </div>
             )}
+          </div>
           </div>
         </div>
       </div>

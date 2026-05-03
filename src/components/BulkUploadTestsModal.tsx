@@ -5,7 +5,6 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import Papa from "papaparse";
-import JSZip from "jszip";
 import { MultiAgentPicker } from "@/components/AgentPicker";
 import { MultiSelectPicker } from "@/components/MultiSelectPicker";
 import {
@@ -120,72 +119,6 @@ function buildResponseSampleCsv(selected: LLMEvaluatorOption[]): string {
 const SAMPLE_TOOL_CALL_CSV = `name,conversation_history,tool_calls
 "Book room test","[{""role"":""user"",""content"":""I want to book room 101 for tomorrow""}]","[{""tool"":""book_room"",""arguments"":{""room"":""101""},""accept_any_arguments"":false}]"
 "Weather lookup","[{""role"":""assistant"",""content"":""How can I help?""},{""role"":""user"",""content"":""What is the weather in Bangalore?""}]","[{""tool"":""get_weather"",""arguments"":{},""accept_any_arguments"":true}]"`;
-
-// Plain-text README bundled in the tool-call sample ZIP. Mirrors the PDF
-// guidelines content but rendered as text for users who prefer reading the
-// readme alongside the sample CSV.
-const TOOL_CALL_README = `BULK UPLOAD - TOOL CALL TESTS
-==============================
-
-This ZIP contains a sample CSV file for bulk uploading "Tool Call" tests.
-Each row in the CSV creates one test. The CSV must have the following columns:
-
-
-COLUMNS
--------
-
-1. name
-   A unique name for the test. This must be different from every other test
-   in the CSV and from any test you have already created.
-   Example: "Book room test"
-
-2. conversation_history
-   A JSON array of chat messages that represents the conversation that has
-   happened so far, before the agent's tool call behavior is evaluated.
-   Each message is an object with a "role" and "content" field.
-
-   Supported roles:
-     - "user"       — A message from the end user
-     - "assistant"  — A message from the agent
-
-   The conversation should end with a user message, since the test evaluates
-   which tools the agent calls after this conversation.
-
-   Example:
-     [
-       {"role": "user", "content": "I want to book room 101 for tomorrow"}
-     ]
-
-3. tool_calls
-   A JSON array of expected tool call objects. Each object describes a tool
-   the agent is expected to call and what arguments to expect.
-
-   Fields for each tool call object:
-
-     - "tool" (required, string)
-       The name of the tool. Must match the tool name exactly as configured
-       in your agent.
-       Example: "book_room"
-
-     - "arguments" (optional, object)
-       The expected arguments the agent should pass to the tool. Each key is
-       a parameter name and each value is the expected value. If omitted or
-       empty ({}), arguments are not checked — equivalent to setting
-       accept_any_arguments to true.
-       Example: {"room": "101", "date": "tomorrow"}
-
-     - "accept_any_arguments" (optional, boolean, default: false)
-       If true, the test passes regardless of what arguments the agent sends
-       to this tool. Useful when you only care that the tool was called, not
-       what was passed. When true, the "arguments" field is ignored.
-
-   Examples:
-     Tool should be called with specific arguments:
-       [{"tool": "book_room", "arguments": {"room": "101"}, "accept_any_arguments": false}]
-
-     Tool should be called, any arguments accepted:
-       [{"tool": "get_weather", "arguments": {}, "accept_any_arguments": true}]
-`;
 
 const CONVERSATION_HISTORY_DESC =
   'A JSON array of chat messages that represents the conversation that has happened so far, before the agent\'s response is evaluated. Each message is an object with a "role" and "content" field.\n\nrole — either "user" or "assistant"\ncontent — the message said by that role';
@@ -585,7 +518,7 @@ export function BulkUploadTestsModal({
     URL.revokeObjectURL(url);
   };
 
-  const downloadSampleCsv = async () => {
+  const downloadSampleCsv = () => {
     if (!testType) return;
 
     if (isResponseType) {
@@ -603,15 +536,14 @@ export function BulkUploadTestsModal({
       return;
     }
 
-    const zip = new JSZip();
-    zip.file("sample_tool_call_tests.csv", SAMPLE_TOOL_CALL_CSV);
-    zip.file("README.txt", TOOL_CALL_README);
-    const blob = await zip.generateAsync({ type: "blob" });
+    const blob = new Blob([SAMPLE_TOOL_CALL_CSV], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "sample_tool_call_tests.zip";
+    link.download = "sample_tool_call_tests.csv";
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
 

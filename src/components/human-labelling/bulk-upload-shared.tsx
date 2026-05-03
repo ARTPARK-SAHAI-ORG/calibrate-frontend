@@ -894,7 +894,7 @@ export function BulkUploadDialogShell({
     >
       <div
         className={`bg-background border border-border rounded-xl shadow-2xl w-full flex flex-col max-h-[90vh] transition-[max-width] duration-200 ${
-          itemCount > 0 ? "md:max-w-[80vw]" : "md:max-w-[37.5vw]"
+          itemCount > 0 ? "md:max-w-[70vw]" : "md:max-w-[37.5vw]"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
