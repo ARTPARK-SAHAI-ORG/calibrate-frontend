@@ -232,7 +232,10 @@ function TTSPageInner() {
         {/* Tab Bar */}
         <div className="flex gap-1 border-b border-border">
           <button
-            onClick={() => { setActiveTab("evaluations"); router.replace("/tts", { scroll: false }); }}
+            onClick={() => {
+              setActiveTab("evaluations");
+              router.replace("/tts", { scroll: false });
+            }}
             className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 -mb-px ${
               activeTab === "evaluations"
                 ? "border-foreground text-foreground"
@@ -242,7 +245,10 @@ function TTSPageInner() {
             Evaluations
           </button>
           <button
-            onClick={() => { setActiveTab("datasets"); router.replace("/tts?tab=datasets", { scroll: false }); }}
+            onClick={() => {
+              setActiveTab("datasets");
+              router.replace("/tts?tab=datasets", { scroll: false });
+            }}
             className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 -mb-px ${
               activeTab === "datasets"
                 ? "border-foreground text-foreground"
@@ -323,7 +329,8 @@ function TTSPageInner() {
             ) : (
               <>
                 <p className="text-sm text-muted-foreground mb-3">
-                  {jobs.length} {jobs.length === 1 ? "evaluation" : "evaluations"}
+                  {jobs.length}{" "}
+                  {jobs.length === 1 ? "evaluation" : "evaluations"}
                 </p>
                 {/* Mobile Sort Button */}
                 <div className="flex justify-end md:hidden mb-3">
@@ -708,7 +715,8 @@ function TTSPageInner() {
             ) : (
               <>
                 <p className="text-sm text-muted-foreground mb-3">
-                  {datasets.length} {datasets.length === 1 ? "dataset" : "datasets"}
+                  {datasets.length}{" "}
+                  {datasets.length === 1 ? "dataset" : "datasets"}
                 </p>
                 <div className="border border-border rounded-xl overflow-hidden">
                   {/* Table Header */}
@@ -721,59 +729,59 @@ function TTSPageInner() {
                     </div>
                     <div className="text-sm font-medium text-muted-foreground">
                       Evals
+                    </div>
+                    <div className="text-sm font-medium text-muted-foreground">
+                      Updated
+                    </div>
+                    <div />
                   </div>
-                  <div className="text-sm font-medium text-muted-foreground">
-                    Updated
-                  </div>
-                  <div />
-                </div>
-                {datasets.map((dataset) => (
-                  <div
-                    key={dataset.uuid}
-                    onClick={() => router.push(`/datasets/${dataset.uuid}`)}
-                    className="flex flex-col md:grid md:grid-cols-[2fr_80px_80px_1fr_40px] gap-1 md:gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
-                  >
-                    <div className="text-sm font-medium text-foreground">
-                      {dataset.name}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {dataset.item_count}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {dataset.eval_count}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {dataset.updated_at
-                        ? formatDate(dataset.updated_at)
-                        : "—"}
-                    </div>
-                    <div className="flex justify-end">
-                      <button
-                        title="Delete dataset"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteDatasetId(dataset.uuid);
-                        }}
-                        className="p-1.5 rounded hover:bg-muted/50 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
-                      >
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
+                  {datasets.map((dataset) => (
+                    <div
+                      key={dataset.uuid}
+                      onClick={() => router.push(`/datasets/${dataset.uuid}`)}
+                      className="flex flex-col md:grid md:grid-cols-[2fr_80px_80px_1fr_40px] gap-1 md:gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                    >
+                      <div className="text-sm font-medium text-foreground">
+                        {dataset.name}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {dataset.item_count}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {dataset.eval_count}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {dataset.updated_at
+                          ? formatDate(dataset.updated_at)
+                          : "—"}
+                      </div>
+                      <div className="flex justify-end">
+                        <button
+                          title="Delete dataset"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteDatasetId(dataset.uuid);
+                          }}
+                          className="p-1.5 rounded hover:bg-muted/50 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                          />
-                        </svg>
-                      </button>
+                          <svg
+                            className="w-3.5 h-3.5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                            />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
               </>
             )}
           </>
@@ -826,7 +834,7 @@ function TTSPageInner() {
                 disabled={!newDatasetName.trim() || isCreating}
                 className="h-9 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isCreating ? "Creating…" : "Create"}
+                {isCreating ? "Creating" : "Create"}
               </button>
             </div>
           </div>

@@ -2,17 +2,27 @@
 
 import { useEffect, useState } from "react";
 import Papa from "papaparse";
-import { useHideFloatingButton } from "@/components/AppLayout";
 import { apiClient } from "@/lib/api";
 import {
-  CsvDropzone,
-  FormatHelpToggle,
+  AnnotationOptIn,
+  BulkUploadDialogShell,
+  type EvaluatorMeta,
+  type GuidelineColumn,
+  type GuidelineDoc,
+  type ParsedAnnotation,
   type TurnObject,
+  buildItemAnnotationsPayload,
+  duplicateEvaluatorNames,
+  evaluatorReasoningColumn,
+  evaluatorValueColumn,
   findHeaderKey,
+  parseAnnotationCell,
   parseApiError,
   roleLabel,
   rolePillClass,
+  sampleEvaluatorValue,
   turnContentString,
+  useAnnotators,
 } from "./bulk-upload-shared";
 
 const TRANSCRIPT_HEADERS = [
@@ -23,27 +33,94 @@ const TRANSCRIPT_HEADERS = [
 ];
 const NAME_HEADERS = ["name", "title", "simulation_name"];
 
-const SAMPLE_SIMULATION_CSV = `name,transcript
-"Card lost - happy path","[{""role"":""assistant"",""content"":""Hi, how can I help?""},{""role"":""user"",""content"":""I lost my card""},{""role"":""assistant"",""content"":""I can help block it. Can you confirm the last 4 digits?""}]"
-"Refund flow","[{""role"":""user"",""content"":""I was charged twice""},{""role"":""assistant"",""content"":""I'm sorry to hear that. Let me investigate the duplicate charge for you.""}]"
-`;
+function csvEscape(s: string): string {
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+const SAMPLE_SIMULATION_BASE_ROWS: Array<{
+  name: string;
+  transcript: string;
+  reasoning: string;
+}> = [
+  {
+    name: "Card lost - happy path",
+    transcript: JSON.stringify([
+      { role: "assistant", content: "Hi, how can I help?" },
+      { role: "user", content: "I lost my card" },
+      {
+        role: "assistant",
+        content: "I can help block it. Can you confirm the last 4 digits?",
+      },
+    ]),
+    reasoning:
+      "The agent acknowledged the issue and asked the right verification question.",
+  },
+  {
+    name: "Refund flow",
+    transcript: JSON.stringify([
+      { role: "user", content: "I was charged twice" },
+      {
+        role: "assistant",
+        content:
+          "I'm sorry to hear that. Let me investigate the duplicate charge for you.",
+      },
+    ]),
+    reasoning: "",
+  },
+];
+
+function buildSampleSimulationCsv(
+  evaluators: EvaluatorMeta[],
+  includeAnnotations: boolean,
+): string {
+  const headerCells = [
+    "name",
+    "transcript",
+    ...(includeAnnotations
+      ? evaluators.flatMap((e) => [
+          csvEscape(evaluatorValueColumn(e.name)),
+          csvEscape(evaluatorReasoningColumn(e.name)),
+        ])
+      : []),
+  ];
+  const lines = SAMPLE_SIMULATION_BASE_ROWS.map((r) =>
+    [
+      csvEscape(r.name),
+      csvEscape(r.transcript),
+      ...(includeAnnotations
+        ? evaluators.flatMap((e) => [
+            csvEscape(sampleEvaluatorValue(e)),
+            csvEscape(r.reasoning),
+          ])
+        : []),
+    ].join(","),
+  );
+  return `${headerCells.join(",")}\n${lines.join("\n")}\n`;
+}
 
 type ParsedItem = {
   name: string;
   transcript: TurnObject[];
+  annotations: ParsedAnnotation[];
+};
+
+export type SimulationLinkedEvaluator = {
+  uuid: string;
+  name: string;
+  output_type: "binary" | "rating" | null;
+  scale_min: number | null;
+  scale_max: number | null;
 };
 
 type BulkUploadSimulationItemsDialogProps = {
   isOpen: boolean;
   accessToken: string;
   taskUuid: string;
+  linkedEvaluators?: SimulationLinkedEvaluator[];
   onClose: () => void;
-  onSuccess: (count: number) => void;
+  onSuccess: (count: number, withAnnotations: boolean) => void;
 };
 
-// Vertical preview of a transcript: each turn rendered as a "Role" label
-// above its content. The container is sized so that ~2 turns are visible
-// at once; anything beyond that scrolls inside the cell.
 function TranscriptPreview({ turns }: { turns: TurnObject[] }) {
   return (
     <div className="max-h-24 overflow-y-auto pr-1 space-y-2">
@@ -75,24 +152,50 @@ export function BulkUploadSimulationItemsDialog({
   isOpen,
   accessToken,
   taskUuid,
+  linkedEvaluators = [],
   onClose,
   onSuccess,
 }: BulkUploadSimulationItemsDialogProps) {
-  useHideFloatingButton(isOpen);
-
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [formatHelpOpen, setFormatHelpOpen] = useState(true);
+  const [uploadAnnotations, setUploadAnnotations] = useState(false);
+  const [selectedAnnotatorId, setSelectedAnnotatorId] = useState<string | null>(
+    null,
+  );
+  const annotatorsState = useAnnotators(isOpen, accessToken);
+
+  const annotationEvaluatorsMeta: EvaluatorMeta[] = linkedEvaluators.map(
+    (e) => ({
+      uuid: e.uuid,
+      name: e.name,
+      output_type: e.output_type,
+      scale_min: e.scale_min,
+      scale_max: e.scale_max,
+    }),
+  );
+
+  // Evaluators without a usable output_type can't be annotated here —
+  // the parser would silently drop their column and produce a half-
+  // labelled batch. Block the annotation flow rather than failing later.
+  const evaluatorsMissingOutputType = annotationEvaluatorsMeta.filter(
+    (e) => e.output_type !== "binary" && e.output_type !== "rating",
+  );
+
+  // Two linked evaluators sharing a name produce duplicate CSV headers
+  // that PapaParse silently overwrites. Block the annotation flow until
+  // one is renamed.
+  const duplicateNames = duplicateEvaluatorNames(annotationEvaluatorsMeta);
 
   const reset = () => {
     setCsvFile(null);
     setParsedItems([]);
     setParseError(null);
     setUploadError(null);
-    setFormatHelpOpen(true);
+    setUploadAnnotations(false);
+    setSelectedAnnotatorId(null);
   };
 
   useEffect(() => {
@@ -100,22 +203,11 @@ export function BulkUploadSimulationItemsDialog({
   }, [isOpen]);
 
   useEffect(() => {
-    setFormatHelpOpen(parsedItems.length === 0);
-  }, [parsedItems.length]);
+    setParsedItems([]);
+    setParseError(null);
+    setCsvFile(null);
+  }, [uploadAnnotations]);
 
-  if (!isOpen) return null;
-
-  const downloadSampleCsv = () => {
-    const blob = new Blob([SAMPLE_SIMULATION_CSV], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "sample_simulation_items.csv";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
 
   const handleFile = (file: File | null) => {
     setUploadError(null);
@@ -136,6 +228,29 @@ export function BulkUploadSimulationItemsDialog({
             `CSV must include "name" and "transcript" columns. Found: ${headers.join(", ") || "(none)"}`,
           );
           return;
+        }
+        if (uploadAnnotations) {
+          if (evaluatorsMissingOutputType.length > 0) {
+            setParseError(
+              `Annotation upload is unavailable: evaluator(s) ${evaluatorsMissingOutputType
+                .map((e) => `"${e.name}"`)
+                .join(", ")} have no binary/rating output configured.`,
+            );
+            return;
+          }
+          const missing: string[] = [];
+          for (const meta of annotationEvaluatorsMeta) {
+            const valueHeader = evaluatorValueColumn(meta.name);
+            if (!headers.includes(valueHeader)) missing.push(valueHeader);
+          }
+          if (missing.length > 0) {
+            setParseError(
+              `CSV is missing annotation column(s): ${missing
+                .map((c) => `"${c}"`)
+                .join(", ")}.`,
+            );
+            return;
+          }
         }
         const items: ParsedItem[] = [];
         for (let i = 0; i < results.data.length; i++) {
@@ -181,7 +296,39 @@ export function BulkUploadSimulationItemsDialog({
               return;
             }
           }
-          items.push({ name, transcript: parsed as TurnObject[] });
+          const annotations: ParsedAnnotation[] = [];
+          if (uploadAnnotations) {
+            for (const meta of annotationEvaluatorsMeta) {
+              if (meta.output_type !== "binary" && meta.output_type !== "rating")
+                continue;
+              const valueHeader = evaluatorValueColumn(meta.name);
+              const reasoningHeader = evaluatorReasoningColumn(meta.name);
+              const rawValue = (row[valueHeader] ?? "").trim();
+              const rawReasoning = (row[reasoningHeader] ?? "").trim();
+              if (!rawValue) {
+                setParseError(
+                  `Row ${i + 1}: missing value for "${valueHeader}".`,
+                );
+                return;
+              }
+              const parsedAnn = parseAnnotationCell(rawValue, meta);
+              if ("error" in parsedAnn) {
+                setParseError(`Row ${i + 1}: ${parsedAnn.error}.`);
+                return;
+              }
+              annotations.push({
+                evaluator_uuid: meta.uuid,
+                output_type: meta.output_type,
+                value: parsedAnn.value,
+                reasoning: rawReasoning,
+              });
+            }
+          }
+          items.push({
+            name,
+            transcript: parsed as TurnObject[],
+            annotations,
+          });
         }
         if (items.length === 0) {
           setParseError("No rows with a transcript were found in the CSV.");
@@ -195,18 +342,39 @@ export function BulkUploadSimulationItemsDialog({
 
   const handleUpload = async () => {
     if (parsedItems.length === 0 || isUploading) return;
+    if (uploadAnnotations && !selectedAnnotatorId) {
+      setUploadError("Select an annotator before uploading.");
+      return;
+    }
+    if (uploadAnnotations && evaluatorsMissingOutputType.length > 0) {
+      setUploadError(
+        "One or more evaluators have no binary/rating output configured.",
+      );
+      return;
+    }
     setIsUploading(true);
     setUploadError(null);
     try {
+      const itemsBody = parsedItems.map((p) => {
+        const annotationsObj = uploadAnnotations
+          ? buildItemAnnotationsPayload(p.annotations)
+          : undefined;
+        return {
+          payload: { name: p.name, transcript: p.transcript },
+          ...(annotationsObj ? { annotations: annotationsObj } : {}),
+        };
+      });
+      const anyAnnotated = itemsBody.some((it) => "annotations" in it);
       await apiClient(`/annotation-tasks/${taskUuid}/items`, accessToken, {
         method: "POST",
         body: {
-          items: parsedItems.map((p) => ({
-            payload: { name: p.name, transcript: p.transcript },
-          })),
+          ...(anyAnnotated && selectedAnnotatorId
+            ? { annotator_id: selectedAnnotatorId }
+            : {}),
+          items: itemsBody,
         },
       });
-      onSuccess(parsedItems.length);
+      onSuccess(parsedItems.length, uploadAnnotations);
     } catch (err) {
       setUploadError(parseApiError(err, "Failed to upload items"));
     } finally {
@@ -214,186 +382,233 @@ export function BulkUploadSimulationItemsDialog({
     }
   };
 
-  const handleClose = () => {
-    if (!isUploading) onClose();
+  const buildGuidelines = (): GuidelineDoc => {
+    const columns: GuidelineColumn[] = [
+      {
+        name: "name",
+        description: "A name for the item.",
+      },
+      {
+        name: "transcript",
+        description:
+          'A JSON array of chat messages representing the full conversation. Each message is an object with a "role" and "content" field.\n\nrole — either "user" or "assistant"\ncontent — the message said by that role',
+        example: `[
+  {"role": "assistant", "content": "Hi, how can I help?"},
+  {"role": "user", "content": "I lost my card"}
+]`,
+      },
+    ];
+
+    if (uploadAnnotations && annotationEvaluatorsMeta.length > 0) {
+      for (const e of annotationEvaluatorsMeta) {
+        const range =
+          e.output_type === "binary"
+            ? "true/false"
+            : e.output_type === "rating" &&
+                typeof e.scale_min === "number" &&
+                typeof e.scale_max === "number"
+              ? `any value between ${e.scale_min}-${e.scale_max}`
+              : "value";
+        columns.push({
+          name: evaluatorValueColumn(e.name),
+          description: `Required. Value for the "${e.name}" evaluator (${range}).`,
+        });
+        columns.push({
+          name: evaluatorReasoningColumn(e.name),
+          description: `(optional) Reasoning for the value assigned to "${e.name}".`,
+        });
+      }
+    }
+
+    return {
+      title: "Bulk upload — Simulation labelling items",
+      intro:
+        "Upload a CSV with the following columns. Each row creates one simulation annotation item.",
+      columns,
+    };
   };
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={handleClose}
-    >
-      <div
-        className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="text-lg font-semibold text-foreground">
-            Bulk upload items
-          </h2>
-          <button
-            onClick={handleClose}
-            disabled={isUploading}
-            aria-label="Close"
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+  const annotationColumns =
+    uploadAnnotations && annotationEvaluatorsMeta.length > 0
+      ? annotationEvaluatorsMeta.flatMap((e) => [
+          {
+            evaluatorUuid: e.uuid,
+            kind: "value" as const,
+            header: evaluatorValueColumn(e.name),
+          },
+          {
+            evaluatorUuid: e.uuid,
+            kind: "reasoning" as const,
+            header: evaluatorReasoningColumn(e.name),
+          },
+        ])
+      : [];
+  const simGridStyle = {
+    gridTemplateColumns: [
+      "180px",
+      "minmax(280px,1fr)",
+      "60px",
+      ...annotationColumns.map(() => "minmax(180px,1fr)"),
+    ].join(" "),
+  };
+
+  const itemsPreview = (
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-foreground">
+        {parsedItems.length} {parsedItems.length === 1 ? "item" : "items"} ready
+        to upload
+      </p>
+      <div className="border border-border rounded-xl overflow-hidden">
+        <div className="overflow-auto max-h-[20rem]">
+          <div
+            className="grid gap-3 px-4 py-2 border-b border-border bg-muted sticky top-0 z-10"
+            style={simGridStyle}
           >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <label className="block text-sm font-medium text-foreground">
-                Upload CSV
-              </label>
-              <button
-                type="button"
-                onClick={downloadSampleCsv}
-                className="h-9 px-3 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-                  />
-                </svg>
-                Download sample CSV
-              </button>
+            <div className="text-xs font-medium text-muted-foreground">
+              Name
             </div>
-
-            {parsedItems.length > 0 && (
-              <FormatHelpToggle
-                open={formatHelpOpen}
-                onToggle={() => setFormatHelpOpen((o) => !o)}
-              />
-            )}
-
-            {formatHelpOpen && (
-              <div className="text-xs text-muted-foreground mb-3 leading-relaxed space-y-2">
-                <p>Each row creates one simulation item:</p>
-                <ul className="list-disc pl-5 space-y-1.5">
-                  <li>
-                    <code className="font-mono text-foreground">name</code> — a
-                    name for the item
-                  </li>
-                  <li>
-                    <code className="font-mono text-foreground">
-                      transcript
-                    </code>{" "}
-                    — JSON array representing a conversation with each turn
-                    having a{" "}
-                    <code className="font-mono text-foreground">role</code> and{" "}
-                    <code className="font-mono text-foreground">content</code>{" "}
-                    fields
-                  </li>
-                </ul>
+            <div className="text-xs font-medium text-muted-foreground">
+              Transcript
+            </div>
+            <div className="text-xs font-medium text-muted-foreground text-right">
+              Turns
+            </div>
+            {annotationColumns.map((c) => (
+              <div
+                key={`ah-${c.evaluatorUuid}-${c.kind}`}
+                className="text-xs font-medium text-muted-foreground font-mono truncate"
+                title={c.header}
+              >
+                {c.header}
               </div>
-            )}
-
-            <CsvDropzone
-              csvFile={csvFile}
-              onFile={handleFile}
-              onClear={reset}
-            />
-
-            {parseError && (
-              <p className="text-xs text-red-500 mt-3">{parseError}</p>
+            ))}
+          </div>
+          <div className="divide-y divide-border">
+            {parsedItems.slice(0, 50).map((p, idx) => (
+              <div
+                key={idx}
+                className="grid gap-3 px-4 py-2 text-xs items-start"
+                style={simGridStyle}
+              >
+                <div className="truncate text-foreground" title={p.name}>
+                  {p.name}
+                </div>
+                <div className="min-w-0">
+                  <TranscriptPreview turns={p.transcript} />
+                </div>
+                <div className="text-right tabular-nums text-muted-foreground">
+                  {p.transcript.length}
+                </div>
+                {annotationColumns.map((c) => {
+                  const ann = p.annotations.find(
+                    (a) => a.evaluator_uuid === c.evaluatorUuid,
+                  );
+                  const display =
+                    c.kind === "value"
+                      ? ann
+                        ? typeof ann.value === "boolean"
+                          ? ann.value
+                            ? "true"
+                            : "false"
+                          : String(ann.value)
+                        : ""
+                      : (ann?.reasoning ?? "");
+                  return (
+                    <div
+                      key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
+                      className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                    >
+                      {display}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+            {parsedItems.length > 50 && (
+              <div className="px-4 py-2 text-xs text-muted-foreground">
+                + {parsedItems.length - 50} more rows
+              </div>
             )}
           </div>
-
-          {parsedItems.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-foreground">
-                {parsedItems.length}{" "}
-                {parsedItems.length === 1 ? "item" : "items"} ready to upload
-              </p>
-              <div className="border border-border rounded-xl overflow-hidden">
-                <div className="grid grid-cols-[180px_1fr_60px] gap-3 px-4 py-2 border-b border-border bg-muted/30">
-                  <div className="text-xs font-medium text-muted-foreground">
-                    Name
-                  </div>
-                  <div className="text-xs font-medium text-muted-foreground">
-                    Transcript
-                  </div>
-                  <div className="text-xs font-medium text-muted-foreground text-right">
-                    Turns
-                  </div>
-                </div>
-                <div className="max-h-[15rem] overflow-y-auto divide-y divide-border">
-                  {parsedItems.slice(0, 50).map((p, idx) => (
-                    <div
-                      key={idx}
-                      className="grid grid-cols-[180px_1fr_60px] gap-3 px-4 py-2 text-xs items-start"
-                    >
-                      <div className="truncate text-foreground" title={p.name}>
-                        {p.name}
-                      </div>
-                      <div className="min-w-0">
-                        <TranscriptPreview turns={p.transcript} />
-                      </div>
-                      <div className="text-right tabular-nums text-muted-foreground">
-                        {p.transcript.length}
-                      </div>
-                    </div>
-                  ))}
-                  {parsedItems.length > 50 && (
-                    <div className="px-4 py-2 text-xs text-muted-foreground">
-                      + {parsedItems.length - 50} more rows
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {uploadError && (
-            <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-500">
-              {uploadError}
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
-          <button
-            onClick={handleClose}
-            disabled={isUploading}
-            className="h-10 px-4 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleUpload}
-            disabled={parsedItems.length === 0 || isUploading || !!parseError}
-            className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isUploading
-              ? "Uploading…"
-              : parsedItems.length > 1
-                ? `Upload ${parsedItems.length} items`
-                : "Upload item"}
-          </button>
         </div>
       </div>
     </div>
+  );
+
+  const annotationOptIn =
+    linkedEvaluators.length > 0 ? (
+      <div className="space-y-3">
+        <AnnotationOptIn
+          annotators={annotatorsState.annotators}
+          loading={annotatorsState.loading}
+          error={annotatorsState.error}
+          uploadAnnotations={uploadAnnotations}
+          onToggle={setUploadAnnotations}
+          selectedAnnotatorId={selectedAnnotatorId}
+          onSelectAnnotator={setSelectedAnnotatorId}
+        />
+        {uploadAnnotations && duplicateNames.length > 0 && (
+          <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
+            Two or more linked evaluators share the same name (
+            {duplicateNames.map((n) => `"${n}"`).join(", ")}). Rename one
+            on the evaluators page before uploading annotations.
+          </div>
+        )}
+        {uploadAnnotations && evaluatorsMissingOutputType.length > 0 && (
+          <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
+            Annotation upload isn&apos;t available — evaluator(s){" "}
+            {evaluatorsMissingOutputType
+              .map((e) => `"${e.name}"`)
+              .join(", ")}{" "}
+            have no binary/rating output configured.
+          </div>
+        )}
+      </div>
+    ) : null;
+
+  const uploadBlocked =
+    uploadAnnotations &&
+    (annotatorsState.annotators.length === 0 ||
+      !selectedAnnotatorId ||
+      duplicateNames.length > 0 ||
+      evaluatorsMissingOutputType.length > 0);
+
+  return (
+    <BulkUploadDialogShell
+      isOpen={isOpen}
+      title="Bulk upload items"
+      buildSampleCsv={() =>
+        buildSampleSimulationCsv(annotationEvaluatorsMeta, uploadAnnotations)
+      }
+      sampleFilename={() =>
+        uploadAnnotations
+          ? "sample_simulation_items_with_annotations.csv"
+          : "sample_simulation_items.csv"
+      }
+      buildGuidelines={buildGuidelines}
+      guidelinesFilename={() =>
+        uploadAnnotations
+          ? "simulation_items_csv_guidelines_with_annotations.pdf"
+          : "simulation_items_csv_guidelines.pdf"
+      }
+      csvFile={csvFile}
+      onFile={handleFile}
+      onClear={reset}
+      parseError={parseError}
+      uploadError={uploadError}
+      isUploading={isUploading}
+      itemCount={parsedItems.length}
+      itemsPreview={itemsPreview}
+      onUpload={handleUpload}
+      onClose={onClose}
+      topContent={annotationOptIn}
+      uploadBlocked={uploadBlocked}
+      hideUploadSection={
+        uploadAnnotations &&
+        (!selectedAnnotatorId ||
+          duplicateNames.length > 0 ||
+          evaluatorsMissingOutputType.length > 0)
+      }
+    />
   );
 }

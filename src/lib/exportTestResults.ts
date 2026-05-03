@@ -66,7 +66,7 @@ function isToolCallTest(
 // Multi-line text dump of the agent's tool calls for tool-call tests.
 // One block per call (`Tool: <name>` + `Arguments: <json>`), blocks
 // separated by a blank line. Routes through `normalizeToolCall` so the
-// historical `{name, arguments}` / `{tool, arguments}` / `{function: …}`
+// historical `{name, arguments}` / `{tool, arguments}` / `{function: ...}`
 // shapes all render consistently.
 function toolCallsCell(output: TestCaseOutput | null | undefined): string {
   if (!output?.tool_calls || output.tool_calls.length === 0) return "";
@@ -82,7 +82,7 @@ function toolCallsCell(output: TestCaseOutput | null | undefined): string {
 
 // Multi-line text dump of the per-evaluator verdicts for response tests.
 // One block per evaluator: `<name>: <verdict>`, optional `Variables:` list
-// (one indented line per `{{var}}: <value>`), and `Reasoning: …` line.
+// (one indented line per `{{var}}: <value>`), and `Reasoning: ...` line.
 // Falls back to the top-level `reasoning` string for legacy response
 // snapshots that pre-date the `judge_results` rollout (rendered as a
 // single un-keyed reasoning block).

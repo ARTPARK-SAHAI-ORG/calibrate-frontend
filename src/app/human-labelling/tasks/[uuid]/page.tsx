@@ -249,7 +249,13 @@ type LabellingTask = {
   evaluators?: {
     uuid: string;
     name: string;
+    description?: string | null;
+    slug?: string | null;
     evaluator_type?: "llm" | "stt" | "tts" | "simulation";
+    output_type?: "binary" | "rating" | null;
+    scale_min?: number | boolean | null;
+    scale_max?: number | boolean | null;
+    variables?: EvaluatorVariableDef[] | null;
   }[];
   items?: LabellingItem[];
   jobs?: LabellingJob[];
@@ -1241,56 +1247,10 @@ function LabellingTaskPageInner() {
     }
   };
 
-  // Hydrated evaluator catalogue (with live_version.variables) used to
-  // pre-fill the AddTestDialog's evaluators section for label items.
-  type HydratedEvaluator = {
-    uuid: string;
-    name: string;
-    description?: string | null;
-    slug: string | null;
-    variables: EvaluatorVariableDef[];
-  };
-  const [evaluatorCatalogue, setEvaluatorCatalogue] = useState<
-    Record<string, HydratedEvaluator>
-  >({});
-
-  useEffect(() => {
-    if (!accessToken) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const data = await apiClient<
-          Array<{
-            uuid: string;
-            name: string;
-            description?: string | null;
-            slug: string | null;
-            evaluator_type?: string;
-            live_version?: { variables?: EvaluatorVariableDef[] | null } | null;
-          }>
-        >("/evaluators?include_defaults=true", accessToken);
-        if (cancelled) return;
-        const next: Record<string, HydratedEvaluator> = {};
-        for (const e of Array.isArray(data) ? data : []) {
-          next[e.uuid] = {
-            uuid: e.uuid,
-            name: e.name,
-            description: e.description ?? null,
-            slug: e.slug,
-            variables: Array.isArray(e.live_version?.variables)
-              ? (e.live_version!.variables as EvaluatorVariableDef[])
-              : [],
-          };
-        }
-        setEvaluatorCatalogue(next);
-      } catch {
-        // best-effort hydration; dialog will fall back to defaults
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken]);
+  // GET /annotation-tasks/{uuid} now returns each linked evaluator with
+  // its live-version metadata (variables, output_type, scale, slug,
+  // description) inlined, so we no longer need a separate
+  // /evaluators?include_defaults=true catalogue fetch on this page.
 
   const editingItem = items.find((i) => i.uuid === editLlmItemUuid) ?? null;
   const editingPayload = (editingItem?.payload ?? null) as Record<
@@ -1329,17 +1289,16 @@ function LabellingTaskPageInner() {
   ): AttachedEvaluatorInit[] => {
     const linked = task?.evaluators ?? [];
     return linked.map((ev) => {
-      const hydrated = evaluatorCatalogue[ev.uuid];
       const saved = savedValues[ev.uuid] ?? null;
-      let variables: EvaluatorVariableDef[] = hydrated?.variables ?? [];
+      let variables: EvaluatorVariableDef[] = ev.variables ?? [];
       if (variables.length === 0 && saved && Object.keys(saved).length > 0) {
         variables = Object.keys(saved).map((name) => ({ name }));
       }
       return {
         evaluator_uuid: ev.uuid,
-        name: hydrated?.name ?? ev.name,
-        description: hydrated?.description ?? null,
-        slug: hydrated?.slug ?? null,
+        name: ev.name,
+        description: ev.description ?? null,
+        slug: ev.slug ?? null,
         variables,
         variable_values: saved,
       };
@@ -2131,7 +2090,7 @@ function LabellingTaskPageInner() {
                             selectedItems={summaryEvaluatorFilter}
                             onSelectionChange={setSummaryEvaluatorFilter}
                             placeholder="All evaluators"
-                            searchPlaceholder="Search evaluators..."
+                            searchPlaceholder="Search evaluators"
                           />
                         </div>
                         <Tooltip content="Show results for only the live versions of each evaluator. Toggle to see the results for all versions.">
@@ -2914,11 +2873,19 @@ function LabellingTaskPageInner() {
           isOpen={bulkUploadSttOpen}
           accessToken={accessToken}
           taskUuid={uuid}
+          linkedEvaluators={(task?.evaluators ?? []).map((e) => ({
+            uuid: e.uuid,
+            name: e.name,
+            output_type: e.output_type ?? null,
+            scale_min: typeof e.scale_min === "number" ? e.scale_min : null,
+            scale_max: typeof e.scale_max === "number" ? e.scale_max : null,
+          }))}
           onClose={() => setBulkUploadSttOpen(false)}
-          onSuccess={async (count) => {
+          onSuccess={async (count, withAnnotations) => {
             setBulkUploadSttOpen(false);
             handleTabChange("items");
             await fetchTask();
+            if (withAnnotations) await fetchTaskSummary();
             toast.success(`Added ${count} ${count === 1 ? "item" : "items"}`);
           }}
         />
@@ -2929,11 +2896,19 @@ function LabellingTaskPageInner() {
           isOpen={bulkUploadSimulationOpen}
           accessToken={accessToken}
           taskUuid={uuid}
+          linkedEvaluators={(task?.evaluators ?? []).map((e) => ({
+            uuid: e.uuid,
+            name: e.name,
+            output_type: e.output_type ?? null,
+            scale_min: typeof e.scale_min === "number" ? e.scale_min : null,
+            scale_max: typeof e.scale_max === "number" ? e.scale_max : null,
+          }))}
           onClose={() => setBulkUploadSimulationOpen(false)}
-          onSuccess={async (count) => {
+          onSuccess={async (count, withAnnotations) => {
             setBulkUploadSimulationOpen(false);
             handleTabChange("items");
             await fetchTask();
+            if (withAnnotations) await fetchTaskSummary();
             toast.success(`Added ${count} ${count === 1 ? "item" : "items"}`);
           }}
         />
@@ -2944,20 +2919,21 @@ function LabellingTaskPageInner() {
           isOpen={bulkUploadLlmOpen}
           accessToken={accessToken}
           taskUuid={uuid}
-          linkedEvaluators={(task?.evaluators ?? []).map((e) => {
-            const hydrated = evaluatorCatalogue[e.uuid];
-            return {
-              uuid: e.uuid,
-              name: hydrated?.name ?? e.name,
-              slug: hydrated?.slug ?? null,
-              variables: hydrated?.variables ?? [],
-            };
-          })}
+          linkedEvaluators={(task?.evaluators ?? []).map((e) => ({
+            uuid: e.uuid,
+            name: e.name,
+            slug: e.slug ?? null,
+            variables: e.variables ?? [],
+            output_type: e.output_type ?? null,
+            scale_min: typeof e.scale_min === "number" ? e.scale_min : null,
+            scale_max: typeof e.scale_max === "number" ? e.scale_max : null,
+          }))}
           onClose={() => setBulkUploadLlmOpen(false)}
-          onSuccess={async (count) => {
+          onSuccess={async (count, withAnnotations) => {
             setBulkUploadLlmOpen(false);
             handleTabChange("items");
             await fetchTask();
+            if (withAnnotations) await fetchTaskSummary();
             toast.success(`Added ${count} ${count === 1 ? "item" : "items"}`);
           }}
         />

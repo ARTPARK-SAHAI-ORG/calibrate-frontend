@@ -1476,7 +1476,7 @@ export function AddTestDialog({
                             onChange={(e) =>
                               setEvaluatorPickerSearch(e.target.value)
                             }
-                            placeholder="Search evaluators..."
+                            placeholder="Search evaluators"
                             autoFocus
                             className="w-full h-9 px-3 rounded-md text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-1 focus:ring-accent"
                           />
@@ -2287,188 +2287,197 @@ export function AddTestDialog({
                       {message.role === "tool_call" && (
                         <div className="flex w-full items-start gap-2">
                           <div className="w-1/2">
-                          <div className="bg-muted border border-border rounded-2xl p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                              <svg
-                                className="w-4 h-4 text-muted-foreground"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={1.5}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
-                                />
-                              </svg>
-                              <span className="text-sm font-medium text-foreground">
-                                {message.toolName}
-                              </span>
-                              {message.isWebhook && (
-                                <span className="text-xs text-muted-foreground bg-background px-2 py-0.5 rounded">
-                                  Webhook
+                            <div className="bg-muted border border-border rounded-2xl p-4">
+                              <div className="flex items-center gap-2 mb-2">
+                                <svg
+                                  className="w-4 h-4 text-muted-foreground"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={1.5}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
+                                  />
+                                </svg>
+                                <span className="text-sm font-medium text-foreground">
+                                  {message.toolName}
                                 </span>
-                              )}
-                            </div>
-                            {message.toolParams &&
-                              message.toolParams.length > 0 && (
-                                <div className="space-y-3 mt-3">
-                                  {/* Group parameters by type for webhook tools */}
-                                  {message.isWebhook ? (
-                                    <>
-                                      {/* Query Parameters */}
-                                      {message.toolParams.filter(
-                                        (p) => p.group === "query",
-                                      ).length > 0 && (
-                                        <div className="bg-background border border-border rounded-xl p-3">
-                                          <h5 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">
-                                            Query
-                                          </h5>
-                                          <div className="space-y-3">
-                                            {message.toolParams
-                                              .filter(
-                                                (p) => p.group === "query",
-                                              )
-                                              .map((param, idx) => {
-                                                const isEmpty =
-                                                  !param.value.trim();
-                                                const showError =
-                                                  localValidationAttempted &&
-                                                  isEmpty;
-                                                return (
-                                                  <div key={idx}>
-                                                    <label className="block text-sm font-medium text-foreground mb-1.5">
-                                                      {param.name}
-                                                    </label>
-                                                    <input
-                                                      type="text"
-                                                      value={param.value}
-                                                      onChange={(e) =>
-                                                        updateToolCallParam(
-                                                          message.id,
-                                                          param.name,
-                                                          e.target.value,
-                                                          param.group,
-                                                        )
-                                                      }
-                                                      placeholder={`Enter ${param.name}`}
-                                                      data-tool-call-id={message.id}
-                                                      className={`w-full h-10 px-3 rounded-lg text-sm bg-muted text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
-                                                        showError
-                                                          ? "border-red-500"
-                                                          : "border-border"
-                                                      }`}
-                                                    />
-                                                    {showError && (
-                                                      <p className="text-xs text-red-500 mt-1">
-                                                        This field cannot be
-                                                        empty
-                                                      </p>
-                                                    )}
-                                                  </div>
-                                                );
-                                              })}
-                                          </div>
-                                        </div>
-                                      )}
-                                      {/* Body Parameters */}
-                                      {message.toolParams.filter(
-                                        (p) => p.group === "body",
-                                      ).length > 0 && (
-                                        <div className="bg-background border border-border rounded-xl p-3">
-                                          <h5 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">
-                                            Body
-                                          </h5>
-                                          <div className="space-y-3">
-                                            {message.toolParams
-                                              .filter((p) => p.group === "body")
-                                              .map((param, idx) => {
-                                                const isEmpty =
-                                                  !param.value.trim();
-                                                const showError =
-                                                  localValidationAttempted &&
-                                                  isEmpty;
-                                                return (
-                                                  <div key={idx}>
-                                                    <label className="block text-sm font-medium text-foreground mb-1.5">
-                                                      {param.name}
-                                                    </label>
-                                                    <input
-                                                      type="text"
-                                                      value={param.value}
-                                                      onChange={(e) =>
-                                                        updateToolCallParam(
-                                                          message.id,
-                                                          param.name,
-                                                          e.target.value,
-                                                          param.group,
-                                                        )
-                                                      }
-                                                      placeholder={`Enter ${param.name}`}
-                                                      data-tool-call-id={message.id}
-                                                      className={`w-full h-10 px-3 rounded-lg text-sm bg-muted text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
-                                                        showError
-                                                          ? "border-red-500"
-                                                          : "border-border"
-                                                      }`}
-                                                    />
-                                                    {showError && (
-                                                      <p className="text-xs text-red-500 mt-1">
-                                                        This field cannot be
-                                                        empty
-                                                      </p>
-                                                    )}
-                                                  </div>
-                                                );
-                                              })}
-                                          </div>
-                                        </div>
-                                      )}
-                                    </>
-                                  ) : (
-                                    /* Regular tool parameters */
-                                    <div className="space-y-3">
-                                      {message.toolParams.map((param, idx) => {
-                                        const isEmpty = !param.value.trim();
-                                        const showError =
-                                          localValidationAttempted && isEmpty;
-                                        return (
-                                          <div key={idx}>
-                                            <label className="block text-sm font-medium text-foreground mb-1.5">
-                                              {param.name}
-                                            </label>
-                                            <input
-                                              type="text"
-                                              value={param.value}
-                                              onChange={(e) =>
-                                                updateToolCallParam(
-                                                  message.id,
-                                                  param.name,
-                                                  e.target.value,
-                                                  param.group,
+                                {message.isWebhook && (
+                                  <span className="text-xs text-muted-foreground bg-background px-2 py-0.5 rounded">
+                                    Webhook
+                                  </span>
+                                )}
+                              </div>
+                              {message.toolParams &&
+                                message.toolParams.length > 0 && (
+                                  <div className="space-y-3 mt-3">
+                                    {/* Group parameters by type for webhook tools */}
+                                    {message.isWebhook ? (
+                                      <>
+                                        {/* Query Parameters */}
+                                        {message.toolParams.filter(
+                                          (p) => p.group === "query",
+                                        ).length > 0 && (
+                                          <div className="bg-background border border-border rounded-xl p-3">
+                                            <h5 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">
+                                              Query
+                                            </h5>
+                                            <div className="space-y-3">
+                                              {message.toolParams
+                                                .filter(
+                                                  (p) => p.group === "query",
                                                 )
-                                              }
-                                              placeholder={`Enter ${param.name}`}
-                                              className={`w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
-                                                showError
-                                                  ? "border-red-500"
-                                                  : "border-border"
-                                              }`}
-                                            />
-                                            {showError && (
-                                              <p className="text-xs text-red-500 mt-1">
-                                                This field cannot be empty
-                                              </p>
-                                            )}
+                                                .map((param, idx) => {
+                                                  const isEmpty =
+                                                    !param.value.trim();
+                                                  const showError =
+                                                    localValidationAttempted &&
+                                                    isEmpty;
+                                                  return (
+                                                    <div key={idx}>
+                                                      <label className="block text-sm font-medium text-foreground mb-1.5">
+                                                        {param.name}
+                                                      </label>
+                                                      <input
+                                                        type="text"
+                                                        value={param.value}
+                                                        onChange={(e) =>
+                                                          updateToolCallParam(
+                                                            message.id,
+                                                            param.name,
+                                                            e.target.value,
+                                                            param.group,
+                                                          )
+                                                        }
+                                                        placeholder={`Enter ${param.name}`}
+                                                        data-tool-call-id={
+                                                          message.id
+                                                        }
+                                                        className={`w-full h-10 px-3 rounded-lg text-sm bg-muted text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                                                          showError
+                                                            ? "border-red-500"
+                                                            : "border-border"
+                                                        }`}
+                                                      />
+                                                      {showError && (
+                                                        <p className="text-xs text-red-500 mt-1">
+                                                          This field cannot be
+                                                          empty
+                                                        </p>
+                                                      )}
+                                                    </div>
+                                                  );
+                                                })}
+                                            </div>
                                           </div>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                          </div>
+                                        )}
+                                        {/* Body Parameters */}
+                                        {message.toolParams.filter(
+                                          (p) => p.group === "body",
+                                        ).length > 0 && (
+                                          <div className="bg-background border border-border rounded-xl p-3">
+                                            <h5 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">
+                                              Body
+                                            </h5>
+                                            <div className="space-y-3">
+                                              {message.toolParams
+                                                .filter(
+                                                  (p) => p.group === "body",
+                                                )
+                                                .map((param, idx) => {
+                                                  const isEmpty =
+                                                    !param.value.trim();
+                                                  const showError =
+                                                    localValidationAttempted &&
+                                                    isEmpty;
+                                                  return (
+                                                    <div key={idx}>
+                                                      <label className="block text-sm font-medium text-foreground mb-1.5">
+                                                        {param.name}
+                                                      </label>
+                                                      <input
+                                                        type="text"
+                                                        value={param.value}
+                                                        onChange={(e) =>
+                                                          updateToolCallParam(
+                                                            message.id,
+                                                            param.name,
+                                                            e.target.value,
+                                                            param.group,
+                                                          )
+                                                        }
+                                                        placeholder={`Enter ${param.name}`}
+                                                        data-tool-call-id={
+                                                          message.id
+                                                        }
+                                                        className={`w-full h-10 px-3 rounded-lg text-sm bg-muted text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                                                          showError
+                                                            ? "border-red-500"
+                                                            : "border-border"
+                                                        }`}
+                                                      />
+                                                      {showError && (
+                                                        <p className="text-xs text-red-500 mt-1">
+                                                          This field cannot be
+                                                          empty
+                                                        </p>
+                                                      )}
+                                                    </div>
+                                                  );
+                                                })}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </>
+                                    ) : (
+                                      /* Regular tool parameters */
+                                      <div className="space-y-3">
+                                        {message.toolParams.map(
+                                          (param, idx) => {
+                                            const isEmpty = !param.value.trim();
+                                            const showError =
+                                              localValidationAttempted &&
+                                              isEmpty;
+                                            return (
+                                              <div key={idx}>
+                                                <label className="block text-sm font-medium text-foreground mb-1.5">
+                                                  {param.name}
+                                                </label>
+                                                <input
+                                                  type="text"
+                                                  value={param.value}
+                                                  onChange={(e) =>
+                                                    updateToolCallParam(
+                                                      message.id,
+                                                      param.name,
+                                                      e.target.value,
+                                                      param.group,
+                                                    )
+                                                  }
+                                                  placeholder={`Enter ${param.name}`}
+                                                  className={`w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                                                    showError
+                                                      ? "border-red-500"
+                                                      : "border-border"
+                                                  }`}
+                                                />
+                                                {showError && (
+                                                  <p className="text-xs text-red-500 mt-1">
+                                                    This field cannot be empty
+                                                  </p>
+                                                )}
+                                              </div>
+                                            );
+                                          },
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                            </div>
                           </div>
                           {showInlineDelete && (
                             <button
@@ -2927,7 +2936,6 @@ export function AddTestDialog({
               </div>
             )}
           </div>
-
         </div>
       </div>
     </div>
