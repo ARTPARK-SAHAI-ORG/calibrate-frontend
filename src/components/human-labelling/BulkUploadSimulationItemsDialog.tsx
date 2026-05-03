@@ -176,6 +176,14 @@ export function BulkUploadSimulationItemsDialog({
     }),
   );
 
+  // Evaluator metadata (output_type) hydrates asynchronously on the parent
+  // page. Until every linked evaluator has a usable output_type the parser
+  // would silently drop those evaluators' annotation columns, so we treat
+  // the metadata as "not ready" and re-parse once it lands.
+  const annotationMetadataReady = annotationEvaluatorsMeta.every(
+    (e) => e.output_type === "binary" || e.output_type === "rating",
+  );
+
   const reset = () => {
     setCsvFile(null);
     setParsedItems([]);
@@ -194,6 +202,15 @@ export function BulkUploadSimulationItemsDialog({
     setParseError(null);
     setCsvFile(null);
   }, [uploadAnnotations]);
+
+  // Re-parse once evaluator metadata hydrates so annotations land on every
+  // evaluator instead of being silently skipped for ones whose output_type
+  // was still null when the user dropped the CSV.
+  useEffect(() => {
+    if (!uploadAnnotations || !annotationMetadataReady || !csvFile) return;
+    handleFile(csvFile);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annotationMetadataReady]);
 
   const handleFile = (file: File | null) => {
     setUploadError(null);
@@ -216,6 +233,12 @@ export function BulkUploadSimulationItemsDialog({
           return;
         }
         if (uploadAnnotations) {
+          if (!annotationMetadataReady) {
+            setParseError(
+              "Evaluator metadata is still loading. Please wait a moment and try again.",
+            );
+            return;
+          }
           const missing: string[] = [];
           for (const meta of annotationEvaluatorsMeta) {
             const valueHeader = evaluatorValueColumn(meta.name);
@@ -322,6 +345,12 @@ export function BulkUploadSimulationItemsDialog({
     if (parsedItems.length === 0 || isUploading) return;
     if (uploadAnnotations && !selectedAnnotatorId) {
       setUploadError("Select an annotator before uploading.");
+      return;
+    }
+    if (uploadAnnotations && !annotationMetadataReady) {
+      setUploadError(
+        "Evaluator metadata is still loading. Please wait a moment and try again.",
+      );
       return;
     }
     setIsUploading(true);

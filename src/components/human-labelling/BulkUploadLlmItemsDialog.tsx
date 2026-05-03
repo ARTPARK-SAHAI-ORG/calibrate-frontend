@@ -217,6 +217,25 @@ export function BulkUploadLlmItemsDialog({
     }),
   );
 
+  // Evaluator metadata (output_type) hydrates asynchronously on the parent
+  // page. Until every linked evaluator has a usable output_type the parser
+  // would silently drop those evaluators' annotation columns, so we treat
+  // the metadata as "not ready" and re-parse once it lands.
+  const annotationMetadataReady = annotationEvaluatorsMeta.every(
+    (e) => e.output_type === "binary" || e.output_type === "rating",
+  );
+
+  // If the user dropped a CSV before evaluator metadata hydrated, re-run
+  // the parser as soon as it does so annotations land on every evaluator
+  // instead of being silently skipped.
+  useEffect(() => {
+    if (!uploadAnnotations || !annotationMetadataReady || !csvFile) return;
+    handleFile(csvFile);
+    // handleFile is recreated each render and reads latest state via
+    // closure; we only want this firing on the readiness flip.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annotationMetadataReady]);
+
   const evaluatorsWithVariables = linkedEvaluators.filter(
     (e) => e.variables.length > 0,
   );
@@ -278,6 +297,12 @@ export function BulkUploadLlmItemsDialog({
         }
 
         if (uploadAnnotations) {
+          if (!annotationMetadataReady) {
+            setParseError(
+              "Evaluator metadata is still loading. Please wait a moment and try again.",
+            );
+            return;
+          }
           const missingAnnotationCols: string[] = [];
           for (const meta of annotationEvaluatorsMeta) {
             const valueHeader = evaluatorValueColumn(meta.name);
@@ -435,6 +460,12 @@ export function BulkUploadLlmItemsDialog({
     if (parsedItems.length === 0 || isUploading) return;
     if (uploadAnnotations && !selectedAnnotatorId) {
       setUploadError("Select an annotator before uploading.");
+      return;
+    }
+    if (uploadAnnotations && !annotationMetadataReady) {
+      setUploadError(
+        "Evaluator metadata is still loading. Please wait a moment and try again.",
+      );
       return;
     }
     setIsUploading(true);
