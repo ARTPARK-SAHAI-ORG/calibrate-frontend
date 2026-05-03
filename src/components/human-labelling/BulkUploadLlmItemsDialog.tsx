@@ -13,6 +13,7 @@ import {
   type ParsedAnnotation,
   type TurnObject,
   buildItemAnnotationsPayload,
+  duplicateEvaluatorNames,
   evaluatorReasoningColumn,
   evaluatorValueColumn,
   findHeaderKey,
@@ -224,6 +225,11 @@ export function BulkUploadLlmItemsDialog({
   const annotationMetadataReady = annotationEvaluatorsMeta.every(
     (e) => e.output_type === "binary" || e.output_type === "rating",
   );
+
+  // Two linked evaluators with the same name would produce duplicate CSV
+  // headers and PapaParse would silently overwrite one. Block the
+  // annotation flow until the task admin renames one of them.
+  const duplicateNames = duplicateEvaluatorNames(annotationEvaluatorsMeta);
 
   // If the user dropped a CSV before evaluator metadata hydrated, re-run
   // the parser as soon as it does so annotations land on every evaluator
@@ -727,20 +733,31 @@ export function BulkUploadLlmItemsDialog({
 
   const annotationOptIn =
     linkedEvaluators.length > 0 ? (
-      <AnnotationOptIn
-        annotators={annotatorsState.annotators}
-        loading={annotatorsState.loading}
-        error={annotatorsState.error}
-        uploadAnnotations={uploadAnnotations}
-        onToggle={setUploadAnnotations}
-        selectedAnnotatorId={selectedAnnotatorId}
-        onSelectAnnotator={setSelectedAnnotatorId}
-      />
+      <div className="space-y-3">
+        <AnnotationOptIn
+          annotators={annotatorsState.annotators}
+          loading={annotatorsState.loading}
+          error={annotatorsState.error}
+          uploadAnnotations={uploadAnnotations}
+          onToggle={setUploadAnnotations}
+          selectedAnnotatorId={selectedAnnotatorId}
+          onSelectAnnotator={setSelectedAnnotatorId}
+        />
+        {uploadAnnotations && duplicateNames.length > 0 && (
+          <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
+            Two or more linked evaluators share the same name (
+            {duplicateNames.map((n) => `"${n}"`).join(", ")}). Rename one
+            on the evaluators page before uploading annotations.
+          </div>
+        )}
+      </div>
     ) : null;
 
   const uploadBlocked =
     uploadAnnotations &&
-    (annotatorsState.annotators.length === 0 || !selectedAnnotatorId);
+    (annotatorsState.annotators.length === 0 ||
+      !selectedAnnotatorId ||
+      duplicateNames.length > 0);
 
   return (
     <BulkUploadDialogShell
@@ -770,7 +787,10 @@ export function BulkUploadLlmItemsDialog({
       onClose={onClose}
       topContent={annotationOptIn}
       uploadBlocked={uploadBlocked}
-      hideUploadSection={uploadAnnotations && !selectedAnnotatorId}
+      hideUploadSection={
+        uploadAnnotations &&
+        (!selectedAnnotatorId || duplicateNames.length > 0)
+      }
     />
   );
 }

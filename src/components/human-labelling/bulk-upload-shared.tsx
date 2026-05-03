@@ -65,14 +65,33 @@ export function buildItemAnnotationsPayload(
   return out;
 }
 
-// CSV column header for an evaluator's value column.
+// CSV column header for an evaluator's value column. We namespace under
+// `<evalName>/value` (not just `<evalName>`) so the header can't collide
+// with reserved item columns like `name`, `agent_response`, or
+// `conversation_history`.
 export function evaluatorValueColumn(evalName: string): string {
-  return evalName;
+  return `${evalName}/value`;
 }
 
 // CSV column header for an evaluator's reasoning column.
 export function evaluatorReasoningColumn(evalName: string): string {
   return `${evalName}/reasoning`;
+}
+
+// Returns the names that appear more than once in `evaluators`, so the
+// caller can refuse to render the annotation flow when two linked
+// evaluators share a name (which would produce duplicate CSV headers
+// that PapaParse silently overwrites). Empty list = safe to proceed.
+export function duplicateEvaluatorNames(
+  evaluators: { name: string }[],
+): string[] {
+  const seen = new Map<string, number>();
+  for (const e of evaluators) {
+    seen.set(e.name, (seen.get(e.name) ?? 0) + 1);
+  }
+  return Array.from(seen.entries())
+    .filter(([, n]) => n > 1)
+    .map(([name]) => name);
 }
 
 // Sample value to render in the sample CSV's evaluator value column.
@@ -875,7 +894,7 @@ export function BulkUploadDialogShell({
     >
       <div
         className={`bg-background border border-border rounded-xl shadow-2xl w-full flex flex-col max-h-[90vh] transition-[max-width] duration-200 ${
-          itemCount > 0 ? "max-w-[80vw]" : "max-w-[37.5vw]"
+          itemCount > 0 ? "md:max-w-[80vw]" : "md:max-w-[37.5vw]"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
