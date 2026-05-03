@@ -1249,6 +1249,9 @@ function LabellingTaskPageInner() {
     description?: string | null;
     slug: string | null;
     variables: EvaluatorVariableDef[];
+    output_type: "binary" | "rating" | null;
+    scale_min: number | null;
+    scale_max: number | null;
   };
   const [evaluatorCatalogue, setEvaluatorCatalogue] = useState<
     Record<string, HydratedEvaluator>
@@ -1266,12 +1269,30 @@ function LabellingTaskPageInner() {
             description?: string | null;
             slug: string | null;
             evaluator_type?: string;
-            live_version?: { variables?: EvaluatorVariableDef[] | null } | null;
+            output_type?: "binary" | "rating";
+            live_version?: {
+              variables?: EvaluatorVariableDef[] | null;
+              output_config?: {
+                scale?: Array<{ value: unknown }> | null;
+              } | null;
+            } | null;
           }>
         >("/evaluators?include_defaults=true", accessToken);
         if (cancelled) return;
         const next: Record<string, HydratedEvaluator> = {};
         for (const e of Array.isArray(data) ? data : []) {
+          const scale = e.live_version?.output_config?.scale ?? [];
+          const numericValues = scale
+            .map((s) =>
+              typeof s.value === "number"
+                ? s.value
+                : typeof s.value === "boolean"
+                  ? s.value
+                    ? 1
+                    : 0
+                  : Number(s.value),
+            )
+            .filter((n) => Number.isFinite(n));
           next[e.uuid] = {
             uuid: e.uuid,
             name: e.name,
@@ -1280,6 +1301,15 @@ function LabellingTaskPageInner() {
             variables: Array.isArray(e.live_version?.variables)
               ? (e.live_version!.variables as EvaluatorVariableDef[])
               : [],
+            output_type: e.output_type ?? null,
+            scale_min:
+              e.output_type === "rating" && numericValues.length > 0
+                ? Math.min(...numericValues)
+                : null,
+            scale_max:
+              e.output_type === "rating" && numericValues.length > 0
+                ? Math.max(...numericValues)
+                : null,
           };
         }
         setEvaluatorCatalogue(next);
@@ -2914,11 +2944,22 @@ function LabellingTaskPageInner() {
           isOpen={bulkUploadSttOpen}
           accessToken={accessToken}
           taskUuid={uuid}
+          linkedEvaluators={(task?.evaluators ?? []).map((e) => {
+            const hydrated = evaluatorCatalogue[e.uuid];
+            return {
+              uuid: e.uuid,
+              name: hydrated?.name ?? e.name,
+              output_type: hydrated?.output_type ?? null,
+              scale_min: hydrated?.scale_min ?? null,
+              scale_max: hydrated?.scale_max ?? null,
+            };
+          })}
           onClose={() => setBulkUploadSttOpen(false)}
-          onSuccess={async (count) => {
+          onSuccess={async (count, withAnnotations) => {
             setBulkUploadSttOpen(false);
             handleTabChange("items");
             await fetchTask();
+            if (withAnnotations) await fetchTaskSummary();
             toast.success(`Added ${count} ${count === 1 ? "item" : "items"}`);
           }}
         />
@@ -2929,11 +2970,22 @@ function LabellingTaskPageInner() {
           isOpen={bulkUploadSimulationOpen}
           accessToken={accessToken}
           taskUuid={uuid}
+          linkedEvaluators={(task?.evaluators ?? []).map((e) => {
+            const hydrated = evaluatorCatalogue[e.uuid];
+            return {
+              uuid: e.uuid,
+              name: hydrated?.name ?? e.name,
+              output_type: hydrated?.output_type ?? null,
+              scale_min: hydrated?.scale_min ?? null,
+              scale_max: hydrated?.scale_max ?? null,
+            };
+          })}
           onClose={() => setBulkUploadSimulationOpen(false)}
-          onSuccess={async (count) => {
+          onSuccess={async (count, withAnnotations) => {
             setBulkUploadSimulationOpen(false);
             handleTabChange("items");
             await fetchTask();
+            if (withAnnotations) await fetchTaskSummary();
             toast.success(`Added ${count} ${count === 1 ? "item" : "items"}`);
           }}
         />
@@ -2951,13 +3003,17 @@ function LabellingTaskPageInner() {
               name: hydrated?.name ?? e.name,
               slug: hydrated?.slug ?? null,
               variables: hydrated?.variables ?? [],
+              output_type: hydrated?.output_type ?? null,
+              scale_min: hydrated?.scale_min ?? null,
+              scale_max: hydrated?.scale_max ?? null,
             };
           })}
           onClose={() => setBulkUploadLlmOpen(false)}
-          onSuccess={async (count) => {
+          onSuccess={async (count, withAnnotations) => {
             setBulkUploadLlmOpen(false);
             handleTabChange("items");
             await fetchTask();
+            if (withAnnotations) await fetchTaskSummary();
             toast.success(`Added ${count} ${count === 1 ? "item" : "items"}`);
           }}
         />

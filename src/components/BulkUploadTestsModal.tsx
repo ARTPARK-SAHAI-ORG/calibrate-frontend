@@ -10,7 +10,10 @@ import { MultiAgentPicker } from "@/components/AgentPicker";
 import { MultiSelectPicker } from "@/components/MultiSelectPicker";
 import {
   ChatHistoryPreview,
-  ConversationFormatDetails,
+  generateGuidelinesPdf,
+  type GuidelineColumn,
+  type GuidelineDoc,
+  type GuidelineField,
   type TurnObject,
 } from "@/components/human-labelling/bulk-upload-shared";
 import type { EvaluatorRefPayload } from "@/components/AddTestDialog";
@@ -118,6 +121,9 @@ const SAMPLE_TOOL_CALL_CSV = `name,conversation_history,tool_calls
 "Book room test","[{""role"":""user"",""content"":""I want to book room 101 for tomorrow""}]","[{""tool"":""book_room"",""arguments"":{""room"":""101""},""accept_any_arguments"":false}]"
 "Weather lookup","[{""role"":""assistant"",""content"":""How can I help?""},{""role"":""user"",""content"":""What is the weather in Bangalore?""}]","[{""tool"":""get_weather"",""arguments"":{},""accept_any_arguments"":true}]"`;
 
+// Plain-text README bundled in the tool-call sample ZIP. Mirrors the PDF
+// guidelines content but rendered as text for users who prefer reading the
+// readme alongside the sample CSV.
 const TOOL_CALL_README = `BULK UPLOAD - TOOL CALL TESTS
 ==============================
 
@@ -134,10 +140,9 @@ COLUMNS
    Example: "Book room test"
 
 2. conversation_history
-   A JSON array of chat messages in OpenAI's chat format. This represents
-   the conversation that has happened so far, before the agent's tool call
-   behavior is evaluated. Each message is an object with a "role" and
-   "content" field.
+   A JSON array of chat messages that represents the conversation that has
+   happened so far, before the agent's tool call behavior is evaluated.
+   Each message is an object with a "role" and "content" field.
 
    Supported roles:
      - "user"       — A message from the end user
@@ -151,13 +156,9 @@ COLUMNS
        {"role": "user", "content": "I want to book room 101 for tomorrow"}
      ]
 
-   In CSV, JSON must be enclosed in double quotes, and any double quotes
-   inside the JSON must be escaped by doubling them (""). See the sample
-   CSV for the correct format.
-
 3. tool_calls
    A JSON array of expected tool call objects. Each object describes a tool
-   the agent is expected to call (or not call) and what arguments to expect.
+   the agent is expected to call and what arguments to expect.
 
    Fields for each tool call object:
 
@@ -186,6 +187,32 @@ COLUMNS
        [{"tool": "get_weather", "arguments": {}, "accept_any_arguments": true}]
 `;
 
+const CONVERSATION_HISTORY_DESC =
+  'A JSON array of chat messages that represents the conversation that has happened so far, before the agent\'s response is evaluated. Each message is an object with a "role" and "content" field.\n\nrole — either "user" or "assistant"\ncontent — the message said by that role';
+
+const TOOL_CALL_FIELDS: GuidelineField[] = [
+  {
+    name: "tool",
+    meta: "(required, string)",
+    description:
+      "The name of the tool. Must match the tool name exactly as configured in your agent.",
+    example: '"book_room"',
+  },
+  {
+    name: "arguments",
+    meta: "(optional, object)",
+    description:
+      "The expected arguments the agent should pass to the tool. Each key is a parameter name and each value is the expected value. If omitted or empty ({}), arguments are not checked — equivalent to setting accept_any_arguments to true.",
+    example: '{"room": "101", "date": "tomorrow"}',
+  },
+  {
+    name: "accept_any_arguments",
+    meta: "(optional, boolean, default: false)",
+    description:
+      'If true, the test passes regardless of what arguments the agent sends to this tool. Useful when you only care that the tool was called, not what was passed. When true, the "arguments" field is ignored.',
+  },
+];
+
 export function BulkUploadTestsModal({
   isOpen,
   onClose,
@@ -211,12 +238,6 @@ export function BulkUploadTestsModal({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadWarnings, setUploadWarnings] = useState<string[] | null>(null);
-  // Whether the CSV-format helper block above the dropzone is expanded.
-  // Starts open so first-time uploaders see the format spec, auto-collapses
-  // as soon as a CSV parses successfully (managed by the effect below) so
-  // the help doesn't compete with the parsed-tests preview for screen real
-  // estate, and the user can re-open it manually via the toggle.
-  const [formatHelpOpen, setFormatHelpOpen] = useState(true);
 
   // LLM evaluators (defaults + user-owned) available to the tenant —
   // populates the picker and gives us the variable definitions we need to
@@ -263,7 +284,6 @@ export function BulkUploadTestsModal({
       setParsedTests([]);
       setParseError(null);
       setPendingFile(null);
-      setFormatHelpOpen(true);
       setAssignToAgents(false);
       setSelectedAgentUuids([]);
       setIsUploading(false);
@@ -435,14 +455,6 @@ export function BulkUploadTestsModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingFile, evaluatorsFetched, toolsFetched, isResponseType]);
 
-  // Auto-collapse the CSV-format helper as soon as a CSV parses
-  // successfully (so the preview owns the screen), and re-expand it once
-  // the user clears the parsed tests (back to a "first upload" state).
-  // The user can still flip it manually via the toggle either way.
-  useEffect(() => {
-    setFormatHelpOpen(parsedTests.length === 0);
-  }, [parsedTests.length]);
-
   // Lookup set of every tool name the platform recognises for this tenant:
   // the names of all custom tools (from `GET /tools`) plus the ids of every
   // inbuilt tool (e.g. `end_call`). Tool-call CSV entries whose `tool` value
@@ -485,6 +497,92 @@ export function BulkUploadTestsModal({
         el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
       }
     });
+  };
+
+  const buildGuidelines = (): GuidelineDoc => {
+    if (isResponseType) {
+      const columns: GuidelineColumn[] = [
+        { name: "name", description: "A unique test name." },
+        {
+          name: "conversation_history",
+          description: CONVERSATION_HISTORY_DESC,
+          example: `[
+  {"role": "user", "content": "What is your return policy?"},
+  {"role": "assistant", "content": "You can return any item within 30 days."}
+]`,
+        },
+      ];
+      for (const e of committedEvaluators) {
+        for (const v of e.variables) {
+          const desc = v.description ? ` — ${v.description}` : "";
+          columns.push({
+            name: variableColumnName(e.name, v.name),
+            description: `Used for the "${e.name}" evaluator${desc}`,
+          });
+        }
+      }
+      return {
+        title: "Bulk upload — Next reply tests",
+        intro:
+          "Upload a CSV with the following columns. Each row creates one test.",
+        columns,
+      };
+    }
+
+    return {
+      title: "Bulk upload — Tool call tests",
+      intro:
+        "Upload a CSV with the following columns. Each row creates one test.",
+      columns: [
+        {
+          name: "name",
+          description:
+            "A unique name for the test. This must be different from every other test in the CSV and from any test you have already created.",
+          example: '"Book room test"',
+        },
+        {
+          name: "conversation_history",
+          description: `${CONVERSATION_HISTORY_DESC}\n\nThe conversation should end with a user message, since the test evaluates which tools the agent calls after this conversation.`,
+          example: `[
+  {"role": "user", "content": "I want to book room 101 for tomorrow"}
+]`,
+        },
+        {
+          name: "tool_calls",
+          description:
+            "A JSON array of expected tool call objects. Each object describes a tool the agent is expected to call and what arguments to expect.",
+          fields: TOOL_CALL_FIELDS,
+          trailingExamples: [
+            {
+              label: "Tool should be called with specific arguments:",
+              example:
+                '[{"tool": "book_room", "arguments": {"room": "101"}, "accept_any_arguments": false}]',
+            },
+            {
+              label: "Tool should be called, any arguments accepted:",
+              example:
+                '[{"tool": "get_weather", "arguments": {}, "accept_any_arguments": true}]',
+            },
+          ],
+        },
+      ],
+    };
+  };
+
+  const downloadGuidelines = () => {
+    if (!testType) return;
+    const blob = generateGuidelinesPdf(buildGuidelines());
+    const filename = isResponseType
+      ? "next_reply_tests_csv_guidelines.pdf"
+      : "tool_call_tests_csv_guidelines.pdf";
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const downloadSampleCsv = async () => {
@@ -1065,7 +1163,6 @@ export function BulkUploadTestsModal({
     );
   };
 
-
   if (!isOpen) return null;
 
   return (
@@ -1172,8 +1269,7 @@ export function BulkUploadTestsModal({
                 Select evaluators to attach
               </label>
               <p className="text-xs text-muted-foreground mb-3">
-                These evaluators will be attached to every test in this upload.
-                Variables they declare become CSV columns.
+                These evaluators will be attached to every test you upload
               </p>
               {evaluatorsFetchError && (
                 <p className="text-xs text-red-500 mb-2">
@@ -1227,132 +1323,30 @@ export function BulkUploadTestsModal({
               one evaluator are picked) */}
           {testType && (!isResponseType || committedEvaluators.length > 0) && (
             <div>
-              {/* Format description — once a CSV has parsed successfully
-                  it auto-collapses so the preview owns the screen, but
-                  remains togglable via the disclosure button below. */}
-              {parsedTests.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setFormatHelpOpen((o) => !o)}
-                  className="mb-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                  aria-expanded={formatHelpOpen}
-                >
-                  <svg
-                    className={`w-3.5 h-3.5 transition-transform ${
-                      formatHelpOpen ? "rotate-90" : ""
-                    }`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
+              {parsedTests.length === 0 && (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={downloadGuidelines}
+                    className="h-9 px-3 rounded-md text-xs font-semibold border border-blue-500/40 bg-blue-500/15 text-blue-700 dark:text-blue-300 hover:bg-blue-500/25 hover:border-blue-500/60 transition-colors cursor-pointer flex items-center gap-1.5"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M8.25 4.5l7.5 7.5-7.5 7.5"
-                    />
-                  </svg>
-                  {formatHelpOpen
-                    ? "Hide CSV format details"
-                    : "Show CSV format details"}
-                </button>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                      />
+                    </svg>
+                    Download CSV format guidelines
+                  </button>
+                </div>
               )}
-              {formatHelpOpen &&
-                (isResponseType ? (
-                  <div className="text-xs text-muted-foreground mb-3 leading-relaxed space-y-2">
-                    <p>Upload a CSV with the following columns:</p>
-                    <ul className="list-disc pl-5 space-y-1.5">
-                      <li>
-                        <code className="font-mono text-foreground">name</code>{" "}
-                        — a unique test name
-                      </li>
-                      <li>
-                        <code className="font-mono text-foreground">
-                          conversation_history
-                        </code>{" "}
-                        — JSON array representing a conversation that an
-                        agent needs to respond to.
-                        <ConversationFormatDetails
-                          example={
-                            '[{"role":"user","content":"What is your return policy?"},{"role":"assistant","content":"You can return any item within 30 days."},{"role":"user","content":"What about defective items?"}]'
-                          }
-                        />
-                      </li>
-                      {committedEvaluators.flatMap((e) =>
-                        e.variables.map((v) => (
-                          <li key={`${e.uuid}-${v.name}`}>
-                            <code className="font-mono text-foreground">
-                              {variableColumnName(e.name, v.name)}
-                            </code>
-                            {v.description ? ` — ${v.description}` : ""} (used
-                            for{" "}
-                            <Link
-                              href={`/evaluators/${e.uuid}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground text-[10px] font-medium hover:opacity-80 transition-opacity cursor-pointer"
-                            >
-                              {e.name}
-                            </Link>
-                            )
-                          </li>
-                        )),
-                      )}
-                    </ul>
-                  </div>
-                ) : (
-                  <div className="text-xs text-muted-foreground mb-3 leading-relaxed space-y-2">
-                    <p>Upload a CSV with the following columns:</p>
-                    <ul className="list-disc pl-5 space-y-1.5">
-                      <li>
-                        <code className="font-mono text-foreground">name</code>{" "}
-                        — a unique test name
-                      </li>
-                      <li>
-                        <code className="font-mono text-foreground">
-                          conversation_history
-                        </code>{" "}
-                        — JSON array representing a conversation that an
-                        agent needs to respond to.
-                        <ConversationFormatDetails
-                          example={
-                            '[{"role":"user","content":"What is your return policy?"},{"role":"assistant","content":"You can return any item within 30 days."},{"role":"user","content":"What about defective items?"}]'
-                          }
-                        />
-                      </li>
-                      <li>
-                        <code className="font-mono text-foreground">
-                          tool_calls
-                        </code>{" "}
-                        — JSON array of expected tool-call objects, each with:
-                        <ul className="list-disc pl-5 mt-1.5 space-y-1.5">
-                          <li>
-                            <code className="font-mono text-foreground">
-                              tool
-                            </code>{" "}
-                            (required) — the tool&apos;s name
-                          </li>
-                          <li>
-                            <code className="font-mono text-foreground">
-                              arguments
-                            </code>{" "}
-                            (optional) — object of expected argument values
-                          </li>
-                          <li>
-                            <code className="font-mono text-foreground">
-                              accept_any_arguments
-                            </code>{" "}
-                            (optional) — set to{" "}
-                            <code className="font-mono text-foreground">
-                              true
-                            </code>{" "}
-                            to skip argument matching
-                          </li>
-                        </ul>
-                      </li>
-                    </ul>
-                  </div>
-                ))}
 
               {/* Backing-fetch failures are the only state worth
                   surfacing — loading happens silently in the background,
@@ -1472,173 +1466,152 @@ export function BulkUploadTestsModal({
                   callout pointing at it. Hidden once a CSV has parsed
                   so the preview owns the screen. */}
               {parsedTests.length === 0 && (
-                <>
-                  <div className="mt-3 flex items-start gap-2 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-foreground">
-                    <svg
-                      className="w-4 h-4 mt-0.5 shrink-0 text-blue-500"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"
-                      />
-                    </svg>
-                    <span>
-                      <span className="font-semibold">Tip:</span>{" "}
-                      <button
-                        type="button"
-                        onClick={downloadSampleCsv}
-                        className="underline underline-offset-2 hover:opacity-80 transition-opacity cursor-pointer"
-                      >
-                        download the sample CSV
-                      </button>{" "}
-                      and edit it as a starting point
-                    </span>
-                  </div>
-                  <div className="mt-3 flex justify-end">
+                <div className="mt-3 flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-foreground">
+                  <svg
+                    className="w-4 h-4 mt-0.5 shrink-0 text-emerald-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"
+                    />
+                  </svg>
+                  <span>
+                    <span className="font-semibold">Tip:</span>{" "}
                     <button
+                      type="button"
                       onClick={downloadSampleCsv}
-                      className="h-9 px-3 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+                      className="underline underline-offset-2 font-semibold text-emerald-700 dark:text-emerald-300 hover:opacity-80 transition-opacity cursor-pointer"
                     >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-                        />
-                      </svg>
-                      Download sample CSV
-                    </button>
-                  </div>
-                </>
+                      download the sample CSV
+                    </button>{" "}
+                    and edit it as a starting point
+                  </span>
+                </div>
               )}
 
               {/* Parsed Preview */}
-              {parsedTests.length > 0 && isResponseType && (() => {
-                const variableColumns = committedEvaluators.flatMap((e) =>
-                  e.variables.map((v) => ({
-                    evaluatorUuid: e.uuid,
-                    varName: v.name,
-                    header: variableColumnName(e.name, v.name),
-                  })),
-                );
-                const gridStyle = {
-                  gridTemplateColumns: [
-                    "160px",
-                    "minmax(220px,1fr)",
-                    ...variableColumns.map(() => "minmax(220px,1fr)"),
-                  ].join(" "),
-                };
-                return (
-                  <div className="mt-3 space-y-2">
-                    <p className="text-sm font-medium text-foreground">
-                      {parsedTests.length}{" "}
-                      {parsedTests.length === 1 ? "test" : "tests"} ready to
-                      upload
-                    </p>
-                    <div className="border border-border rounded-xl overflow-hidden">
-                      <div className="overflow-x-auto">
-                        <div
-                          className="grid gap-3 px-4 py-2 border-b border-border bg-muted/30"
-                          style={gridStyle}
-                        >
-                          <div className="text-xs font-medium text-muted-foreground">
-                            Name
-                          </div>
-                          <div className="text-xs font-medium text-muted-foreground">
-                            Chat history
-                          </div>
-                          {variableColumns.map((c) => (
-                            <div
-                              key={`h-${c.evaluatorUuid}-${c.varName}`}
-                              className="text-xs font-medium text-muted-foreground font-mono truncate"
-                              title={c.header}
-                            >
-                              {c.header}
+              {parsedTests.length > 0 &&
+                isResponseType &&
+                (() => {
+                  const variableColumns = committedEvaluators.flatMap((e) =>
+                    e.variables.map((v) => ({
+                      evaluatorUuid: e.uuid,
+                      varName: v.name,
+                      header: variableColumnName(e.name, v.name),
+                    })),
+                  );
+                  const gridStyle = {
+                    gridTemplateColumns: [
+                      "160px",
+                      "minmax(220px,1fr)",
+                      ...variableColumns.map(() => "minmax(220px,1fr)"),
+                    ].join(" "),
+                  };
+                  return (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-sm font-medium text-foreground">
+                        {parsedTests.length}{" "}
+                        {parsedTests.length === 1 ? "test" : "tests"} ready to
+                        upload
+                      </p>
+                      <div className="border border-border rounded-xl overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <div
+                            className="grid gap-3 px-4 py-2 border-b border-border bg-muted/30"
+                            style={gridStyle}
+                          >
+                            <div className="text-xs font-medium text-muted-foreground">
+                              Name
                             </div>
-                          ))}
-                        </div>
-                        <div className="max-h-[15rem] overflow-y-auto divide-y divide-border">
-                          {parsedTests.slice(0, 50).map((test, idx) => {
-                            let turns: TurnObject[] = [];
-                            try {
-                              const parsed = JSON.parse(
-                                test.conversation_history,
-                              );
-                              if (Array.isArray(parsed)) turns = parsed;
-                            } catch {
-                              // Parsed-tests entries already passed JSON
-                              // validation; this is a defensive fallback.
-                            }
-                            const valuesByKey = new Map<string, string>();
-                            for (const ref of test.evaluators ?? []) {
-                              if (!ref.variable_values) continue;
-                              for (const [varName, value] of Object.entries(
-                                ref.variable_values,
-                              )) {
-                                valuesByKey.set(
-                                  `${ref.evaluator_uuid}/${varName}`,
-                                  value,
-                                );
-                              }
-                            }
-                            return (
+                            <div className="text-xs font-medium text-muted-foreground">
+                              Chat history
+                            </div>
+                            {variableColumns.map((c) => (
                               <div
-                                key={idx}
-                                className="grid gap-3 px-4 py-2 text-xs items-start"
-                                style={gridStyle}
+                                key={`h-${c.evaluatorUuid}-${c.varName}`}
+                                className="text-xs font-medium text-muted-foreground font-mono truncate"
+                                title={c.header}
                               >
-                                <div
-                                  className="truncate text-foreground"
-                                  title={test.name}
-                                >
-                                  {test.name}
-                                </div>
-                                <div className="min-w-0">
-                                  <ChatHistoryPreview turns={turns} />
-                                </div>
-                                {variableColumns.map((c) => {
-                                  const value =
-                                    valuesByKey.get(
-                                      `${c.evaluatorUuid}/${c.varName}`,
-                                    ) ?? "";
-                                  return (
-                                    <div
-                                      key={`${idx}-${c.evaluatorUuid}-${c.varName}`}
-                                      className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
-                                    >
-                                      {value || (
-                                        <span className="text-muted-foreground italic">
-                                          (empty)
-                                        </span>
-                                      )}
-                                    </div>
-                                  );
-                                })}
+                                {c.header}
                               </div>
-                            );
-                          })}
-                          {parsedTests.length > 50 && (
-                            <div className="px-4 py-2 text-xs text-muted-foreground">
-                              + {parsedTests.length - 50} more rows
-                            </div>
-                          )}
+                            ))}
+                          </div>
+                          <div className="max-h-[15rem] overflow-y-auto divide-y divide-border">
+                            {parsedTests.slice(0, 50).map((test, idx) => {
+                              let turns: TurnObject[] = [];
+                              try {
+                                const parsed = JSON.parse(
+                                  test.conversation_history,
+                                );
+                                if (Array.isArray(parsed)) turns = parsed;
+                              } catch {
+                                // Parsed-tests entries already passed JSON
+                                // validation; this is a defensive fallback.
+                              }
+                              const valuesByKey = new Map<string, string>();
+                              for (const ref of test.evaluators ?? []) {
+                                if (!ref.variable_values) continue;
+                                for (const [varName, value] of Object.entries(
+                                  ref.variable_values,
+                                )) {
+                                  valuesByKey.set(
+                                    `${ref.evaluator_uuid}/${varName}`,
+                                    value,
+                                  );
+                                }
+                              }
+                              return (
+                                <div
+                                  key={idx}
+                                  className="grid gap-3 px-4 py-2 text-xs items-start"
+                                  style={gridStyle}
+                                >
+                                  <div
+                                    className="truncate text-foreground"
+                                    title={test.name}
+                                  >
+                                    {test.name}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <ChatHistoryPreview turns={turns} />
+                                  </div>
+                                  {variableColumns.map((c) => {
+                                    const value =
+                                      valuesByKey.get(
+                                        `${c.evaluatorUuid}/${c.varName}`,
+                                      ) ?? "";
+                                    return (
+                                      <div
+                                        key={`${idx}-${c.evaluatorUuid}-${c.varName}`}
+                                        className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                                      >
+                                        {value || (
+                                          <span className="text-muted-foreground italic">
+                                            (empty)
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })}
+                            {parsedTests.length > 50 && (
+                              <div className="px-4 py-2 text-xs text-muted-foreground">
+                                + {parsedTests.length - 50} more rows
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })()}
+                  );
+                })()}
 
               {/* Tool-call preview keeps the existing table layout — its
                   per-row `tool_calls` column has its own custom rendering. */}

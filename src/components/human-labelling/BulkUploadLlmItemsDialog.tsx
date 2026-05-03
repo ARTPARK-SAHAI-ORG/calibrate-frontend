@@ -4,12 +4,22 @@ import { useEffect, useState } from "react";
 import Papa from "papaparse";
 import { apiClient } from "@/lib/api";
 import {
+  AnnotationOptIn,
   BulkUploadDialogShell,
   ChatHistoryPreview,
-  ConversationFormatDetails,
+  type EvaluatorMeta,
+  type GuidelineColumn,
+  type GuidelineDoc,
+  type ParsedAnnotation,
   type TurnObject,
+  buildItemAnnotationsPayload,
+  evaluatorReasoningColumn,
+  evaluatorValueColumn,
   findHeaderKey,
+  parseAnnotationCell,
   parseApiError,
+  sampleEvaluatorValue,
+  useAnnotators,
 } from "./bulk-upload-shared";
 
 type EvaluatorVariableDef = {
@@ -23,6 +33,9 @@ export type LinkedEvaluator = {
   name: string;
   slug: string | null;
   variables: EvaluatorVariableDef[];
+  output_type: "binary" | "rating" | null;
+  scale_min: number | null;
+  scale_max: number | null;
 };
 
 type EvaluatorRef = {
@@ -35,6 +48,7 @@ type ParsedItem = {
   chat_history: TurnObject[];
   agent_response: string;
   evaluators: EvaluatorRef[];
+  annotations: ParsedAnnotation[];
 };
 
 const NAME_HEADERS = ["name", "title"];
@@ -62,13 +76,19 @@ function variableColumnName(evalName: string, varName: string): string {
   return `${evalName}/${varName}`;
 }
 
-function buildSampleCsv(linked: LinkedEvaluator[]): string {
+function buildSampleCsv(
+  linked: LinkedEvaluator[],
+  includeAnnotations: boolean,
+): string {
   const fallback: LinkedEvaluator[] = [
     {
       uuid: "",
       name: "Correctness",
       slug: null,
       variables: [{ name: "criteria" }],
+      output_type: "binary",
+      scale_min: null,
+      scale_max: null,
     },
   ];
   const evaluators = linked.length > 0 ? linked : fallback;
@@ -86,6 +106,8 @@ function buildSampleCsv(linked: LinkedEvaluator[]): string {
       response: "You can return any item within 30 days for a full refund.",
       sampleVariableValue:
         "The agent should clearly explain the return policy in a helpful and friendly tone.",
+      sampleReasoning:
+        "The agent answered the policy clearly and politely.",
     },
     {
       name: "Refund flow",
@@ -94,6 +116,7 @@ function buildSampleCsv(linked: LinkedEvaluator[]): string {
         "I'm sorry to hear that. Can you confirm the order ID so I can investigate?",
       sampleVariableValue:
         "The agent should apologize for the duplicate charge and offer to investigate the order.",
+      sampleReasoning: "",
     },
   ];
 
@@ -104,6 +127,12 @@ function buildSampleCsv(linked: LinkedEvaluator[]): string {
     ...variableColumns.map((c) =>
       csvEscape(variableColumnName(c.evalName, c.varName)),
     ),
+    ...(includeAnnotations
+      ? evaluators.flatMap((e) => [
+          csvEscape(evaluatorValueColumn(e.name)),
+          csvEscape(evaluatorReasoningColumn(e.name)),
+        ])
+      : []),
   ];
   const lines = rows.map((r) =>
     [
@@ -111,6 +140,12 @@ function buildSampleCsv(linked: LinkedEvaluator[]): string {
       csvEscape(JSON.stringify(r.conversation)),
       csvEscape(r.response),
       ...variableColumns.map(() => csvEscape(r.sampleVariableValue)),
+      ...(includeAnnotations
+        ? evaluators.flatMap((e) => [
+            csvEscape(sampleEvaluatorValue(e)),
+            csvEscape(r.sampleReasoning),
+          ])
+        : []),
     ].join(","),
   );
   return `${headerCells.join(",")}\n${lines.join("\n")}\n`;
@@ -119,9 +154,7 @@ function buildSampleCsv(linked: LinkedEvaluator[]): string {
 function AgentReplyPreview({ agentResponse }: { agentResponse: string }) {
   return (
     <div className="max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap">
-      {agentResponse || (
-        <span className="text-muted-foreground italic">(empty)</span>
-      )}
+      {agentResponse}
     </div>
   );
 }
@@ -132,7 +165,7 @@ type BulkUploadLlmItemsDialogProps = {
   taskUuid: string;
   linkedEvaluators: LinkedEvaluator[];
   onClose: () => void;
-  onSuccess: (count: number) => void;
+  onSuccess: (count: number, withAnnotations: boolean) => void;
 };
 
 export function BulkUploadLlmItemsDialog({
@@ -148,17 +181,41 @@ export function BulkUploadLlmItemsDialog({
   const [parseError, setParseError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadAnnotations, setUploadAnnotations] = useState(false);
+  const [selectedAnnotatorId, setSelectedAnnotatorId] = useState<string | null>(
+    null,
+  );
+  const annotatorsState = useAnnotators(isOpen, accessToken);
 
   const reset = () => {
     setCsvFile(null);
     setParsedItems([]);
     setParseError(null);
     setUploadError(null);
+    setUploadAnnotations(false);
+    setSelectedAnnotatorId(null);
   };
 
   useEffect(() => {
     if (isOpen) reset();
   }, [isOpen]);
+
+  // Re-parse when the annotation toggle changes (column requirements differ).
+  useEffect(() => {
+    setParsedItems([]);
+    setParseError(null);
+    setCsvFile(null);
+  }, [uploadAnnotations]);
+
+  const annotationEvaluatorsMeta: EvaluatorMeta[] = linkedEvaluators.map(
+    (e) => ({
+      uuid: e.uuid,
+      name: e.name,
+      output_type: e.output_type,
+      scale_min: e.scale_min,
+      scale_max: e.scale_max,
+    }),
+  );
 
   const evaluatorsWithVariables = linkedEvaluators.filter(
     (e) => e.variables.length > 0,
@@ -218,6 +275,26 @@ export function BulkUploadLlmItemsDialog({
               )}. Download the sample CSV above for the exact format.`,
           );
           return;
+        }
+
+        if (uploadAnnotations) {
+          const missingAnnotationCols: string[] = [];
+          for (const meta of annotationEvaluatorsMeta) {
+            const valueHeader = evaluatorValueColumn(meta.name);
+            if (!headers.includes(valueHeader)) {
+              missingAnnotationCols.push(valueHeader);
+            }
+          }
+          if (missingAnnotationCols.length > 0) {
+            setParseError(
+              `CSV is missing annotation column(s): ${missingAnnotationCols
+                .map((c) => `"${c}"`)
+                .join(
+                  ", ",
+                )}. Download the sample CSV above for the exact format.`,
+            );
+            return;
+          }
         }
 
         const items: ParsedItem[] = [];
@@ -306,11 +383,41 @@ export function BulkUploadLlmItemsDialog({
             return;
           }
 
+          const annotations: ParsedAnnotation[] = [];
+          if (uploadAnnotations) {
+            for (const meta of annotationEvaluatorsMeta) {
+              if (meta.output_type !== "binary" && meta.output_type !== "rating")
+                continue;
+              const valueHeader = evaluatorValueColumn(meta.name);
+              const reasoningHeader = evaluatorReasoningColumn(meta.name);
+              const rawValue = (row[valueHeader] ?? "").trim();
+              const rawReasoning = (row[reasoningHeader] ?? "").trim();
+              if (!rawValue) {
+                setParseError(
+                  `Row ${i + 1}: missing value for "${valueHeader}".`,
+                );
+                return;
+              }
+              const parsed = parseAnnotationCell(rawValue, meta);
+              if ("error" in parsed) {
+                setParseError(`Row ${i + 1}: ${parsed.error}.`);
+                return;
+              }
+              annotations.push({
+                evaluator_uuid: meta.uuid,
+                output_type: meta.output_type,
+                value: parsed.value,
+                reasoning: rawReasoning,
+              });
+            }
+          }
+
           items.push({
             name,
             chat_history: turns,
             agent_response: responseRaw,
             evaluators: refs,
+            annotations,
           });
         }
 
@@ -326,36 +433,49 @@ export function BulkUploadLlmItemsDialog({
 
   const handleUpload = async () => {
     if (parsedItems.length === 0 || isUploading) return;
+    if (uploadAnnotations && !selectedAnnotatorId) {
+      setUploadError("Select an annotator before uploading.");
+      return;
+    }
     setIsUploading(true);
     setUploadError(null);
     try {
+      const itemsBody = parsedItems.map((p) => {
+        const evaluator_variables: Record<
+          string,
+          Record<string, string>
+        > = {};
+        for (const ref of p.evaluators) {
+          if (ref.variable_values) {
+            evaluator_variables[ref.evaluator_uuid] = {
+              ...ref.variable_values,
+            };
+          }
+        }
+        const annotationsObj = uploadAnnotations
+          ? buildItemAnnotationsPayload(p.annotations)
+          : undefined;
+        return {
+          payload: {
+            name: p.name,
+            chat_history: p.chat_history,
+            agent_response: p.agent_response,
+            evaluator_variables,
+          },
+          ...(annotationsObj ? { annotations: annotationsObj } : {}),
+        };
+      });
+      const anyAnnotated = itemsBody.some((it) => "annotations" in it);
       await apiClient(`/annotation-tasks/${taskUuid}/items`, accessToken, {
         method: "POST",
         body: {
-          items: parsedItems.map((p) => {
-            const evaluator_variables: Record<
-              string,
-              Record<string, string>
-            > = {};
-            for (const ref of p.evaluators) {
-              if (ref.variable_values) {
-                evaluator_variables[ref.evaluator_uuid] = {
-                  ...ref.variable_values,
-                };
-              }
-            }
-            return {
-              payload: {
-                name: p.name,
-                chat_history: p.chat_history,
-                agent_response: p.agent_response,
-                evaluator_variables,
-              },
-            };
-          }),
+          ...(anyAnnotated && selectedAnnotatorId
+            ? { annotator_id: selectedAnnotatorId }
+            : {}),
+          items: itemsBody,
         },
       });
-      onSuccess(parsedItems.length);
+      onSuccess(parsedItems.length, uploadAnnotations);
     } catch (err) {
       setUploadError(parseApiError(err, "Failed to upload items"));
     } finally {
@@ -363,50 +483,64 @@ export function BulkUploadLlmItemsDialog({
     }
   };
 
-  const helpContent = (
-    <>
-      <p>Each row creates one LLM annotation item:</p>
-      <ul className="list-disc pl-5 space-y-1.5">
-        <li>
-          <code className="font-mono text-foreground">name</code> — a unique
-          item name
-        </li>
-        <li>
-          <code className="font-mono text-foreground">conversation_history</code>{" "}
-          — JSON array representing a conversation up to (but not including)
-          the agent response being judged.
-          <ConversationFormatDetails
-            example={
-              '[{"role":"user","content":"What is your return policy?"},{"role":"assistant","content":"You can return any item within 30 days."},{"role":"user","content":"What about defective items?"}]'
-            }
-          />
-        </li>
-        <li>
-          <code className="font-mono text-foreground">agent_response</code> —
-          the agent response being judged
-        </li>
-        {evaluatorsWithVariables.flatMap((e) =>
-          e.variables.map((v) => (
-            <li key={`${e.uuid}-${v.name}`}>
-              <code className="font-mono text-foreground">
-                {variableColumnName(e.name, v.name)}
-              </code>
-              {v.description ? ` — ${v.description}` : ""} (used for{" "}
-              <a
-                href={`/evaluators/${e.uuid}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground text-[10px] font-medium hover:opacity-80 transition-opacity cursor-pointer"
-              >
-                {e.name}
-              </a>
-              )
-            </li>
-          )),
-        )}
-      </ul>
-    </>
-  );
+  const buildGuidelines = (): GuidelineDoc => {
+    const columns: GuidelineColumn[] = [
+      {
+        name: "name",
+        description: "A unique item name.",
+      },
+      {
+        name: "conversation_history",
+        description:
+          'A JSON array of chat messages that represents the conversation that has happened so far, before the agent response being judged. Each message is an object with a "role" and "content" field.\n\nrole — either "user" or "assistant"\ncontent — the message said by that role',
+        example: `[
+  {"role": "user", "content": "What is your return policy?"},
+  {"role": "assistant", "content": "You can return any item within 30 days."}
+]`,
+      },
+      {
+        name: "agent_response",
+        description: "The agent response being judged.",
+      },
+    ];
+
+    for (const e of evaluatorsWithVariables) {
+      for (const v of e.variables) {
+        const desc = v.description ? ` — ${v.description}` : "";
+        columns.push({
+          name: variableColumnName(e.name, v.name),
+          description: `Used for the "${e.name}" evaluator${desc}`,
+        });
+      }
+    }
+
+    if (uploadAnnotations && annotationEvaluatorsMeta.length > 0) {
+      for (const e of annotationEvaluatorsMeta) {
+        const range =
+          e.output_type === "binary"
+            ? "true/false"
+            : e.output_type === "rating" &&
+                typeof e.scale_min === "number" &&
+                typeof e.scale_max === "number"
+              ? `any value between ${e.scale_min}-${e.scale_max}`
+              : "value";
+        columns.push({
+          name: evaluatorValueColumn(e.name),
+          description: `Required. Value for the "${e.name}" evaluator (${range}).`,
+        });
+        columns.push({
+          name: evaluatorReasoningColumn(e.name),
+          description: `(optional) Reasoning for the value assigned to "${e.name}".`,
+        });
+      }
+    }
+
+    return {
+      title: "Bulk upload — LLM labelling items",
+      intro: "Upload a CSV with the following columns. Each row creates one LLM annotation item.",
+      columns,
+    };
+  };
 
   const variableColumns = evaluatorsWithVariables.flatMap((e) =>
     e.variables.map((v) => ({
@@ -415,6 +549,24 @@ export function BulkUploadLlmItemsDialog({
       header: variableColumnName(e.name, v.name),
     })),
   );
+  // Annotation columns shown only when uploadAnnotations is on. Two columns
+  // per evaluator (value + reasoning) so the user can verify everything in
+  // the CSV landed correctly before hitting upload.
+  const annotationColumns =
+    uploadAnnotations && annotationEvaluatorsMeta.length > 0
+      ? annotationEvaluatorsMeta.flatMap((e) => [
+          {
+            evaluatorUuid: e.uuid,
+            kind: "value" as const,
+            header: evaluatorValueColumn(e.name),
+          },
+          {
+            evaluatorUuid: e.uuid,
+            kind: "reasoning" as const,
+            header: evaluatorReasoningColumn(e.name),
+          },
+        ])
+      : [];
   // Use fixed minimum widths per column so the table can grow wider than
   // the dialog and scroll horizontally when there are many variables.
   const gridStyle = {
@@ -423,19 +575,20 @@ export function BulkUploadLlmItemsDialog({
       "minmax(220px,1fr)",
       "minmax(220px,1fr)",
       ...variableColumns.map(() => "minmax(220px,1fr)"),
+      ...annotationColumns.map(() => "minmax(180px,1fr)"),
     ].join(" "),
   };
 
   const itemsPreview = (
     <div className="space-y-2">
       <p className="text-sm font-medium text-foreground">
-        {parsedItems.length}{" "}
-        {parsedItems.length === 1 ? "item" : "items"} ready to upload
+        {parsedItems.length} {parsedItems.length === 1 ? "item" : "items"} ready
+        to upload
       </p>
       <div className="border border-border rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[20rem]">
           <div
-            className="grid gap-3 px-4 py-2 border-b border-border bg-muted/30"
+            className="grid gap-3 px-4 py-2 border-b border-border bg-muted sticky top-0 z-10"
             style={gridStyle}
           >
             <div className="text-xs font-medium text-muted-foreground">
@@ -456,8 +609,17 @@ export function BulkUploadLlmItemsDialog({
                 {c.header}
               </div>
             ))}
+            {annotationColumns.map((c) => (
+              <div
+                key={`ah-${c.evaluatorUuid}-${c.kind}`}
+                className="text-xs font-medium text-muted-foreground font-mono truncate"
+                title={c.header}
+              >
+                {c.header}
+              </div>
+            ))}
           </div>
-          <div className="max-h-[15rem] overflow-y-auto divide-y divide-border">
+          <div className="divide-y divide-border">
             {parsedItems.slice(0, 50).map((p, idx) => {
               const valuesByKey = new Map<string, string>();
               for (const ref of p.evaluators) {
@@ -491,11 +653,30 @@ export function BulkUploadLlmItemsDialog({
                         key={`${idx}-${c.evaluatorUuid}-${c.varName}`}
                         className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
                       >
-                        {value || (
-                          <span className="text-muted-foreground italic">
-                            (empty)
-                          </span>
-                        )}
+                        {value}
+                      </div>
+                    );
+                  })}
+                  {annotationColumns.map((c) => {
+                    const ann = p.annotations.find(
+                      (a) => a.evaluator_uuid === c.evaluatorUuid,
+                    );
+                    const display =
+                      c.kind === "value"
+                        ? ann
+                          ? typeof ann.value === "boolean"
+                            ? ann.value
+                              ? "true"
+                              : "false"
+                            : String(ann.value)
+                          : ""
+                        : (ann?.reasoning ?? "");
+                    return (
+                      <div
+                        key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
+                        className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                      >
+                        {display}
                       </div>
                     );
                   })}
@@ -513,13 +694,39 @@ export function BulkUploadLlmItemsDialog({
     </div>
   );
 
+  const annotationOptIn =
+    linkedEvaluators.length > 0 ? (
+      <AnnotationOptIn
+        annotators={annotatorsState.annotators}
+        loading={annotatorsState.loading}
+        error={annotatorsState.error}
+        uploadAnnotations={uploadAnnotations}
+        onToggle={setUploadAnnotations}
+        selectedAnnotatorId={selectedAnnotatorId}
+        onSelectAnnotator={setSelectedAnnotatorId}
+      />
+    ) : null;
+
+  const uploadBlocked =
+    uploadAnnotations &&
+    (annotatorsState.annotators.length === 0 || !selectedAnnotatorId);
+
   return (
     <BulkUploadDialogShell
       isOpen={isOpen}
       title="Bulk upload items"
-      buildSampleCsv={() => buildSampleCsv(linkedEvaluators)}
-      sampleFilename="sample_llm_items.csv"
-      helpContent={helpContent}
+      buildSampleCsv={() => buildSampleCsv(linkedEvaluators, uploadAnnotations)}
+      sampleFilename={() =>
+        uploadAnnotations
+          ? "sample_llm_items_with_annotations.csv"
+          : "sample_llm_items.csv"
+      }
+      buildGuidelines={buildGuidelines}
+      guidelinesFilename={() =>
+        uploadAnnotations
+          ? "llm_items_csv_guidelines_with_annotations.pdf"
+          : "llm_items_csv_guidelines.pdf"
+      }
       csvFile={csvFile}
       onFile={handleFile}
       onClear={reset}
@@ -530,6 +737,9 @@ export function BulkUploadLlmItemsDialog({
       itemsPreview={itemsPreview}
       onUpload={handleUpload}
       onClose={onClose}
+      topContent={annotationOptIn}
+      uploadBlocked={uploadBlocked}
+      hideUploadSection={uploadAnnotations && !selectedAnnotatorId}
     />
   );
 }
