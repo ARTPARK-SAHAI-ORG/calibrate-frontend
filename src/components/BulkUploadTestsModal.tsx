@@ -1174,7 +1174,7 @@ export function BulkUploadTestsModal({
 
       <div
         className={`relative w-full mx-4 bg-background rounded-2xl shadow-2xl border border-border flex flex-col max-h-[85vh] transition-[max-width] duration-300 ease-out ${
-          parsedTests.length > 0 ? "max-w-[80vw]" : "max-w-[50vw]"
+          parsedTests.length > 0 ? "md:max-w-[80vw]" : "md:max-w-[50vw]"
         }`}
       >
         {/* Header */}
