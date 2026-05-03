@@ -104,13 +104,14 @@ function readSavedValue(v: unknown): unknown {
 }
 
 function readSavedComment(v: unknown): string {
-  if (
-    v &&
-    typeof v === "object" &&
-    "comment" in (v as Record<string, unknown>) &&
-    typeof (v as Record<string, unknown>).comment === "string"
-  ) {
-    return (v as Record<string, unknown>).comment as string;
+  if (v && typeof v === "object") {
+    const obj = v as Record<string, unknown>;
+    if ("reasoning" in obj && typeof obj.reasoning === "string") {
+      return obj.reasoning as string;
+    }
+    if ("comment" in obj && typeof obj.comment === "string") {
+      return obj.comment as string;
+    }
   }
   return "";
 }
@@ -428,7 +429,7 @@ function AnnotateView({
         evaluator_id: ev.uuid,
         value: {
           value: f.value,
-          ...(f.comment ? { comment: f.comment } : {}),
+          ...(f.comment ? { reasoning: f.comment } : {}),
         },
       });
     }
@@ -756,7 +757,7 @@ function EvaluatorsPane({
   })();
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 pb-4 md:pb-6">
       {evaluators.map((ev) => {
         const k = fieldKey(item.uuid, ev.uuid);
         const f = fields[k];

@@ -35,6 +35,10 @@ import {
 } from "@/components/human-labelling/JobsCreatedDialog";
 import { ManageEvaluatorsDialog } from "@/components/human-labelling/ManageEvaluatorsDialog";
 import { RunEvaluatorsDialog } from "@/components/human-labelling/RunEvaluatorsDialog";
+import {
+  AgreementStatCard,
+  agreementColor,
+} from "@/components/human-labelling/AgreementStatCard";
 import { EmptyState } from "@/components/ui/LoadingState";
 import {
   MultiSelectPicker,
@@ -120,63 +124,6 @@ function verdictTextClass(v: boolean | number | null | undefined): string {
   if (v === true) return "text-green-600 dark:text-green-400";
   if (v === false) return "text-red-600 dark:text-red-400";
   return "text-foreground";
-}
-
-function agreementColor(v: number | null | undefined): string {
-  if (v == null) return "text-muted-foreground";
-  const pct = v * 100;
-  if (pct >= 75) return "text-green-600 dark:text-green-400";
-  if (pct <= 50) return "text-red-600 dark:text-red-400";
-  return "text-yellow-600 dark:text-yellow-400";
-}
-
-const agreementStatPillBase =
-  "inline-flex items-center max-w-full min-w-0 px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground";
-
-function AgreementStatCard(
-  props:
-    | {
-        staticPillText: string;
-        value: string;
-        valueClassName?: string;
-      }
-    | {
-        evaluatorPill: { href: string; name: string };
-        value: string;
-        valueClassName?: string;
-      },
-) {
-  const { value, valueClassName = "" } = props;
-  return (
-    <div className="border border-border rounded-lg px-4 py-3 bg-background min-w-[160px]">
-      {"staticPillText" in props ? (
-        <span
-          className={`${agreementStatPillBase} cursor-default`}
-          title={props.staticPillText}
-        >
-          <span className="truncate">{props.staticPillText}</span>
-        </span>
-      ) : (
-        <div className="flex items-center gap-2 min-w-0 flex-wrap">
-          <Link
-            href={props.evaluatorPill.href}
-            className={`${agreementStatPillBase} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
-            title={`Open ${props.evaluatorPill.name}`}
-          >
-            <span className="truncate">{props.evaluatorPill.name}</span>
-          </Link>
-          <span className="text-sm font-medium text-foreground shrink-0">
-            alignment
-          </span>
-        </div>
-      )}
-      <div
-        className={`text-2xl font-semibold tabular-nums mt-2 ${valueClassName}`}
-      >
-        {value}
-      </div>
-    </div>
-  );
 }
 
 const TABS: Tab[] = ["overview", "items", "jobs", "runs"];
