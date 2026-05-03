@@ -227,9 +227,10 @@ export function BulkUploadLlmItemsDialog({
     (e) => e.output_type !== "binary" && e.output_type !== "rating",
   );
 
-  // Two linked evaluators with the same name would produce duplicate CSV
-  // headers and PapaParse would silently overwrite one. Block the
-  // annotation flow until the task admin renames one of them.
+  // Two linked evaluators with the same name produce duplicate CSV
+  // headers — for LLM items this also breaks the always-present
+  // `<evalName>/<varName>` variable columns, so it has to block
+  // regardless of whether the user is uploading annotations.
   const duplicateNames = duplicateEvaluatorNames(annotationEvaluatorsMeta);
 
   const evaluatorsWithVariables = linkedEvaluators.filter(
@@ -242,6 +243,14 @@ export function BulkUploadLlmItemsDialog({
     setParsedItems([]);
     setCsvFile(file);
     if (!file) return;
+    if (duplicateNames.length > 0) {
+      setParseError(
+        `Two or more linked evaluators share the same name (${duplicateNames
+          .map((n) => `"${n}"`)
+          .join(", ")}). Rename one before uploading.`,
+      );
+      return;
+    }
     Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,
@@ -724,22 +733,25 @@ export function BulkUploadLlmItemsDialog({
   );
 
   const annotationOptIn =
-    linkedEvaluators.length > 0 ? (
+    linkedEvaluators.length > 0 || duplicateNames.length > 0 ? (
       <div className="space-y-3">
-        <AnnotationOptIn
-          annotators={annotatorsState.annotators}
-          loading={annotatorsState.loading}
-          error={annotatorsState.error}
-          uploadAnnotations={uploadAnnotations}
-          onToggle={setUploadAnnotations}
-          selectedAnnotatorId={selectedAnnotatorId}
-          onSelectAnnotator={setSelectedAnnotatorId}
-        />
-        {uploadAnnotations && duplicateNames.length > 0 && (
+        {linkedEvaluators.length > 0 && (
+          <AnnotationOptIn
+            annotators={annotatorsState.annotators}
+            loading={annotatorsState.loading}
+            error={annotatorsState.error}
+            uploadAnnotations={uploadAnnotations}
+            onToggle={setUploadAnnotations}
+            selectedAnnotatorId={selectedAnnotatorId}
+            onSelectAnnotator={setSelectedAnnotatorId}
+          />
+        )}
+        {duplicateNames.length > 0 && (
           <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
             Two or more linked evaluators share the same name (
-            {duplicateNames.map((n) => `"${n}"`).join(", ")}). Rename one
-            on the evaluators page before uploading annotations.
+            {duplicateNames.map((n) => `"${n}"`).join(", ")}). Their
+            variable and annotation columns would collide in the CSV —
+            rename one on the evaluators page before uploading.
           </div>
         )}
         {uploadAnnotations && evaluatorsMissingOutputType.length > 0 && (
@@ -755,11 +767,11 @@ export function BulkUploadLlmItemsDialog({
     ) : null;
 
   const uploadBlocked =
-    uploadAnnotations &&
-    (annotatorsState.annotators.length === 0 ||
-      !selectedAnnotatorId ||
-      duplicateNames.length > 0 ||
-      evaluatorsMissingOutputType.length > 0);
+    duplicateNames.length > 0 ||
+    (uploadAnnotations &&
+      (annotatorsState.annotators.length === 0 ||
+        !selectedAnnotatorId ||
+        evaluatorsMissingOutputType.length > 0));
 
   return (
     <BulkUploadDialogShell
@@ -790,10 +802,9 @@ export function BulkUploadLlmItemsDialog({
       topContent={annotationOptIn}
       uploadBlocked={uploadBlocked}
       hideUploadSection={
-        uploadAnnotations &&
-        (!selectedAnnotatorId ||
-          duplicateNames.length > 0 ||
-          evaluatorsMissingOutputType.length > 0)
+        duplicateNames.length > 0 ||
+        (uploadAnnotations &&
+          (!selectedAnnotatorId || evaluatorsMissingOutputType.length > 0))
       }
     />
   );
