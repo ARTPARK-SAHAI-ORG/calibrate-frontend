@@ -5,10 +5,17 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
-import { ItemPane, type Item } from "@/components/human-labelling/AnnotationJobView";
+import {
+  ItemPane,
+  type Item,
+} from "@/components/human-labelling/AnnotationJobView";
 import { useAccessToken } from "@/hooks";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
+import {
+  AgreementStatCard,
+  agreementColor,
+} from "@/components/human-labelling/AgreementStatCard";
 
 type EvaluatorRunRow = {
   uuid: string;
@@ -28,12 +35,60 @@ type EvaluatorRunRow = {
     scale_min?: number | null;
     scale_max?: number | null;
   } | null;
+  evaluator?: {
+    uuid?: string;
+    name?: string;
+    description?: string | null;
+    output_type?: string;
+  } | null;
 };
 
 /** Embedded on GET …/evaluator-runs/{job_uuid} only; join `uuid` ↔ `runs[].item_id`. */
 type EvaluatorRunItemSnapshot = {
   uuid: string;
   payload: unknown;
+};
+
+type HumanAnnotationValue = {
+  value?: unknown;
+  reasoning?: unknown;
+} | null;
+
+type HumanAnnotation = {
+  annotation_id: string;
+  annotator_id: string;
+  annotator_name: string | null;
+  job_id: string;
+  value: HumanAnnotationValue;
+  /** Convenience copy of `value.reasoning`; null when not provided. */
+  reasoning?: string | null;
+  updated_at: string;
+};
+
+type HumanAgreementEvaluatorSummary = {
+  evaluator_id: string;
+  evaluator_version_id: string | null;
+  agreement: number | null;
+  pair_count: number;
+  item_count: number;
+};
+
+type HumanAgreementItemEvaluator = {
+  evaluator_id: string;
+  agreement: number | null;
+  pair_count: number;
+  human_annotations: HumanAnnotation[];
+};
+
+type HumanAgreementItem = {
+  item_id: string;
+  annotator_count: number;
+  evaluators: HumanAgreementItemEvaluator[];
+};
+
+type HumanAgreement = {
+  evaluators: HumanAgreementEvaluatorSummary[];
+  items: HumanAgreementItem[];
 };
 
 type EvaluatorRunJob = {
@@ -57,6 +112,8 @@ type EvaluatorRunJob = {
   runs: EvaluatorRunRow[];
   /** Snapshot payloads for this job; preferred over live task items (survives soft-delete). */
   items?: EvaluatorRunItemSnapshot[];
+  /** Human annotation overlap and per-(item,evaluator) values; populated opportunistically. */
+  human_agreement?: HumanAgreement;
 };
 
 type LabellingTaskFull = {
@@ -67,10 +124,7 @@ type LabellingTaskFull = {
   items?: Item[];
 };
 
-function snapshotToItem(
-  snap: EvaluatorRunItemSnapshot,
-  taskId: string,
-): Item {
+function snapshotToItem(snap: EvaluatorRunItemSnapshot, taskId: string): Item {
   return {
     id: 0,
     uuid: snap.uuid,
@@ -85,7 +139,9 @@ function snapshotToItem(
  * Order snapshots for the run UI: explicit `details.item_ids`, else first-seen
  * `runs[].item_id`, else API order, with `item_count` cap when applicable.
  */
-function orderedSnapshotsForRun(job: EvaluatorRunJob): EvaluatorRunItemSnapshot[] {
+function orderedSnapshotsForRun(
+  job: EvaluatorRunJob,
+): EvaluatorRunItemSnapshot[] {
   const snaps = job.items ?? [];
   if (snaps.length === 0) return [];
   const byUuid = new Map(snaps.map((s) => [s.uuid, s]));
@@ -155,6 +211,40 @@ function statusPillClass(status: EvaluatorRunJob["status"]): string {
     default:
       return "border-gray-200 bg-gray-100 text-gray-700 dark:border-gray-500/30 dark:bg-gray-500/20 dark:text-gray-300";
   }
+}
+
+function formatAgreement(value: number | null | undefined): string {
+  if (value == null) return "—";
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+/** Read `payload.evaluator_variables[evaluatorId] -> { var: value }`. */
+function extractEvaluatorVariables(
+  payload: unknown,
+): Record<string, Record<string, string>> {
+  if (!payload || typeof payload !== "object") return {};
+  const ev = (payload as Record<string, unknown>).evaluator_variables;
+  if (!ev || typeof ev !== "object") return {};
+  const out: Record<string, Record<string, string>> = {};
+  for (const [evId, raw] of Object.entries(ev as Record<string, unknown>)) {
+    if (!raw || typeof raw !== "object") continue;
+    const flat: Record<string, string> = {};
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      if (typeof v === "string") flat[k] = v;
+      else if (v != null) flat[k] = String(v);
+    }
+    if (Object.keys(flat).length > 0) out[evId] = flat;
+  }
+  return out;
+}
+
+function annotatorDisplayName(a: {
+  annotator_name: string | null;
+  annotator_id: string;
+}): string {
+  if (a.annotator_name && a.annotator_name.trim().length > 0)
+    return a.annotator_name;
+  return a.annotator_id.slice(0, 8);
 }
 
 function statusLabel(status: EvaluatorRunJob["status"]): string {
@@ -415,7 +505,11 @@ export default function EvaluatorRunDetailPage() {
           </div>
         )}
 
-        {job && task && (task.type === "stt" || task.type === "llm" || task.type === "simulation") ? (
+        {job &&
+        task &&
+        (task.type === "stt" ||
+          task.type === "llm" ||
+          task.type === "simulation") ? (
           <>
             <div>
               <span
@@ -426,107 +520,136 @@ export default function EvaluatorRunDetailPage() {
                 {statusLabel(job.status)}
               </span>
             </div>
-            <div className="flex items-center gap-2 flex-wrap min-w-0">
-              {(job.details?.evaluators ?? []).length === 0 ? (
-                <span className="text-sm text-muted-foreground">—</span>
-              ) : (
-                (job.details?.evaluators ?? []).map((e) => {
-                  const name = e.name || e.evaluator_id.slice(0, 8);
-                  const label = e.evaluator_version_id
-                    ? versionLabels[e.evaluator_version_id]
-                    : null;
-                  return (
-                    <Link
-                      key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
-                      href={`/evaluators/${e.evaluator_id}`}
-                      title={`Open ${name}`}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-sm font-semibold border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer"
-                    >
-                      <span className="truncate max-w-[200px]">{name}</span>
-                      {label && (
-                        <span className="font-mono text-[11px] text-muted-foreground">
-                          {label}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })
-              )}
-            </div>
-
-          <div className="border border-border rounded-xl overflow-hidden">
-            <div className="flex flex-col flex-1 min-h-0">
-              <header className="border-b border-border px-4 md:px-6 py-3 flex items-center justify-center gap-2">
-                <button
-                  onClick={() =>
-                    setCurrentIndex(Math.max(0, currentIndex - 1))
-                  }
-                  disabled={currentIndex === 0 || total === 0}
-                  className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Previous
-                </button>
-                <span className="text-sm text-muted-foreground tabular-nums px-2">
-                  Item {Math.min(currentIndex + 1, Math.max(total, 1))} of{" "}
-                  {total}
-                </span>
-                <button
-                  onClick={() =>
-                    setCurrentIndex(Math.min(total - 1, currentIndex + 1))
-                  }
-                  disabled={currentIndex >= total - 1 || total === 0}
-                  className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </header>
-
-              <div className="flex flex-col md:flex-row min-h-0">
-                <aside className="w-full md:w-20 border-b md:border-b-0 md:border-r border-border bg-muted/20 overflow-y-auto">
-                  <div className="p-2 md:p-3 grid grid-cols-8 md:grid-cols-1 gap-2">
-                    {itemsForRun.map((it, i) => {
-                      const done = itemDone(it.uuid);
-                      const isCurrent = i === safeIndex;
-                      return (
-                        <button
-                          key={it.uuid}
-                          onClick={() => setCurrentIndex(i)}
-                          title={`Item ${i + 1}${done ? " (completed)" : ""}`}
-                          className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
-                            isCurrent
-                              ? "border-foreground bg-foreground text-background"
-                              : done
-                                ? "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400"
-                                : "border-border bg-background text-foreground hover:bg-muted/50"
-                          }`}
-                        >
-                          {i + 1}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </aside>
-
-                <main className="flex-1 overflow-y-auto">
-                  {!currentItem ? (
-                    <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground">
-                      No items in this run.
-                    </div>
+            {(() => {
+              const ha = job.human_agreement;
+              const cardsWillRender =
+                job.status === "completed" &&
+                !!ha &&
+                ha.evaluators.length > 0 &&
+                !(
+                  ha.evaluators.every((e) => e.agreement === null) &&
+                  ha.items.length === 0
+                );
+              if (cardsWillRender) return null;
+              return (
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  {(job.details?.evaluators ?? []).length === 0 ? (
+                    <span className="text-sm text-muted-foreground">—</span>
                   ) : (
-                    <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                      <ItemPane item={currentItem} taskType={task.type} />
-                      <EvaluatorResultsPane
-                        evaluators={job.details?.evaluators ?? []}
-                        runs={runsByItem[currentItem.uuid] ?? []}
-                        versionLabels={versionLabels}
-                        jobStatus={job.status}
-                      />
-                    </div>
+                    (job.details?.evaluators ?? []).map((e) => {
+                      const name = e.name || e.evaluator_id.slice(0, 8);
+                      const label = e.evaluator_version_id
+                        ? versionLabels[e.evaluator_version_id]
+                        : null;
+                      return (
+                        <Link
+                          key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
+                          href={`/evaluators/${e.evaluator_id}`}
+                          title={`Open ${name}`}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-sm font-semibold border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer"
+                        >
+                          <span className="truncate max-w-[200px]">{name}</span>
+                          {label && (
+                            <span className="font-mono text-[11px] text-muted-foreground">
+                              {label}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })
                   )}
-                </main>
+                </div>
+              );
+            })()}
+
+            <HumanAgreementSummary
+              jobStatus={job.status}
+              agreement={job.human_agreement}
+              evaluators={job.details?.evaluators ?? []}
+              versionLabels={versionLabels}
+            />
+
+            <div className="border border-border rounded-xl overflow-hidden">
+              <div className="flex flex-col flex-1 min-h-0">
+                <header className="border-b border-border px-4 md:px-6 py-3 flex items-center justify-center gap-2">
+                  <button
+                    onClick={() =>
+                      setCurrentIndex(Math.max(0, currentIndex - 1))
+                    }
+                    disabled={currentIndex === 0 || total === 0}
+                    className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-muted-foreground tabular-nums px-2">
+                    Item {Math.min(currentIndex + 1, Math.max(total, 1))} of{" "}
+                    {total}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setCurrentIndex(Math.min(total - 1, currentIndex + 1))
+                    }
+                    disabled={currentIndex >= total - 1 || total === 0}
+                    className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </header>
+
+                <div className="flex flex-col md:flex-row min-h-0">
+                  <aside className="w-full md:w-20 border-b md:border-b-0 md:border-r border-border bg-muted/20 overflow-y-auto">
+                    <div className="p-2 md:p-3 grid grid-cols-8 md:grid-cols-1 gap-2">
+                      {itemsForRun.map((it, i) => {
+                        const done = itemDone(it.uuid);
+                        const isCurrent = i === safeIndex;
+                        return (
+                          <button
+                            key={it.uuid}
+                            onClick={() => setCurrentIndex(i)}
+                            title={`Item ${i + 1}${done ? " (completed)" : ""}`}
+                            className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
+                              isCurrent
+                                ? "border-foreground bg-foreground text-background"
+                                : done
+                                  ? "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400"
+                                  : "border-border bg-background text-foreground hover:bg-muted/50"
+                            }`}
+                          >
+                            {i + 1}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </aside>
+
+                  <main className="flex-1 overflow-y-auto">
+                    {!currentItem ? (
+                      <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground">
+                        No items in this run.
+                      </div>
+                    ) : (
+                      <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                        <ItemPane item={currentItem} taskType={task.type} />
+                        <EvaluatorResultsPane
+                          evaluators={job.details?.evaluators ?? []}
+                          runs={runsByItem[currentItem.uuid] ?? []}
+                          versionLabels={versionLabels}
+                          jobStatus={job.status}
+                          humanAgreementForItem={
+                            job.human_agreement?.items.find(
+                              (i) => i.item_id === currentItem.uuid,
+                            ) ?? null
+                          }
+                          evaluatorVariablesByEvaluatorId={
+                            extractEvaluatorVariables(currentItem.payload)
+                          }
+                        />
+                      </div>
+                    )}
+                  </main>
+                </div>
               </div>
             </div>
-          </div>
           </>
         ) : null}
 
@@ -550,6 +673,8 @@ function EvaluatorResultsPane({
   runs,
   versionLabels,
   jobStatus,
+  humanAgreementForItem,
+  evaluatorVariablesByEvaluatorId,
 }: {
   evaluators: {
     evaluator_id: string;
@@ -559,7 +684,13 @@ function EvaluatorResultsPane({
   runs: EvaluatorRunRow[];
   versionLabels: Record<string, string>;
   jobStatus: EvaluatorRunJob["status"];
+  humanAgreementForItem: HumanAgreementItem | null;
+  evaluatorVariablesByEvaluatorId: Record<string, Record<string, string>>;
 }) {
+  const [selectionByEvaluator, setSelectionByEvaluator] = useState<
+    Record<string, string>
+  >({});
+
   if (evaluators.length === 0) {
     return (
       <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
@@ -568,7 +699,7 @@ function EvaluatorResultsPane({
     );
   }
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {evaluators.map((ev) => {
         const versionLabel = ev.evaluator_version_id
           ? versionLabels[ev.evaluator_version_id]
@@ -672,31 +803,323 @@ function EvaluatorResultsPane({
           );
         }
 
+        const humansForEvaluator =
+          humanAgreementForItem?.evaluators.find(
+            (e) => e.evaluator_id === ev.evaluator_id,
+          ) ?? null;
+        const annotations =
+          jobStatus === "completed"
+            ? (humansForEvaluator?.human_annotations ?? [])
+            : [];
+        const hasHumans = annotations.length > 0;
+
+        const selection =
+          selectionByEvaluator[ev.evaluator_id] ?? "evaluator";
+        const selectedAnnotation =
+          selection !== "evaluator"
+            ? annotations.find((a) => a.annotation_id === selection)
+            : undefined;
+        const showHuman = !!selectedAnnotation;
+
+        const setSelection = (sel: string) =>
+          setSelectionByEvaluator((prev) => ({
+            ...prev,
+            [ev.evaluator_id]: sel,
+          }));
+
+        const scaleMin =
+          typeof r.evaluator_version?.scale_min === "number"
+            ? r.evaluator_version.scale_min
+            : undefined;
+        const scaleMax =
+          typeof r.evaluator_version?.scale_max === "number"
+            ? r.evaluator_version.scale_max
+            : undefined;
+
+        let displayMatch: boolean | null = match;
+        let displayScore: number | null = score;
+        let displayReasoning: string | null = reasoning;
+
+        if (showHuman && selectedAnnotation) {
+          const v = selectedAnnotation.value?.value;
+          displayMatch = null;
+          displayScore = null;
+          if (outputType === "binary" && typeof v === "boolean") {
+            displayMatch = v;
+          } else if (outputType === "rating" && typeof v === "number") {
+            displayScore = v;
+          }
+          const topLevelReasoning =
+            typeof selectedAnnotation.reasoning === "string"
+              ? selectedAnnotation.reasoning
+              : null;
+          const nestedReasoning =
+            typeof selectedAnnotation.value?.reasoning === "string"
+              ? (selectedAnnotation.value.reasoning as string)
+              : null;
+          const raw = topLevelReasoning ?? nestedReasoning;
+          displayReasoning = raw && raw.trim().length > 0 ? raw : null;
+        }
+
         return (
-          <EvaluatorVerdictCard
+          <div
             key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
-            mode="read"
-            name={evaluatorName}
-            versionLabel={versionLabel}
-            outputType={outputType}
-            evaluatorUuid={ev.evaluator_id}
-            enableLink
-            match={match}
-            score={score}
-            scaleMin={
-              typeof r.evaluator_version?.scale_min === "number"
-                ? r.evaluator_version.scale_min
-                : undefined
-            }
-            scaleMax={
-              typeof r.evaluator_version?.scale_max === "number"
-                ? r.evaluator_version.scale_max
-                : undefined
-            }
-            reasoning={reasoning}
-          />
+            className="space-y-2"
+          >
+            {hasHumans && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <AgreementGlyph
+                  perfect={humansForEvaluator?.agreement === 1}
+                  agreement={humansForEvaluator?.agreement ?? null}
+                  pairCount={humansForEvaluator?.pair_count ?? 0}
+                />
+                <SourcePill
+                  selected={selection === "evaluator"}
+                  onClick={() => setSelection("evaluator")}
+                  primaryLabel="Evaluator"
+                />
+                {annotations.map((a) => {
+                  const aligned = isAnnotationAligned(
+                    a.value?.value,
+                    r.value?.value,
+                    outputType,
+                  );
+                  return (
+                    <SourcePill
+                      key={a.annotation_id}
+                      primaryLabel={annotatorDisplayName(a)}
+                      selected={selection === a.annotation_id}
+                      onClick={() => setSelection(a.annotation_id)}
+                      tone={aligned ? "aligned" : "misaligned"}
+                    />
+                  );
+                })}
+              </div>
+            )}
+            <EvaluatorVerdictCard
+              mode="read"
+              name={evaluatorName}
+              description={r.evaluator?.description ?? null}
+              versionLabel={versionLabel}
+              outputType={outputType}
+              evaluatorUuid={ev.evaluator_id}
+              enableLink
+              variableValues={
+                evaluatorVariablesByEvaluatorId[ev.evaluator_id] ?? null
+              }
+              match={displayMatch}
+              score={displayScore}
+              scaleMin={scaleMin}
+              scaleMax={scaleMax}
+              reasoning={displayReasoning}
+            />
+          </div>
         );
       })}
     </div>
   );
 }
+
+function isAnnotationAligned(
+  humanVal: unknown,
+  machineVal: unknown,
+  outputType: "binary" | "rating",
+): boolean {
+  if (outputType === "binary") {
+    return (
+      typeof humanVal === "boolean" &&
+      typeof machineVal === "boolean" &&
+      humanVal === machineVal
+    );
+  }
+  return (
+    typeof humanVal === "number" &&
+    typeof machineVal === "number" &&
+    humanVal === machineVal
+  );
+}
+
+function AgreementGlyph({
+  perfect,
+  agreement,
+  pairCount,
+}: {
+  perfect: boolean;
+  agreement: number | null;
+  pairCount: number;
+}) {
+  const tooltip =
+    agreement == null
+      ? "No comparisons"
+      : `Agreement ${formatAgreement(agreement)} · ${pairCount} comparison${pairCount === 1 ? "" : "s"}`;
+  if (perfect) {
+    return (
+      <span
+        title={tooltip}
+        className="inline-flex items-center justify-center w-5 h-5 rounded-full text-green-600 dark:text-green-400"
+        aria-label="Annotators agree with evaluator"
+      >
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={3}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      </span>
+    );
+  }
+  return (
+    <span
+      title={tooltip}
+      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-red-600 dark:text-red-400"
+      aria-label="At least one annotator disagrees with evaluator"
+    >
+      <svg
+        className="w-4 h-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={3}
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </span>
+  );
+}
+
+function SourcePill({
+  primaryLabel,
+  monoSuffix,
+  selected,
+  onClick,
+  tone,
+}: {
+  primaryLabel: string;
+  monoSuffix?: string | null;
+  selected: boolean;
+  onClick: () => void;
+  tone?: "aligned" | "misaligned";
+}) {
+  let labelToneClass = "";
+  if (!selected && tone === "aligned") {
+    labelToneClass = "text-green-700 dark:text-green-400";
+  } else if (!selected && tone === "misaligned") {
+    labelToneClass = "text-red-700 dark:text-red-400";
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
+        selected
+          ? "border-foreground bg-foreground text-background"
+          : "border-border bg-muted/40 hover:bg-muted hover:border-foreground/30"
+      } ${selected ? "" : "text-foreground"}`}
+    >
+      <span className={`truncate max-w-[160px] ${labelToneClass}`}>
+        {primaryLabel}
+      </span>
+      {monoSuffix && (
+        <span
+          className={`font-mono text-[11px] ${selected ? "text-background/70" : "text-muted-foreground"}`}
+        >
+          {monoSuffix}
+        </span>
+      )}
+    </button>
+  );
+}
+
+function HumanAgreementSummary({
+  jobStatus,
+  agreement,
+  evaluators,
+  versionLabels,
+}: {
+  jobStatus: EvaluatorRunJob["status"];
+  agreement: HumanAgreement | undefined;
+  evaluators: {
+    evaluator_id: string;
+    evaluator_version_id?: string;
+    name?: string;
+  }[];
+  versionLabels: Record<string, string>;
+}) {
+  if (jobStatus !== "completed") return null;
+  if (!agreement || agreement.evaluators.length === 0) return null;
+
+  const allNull = agreement.evaluators.every((e) => e.agreement === null);
+  const noItems = agreement.items.length === 0;
+
+  if (allNull && noItems) {
+    return (
+      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200 flex items-start gap-2">
+        <svg
+          className="w-4 h-4 mt-0.5 shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"
+          />
+        </svg>
+        <span>
+          No human labels found on the items in this run yet. Once labelled,
+          each evaluator&apos;s alignment with humans will be shown.
+        </span>
+      </div>
+    );
+  }
+
+  const agreementById = new Map(
+    agreement.evaluators.map((e) => [e.evaluator_id, e]),
+  );
+
+  return (
+    <div className="space-y-2">
+      <div>
+        <h2 className="text-sm font-semibold">Human agreement</h2>
+        <p className="text-xs text-muted-foreground max-w-2xl mt-1">
+          How closely each evaluator&apos;s outputs in this run match the human
+          annotations on the same items
+        </p>
+      </div>
+      <div className="flex flex-wrap items-stretch gap-3">
+        {evaluators.map((ev) => {
+          const row = agreementById.get(ev.evaluator_id);
+          if (!row) return null;
+          const name = ev.name || ev.evaluator_id.slice(0, 8);
+          const version = row.evaluator_version_id
+            ? (versionLabels[row.evaluator_version_id] ?? null)
+            : ev.evaluator_version_id
+              ? (versionLabels[ev.evaluator_version_id] ?? null)
+              : null;
+          return (
+            <AgreementStatCard
+              key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
+              evaluatorPill={{
+                href: `/evaluators/${ev.evaluator_id}`,
+                name,
+                versionLabel: version,
+              }}
+              value={
+                row.agreement != null
+                  ? `${Math.round(row.agreement * 100)}%`
+                  : "—"
+              }
+              valueClassName={agreementColor(row.agreement)}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
