@@ -177,12 +177,11 @@ export function BulkUploadSimulationItemsDialog({
     }),
   );
 
-  // Evaluator metadata (output_type) hydrates asynchronously on the parent
-  // page. Until every linked evaluator has a usable output_type the parser
-  // would silently drop those evaluators' annotation columns, so we treat
-  // the metadata as "not ready" and re-parse once it lands.
-  const annotationMetadataReady = annotationEvaluatorsMeta.every(
-    (e) => e.output_type === "binary" || e.output_type === "rating",
+  // Evaluators without a usable output_type can't be annotated here —
+  // the parser would silently drop their column and produce a half-
+  // labelled batch. Block the annotation flow rather than failing later.
+  const evaluatorsMissingOutputType = annotationEvaluatorsMeta.filter(
+    (e) => e.output_type !== "binary" && e.output_type !== "rating",
   );
 
   // Two linked evaluators sharing a name produce duplicate CSV headers
@@ -209,14 +208,6 @@ export function BulkUploadSimulationItemsDialog({
     setCsvFile(null);
   }, [uploadAnnotations]);
 
-  // Re-parse once evaluator metadata hydrates so annotations land on every
-  // evaluator instead of being silently skipped for ones whose output_type
-  // was still null when the user dropped the CSV.
-  useEffect(() => {
-    if (!uploadAnnotations || !annotationMetadataReady || !csvFile) return;
-    handleFile(csvFile);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annotationMetadataReady]);
 
   const handleFile = (file: File | null) => {
     setUploadError(null);
@@ -239,9 +230,11 @@ export function BulkUploadSimulationItemsDialog({
           return;
         }
         if (uploadAnnotations) {
-          if (!annotationMetadataReady) {
+          if (evaluatorsMissingOutputType.length > 0) {
             setParseError(
-              "Evaluator metadata is still loading. Please wait a moment and try again.",
+              `Annotation upload is unavailable: evaluator(s) ${evaluatorsMissingOutputType
+                .map((e) => `"${e.name}"`)
+                .join(", ")} have no binary/rating output configured.`,
             );
             return;
           }
@@ -353,9 +346,9 @@ export function BulkUploadSimulationItemsDialog({
       setUploadError("Select an annotator before uploading.");
       return;
     }
-    if (uploadAnnotations && !annotationMetadataReady) {
+    if (uploadAnnotations && evaluatorsMissingOutputType.length > 0) {
       setUploadError(
-        "Evaluator metadata is still loading. Please wait a moment and try again.",
+        "One or more evaluators have no binary/rating output configured.",
       );
       return;
     }
@@ -561,6 +554,15 @@ export function BulkUploadSimulationItemsDialog({
             on the evaluators page before uploading annotations.
           </div>
         )}
+        {uploadAnnotations && evaluatorsMissingOutputType.length > 0 && (
+          <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
+            Annotation upload isn&apos;t available — evaluator(s){" "}
+            {evaluatorsMissingOutputType
+              .map((e) => `"${e.name}"`)
+              .join(", ")}{" "}
+            have no binary/rating output configured.
+          </div>
+        )}
       </div>
     ) : null;
 
@@ -568,7 +570,8 @@ export function BulkUploadSimulationItemsDialog({
     uploadAnnotations &&
     (annotatorsState.annotators.length === 0 ||
       !selectedAnnotatorId ||
-      duplicateNames.length > 0);
+      duplicateNames.length > 0 ||
+      evaluatorsMissingOutputType.length > 0);
 
   return (
     <BulkUploadDialogShell
@@ -602,7 +605,9 @@ export function BulkUploadSimulationItemsDialog({
       uploadBlocked={uploadBlocked}
       hideUploadSection={
         uploadAnnotations &&
-        (!selectedAnnotatorId || duplicateNames.length > 0)
+        (!selectedAnnotatorId ||
+          duplicateNames.length > 0 ||
+          evaluatorsMissingOutputType.length > 0)
       }
     />
   );
