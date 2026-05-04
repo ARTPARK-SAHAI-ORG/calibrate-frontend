@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type ScaleEntry = {
   value: boolean | number | string;
@@ -46,6 +46,10 @@ export function VersionCard({
   const [promptVisible, setPromptVisible] = useState(isLive || isDefault);
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => {
+    setPromptVisible(isLive || isDefault);
+  }, [isLive, isDefault]);
+
   function handleCopy() {
     navigator.clipboard.writeText(version.system_prompt).then(() => {
       setCopied(true);
@@ -62,9 +66,9 @@ export function VersionCard({
       }
     >
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap min-w-0">
+        <div className="flex flex-col gap-1 min-w-0">
           {!isDefault && (
-            <>
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-muted text-foreground">
                 v{version.version_number}
               </span>
@@ -73,14 +77,14 @@ export function VersionCard({
                   Current
                 </span>
               )}
-            </>
+            </div>
           )}
           <code className="text-xs md:text-sm font-mono text-muted-foreground truncate">
             {version.judge_model}
           </code>
         </div>
         {!isDefault && (
-          <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {!isLive && (
               <button
                 onClick={() => onSetLive(version.uuid)}
@@ -90,40 +94,38 @@ export function VersionCard({
                 {isSettingLive ? "Marking..." : "Mark as current"}
               </button>
             )}
-            <span className="text-xs text-muted-foreground whitespace-nowrap">
-              {formatDateTime(version.created_at)}
-            </span>
+            <button
+              onClick={() => setPromptVisible((v) => !v)}
+              className="h-9 px-3 rounded-md text-xs md:text-sm font-semibold border border-violet-500/40 bg-violet-500/10 text-violet-700 hover:bg-violet-500/20 dark:text-violet-300 dark:border-violet-400/40 dark:bg-violet-500/15 dark:hover:bg-violet-500/25 transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              {promptVisible ? (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                  </svg>
+                  Hide prompt
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Show prompt
+                </>
+              )}
+            </button>
           </div>
         )}
       </div>
 
-      <div className="space-y-2">
+      {promptVisible && <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <button
-            onClick={() => setPromptVisible((v) => !v)}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-          >
-            {promptVisible ? (
-              <>
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
-                </svg>
-                Hide prompt
-              </>
-            ) : (
-              <>
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                View prompt
-              </>
-            )}
-          </button>
-          {promptVisible && (
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Prompt</span>
+          {(
             <button
               onClick={handleCopy}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted transition-colors cursor-pointer"
             >
               {copied ? (
                 <>
@@ -143,12 +145,10 @@ export function VersionCard({
             </button>
           )}
         </div>
-        {promptVisible && (
-          <pre className="border border-border rounded-md p-3 md:p-4 bg-muted/10 text-sm text-foreground whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">
-            {version.system_prompt}
-          </pre>
-        )}
-      </div>
+        <pre className="border border-border rounded-md p-3 md:p-4 bg-muted/10 text-sm text-foreground whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">
+          {version.system_prompt}
+        </pre>
+      </div>}
 
       {version.variables?.length ? (
         <div className="space-y-2">
