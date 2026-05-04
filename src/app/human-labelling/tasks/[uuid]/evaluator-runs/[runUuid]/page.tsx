@@ -446,6 +446,7 @@ export default function EvaluatorRunDetailPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [filterDisagreements, setFilterDisagreements] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const startTime = useRef(Date.now());
 
   const evaluatorNamesById = useMemo(() => {
@@ -566,7 +567,7 @@ export default function EvaluatorRunDetailPage() {
 
   // Item previews: prefer embedded `job.items` (snapshot, survives soft-delete);
   // otherwise same ordering rules against live `task.items`.
-  const itemsForRun: Item[] = (() => {
+  const itemsForRun = useMemo<Item[]>(() => {
     if (!job) return [];
     const taskId = task?.uuid ?? job.task_id;
     const embedded = job.items;
@@ -591,32 +592,45 @@ export default function EvaluatorRunDetailPage() {
       return task.items.slice(0, cap);
     }
     return task.items;
-  })();
+  }, [job, task]);
 
-  // Whether there is any human agreement data worth filtering by.
-  const hasHumanAgreementData = !!(
-    job?.human_agreement &&
-    job.human_agreement.items.some((item) =>
-      item.evaluators.some((e) => e.human_annotations.length > 0),
-    )
+  const hasDisagreements = useMemo(
+    () =>
+      !!(
+        job?.human_agreement &&
+        job.human_agreement.items.some((item) =>
+          item.evaluators.some(
+            (e) =>
+              e.human_annotations.length > 0 &&
+              e.agreement !== null &&
+              e.agreement !== 1,
+          ),
+        )
+      ),
+    [job],
   );
 
   // Items that have at least one evaluator with a misaligned human annotation.
-  const filteredItemsForRun = filterDisagreements
-    ? itemsForRun.filter((it) => {
-        const itemAgreement = job?.human_agreement?.items.find(
-          (i) => i.item_id === it.uuid,
-        );
-        if (!itemAgreement) return false;
-        return itemAgreement.evaluators.some(
-          (e) => e.human_annotations.length > 0 && e.agreement !== 1,
-        );
-      })
-    : itemsForRun;
+  const filteredItemsForRun = useMemo(
+    () =>
+      filterDisagreements
+        ? itemsForRun.filter((it) => {
+            const itemAgreement = job?.human_agreement?.items.find(
+              (i) => i.item_id === it.uuid,
+            );
+            if (!itemAgreement) return false;
+            return itemAgreement.evaluators.some(
+              (e) => e.human_annotations.length > 0 && e.agreement !== null && e.agreement !== 1,
+            );
+          })
+        : itemsForRun,
+    [filterDisagreements, itemsForRun, job],
+  );
 
   // Map from item UUID to its 1-based position in the full (unfiltered) list.
-  const originalIndexByUuid = new Map(
-    itemsForRun.map((it, i) => [it.uuid, i + 1]),
+  const originalIndexByUuid = useMemo(
+    () => new Map(itemsForRun.map((it, i) => [it.uuid, i + 1])),
+    [itemsForRun],
   );
 
   const total = filteredItemsForRun.length;
@@ -624,13 +638,13 @@ export default function EvaluatorRunDetailPage() {
   const currentItem: Item | undefined = filteredItemsForRun[safeIndex];
 
   // Group runs by item_id for quick lookup.
-  const runsByItem = (() => {
+  const runsByItem = useMemo(() => {
     const m: Record<string, EvaluatorRunRow[]> = {};
     for (const r of job?.runs ?? []) {
       (m[r.item_id] = m[r.item_id] ?? []).push(r);
     }
     return m;
-  })();
+  }, [job]);
 
   const itemDone = (itemId: string): boolean => {
     if (!job || job.status !== "completed") return false;
@@ -652,11 +666,10 @@ export default function EvaluatorRunDetailPage() {
     const exportItems = filteredItemsForRun;
     if (!job || !task || exportItems.length === 0) return;
     setExporting(true);
+    setExportError(null);
     try {
-      const xlsxMod = await import("xlsx");
-      const XLSX = xlsxMod.default ?? xlsxMod;
-      const wb = XLSX.utils.book_new();
-      const usedSheetNames = new Set<string>();
+      const ExcelJS = (await import("exceljs")).default;
+      const wb = new ExcelJS.Workbook();
       const evaluators = job.details?.evaluators ?? [];
 
       for (const ev of evaluators) {
@@ -665,11 +678,7 @@ export default function EvaluatorRunDetailPage() {
           ? (versionLabels[ev.evaluator_version_id] ?? null)
           : null;
         const rawSheetName = versionLabel ? `${evName} ${versionLabel}` : evName;
-        let sheetName = rawSheetName.replace(/[:\\/?*[\]]/g, "_").slice(0, 31);
-        if (usedSheetNames.has(sheetName)) {
-          sheetName = sheetName.slice(0, 28) + `_${usedSheetNames.size}`;
-        }
-        usedSheetNames.add(sheetName);
+        const sheetName = rawSheetName.replace(/[:\\/?*[\]]/g, "_").slice(0, 31);
 
         // Collect all variable names for this evaluator across all items
         const allVarNames = new Set<string>();
@@ -791,11 +800,22 @@ export default function EvaluatorRunDetailPage() {
           ]);
         }
 
-        const ws = XLSX.utils.aoa_to_sheet(rows);
-        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        const ws = wb.addWorksheet(sheetName);
+        ws.addRows(rows);
       }
 
-      XLSX.writeFile(wb, `evaluator-run-${job.uuid.slice(0, 8)}.xlsx`);
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `evaluator-run-${job.uuid.slice(0, 8)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Export failed");
     } finally {
       setExporting(false);
     }
@@ -923,6 +943,11 @@ export default function EvaluatorRunDetailPage() {
                 </button>
               )}
             </div>
+            {exportError && (
+              <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-500">
+                Export failed: {exportError}
+              </div>
+            )}
             {(() => {
               const ha = job.human_agreement;
               const cardsWillRender =
@@ -975,7 +1000,7 @@ export default function EvaluatorRunDetailPage() {
 
             <div className="border border-border rounded-xl [overflow:clip] flex flex-col flex-1 min-h-0">
               <div className="flex flex-col flex-1 min-h-0">
-                {hasHumanAgreementData && (
+                {hasDisagreements && (
                   <div className="border-b border-border px-4 md:px-6 py-2.5 flex items-center justify-start">
                     <button
                       onClick={() => setFilterDisagreements((f) => !f)}
@@ -1170,6 +1195,7 @@ function EvaluatorResultsPane({
         return (
           !!humansForEv &&
           humansForEv.human_annotations.length > 0 &&
+          humansForEv.agreement !== null &&
           humansForEv.agreement !== 1
         );
       })
