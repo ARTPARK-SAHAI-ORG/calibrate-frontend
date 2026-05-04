@@ -500,6 +500,7 @@ function ItemRowActions({
   onDelete,
   onViewResults,
   onLabel,
+  onEdit,
   onEvaluate,
   isResultsOpen,
   viewResultsDisabled,
@@ -509,6 +510,7 @@ function ItemRowActions({
   onDelete: (uuid: string) => void | Promise<void>;
   onViewResults: (uuid: string) => void;
   onLabel?: (uuid: string) => void;
+  onEdit?: (uuid: string) => void;
   onEvaluate?: (uuid: string) => void;
   isResultsOpen?: boolean;
   viewResultsDisabled?: boolean;
@@ -527,6 +529,16 @@ function ItemRowActions({
           className="h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
         >
           Label
+        </button>
+      )}
+      {onEdit && (
+        <button
+          type="button"
+          onClick={() => onEdit(itemUuid)}
+          aria-label="Edit"
+          className="h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+        >
+          Edit
         </button>
       )}
       {onEvaluate && (
@@ -810,6 +822,7 @@ function LabellingTaskPageInner() {
   const [deleteSelectedOpen, setDeleteSelectedOpen] = useState(false);
   const [deletingSelected, setDeletingSelected] = useState(false);
   const [editSttItemsOpen, setEditSttItemsOpen] = useState(false);
+  const [editSttSingleItemUuid, setEditSttSingleItemUuid] = useState<string | null>(null);
   const [editLlmItemUuid, setEditLlmItemUuid] = useState<string | null>(null);
   const [editLlmItemName, setEditLlmItemName] = useState("");
   const [savingLlmItem, setSavingLlmItem] = useState(false);
@@ -1887,17 +1900,17 @@ function LabellingTaskPageInner() {
                   const annotators = taskSummary.annotators ?? [];
                   const evaluators = taskSummary.evaluators ?? [];
                   const summaryTaskType = taskSummary.task_type;
-                  const itemColumns =
-                    summaryTaskType === "stt"
-                      ? [
-                          { key: "ref", label: "Reference transcript" },
-                          { key: "pred", label: "Predicted transcript" },
-                        ]
-                      : [{ key: "name", label: "Name" }];
-                  const itemColTpl = itemColumns
-                    .map(() => "minmax(180px,1.4fr)")
-                    .join(" ");
-                  const evalColTpl = "minmax(180px,1fr) 170px 170px 140px";
+                  const itemColumns = [{ key: "name", label: "Name" }];
+                  const itemColTpl = "200px";
+                  const longestEvalName =
+                    evaluators.length > 0
+                      ? Math.max(...evaluators.map((e) => e.name.length))
+                      : 0;
+                  const evalNameColPx = Math.max(
+                    120,
+                    Math.ceil(longestEvalName * 6.5 + 60),
+                  );
+                  const evalColTpl = `${evalNameColPx}px 170px 170px 140px`;
                   const annotatorColTpl =
                     annotators.length > 0
                       ? annotators.map(() => "120px").join(" ")
@@ -1910,17 +1923,6 @@ function LabellingTaskPageInner() {
                     payload: Record<string, unknown> | null,
                   ): string[] => {
                     const p = payload ?? {};
-                    if (summaryTaskType === "stt") {
-                      const ref =
-                        typeof p.reference_transcript === "string"
-                          ? (p.reference_transcript as string)
-                          : "";
-                      const pred =
-                        typeof p.predicted_transcript === "string"
-                          ? (p.predicted_transcript as string)
-                          : "";
-                      return [ref || "—", pred || "—"];
-                    }
                     const name =
                       typeof p.name === "string" ? (p.name as string) : "";
                     return [name || "—"];
@@ -2284,14 +2286,6 @@ function LabellingTaskPageInner() {
                     >
                       Clear
                     </button>
-                    {taskType === "stt" && (
-                      <button
-                        onClick={() => setEditSttItemsOpen(true)}
-                        className="h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-                      >
-                        Edit
-                      </button>
-                    )}
                     <button
                       onClick={() => setDeleteSelectedOpen(true)}
                       className="h-8 px-3 rounded-md text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors cursor-pointer"
@@ -2348,7 +2342,7 @@ function LabellingTaskPageInner() {
 
               {taskType === "stt" ? (
                 <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)_440px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
+                  <div className="grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_440px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
                     <input
                       type="checkbox"
                       checked={allSelected}
@@ -2359,6 +2353,9 @@ function LabellingTaskPageInner() {
                       aria-label="Select all"
                       className="w-4 h-4 cursor-pointer accent-foreground"
                     />
+                    <div className="text-sm font-medium text-muted-foreground">
+                      Name
+                    </div>
                     <div className="text-sm font-medium text-muted-foreground">
                       Reference transcript
                     </div>
@@ -2371,6 +2368,7 @@ function LabellingTaskPageInner() {
                   </div>
                   {items.map((item) => {
                     const p = (item.payload ?? {}) as Record<string, unknown>;
+                    const name = typeof p.name === "string" ? p.name : "";
                     const ref =
                       typeof p.reference_transcript === "string"
                         ? p.reference_transcript
@@ -2384,7 +2382,7 @@ function LabellingTaskPageInner() {
                     return (
                       <Fragment key={item.uuid}>
                         <div
-                          className={`grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)_440px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center ${
+                          className={`grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_440px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center ${
                             isSelected ? "bg-muted/30" : "hover:bg-muted/20"
                           }`}
                         >
@@ -2395,6 +2393,9 @@ function LabellingTaskPageInner() {
                             aria-label={`Select item ${item.id}`}
                             className="w-4 h-4 cursor-pointer accent-foreground"
                           />
+                          <p className="text-sm text-foreground line-clamp-2">
+                            {name || "—"}
+                          </p>
                           <p className="text-sm text-foreground line-clamp-2">
                             {ref || "—"}
                           </p>
@@ -2415,6 +2416,10 @@ function LabellingTaskPageInner() {
                               } else {
                                 toggleItem(uuid);
                               }
+                            }}
+                            onEdit={(uuid) => {
+                              setEditSttSingleItemUuid(uuid);
+                              setEditSttItemsOpen(true);
                             }}
                             onEvaluate={(uuid) => {
                               if (items.length === 1) {
@@ -2496,6 +2501,7 @@ function LabellingTaskPageInner() {
                                 toggleItem(uuid);
                               }
                             }}
+                            onEdit={(uuid) => setEditLlmItemUuid(uuid)}
                             onEvaluate={(uuid) => {
                               if (items.length === 1) {
                                 setSelectedItemIds(new Set([uuid]));
@@ -2896,6 +2902,7 @@ function LabellingTaskPageInner() {
             body: {
               items: rows.map((r) => ({
                 payload: {
+                  ...(r.name ? { name: r.name } : {}),
                   reference_transcript: r.actual_transcript,
                   predicted_transcript: r.predicted_transcript,
                 },
@@ -2912,11 +2919,16 @@ function LabellingTaskPageInner() {
         isOpen={editSttItemsOpen}
         mode="edit"
         initialRows={items
-          .filter((it) => selectedItemIds.has(it.uuid))
+          .filter((it) =>
+            editSttSingleItemUuid
+              ? it.uuid === editSttSingleItemUuid
+              : selectedItemIds.has(it.uuid),
+          )
           .map((it) => {
             const p = (it.payload ?? {}) as Record<string, unknown>;
             return {
               uuid: it.uuid,
+              name: typeof p.name === "string" ? p.name : "",
               actual:
                 typeof p.reference_transcript === "string"
                   ? p.reference_transcript
@@ -2927,7 +2939,7 @@ function LabellingTaskPageInner() {
                   : "",
             };
           })}
-        onClose={() => setEditSttItemsOpen(false)}
+        onClose={() => { setEditSttItemsOpen(false); setEditSttSingleItemUuid(null); }}
         onSubmit={async (rows) => {
           if (!accessToken) return;
           await apiClient<{ updated_count: number }>(
@@ -2941,6 +2953,7 @@ function LabellingTaskPageInner() {
                   .map((r) => ({
                     uuid: r.uuid,
                     payload: {
+                      ...(r.name ? { name: r.name } : {}),
                       reference_transcript: r.actual_transcript,
                       predicted_transcript: r.predicted_transcript,
                     },
@@ -2950,6 +2963,7 @@ function LabellingTaskPageInner() {
           );
           await fetchTask();
           setEditSttItemsOpen(false);
+          setEditSttSingleItemUuid(null);
           setSelectedItemIds(new Set());
         }}
       />

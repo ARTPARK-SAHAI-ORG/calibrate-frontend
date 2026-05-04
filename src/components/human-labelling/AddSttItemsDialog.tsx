@@ -6,12 +6,14 @@ import { useHideFloatingButton } from "@/components/AppLayout";
 type SttRowDraft = {
   id: string;
   uuid?: string; // present in edit mode; undefined for new rows
+  name: string;
   actual: string;
   predicted: string;
 };
 
 export type SttItemRowSubmission = {
   uuid?: string;
+  name: string;
   actual_transcript: string;
   predicted_transcript: string;
 };
@@ -19,16 +21,69 @@ export type SttItemRowSubmission = {
 type AddSttItemsDialogProps = {
   isOpen: boolean;
   mode?: "add" | "edit";
-  initialRows?: { uuid: string; actual: string; predicted: string }[];
+  initialRows?: {
+    uuid: string;
+    name: string;
+    actual: string;
+    predicted: string;
+  }[];
   onClose: () => void;
   onSubmit: (rows: SttItemRowSubmission[]) => Promise<void> | void;
 };
+
+function humaniseDetailObject(detail: {
+  code?: string;
+  conflicting_names?: string[];
+}): string | null {
+  const names = detail.conflicting_names ?? [];
+  const fmt =
+    names.length === 0
+      ? null
+      : names.length === 1
+        ? `"${names[0]}"`
+        : names.map((n) => `"${n}"`).join(", ");
+
+  if (detail.code === "ITEM_NAME_CONFLICT") {
+    return fmt
+      ? names.length === 1
+        ? `An item named ${fmt} already exists in this task.`
+        : `Items with these names already exist in this task: ${fmt}.`
+      : "One or more item names already exist in this task.";
+  }
+  if (detail.code === "ITEM_NAME_DUPLICATE_IN_REQUEST") {
+    return fmt
+      ? names.length === 1
+        ? `Duplicate name in your request: ${fmt}.`
+        : `Duplicate names in your request: ${fmt}.`
+      : "Your request contains duplicate item names.";
+  }
+  return null;
+}
+
+function extractApiError(err: unknown, fallback: string): string {
+  if (!(err instanceof Error)) return fallback;
+  const m = err.message.match(/Request failed: \d+ - (.+)$/s);
+  if (m) {
+    try {
+      const parsed = JSON.parse(m[1]);
+      if (parsed?.detail && typeof parsed.detail === "object") {
+        const msg = humaniseDetailObject(parsed.detail);
+        if (msg) return msg;
+      }
+    } catch {
+      /* ignore */
+    }
+    return m[1];
+  }
+  return err.message || fallback;
+}
 
 const newRow = (): SttRowDraft => ({
   id:
     typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  name: "",
   actual: "",
   predicted: "",
 });
@@ -49,6 +104,7 @@ export function AddSttItemsDialog({
       ? initialRows.map((r) => ({
           id: r.uuid,
           uuid: r.uuid,
+          name: r.name,
           actual: r.actual,
           predicted: r.predicted,
         }))
@@ -66,6 +122,7 @@ export function AddSttItemsDialog({
           ? initialRows.map((r) => ({
               id: r.uuid,
               uuid: r.uuid,
+              name: r.name,
               actual: r.actual,
               predicted: r.predicted,
             }))
@@ -94,10 +151,11 @@ export function AddSttItemsDialog({
   const validRows: SttItemRowSubmission[] = rows
     .map((r) => ({
       uuid: r.uuid,
+      name: r.name.trim(),
       actual_transcript: r.actual.trim(),
       predicted_transcript: r.predicted.trim(),
     }))
-    .filter((r) => r.actual_transcript && r.predicted_transcript);
+    .filter((r) => r.name && r.actual_transcript && r.predicted_transcript);
 
   const handleClose = () => {
     if (!submitting) {
@@ -114,11 +172,10 @@ export function AddSttItemsDialog({
       await onSubmit(validRows);
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : isEdit
-            ? "Failed to save items"
-            : "Failed to add items",
+        extractApiError(
+          err,
+          isEdit ? "Failed to save items" : "Failed to add items",
+        ),
       );
     } finally {
       setSubmitting(false);
@@ -131,7 +188,7 @@ export function AddSttItemsDialog({
       onClick={handleClose}
     >
       <div
-        className="bg-background border border-border rounded-xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[90vh]"
+        className="bg-background border border-border rounded-xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 px-5 md:px-6 py-4 border-b border-border">
@@ -141,7 +198,7 @@ export function AddSttItemsDialog({
             </h2>
             <p className="text-xs md:text-sm text-muted-foreground mt-1">
               {isEdit
-                ? "Update the reference and predicted transcripts for each row"
+                ? "Update the name, reference, and predicted transcripts for each row"
                 : "Annotators will compare the predicted transcript against the reference"}
             </p>
           </div>
@@ -168,7 +225,10 @@ export function AddSttItemsDialog({
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-2">
           {/* Column headers (shown once) */}
-          <div className="grid grid-cols-[1fr_1fr_28px] gap-2 px-1 pb-1">
+          <div className="grid grid-cols-[1fr_2fr_2fr_28px] gap-2 px-1 pb-1">
+            <div className="text-xs font-medium text-muted-foreground">
+              Name
+            </div>
             <div className="text-xs font-medium text-muted-foreground">
               Reference transcript
             </div>
@@ -181,8 +241,16 @@ export function AddSttItemsDialog({
           {rows.map((row, idx) => (
             <div
               key={row.id}
-              className="grid grid-cols-[1fr_1fr_28px] gap-2 items-center"
+              className="grid grid-cols-[1fr_2fr_2fr_28px] gap-2 items-center"
             >
+              <input
+                type="text"
+                value={row.name}
+                onChange={(e) => updateRow(row.id, { name: e.target.value })}
+                placeholder="e.g. Clip 1"
+                disabled={submitting}
+                className="w-full h-9 px-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
+              />
               <input
                 type="text"
                 value={row.actual}
