@@ -29,6 +29,13 @@ export type EvaluatorMeta = {
 
 export type Annotator = { uuid: string; name: string };
 
+/** Response from `POST /annotation-tasks/:id/items/annotated-check` (bulk upload preview). */
+export type AnnotatedCheckResult = {
+  all_new: boolean;
+  existing_with_annotations: { index: number; name: string }[];
+  existing_without_annotations: { index: number; name: string }[];
+};
+
 // Per-evaluator annotation parsed from a CSV row. Reasoning is always a
 // string (empty string when no reasoning column / cell). The value field
 // holds either a boolean (binary evaluators) or a number (rating).
@@ -143,6 +150,151 @@ export function parseAnnotationCell(
     return { value: num };
   }
   return { error: `unsupported evaluator type for "${e.name}"` };
+}
+
+// ─── Parsed-items preview + annotated-check (LLM / STT / Simulation) ───────
+
+/** POST `annotated-check` when bulk-uploading with pre-filled annotations. */
+export function useAnnotatedItemsCheck(args: {
+  enabled: boolean;
+  taskUuid: string;
+  accessToken: string;
+  annotatorId: string | null;
+  namedItems: readonly { name: string }[];
+}): {
+  annotatedCheck: AnnotatedCheckResult | null;
+  annotatedCheckLoading: boolean;
+} {
+  const { enabled, taskUuid, accessToken, annotatorId, namedItems } = args;
+  const [annotatedCheck, setAnnotatedCheck] =
+    useState<AnnotatedCheckResult | null>(null);
+  const [annotatedCheckLoading, setAnnotatedCheckLoading] = useState(false);
+
+  useEffect(() => {
+    if (!enabled || !annotatorId || namedItems.length === 0) {
+      setAnnotatedCheck(null);
+      setAnnotatedCheckLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setAnnotatedCheckLoading(true);
+      setAnnotatedCheck(null);
+      try {
+        const result = await apiClient<AnnotatedCheckResult>(
+          `/annotation-tasks/${taskUuid}/items/annotated-check`,
+          accessToken,
+          {
+            method: "POST",
+            body: {
+              annotator_id: annotatorId,
+              names: namedItems.map((p) => p.name),
+            },
+          },
+        );
+        if (!cancelled) setAnnotatedCheck(result);
+      } catch {
+        // Don't block upload — hide warnings only.
+        if (!cancelled) setAnnotatedCheck(null);
+      } finally {
+        if (!cancelled) setAnnotatedCheckLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, annotatorId, namedItems, taskUuid, accessToken]);
+
+  return { annotatedCheck, annotatedCheckLoading };
+}
+
+export function bulkUploadAnnotatedRowBgClass(
+  index: number,
+  check: AnnotatedCheckResult | null,
+): string {
+  if (!check) return "";
+  if (check.existing_with_annotations.some((e) => e.index === index)) {
+    return "bg-red-500/10";
+  }
+  if (check.existing_without_annotations.some((e) => e.index === index)) {
+    return "bg-amber-500/10";
+  }
+  return "";
+}
+
+/** Shared chrome around the parsed-rows grid: count, check spinner, scroll frame, footnotes. */
+export function BulkUploadItemsPreviewShell({
+  itemCount,
+  annotatedCheckLoading,
+  annotatedCheck,
+  children,
+}: {
+  itemCount: number;
+  annotatedCheckLoading: boolean;
+  annotatedCheck: AnnotatedCheckResult | null;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium text-foreground">
+          {itemCount} {itemCount === 1 ? "item" : "items"} ready to upload
+        </p>
+        {annotatedCheckLoading && (
+          <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <svg
+              className="w-3.5 h-3.5 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
+              />
+            </svg>
+            Checking for existing items…
+          </span>
+        )}
+      </div>
+      <div className="border border-border rounded-xl overflow-hidden">
+        <div className="overflow-auto max-h-[20rem]">
+          <div className="min-w-max">{children}</div>
+        </div>
+      </div>
+      {annotatedCheck &&
+        annotatedCheck.existing_without_annotations.length > 0 && (
+          <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-foreground">
+            <span className="mt-0.5 shrink-0 inline-block w-2.5 h-2.5 rounded-sm bg-amber-500/60" />
+            <span>
+              Rows highlighted in{" "}
+              <span className="font-semibold text-amber-700 dark:text-amber-400">
+                amber
+              </span>{" "}
+              match names of existing items — annotations will be attached to
+              those existing items. The original item remains unchanged.
+            </span>
+          </div>
+        )}
+      {annotatedCheck &&
+        annotatedCheck.existing_with_annotations.length > 0 && (
+          <div className="flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-xs text-foreground">
+            <span className="mt-0.5 shrink-0 inline-block w-2.5 h-2.5 rounded-sm bg-red-500/60" />
+            <span>
+              Rows highlighted in{" "}
+              <span className="font-semibold text-red-700 dark:text-red-400">
+                red
+              </span>{" "}
+              match names of existing items that already have annotations from
+              this annotator — those annotations will be replaced with the new
+              ones. The original item remains unchanged.
+            </span>
+          </div>
+        )}
+    </div>
+  );
 }
 
 // ─── Annotator picker ─────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import { apiClient } from "@/lib/api";
 import {
   AnnotationOptIn,
   BulkUploadDialogShell,
+  BulkUploadItemsPreviewShell,
   ChatHistoryPreview,
   type EvaluatorMeta,
   type GuidelineColumn,
@@ -13,6 +14,7 @@ import {
   type ParsedAnnotation,
   type TurnObject,
   buildItemAnnotationsPayload,
+  bulkUploadAnnotatedRowBgClass,
   duplicateEvaluatorNames,
   evaluatorReasoningColumn,
   evaluatorValueColumn,
@@ -20,6 +22,7 @@ import {
   parseAnnotationCell,
   parseApiError,
   sampleEvaluatorValue,
+  useAnnotatedItemsCheck,
   useAnnotators,
 } from "./bulk-upload-shared";
 
@@ -187,6 +190,16 @@ export function BulkUploadLlmItemsDialog({
     null,
   );
   const annotatorsState = useAnnotators(isOpen, accessToken);
+  const { annotatedCheck, annotatedCheckLoading } = useAnnotatedItemsCheck({
+    enabled:
+      uploadAnnotations &&
+      !!selectedAnnotatorId &&
+      parsedItems.length > 0,
+    taskUuid,
+    accessToken,
+    annotatorId: selectedAnnotatorId,
+    namedItems: parsedItems,
+  });
 
   const reset = () => {
     setCsvFile(null);
@@ -622,14 +635,11 @@ export function BulkUploadLlmItemsDialog({
   };
 
   const itemsPreview = (
-    <div className="space-y-2">
-      <p className="text-sm font-medium text-foreground">
-        {parsedItems.length} {parsedItems.length === 1 ? "item" : "items"} ready
-        to upload
-      </p>
-      <div className="border border-border rounded-xl overflow-hidden">
-        <div className="overflow-auto max-h-[20rem]">
-          <div className="min-w-max">
+    <BulkUploadItemsPreviewShell
+      itemCount={parsedItems.length}
+      annotatedCheckLoading={annotatedCheckLoading}
+      annotatedCheck={annotatedCheck}
+    >
           <div
             className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
             style={gridStyle}
@@ -676,7 +686,7 @@ export function BulkUploadLlmItemsDialog({
               return (
                 <div
                   key={idx}
-                  className="grid gap-2 px-3 py-2 text-xs items-start"
+                  className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
                   style={gridStyle}
                 >
                   <div className="truncate text-foreground" title={p.name}>
@@ -732,10 +742,7 @@ export function BulkUploadLlmItemsDialog({
               </div>
             )}
           </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    </BulkUploadItemsPreviewShell>
   );
 
   const annotationOptIn =

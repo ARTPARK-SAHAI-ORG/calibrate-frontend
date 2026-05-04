@@ -6,12 +6,14 @@ import { apiClient } from "@/lib/api";
 import {
   AnnotationOptIn,
   BulkUploadDialogShell,
+  BulkUploadItemsPreviewShell,
   type EvaluatorMeta,
   type GuidelineColumn,
   type GuidelineDoc,
   type ParsedAnnotation,
   type TurnObject,
   buildItemAnnotationsPayload,
+  bulkUploadAnnotatedRowBgClass,
   duplicateEvaluatorNames,
   evaluatorReasoningColumn,
   evaluatorValueColumn,
@@ -22,6 +24,7 @@ import {
   rolePillClass,
   sampleEvaluatorValue,
   turnContentString,
+  useAnnotatedItemsCheck,
   useAnnotators,
 } from "./bulk-upload-shared";
 
@@ -166,6 +169,16 @@ export function BulkUploadSimulationItemsDialog({
     null,
   );
   const annotatorsState = useAnnotators(isOpen, accessToken);
+  const { annotatedCheck, annotatedCheckLoading } = useAnnotatedItemsCheck({
+    enabled:
+      uploadAnnotations &&
+      !!selectedAnnotatorId &&
+      parsedItems.length > 0,
+    taskUuid,
+    accessToken,
+    annotatorId: selectedAnnotatorId,
+    namedItems: parsedItems,
+  });
 
   const annotationEvaluatorsMeta: EvaluatorMeta[] = linkedEvaluators.map(
     (e) => ({
@@ -207,7 +220,6 @@ export function BulkUploadSimulationItemsDialog({
     setParseError(null);
     setCsvFile(null);
   }, [uploadAnnotations]);
-
 
   const handleFile = (file: File | null) => {
     setUploadError(null);
@@ -457,14 +469,11 @@ export function BulkUploadSimulationItemsDialog({
   };
 
   const itemsPreview = (
-    <div className="space-y-2">
-      <p className="text-sm font-medium text-foreground">
-        {parsedItems.length} {parsedItems.length === 1 ? "item" : "items"} ready
-        to upload
-      </p>
-      <div className="border border-border rounded-xl overflow-hidden">
-        <div className="overflow-auto max-h-[20rem]">
-          <div className="min-w-max">
+    <BulkUploadItemsPreviewShell
+      itemCount={parsedItems.length}
+      annotatedCheckLoading={annotatedCheckLoading}
+      annotatedCheck={annotatedCheck}
+    >
           <div
             className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
             style={simGridStyle}
@@ -492,7 +501,7 @@ export function BulkUploadSimulationItemsDialog({
             {parsedItems.slice(0, 50).map((p, idx) => (
               <div
                 key={idx}
-                className="grid gap-2 px-3 py-2 text-xs items-start"
+                className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
                 style={simGridStyle}
               >
                 <div className="truncate text-foreground" title={p.name}>
@@ -535,10 +544,7 @@ export function BulkUploadSimulationItemsDialog({
               </div>
             )}
           </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    </BulkUploadItemsPreviewShell>
   );
 
   const annotationOptIn =

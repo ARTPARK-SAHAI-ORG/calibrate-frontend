@@ -6,11 +6,13 @@ import { apiClient } from "@/lib/api";
 import {
   AnnotationOptIn,
   BulkUploadDialogShell,
+  BulkUploadItemsPreviewShell,
   type EvaluatorMeta,
   type GuidelineColumn,
   type GuidelineDoc,
   type ParsedAnnotation,
   buildItemAnnotationsPayload,
+  bulkUploadAnnotatedRowBgClass,
   duplicateEvaluatorNames,
   evaluatorReasoningColumn,
   evaluatorValueColumn,
@@ -18,6 +20,7 @@ import {
   parseAnnotationCell,
   parseApiError,
   sampleEvaluatorValue,
+  useAnnotatedItemsCheck,
   useAnnotators,
 } from "./bulk-upload-shared";
 
@@ -105,12 +108,6 @@ type ParsedItem = {
   annotations: ParsedAnnotation[];
 };
 
-type AnnotatedCheckResult = {
-  all_new: boolean;
-  existing_with_annotations: { index: number; name: string }[];
-  existing_without_annotations: { index: number; name: string }[];
-};
-
 export type SttLinkedEvaluator = {
   uuid: string;
   name: string;
@@ -145,10 +142,17 @@ export function BulkUploadSttItemsDialog({
   const [selectedAnnotatorId, setSelectedAnnotatorId] = useState<string | null>(
     null,
   );
-  const [annotatedCheck, setAnnotatedCheck] =
-    useState<AnnotatedCheckResult | null>(null);
-  const [annotatedCheckLoading, setAnnotatedCheckLoading] = useState(false);
   const annotatorsState = useAnnotators(isOpen, accessToken);
+  const { annotatedCheck, annotatedCheckLoading } = useAnnotatedItemsCheck({
+    enabled:
+      uploadAnnotations &&
+      !!selectedAnnotatorId &&
+      parsedItems.length > 0,
+    taskUuid,
+    accessToken,
+    annotatorId: selectedAnnotatorId,
+    namedItems: parsedItems,
+  });
 
   const annotationEvaluatorsMeta: EvaluatorMeta[] = linkedEvaluators.map(
     (e) => ({
@@ -179,8 +183,6 @@ export function BulkUploadSttItemsDialog({
     setUploadError(null);
     setUploadAnnotations(false);
     setSelectedAnnotatorId(null);
-    setAnnotatedCheck(null);
-    setAnnotatedCheckLoading(false);
   };
 
   useEffect(() => {
@@ -191,53 +193,7 @@ export function BulkUploadSttItemsDialog({
     setParsedItems([]);
     setParseError(null);
     setCsvFile(null);
-    setAnnotatedCheck(null);
   }, [uploadAnnotations]);
-
-  useEffect(() => {
-    if (
-      !uploadAnnotations ||
-      !selectedAnnotatorId ||
-      parsedItems.length === 0
-    ) {
-      setAnnotatedCheck(null);
-      setAnnotatedCheckLoading(false);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      setAnnotatedCheckLoading(true);
-      setAnnotatedCheck(null);
-      try {
-        const result = await apiClient<AnnotatedCheckResult>(
-          `/annotation-tasks/${taskUuid}/items/annotated-check`,
-          accessToken,
-          {
-            method: "POST",
-            body: {
-              annotator_id: selectedAnnotatorId,
-              names: parsedItems.map((p) => p.name),
-            },
-          },
-        );
-        if (!cancelled) setAnnotatedCheck(result);
-      } catch {
-        // Don't block the upload if the check fails — just hide the warnings.
-        if (!cancelled) setAnnotatedCheck(null);
-      } finally {
-        if (!cancelled) setAnnotatedCheckLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    uploadAnnotations,
-    selectedAnnotatorId,
-    parsedItems,
-    taskUuid,
-    accessToken,
-  ]);
 
   const handleFile = (file: File | null) => {
     setUploadError(null);
@@ -465,42 +421,12 @@ export function BulkUploadSttItemsDialog({
     ].join(" "),
   };
 
-  const existingNoAnnotationIndices = new Set(
-    annotatedCheck?.existing_without_annotations.map((e) => e.index) ?? [],
-  );
-  const existingWithAnnotationIndices = new Set(
-    annotatedCheck?.existing_with_annotations.map((e) => e.index) ?? [],
-  );
-
   const itemsPreview = (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium text-foreground">
-          {parsedItems.length} {parsedItems.length === 1 ? "item" : "items"}{" "}
-          ready to upload
-        </p>
-        {annotatedCheckLoading && (
-          <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-            <svg
-              className="w-3.5 h-3.5 animate-spin"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
-              />
-            </svg>
-            Checking for existing items…
-          </span>
-        )}
-      </div>
-      <div className="border border-border rounded-xl overflow-hidden">
-        <div className="overflow-auto max-h-[20rem]">
-          <div className="min-w-max">
+    <BulkUploadItemsPreviewShell
+      itemCount={parsedItems.length}
+      annotatedCheckLoading={annotatedCheckLoading}
+      annotatedCheck={annotatedCheck}
+    >
             <div
               className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
               style={sttGridStyle}
@@ -525,20 +451,10 @@ export function BulkUploadSttItemsDialog({
               ))}
             </div>
             <div className="divide-y divide-border">
-              {parsedItems.slice(0, 50).map((p, idx) => {
-                const isExistingNoAnnotation =
-                  existingNoAnnotationIndices.has(idx);
-                const isExistingWithAnnotation =
-                  existingWithAnnotationIndices.has(idx);
-                const rowBg = isExistingWithAnnotation
-                  ? "bg-red-500/10"
-                  : isExistingNoAnnotation
-                    ? "bg-amber-500/10"
-                    : "";
-                return (
+              {parsedItems.slice(0, 50).map((p, idx) => (
                   <div
                     key={idx}
-                    className={`grid gap-2 px-3 py-2 text-xs items-start ${rowBg}`}
+                    className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
                     style={sttGridStyle}
                   >
                     <div className="truncate text-foreground" title={p.name}>
@@ -582,45 +498,14 @@ export function BulkUploadSttItemsDialog({
                       );
                     })}
                   </div>
-                );
-              })}
+              ))}
               {parsedItems.length > 50 && (
                 <div className="px-4 py-2 text-xs text-muted-foreground">
                   + {parsedItems.length - 50} more rows
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      </div>
-      {existingNoAnnotationIndices.size > 0 && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-foreground">
-          <span className="mt-0.5 shrink-0 inline-block w-2.5 h-2.5 rounded-sm bg-amber-500/60" />
-          <span>
-            Rows highlighted in{" "}
-            <span className="font-semibold text-amber-700 dark:text-amber-400">
-              amber
-            </span>{" "}
-            match names of existing items — annotations will be attached to
-            those existing items. The original item remains unchanged.
-          </span>
-        </div>
-      )}
-      {existingWithAnnotationIndices.size > 0 && (
-        <div className="flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-xs text-foreground">
-          <span className="mt-0.5 shrink-0 inline-block w-2.5 h-2.5 rounded-sm bg-red-500/60" />
-          <span>
-            Rows highlighted in{" "}
-            <span className="font-semibold text-red-700 dark:text-red-400">
-              red
-            </span>{" "}
-            match names of existing items that already have annotations from
-            this annotator — those annotations will be replaced with the new
-            ones. The original item remains unchanged.
-          </span>
-        </div>
-      )}
-    </div>
+    </BulkUploadItemsPreviewShell>
   );
 
   const annotationOptIn =
