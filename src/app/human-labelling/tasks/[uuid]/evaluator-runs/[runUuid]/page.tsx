@@ -316,6 +316,16 @@ function computeEvaluatorHumanAgreement(
   return comparable > 0 ? aligned / comparable : null;
 }
 
+/** Row included in spreadsheet export when humans labelled this slot and `agreement` (evaluator ↔ human consensus) is below 100%. */
+function isBelowFullEvaluatorAgreement(
+  evHumanData: HumanAgreementItemEvaluator | undefined,
+): boolean {
+  if (!evHumanData || evHumanData.human_annotations.length === 0)
+    return false;
+  const ag = evHumanData.agreement;
+  return typeof ag === "number" && ag < 1;
+}
+
 function agreementExportCell(
   fromApi: number | null | undefined,
   computed: number | null,
@@ -663,7 +673,7 @@ export default function EvaluatorRunDetailPage() {
   };
 
   const handleExport = useCallback(async () => {
-    const exportItems = filteredItemsForRun;
+    const exportItems = itemsForRun;
     if (!job || !task || exportItems.length === 0) return;
     setExporting(true);
     setExportError(null);
@@ -680,9 +690,16 @@ export default function EvaluatorRunDetailPage() {
         const rawSheetName = versionLabel ? `${evName} ${versionLabel}` : evName;
         const sheetName = rawSheetName.replace(/[:\\/?*[\]]/g, "_").slice(0, 31);
 
-        // Collect all variable names for this evaluator across all items
+        // Collect variable names across exported rows only (this sheet: agreement < 100%)
         const allVarNames = new Set<string>();
         for (const item of exportItems) {
+          const haItem = job.human_agreement?.items.find(
+            (i) => i.item_id === item.uuid,
+          );
+          const evHumanData = haItem?.evaluators.find(
+            (e) => e.evaluator_id === ev.evaluator_id,
+          );
+          if (!isBelowFullEvaluatorAgreement(evHumanData)) continue;
           const vars = extractEvaluatorVariables(item.payload);
           for (const k of Object.keys(vars[ev.evaluator_id] ?? {})) {
             allVarNames.add(k);
@@ -727,6 +744,14 @@ export default function EvaluatorRunDetailPage() {
         const rows: unknown[][] = [header];
 
         for (const item of exportItems) {
+          const haItem = job.human_agreement?.items.find(
+            (i) => i.item_id === item.uuid,
+          );
+          const evHumanData = haItem?.evaluators.find(
+            (e) => e.evaluator_id === ev.evaluator_id,
+          );
+          if (!isBelowFullEvaluatorAgreement(evHumanData)) continue;
+
           const inputValues = extractPayloadInputValues(
             item.payload,
             task.type,
@@ -750,12 +775,6 @@ export default function EvaluatorRunDetailPage() {
             evReasoning = typeof reas === "string" ? reas : "";
           }
 
-          const haItem = job.human_agreement?.items.find(
-            (i) => i.item_id === item.uuid,
-          );
-          const evHumanData = haItem?.evaluators.find(
-            (e) => e.evaluator_id === ev.evaluator_id,
-          );
           const outputType = runOutputType(run);
           const humanAgCell = agreementExportCell(
             evHumanData?.human_agreement,
@@ -819,7 +838,7 @@ export default function EvaluatorRunDetailPage() {
     } finally {
       setExporting(false);
     }
-  }, [job, task, filteredItemsForRun, runsByItem, versionLabels, evaluatorNamesById]);
+  }, [job, task, itemsForRun, runsByItem, versionLabels, evaluatorNamesById]);
 
   return (
     <AppLayout
