@@ -1899,7 +1899,6 @@ function LabellingTaskPageInner() {
               : (() => {
                   const annotators = taskSummary.annotators ?? [];
                   const evaluators = taskSummary.evaluators ?? [];
-                  const summaryTaskType = taskSummary.task_type;
                   const itemColumns = [{ key: "name", label: "Name" }];
                   const itemColTpl = "200px";
                   const longestEvalName =

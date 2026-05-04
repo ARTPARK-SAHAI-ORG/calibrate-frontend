@@ -254,9 +254,9 @@ export function BulkUploadSttItemsDialog({
         const nameKey = findHeaderKey(headers, NAME_HEADERS);
         const refKey = findHeaderKey(headers, REFERENCE_HEADERS);
         const predKey = findHeaderKey(headers, PREDICTED_HEADERS);
-        if (!refKey || !predKey) {
+        if (!nameKey || !refKey || !predKey) {
           setParseError(
-            `CSV must include "reference_transcript" and "predicted_transcript" columns. Found: ${headers.join(", ") || "(none)"}`,
+            `CSV must include "name", "reference_transcript" and "predicted_transcript" columns. Found: ${headers.join(", ") || "(none)"}`,
           );
           return;
         }
@@ -286,13 +286,17 @@ export function BulkUploadSttItemsDialog({
         const items: ParsedItem[] = [];
         for (let i = 0; i < results.data.length; i++) {
           const r = results.data[i];
-          const name = nameKey ? (r[nameKey] ?? "").trim() : "";
+          const name = (r[nameKey] ?? "").trim();
           const reference_transcript = (r[refKey] ?? "").trim();
           const predicted_transcript = (r[predKey] ?? "").trim();
-          if (!reference_transcript && !predicted_transcript) continue;
+          if (!name && !reference_transcript && !predicted_transcript) continue;
+          if (!name) {
+            setParseError(`Row ${i + 1}: "name" is required.`);
+            return;
+          }
           if (!reference_transcript || !predicted_transcript) {
             setParseError(
-              "Every row must have both a reference and a predicted transcript.",
+              `Row ${i + 1}: both "reference_transcript" and "predicted_transcript" are required.`,
             );
             return;
           }
@@ -365,7 +369,7 @@ export function BulkUploadSttItemsDialog({
           : undefined;
         return {
           payload: {
-            ...(p.name ? { name: p.name } : {}),
+            name: p.name,
             reference_transcript: p.reference_transcript,
             predicted_transcript: p.predicted_transcript,
           },
@@ -394,7 +398,7 @@ export function BulkUploadSttItemsDialog({
     const columns: GuidelineColumn[] = [
       {
         name: "name",
-        description: "(optional) A display name or label for the item.",
+        description: "Required. A unique name for the item.",
       },
       {
         name: "reference_transcript",

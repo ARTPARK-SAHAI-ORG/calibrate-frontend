@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { humaniseDetailObject } from "./bulk-upload-shared";
 
 type SttRowDraft = {
   id: string;
@@ -30,35 +31,6 @@ type AddSttItemsDialogProps = {
   onClose: () => void;
   onSubmit: (rows: SttItemRowSubmission[]) => Promise<void> | void;
 };
-
-function humaniseDetailObject(detail: {
-  code?: string;
-  conflicting_names?: string[];
-}): string | null {
-  const names = detail.conflicting_names ?? [];
-  const fmt =
-    names.length === 0
-      ? null
-      : names.length === 1
-        ? `"${names[0]}"`
-        : names.map((n) => `"${n}"`).join(", ");
-
-  if (detail.code === "ITEM_NAME_CONFLICT") {
-    return fmt
-      ? names.length === 1
-        ? `An item named ${fmt} already exists in this task.`
-        : `Items with these names already exist in this task: ${fmt}.`
-      : "One or more item names already exist in this task.";
-  }
-  if (detail.code === "ITEM_NAME_DUPLICATE_IN_REQUEST") {
-    return fmt
-      ? names.length === 1
-        ? `Duplicate name in your request: ${fmt}.`
-        : `Duplicate names in your request: ${fmt}.`
-      : "Your request contains duplicate item names.";
-  }
-  return null;
-}
 
 function extractApiError(err: unknown, fallback: string): string {
   if (!(err instanceof Error)) return fallback;

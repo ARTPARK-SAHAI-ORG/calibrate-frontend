@@ -342,7 +342,7 @@ export function EvaluatorAnnotationColumnsHelp({
 
 // ─── Shared helpers ───────────────────────────────────────────────────────
 
-function humaniseDetailObject(detail: {
+export function humaniseDetailObject(detail: {
   code?: string;
   conflicting_names?: string[];
 }): string | null {

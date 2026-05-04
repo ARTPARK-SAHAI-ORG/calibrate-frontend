@@ -638,7 +638,7 @@ function AnnotateView({
           </div>
         </div>
         {/* Desktop: sidebar whose height is defined by the main pane, not its own content */}
-        <div className={`hidden md:block relative w-20 flex-shrink-0 border-r border-border bg-muted/20 ${fillViewport ? "" : ""}`}>
+        <div className="hidden md:block relative w-20 flex-shrink-0 border-r border-border bg-muted/20">
           <div className="absolute inset-0 overflow-y-auto">
             <div className="p-3 grid grid-cols-1 gap-2">
               {items.map((it, i) => {
