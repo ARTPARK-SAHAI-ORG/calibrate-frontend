@@ -993,9 +993,11 @@ export default function EvaluatorRunDetailPage() {
                           key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
                           href={`/evaluators/${e.evaluator_id}`}
                           title={`Open ${name}`}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-sm font-semibold border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1 flex-wrap px-2 py-0.5 rounded-md text-sm font-semibold border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer shrink-0 text-left"
                         >
-                          <span>{name}</span>
+                          <span className="break-words whitespace-normal">
+                            {name}
+                          </span>
                           {label && (
                             <span className="font-mono text-[11px] text-muted-foreground">
                               {label}

@@ -13,6 +13,10 @@ export function agreementColor(v: number | null | undefined): string {
 const agreementStatPillBase =
   "inline-flex items-center max-w-full min-w-0 px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground";
 
+/** Evaluator name pills should show in full (wrap / grow); avoid min-w-0 + truncate. */
+const evaluatorAgreementPillLink =
+  "inline-flex items-center gap-1 flex-wrap px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground shrink-0 text-left";
+
 export function AgreementStatCard(
   props:
     | {
@@ -32,7 +36,7 @@ export function AgreementStatCard(
 ) {
   const { value, valueClassName = "" } = props;
   return (
-    <div className="border border-border rounded-lg px-4 py-3 bg-background min-w-[160px] shrink-0">
+    <div className="border border-border rounded-lg px-4 py-3 bg-background min-w-[160px] w-max shrink-0">
       {"staticPillText" in props ? (
         <span
           className={`${agreementStatPillBase} cursor-default`}
@@ -44,10 +48,12 @@ export function AgreementStatCard(
         <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <Link
             href={props.evaluatorPill.href}
-            className={`${agreementStatPillBase} gap-1 hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
+            className={`${evaluatorAgreementPillLink} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
             title={`Open ${props.evaluatorPill.name}`}
           >
-            <span className="truncate">{props.evaluatorPill.name}</span>
+            <span className="break-words whitespace-normal">
+              {props.evaluatorPill.name}
+            </span>
             {props.evaluatorPill.versionLabel && (
               <span className="font-mono text-[11px] text-muted-foreground">
                 {props.evaluatorPill.versionLabel}
