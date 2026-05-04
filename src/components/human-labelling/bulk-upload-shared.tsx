@@ -377,6 +377,7 @@ export function parseApiError(err: unknown, fallback: string): string {
   if (m) {
     try {
       const parsed = JSON.parse(m[1]);
+      if (typeof parsed?.detail === "string") return parsed.detail;
       if (parsed?.detail && typeof parsed.detail === "object") {
         const msg = humaniseDetailObject(parsed.detail);
         if (msg) return msg;
