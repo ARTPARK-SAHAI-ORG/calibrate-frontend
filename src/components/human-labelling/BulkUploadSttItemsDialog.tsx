@@ -21,6 +21,7 @@ import {
   useAnnotators,
 } from "./bulk-upload-shared";
 
+const NAME_HEADERS = ["name", "title", "label", "item_name"];
 const REFERENCE_HEADERS = [
   "reference_transcript",
   "reference",
@@ -41,21 +42,25 @@ function csvEscape(s: string): string {
 }
 
 const SAMPLE_STT_BASE_ROWS: Array<{
+  name: string;
   ref: string;
   pred: string;
   reasoning: string;
 }> = [
   {
+    name: "Greeting",
     ref: "Hello, how are you today?",
     pred: "hello how are you today",
     reasoning: "Punctuation is missing but the words match.",
   },
   {
+    name: "Flight booking",
     ref: "I would like to book a flight.",
     pred: "I'd like to book a flight",
     reasoning: "",
   },
   {
+    name: "Repeat request",
     ref: "Can you repeat that, please?",
     pred: "can you repeat that please",
     reasoning: "",
@@ -67,6 +72,7 @@ function buildSampleSttCsv(
   includeAnnotations: boolean,
 ): string {
   const headerCells = [
+    "name",
     "reference_transcript",
     "predicted_transcript",
     ...(includeAnnotations
@@ -78,6 +84,7 @@ function buildSampleSttCsv(
   ];
   const lines = SAMPLE_STT_BASE_ROWS.map((r) =>
     [
+      csvEscape(r.name),
       csvEscape(r.ref),
       csvEscape(r.pred),
       ...(includeAnnotations
@@ -92,9 +99,16 @@ function buildSampleSttCsv(
 }
 
 type ParsedItem = {
+  name: string;
   reference_transcript: string;
   predicted_transcript: string;
   annotations: ParsedAnnotation[];
+};
+
+type AnnotatedCheckResult = {
+  all_new: boolean;
+  existing_with_annotations: { index: number; name: string }[];
+  existing_without_annotations: { index: number; name: string }[];
 };
 
 export type SttLinkedEvaluator = {
@@ -131,6 +145,9 @@ export function BulkUploadSttItemsDialog({
   const [selectedAnnotatorId, setSelectedAnnotatorId] = useState<string | null>(
     null,
   );
+  const [annotatedCheck, setAnnotatedCheck] =
+    useState<AnnotatedCheckResult | null>(null);
+  const [annotatedCheckLoading, setAnnotatedCheckLoading] = useState(false);
   const annotatorsState = useAnnotators(isOpen, accessToken);
 
   const annotationEvaluatorsMeta: EvaluatorMeta[] = linkedEvaluators.map(
@@ -162,6 +179,8 @@ export function BulkUploadSttItemsDialog({
     setUploadError(null);
     setUploadAnnotations(false);
     setSelectedAnnotatorId(null);
+    setAnnotatedCheck(null);
+    setAnnotatedCheckLoading(false);
   };
 
   useEffect(() => {
@@ -172,8 +191,53 @@ export function BulkUploadSttItemsDialog({
     setParsedItems([]);
     setParseError(null);
     setCsvFile(null);
+    setAnnotatedCheck(null);
   }, [uploadAnnotations]);
 
+  useEffect(() => {
+    if (
+      !uploadAnnotations ||
+      !selectedAnnotatorId ||
+      parsedItems.length === 0
+    ) {
+      setAnnotatedCheck(null);
+      setAnnotatedCheckLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setAnnotatedCheckLoading(true);
+      setAnnotatedCheck(null);
+      try {
+        const result = await apiClient<AnnotatedCheckResult>(
+          `/annotation-tasks/${taskUuid}/items/annotated-check`,
+          accessToken,
+          {
+            method: "POST",
+            body: {
+              annotator_id: selectedAnnotatorId,
+              names: parsedItems.map((p) => p.name),
+            },
+          },
+        );
+        if (!cancelled) setAnnotatedCheck(result);
+      } catch {
+        // Don't block the upload if the check fails — just hide the warnings.
+        if (!cancelled) setAnnotatedCheck(null);
+      } finally {
+        if (!cancelled) setAnnotatedCheckLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    uploadAnnotations,
+    selectedAnnotatorId,
+    parsedItems,
+    taskUuid,
+    accessToken,
+  ]);
 
   const handleFile = (file: File | null) => {
     setUploadError(null);
@@ -187,11 +251,12 @@ export function BulkUploadSttItemsDialog({
       transformHeader: (h) => h.trim(),
       complete: (results) => {
         const headers = results.meta.fields ?? [];
+        const nameKey = findHeaderKey(headers, NAME_HEADERS);
         const refKey = findHeaderKey(headers, REFERENCE_HEADERS);
         const predKey = findHeaderKey(headers, PREDICTED_HEADERS);
-        if (!refKey || !predKey) {
+        if (!nameKey || !refKey || !predKey) {
           setParseError(
-            `CSV must include "reference_transcript" and "predicted_transcript" columns. Found: ${headers.join(", ") || "(none)"}`,
+            `CSV must include "name", "reference_transcript" and "predicted_transcript" columns. Found: ${headers.join(", ") || "(none)"}`,
           );
           return;
         }
@@ -221,19 +286,27 @@ export function BulkUploadSttItemsDialog({
         const items: ParsedItem[] = [];
         for (let i = 0; i < results.data.length; i++) {
           const r = results.data[i];
+          const name = (r[nameKey] ?? "").trim();
           const reference_transcript = (r[refKey] ?? "").trim();
           const predicted_transcript = (r[predKey] ?? "").trim();
-          if (!reference_transcript && !predicted_transcript) continue;
+          if (!name && !reference_transcript && !predicted_transcript) continue;
+          if (!name) {
+            setParseError(`Row ${i + 1}: "name" is required.`);
+            return;
+          }
           if (!reference_transcript || !predicted_transcript) {
             setParseError(
-              "Every row must have both a reference and a predicted transcript.",
+              `Row ${i + 1}: both "reference_transcript" and "predicted_transcript" are required.`,
             );
             return;
           }
           const annotations: ParsedAnnotation[] = [];
           if (uploadAnnotations) {
             for (const meta of annotationEvaluatorsMeta) {
-              if (meta.output_type !== "binary" && meta.output_type !== "rating")
+              if (
+                meta.output_type !== "binary" &&
+                meta.output_type !== "rating"
+              )
                 continue;
               const valueHeader = evaluatorValueColumn(meta.name);
               const reasoningHeader = evaluatorReasoningColumn(meta.name);
@@ -259,6 +332,7 @@ export function BulkUploadSttItemsDialog({
             }
           }
           items.push({
+            name,
             reference_transcript,
             predicted_transcript,
             annotations,
@@ -295,6 +369,7 @@ export function BulkUploadSttItemsDialog({
           : undefined;
         return {
           payload: {
+            name: p.name,
             reference_transcript: p.reference_transcript,
             predicted_transcript: p.predicted_transcript,
           },
@@ -321,6 +396,10 @@ export function BulkUploadSttItemsDialog({
 
   const buildGuidelines = (): GuidelineDoc => {
     const columns: GuidelineColumn[] = [
+      {
+        name: "name",
+        description: "Required. A unique name for the item.",
+      },
       {
         name: "reference_transcript",
         description: "What was actually said.",
@@ -377,98 +456,170 @@ export function BulkUploadSttItemsDialog({
       : [];
   const sttGridStyle = {
     gridTemplateColumns: [
+      "minmax(80px, 140px)",
       "minmax(120px, 200px)",
       "minmax(120px, 200px)",
       ...annotationColumns.map((c) =>
-        c.kind === "value"
-          ? "minmax(64px, 88px)"
-          : "minmax(100px, 176px)",
+        c.kind === "value" ? "minmax(64px, 88px)" : "minmax(100px, 176px)",
       ),
     ].join(" "),
   };
 
+  const existingNoAnnotationIndices = new Set(
+    annotatedCheck?.existing_without_annotations.map((e) => e.index) ?? [],
+  );
+  const existingWithAnnotationIndices = new Set(
+    annotatedCheck?.existing_with_annotations.map((e) => e.index) ?? [],
+  );
+
   const itemsPreview = (
     <div className="space-y-2">
-      <p className="text-sm font-medium text-foreground">
-        {parsedItems.length} {parsedItems.length === 1 ? "item" : "items"} ready
-        to upload
-      </p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium text-foreground">
+          {parsedItems.length} {parsedItems.length === 1 ? "item" : "items"}{" "}
+          ready to upload
+        </p>
+        {annotatedCheckLoading && (
+          <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <svg
+              className="w-3.5 h-3.5 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
+              />
+            </svg>
+            Checking for existing items…
+          </span>
+        )}
+      </div>
       <div className="border border-border rounded-xl overflow-hidden">
         <div className="overflow-auto max-h-[20rem]">
           <div className="min-w-max">
-          <div
-            className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
-            style={sttGridStyle}
-          >
-            <div className="text-xs font-medium text-muted-foreground">
-              Reference transcript
-            </div>
-            <div className="text-xs font-medium text-muted-foreground">
-              Predicted transcript
-            </div>
-            {annotationColumns.map((c) => (
-              <div
-                key={`ah-${c.evaluatorUuid}-${c.kind}`}
-                className="text-xs font-medium text-muted-foreground font-mono truncate"
-                title={c.header}
-              >
-                {c.header}
+            <div
+              className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
+              style={sttGridStyle}
+            >
+              <div className="text-xs font-medium text-muted-foreground">
+                Name
               </div>
-            ))}
-          </div>
-          <div className="divide-y divide-border">
-            {parsedItems.slice(0, 50).map((p, idx) => (
-              <div
-                key={idx}
-                className="grid gap-2 px-3 py-2 text-xs items-start"
-                style={sttGridStyle}
-              >
+              <div className="text-xs font-medium text-muted-foreground">
+                Reference transcript
+              </div>
+              <div className="text-xs font-medium text-muted-foreground">
+                Predicted transcript
+              </div>
+              {annotationColumns.map((c) => (
                 <div
-                  className="truncate text-foreground"
-                  title={p.reference_transcript}
+                  key={`ah-${c.evaluatorUuid}-${c.kind}`}
+                  className="text-xs font-medium text-muted-foreground font-mono truncate"
+                  title={c.header}
                 >
-                  {p.reference_transcript}
+                  {c.header}
                 </div>
-                <div
-                  className="truncate text-foreground"
-                  title={p.predicted_transcript}
-                >
-                  {p.predicted_transcript}
-                </div>
-                {annotationColumns.map((c) => {
-                  const ann = p.annotations.find(
-                    (a) => a.evaluator_uuid === c.evaluatorUuid,
-                  );
-                  const display =
-                    c.kind === "value"
-                      ? ann
-                        ? typeof ann.value === "boolean"
-                          ? ann.value
-                            ? "true"
-                            : "false"
-                          : String(ann.value)
-                        : ""
-                      : (ann?.reasoning ?? "");
-                  return (
-                    <div
-                      key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
-                      className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
-                    >
-                      {display}
+              ))}
+            </div>
+            <div className="divide-y divide-border">
+              {parsedItems.slice(0, 50).map((p, idx) => {
+                const isExistingNoAnnotation =
+                  existingNoAnnotationIndices.has(idx);
+                const isExistingWithAnnotation =
+                  existingWithAnnotationIndices.has(idx);
+                const rowBg = isExistingWithAnnotation
+                  ? "bg-red-500/10"
+                  : isExistingNoAnnotation
+                    ? "bg-amber-500/10"
+                    : "";
+                return (
+                  <div
+                    key={idx}
+                    className={`grid gap-2 px-3 py-2 text-xs items-start ${rowBg}`}
+                    style={sttGridStyle}
+                  >
+                    <div className="truncate text-foreground" title={p.name}>
+                      {p.name || (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-            ))}
-            {parsedItems.length > 50 && (
-              <div className="px-4 py-2 text-xs text-muted-foreground">
-                + {parsedItems.length - 50} more rows
-              </div>
-            )}
-          </div>
+                    <div
+                      className="truncate text-foreground"
+                      title={p.reference_transcript}
+                    >
+                      {p.reference_transcript}
+                    </div>
+                    <div
+                      className="truncate text-foreground"
+                      title={p.predicted_transcript}
+                    >
+                      {p.predicted_transcript}
+                    </div>
+                    {annotationColumns.map((c) => {
+                      const ann = p.annotations.find(
+                        (a) => a.evaluator_uuid === c.evaluatorUuid,
+                      );
+                      const display =
+                        c.kind === "value"
+                          ? ann
+                            ? typeof ann.value === "boolean"
+                              ? ann.value
+                                ? "true"
+                                : "false"
+                              : String(ann.value)
+                            : ""
+                          : (ann?.reasoning ?? "");
+                      return (
+                        <div
+                          key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
+                          className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                        >
+                          {display}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+              {parsedItems.length > 50 && (
+                <div className="px-4 py-2 text-xs text-muted-foreground">
+                  + {parsedItems.length - 50} more rows
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
+      {existingNoAnnotationIndices.size > 0 && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-foreground">
+          <span className="mt-0.5 shrink-0 inline-block w-2.5 h-2.5 rounded-sm bg-amber-500/60" />
+          <span>
+            Rows highlighted in{" "}
+            <span className="font-semibold text-amber-700 dark:text-amber-400">
+              amber
+            </span>{" "}
+            match names of existing items — annotations will be attached to
+            those existing items. The original item remains unchanged.
+          </span>
+        </div>
+      )}
+      {existingWithAnnotationIndices.size > 0 && (
+        <div className="flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-xs text-foreground">
+          <span className="mt-0.5 shrink-0 inline-block w-2.5 h-2.5 rounded-sm bg-red-500/60" />
+          <span>
+            Rows highlighted in{" "}
+            <span className="font-semibold text-red-700 dark:text-red-400">
+              red
+            </span>{" "}
+            match names of existing items that already have annotations from
+            this annotator — those annotations will be replaced with the new
+            ones. The original item remains unchanged.
+          </span>
+        </div>
+      )}
     </div>
   );
 
@@ -487,16 +638,14 @@ export function BulkUploadSttItemsDialog({
         {uploadAnnotations && duplicateNames.length > 0 && (
           <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
             Two or more linked evaluators share the same name (
-            {duplicateNames.map((n) => `"${n}"`).join(", ")}). Rename one
-            on the evaluators page before uploading annotations.
+            {duplicateNames.map((n) => `"${n}"`).join(", ")}). Rename one on the
+            evaluators page before uploading annotations.
           </div>
         )}
         {uploadAnnotations && evaluatorsMissingOutputType.length > 0 && (
           <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
             Annotation upload isn&apos;t available — evaluator(s){" "}
-            {evaluatorsMissingOutputType
-              .map((e) => `"${e.name}"`)
-              .join(", ")}{" "}
+            {evaluatorsMissingOutputType.map((e) => `"${e.name}"`).join(", ")}{" "}
             have no binary/rating output configured.
           </div>
         )}

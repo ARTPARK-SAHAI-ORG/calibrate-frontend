@@ -5,6 +5,8 @@ export function SttItemPane({
 }: {
   payload: Record<string, unknown>;
 }) {
+  const name =
+    typeof payload.name === "string" ? (payload.name as string) : "";
   const reference =
     typeof payload.reference_transcript === "string"
       ? (payload.reference_transcript as string)
@@ -15,6 +17,9 @@ export function SttItemPane({
       : "";
   return (
     <div className="space-y-4">
+      {name && (
+        <p className="text-sm font-semibold text-foreground">{name}</p>
+      )}
       <Section
         title="Reference transcript"
         subtitle="What the speaker actually said"

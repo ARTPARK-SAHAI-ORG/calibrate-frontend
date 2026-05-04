@@ -342,13 +342,46 @@ export function EvaluatorAnnotationColumnsHelp({
 
 // ─── Shared helpers ───────────────────────────────────────────────────────
 
+export function humaniseDetailObject(detail: {
+  code?: string;
+  conflicting_names?: string[];
+}): string | null {
+  const names = detail.conflicting_names ?? [];
+  const fmt =
+    names.length === 0
+      ? null
+      : names.length === 1
+        ? `"${names[0]}"`
+        : names.map((n) => `"${n}"`).join(", ");
+
+  if (detail.code === "ITEM_NAME_CONFLICT") {
+    return fmt
+      ? names.length === 1
+        ? `An item named ${fmt} already exists in this task.`
+        : `Items with these names already exist in this task: ${fmt}.`
+      : "One or more item names already exist in this task.";
+  }
+  if (detail.code === "ITEM_NAME_DUPLICATE_IN_REQUEST") {
+    return fmt
+      ? names.length === 1
+        ? `Duplicate name in your request: ${fmt}.`
+        : `Duplicate names in your request: ${fmt}.`
+      : "Your request contains duplicate item names.";
+  }
+  return null;
+}
+
 export function parseApiError(err: unknown, fallback: string): string {
   if (!(err instanceof Error)) return fallback;
   const m = err.message.match(/Request failed: \d+ - (.+)$/);
   if (m) {
     try {
       const parsed = JSON.parse(m[1]);
-      if (parsed && typeof parsed.detail === "string") return parsed.detail;
+      if (typeof parsed?.detail === "string") return parsed.detail;
+      if (parsed?.detail && typeof parsed.detail === "object") {
+        const msg = humaniseDetailObject(parsed.detail);
+        if (msg) return msg;
+      }
     } catch {
       // not JSON — fall through to the captured message
     }
@@ -925,16 +958,42 @@ export function BulkUploadDialogShell({
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           {topContent}
           {!hideUploadSection && (
-          <div>
-            {itemCount === 0 && (
-              <div className="mb-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={downloadGuidelines}
-                  className="h-9 px-3 rounded-md text-xs font-semibold border border-blue-500/40 bg-blue-500/15 text-blue-700 dark:text-blue-300 hover:bg-blue-500/25 hover:border-blue-500/60 transition-colors cursor-pointer flex items-center gap-1.5"
-                >
+            <div>
+              {itemCount === 0 && (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={downloadGuidelines}
+                    className="h-9 px-3 rounded-md text-xs font-semibold border border-blue-500/40 bg-blue-500/15 text-blue-700 dark:text-blue-300 hover:bg-blue-500/25 hover:border-blue-500/60 transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                      />
+                    </svg>
+                    Download CSV format guidelines
+                  </button>
+                </div>
+              )}
+
+              <CsvDropzone
+                csvFile={csvFile}
+                onFile={onFile}
+                onClear={onClear}
+              />
+
+              {itemCount === 0 && (
+                <div className="mt-3 flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-foreground">
                   <svg
-                    className="w-4 h-4"
+                    className="w-4 h-4 mt-0.5 shrink-0 text-emerald-500"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -943,49 +1002,27 @@ export function BulkUploadDialogShell({
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                      d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"
                     />
                   </svg>
-                  Download CSV format guidelines
-                </button>
-              </div>
-            )}
+                  <span>
+                    <span className="font-semibold">Tip:</span>{" "}
+                    <button
+                      type="button"
+                      onClick={downloadSample}
+                      className="underline underline-offset-2 font-semibold text-emerald-700 dark:text-emerald-300 hover:opacity-80 transition-opacity cursor-pointer"
+                    >
+                      download the sample CSV
+                    </button>{" "}
+                    and edit it as a starting point
+                  </span>
+                </div>
+              )}
 
-            <CsvDropzone csvFile={csvFile} onFile={onFile} onClear={onClear} />
-
-            {itemCount === 0 && (
-              <div className="mt-3 flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-foreground">
-                <svg
-                  className="w-4 h-4 mt-0.5 shrink-0 text-emerald-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"
-                  />
-                </svg>
-                <span>
-                  <span className="font-semibold">Tip:</span>{" "}
-                  <button
-                    type="button"
-                    onClick={downloadSample}
-                    className="underline underline-offset-2 font-semibold text-emerald-700 dark:text-emerald-300 hover:opacity-80 transition-opacity cursor-pointer"
-                  >
-                    download the sample CSV
-                  </button>{" "}
-                  and edit it as a starting point
-                </span>
-              </div>
-            )}
-
-            {parseError && (
-              <p className="text-xs text-red-500 mt-3">{parseError}</p>
-            )}
-          </div>
+              {parseError && (
+                <p className="text-xs text-red-500 mt-3">{parseError}</p>
+              )}
+            </div>
           )}
 
           {!hideUploadSection && itemCount > 0 && itemsPreview}
@@ -1006,19 +1043,22 @@ export function BulkUploadDialogShell({
             Cancel
           </button>
           {!hideUploadSection && (
-          <button
-            onClick={onUpload}
-            disabled={
-              itemCount === 0 || isUploading || !!parseError || !!uploadBlocked
-            }
-            className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isUploading
-              ? "Uploading"
-              : itemCount > 1
-                ? `Upload ${itemCount} items`
-                : "Upload item"}
-          </button>
+            <button
+              onClick={onUpload}
+              disabled={
+                itemCount === 0 ||
+                isUploading ||
+                !!parseError ||
+                !!uploadBlocked
+              }
+              className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isUploading
+                ? "Uploading"
+                : itemCount > 1
+                  ? `Upload ${itemCount} items`
+                  : "Upload item"}
+            </button>
           )}
         </div>
       </div>
