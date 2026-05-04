@@ -60,7 +60,6 @@ export default function ToolsPage() {
           method: "GET",
           headers: {
             accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
         });
@@ -118,7 +117,6 @@ export default function ToolsPage() {
         method: "DELETE",
         headers: {
           accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
       });

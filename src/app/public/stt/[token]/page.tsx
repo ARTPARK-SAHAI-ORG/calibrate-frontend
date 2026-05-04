@@ -113,7 +113,7 @@ export default function PublicSTTPage() {
         if (!backendUrl) throw new Error("Backend URL not configured");
 
         const res = await fetch(`${backendUrl}/public/stt/${token}`, {
-          headers: { accept: "application/json", "ngrok-skip-browser-warning": "true" },
+          headers: { accept: "application/json" },
         });
 
         if (res.status === 404) { setNotFound(true); return; }

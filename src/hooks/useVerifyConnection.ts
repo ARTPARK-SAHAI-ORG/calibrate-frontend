@@ -74,7 +74,6 @@ export function useVerifyConnection(): VerifyConnectionResult {
             headers: {
               "Content-Type": "application/json",
               accept: "application/json",
-              "ngrok-skip-browser-warning": "true",
               Authorization: `Bearer ${backendAccessToken}`,
             },
             body: JSON.stringify(
@@ -118,7 +117,6 @@ export function useVerifyConnection(): VerifyConnectionResult {
             headers: {
               "Content-Type": "application/json",
               accept: "application/json",
-              "ngrok-skip-browser-warning": "true",
               Authorization: `Bearer ${backendAccessToken}`,
             },
             body: JSON.stringify({

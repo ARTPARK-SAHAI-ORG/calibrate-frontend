@@ -16,7 +16,6 @@ export async function fetchDefaultLLMNextReplyEvaluator(
     method: "GET",
     headers: {
       accept: "application/json",
-      "ngrok-skip-browser-warning": "true",
       Authorization: `Bearer ${accessToken}`,
     },
   });

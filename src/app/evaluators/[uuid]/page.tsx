@@ -148,7 +148,6 @@ export default function EvaluatorDetailPage() {
         const res = await fetch(`${backendUrl}/evaluators/${uuid}`, {
           headers: {
             accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
         });
@@ -207,7 +206,6 @@ export default function EvaluatorDetailPage() {
           headers: {
             accept: "application/json",
             "Content-Type": "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({ version_uuid: versionUuid }),
@@ -222,7 +220,6 @@ export default function EvaluatorDetailPage() {
       const refreshed = await fetch(`${backendUrl}/evaluators/${uuid}`, {
         headers: {
           accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
       });
@@ -264,7 +261,6 @@ export default function EvaluatorDetailPage() {
         headers: {
           accept: "application/json",
           "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
@@ -422,7 +418,6 @@ export default function EvaluatorDetailPage() {
         headers: {
           accept: "application/json",
           "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify(body),
@@ -439,7 +434,6 @@ export default function EvaluatorDetailPage() {
       const refreshed = await fetch(`${backendUrl}/evaluators/${uuid}`, {
         headers: {
           accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
       });

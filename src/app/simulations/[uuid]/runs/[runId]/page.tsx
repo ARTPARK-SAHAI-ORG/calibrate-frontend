@@ -146,7 +146,6 @@ export default function SimulationRunPage() {
         method: "GET",
         headers: {
           accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
       });
@@ -244,7 +243,6 @@ export default function SimulationRunPage() {
           method: "GET",
           headers: {
             accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
         });
@@ -306,7 +304,6 @@ export default function SimulationRunPage() {
           method: "GET",
           headers: {
             accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
         });
@@ -610,7 +607,6 @@ export default function SimulationRunPage() {
           method: "POST",
           headers: {
             accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
         }

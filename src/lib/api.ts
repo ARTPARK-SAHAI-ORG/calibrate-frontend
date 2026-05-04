@@ -23,7 +23,6 @@ export function getBackendUrl(): string {
 export function getDefaultHeaders(accessToken?: string): Record<string, string> {
   const headers: Record<string, string> = {
     accept: "application/json",
-    "ngrok-skip-browser-warning": "true",
   };
   
   if (accessToken) {

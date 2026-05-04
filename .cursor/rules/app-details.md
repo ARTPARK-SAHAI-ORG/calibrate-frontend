@@ -2862,7 +2862,7 @@ const { items, isLoading, isCreating, error, create, update, remove, refetch } =
   });
 ```
 
-**Manual fetch pattern** (used in pages/components that don't use API utilities):
+**Manual fetch pattern** (used in pages/components that don't use API utilities): use `Authorization` + `accept: "application/json"` (and `Content-Type` when sending JSON bodies)—same minimal headers as `getDefaultHeaders`; nothing tunnel-specific.
 
 ```tsx
 import { signOut } from "next-auth/react";
@@ -2878,7 +2878,6 @@ useEffect(() => {
       headers: {
         Authorization: `Bearer ${backendAccessToken}`,
         accept: "application/json",
-        "ngrok-skip-browser-warning": "true",
       },
     });
 
@@ -3854,9 +3853,13 @@ await apiDelete(`/items/${id}`, accessToken);
 
 The API client automatically:
 
-- Adds required headers (Authorization, Content-Type, accept, ngrok-skip-browser-warning)
+- Adds required headers (Authorization, Content-Type, accept)
 - Signs out user on 401 responses
 - Throws errors on non-2xx responses
+
+**How those headers are assembled:** `getDefaultHeaders(accessToken)` sets `accept: application/json` and, when a token is passed, `Authorization: Bearer …`. `apiClient` merges per-call header overrides, then adds `Content-Type: application/json` for JSON bodies if the caller did not supply `Content-Type`. There is **no** tunnel- or vendor-specific header in this path.
+
+**Raw `fetch` elsewhere:** Most pages and dialogs still call `fetch` directly with the same minimal shape as the manual pattern below: `accept: "application/json"`, `Authorization` when the route is authenticated, and `Content-Type` / multipart only when the endpoint requires it. Public token pages use unauthenticated `fetch` with `headers: { accept: "application/json" }` toward `NEXT_PUBLIC_BACKEND_URL`.
 
 ### Custom Hooks (`@/hooks`)
 
@@ -4603,8 +4606,8 @@ Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When ena
   - **Session loading guard**: `useAccessToken()` returns `null` while `useSession()` status is `"loading"`. This prevents a stale localStorage token (from a previous email/password session) from being used before the Google OAuth session finishes loading, which would cause a 401 → signOut that kills the fresh session.
   - **Type gotcha**: `useAccessToken()` returns `string | null`, but some component props expect `string | undefined`. Use nullish coalescing when passing to child components: `backendAccessToken={accessToken ?? undefined}`
   - **Exception**: `src/app/debug-client/page.tsx` still uses `useSession` directly for debugging purposes
-- **ngrok header**: `"ngrok-skip-browser-warning": "true"` header is included automatically by API utilities
 - **Backend URL check**: API utilities will throw an error if `NEXT_PUBLIC_BACKEND_URL` is not set
+- **Tunnel / ngrok**: The frontend does **not** send `ngrok-skip-browser-warning` (or similar) on API requests. If the backend URL is exposed through a tunnel that returns an HTML interstitial or warning document instead of JSON, fix that with tunnel or DNS configuration—do not re-add that header across the codebase. Helpers such as `src/lib/defaultEvaluators.ts` and `src/lib/publicEvaluators.ts` use the same minimal fetch headers as everything else.
 - **Date formatting**: API returns ISO dates; use `toLocaleString()` for display
 - **UTC timestamps**: Backend returns timestamps in UTC without timezone indicator (e.g., `"2026-01-18 10:00:00"`). When parsing for relative time calculations, append `"Z"` to explicitly mark as UTC: `new Date(dateString.replace(" ", "T") + "Z")`. Without this, JavaScript interprets the timestamp as local time, causing incorrect relative times (e.g., "5 hours ago" instead of "just now" for users in IST)
 - **Multiple date formats**: When creating optimistic UI updates (e.g., adding a pending run to a table), use `new Date().toISOString()` which produces `"2026-01-18T09:30:00.000Z"`. The `formatRelativeTime` helper in `TestsTabContent.tsx` handles both formats - check if the string already has a timezone indicator before appending "Z" to avoid invalid dates like `"...ZZ"` which produce NaN

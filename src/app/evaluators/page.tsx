@@ -228,7 +228,6 @@ function MetricsPageInner() {
             method: "GET",
             headers: {
               accept: "application/json",
-              "ngrok-skip-browser-warning": "true",
               Authorization: `Bearer ${backendAccessToken}`,
             },
           },
@@ -287,7 +286,6 @@ function MetricsPageInner() {
           method: "GET",
           headers: {
             accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
         },
@@ -394,7 +392,6 @@ function MetricsPageInner() {
           method: "DELETE",
           headers: {
             accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
         },
@@ -445,7 +442,6 @@ function MetricsPageInner() {
           method: "GET",
           headers: {
             accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
           },
@@ -534,7 +530,6 @@ function MetricsPageInner() {
         headers: {
           accept: "application/json",
           "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
@@ -603,7 +598,6 @@ function MetricsPageInner() {
           method: "GET",
           headers: {
             accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
         },
@@ -1122,7 +1116,6 @@ function DuplicateEvaluatorDialog({
           headers: {
             accept: "application/json",
             "Content-Type": "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({

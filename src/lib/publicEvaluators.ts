@@ -23,7 +23,6 @@ export async function getPublicDefaultEvaluator(
     {
       headers: {
         accept: "application/json",
-        "ngrok-skip-browser-warning": "true",
       },
     },
   );

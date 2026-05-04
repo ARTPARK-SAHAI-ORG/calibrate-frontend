@@ -751,7 +751,6 @@ export function AddToolDialog({
         method: "GET",
         headers: {
           accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
       });
@@ -853,7 +852,6 @@ export function AddToolDialog({
       method: "GET",
       headers: {
         accept: "application/json",
-        "ngrok-skip-browser-warning": "true",
         Authorization: `Bearer ${backendAccessToken}`,
       },
     });
@@ -932,7 +930,6 @@ export function AddToolDialog({
         headers: {
           accept: "application/json",
           "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
@@ -1031,7 +1028,6 @@ export function AddToolDialog({
         headers: {
           accept: "application/json",
           "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({

@@ -259,7 +259,6 @@ export function BulkUploadTestsModal({
             method: "GET",
             headers: {
               accept: "application/json",
-              "ngrok-skip-browser-warning": "true",
               Authorization: `Bearer ${backendAccessToken}`,
             },
           },
@@ -337,7 +336,6 @@ export function BulkUploadTestsModal({
           method: "GET",
           headers: {
             accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
         });
@@ -865,7 +863,6 @@ export function BulkUploadTestsModal({
         headers: {
           accept: "application/json",
           "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify(body),

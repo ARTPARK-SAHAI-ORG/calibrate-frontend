@@ -86,7 +86,6 @@ export default function PersonasPage() {
           method: "GET",
           headers: {
             accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
         });
@@ -146,7 +145,6 @@ export default function PersonasPage() {
           method: "DELETE",
           headers: {
             accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
         }
@@ -203,7 +201,6 @@ export default function PersonasPage() {
         headers: {
           accept: "application/json",
           "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
@@ -231,7 +228,6 @@ export default function PersonasPage() {
         method: "GET",
         headers: {
           accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
       });
@@ -271,7 +267,6 @@ export default function PersonasPage() {
         method: "GET",
         headers: {
           accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
       });
@@ -332,7 +327,6 @@ export default function PersonasPage() {
           headers: {
             accept: "application/json",
             "Content-Type": "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({
@@ -361,7 +355,6 @@ export default function PersonasPage() {
         method: "GET",
         headers: {
           accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
       });

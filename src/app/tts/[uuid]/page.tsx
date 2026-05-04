@@ -219,7 +219,6 @@ export default function TTSEvaluationDetailPage() {
             method: "GET",
             headers: {
               accept: "application/json",
-              "ngrok-skip-browser-warning": "true",
               Authorization: `Bearer ${backendAccessToken}`,
             },
           }
@@ -359,7 +358,6 @@ export default function TTSEvaluationDetailPage() {
               method: "GET",
               headers: {
                 accept: "application/json",
-                "ngrok-skip-browser-warning": "true",
                 Authorization: `Bearer ${backendAccessToken}`,
               },
             });
@@ -416,7 +414,6 @@ export default function TTSEvaluationDetailPage() {
           method: "GET",
           headers: {
             accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
         });
@@ -500,7 +497,6 @@ export default function TTSEvaluationDetailPage() {
         method: "GET",
         headers: {
           accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
       });

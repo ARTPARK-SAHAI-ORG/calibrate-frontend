@@ -78,7 +78,6 @@ export function ShareButton({
         headers: {
           "Content-Type": "application/json",
           accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ is_public: !isPublic }),

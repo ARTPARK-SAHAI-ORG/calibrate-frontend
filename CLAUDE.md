@@ -47,7 +47,7 @@ There is currently no test suite checked in — `jest.config.js` is configured b
 
 **Sign-out must clear all three**: `localStorage` (`access_token`, `user`), the `access_token` cookie, and `signOut()`.
 
-**API client**: `src/lib/api.ts` wraps fetch with default headers (`ngrok-skip-browser-warning`, Bearer token) and auto-signs-out on 401. Prefer it over raw fetch when adding new backend calls.
+**API client**: `src/lib/api.ts` wraps fetch with default headers (Bearer token) and auto-signs-out on 401. Prefer it over raw fetch when adding new backend calls.
 
 **Page skeleton**: every authenticated page is:
 ```tsx

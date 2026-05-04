@@ -126,7 +126,6 @@ async function publicFetch<T>(
     method: init?.method ?? "GET",
     headers: {
       accept: "application/json",
-      "ngrok-skip-browser-warning": "true",
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
     },
     body: init?.body ? JSON.stringify(init.body) : undefined,

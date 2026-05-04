@@ -208,7 +208,6 @@ function LLMPageInner() {
         method: "GET",
         headers: {
           accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
       });
@@ -250,7 +249,6 @@ function LLMPageInner() {
           method: "GET",
           headers: {
             accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
         });
@@ -334,7 +332,6 @@ function LLMPageInner() {
             method: "GET",
             headers: {
               accept: "application/json",
-              "ngrok-skip-browser-warning": "true",
               Authorization: `Bearer ${backendAccessToken}`,
             },
           });
@@ -501,7 +498,6 @@ function LLMPageInner() {
           method: "DELETE",
           headers: {
             accept: "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
         });
@@ -554,7 +550,6 @@ function LLMPageInner() {
           headers: {
             accept: "application/json",
             "Content-Type": "application/json",
-            "ngrok-skip-browser-warning": "true",
             Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({
@@ -624,7 +619,6 @@ function LLMPageInner() {
         headers: {
           accept: "application/json",
           "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify(body),
@@ -644,7 +638,6 @@ function LLMPageInner() {
         method: "GET",
         headers: {
           accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
       });
@@ -687,7 +680,6 @@ function LLMPageInner() {
         method: "GET",
         headers: {
           accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
       });
@@ -781,7 +773,6 @@ function LLMPageInner() {
         headers: {
           accept: "application/json",
           "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify(body),
@@ -801,7 +792,6 @@ function LLMPageInner() {
         method: "GET",
         headers: {
           accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
           Authorization: `Bearer ${backendAccessToken}`,
         },
       });
