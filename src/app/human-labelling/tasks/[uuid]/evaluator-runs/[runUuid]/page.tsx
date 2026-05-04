@@ -238,6 +238,62 @@ function extractEvaluatorVariables(
   return out;
 }
 
+function exportInputCols(taskType: LabellingTaskFull["type"]): string[] {
+  if (taskType === "stt") return ["reference_transcript", "predicted_transcript"];
+  if (taskType === "llm") return ["conversation_history", "agent_response"];
+  return ["transcript"];
+}
+
+function serializeMessages(messages: unknown[]): string {
+  return messages
+    .map((msg) => {
+      if (!msg || typeof msg !== "object") return null;
+      const m = msg as Record<string, unknown>;
+      const role = typeof m.role === "string" ? m.role : "unknown";
+      if (Array.isArray(m.tool_calls) && m.tool_calls.length > 0) {
+        const calls = m.tool_calls
+          .map((tc: unknown) => {
+            if (!tc || typeof tc !== "object") return "";
+            const t = tc as Record<string, unknown>;
+            const fn = t.function as Record<string, unknown> | undefined;
+            return fn ? `${fn.name}(${fn.arguments})` : "";
+          })
+          .join("; ");
+        return `${role} (tool_call): ${calls}`;
+      }
+      const content = typeof m.content === "string" ? m.content : "";
+      return `${role}: ${content}`;
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function extractPayloadInputValues(
+  payload: unknown,
+  taskType: LabellingTaskFull["type"],
+): unknown[] {
+  const p =
+    payload && typeof payload === "object"
+      ? (payload as Record<string, unknown>)
+      : {};
+  if (taskType === "stt") {
+    return [
+      typeof p.reference_transcript === "string" ? p.reference_transcript : "",
+      typeof p.predicted_transcript === "string" ? p.predicted_transcript : "",
+    ];
+  }
+  if (taskType === "llm") {
+    const history = Array.isArray(p.chat_history)
+      ? serializeMessages(p.chat_history)
+      : "";
+    const response =
+      typeof p.agent_response === "string" ? p.agent_response : "";
+    return [history, response];
+  }
+  // simulation
+  return [Array.isArray(p.transcript) ? serializeMessages(p.transcript) : ""];
+}
+
 function annotatorDisplayName(a: {
   annotator_name: string | null;
   annotator_id: string;
@@ -282,6 +338,8 @@ export default function EvaluatorRunDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [filterDisagreements, setFilterDisagreements] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const startTime = useRef(Date.now());
 
   useEffect(() => {
@@ -386,6 +444,11 @@ export default function EvaluatorRunDetailPage() {
     };
   }, [accessToken, evaluatorIdsKey]);
 
+  // Reset item index when the disagreement filter is toggled.
+  useEffect(() => {
+    setCurrentIndex(0);
+  }, [filterDisagreements]);
+
   // Item previews: prefer embedded `job.items` (snapshot, survives soft-delete);
   // otherwise same ordering rules against live `task.items`.
   const itemsForRun: Item[] = (() => {
@@ -415,9 +478,30 @@ export default function EvaluatorRunDetailPage() {
     return task.items;
   })();
 
-  const total = itemsForRun.length;
+  // Whether there is any human agreement data worth filtering by.
+  const hasHumanAgreementData = !!(
+    job?.human_agreement &&
+    job.human_agreement.items.some((item) =>
+      item.evaluators.some((e) => e.human_annotations.length > 0),
+    )
+  );
+
+  // Items that have at least one evaluator with a misaligned human annotation.
+  const filteredItemsForRun = filterDisagreements
+    ? itemsForRun.filter((it) => {
+        const itemAgreement = job?.human_agreement?.items.find(
+          (i) => i.item_id === it.uuid,
+        );
+        if (!itemAgreement) return false;
+        return itemAgreement.evaluators.some(
+          (e) => e.human_annotations.length > 0 && e.agreement !== 1,
+        );
+      })
+    : itemsForRun;
+
+  const total = filteredItemsForRun.length;
   const safeIndex = Math.min(Math.max(currentIndex, 0), Math.max(total - 1, 0));
-  const currentItem: Item | undefined = itemsForRun[safeIndex];
+  const currentItem: Item | undefined = filteredItemsForRun[safeIndex];
 
   // Group runs by item_id for quick lookup.
   const runsByItem = (() => {
@@ -443,6 +527,137 @@ export default function EvaluatorRunDetailPage() {
       ),
     );
   };
+
+  const handleExport = useCallback(async () => {
+    if (!job || !task || itemsForRun.length === 0) return;
+    setExporting(true);
+    try {
+      const XLSX = (await import("xlsx")).default;
+      const wb = XLSX.utils.book_new();
+      const usedSheetNames = new Set<string>();
+      const evaluators = job.details?.evaluators ?? [];
+
+      for (const ev of evaluators) {
+        const evName = ev.name || ev.evaluator_id.slice(0, 8);
+        const versionLabel = ev.evaluator_version_id
+          ? (versionLabels[ev.evaluator_version_id] ?? null)
+          : null;
+        const rawSheetName = versionLabel ? `${evName} ${versionLabel}` : evName;
+        let sheetName = rawSheetName.replace(/[:\\/?*[\]]/g, "_").slice(0, 31);
+        if (usedSheetNames.has(sheetName)) {
+          sheetName = sheetName.slice(0, 28) + `_${usedSheetNames.size}`;
+        }
+        usedSheetNames.add(sheetName);
+
+        // Collect all variable names for this evaluator across all items
+        const allVarNames = new Set<string>();
+        for (const item of itemsForRun) {
+          const vars = extractEvaluatorVariables(item.payload);
+          for (const k of Object.keys(vars[ev.evaluator_id] ?? {})) {
+            allVarNames.add(k);
+          }
+        }
+        const varNames = Array.from(allVarNames).sort();
+
+        // Collect all annotators (id → display name) for this evaluator
+        const annotatorMap = new Map<string, string>();
+        for (const haItem of job.human_agreement?.items ?? []) {
+          const evData = haItem.evaluators.find(
+            (e) => e.evaluator_id === ev.evaluator_id,
+          );
+          for (const ann of evData?.human_annotations ?? []) {
+            if (!annotatorMap.has(ann.annotator_id)) {
+              annotatorMap.set(
+                ann.annotator_id,
+                annotatorDisplayName(ann),
+              );
+            }
+          }
+        }
+        const annotatorIds = Array.from(annotatorMap.keys());
+
+        // Header
+        const inputCols = exportInputCols(task.type);
+        const varCols = varNames.map((v) => `${evName}/${v}`);
+        const annotatorCols = annotatorIds.flatMap((id) => {
+          const name = annotatorMap.get(id)!;
+          return [`${name}/value`, `${name}/reasoning`];
+        });
+        const header = [
+          ...inputCols,
+          ...varCols,
+          "Evaluator/value",
+          "Evaluator/reasoning",
+          ...annotatorCols,
+        ];
+
+        const rows: unknown[][] = [header];
+
+        for (const item of itemsForRun) {
+          const inputValues = extractPayloadInputValues(
+            item.payload,
+            task.type,
+          );
+          const vars = extractEvaluatorVariables(item.payload);
+          const evVars = vars[ev.evaluator_id] ?? {};
+          const varValues = varNames.map((v) => evVars[v] ?? "");
+
+          const run = (runsByItem[item.uuid] ?? []).find(
+            (r) =>
+              r.evaluator_id === ev.evaluator_id &&
+              (!ev.evaluator_version_id ||
+                r.evaluator_version_id === ev.evaluator_version_id),
+          );
+          let evValue: unknown = "";
+          let evReasoning = "";
+          if (run) {
+            const v = run.value?.value;
+            evValue = v != null ? v : "";
+            const reas = run.value?.reasoning;
+            evReasoning = typeof reas === "string" ? reas : "";
+          }
+
+          const haItem = job.human_agreement?.items.find(
+            (i) => i.item_id === item.uuid,
+          );
+          const evHumanData = haItem?.evaluators.find(
+            (e) => e.evaluator_id === ev.evaluator_id,
+          );
+          const annotatorValues = annotatorIds.flatMap((annotatorId) => {
+            const ann = evHumanData?.human_annotations.find(
+              (a) => a.annotator_id === annotatorId,
+            );
+            if (!ann) return ["", ""];
+            const v = ann.value?.value;
+            const annValue = v != null ? v : "";
+            const topReasoning =
+              typeof ann.reasoning === "string" ? ann.reasoning : null;
+            const nestedReasoning =
+              typeof ann.value?.reasoning === "string"
+                ? (ann.value.reasoning as string)
+                : null;
+            const annReasoning = topReasoning ?? nestedReasoning ?? "";
+            return [annValue, annReasoning];
+          });
+
+          rows.push([
+            ...inputValues,
+            ...varValues,
+            evValue,
+            evReasoning,
+            ...annotatorValues,
+          ]);
+        }
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      }
+
+      XLSX.writeFile(wb, `evaluator-run-${job.uuid.slice(0, 8)}.xlsx`);
+    } finally {
+      setExporting(false);
+    }
+  }, [job, task, itemsForRun, runsByItem, versionLabels]);
 
   return (
     <AppLayout
@@ -511,7 +726,7 @@ export default function EvaluatorRunDetailPage() {
           task.type === "llm" ||
           task.type === "simulation") ? (
           <>
-            <div>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               <span
                 className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusPillClass(
                   job.status,
@@ -519,6 +734,50 @@ export default function EvaluatorRunDetailPage() {
               >
                 {statusLabel(job.status)}
               </span>
+              {job.status === "completed" && itemsForRun.length > 0 && (
+                <button
+                  onClick={handleExport}
+                  disabled={exporting}
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {exporting ? (
+                    <svg
+                      className="w-3.5 h-3.5 animate-spin"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                      />
+                    </svg>
+                  )}
+                  {exporting ? "Exporting…" : "Export XLSX"}
+                </button>
+              )}
             </div>
             {(() => {
               const ha = job.human_agreement;
@@ -570,37 +829,57 @@ export default function EvaluatorRunDetailPage() {
             />
 
             <div className="border border-border rounded-xl [overflow:clip]">
-              <div className="flex flex-col">
-                <header className="border-b border-border px-4 md:px-6 py-3 flex items-center justify-center gap-2">
-                  <button
-                    onClick={() =>
-                      setCurrentIndex(Math.max(0, currentIndex - 1))
-                    }
-                    disabled={currentIndex === 0 || total === 0}
-                    className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Previous
-                  </button>
-                  <span className="text-sm text-muted-foreground tabular-nums px-2">
-                    Item {Math.min(currentIndex + 1, Math.max(total, 1))} of{" "}
-                    {total}
-                  </span>
-                  <button
-                    onClick={() =>
-                      setCurrentIndex(Math.min(total - 1, currentIndex + 1))
-                    }
-                    disabled={currentIndex >= total - 1 || total === 0}
-                    className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
+              <div className="flex flex-col flex-1 min-h-0">
+                <header className="border-b border-border px-4 md:px-6 py-3 flex items-center gap-2">
+                  <div className="flex-1 flex justify-start">
+                    {hasHumanAgreementData && (
+                      <button
+                        onClick={() =>
+                          setFilterDisagreements((f) => !f)
+                        }
+                        className={`h-8 px-3 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
+                          filterDisagreements
+                            ? "border-red-400 bg-red-500/10 text-red-700 dark:border-red-500/50 dark:bg-red-500/20 dark:text-red-400"
+                            : "border-border bg-background text-foreground hover:bg-muted/50"
+                        }`}
+                      >
+                        {filterDisagreements
+                          ? "Showing disagreements only"
+                          : "Show disagreements only"}
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() =>
+                        setCurrentIndex(Math.max(0, currentIndex - 1))
+                      }
+                      disabled={currentIndex === 0 || total === 0}
+                      className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-sm text-muted-foreground tabular-nums px-2">
+                      Item {Math.min(currentIndex + 1, Math.max(total, 1))} of{" "}
+                      {total}
+                    </span>
+                    <button
+                      onClick={() =>
+                        setCurrentIndex(Math.min(total - 1, currentIndex + 1))
+                      }
+                      disabled={currentIndex >= total - 1 || total === 0}
+                      className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                  <div className="flex-1" />
                 </header>
 
-                <div className="flex flex-col md:flex-row">
-                  {/* Mobile: horizontal scrolling strip */}
-                  <div className="md:hidden w-full max-h-32 border-b border-border bg-muted/20 overflow-y-auto">
-                    <div className="p-2 grid grid-cols-8 gap-2">
-                      {itemsForRun.map((it, i) => {
+                <div className="flex flex-col md:flex-row min-h-0">
+                  <aside className="w-full max-h-32 md:max-h-none md:w-20 flex-shrink-0 border-b md:border-b-0 md:border-r border-border bg-muted/20 overflow-y-auto">
+                    <div className="p-2 md:p-3 grid grid-cols-8 md:grid-cols-1 gap-2">
+                      {filteredItemsForRun.map((it, i) => {
                         const done = itemDone(it.uuid);
                         const isCurrent = i === safeIndex;
                         return (
@@ -621,34 +900,7 @@ export default function EvaluatorRunDetailPage() {
                         );
                       })}
                     </div>
-                  </div>
-                  {/* Desktop: sidebar whose height is defined by the main pane, not its own content */}
-                  <div className="hidden md:block relative w-20 flex-shrink-0 border-r border-border bg-muted/20">
-                    <div className="absolute inset-0 overflow-y-auto">
-                      <div className="p-3 grid grid-cols-1 gap-2">
-                        {itemsForRun.map((it, i) => {
-                          const done = itemDone(it.uuid);
-                          const isCurrent = i === safeIndex;
-                          return (
-                            <button
-                              key={it.uuid}
-                              onClick={() => setCurrentIndex(i)}
-                              title={`Item ${i + 1}${done ? " (completed)" : ""}`}
-                              className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
-                                isCurrent
-                                  ? "border-foreground bg-foreground text-background"
-                                  : done
-                                    ? "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400"
-                                    : "border-border bg-background text-foreground hover:bg-muted/50"
-                              }`}
-                            >
-                              {i + 1}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
+                  </aside>
 
                   <main className="flex-1">
                     {!currentItem ? (
@@ -671,6 +923,7 @@ export default function EvaluatorRunDetailPage() {
                           evaluatorVariablesByEvaluatorId={extractEvaluatorVariables(
                             currentItem.payload,
                           )}
+                          filterDisagreements={filterDisagreements}
                         />
                       </div>
                     )}
@@ -703,6 +956,7 @@ function EvaluatorResultsPane({
   jobStatus,
   humanAgreementForItem,
   evaluatorVariablesByEvaluatorId,
+  filterDisagreements,
 }: {
   evaluators: {
     evaluator_id: string;
@@ -714,6 +968,7 @@ function EvaluatorResultsPane({
   jobStatus: EvaluatorRunJob["status"];
   humanAgreementForItem: HumanAgreementItem | null;
   evaluatorVariablesByEvaluatorId: Record<string, Record<string, string>>;
+  filterDisagreements: boolean;
 }) {
   const [selectionByEvaluator, setSelectionByEvaluator] = useState<
     Record<string, string>
@@ -726,9 +981,31 @@ function EvaluatorResultsPane({
       </div>
     );
   }
+
+  const visibleEvaluators = filterDisagreements
+    ? evaluators.filter((ev) => {
+        const humansForEv = humanAgreementForItem?.evaluators.find(
+          (e) => e.evaluator_id === ev.evaluator_id,
+        );
+        return (
+          !!humansForEv &&
+          humansForEv.human_annotations.length > 0 &&
+          humansForEv.agreement !== 1
+        );
+      })
+    : evaluators;
+
+  if (filterDisagreements && visibleEvaluators.length === 0) {
+    return (
+      <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
+        All evaluators agree with human annotations on this item.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      {evaluators.map((ev) => {
+      {visibleEvaluators.map((ev) => {
         const versionLabel = ev.evaluator_version_id
           ? versionLabels[ev.evaluator_version_id]
           : null;
