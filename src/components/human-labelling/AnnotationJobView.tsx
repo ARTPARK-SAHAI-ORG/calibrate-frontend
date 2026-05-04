@@ -610,7 +610,7 @@ function AnnotateView({
         </div>
       )}
 
-      <div className={`flex-1 flex flex-col md:flex-row ${fillViewport ? "min-h-0" : ""}`}>
+      <div className="flex-1 flex flex-col md:flex-row min-h-0">
         {/* Mobile: horizontal scrolling strip */}
         <div className="md:hidden w-full max-h-32 border-b border-border bg-muted/20 overflow-y-auto">
           <div className="p-2 grid grid-cols-8 gap-2">
@@ -664,7 +664,7 @@ function AnnotateView({
           </div>
         </div>
 
-        <main className={`flex-1 flex flex-col md:flex-row ${fillViewport ? "min-h-0 overflow-y-auto md:overflow-hidden" : ""}`}>
+        <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden">
           {!currentItem ? (
             <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground w-full">
               No items in this job.

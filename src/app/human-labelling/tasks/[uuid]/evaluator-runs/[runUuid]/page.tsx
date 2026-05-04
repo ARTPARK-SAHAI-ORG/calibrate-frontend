@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
@@ -78,6 +84,10 @@ type HumanAgreementItemEvaluator = {
   agreement: number | null;
   pair_count: number;
   human_annotations: HumanAnnotation[];
+  /** Inter-annotator agreement for this slot; optional — computed client-side when absent. */
+  human_agreement?: number | null;
+  /** Evaluator vs human labels; optional — computed client-side when absent. */
+  evaluator_agreement?: number | null;
 };
 
 type HumanAgreementItem = {
@@ -121,8 +131,27 @@ type LabellingTaskFull = {
   name: string;
   type: "llm" | "stt" | "tts" | "simulation";
   description?: string | null;
+  evaluators?: { uuid: string; name: string }[];
   items?: Item[];
 };
+
+/** Prefer job/run payload names; fallback to linked task evaluators (often present before runs finish). */
+function evaluatorDisplayName(
+  ev: { evaluator_id: string; name?: string },
+  nameByEvaluatorId: Record<string, string>,
+  runRow?: EvaluatorRunRow | null,
+): string {
+  for (const candidate of [
+    ev.name,
+    runRow?.evaluator?.name,
+    nameByEvaluatorId[ev.evaluator_id],
+  ]) {
+    if (typeof candidate === "string" && candidate.trim().length > 0) {
+      return candidate.trim();
+    }
+  }
+  return ev.evaluator_id.slice(0, 8);
+}
 
 function snapshotToItem(snap: EvaluatorRunItemSnapshot, taskId: string): Item {
   return {
@@ -218,6 +247,83 @@ function formatAgreement(value: number | null | undefined): string {
   return `${(value * 100).toFixed(1)}%`;
 }
 
+function runOutputType(run: EvaluatorRunRow | undefined): "binary" | "rating" {
+  const v = run?.value?.value;
+  if (typeof v === "boolean") return "binary";
+  if (typeof v === "number") return "rating";
+  if (run?.evaluator?.output_type === "rating") return "rating";
+  return "binary";
+}
+
+function valuesComparable(
+  a: unknown,
+  b: unknown,
+  outputType: "binary" | "rating",
+): boolean {
+  if (outputType === "binary") {
+    return typeof a === "boolean" && typeof b === "boolean";
+  }
+  return typeof a === "number" && typeof b === "number" && Number.isFinite(a) && Number.isFinite(b);
+}
+
+function valuesMatchOutput(
+  a: unknown,
+  b: unknown,
+  outputType: "binary" | "rating",
+): boolean {
+  if (!valuesComparable(a, b, outputType)) return false;
+  return a === b;
+}
+
+/** Pairwise inter-annotator agreement among labelled values (same notion as task summary when API omits `human_agreement`). */
+function computeInterAnnotatorAgreement(
+  annotations: HumanAnnotation[],
+  outputType: "binary" | "rating",
+): number | null {
+  const vals = annotations
+    .map((x) => x.value?.value)
+    .filter(
+      (v) =>
+        typeof v === "boolean" || (typeof v === "number" && Number.isFinite(v)),
+    );
+  if (vals.length < 2) return null;
+  let agree = 0;
+  let total = 0;
+  for (let i = 0; i < vals.length; i++) {
+    for (let j = i + 1; j < vals.length; j++) {
+      if (!valuesComparable(vals[i], vals[j], outputType)) continue;
+      total++;
+      if (valuesMatchOutput(vals[i], vals[j], outputType)) agree++;
+    }
+  }
+  return total > 0 ? agree / total : null;
+}
+
+/** Share of human labels that match the evaluator output (when API omits `evaluator_agreement`). */
+function computeEvaluatorHumanAgreement(
+  annotations: HumanAnnotation[],
+  machineVal: unknown,
+  outputType: "binary" | "rating",
+): number | null {
+  let comparable = 0;
+  let aligned = 0;
+  for (const a of annotations) {
+    const h = a.value?.value;
+    if (!valuesComparable(h, machineVal, outputType)) continue;
+    comparable++;
+    if (valuesMatchOutput(h, machineVal, outputType)) aligned++;
+  }
+  return comparable > 0 ? aligned / comparable : null;
+}
+
+function agreementExportCell(
+  fromApi: number | null | undefined,
+  computed: number | null,
+): string {
+  if (fromApi !== undefined) return formatAgreement(fromApi);
+  return formatAgreement(computed);
+}
+
 /** Read `payload.evaluator_variables[evaluatorId] -> { var: value }`. */
 function extractEvaluatorVariables(
   payload: unknown,
@@ -236,6 +342,62 @@ function extractEvaluatorVariables(
     if (Object.keys(flat).length > 0) out[evId] = flat;
   }
   return out;
+}
+
+function exportInputCols(taskType: LabellingTaskFull["type"]): string[] {
+  if (taskType === "stt") return ["reference_transcript", "predicted_transcript"];
+  if (taskType === "llm") return ["conversation_history", "agent_response"];
+  return ["transcript"];
+}
+
+function serializeMessages(messages: unknown[]): string {
+  return messages
+    .map((msg) => {
+      if (!msg || typeof msg !== "object") return null;
+      const m = msg as Record<string, unknown>;
+      const role = typeof m.role === "string" ? m.role : "unknown";
+      if (Array.isArray(m.tool_calls) && m.tool_calls.length > 0) {
+        const calls = m.tool_calls
+          .map((tc: unknown) => {
+            if (!tc || typeof tc !== "object") return "";
+            const t = tc as Record<string, unknown>;
+            const fn = t.function as Record<string, unknown> | undefined;
+            return fn ? `${fn.name}(${fn.arguments})` : "";
+          })
+          .join("; ");
+        return `${role} (tool_call): ${calls}`;
+      }
+      const content = typeof m.content === "string" ? m.content : "";
+      return `${role}: ${content}`;
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function extractPayloadInputValues(
+  payload: unknown,
+  taskType: LabellingTaskFull["type"],
+): unknown[] {
+  const p =
+    payload && typeof payload === "object"
+      ? (payload as Record<string, unknown>)
+      : {};
+  if (taskType === "stt") {
+    return [
+      typeof p.reference_transcript === "string" ? p.reference_transcript : "",
+      typeof p.predicted_transcript === "string" ? p.predicted_transcript : "",
+    ];
+  }
+  if (taskType === "llm") {
+    const history = Array.isArray(p.chat_history)
+      ? serializeMessages(p.chat_history)
+      : "";
+    const response =
+      typeof p.agent_response === "string" ? p.agent_response : "";
+    return [history, response];
+  }
+  // simulation
+  return [Array.isArray(p.transcript) ? serializeMessages(p.transcript) : ""];
 }
 
 function annotatorDisplayName(a: {
@@ -282,7 +444,19 @@ export default function EvaluatorRunDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [filterDisagreements, setFilterDisagreements] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const startTime = useRef(Date.now());
+
+  const evaluatorNamesById = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const ev of task?.evaluators ?? []) {
+      const n = ev.name?.trim();
+      if (ev.uuid && n) m[ev.uuid] = n;
+    }
+    return m;
+  }, [task?.evaluators]);
 
   useEffect(() => {
     document.title = "Evaluation run | Calibrate";
@@ -386,9 +560,14 @@ export default function EvaluatorRunDetailPage() {
     };
   }, [accessToken, evaluatorIdsKey]);
 
+  // Reset item index when the disagreement filter is toggled.
+  useEffect(() => {
+    setCurrentIndex(0);
+  }, [filterDisagreements]);
+
   // Item previews: prefer embedded `job.items` (snapshot, survives soft-delete);
   // otherwise same ordering rules against live `task.items`.
-  const itemsForRun: Item[] = (() => {
+  const itemsForRun = useMemo<Item[]>(() => {
     if (!job) return [];
     const taskId = task?.uuid ?? job.task_id;
     const embedded = job.items;
@@ -413,20 +592,59 @@ export default function EvaluatorRunDetailPage() {
       return task.items.slice(0, cap);
     }
     return task.items;
-  })();
+  }, [job, task]);
 
-  const total = itemsForRun.length;
+  const hasDisagreements = useMemo(
+    () =>
+      !!(
+        job?.human_agreement &&
+        job.human_agreement.items.some((item) =>
+          item.evaluators.some(
+            (e) =>
+              e.human_annotations.length > 0 &&
+              e.agreement !== null &&
+              e.agreement !== 1,
+          ),
+        )
+      ),
+    [job],
+  );
+
+  // Items that have at least one evaluator with a misaligned human annotation.
+  const filteredItemsForRun = useMemo(
+    () =>
+      filterDisagreements
+        ? itemsForRun.filter((it) => {
+            const itemAgreement = job?.human_agreement?.items.find(
+              (i) => i.item_id === it.uuid,
+            );
+            if (!itemAgreement) return false;
+            return itemAgreement.evaluators.some(
+              (e) => e.human_annotations.length > 0 && e.agreement !== null && e.agreement !== 1,
+            );
+          })
+        : itemsForRun,
+    [filterDisagreements, itemsForRun, job],
+  );
+
+  // Map from item UUID to its 1-based position in the full (unfiltered) list.
+  const originalIndexByUuid = useMemo(
+    () => new Map(itemsForRun.map((it, i) => [it.uuid, i + 1])),
+    [itemsForRun],
+  );
+
+  const total = filteredItemsForRun.length;
   const safeIndex = Math.min(Math.max(currentIndex, 0), Math.max(total - 1, 0));
-  const currentItem: Item | undefined = itemsForRun[safeIndex];
+  const currentItem: Item | undefined = filteredItemsForRun[safeIndex];
 
   // Group runs by item_id for quick lookup.
-  const runsByItem = (() => {
+  const runsByItem = useMemo(() => {
     const m: Record<string, EvaluatorRunRow[]> = {};
     for (const r of job?.runs ?? []) {
       (m[r.item_id] = m[r.item_id] ?? []).push(r);
     }
     return m;
-  })();
+  }, [job]);
 
   const itemDone = (itemId: string): boolean => {
     if (!job || job.status !== "completed") return false;
@@ -444,6 +662,165 @@ export default function EvaluatorRunDetailPage() {
     );
   };
 
+  const handleExport = useCallback(async () => {
+    const exportItems = filteredItemsForRun;
+    if (!job || !task || exportItems.length === 0) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      const ExcelJS = (await import("exceljs")).default;
+      const wb = new ExcelJS.Workbook();
+      const evaluators = job.details?.evaluators ?? [];
+
+      for (const ev of evaluators) {
+        const evName = evaluatorDisplayName(ev, evaluatorNamesById);
+        const versionLabel = ev.evaluator_version_id
+          ? (versionLabels[ev.evaluator_version_id] ?? null)
+          : null;
+        const rawSheetName = versionLabel ? `${evName} ${versionLabel}` : evName;
+        const sheetName = rawSheetName.replace(/[:\\/?*[\]]/g, "_").slice(0, 31);
+
+        // Collect all variable names for this evaluator across all items
+        const allVarNames = new Set<string>();
+        for (const item of exportItems) {
+          const vars = extractEvaluatorVariables(item.payload);
+          for (const k of Object.keys(vars[ev.evaluator_id] ?? {})) {
+            allVarNames.add(k);
+          }
+        }
+        const varNames = Array.from(allVarNames).sort();
+
+        // Collect all annotators (id → display name) for this evaluator
+        const annotatorMap = new Map<string, string>();
+        for (const haItem of job.human_agreement?.items ?? []) {
+          const evData = haItem.evaluators.find(
+            (e) => e.evaluator_id === ev.evaluator_id,
+          );
+          for (const ann of evData?.human_annotations ?? []) {
+            if (!annotatorMap.has(ann.annotator_id)) {
+              annotatorMap.set(
+                ann.annotator_id,
+                annotatorDisplayName(ann),
+              );
+            }
+          }
+        }
+        const annotatorIds = Array.from(annotatorMap.keys());
+
+        // Header
+        const inputCols = exportInputCols(task.type);
+        const varCols = varNames.map((v) => `${evName}/${v}`);
+        const annotatorCols = annotatorIds.flatMap((id) => {
+          const name = annotatorMap.get(id)!;
+          return [`${name}/value`, `${name}/reasoning`];
+        });
+        const header = [
+          ...inputCols,
+          ...varCols,
+          "Human agreement",
+          "Evaluator agreement",
+          "Evaluator/value",
+          "Evaluator/reasoning",
+          ...annotatorCols,
+        ];
+
+        const rows: unknown[][] = [header];
+
+        for (const item of exportItems) {
+          const inputValues = extractPayloadInputValues(
+            item.payload,
+            task.type,
+          );
+          const vars = extractEvaluatorVariables(item.payload);
+          const evVars = vars[ev.evaluator_id] ?? {};
+          const varValues = varNames.map((v) => evVars[v] ?? "");
+
+          const run = (runsByItem[item.uuid] ?? []).find(
+            (r) =>
+              r.evaluator_id === ev.evaluator_id &&
+              (!ev.evaluator_version_id ||
+                r.evaluator_version_id === ev.evaluator_version_id),
+          );
+          let evValue: unknown = "";
+          let evReasoning = "";
+          if (run) {
+            const v = run.value?.value;
+            evValue = v != null ? v : "";
+            const reas = run.value?.reasoning;
+            evReasoning = typeof reas === "string" ? reas : "";
+          }
+
+          const haItem = job.human_agreement?.items.find(
+            (i) => i.item_id === item.uuid,
+          );
+          const evHumanData = haItem?.evaluators.find(
+            (e) => e.evaluator_id === ev.evaluator_id,
+          );
+          const outputType = runOutputType(run);
+          const humanAgCell = agreementExportCell(
+            evHumanData?.human_agreement,
+            computeInterAnnotatorAgreement(
+              evHumanData?.human_annotations ?? [],
+              outputType,
+            ),
+          );
+          const evaluatorAgCell = agreementExportCell(
+            evHumanData?.evaluator_agreement,
+            computeEvaluatorHumanAgreement(
+              evHumanData?.human_annotations ?? [],
+              run?.value?.value,
+              outputType,
+            ),
+          );
+          const annotatorValues = annotatorIds.flatMap((annotatorId) => {
+            const ann = evHumanData?.human_annotations.find(
+              (a) => a.annotator_id === annotatorId,
+            );
+            if (!ann) return ["", ""];
+            const v = ann.value?.value;
+            const annValue = v != null ? v : "";
+            const topReasoning =
+              typeof ann.reasoning === "string" ? ann.reasoning : null;
+            const nestedReasoning =
+              typeof ann.value?.reasoning === "string"
+                ? (ann.value.reasoning as string)
+                : null;
+            const annReasoning = topReasoning ?? nestedReasoning ?? "";
+            return [annValue, annReasoning];
+          });
+
+          rows.push([
+            ...inputValues,
+            ...varValues,
+            humanAgCell,
+            evaluatorAgCell,
+            evValue,
+            evReasoning,
+            ...annotatorValues,
+          ]);
+        }
+
+        const ws = wb.addWorksheet(sheetName);
+        ws.addRows(rows);
+      }
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `evaluator-run-${job.uuid.slice(0, 8)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }, [job, task, filteredItemsForRun, runsByItem, versionLabels, evaluatorNamesById]);
+
   return (
     <AppLayout
       activeItem="human-labelling"
@@ -451,7 +828,7 @@ export default function EvaluatorRunDetailPage() {
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
     >
-      <div className="py-4 md:py-6 space-y-4">
+      <div className="py-4 md:py-6 flex flex-col gap-4" style={{ height: "calc(100dvh - 56px)" }}>
         <button
           onClick={() =>
             router.push(`/human-labelling/tasks/${taskUuid}?tab=runs`)
@@ -511,7 +888,7 @@ export default function EvaluatorRunDetailPage() {
           task.type === "llm" ||
           task.type === "simulation") ? (
           <>
-            <div>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               <span
                 className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusPillClass(
                   job.status,
@@ -519,7 +896,58 @@ export default function EvaluatorRunDetailPage() {
               >
                 {statusLabel(job.status)}
               </span>
+              {job.status === "completed" && itemsForRun.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleExport}
+                  disabled={exporting}
+                  title="Download spreadsheet (XLSX)"
+                  className="inline-flex items-center gap-2 h-11 px-6 rounded-md text-[14px] font-semibold bg-foreground text-background shadow-sm hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {exporting ? (
+                    <svg
+                      className="w-4 h-4 shrink-0 animate-spin"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="w-4 h-4 shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                      />
+                    </svg>
+                  )}
+                  {exporting ? "Exporting…" : "Export results"}
+                </button>
+              )}
             </div>
+            {exportError && (
+              <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-500">
+                Export failed: {exportError}
+              </div>
+            )}
             {(() => {
               const ha = job.human_agreement;
               const cardsWillRender =
@@ -537,7 +965,7 @@ export default function EvaluatorRunDetailPage() {
                     <span className="text-sm text-muted-foreground">—</span>
                   ) : (
                     (job.details?.evaluators ?? []).map((e) => {
-                      const name = e.name || e.evaluator_id.slice(0, 8);
+                      const name = evaluatorDisplayName(e, evaluatorNamesById);
                       const label = e.evaluator_version_id
                         ? versionLabels[e.evaluator_version_id]
                         : null;
@@ -548,7 +976,7 @@ export default function EvaluatorRunDetailPage() {
                           title={`Open ${name}`}
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-sm font-semibold border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer"
                         >
-                          <span className="truncate max-w-[200px]">{name}</span>
+                          <span>{name}</span>
                           {label && (
                             <span className="font-mono text-[11px] text-muted-foreground">
                               {label}
@@ -566,11 +994,28 @@ export default function EvaluatorRunDetailPage() {
               jobStatus={job.status}
               agreement={job.human_agreement}
               evaluators={job.details?.evaluators ?? []}
+              evaluatorNamesById={evaluatorNamesById}
               versionLabels={versionLabels}
             />
 
-            <div className="border border-border rounded-xl [overflow:clip]">
-              <div className="flex flex-col">
+            <div className="border border-border rounded-xl [overflow:clip] flex flex-col flex-1 min-h-0">
+              <div className="flex flex-col flex-1 min-h-0">
+                {hasDisagreements && (
+                  <div className="border-b border-border px-4 md:px-6 py-2.5 flex items-center justify-start">
+                    <button
+                      onClick={() => setFilterDisagreements((f) => !f)}
+                      className={`h-8 px-3 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
+                        filterDisagreements
+                          ? "border-red-400 bg-red-500/10 text-red-700 dark:border-red-500/50 dark:bg-red-500/20 dark:text-red-400"
+                          : "border-foreground/20 bg-muted/60 text-foreground hover:bg-muted hover:border-foreground/30"
+                      }`}
+                    >
+                      {filterDisagreements
+                        ? "Showing disagreements only"
+                        : "Show disagreements only"}
+                    </button>
+                  </div>
+                )}
                 <header className="border-b border-border px-4 md:px-6 py-3 flex items-center justify-center gap-2">
                   <button
                     onClick={() =>
@@ -582,8 +1027,11 @@ export default function EvaluatorRunDetailPage() {
                     Previous
                   </button>
                   <span className="text-sm text-muted-foreground tabular-nums px-2">
-                    Item {Math.min(currentIndex + 1, Math.max(total, 1))} of{" "}
-                    {total}
+                    Item{" "}
+                    {currentItem
+                      ? (originalIndexByUuid.get(currentItem.uuid) ?? safeIndex + 1)
+                      : Math.min(safeIndex + 1, Math.max(total, 1))}{" "}
+                    of {itemsForRun.length}
                   </span>
                   <button
                     onClick={() =>
@@ -596,18 +1044,19 @@ export default function EvaluatorRunDetailPage() {
                   </button>
                 </header>
 
-                <div className="flex flex-col md:flex-row">
+                <div className="flex flex-col md:flex-row flex-1 min-h-0">
                   {/* Mobile: horizontal scrolling strip */}
                   <div className="md:hidden w-full max-h-32 border-b border-border bg-muted/20 overflow-y-auto">
                     <div className="p-2 grid grid-cols-8 gap-2">
-                      {itemsForRun.map((it, i) => {
+                      {filteredItemsForRun.map((it, i) => {
                         const done = itemDone(it.uuid);
                         const isCurrent = i === safeIndex;
+                        const label = originalIndexByUuid.get(it.uuid) ?? i + 1;
                         return (
                           <button
                             key={it.uuid}
                             onClick={() => setCurrentIndex(i)}
-                            title={`Item ${i + 1}${done ? " (completed)" : ""}`}
+                            title={`Item ${label}${done ? " (completed)" : ""}`}
                             className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
                               isCurrent
                                 ? "border-foreground bg-foreground text-background"
@@ -616,7 +1065,7 @@ export default function EvaluatorRunDetailPage() {
                                   : "border-border bg-background text-foreground hover:bg-muted/50"
                             }`}
                           >
-                            {i + 1}
+                            {label}
                           </button>
                         );
                       })}
@@ -626,14 +1075,15 @@ export default function EvaluatorRunDetailPage() {
                   <div className="hidden md:block relative w-20 flex-shrink-0 border-r border-border bg-muted/20">
                     <div className="absolute inset-0 overflow-y-auto">
                       <div className="p-3 grid grid-cols-1 gap-2">
-                        {itemsForRun.map((it, i) => {
+                        {filteredItemsForRun.map((it, i) => {
                           const done = itemDone(it.uuid);
                           const isCurrent = i === safeIndex;
+                          const label = originalIndexByUuid.get(it.uuid) ?? i + 1;
                           return (
                             <button
                               key={it.uuid}
                               onClick={() => setCurrentIndex(i)}
-                              title={`Item ${i + 1}${done ? " (completed)" : ""}`}
+                              title={`Item ${label}${done ? " (completed)" : ""}`}
                               className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
                                 isCurrent
                                   ? "border-foreground bg-foreground text-background"
@@ -642,7 +1092,7 @@ export default function EvaluatorRunDetailPage() {
                                     : "border-border bg-background text-foreground hover:bg-muted/50"
                               }`}
                             >
-                              {i + 1}
+                              {label}
                             </button>
                           );
                         })}
@@ -650,29 +1100,35 @@ export default function EvaluatorRunDetailPage() {
                     </div>
                   </div>
 
-                  <main className="flex-1">
+                  <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden">
                     {!currentItem ? (
                       <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground">
                         No items in this run.
                       </div>
                     ) : (
-                      <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                        <ItemPane item={currentItem} taskType={task.type} />
-                        <EvaluatorResultsPane
-                          evaluators={job.details?.evaluators ?? []}
-                          runs={runsByItem[currentItem.uuid] ?? []}
-                          versionLabels={versionLabels}
-                          jobStatus={job.status}
-                          humanAgreementForItem={
-                            job.human_agreement?.items.find(
-                              (i) => i.item_id === currentItem.uuid,
-                            ) ?? null
-                          }
-                          evaluatorVariablesByEvaluatorId={extractEvaluatorVariables(
-                            currentItem.payload,
-                          )}
-                        />
-                      </div>
+                      <>
+                        <div className="md:flex-1 md:min-h-0 md:overflow-y-auto p-4 md:p-6 md:border-r border-border">
+                          <ItemPane item={currentItem} taskType={task.type} />
+                        </div>
+                        <div className="md:flex-1 md:min-h-0 md:overflow-y-auto p-4 md:p-6">
+                          <EvaluatorResultsPane
+                            evaluators={job.details?.evaluators ?? []}
+                            evaluatorNamesById={evaluatorNamesById}
+                            runs={runsByItem[currentItem.uuid] ?? []}
+                            versionLabels={versionLabels}
+                            jobStatus={job.status}
+                            humanAgreementForItem={
+                              job.human_agreement?.items.find(
+                                (i) => i.item_id === currentItem.uuid,
+                              ) ?? null
+                            }
+                            evaluatorVariablesByEvaluatorId={extractEvaluatorVariables(
+                              currentItem.payload,
+                            )}
+                            filterDisagreements={filterDisagreements}
+                          />
+                        </div>
+                      </>
                     )}
                   </main>
                 </div>
@@ -698,22 +1154,26 @@ export default function EvaluatorRunDetailPage() {
 
 function EvaluatorResultsPane({
   evaluators,
+  evaluatorNamesById,
   runs,
   versionLabels,
   jobStatus,
   humanAgreementForItem,
   evaluatorVariablesByEvaluatorId,
+  filterDisagreements,
 }: {
   evaluators: {
     evaluator_id: string;
     evaluator_version_id?: string;
     name?: string;
   }[];
+  evaluatorNamesById: Record<string, string>;
   runs: EvaluatorRunRow[];
   versionLabels: Record<string, string>;
   jobStatus: EvaluatorRunJob["status"];
   humanAgreementForItem: HumanAgreementItem | null;
   evaluatorVariablesByEvaluatorId: Record<string, Record<string, string>>;
+  filterDisagreements: boolean;
 }) {
   const [selectionByEvaluator, setSelectionByEvaluator] = useState<
     Record<string, string>
@@ -726,9 +1186,32 @@ function EvaluatorResultsPane({
       </div>
     );
   }
+
+  const visibleEvaluators = filterDisagreements
+    ? evaluators.filter((ev) => {
+        const humansForEv = humanAgreementForItem?.evaluators.find(
+          (e) => e.evaluator_id === ev.evaluator_id,
+        );
+        return (
+          !!humansForEv &&
+          humansForEv.human_annotations.length > 0 &&
+          humansForEv.agreement !== null &&
+          humansForEv.agreement !== 1
+        );
+      })
+    : evaluators;
+
+  if (filterDisagreements && visibleEvaluators.length === 0) {
+    return (
+      <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
+        All evaluators agree with human annotations on this item.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      {evaluators.map((ev) => {
+      {visibleEvaluators.map((ev) => {
         const versionLabel = ev.evaluator_version_id
           ? versionLabels[ev.evaluator_version_id]
           : null;
@@ -738,6 +1221,7 @@ function EvaluatorResultsPane({
             (!ev.evaluator_version_id ||
               x.evaluator_version_id === ev.evaluator_version_id),
         );
+        const displayName = evaluatorDisplayName(ev, evaluatorNamesById, r);
         const reasoning =
           typeof r?.value?.reasoning === "string"
             ? (r.value.reasoning as string)
@@ -767,8 +1251,8 @@ function EvaluatorResultsPane({
               className="border border-border rounded-xl p-4 space-y-2"
             >
               <div className="flex items-center gap-2 flex-wrap min-w-0">
-                <h3 className="text-sm font-semibold truncate">
-                  {ev.name || ev.evaluator_id.slice(0, 8)}
+                <h3 className="text-sm font-semibold">
+                  {displayName}
                 </h3>
                 {versionLabel && (
                   <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-border bg-muted/40 text-muted-foreground">
@@ -804,7 +1288,7 @@ function EvaluatorResultsPane({
           );
         }
 
-        const evaluatorName = ev.name || ev.evaluator_id.slice(0, 8);
+        const evaluatorName = displayName;
 
         // Job is done (or failed) but no row exists for this item — that's
         // a real error state now that the backend always populates runs[].
@@ -815,7 +1299,7 @@ function EvaluatorResultsPane({
               className="border border-red-500/30 bg-red-500/5 rounded-xl p-4 space-y-1.5"
             >
               <div className="flex items-center gap-2 flex-wrap min-w-0">
-                <h3 className="text-sm font-semibold truncate">
+                <h3 className="text-sm font-semibold">
                   {evaluatorName}
                 </h3>
                 {versionLabel && (
@@ -1079,6 +1563,7 @@ function HumanAgreementSummary({
   jobStatus,
   agreement,
   evaluators,
+  evaluatorNamesById,
   versionLabels,
 }: {
   jobStatus: EvaluatorRunJob["status"];
@@ -1088,6 +1573,7 @@ function HumanAgreementSummary({
     evaluator_version_id?: string;
     name?: string;
   }[];
+  evaluatorNamesById: Record<string, string>;
   versionLabels: Record<string, string>;
 }) {
   if (jobStatus !== "completed") return null;
@@ -1137,7 +1623,7 @@ function HumanAgreementSummary({
         {evaluators.map((ev) => {
           const row = agreementById.get(ev.evaluator_id);
           if (!row) return null;
-          const name = ev.name || ev.evaluator_id.slice(0, 8);
+          const name = evaluatorDisplayName(ev, evaluatorNamesById);
           const version = row.evaluator_version_id
             ? (versionLabels[row.evaluator_version_id] ?? null)
             : ev.evaluator_version_id
