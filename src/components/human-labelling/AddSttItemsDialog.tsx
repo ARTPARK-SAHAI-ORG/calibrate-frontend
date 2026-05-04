@@ -62,7 +62,7 @@ function humaniseDetailObject(detail: {
 
 function extractApiError(err: unknown, fallback: string): string {
   if (!(err instanceof Error)) return fallback;
-  const m = err.message.match(/Request failed: \d+ - (.+)$/s);
+  const m = err.message.match(/Request failed: \d+ - ([\s\S]+)$/);
   if (m) {
     try {
       const parsed = JSON.parse(m[1]);
