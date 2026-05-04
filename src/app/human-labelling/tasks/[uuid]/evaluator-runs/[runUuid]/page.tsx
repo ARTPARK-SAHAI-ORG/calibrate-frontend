@@ -569,8 +569,8 @@ export default function EvaluatorRunDetailPage() {
               versionLabels={versionLabels}
             />
 
-            <div className="border border-border rounded-xl overflow-hidden">
-              <div className="flex flex-col flex-1 min-h-0">
+            <div className="border border-border rounded-xl [overflow:clip]">
+              <div className="flex flex-col">
                 <header className="border-b border-border px-4 md:px-6 py-3 flex items-center justify-center gap-2">
                   <button
                     onClick={() =>
@@ -596,9 +596,10 @@ export default function EvaluatorRunDetailPage() {
                   </button>
                 </header>
 
-                <div className="flex flex-col md:flex-row min-h-0">
-                  <aside className="w-full md:w-20 border-b md:border-b-0 md:border-r border-border bg-muted/20 overflow-y-auto">
-                    <div className="p-2 md:p-3 grid grid-cols-8 md:grid-cols-1 gap-2">
+                <div className="flex flex-col md:flex-row">
+                  {/* Mobile: horizontal scrolling strip */}
+                  <div className="md:hidden w-full max-h-32 border-b border-border bg-muted/20 overflow-y-auto">
+                    <div className="p-2 grid grid-cols-8 gap-2">
                       {itemsForRun.map((it, i) => {
                         const done = itemDone(it.uuid);
                         const isCurrent = i === safeIndex;
@@ -620,9 +621,36 @@ export default function EvaluatorRunDetailPage() {
                         );
                       })}
                     </div>
-                  </aside>
+                  </div>
+                  {/* Desktop: sidebar whose height is defined by the main pane, not its own content */}
+                  <div className="hidden md:block relative w-20 flex-shrink-0 border-r border-border bg-muted/20">
+                    <div className="absolute inset-0 overflow-y-auto">
+                      <div className="p-3 grid grid-cols-1 gap-2">
+                        {itemsForRun.map((it, i) => {
+                          const done = itemDone(it.uuid);
+                          const isCurrent = i === safeIndex;
+                          return (
+                            <button
+                              key={it.uuid}
+                              onClick={() => setCurrentIndex(i)}
+                              title={`Item ${i + 1}${done ? " (completed)" : ""}`}
+                              className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
+                                isCurrent
+                                  ? "border-foreground bg-foreground text-background"
+                                  : done
+                                    ? "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400"
+                                    : "border-border bg-background text-foreground hover:bg-muted/50"
+                              }`}
+                            >
+                              {i + 1}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
 
-                  <main className="flex-1 overflow-y-auto">
+                  <main className="flex-1">
                     {!currentItem ? (
                       <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground">
                         No items in this run.
@@ -1105,7 +1133,7 @@ function HumanAgreementSummary({
           annotations on the same items
         </p>
       </div>
-      <div className="flex flex-wrap items-stretch gap-3">
+      <div className="flex items-stretch gap-3 overflow-x-auto pb-1">
         {evaluators.map((ev) => {
           const row = agreementById.get(ev.evaluator_id);
           if (!row) return null;

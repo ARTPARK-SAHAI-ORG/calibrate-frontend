@@ -474,7 +474,7 @@ export default function EvaluatorDetailPage() {
       <div className="space-y-4 md:space-y-6 py-4 md:py-6">
         {/* Back */}
         <button
-          onClick={() => router.push("/evaluators")}
+          onClick={() => router.back()}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         >
           <svg
@@ -521,7 +521,7 @@ export default function EvaluatorDetailPage() {
               {error ?? "Evaluator not found"}
             </p>
             <button
-              onClick={() => router.push("/evaluators")}
+              onClick={() => router.back()}
               className="text-sm md:text-base text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >
               Back to evaluators
