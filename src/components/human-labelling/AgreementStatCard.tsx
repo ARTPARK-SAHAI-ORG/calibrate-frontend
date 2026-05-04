@@ -32,7 +32,7 @@ export function AgreementStatCard(
 ) {
   const { value, valueClassName = "" } = props;
   return (
-    <div className="border border-border rounded-lg px-4 py-3 bg-background min-w-[160px]">
+    <div className="border border-border rounded-lg px-4 py-3 bg-background min-w-[160px] shrink-0">
       {"staticPillText" in props ? (
         <span
           className={`${agreementStatPillBase} cursor-default`}

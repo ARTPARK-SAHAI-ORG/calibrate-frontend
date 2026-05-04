@@ -109,7 +109,7 @@ export default function AdminAnnotateJobPage() {
           </>
         )}
 
-        <div className="border border-border rounded-xl overflow-hidden">
+        <div className="border border-border rounded-xl [overflow:clip]">
           <AnnotationJobView
             token={token}
             mode="admin"
