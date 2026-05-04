@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
@@ -78,6 +84,10 @@ type HumanAgreementItemEvaluator = {
   agreement: number | null;
   pair_count: number;
   human_annotations: HumanAnnotation[];
+  /** Inter-annotator agreement for this slot; optional — computed client-side when absent. */
+  human_agreement?: number | null;
+  /** Evaluator vs human labels; optional — computed client-side when absent. */
+  evaluator_agreement?: number | null;
 };
 
 type HumanAgreementItem = {
@@ -121,8 +131,27 @@ type LabellingTaskFull = {
   name: string;
   type: "llm" | "stt" | "tts" | "simulation";
   description?: string | null;
+  evaluators?: { uuid: string; name: string }[];
   items?: Item[];
 };
+
+/** Prefer job/run payload names; fallback to linked task evaluators (often present before runs finish). */
+function evaluatorDisplayName(
+  ev: { evaluator_id: string; name?: string },
+  nameByEvaluatorId: Record<string, string>,
+  runRow?: EvaluatorRunRow | null,
+): string {
+  for (const candidate of [
+    ev.name,
+    runRow?.evaluator?.name,
+    nameByEvaluatorId[ev.evaluator_id],
+  ]) {
+    if (typeof candidate === "string" && candidate.trim().length > 0) {
+      return candidate.trim();
+    }
+  }
+  return ev.evaluator_id.slice(0, 8);
+}
 
 function snapshotToItem(snap: EvaluatorRunItemSnapshot, taskId: string): Item {
   return {
@@ -216,6 +245,83 @@ function statusPillClass(status: EvaluatorRunJob["status"]): string {
 function formatAgreement(value: number | null | undefined): string {
   if (value == null) return "—";
   return `${(value * 100).toFixed(1)}%`;
+}
+
+function runOutputType(run: EvaluatorRunRow | undefined): "binary" | "rating" {
+  const v = run?.value?.value;
+  if (typeof v === "boolean") return "binary";
+  if (typeof v === "number") return "rating";
+  if (run?.evaluator?.output_type === "rating") return "rating";
+  return "binary";
+}
+
+function valuesComparable(
+  a: unknown,
+  b: unknown,
+  outputType: "binary" | "rating",
+): boolean {
+  if (outputType === "binary") {
+    return typeof a === "boolean" && typeof b === "boolean";
+  }
+  return typeof a === "number" && typeof b === "number" && Number.isFinite(a) && Number.isFinite(b);
+}
+
+function valuesMatchOutput(
+  a: unknown,
+  b: unknown,
+  outputType: "binary" | "rating",
+): boolean {
+  if (!valuesComparable(a, b, outputType)) return false;
+  return a === b;
+}
+
+/** Pairwise inter-annotator agreement among labelled values (same notion as task summary when API omits `human_agreement`). */
+function computeInterAnnotatorAgreement(
+  annotations: HumanAnnotation[],
+  outputType: "binary" | "rating",
+): number | null {
+  const vals = annotations
+    .map((x) => x.value?.value)
+    .filter(
+      (v) =>
+        typeof v === "boolean" || (typeof v === "number" && Number.isFinite(v)),
+    );
+  if (vals.length < 2) return null;
+  let agree = 0;
+  let total = 0;
+  for (let i = 0; i < vals.length; i++) {
+    for (let j = i + 1; j < vals.length; j++) {
+      if (!valuesComparable(vals[i], vals[j], outputType)) continue;
+      total++;
+      if (valuesMatchOutput(vals[i], vals[j], outputType)) agree++;
+    }
+  }
+  return total > 0 ? agree / total : null;
+}
+
+/** Share of human labels that match the evaluator output (when API omits `evaluator_agreement`). */
+function computeEvaluatorHumanAgreement(
+  annotations: HumanAnnotation[],
+  machineVal: unknown,
+  outputType: "binary" | "rating",
+): number | null {
+  let comparable = 0;
+  let aligned = 0;
+  for (const a of annotations) {
+    const h = a.value?.value;
+    if (!valuesComparable(h, machineVal, outputType)) continue;
+    comparable++;
+    if (valuesMatchOutput(h, machineVal, outputType)) aligned++;
+  }
+  return comparable > 0 ? aligned / comparable : null;
+}
+
+function agreementExportCell(
+  fromApi: number | null | undefined,
+  computed: number | null,
+): string {
+  if (fromApi !== undefined) return formatAgreement(fromApi);
+  return formatAgreement(computed);
 }
 
 /** Read `payload.evaluator_variables[evaluatorId] -> { var: value }`. */
@@ -341,6 +447,15 @@ export default function EvaluatorRunDetailPage() {
   const [filterDisagreements, setFilterDisagreements] = useState(false);
   const [exporting, setExporting] = useState(false);
   const startTime = useRef(Date.now());
+
+  const evaluatorNamesById = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const ev of task?.evaluators ?? []) {
+      const n = ev.name?.trim();
+      if (ev.uuid && n) m[ev.uuid] = n;
+    }
+    return m;
+  }, [task?.evaluators]);
 
   useEffect(() => {
     document.title = "Evaluation run | Calibrate";
@@ -499,6 +614,11 @@ export default function EvaluatorRunDetailPage() {
       })
     : itemsForRun;
 
+  // Map from item UUID to its 1-based position in the full (unfiltered) list.
+  const originalIndexByUuid = new Map(
+    itemsForRun.map((it, i) => [it.uuid, i + 1]),
+  );
+
   const total = filteredItemsForRun.length;
   const safeIndex = Math.min(Math.max(currentIndex, 0), Math.max(total - 1, 0));
   const currentItem: Item | undefined = filteredItemsForRun[safeIndex];
@@ -529,16 +649,18 @@ export default function EvaluatorRunDetailPage() {
   };
 
   const handleExport = useCallback(async () => {
-    if (!job || !task || itemsForRun.length === 0) return;
+    const exportItems = filteredItemsForRun;
+    if (!job || !task || exportItems.length === 0) return;
     setExporting(true);
     try {
-      const XLSX = (await import("xlsx")).default;
+      const xlsxMod = await import("xlsx");
+      const XLSX = xlsxMod.default ?? xlsxMod;
       const wb = XLSX.utils.book_new();
       const usedSheetNames = new Set<string>();
       const evaluators = job.details?.evaluators ?? [];
 
       for (const ev of evaluators) {
-        const evName = ev.name || ev.evaluator_id.slice(0, 8);
+        const evName = evaluatorDisplayName(ev, evaluatorNamesById);
         const versionLabel = ev.evaluator_version_id
           ? (versionLabels[ev.evaluator_version_id] ?? null)
           : null;
@@ -551,7 +673,7 @@ export default function EvaluatorRunDetailPage() {
 
         // Collect all variable names for this evaluator across all items
         const allVarNames = new Set<string>();
-        for (const item of itemsForRun) {
+        for (const item of exportItems) {
           const vars = extractEvaluatorVariables(item.payload);
           for (const k of Object.keys(vars[ev.evaluator_id] ?? {})) {
             allVarNames.add(k);
@@ -586,6 +708,8 @@ export default function EvaluatorRunDetailPage() {
         const header = [
           ...inputCols,
           ...varCols,
+          "Human agreement",
+          "Evaluator agreement",
           "Evaluator/value",
           "Evaluator/reasoning",
           ...annotatorCols,
@@ -593,7 +717,7 @@ export default function EvaluatorRunDetailPage() {
 
         const rows: unknown[][] = [header];
 
-        for (const item of itemsForRun) {
+        for (const item of exportItems) {
           const inputValues = extractPayloadInputValues(
             item.payload,
             task.type,
@@ -623,6 +747,22 @@ export default function EvaluatorRunDetailPage() {
           const evHumanData = haItem?.evaluators.find(
             (e) => e.evaluator_id === ev.evaluator_id,
           );
+          const outputType = runOutputType(run);
+          const humanAgCell = agreementExportCell(
+            evHumanData?.human_agreement,
+            computeInterAnnotatorAgreement(
+              evHumanData?.human_annotations ?? [],
+              outputType,
+            ),
+          );
+          const evaluatorAgCell = agreementExportCell(
+            evHumanData?.evaluator_agreement,
+            computeEvaluatorHumanAgreement(
+              evHumanData?.human_annotations ?? [],
+              run?.value?.value,
+              outputType,
+            ),
+          );
           const annotatorValues = annotatorIds.flatMap((annotatorId) => {
             const ann = evHumanData?.human_annotations.find(
               (a) => a.annotator_id === annotatorId,
@@ -643,6 +783,8 @@ export default function EvaluatorRunDetailPage() {
           rows.push([
             ...inputValues,
             ...varValues,
+            humanAgCell,
+            evaluatorAgCell,
             evValue,
             evReasoning,
             ...annotatorValues,
@@ -657,7 +799,7 @@ export default function EvaluatorRunDetailPage() {
     } finally {
       setExporting(false);
     }
-  }, [job, task, itemsForRun, runsByItem, versionLabels]);
+  }, [job, task, filteredItemsForRun, runsByItem, versionLabels, evaluatorNamesById]);
 
   return (
     <AppLayout
@@ -666,7 +808,7 @@ export default function EvaluatorRunDetailPage() {
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
     >
-      <div className="py-4 md:py-6 space-y-4">
+      <div className="py-4 md:py-6 flex flex-col gap-4" style={{ height: "calc(100dvh - 56px)" }}>
         <button
           onClick={() =>
             router.push(`/human-labelling/tasks/${taskUuid}?tab=runs`)
@@ -736,13 +878,15 @@ export default function EvaluatorRunDetailPage() {
               </span>
               {job.status === "completed" && itemsForRun.length > 0 && (
                 <button
+                  type="button"
                   onClick={handleExport}
                   disabled={exporting}
-                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Download spreadsheet (XLSX)"
+                  className="inline-flex items-center gap-2 h-11 px-6 rounded-md text-[14px] font-semibold bg-foreground text-background shadow-sm hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {exporting ? (
                     <svg
-                      className="w-3.5 h-3.5 animate-spin"
+                      className="w-4 h-4 shrink-0 animate-spin"
                       fill="none"
                       viewBox="0 0 24 24"
                     >
@@ -762,7 +906,7 @@ export default function EvaluatorRunDetailPage() {
                     </svg>
                   ) : (
                     <svg
-                      className="w-3.5 h-3.5"
+                      className="w-4 h-4 shrink-0"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -775,7 +919,7 @@ export default function EvaluatorRunDetailPage() {
                       />
                     </svg>
                   )}
-                  {exporting ? "Exporting…" : "Export XLSX"}
+                  {exporting ? "Exporting…" : "Export results"}
                 </button>
               )}
             </div>
@@ -796,7 +940,7 @@ export default function EvaluatorRunDetailPage() {
                     <span className="text-sm text-muted-foreground">—</span>
                   ) : (
                     (job.details?.evaluators ?? []).map((e) => {
-                      const name = e.name || e.evaluator_id.slice(0, 8);
+                      const name = evaluatorDisplayName(e, evaluatorNamesById);
                       const label = e.evaluator_version_id
                         ? versionLabels[e.evaluator_version_id]
                         : null;
@@ -807,7 +951,7 @@ export default function EvaluatorRunDetailPage() {
                           title={`Open ${name}`}
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-sm font-semibold border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer"
                         >
-                          <span className="truncate max-w-[200px]">{name}</span>
+                          <span>{name}</span>
                           {label && (
                             <span className="font-mono text-[11px] text-muted-foreground">
                               {label}
@@ -825,68 +969,69 @@ export default function EvaluatorRunDetailPage() {
               jobStatus={job.status}
               agreement={job.human_agreement}
               evaluators={job.details?.evaluators ?? []}
+              evaluatorNamesById={evaluatorNamesById}
               versionLabels={versionLabels}
             />
 
-            <div className="border border-border rounded-xl [overflow:clip]">
+            <div className="border border-border rounded-xl [overflow:clip] flex flex-col flex-1 min-h-0">
               <div className="flex flex-col flex-1 min-h-0">
-                <header className="border-b border-border px-4 md:px-6 py-3 flex items-center gap-2">
-                  <div className="flex-1 flex justify-start">
-                    {hasHumanAgreementData && (
-                      <button
-                        onClick={() =>
-                          setFilterDisagreements((f) => !f)
-                        }
-                        className={`h-8 px-3 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
-                          filterDisagreements
-                            ? "border-red-400 bg-red-500/10 text-red-700 dark:border-red-500/50 dark:bg-red-500/20 dark:text-red-400"
-                            : "border-border bg-background text-foreground hover:bg-muted/50"
-                        }`}
-                      >
-                        {filterDisagreements
-                          ? "Showing disagreements only"
-                          : "Show disagreements only"}
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
+                {hasHumanAgreementData && (
+                  <div className="border-b border-border px-4 md:px-6 py-2.5 flex items-center justify-start">
                     <button
-                      onClick={() =>
-                        setCurrentIndex(Math.max(0, currentIndex - 1))
-                      }
-                      disabled={currentIndex === 0 || total === 0}
-                      className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => setFilterDisagreements((f) => !f)}
+                      className={`h-8 px-3 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
+                        filterDisagreements
+                          ? "border-red-400 bg-red-500/10 text-red-700 dark:border-red-500/50 dark:bg-red-500/20 dark:text-red-400"
+                          : "border-foreground/20 bg-muted/60 text-foreground hover:bg-muted hover:border-foreground/30"
+                      }`}
                     >
-                      Previous
-                    </button>
-                    <span className="text-sm text-muted-foreground tabular-nums px-2">
-                      Item {Math.min(currentIndex + 1, Math.max(total, 1))} of{" "}
-                      {total}
-                    </span>
-                    <button
-                      onClick={() =>
-                        setCurrentIndex(Math.min(total - 1, currentIndex + 1))
-                      }
-                      disabled={currentIndex >= total - 1 || total === 0}
-                      className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Next
+                      {filterDisagreements
+                        ? "Showing disagreements only"
+                        : "Show disagreements only"}
                     </button>
                   </div>
-                  <div className="flex-1" />
+                )}
+                <header className="border-b border-border px-4 md:px-6 py-3 flex items-center justify-center gap-2">
+                  <button
+                    onClick={() =>
+                      setCurrentIndex(Math.max(0, currentIndex - 1))
+                    }
+                    disabled={currentIndex === 0 || total === 0}
+                    className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-muted-foreground tabular-nums px-2">
+                    Item{" "}
+                    {currentItem
+                      ? (originalIndexByUuid.get(currentItem.uuid) ?? safeIndex + 1)
+                      : Math.min(safeIndex + 1, Math.max(total, 1))}{" "}
+                    of {itemsForRun.length}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setCurrentIndex(Math.min(total - 1, currentIndex + 1))
+                    }
+                    disabled={currentIndex >= total - 1 || total === 0}
+                    className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
                 </header>
 
-                <div className="flex flex-col md:flex-row min-h-0">
-                  <aside className="w-full max-h-32 md:max-h-none md:w-20 flex-shrink-0 border-b md:border-b-0 md:border-r border-border bg-muted/20 overflow-y-auto">
-                    <div className="p-2 md:p-3 grid grid-cols-8 md:grid-cols-1 gap-2">
+                <div className="flex flex-col md:flex-row flex-1 min-h-0">
+                  {/* Mobile: horizontal scrolling strip */}
+                  <div className="md:hidden w-full max-h-32 border-b border-border bg-muted/20 overflow-y-auto">
+                    <div className="p-2 grid grid-cols-8 gap-2">
                       {filteredItemsForRun.map((it, i) => {
                         const done = itemDone(it.uuid);
                         const isCurrent = i === safeIndex;
+                        const label = originalIndexByUuid.get(it.uuid) ?? i + 1;
                         return (
                           <button
                             key={it.uuid}
                             onClick={() => setCurrentIndex(i)}
-                            title={`Item ${i + 1}${done ? " (completed)" : ""}`}
+                            title={`Item ${label}${done ? " (completed)" : ""}`}
                             className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
                               isCurrent
                                 ? "border-foreground bg-foreground text-background"
@@ -895,37 +1040,70 @@ export default function EvaluatorRunDetailPage() {
                                   : "border-border bg-background text-foreground hover:bg-muted/50"
                             }`}
                           >
-                            {i + 1}
+                            {label}
                           </button>
                         );
                       })}
                     </div>
-                  </aside>
+                  </div>
+                  {/* Desktop: sidebar whose height is defined by the main pane, not its own content */}
+                  <div className="hidden md:block relative w-20 flex-shrink-0 border-r border-border bg-muted/20">
+                    <div className="absolute inset-0 overflow-y-auto">
+                      <div className="p-3 grid grid-cols-1 gap-2">
+                        {filteredItemsForRun.map((it, i) => {
+                          const done = itemDone(it.uuid);
+                          const isCurrent = i === safeIndex;
+                          const label = originalIndexByUuid.get(it.uuid) ?? i + 1;
+                          return (
+                            <button
+                              key={it.uuid}
+                              onClick={() => setCurrentIndex(i)}
+                              title={`Item ${label}${done ? " (completed)" : ""}`}
+                              className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
+                                isCurrent
+                                  ? "border-foreground bg-foreground text-background"
+                                  : done
+                                    ? "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400"
+                                    : "border-border bg-background text-foreground hover:bg-muted/50"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
 
-                  <main className="flex-1">
+                  <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden">
                     {!currentItem ? (
                       <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground">
                         No items in this run.
                       </div>
                     ) : (
-                      <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                        <ItemPane item={currentItem} taskType={task.type} />
-                        <EvaluatorResultsPane
-                          evaluators={job.details?.evaluators ?? []}
-                          runs={runsByItem[currentItem.uuid] ?? []}
-                          versionLabels={versionLabels}
-                          jobStatus={job.status}
-                          humanAgreementForItem={
-                            job.human_agreement?.items.find(
-                              (i) => i.item_id === currentItem.uuid,
-                            ) ?? null
-                          }
-                          evaluatorVariablesByEvaluatorId={extractEvaluatorVariables(
-                            currentItem.payload,
-                          )}
-                          filterDisagreements={filterDisagreements}
-                        />
-                      </div>
+                      <>
+                        <div className="md:flex-1 md:min-h-0 md:overflow-y-auto p-4 md:p-6 md:border-r border-border">
+                          <ItemPane item={currentItem} taskType={task.type} />
+                        </div>
+                        <div className="md:flex-1 md:min-h-0 md:overflow-y-auto p-4 md:p-6">
+                          <EvaluatorResultsPane
+                            evaluators={job.details?.evaluators ?? []}
+                            evaluatorNamesById={evaluatorNamesById}
+                            runs={runsByItem[currentItem.uuid] ?? []}
+                            versionLabels={versionLabels}
+                            jobStatus={job.status}
+                            humanAgreementForItem={
+                              job.human_agreement?.items.find(
+                                (i) => i.item_id === currentItem.uuid,
+                              ) ?? null
+                            }
+                            evaluatorVariablesByEvaluatorId={extractEvaluatorVariables(
+                              currentItem.payload,
+                            )}
+                            filterDisagreements={filterDisagreements}
+                          />
+                        </div>
+                      </>
                     )}
                   </main>
                 </div>
@@ -951,6 +1129,7 @@ export default function EvaluatorRunDetailPage() {
 
 function EvaluatorResultsPane({
   evaluators,
+  evaluatorNamesById,
   runs,
   versionLabels,
   jobStatus,
@@ -963,6 +1142,7 @@ function EvaluatorResultsPane({
     evaluator_version_id?: string;
     name?: string;
   }[];
+  evaluatorNamesById: Record<string, string>;
   runs: EvaluatorRunRow[];
   versionLabels: Record<string, string>;
   jobStatus: EvaluatorRunJob["status"];
@@ -1015,6 +1195,7 @@ function EvaluatorResultsPane({
             (!ev.evaluator_version_id ||
               x.evaluator_version_id === ev.evaluator_version_id),
         );
+        const displayName = evaluatorDisplayName(ev, evaluatorNamesById, r);
         const reasoning =
           typeof r?.value?.reasoning === "string"
             ? (r.value.reasoning as string)
@@ -1044,8 +1225,8 @@ function EvaluatorResultsPane({
               className="border border-border rounded-xl p-4 space-y-2"
             >
               <div className="flex items-center gap-2 flex-wrap min-w-0">
-                <h3 className="text-sm font-semibold truncate">
-                  {ev.name || ev.evaluator_id.slice(0, 8)}
+                <h3 className="text-sm font-semibold">
+                  {displayName}
                 </h3>
                 {versionLabel && (
                   <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-border bg-muted/40 text-muted-foreground">
@@ -1081,7 +1262,7 @@ function EvaluatorResultsPane({
           );
         }
 
-        const evaluatorName = ev.name || ev.evaluator_id.slice(0, 8);
+        const evaluatorName = displayName;
 
         // Job is done (or failed) but no row exists for this item — that's
         // a real error state now that the backend always populates runs[].
@@ -1092,7 +1273,7 @@ function EvaluatorResultsPane({
               className="border border-red-500/30 bg-red-500/5 rounded-xl p-4 space-y-1.5"
             >
               <div className="flex items-center gap-2 flex-wrap min-w-0">
-                <h3 className="text-sm font-semibold truncate">
+                <h3 className="text-sm font-semibold">
                   {evaluatorName}
                 </h3>
                 {versionLabel && (
@@ -1356,6 +1537,7 @@ function HumanAgreementSummary({
   jobStatus,
   agreement,
   evaluators,
+  evaluatorNamesById,
   versionLabels,
 }: {
   jobStatus: EvaluatorRunJob["status"];
@@ -1365,6 +1547,7 @@ function HumanAgreementSummary({
     evaluator_version_id?: string;
     name?: string;
   }[];
+  evaluatorNamesById: Record<string, string>;
   versionLabels: Record<string, string>;
 }) {
   if (jobStatus !== "completed") return null;
@@ -1414,7 +1597,7 @@ function HumanAgreementSummary({
         {evaluators.map((ev) => {
           const row = agreementById.get(ev.evaluator_id);
           if (!row) return null;
-          const name = ev.name || ev.evaluator_id.slice(0, 8);
+          const name = evaluatorDisplayName(ev, evaluatorNamesById);
           const version = row.evaluator_version_id
             ? (versionLabels[row.evaluator_version_id] ?? null)
             : ev.evaluator_version_id

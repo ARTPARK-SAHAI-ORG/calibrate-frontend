@@ -36,7 +36,7 @@ export default function AdminAnnotateJobPage() {
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
     >
-      <div className="py-4 md:py-6 space-y-4">
+      <div className="py-4 md:py-6 flex flex-col gap-4" style={{ height: "calc(100dvh - 56px)" }}>
         <button
           onClick={() => router.back()}
           className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1.5"
@@ -109,7 +109,7 @@ export default function AdminAnnotateJobPage() {
           </>
         )}
 
-        <div className="border border-border rounded-xl [overflow:clip]">
+        <div className="border border-border rounded-xl [overflow:clip] flex flex-col flex-1 min-h-0">
           <AnnotationJobView
             token={token}
             mode="admin"

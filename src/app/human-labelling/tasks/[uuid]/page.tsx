@@ -434,7 +434,7 @@ function EvaluatorRunsList({
                       key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
                       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-background text-foreground"
                     >
-                      <span className="truncate max-w-[140px]">{name}</span>
+                      <span>{name}</span>
                       {label && (
                         <span className="font-mono text-[10px] text-muted-foreground">
                           {label}
