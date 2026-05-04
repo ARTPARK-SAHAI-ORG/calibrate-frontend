@@ -514,6 +514,7 @@ export default function EvaluatorRunDetailPage() {
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let didFinalFetch = false;
     const tick = async () => {
       if (cancelled) return;
       const data = await fetchJob();
@@ -524,6 +525,12 @@ export default function EvaluatorRunDetailPage() {
         const elapsed = Date.now() - startTime.current;
         const delay = elapsed < 30_000 ? 2500 : 5000;
         timer = setTimeout(tick, delay);
+      } else if (!didFinalFetch) {
+        // human_agreement may be computed by the backend just after the run is
+        // marked complete. One extra fetch a moment later picks it up so the
+        // "Show disagreements" button appears without a manual reload.
+        didFinalFetch = true;
+        timer = setTimeout(tick, 1500);
       }
     };
     tick();
@@ -1048,11 +1055,7 @@ export default function EvaluatorRunDetailPage() {
                     Previous
                   </button>
                   <span className="text-sm text-muted-foreground tabular-nums px-2">
-                    Item{" "}
-                    {currentItem
-                      ? (originalIndexByUuid.get(currentItem.uuid) ?? safeIndex + 1)
-                      : Math.min(safeIndex + 1, Math.max(total, 1))}{" "}
-                    of {itemsForRun.length}
+                    Item {Math.min(safeIndex + 1, Math.max(total, 1))} of {total}
                   </span>
                   <button
                     onClick={() =>
