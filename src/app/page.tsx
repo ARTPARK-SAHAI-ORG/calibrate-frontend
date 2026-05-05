@@ -7,43 +7,65 @@ import { IntegrationLogoMarquee } from "@/components/landing/IntegrationLogoMarq
 import { AboutMarketingSection } from "@/components/landing/AboutMarketingSection";
 import Link from "next/link";
 
-const tabs = [
-  {
-    id: "stt",
-    label: "Speech to text",
-    headingBold: "Benchmark providers",
-    headingLight: "to find the best fit for your use case",
-    description:
-      "Go beyond simplistic rule-based metrics towards accurate evaluations by comparing the meaning of the transcriptions with the reference texts",
-    images: ["/stt-leaderboard.png", "/stt-output.png"],
-  },
+type LandingFeatureSection = {
+  headingBold: string;
+  headingLight: string;
+  description: string;
+  images: string[];
+};
+
+type LandingTab = {
+  id: string;
+  label: string;
+  sections: LandingFeatureSection[];
+};
+
+const tabs: LandingTab[] = [
   {
     id: "llm",
-    label: "LLM Tests",
-    headingBold: "Choose the best LLM",
-    headingLight: "by evaluating multi-turn conversations",
-    description:
-      "Test the agent's tool calling and response quality by defining specific edge cases and benchmark them across multiple models, proprietary or open source",
-    images: ["/llm-output.png", "/llm-ui.png"],
+    label: "Text agents",
+    sections: [
+      {
+        headingBold: "Choose the best LLM",
+        headingLight: "by evaluating multi-turn conversations",
+        description:
+          "Test the agent's tool calling and response quality by defining specific edge cases and benchmark them across multiple models, proprietary or open source",
+        images: ["/llm-output.png", "/llm-ui.png"],
+      },
+    ],
   },
   {
-    id: "tts",
-    label: "Text to speech",
-    headingBold: "Select the perfect voice",
-    headingLight: "for your agent",
-    description:
-      "Automated evaluations using models that compare the reference texts with the generated audio samples without an intermediate transcription step help you select the right provider",
-    images: ["/tts-leaderboard.png", "/tts-output.png"],
+    id: "voice",
+    label: "Voice agents",
+    sections: [
+      {
+        headingBold: "Benchmark providers",
+        headingLight: "to find the best fit for your use case",
+        description:
+          "Go beyond simplistic rule-based metrics towards accurate evaluations by comparing the meaning of the transcriptions with the reference texts",
+        images: ["/stt-leaderboard.png", "/stt-output.png"],
+      },
+      {
+        headingBold: "Select the perfect voice",
+        headingLight: "for your agent",
+        description:
+          "Automated evaluations using models that compare the reference texts with the generated audio samples without an intermediate transcription step help you select the right provider",
+        images: ["/tts-leaderboard.png", "/tts-output.png"],
+      },
+    ],
   },
-
   {
     id: "simulations",
     label: "Simulations",
-    headingBold: "Simulate realistic conversations",
-    headingLight: "to catch bugs before deployment",
-    description:
-      "Define user personas and scenarios your agent should handle to run simulated conversations with automated evaluations based on metrics defined by you",
-    images: ["/simulation-run.png"],
+    sections: [
+      {
+        headingBold: "Simulate realistic conversations",
+        headingLight: "to catch bugs before deployment",
+        description:
+          "Define user personas and scenarios your agent should handle to run simulated conversations with automated evaluations based on metrics defined by you",
+        images: ["/simulation-run.png"],
+      },
+    ],
   },
 ];
 
@@ -52,7 +74,7 @@ import { ARTPARK_WEBSITE_URL, WHATSAPP_INVITE_URL } from "@/constants/links";
 const GITHUB_REPO_URL = "https://github.com/artpark-sahai-org/calibrate";
 
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState("stt");
+  const [activeTab, setActiveTab] = useState("llm");
   const [getStartedTab, setGetStartedTab] = useState<"evaluate" | "learn">(
     "evaluate",
   );
@@ -61,6 +83,39 @@ export default function HomePage() {
   useEffect(() => {
     document.title = "Calibrate | AI evaluation platform for NGOs";
   }, []);
+
+  const activeLandingTab = tabs.find((t) => t.id === activeTab);
+  const activeSections = activeLandingTab?.sections ?? [];
+
+  const desktopSectionRow = (sec: LandingFeatureSection, secIdx: number) => (
+    <div
+      key={secIdx}
+      className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6 md:gap-8 items-start"
+    >
+      <div className="text-left lg:sticky lg:top-8">
+        <h2 className="text-2xl md:text-3xl lg:text-4xl leading-[1.2] tracking-[-0.01em] mb-4 md:mb-6">
+          <span className="font-medium text-gray-900">{sec.headingBold}</span>{" "}
+          <span className="font-normal text-gray-400">{sec.headingLight}</span>
+        </h2>
+        <p className="text-sm md:text-base text-gray-500">{sec.description}</p>
+      </div>
+      <div className="flex flex-col gap-4">
+        {sec.images.map((src, idx) => (
+          <div key={idx} className="rounded-xl overflow-hidden shadow-xl">
+            <img
+              src={src}
+              alt={
+                activeSections.length > 1
+                  ? `${activeLandingTab?.label ?? "Feature"} preview ${secIdx + 1}-${idx + 1}`
+                  : `Feature preview ${idx + 1}`
+              }
+              className="w-full h-auto"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div
@@ -179,68 +234,51 @@ export default function HomePage() {
         </div>
 
         {/* Desktop: Tabbed view */}
-        <div className="hidden md:grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6 md:gap-8 items-start">
-          {/* Left - Text Content */}
-          <div className="text-left lg:sticky lg:top-8">
-            <h2 className="text-2xl md:text-3xl lg:text-4xl leading-[1.2] tracking-[-0.01em] mb-4 md:mb-6">
-              <span className="font-medium text-gray-900">
-                {tabs.find((t) => t.id === activeTab)?.headingBold}
-              </span>{" "}
-              <span className="font-normal text-gray-400">
-                {tabs.find((t) => t.id === activeTab)?.headingLight}
-              </span>
-            </h2>
-            {/* Description */}
-            <p className="text-sm md:text-base text-gray-500">
-              {tabs.find((t) => t.id === activeTab)?.description}
-            </p>
-          </div>
-
-          {/* Right - Images Stack (one per row, full height) */}
-          <div className="flex flex-col gap-4">
-            {(tabs.find((t) => t.id === activeTab)?.images || []).map(
-              (src, idx) => (
-                <div key={idx} className="rounded-xl overflow-hidden shadow-xl">
-                  <img
-                    src={src}
-                    alt={`Feature preview ${idx + 1}`}
-                    className="w-full h-auto"
-                  />
-                </div>
-              ),
+        {activeSections.length > 1 ? (
+          <div className="hidden md:flex flex-col gap-12 md:gap-16 max-w-7xl mx-auto">
+            {activeSections.map((sec, secIdx) =>
+              desktopSectionRow(sec, secIdx),
             )}
           </div>
-        </div>
+        ) : activeSections[0] ? (
+          <div className="hidden md:block">
+            {desktopSectionRow(activeSections[0], 0)}
+          </div>
+        ) : null}
 
         {/* Mobile: All sections stacked */}
         <div className="md:hidden space-y-12">
           {tabs.map((tab) => (
-            <div key={tab.id} className="space-y-4">
-              <div className="text-left">
-                <h2 className="text-2xl leading-[1.2] tracking-[-0.01em] mb-3">
-                  <span className="font-medium text-gray-900">
-                    {tab.headingBold}
-                  </span>{" "}
-                  <span className="font-normal text-gray-400">
-                    {tab.headingLight}
-                  </span>
-                </h2>
-                <p className="text-sm text-gray-500">{tab.description}</p>
-              </div>
-              <div className="flex flex-col gap-4">
-                {tab.images.map((src, idx) => (
-                  <div
-                    key={idx}
-                    className="rounded-xl overflow-hidden shadow-xl"
-                  >
-                    <img
-                      src={src}
-                      alt={`${tab.label} preview ${idx + 1}`}
-                      className="w-full h-auto"
-                    />
+            <div key={tab.id} className="space-y-12">
+              {tab.sections.map((sec, secIdx) => (
+                <div key={secIdx} className="space-y-4">
+                  <div className="text-left">
+                    <h2 className="text-2xl leading-[1.2] tracking-[-0.01em] mb-3">
+                      <span className="font-medium text-gray-900">
+                        {sec.headingBold}
+                      </span>{" "}
+                      <span className="font-normal text-gray-400">
+                        {sec.headingLight}
+                      </span>
+                    </h2>
+                    <p className="text-sm text-gray-500">{sec.description}</p>
                   </div>
-                ))}
-              </div>
+                  <div className="flex flex-col gap-4">
+                    {sec.images.map((src, idx) => (
+                      <div
+                        key={idx}
+                        className="rounded-xl overflow-hidden shadow-xl"
+                      >
+                        <img
+                          src={src}
+                          alt={`${tab.label} preview ${secIdx + 1}-${idx + 1}`}
+                          className="w-full h-auto"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           ))}
         </div>

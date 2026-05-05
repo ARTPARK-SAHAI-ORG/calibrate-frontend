@@ -1128,7 +1128,7 @@ This enables:
 │   │   ├── metrics/           # Evaluation metrics (has layout.tsx)
 │   │   ├── simulations/       # End-to-end simulation testing (has layout.tsx)
 │   │   ├── human-labelling/   # Hub (?tab=overview|tasks|annotators); tasks/[uuid], jobs/[token], annotators/[uuid], evaluator-runs/[runUuid]
-│   │   ├── page.tsx           # Landing page (marketing: hero eyebrow + pitch, features, integrations, community, etc.)
+│   │   ├── page.tsx           # Landing page (marketing: hero eyebrow + pitch, feature tabs w/ multi-section Voice agents, integrations, community, etc.)
 │   │   ├── login/             # Login page with email/password and Google OAuth (has layout.tsx)
 │   │   ├── signup/            # Signup page with registration form and password validation (has layout.tsx)
 │   │   └── api/auth/          # NextAuth.js route handlers
@@ -1253,7 +1253,7 @@ The root page serves as a marketing-style landing page with a consistent light t
 
 1. **Navigation bar**: Uses `<LandingHeader />` component with "Login" button linking to `/login`
 2. **Hero section**: An **eyebrow line** (muted, small type) sits **above** the hero `<h1>` to convey institutional credibility before the pitch—see **Hero eyebrow** below. Then the large responsive headline (**“AI evaluation” / “platform for NGOs”**, with an intentional `<br />` inside the `<h1>`) and muted subtitle about ML researchers / best practices (no hero CTA; primary actions live in `<LandingHeader />`). Heading scales from `text-4xl` (mobile) to `text-6xl` (`md+`). A **launch video** embed (YouTube `…/_VS8KQbBxKs`, autoplay+mute query params, 16:9, rounded iframe) **exists in source but is commented out** below the subtitle in `src/app/page.tsx`; uncomment that block if marketing ships the clip again—while commented, visitors do **not** see a video in the hero.
-3. **Feature Tabs section**: Tab switcher with feature previews
+3. **Feature Tabs section**: Three marketing tabs—**Text agents**, **Voice agents** (speech-to-text + text-to-speech previews in one pill), **Simulations**—with **Text agents** selected by default on desktop; in-product **LLM Tests** naming on **`/tests`** is unchanged
 4. **Open source — procurement & trust**: **“Proudly open source”** headline plus a **no-paywall / dogfooding** tagline, then a **four-tile** procurement-diligence grid, then one **dark GitHub button** linking to the Calibrate repo — `bg-gray-50`, `border-y` — **see dedicated subsection**. Placement is **before** integrations.
 5. **Integrations section** (`bg-white`): Headline “Works with any AI agent stack” and subtitle about major models (both in `max-w-5xl mx-auto text-center`), then **`<IntegrationLogoMarquee />`** (full-width strip, **outside** the headline wrapper), then the primary CTA row (“See all integrations” to docs integrations) in `max-w-5xl` with `mt-8 md:mt-10` — infinite horizontal **logo + name chips** from **`src/components/landing/IntegrationLogoMarquee.tsx`**
 6. **Community section** (`bg-gray-50`): WhatsApp bordered CTA plus **calendar CTA** (`https://cal.com/amandalmia/30min`; label in source may read **“Let's talk”** or **“Book a demo”**) laid out in **one horizontal row** (`flex flex-row flex-wrap items-center justify-center gap-3 md:gap-4` on `src/app/page.tsx`); buttons can **wrap to two lines** on very narrow widths instead of overflowing. Has `id="join-community"` for anchor linking (`LandingHeader` "Talk to us" defaults here). No Twitter/X links in this section—LinkedIn appears only in the footer Community column.
@@ -1273,11 +1273,13 @@ The root page serves as a marketing-style landing page with a consistent light t
 
 **Feature Tabs:**
 
-- Tabs: "Speech to text", "LLM Tests", "Text to speech", "Simulations"
-- State managed via `useState` with `activeTab` (default: "stt")
-- Tab data defined as array: `{ id, label, headingBold, headingLight, description, images }` where `images` is an array of image paths
-- **Desktop behavior** (`md+`): Tab switcher visible (`hidden md:flex`), clicking tabs switches content via state, two-column layout with sticky text
-- **Mobile behavior** (below `md`): Tabs completely hidden, all four sections rendered stacked in a single scrollable flow (`md:hidden space-y-12`), no tab state interaction needed
+- **Purpose**: Groups related capabilities for scanning: **text-side** agent benchmarking first (**Text agents** / LLM-focused copy), **voice-side** benchmarking second (**Voice agents**—legacy separate STT/TTS marketing rows merged into one tab), then **simulations**. App routes (**`/stt`**, **`/tts`**, **`/tests`**, **`/simulations`**) are unchanged; only the **landing** chrome consolidates speech IN/OUT previews.
+- **Tab order & labels** (desktop pill strip and mobile vertical order of whole tabs): **"Text agents"** → **"Voice agents"** → **"Simulations"**. Internal IDs: **`"llm"`** (Text agents), **`"voice"`** (Voice agents), **`"simulations"`** (`useState` **`activeTab`** — default **`"llm"`**). These IDs are **not** the same strings as evaluator wire types (**`stt`** / **`tts`**) or sidebar **`NavItem`** route keys.
+- **Data model** (`src/app/page.tsx`): Each entry is **`{ id, label, sections[] }`** where **`sections`** is **`LandingFeatureSection[]`**: **`{ headingBold, headingLight, description, images: string[] }`**. Single-feature tabs (**llm**, **simulations**) use **`sections`** of length **1**. **Voice agents** uses **two sections**—first retains the former **Speech to text** copy + **`stt-*`** images; second retains the former **Text to speech** copy + **`tts-*`** images.
+- **Rendering pattern** — **within** the selected tab:
+  - **Desktop** (`md+`): **`sections.length === 1`**: one **`lg:grid-cols-[400px_1fr]`** row (sticky text left, images right) wrapped in **`hidden md:block`**. **`sections.length > 1`** (Voice agents): vertical stack **`hidden md:flex flex-col gap-12 md:gap-16 max-w-7xl mx-auto`**, repeating the **same grid row** per section so users see STT headline + body + screenshots, **then** TTS headline + body + screenshots (**`desktopSectionRow`** helper in **`HomePage`**).
+  - **Mobile** (`below md`): Tabs hidden; **`tabs.map`** nests **`tab.sections.map`**—**`space-y-12`** **between tabs**, **`space-y-12`** **between sections inside one tab**, **`space-y-4`** **inside each section** (copy block then image stack).
+- **Gotcha — naming vs Get Started**: Feature tabs no longer expose separate pills for STT/TTS; the **Evaluate** column still lists **distinct** docs links (**speech-to-text** / **text-to-speech**) and their card titles—not driven by **`tabs`**. Align copy if marketing wants verbal parity (**LLM Tests** vs **Text agents** gotcha remains for the **text-to-text** quickstart card).
 
 **Constants:**
 
@@ -1287,12 +1289,10 @@ The root page serves as a marketing-style landing page with a consistent light t
 **Feature Section Layout:**
 
 - **Container**: Full width with responsive padding (`px-6 md:px-8 lg:px-12`) - mobile uses `px-6` for comfortable margin from screen edges
-- **Desktop tabs** (`md+`): Centered with `max-w-7xl mx-auto`, pill buttons use `px-5 py-2.5 text-sm`, active tab has `bg-white shadow-sm`
-- **Desktop grid** (`md+`): `grid-cols-1 lg:grid-cols-[400px_1fr] gap-6 md:gap-8` - two-column on `lg+`
-  - **Left column**: Two-tone headline (`text-2xl md:text-3xl lg:text-4xl`) + description, sticky on scroll (`lg:sticky lg:top-8`)
-  - **Right column**: Images stacked vertically (`flex-col gap-4`)
-- **Mobile layout** (below `md`): All sections shown sequentially (`space-y-12`), each with heading (`text-2xl`), description (`text-sm`), and images
-- Static files in `public/`: **`artpark-mark.webp`** (follows hero eyebrow **`ARTPARK`** link text—it is **after** that word inside the `<a>`), **`team/aman.jpeg`** and **`team/jigar.jpeg`** (**AboutMarketingSection** portraits), `logo.svg` (app logo, uses `currentColor`), `logo-dark.svg` (white stroke for dark backgrounds), **`integrations/`** (mirrored raster marks for the landing integrations marquee—see **Integrations Section**), `stt_1.png` to `stt_4.png`, `tts_1.png` to `tts_4.png`, `llm-leaderboard.png`, `llm-output.png`, `simulation-all.png`, `simulation-run.png`
+- **Desktop tabs** (`md+`): Centered pill strip (`hidden md:flex`, `max-w-7xl mx-auto`), **`px-5 py-2.5 text-sm`**, active tab **`bg-white shadow-sm`**; **`setActiveTab(id)`** on click
+- **Desktop content panel** (`md+`): Driven by **`activeLandingTab`** + **`activeSections`** in **`HomePage`**. **`sections.length === 1`**: a single **`lg:grid-cols-[400px_1fr]`** row (**sticky** text **`lg:sticky lg:top-8`**, images **`flex-col gap-4`**). **`sections.length > 1`** (Voice agents): **multiple** stacked rows (**`gap-12 md:gap-16`**), each row reusing that same grid — avoids one sticky column trying to summarize two unrelated narratives
+- **Mobile layout** (`below md`): Tabs hidden; **`md:hidden space-y-12`** separates **whole tabs**, inner **`tab.sections`** also **`space-y-12`**; each **`section`** uses **`space-y-4`** between copy and image stack (**`text-2xl`** headline tier, **`text-sm`** body)
+- **Feature-preview rasters** (canonical paths live on **`LandingFeatureSection.images`** entries under **`tabs[]`** → **`sections[]`** in **`src/app/page.tsx`**): **`llm-output.png`**, **`llm-ui.png`**, **`stt-leaderboard.png`**, **`stt-output.png`**, **`tts-leaderboard.png`**, **`tts-output.png`**, **`simulation-run.png`** (each **`/…`** under **`public/`**). Other landing assets often include **`artpark-mark.webp`**, team portraits **`team/*.jpeg`**, **`logo.svg`** / **`logo-dark.svg`**, **`integrations/`** — see **Integrations Section**.
 
 **Integrations Section:**
 
