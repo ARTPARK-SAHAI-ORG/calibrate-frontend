@@ -2,7 +2,7 @@
 
 [![CC BY-SA 4.0][cc-by-sa-shield]][cc-by-sa]
 
-Evaluation platform for **AI agents** (supporting both text and voice agents).
+Frontend for [Calibrate](https://calibrate.artpark.ai): Evaluation platform for **AI agents** (both text and voice agents).
 
 ## Prerequisites
 
