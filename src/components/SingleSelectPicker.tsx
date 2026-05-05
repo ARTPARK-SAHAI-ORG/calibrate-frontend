@@ -39,7 +39,7 @@ export function SingleSelectPicker<T>({
   renderTrigger,
   renderOption,
   matchesSearch,
-  searchPlaceholder = "Search...",
+  searchPlaceholder = "Search",
   loading = false,
   loadingLabel = "Loading",
   emptyLabel = "No items found",

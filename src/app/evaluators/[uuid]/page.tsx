@@ -1,8 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { useAccessToken } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
 import { useSidebarState } from "@/lib/sidebar";
@@ -17,6 +26,7 @@ import type { LLMModel } from "@/components/agent-tabs/constants/providers";
 import { RatingScaleEditor } from "@/components/evaluators/RatingScaleEditor";
 import { VersionCard } from "@/components/evaluators/VersionCard";
 import { extractVariableNames } from "@/lib/evaluatorVariables";
+import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 
 async function getEvaluatorErrorMessage(
   response: Response,
@@ -89,10 +99,59 @@ type EvaluatorDetail = {
   evaluator_type?: EvaluatorType;
 };
 
+type TrendSeriesPoint = {
+  bucket_start: string;
+  bucket_end: string;
+  agreement: number | null;
+  pair_count: number;
+};
+
+type TrendVersion = {
+  version_id: string;
+  version_number: number;
+  is_live: boolean;
+  current: number | null;
+  pair_count: number;
+  series: TrendSeriesPoint[];
+};
+
+type TrendTask = {
+  task_id: string;
+  task_name: string;
+  current: number | null;
+  pair_count: number;
+  series: TrendSeriesPoint[];
+};
+
+type EvaluatorTrendResponse = {
+  evaluator_id: string;
+  evaluator_name: string;
+  bucket: string;
+  days: number;
+  filters: { task_id: string | null; version_id: string | null };
+  overall: { current: number | null; pair_count: number; series: TrendSeriesPoint[] };
+  versions: TrendVersion[];
+  tasks: TrendTask[];
+};
+
+type EvaluatorPageTab = "prompts" | "agreement";
+
 export default function EvaluatorDetailPage() {
+  return (
+    <Suspense fallback={null}>
+      <EvaluatorDetailPageInner />
+    </Suspense>
+  );
+}
+
+function EvaluatorDetailPageInner() {
   const router = useRouter();
   const params = useParams<{ uuid: string }>();
   const uuid = params?.uuid;
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab");
+  const resolvedInitialTab: EvaluatorPageTab =
+    initialTab === "agreement" ? "agreement" : "prompts";
   const backendAccessToken = useAccessToken();
   const [sidebarOpen, setSidebarOpen] = useSidebarState();
 
@@ -100,6 +159,19 @@ export default function EvaluatorDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [settingLiveUuid, setSettingLiveUuid] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<EvaluatorPageTab>(resolvedInitialTab);
+
+  const handleTabChange = useCallback((tab: EvaluatorPageTab) => {
+    setActiveTab(tab);
+    window.history.replaceState(null, "", `?tab=${tab}`);
+  }, []);
+  const [trend, setTrend] = useState<EvaluatorTrendResponse | null>(null);
+  const [trendLoading, setTrendLoading] = useState(false);
+  const [trendError, setTrendError] = useState<string | null>(null);
+  const [trendTaskId, setTrendTaskId] = useState<string>("all");
+  // Full task list from the unfiltered fetch — kept stable so the picker
+  // always shows all options regardless of which task is currently selected.
+  const [trendAllTasks, setTrendAllTasks] = useState<TrendTask[]>([]);
 
   // Edit dialog state
   const [editOpen, setEditOpen] = useState(false);
@@ -452,6 +524,49 @@ export default function EvaluatorDetailPage() {
     }
   };
 
+  const fetchTrend = useCallback(async () => {
+    if (!backendAccessToken || !uuid) return;
+    setTrendLoading(true);
+    setTrendError(null);
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) throw new Error("BACKEND_URL is not set");
+      const params = new URLSearchParams({ bucket: "week", days: "90" });
+      if (trendTaskId !== "all") params.set("task_id", trendTaskId);
+      const res = await fetch(
+        `${backendUrl}/annotation-agreement/evaluator/${uuid}/trend?${params}`,
+        {
+          headers: {
+            accept: "application/json",
+            Authorization: `Bearer ${backendAccessToken}`,
+          },
+        },
+      );
+      if (res.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+      if (!res.ok) throw new Error("Failed to fetch agreement trend");
+      const data: EvaluatorTrendResponse = await res.json();
+      setTrend(data);
+      if (trendTaskId === "all") {
+        setTrendAllTasks(data.tasks ?? []);
+      }
+    } catch (err) {
+      setTrendError(
+        err instanceof Error ? err.message : "Failed to load agreement trend",
+      );
+    } finally {
+      setTrendLoading(false);
+    }
+  }, [backendAccessToken, uuid, trendTaskId]);
+
+  useEffect(() => {
+    if (activeTab === "agreement") {
+      fetchTrend();
+    }
+  }, [activeTab, fetchTrend]);
+
   const formatDateTime = (iso: string): string => {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
@@ -590,37 +705,68 @@ export default function EvaluatorDetailPage() {
               )}
             </div>
 
-            {/* Tabs (only Prompts for now, hidden for default evaluators) */}
+            {/* Tabs (hidden for default evaluators) */}
             {!isDefault && (
               <div className="flex items-center gap-4 md:gap-6 border-b border-border overflow-x-auto">
-                <button className="pb-2 text-sm md:text-base font-medium border-b-2 border-foreground text-foreground cursor-pointer whitespace-nowrap -mb-px">
+                <button
+                  onClick={() => handleTabChange("prompts")}
+                  className={`pb-2 text-sm md:text-base font-medium border-b-2 cursor-pointer whitespace-nowrap -mb-px transition-colors ${
+                    activeTab === "prompts"
+                      ? "border-foreground text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
                   Prompts
+                </button>
+                <button
+                  onClick={() => handleTabChange("agreement")}
+                  className={`pb-2 text-sm md:text-base font-medium border-b-2 cursor-pointer whitespace-nowrap -mb-px transition-colors ${
+                    activeTab === "agreement"
+                      ? "border-foreground text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Agreement
                 </button>
               </div>
             )}
 
-            {/* Versions */}
-            {versions.length > 0 ? (
-              <div className="space-y-3 md:space-y-4">
-                {versions.map((v) => (
-                  <VersionCard
-                    key={v.uuid}
-                    version={v}
-                    outputType={evaluator.output_type}
-                    isDefault={isDefault}
-                    isLive={v.uuid === evaluator.live_version_id}
-                    isSettingLive={settingLiveUuid === v.uuid}
-                    onSetLive={setVersionLive}
-                    formatDateTime={formatDateTime}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="border border-border rounded-xl p-8 md:p-12 flex flex-col items-center justify-center bg-muted/20">
-                <p className="text-sm md:text-base text-muted-foreground">
-                  No version configured yet
-                </p>
-              </div>
+            {/* Prompts tab content */}
+            {(isDefault || activeTab === "prompts") && (
+              versions.length > 0 ? (
+                <div className="space-y-3 md:space-y-4">
+                  {versions.map((v) => (
+                    <VersionCard
+                      key={v.uuid}
+                      version={v}
+                      outputType={evaluator.output_type}
+                      isDefault={isDefault}
+                      isLive={v.uuid === evaluator.live_version_id}
+                      isSettingLive={settingLiveUuid === v.uuid}
+                      onSetLive={setVersionLive}
+                      formatDateTime={formatDateTime}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="border border-border rounded-xl p-8 md:p-12 flex flex-col items-center justify-center bg-muted/20">
+                  <p className="text-sm md:text-base text-muted-foreground">
+                    No version configured yet
+                  </p>
+                </div>
+              )
+            )}
+
+            {/* Agreement tab content */}
+            {!isDefault && activeTab === "agreement" && (
+              <AgreementTrendTab
+                trend={trend}
+                trendLoading={trendLoading}
+                trendError={trendError}
+                trendTaskId={trendTaskId}
+                onSelectTask={setTrendTaskId}
+                allTasks={trendAllTasks}
+              />
             )}
           </>
         )}
@@ -1149,5 +1295,238 @@ export default function EvaluatorDetailPage() {
         />
       )}
     </AppLayout>
+  );
+}
+
+function averageSeriesAgreement(series: TrendSeriesPoint[]): number | null {
+  const values = series
+    .map((p) => p.agreement)
+    .filter((v): v is number => v != null);
+  if (values.length === 0) return null;
+  return values.reduce((a, b) => a + b, 0) / values.length;
+}
+
+function VersionAxisTick({
+  x,
+  y,
+  payload,
+  liveLabels,
+}: {
+  x?: number;
+  y?: number;
+  payload?: { value: string };
+  liveLabels: Set<string>;
+}) {
+  const cx = x ?? 0;
+  const cy = y ?? 0;
+  const label = payload?.value ?? "";
+  const isLive = liveLabels.has(label);
+  return (
+    <g transform={`translate(${cx},${cy})`}>
+      <text
+        x={0}
+        y={0}
+        dy={12}
+        textAnchor="middle"
+        fontSize={11}
+        fill="currentColor"
+      >
+        {label}
+      </text>
+      {isLive && (
+        <>
+          <rect
+            x={-17}
+            y={18}
+            width={34}
+            height={14}
+            rx={3}
+            className="fill-green-500/10"
+          />
+          <text
+            x={0}
+            y={29}
+            textAnchor="middle"
+            fontSize={9}
+            fontWeight={600}
+            className="fill-green-600 dark:fill-green-400"
+          >
+            Live
+          </text>
+        </>
+      )}
+    </g>
+  );
+}
+
+function AgreementTrendTab({
+  trend,
+  trendLoading,
+  trendError,
+  trendTaskId,
+  onSelectTask,
+  allTasks,
+}: {
+  trend: EvaluatorTrendResponse | null;
+  trendLoading: boolean;
+  trendError: string | null;
+  trendTaskId: string;
+  onSelectTask: (id: string) => void;
+  allTasks: TrendTask[];
+}) {
+  const { chartData, liveLabels } = useMemo(() => {
+    if (!trend?.versions?.length) return { chartData: [], liveLabels: new Set<string>() };
+    const sorted = [...trend.versions].sort((a, b) => a.version_number - b.version_number);
+    const liveSet = new Set(sorted.filter((v) => v.is_live).map((v) => `v${v.version_number}`));
+    return {
+      chartData: sorted.map((v) => ({
+        version: `v${v.version_number}`,
+        agreement: (() => {
+          const avg = averageSeriesAgreement(v.series);
+          return avg == null ? null : Math.round(avg * 100);
+        })(),
+      })),
+      liveLabels: liveSet,
+    };
+  }, [trend]);
+
+  const hasData =
+    chartData.length > 0 && chartData.some((p) => p.agreement != null);
+
+  type TaskOption = { id: string; name: string };
+  const ALL_TASKS_OPTION: TaskOption = { id: "all", name: "All tasks" };
+  const taskPickerItems: TaskOption[] = [
+    ALL_TASKS_OPTION,
+    ...allTasks.map((t) => ({ id: t.task_id, name: t.task_name })),
+  ];
+
+  return (
+    <div className="space-y-4 md:space-y-6">
+      {trendError && (
+        <div className="rounded-md border border-border bg-muted/20 p-4 text-sm text-red-500">
+          {trendError}
+        </div>
+      )}
+
+      {!trendLoading && !trendError && (
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-sm font-semibold">Agreement trend</h2>
+            <p className="text-xs text-muted-foreground">
+              How closely this evaluator aligns with human annotators across
+              versions
+            </p>
+          </div>
+          <SingleSelectPicker
+            items={taskPickerItems}
+            selectedId={trendTaskId}
+            onSelect={(item) => onSelectTask(item.id)}
+            getId={(item) => item.id}
+            renderTrigger={(item) => (
+              <span className="text-sm truncate">
+                {item?.name ?? "All tasks"}
+              </span>
+            )}
+            renderOption={(item, isSelected) => (
+              <span
+                className={`text-sm truncate ${isSelected ? "font-medium" : ""}`}
+              >
+                {item.name}
+              </span>
+            )}
+            matchesSearch={(item, q) =>
+              item.name.toLowerCase().includes(q.toLowerCase())
+            }
+            className="w-48"
+          />
+        </div>
+      )}
+
+      {trendLoading ? (
+        <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
+          </svg>
+          Loading agreement
+        </div>
+      ) : !hasData ? (
+        <div className="border border-border rounded-xl p-8 md:p-12 flex flex-col items-center justify-center bg-muted/20 text-center">
+          <svg
+            className="w-7 h-7 text-muted-foreground mb-3"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"
+            />
+          </svg>
+          <p className="text-sm font-medium text-foreground">
+            No agreement data yet
+          </p>
+          <p className="text-xs text-muted-foreground mt-1.5 max-w-sm">
+            Agreement trend will appear here once this evaluator has been run on
+            items that annotators have also labelled
+          </p>
+        </div>
+      ) : (
+        <div className="border border-border rounded-xl p-4 md:p-6">
+          <div className="w-full h-64 md:h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData}>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="rgba(125,125,125,0.15)"
+                />
+                <XAxis
+                  dataKey="version"
+                  padding={{ left: 40, right: 40 }}
+                  tick={(props) => (
+                    <VersionAxisTick {...props} liveLabels={liveLabels} />
+                  )}
+                  height={44}
+                />
+                <YAxis domain={[0, 100]} fontSize={11} unit="%" />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--background, #fff)",
+                    border: "1px solid rgba(125,125,125,0.2)",
+                    borderRadius: 8,
+                    fontSize: 12,
+                  }}
+                  formatter={(value) =>
+                    value == null ? "—" : `${value}%`
+                  }
+                />
+                <Line
+                  type="monotone"
+                  dataKey="agreement"
+                  name="Agreement"
+                  stroke="#3b82f6"
+                  strokeWidth={2}
+                  dot={{ r: 4 }}
+                  connectNulls={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

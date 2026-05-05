@@ -32,7 +32,7 @@ export function MultiSelectPicker({
   onSelectionChange,
   label,
   placeholder = "Select items",
-  searchPlaceholder = "Search...",
+  searchPlaceholder = "Search",
   isLoading = false,
   className = "",
   disabled = false,
@@ -100,7 +100,7 @@ export function MultiSelectPicker({
   }, [dropdownOpen]);
 
   const filteredItems = items.filter((item) =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase())
+    item.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const isSelected = (uuid: string) =>
@@ -151,9 +151,7 @@ export function MultiSelectPicker({
         >
           <div className="flex-1 flex flex-wrap gap-2 items-center">
             {selectedItems.length === 0 ? (
-              <span className="text-foreground/90">
-                {placeholder}
-              </span>
+              <span className="text-foreground/90">{placeholder}</span>
             ) : (
               selectedItems.map((item) => (
                 <span
@@ -207,106 +205,109 @@ export function MultiSelectPicker({
         {/* Dropdown — portaled to <body> with fixed positioning so it
             escapes any ancestor `overflow: auto` (e.g. a scrolling modal
             content area) and isn't clipped. */}
-        {dropdownOpen && !disabled && menuRect && typeof document !== "undefined" &&
+        {dropdownOpen &&
+          !disabled &&
+          menuRect &&
+          typeof document !== "undefined" &&
           createPortal(
-          <div
-            ref={menuRef}
-            style={{
-              position: "fixed",
-              left: menuRect.left,
-              top: menuRect.top,
-              width: menuRect.width,
-            }}
-            className="bg-popover text-foreground border border-border rounded-xl shadow-xl z-[100] overflow-hidden"
-          >
-            {/* Search */}
-            <div className="p-3 border-b border-border">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={searchPlaceholder}
-                className="w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-1 focus:ring-accent"
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
+            <div
+              ref={menuRef}
+              style={{
+                position: "fixed",
+                left: menuRect.left,
+                top: menuRect.top,
+                width: menuRect.width,
+              }}
+              className="bg-popover text-foreground border border-border rounded-xl shadow-xl z-[100] overflow-hidden"
+            >
+              {/* Search */}
+              <div className="p-3 border-b border-border">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={searchPlaceholder}
+                  className="w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-1 focus:ring-accent"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
 
-            {/* Options */}
-            <div className="max-h-60 overflow-y-auto">
-              {isLoading ? (
-                <div className="px-4 py-3 text-sm text-muted-foreground flex items-center gap-2">
-                  <svg
-                    className="w-4 h-4 animate-spin"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Loading
-                </div>
-              ) : filteredItems.length === 0 ? (
-                <div className="px-4 py-3 text-sm text-muted-foreground">
-                  No items found
-                </div>
-              ) : (
-                filteredItems.map((item) => (
-                  <button
-                    key={item.uuid}
-                    onClick={() => toggleItem(item)}
-                    className={`w-full px-4 py-3 text-left text-sm transition-colors cursor-pointer flex items-center justify-between ${
-                      isSelected(item.uuid)
-                        ? "bg-accent text-accent-foreground"
-                        : "text-foreground hover:bg-muted"
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <span className="block truncate">{item.name}</span>
-                      {item.description && (
-                        <span
-                          className={`block text-xs truncate mt-0.5 ${
-                            isSelected(item.uuid)
-                              ? "text-accent-foreground/75"
-                              : "text-muted-foreground"
-                          }`}
-                        >
-                          {item.description}
-                        </span>
-                      )}
-                    </div>
-                    {isSelected(item.uuid) && (
-                      <svg
-                        className="w-5 h-5 text-accent-foreground flex-shrink-0 ml-2"
-                        fill="none"
-                        viewBox="0 0 24 24"
+              {/* Options */}
+              <div className="max-h-60 overflow-y-auto">
+                {isLoading ? (
+                  <div className="px-4 py-3 text-sm text-muted-foreground flex items-center gap-2">
+                    <svg
+                      className="w-4 h-4 animate-spin"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
                         stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M4.5 12.75l6 6 9-13.5"
-                        />
-                      </svg>
-                    )}
-                  </button>
-                ))
-              )}
-            </div>
-          </div>,
-          document.body,
-        )}
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Loading
+                  </div>
+                ) : filteredItems.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-muted-foreground">
+                    No items found
+                  </div>
+                ) : (
+                  filteredItems.map((item) => (
+                    <button
+                      key={item.uuid}
+                      onClick={() => toggleItem(item)}
+                      className={`w-full px-4 py-3 text-left text-sm transition-colors cursor-pointer flex items-center justify-between ${
+                        isSelected(item.uuid)
+                          ? "bg-accent text-accent-foreground"
+                          : "text-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <span className="block truncate">{item.name}</span>
+                        {item.description && (
+                          <span
+                            className={`block text-xs truncate mt-0.5 ${
+                              isSelected(item.uuid)
+                                ? "text-accent-foreground/75"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {item.description}
+                          </span>
+                        )}
+                      </div>
+                      {isSelected(item.uuid) && (
+                        <svg
+                          className="w-5 h-5 text-accent-foreground flex-shrink-0 ml-2"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M4.5 12.75l6 6 9-13.5"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>,
+            document.body,
+          )}
       </div>
     </div>
   );
