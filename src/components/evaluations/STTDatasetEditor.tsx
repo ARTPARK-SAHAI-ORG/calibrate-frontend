@@ -332,27 +332,58 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
     const handleDownloadSampleZip = async () => {
       const zip = new JSZip();
       const audiosFolder = zip.folder("audios");
+      // Real PCM silence (not header-only): empty `data` chunks fail in QuickTime (-12842). Use 44.1 kHz
+      // and ~100 ms so consumer players and `HTMLAudioElement` duration metadata behave reliably.
       const createSilentWav = () => {
-        const buffer = new ArrayBuffer(44);
+        const sampleRate = 44_100;
+        const numChannels = 1;
+        const bitsPerSample = 16;
+        const bytesPerSample = bitsPerSample / 8;
+        const numSamples = 4410; // 100 ms
+        const dataBytes = numSamples * numChannels * bytesPerSample;
+        const blockAlign = numChannels * bytesPerSample;
+        const byteRate = sampleRate * blockAlign;
+        const fmtChunkPayload = 16;
+        const headerBytes =
+          12 + 8 + fmtChunkPayload + 8; // RIFF + fmt + data chunk headers
+        const fileSize = headerBytes + dataBytes;
+        const riffChunkSize = fileSize - 8;
+
+        const buffer = new ArrayBuffer(fileSize);
         const view = new DataView(buffer);
-        view.setUint32(0, 0x52494646, false);
-        view.setUint32(4, 36, true);
-        view.setUint32(8, 0x57415645, false);
-        view.setUint32(12, 0x666d7420, false);
-        view.setUint32(16, 16, true);
-        view.setUint16(20, 1, true);
-        view.setUint16(22, 1, true);
-        view.setUint32(24, 16000, true);
-        view.setUint32(28, 32000, true);
-        view.setUint16(32, 2, true);
-        view.setUint16(34, 16, true);
-        view.setUint32(36, 0x64617461, false);
-        view.setUint32(40, 0, true);
+        let o = 0;
+        view.setUint32(o, 0x52494646, false);
+        o += 4;
+        view.setUint32(o, riffChunkSize, true);
+        o += 4;
+        view.setUint32(o, 0x57415645, false);
+        o += 4;
+        view.setUint32(o, 0x666d7420, false);
+        o += 4;
+        view.setUint32(o, fmtChunkPayload, true);
+        o += 4;
+        view.setUint16(o, 1, true);
+        o += 2;
+        view.setUint16(o, numChannels, true);
+        o += 2;
+        view.setUint32(o, sampleRate, true);
+        o += 4;
+        view.setUint32(o, byteRate, true);
+        o += 4;
+        view.setUint16(o, blockAlign, true);
+        o += 2;
+        view.setUint16(o, bitsPerSample, true);
+        o += 2;
+        view.setUint32(o, 0x64617461, false);
+        o += 4;
+        view.setUint32(o, dataBytes, true);
+        o += 4;
         return new Uint8Array(buffer);
       };
-      audiosFolder?.file("sample_1.wav", createSilentWav());
-      audiosFolder?.file("sample_2.wav", createSilentWav());
-      audiosFolder?.file("sample_3.wav", createSilentWav());
+      const wavOpts = { compression: "STORE" as const };
+      audiosFolder?.file("sample_1.wav", createSilentWav(), wavOpts);
+      audiosFolder?.file("sample_2.wav", createSilentWav(), wavOpts);
+      audiosFolder?.file("sample_3.wav", createSilentWav(), wavOpts);
       zip.file(
         "data.csv",
         "audio_file,text\nsample_1.wav,Reference transcription for sample 1.\nsample_2.wav,Reference transcription for sample 2.\nsample_3.wav,Reference transcription for sample 3.",

@@ -75,44 +75,76 @@ export function LeaderboardBarChart({
     const svgElement = chartRef.current.querySelector("svg");
     if (!svgElement) return;
 
-    // Clone the SVG to avoid modifying the original
-    const clonedSvg = svgElement.cloneNode(true) as SVGElement;
-
-    // Get computed styles and dimensions
+    const svgNS = "http://www.w3.org/2000/svg";
     const svgRect = svgElement.getBoundingClientRect();
-    clonedSvg.setAttribute("width", String(svgRect.width));
-    clonedSvg.setAttribute("height", String(svgRect.height));
+    const w = svgRect.width;
+    const h = svgRect.height;
+    // Band at top for the same heading as the card (not inside chartRef today)
+    const titleBand = 40;
+    const totalH = titleBand + h;
 
-    // Add white background
-    const bgRect = document.createElementNS(
-      "http://www.w3.org/2000/svg",
-      "rect"
-    );
+    // Deep-clone chart SVG only; strip root width/height/viewBox from the fragment we embed
+    const chartFragment = svgElement.cloneNode(true) as SVGSVGElement;
+    chartFragment.removeAttribute("width");
+    chartFragment.removeAttribute("height");
+    chartFragment.removeAttribute("style");
+    // Serialized SVG has no CSS — Recharts leaves fill as currentColor on many ticks/labels
+    chartFragment.querySelectorAll("text, tspan").forEach((el) => {
+      const fill = el.getAttribute("fill");
+      if (!fill || fill === "currentColor") {
+        el.setAttribute("fill", "#334155");
+      }
+    });
+
+    const outer = document.createElementNS(svgNS, "svg");
+    outer.setAttribute("xmlns", svgNS);
+    outer.setAttribute("width", String(w));
+    outer.setAttribute("height", String(totalH));
+    outer.setAttribute("viewBox", `0 0 ${w} ${totalH}`);
+
+    const bgRect = document.createElementNS(svgNS, "rect");
     bgRect.setAttribute("width", "100%");
     bgRect.setAttribute("height", "100%");
     bgRect.setAttribute("fill", "white");
-    clonedSvg.insertBefore(bgRect, clonedSvg.firstChild);
+    outer.appendChild(bgRect);
 
-    // Convert SVG to data URL
-    const svgData = new XMLSerializer().serializeToString(clonedSvg);
+    const titleText = document.createElementNS(svgNS, "text");
+    titleText.setAttribute("x", "16");
+    titleText.setAttribute("y", "26");
+    titleText.setAttribute(
+      "font-family",
+      'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+    );
+    titleText.setAttribute("font-size", "15");
+    titleText.setAttribute("font-weight", "600");
+    titleText.setAttribute("fill", "#0f172a");
+    titleText.textContent = title;
+    outer.appendChild(titleText);
+
+    const chartGroup = document.createElementNS(svgNS, "g");
+    chartGroup.setAttribute("transform", `translate(0, ${titleBand})`);
+    while (chartFragment.firstChild) {
+      chartGroup.appendChild(chartFragment.firstChild);
+    }
+    outer.appendChild(chartGroup);
+
+    const svgData = new XMLSerializer().serializeToString(outer);
     const svgBlob = new Blob([svgData], {
       type: "image/svg+xml;charset=utf-8",
     });
     const svgUrl = URL.createObjectURL(svgBlob);
 
-    // Create canvas and draw image
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     const img = new Image();
 
     img.onload = () => {
-      canvas.width = svgRect.width * 2; // 2x for better quality
-      canvas.height = svgRect.height * 2;
+      canvas.width = w * 2;
+      canvas.height = totalH * 2;
       ctx?.scale(2, 2);
       ctx?.drawImage(img, 0, 0);
       URL.revokeObjectURL(svgUrl);
 
-      // Download as PNG
       const pngUrl = canvas.toDataURL("image/png");
       const downloadLink = document.createElement("a");
       downloadLink.href = pngUrl;

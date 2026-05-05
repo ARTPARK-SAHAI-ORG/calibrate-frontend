@@ -237,21 +237,91 @@ const tabs: LandingTab[] = [
     id: "voice",
     label: "Voice agents",
     navDescription:
-      "Benchmark speech-to-text and text-to-speech models using metrics suited for agents",
+      "Benchmark speech\u2011to\u2011text and text\u2011to\u2011speech models using metrics suited for agents",
     sections: [
       {
-        headingBold: "Benchmark providers",
-        headingLight: "to find the best fit for your use case",
+        headingBold: "Identify the best speech\u2011to\u2011text model",
+        headingLight: "for your users",
         description:
-          "Go beyond simplistic rule-based metrics towards accurate evaluations by comparing the meaning of the transcriptions with the reference texts",
-        images: ["/stt-leaderboard.png", "/stt-output.png"],
+          "Calibrate uses evaluators that compare the meaning of the transcriptions with the reference texts beyond simple rule-based metrics to rank different models",
+        images: [
+          "/stt-leaderboard.png",
+          "/stt-leaderboard.png",
+          "/stt-leaderboard.png",
+          "/stt-output.png",
+        ],
+        quickStart: {
+          steps: [
+            {
+              key: "stt-upload",
+              headingBold: "Upload your audios",
+              headingLight: "with reference texts",
+              image: "/stt-dataset.png",
+            },
+            {
+              key: "stt-config",
+              headingBold: "Select the language, models to compare",
+              headingLight:
+                "and the evaluators for measuring transcription accuracy",
+              image: "/stt-config.png",
+            },
+            {
+              key: "stt-leaderboard",
+              headingBold: "See the leaderboard",
+              headingLight: "across models for each metric",
+              image: "/stt-leaderboard.png",
+            },
+            {
+              key: "stt-rows",
+              headingBold: "For each model",
+              headingLight:
+                "view row-by-row results along with evaluator scores and reasoning",
+              image: "/stt-row-by-row.png",
+            },
+          ],
+        },
       },
       {
         headingBold: "Select the perfect voice",
         headingLight: "for your agent",
         description:
           "Automated evaluations using models that compare the reference texts with the generated audio samples without an intermediate transcription step help you select the right provider",
-        images: ["/tts-leaderboard.png", "/tts-output.png"],
+        images: [
+          "/tts-dataset.png",
+          "/tts-config.png",
+          "/tts-leaderboard.png",
+          "/tts-row-by-row.png",
+        ],
+        quickStart: {
+          steps: [
+            {
+              key: "tts-texts",
+              headingBold: "Add the reference texts",
+              headingLight: "to be spoken",
+              image: "/tts-dataset.png",
+            },
+            {
+              key: "tts-config",
+              headingBold: "Select the language, models to compare",
+              headingLight:
+                "and automated evaluators to measure quality of generated audio",
+              image: "/tts-config.png",
+            },
+            {
+              key: "tts-leaderboard",
+              headingBold: "See the leaderboard",
+              headingLight: "across models for each metric",
+              image: "/tts-leaderboard.png",
+            },
+            {
+              key: "tts-rows",
+              headingBold: "For each model",
+              headingLight:
+                "view row-by-row generated audio along with evaluator scores and reasoning",
+              image: "/tts-row-by-row.png",
+            },
+          ],
+        },
       },
     ],
   },
@@ -263,10 +333,44 @@ const tabs: LandingTab[] = [
     sections: [
       {
         headingBold: "Simulate realistic conversations",
-        headingLight: "to catch bugs before deployment",
-        description:
-          "Define user personas and scenarios your agent should handle to run simulated conversations with automated evaluations based on metrics defined by you",
-        images: ["/simulation-run.png"],
+        headingLight: "with your agent",
+        description: "Catch bugs before deploying your agent to real users",
+        images: [
+          "/sim-persona.png",
+          "/sim-scenario.png",
+          "/sim-overall.png",
+          "/sim-specific.png",
+        ],
+        quickStart: {
+          steps: [
+            {
+              key: "sim-personas",
+              headingBold: "Create realistic user personas",
+              headingLight: "(who your users are)",
+              image: "/sim-persona.png",
+            },
+            {
+              key: "sim-purpose",
+              headingBold: "Define what purpose",
+              headingLight: "your users are interacting with agent for",
+              image: "/sim-scenario.png",
+            },
+            {
+              key: "sim-run",
+              headingBold: "Run simulation",
+              headingLight:
+                "with the personas and scenarios + evaluators and get scores overall for the simulation",
+              image: "/sim-overall.png",
+            },
+            {
+              key: "sim-inspect",
+              headingBold: "Inspect each simulation run",
+              headingLight:
+                "with full transcript and generated audios for both agent and simulated user",
+              image: "/sim-specific.png",
+            },
+          ],
+        },
       },
     ],
   },
@@ -279,9 +383,6 @@ const GITHUB_REPO_URL = "https://github.com/artpark-sahai-org/calibrate";
 export default function HomePage() {
   const [activeFeatureSectionId, setActiveFeatureSectionId] =
     useState<string>("llm");
-  const [getStartedTab, setGetStartedTab] = useState<"evaluate" | "learn">(
-    "evaluate",
-  );
 
   // Set page title
   useEffect(() => {
@@ -322,7 +423,7 @@ export default function HomePage() {
 
   /** Section-level split headlines (quick-start intro & closing, Voice/Sim columns, section rail) */
   const landingBannerHeadlineClass =
-    "text-3xl sm:text-4xl md:text-[2.25rem] lg:text-5xl xl:text-[3rem] leading-[1.08] tracking-[-0.035em] w-full md:text-balance";
+    "text-3xl sm:text-4xl md:text-[2.25rem] lg:text-5xl xl:text-[3rem] leading-[1.08] tracking-[-0.035em] w-full";
 
   /** Per-step titles — same weight treatment, smaller scale than `landingBannerHeadlineClass` */
   const landingStepHeadlineClass =
@@ -393,7 +494,8 @@ export default function HomePage() {
               <h2 className={`${landingBannerHeadlineClass} mb-3 md:mb-4`}>
                 <span className="font-semibold text-gray-900">
                   {sec.headingBold}
-                </span>{" "}
+                </span>
+                <br />
                 <span className="font-light text-gray-500">
                   {sec.headingLight}
                 </span>
@@ -420,7 +522,8 @@ export default function HomePage() {
                 >
                   <span className="font-semibold text-gray-900">
                     {sec.quickStart.closingHeadline.headingBold}
-                  </span>{" "}
+                  </span>
+                  <br />
                   <span className="font-light text-gray-500">
                     {sec.quickStart.closingHeadline.headingLight}
                   </span>
@@ -450,7 +553,8 @@ export default function HomePage() {
               <h2 className={`${landingBannerHeadlineClass} mb-1`}>
                 <span className="font-semibold text-gray-900">
                   {sec.headingBold}
-                </span>{" "}
+                </span>
+                <br />
                 <span className="font-light text-gray-500">
                   {sec.headingLight}
                 </span>
@@ -476,7 +580,8 @@ export default function HomePage() {
                 >
                   <span className="font-semibold text-gray-900">
                     {sec.quickStart.closingHeadline.headingBold}
-                  </span>{" "}
+                  </span>
+                  <br />
                   <span className="font-light text-gray-500">
                     {sec.quickStart.closingHeadline.headingLight}
                   </span>
@@ -512,7 +617,8 @@ export default function HomePage() {
           <h2 className={`${landingBannerHeadlineClass} mb-4 md:mb-6`}>
             <span className="font-semibold text-gray-900">
               {sec.headingBold}
-            </span>{" "}
+            </span>
+            <br />
             <span className="font-light text-gray-500">{sec.headingLight}</span>
           </h2>
           <p className={landingBannerIntroDescriptionClass}>
@@ -637,17 +743,16 @@ export default function HomePage() {
           >
             <div className="flex w-max max-w-full flex-row flex-nowrap gap-3">
               {tabs.map((tab, index) => (
-                <div key={tab.id}>{renderLandingProductNavButton(tab, index)}</div>
+                <div key={tab.id}>
+                  {renderLandingProductNavButton(tab, index)}
+                </div>
               ))}
             </div>
           </nav>
 
           <div className="flex min-w-0 flex-col gap-24 md:gap-24 lg:gap-28">
             {tabs.map((tab, tabIndex) => (
-              <div
-                key={tab.id}
-                className="flex flex-col gap-10 md:gap-0"
-              >
+              <div key={tab.id} className="flex flex-col gap-10 md:gap-0">
                 <div className="md:hidden">
                   {renderLandingProductNavButton(tab, tabIndex)}
                 </div>
@@ -918,355 +1023,33 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Get Started Section */}
-      <div className="bg-gray-50 py-16 md:py-20 px-4 md:px-8 lg:px-12">
-        <div className="max-w-6xl mx-auto text-center mb-10 md:mb-16">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 mb-3 md:mb-4 tracking-[-0.02em]">
-            Start Calibrating today
-          </h2>
-          <p className="text-base md:text-xl text-gray-500">
-            Choose your path to start building reliable AI agents
-          </p>
-        </div>
-
-        {/* Mobile: Segmented tabs */}
-        <div className="md:hidden flex justify-center mb-6 max-w-6xl mx-auto">
-          <div className="inline-flex items-center gap-1 p-1 bg-gray-100 rounded-xl">
-            <button
-              onClick={() => setGetStartedTab("evaluate")}
-              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                getStartedTab === "evaluate"
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              Evaluate your agent
-            </button>
-            <button
-              onClick={() => setGetStartedTab("learn")}
-              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                getStartedTab === "learn"
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              Learn more
-            </button>
-          </div>
-        </div>
-
-        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-          {/* Left Column - Evaluate */}
-          <div
-            className={`bg-gray-50 rounded-2xl p-4 md:p-8 border border-gray-200 ${
-              getStartedTab === "learn" ? "hidden md:block" : ""
-            }`}
-          >
-            <h3 className="text-lg md:text-xl font-semibold text-gray-900 mb-4 md:mb-6">
-              Evaluate your agent
-            </h3>
-            <div className="space-y-3 md:space-y-4">
-              <a
-                href={`${process.env.NEXT_PUBLIC_DOCS_URL}/quickstart/speech-to-text`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-start gap-3 md:gap-4 p-3 md:p-4 rounded-xl bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all group"
-              >
-                <div className="text-gray-400 mt-1">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium text-gray-900">
-                    Speech to Text
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    Compare accuracy across providers on your dataset
-                  </div>
-                </div>
-                <div className="text-gray-400 group-hover:text-gray-900 transition-colors">
-                  →
-                </div>
-              </a>
-
-              <a
-                href={`${process.env.NEXT_PUBLIC_DOCS_URL}/quickstart/text-to-text`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-start gap-3 md:gap-4 p-3 md:p-4 rounded-xl bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all group"
-              >
-                <div className="text-gray-400 mt-1">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium text-gray-900">LLM Tests</div>
-                  <div className="text-sm text-gray-500">
-                    Test tool calling and response quality across models
-                  </div>
-                </div>
-                <div className="text-gray-400 group-hover:text-gray-900 transition-colors">
-                  →
-                </div>
-              </a>
-
-              <a
-                href={`${process.env.NEXT_PUBLIC_DOCS_URL}/quickstart/text-to-speech`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-start gap-3 md:gap-4 p-3 md:p-4 rounded-xl bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all group"
-              >
-                <div className="text-gray-400 mt-1">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9.348 14.651a3.75 3.75 0 010-5.303m5.304 0a3.75 3.75 0 010 5.303m-7.425 2.122a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546M5.106 18.894c-3.808-3.808-3.808-9.98 0-13.789m13.788 0c3.808 3.808 3.808 9.981 0 13.79"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium text-gray-900">
-                    Text to Speech
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    Automatically evaluate generated voices across providers
-                  </div>
-                </div>
-                <div className="text-gray-400 group-hover:text-gray-900 transition-colors">
-                  →
-                </div>
-              </a>
-
-              <a
-                href={`${process.env.NEXT_PUBLIC_DOCS_URL}/quickstart/simulations`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-start gap-3 md:gap-4 p-3 md:p-4 rounded-xl bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all group"
-              >
-                <div className="text-gray-400 mt-1">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0011.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium text-gray-900">
-                    Run simulations
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    Simulate conversations with user personas and scenarios
-                  </div>
-                </div>
-                <div className="text-gray-400 group-hover:text-gray-900 transition-colors">
-                  →
-                </div>
-              </a>
-            </div>
-          </div>
-
-          {/* Right Column - Learn More */}
-          <div
-            className={`bg-gray-50 rounded-2xl p-4 md:p-8 border border-gray-200 ${
-              getStartedTab === "evaluate" ? "hidden md:block" : ""
-            }`}
-          >
-            <h3 className="text-lg md:text-xl font-semibold text-gray-900 mb-4 md:mb-6">
-              Learn more
-            </h3>
-            <div className="space-y-3 md:space-y-4">
-              <a
-                href="#"
-                className="flex items-start gap-3 md:gap-4 p-3 md:p-4 rounded-xl bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all group"
-              >
-                <div className="text-gray-400 mt-1">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112z"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium text-gray-900">
-                    Watch the demo
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    See Calibrate in action with a guided walkthrough
-                  </div>
-                </div>
-                <div className="text-gray-400 group-hover:text-gray-900 transition-colors">
-                  →
-                </div>
-              </a>
-
-              <a
-                href={`${process.env.NEXT_PUBLIC_DOCS_URL}/core-concepts`}
-                className="flex items-start gap-3 md:gap-4 p-3 md:p-4 rounded-xl bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all group"
-              >
-                <div className="text-gray-400 mt-1">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium text-gray-900">
-                    Read documentation
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    Understand the core concepts underpinning Calibrate
-                  </div>
-                </div>
-                <div className="text-gray-400 group-hover:text-gray-900 transition-colors">
-                  →
-                </div>
-              </a>
-
-              <a
-                href="https://cal.com/amandalmia/30min"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-start gap-3 md:gap-4 p-3 md:p-4 rounded-xl bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all group"
-              >
-                <div className="text-gray-400 mt-1">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium text-gray-900">Book a demo</div>
-                  <div className="text-sm text-gray-500">
-                    Get a personalized walkthrough with our team
-                  </div>
-                </div>
-                <div className="text-gray-400 group-hover:text-gray-900 transition-colors">
-                  →
-                </div>
-              </a>
-
-              <a
-                href="https://voiceaiandvoiceagents.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-start gap-3 md:gap-4 p-3 md:p-4 rounded-xl bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all group"
-              >
-                <div className="text-gray-400 mt-1">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium text-gray-900">
-                    Guide to voice agents
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    Learn to build production-ready voice AI applications
-                  </div>
-                </div>
-                <div className="text-gray-400 group-hover:text-gray-900 transition-colors">
-                  →
-                </div>
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Final CTA Section */}
       <div className="bg-gray-900 py-16 md:py-24 px-4 md:px-8 lg:px-12">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-medium text-white mb-4 md:mb-6 leading-[1.1] tracking-[-0.02em]">
-            Ready to get started?
+            Start Calibrating today
           </h2>
           <p className="text-base md:text-xl text-gray-400 mb-8 md:mb-10">
             Become a team that ships trustworthy AI agents beyond vibe checks
           </p>
-          <Link
-            href="/login"
-            className="inline-flex items-center justify-center gap-2 md:gap-3 px-6 md:px-8 py-3 md:py-4 bg-white hover:bg-gray-100 text-gray-800 text-sm md:text-base font-medium rounded-xl transition-all duration-200 cursor-pointer"
-          >
-            Get started free
-            <span>→</span>
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-stretch sm:items-center">
+            <Link
+              href="/signup"
+              className="inline-flex items-center justify-center gap-2 md:gap-3 px-6 md:px-8 py-3 md:py-4 bg-white hover:bg-gray-100 text-gray-800 text-sm md:text-base font-medium rounded-xl transition-all duration-200 cursor-pointer"
+            >
+              Get started for free
+              <span aria-hidden>→</span>
+            </Link>
+            <a
+              href={process.env.NEXT_PUBLIC_DOCS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 md:gap-3 px-6 md:px-8 py-3 md:py-4 border border-white/40 text-white hover:bg-white/10 text-sm md:text-base font-medium rounded-xl transition-all duration-200 cursor-pointer"
+            >
+              Read the docs
+              <span aria-hidden>→</span>
+            </a>
+          </div>
         </div>
       </div>
 
