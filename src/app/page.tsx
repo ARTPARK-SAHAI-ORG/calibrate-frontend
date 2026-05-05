@@ -243,7 +243,7 @@ const tabs: LandingTab[] = [
         headingBold: "Identify the best speech\u2011to\u2011text model",
         headingLight: "for your users",
         description:
-          "Calibrate uses evaluators that compare the meaning of the transcriptions with the reference texts beyond simple rule-based metrics to rank different models",
+          "Calibrate uses evaluators that compare the meaning of the predicted transcriptions with the references beyond simple rule-based metrics to rank different models",
         images: [
           "/stt-leaderboard.png",
           "/stt-leaderboard.png",
@@ -275,7 +275,7 @@ const tabs: LandingTab[] = [
               key: "stt-rows",
               headingBold: "For each model",
               headingLight:
-                "view row-by-row results along with evaluator scores and reasoning",
+                "view row-by-row outputs along with evaluator scores and reasoning",
               image: "/stt-row-by-row.png",
             },
           ],
@@ -285,7 +285,7 @@ const tabs: LandingTab[] = [
         headingBold: "Select the perfect voice",
         headingLight: "for your agent",
         description:
-          "Automated evaluations using models that compare the reference texts with the generated audio samples without an intermediate transcription step help you select the right provider",
+          "Calibrate uses AI models which lets you evaluate the generated audios against the reference texts on pronunciation, clarity, naturalness and more",
         images: [
           "/tts-dataset.png",
           "/tts-config.png",
@@ -304,7 +304,7 @@ const tabs: LandingTab[] = [
               key: "tts-config",
               headingBold: "Select the language, models to compare",
               headingLight:
-                "and automated evaluators to measure quality of generated audio",
+                "and the evaluators to measure the quality of the generated audios",
               image: "/tts-config.png",
             },
             {
@@ -317,7 +317,7 @@ const tabs: LandingTab[] = [
               key: "tts-rows",
               headingBold: "For each model",
               headingLight:
-                "view row-by-row generated audio along with evaluator scores and reasoning",
+                "view the generated audios for each row along with evaluator scores and reasoning",
               image: "/tts-row-by-row.png",
             },
           ],
@@ -345,28 +345,29 @@ const tabs: LandingTab[] = [
           steps: [
             {
               key: "sim-personas",
-              headingBold: "Create realistic user personas",
-              headingLight: "(who your users are)",
+              headingBold: "Create user personas",
+              headingLight: "to define who your users are",
               image: "/sim-persona.png",
             },
             {
               key: "sim-purpose",
-              headingBold: "Define what purpose",
-              headingLight: "your users are interacting with agent for",
+              headingBold: "Create scenarios",
+              headingLight:
+                "to depict the purpose of the user's interaction with the agent",
               image: "/sim-scenario.png",
             },
             {
               key: "sim-run",
-              headingBold: "Run simulation",
+              headingBold: "Run a simulation",
               headingLight:
-                "with the personas and scenarios + evaluators and get scores overall for the simulation",
+                "with personas and scenarios using custom evaluators and get performance metrics across all runs",
               image: "/sim-overall.png",
             },
             {
               key: "sim-inspect",
               headingBold: "Inspect each simulation run",
               headingLight:
-                "with full transcript and generated audios for both agent and simulated user",
+                "with full transcript and generated audios for the agent and the simulated user",
               image: "/sim-specific.png",
             },
           ],
@@ -423,7 +424,7 @@ export default function HomePage() {
 
   /** Section-level split headlines (quick-start intro & closing, Voice/Sim columns, section rail) */
   const landingBannerHeadlineClass =
-    "text-3xl sm:text-4xl md:text-[2.25rem] lg:text-5xl xl:text-[3rem] leading-[1.08] tracking-[-0.035em] w-full";
+    "text-base min-[380px]:text-lg min-[440px]:text-2xl sm:text-4xl md:text-[2.25rem] lg:text-5xl xl:text-[3rem] leading-[1.08] tracking-[-0.035em] w-full";
 
   /** Per-step titles — same weight treatment, smaller scale than `landingBannerHeadlineClass` */
   const landingStepHeadlineClass =
@@ -687,31 +688,39 @@ export default function HomePage() {
           </h1>
 
           <p className="mx-auto max-w-2xl text-base text-gray-500 md:text-xl">
-            Built by ML researchers with decades of experience to help teams
+            Built by ML engineers with decades of experience to help teams
             evaluate AI agents with best practices baked into every step
           </p>
 
-          <p className="mx-auto mt-5 max-w-2xl text-balance text-center text-[11px] font-medium leading-snug tracking-wide text-gray-500 md:mt-14 md:text-[13px]">
-            <span className="font-normal text-gray-400">BUILT BY</span>{" "}
-            <a
-              href={ARTPARK_WEBSITE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mx-0.5 inline cursor-pointer text-inherit underline-offset-[3px] decoration-gray-400/80 transition-colors hover:text-gray-700 hover:decoration-gray-600"
-            >
-              <span className="whitespace-nowrap">ARTPARK</span>
-              <img
-                src="/artpark-mark.webp"
-                alt=""
-                width={32}
-                height={32}
-                className="ml-1 inline-block h-[1.05em] w-[1.05em] max-h-[14px] max-w-[14px] object-contain align-[-0.2em] md:max-h-4 md:max-w-4"
-              />
-            </a>{" "}
-            @ IISc ·{" "}
-            <span className="font-normal text-gray-400">FUNDED BY</span>{" "}
-            <span className="font-semibold tracking-wide text-gray-800">
-              GOVERNMENT OF KARNATAKA
+          <p className="mx-auto mt-12 flex max-w-2xl flex-col items-center gap-1 text-center text-[11px] font-medium leading-snug tracking-wide text-gray-500 md:mt-14 md:block md:text-[13px] md:text-balance">
+            <span className="block md:contents">
+              <span className="font-normal text-gray-400">BUILT BY</span>{" "}
+              <a
+                href={ARTPARK_WEBSITE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mx-0.5 inline cursor-pointer text-inherit underline-offset-[3px] decoration-gray-400/80 transition-colors hover:text-gray-700 hover:decoration-gray-600"
+              >
+                <span className="whitespace-nowrap">ARTPARK</span>
+                <img
+                  src="/artpark-mark.webp"
+                  alt=""
+                  width={32}
+                  height={32}
+                  className="ml-1 inline-block h-[1.05em] w-[1.05em] max-h-[14px] max-w-[14px] object-contain align-[-0.2em] md:max-h-4 md:max-w-4"
+                />
+              </a>{" "}
+              @ IISc
+            </span>
+            <span className="hidden md:inline" aria-hidden>
+              {" "}
+              ·{" "}
+            </span>
+            <span className="block md:contents">
+              <span className="font-normal text-gray-400">FUNDED BY</span>{" "}
+              <span className="font-semibold tracking-wide text-gray-800">
+                GOVERNMENT OF KARNATAKA
+              </span>
             </span>
           </p>
 
