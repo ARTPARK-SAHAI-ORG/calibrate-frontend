@@ -19,9 +19,9 @@ The platform addresses quality assurance for agent teams by providing:
 - **End-to-end simulation testing** (conversations with simulated users—**text** or **voice** runs per product rules)
 - **Benchmarking** across AI providers to pick the best configuration
 
-> **Note on naming**: The app is branded as "Calibrate" in all user-facing UI, page titles, and documentation. However, external URLs and infrastructure still reference "pense" (e.g., Discord: `https://discord.gg/9dQB4AngK2`). Documentation links use `process.env.NEXT_PUBLIC_DOCS_URL` directly. The npm package name is `calibrate-frontend`.
+> **Note on naming**: The app is branded as "Calibrate" in all user-facing UI, page titles, and documentation. Legacy infrastructure outside this repo may still reference "pense". Documentation links use `process.env.NEXT_PUBLIC_DOCS_URL` directly. The npm package name is `calibrate-frontend`.
 >
-> **Community links**: WhatsApp and Discord invite URLs are defined once in `src/constants/links.ts` (`WHATSAPP_INVITE_URL`, `DISCORD_INVITE_URL`) and imported wherever needed: `AppLayout.tsx` (Talk to Us FAB), `page.tsx` (landing page Community section), and `LandingFooter.tsx`. Always import from `@/constants/links` — never hardcode these URLs.
+> **Community links**: `WHATSAPP_INVITE_URL` and **`ARTPARK_WEBSITE_URL`** live in **`src/constants/links.ts`**. WhatsApp is imported wherever needed: `AppLayout.tsx` (Talk to Us FAB), `page.tsx` (landing Community section), and `LandingFooter.tsx`. **`ARTPARK_WEBSITE_URL`** targets `https://www.artpark.in/` and is consumed by **`page.tsx`** for the landing hero eyebrow’s ARTPARK link—never hardcode either URL alongside WhatsApp. **Discord** is not linked anywhere in the UI; **`LandingFooter`** still exposes LinkedIn under Community as **`https://linkedin.com/company/artpark`** (hardcoded, not centralized in `links.ts`).
 
 ---
 
@@ -1128,7 +1128,7 @@ This enables:
 │   │   ├── metrics/           # Evaluation metrics (has layout.tsx)
 │   │   ├── simulations/       # End-to-end simulation testing (has layout.tsx)
 │   │   ├── human-labelling/   # Hub (?tab=overview|tasks|annotators); tasks/[uuid], jobs/[token], annotators/[uuid], evaluator-runs/[runUuid]
-│   │   ├── page.tsx           # Landing page (marketing page with features, integrations, community)
+│   │   ├── page.tsx           # Landing page (marketing: hero eyebrow + pitch, features, integrations, community, etc.)
 │   │   ├── login/             # Login page with email/password and Google OAuth (has layout.tsx)
 │   │   ├── signup/            # Signup page with registration form and password validation (has layout.tsx)
 │   │   └── api/auth/          # NextAuth.js route handlers
@@ -1138,6 +1138,7 @@ This enables:
 │   │   ├── human-labelling/   # Labelling dialogs, AnnotationJobView, `AgreementStatCard` (task Overview + eval-run human agreement strip), bulk-upload shell + shared types (`bulk-upload-shared.tsx`, e.g. `AnnotatedCheckResult`)
 │   │   ├── charts/            # Recharts visualization components
 │   │   ├── icons/             # Shared SVG icon components
+│   │   ├── landing/           # Marketing-only UI (`IntegrationLogoMarquee`, `AboutMarketingSection`, etc.)
 │   │   ├── providers/         # React context providers (SessionProvider, FloatingButtonProvider)
 │   │   ├── simulation-tabs/   # Simulation detail components
 │   │   ├── test-results/      # Shared test result components
@@ -1145,7 +1146,7 @@ This enables:
 │   ├── constants/             # Static configuration data
 │   │   ├── inbuilt-tools.ts   # Built-in tool definitions
 │   │   ├── limits.tsx         # Usage limits, contact link, and showLimitToast helper
-│   │   ├── links.ts           # WHATSAPP_INVITE_URL, DISCORD_INVITE_URL - community invite links
+│   │   ├── links.ts           # `WHATSAPP_INVITE_URL`, `ARTPARK_WEBSITE_URL` — shared outbound links
 │   │   └── polling.ts         # POLLING_INTERVAL_MS (3000ms) - shared polling interval
 │   ├── hooks/                 # Custom React hooks
 │   │   ├── index.ts           # Re-exports all hooks
@@ -1219,7 +1220,7 @@ The entire Calibrate application is fully responsive and works seamlessly across
 
 ### Shared Landing Components
 
-The landing page (`/`), about page, login page, and signup page use shared header/footer components to avoid duplication:
+The landing page (`/`), login page, and signup page use shared header/footer components to avoid duplication:
 
 **`LandingHeader`** (`src/components/LandingHeader.tsx`):
 
@@ -1236,10 +1237,13 @@ The landing page (`/`), about page, login page, and signup page use shared heade
 
 **`LandingFooter`** (`src/components/LandingFooter.tsx`):
 
+- **`"use client"`** (uses `new Date()` for copyright year in JSX)
 - No props - self-contained with all links and constants
-- Contains: 3-column layout (Company, Resources, Community), copyright
-- Imports `WHATSAPP_INVITE_URL` and `DISCORD_INVITE_URL` from `@/constants/links`
-- Company column includes "Supported by ARTPARK @IISc" and "Funded by Government of Karnataka (GoK)" attribution text at the bottom
+- **Layout**: **`grid grid-cols-1 md:grid-cols-2`** (**Resources** \| **Community**); each column uses **`border-l border-gray-300 pl-6 md:pl-8`**; **`py-10 md:py-16`**, **`text-gray-500`**, top **`border-t border-gray-200`**, **`bg-gray-50`**
+- Imports **`WHATSAPP_INVITE_URL`** from **`@/constants/links`**
+- **Resources**: **Documentation** (`NEXT_PUBLIC_DOCS_URL`), **CLI** (`${NEXT_PUBLIC_DOCS_URL}/cli/overview`), **Privacy Policy** (hosted Google Doc), **Terms of Service** (hosted Google Doc) — **`Privacy`** and **`Terms`** use **`target="_blank"`** + **`rel="noopener noreferrer"`**; docs/CLI inherit default navigation (typically same tab unless users cmd-click)
+- **Community**: WhatsApp (`WHATSAPP_INVITE_URL`) and LinkedIn (`https://linkedin.com/company/artpark`, hardcoded—not in **`links.ts`**) — both **`target="_blank"`** + **`rel="noopener noreferrer"`**
+- **No Company column**: the old **`md:grid-cols-3`** **Company | Resources | Community** footer is obsolete. **Privacy** and **Terms** now sit under **Resources**. There is **no** footer link to **`/about`** — **`GET /about`** is handled in **`middleware.ts`** with a redirect to **`/#about-calibrate`** (legacy bookmarks); the live About copy is **`AboutMarketingSection`** on **`/`**. **Removed historically**: standalone **ARTPARK @ IISc / GoK** footer attribution (hero eyebrow remains canonical).
 
 ### Landing Page (`/`)
 
@@ -1248,18 +1252,28 @@ The root page serves as a marketing-style landing page with a consistent light t
 **Layout (top to bottom):**
 
 1. **Navigation bar**: Uses `<LandingHeader />` component with "Login" button linking to `/login`
-2. **Hero section**: Large, responsive headline and subtitle (no CTA button - moved to header); heading scales from `text-4xl` on mobile to `text-6xl` on desktop, with matching responsive padding and margin. Includes an embedded YouTube launch video (`https://www.youtube.com/embed/_VS8KQbBxKs?autoplay=1&mute=1`) below the subtitle with 16:9 aspect ratio, rounded corners, and shadow styling. Video autoplays muted (browsers require `mute=1` for autoplay to work).
+2. **Hero section**: An **eyebrow line** (muted, small type) sits **above** the hero `<h1>` to convey institutional credibility before the pitch—see **Hero eyebrow** below. Then the large responsive headline (**“AI evaluation” / “platform for NGOs”**, with an intentional `<br />` inside the `<h1>`) and muted subtitle about ML researchers / best practices (no hero CTA; primary actions live in `<LandingHeader />`). Heading scales from `text-4xl` (mobile) to `text-6xl` (`md+`). A **launch video** embed (YouTube `…/_VS8KQbBxKs`, autoplay+mute query params, 16:9, rounded iframe) **exists in source but is commented out** below the subtitle in `src/app/page.tsx`; uncomment that block if marketing ships the clip again—while commented, visitors do **not** see a video in the hero.
 3. **Feature Tabs section**: Tab switcher with feature previews
-4. **Integrations section**: Provider grid showing supported STT/TTS/LLM providers
-5. **Open Source section**: GitHub link and self-hosting info (`bg-gray-50`)
-6. **Community section**: WhatsApp/Discord join buttons + social links (X, LinkedIn), has `id="join-community"` for anchor linking
-7. **Get Started section**: Two-column card layout with CTAs
-8. **Final CTA section**: Dark background (`bg-gray-900`) with "Ready to get started?" headline and "Get started free" button linking to `/login`
-9. **Footer**: Three-column links (Company, Resources, Community) in `md:grid-cols-3` + copyright (`bg-gray-50`)
+4. **Open source — procurement & trust**: **“Proudly open source”** headline plus a **no-paywall / dogfooding** tagline, then a **four-tile** procurement-diligence grid, then one **dark GitHub button** linking to the Calibrate repo — `bg-gray-50`, `border-y` — **see dedicated subsection**. Placement is **before** integrations.
+5. **Integrations section** (`bg-white`): Headline “Works with any AI agent stack” and subtitle about major models (both in `max-w-5xl mx-auto text-center`), then **`<IntegrationLogoMarquee />`** (full-width strip, **outside** the headline wrapper), then the primary CTA row (“See all integrations” to docs integrations) in `max-w-5xl` with `mt-8 md:mt-10` — infinite horizontal **logo + name chips** from **`src/components/landing/IntegrationLogoMarquee.tsx`**
+6. **Community section** (`bg-gray-50`): WhatsApp bordered CTA plus **calendar CTA** (`https://cal.com/amandalmia/30min`; label in source may read **“Let's talk”** or **“Book a demo”**) laid out in **one horizontal row** (`flex flex-row flex-wrap items-center justify-center gap-3 md:gap-4` on `src/app/page.tsx`); buttons can **wrap to two lines** on very narrow widths instead of overflowing. Has `id="join-community"` for anchor linking (`LandingHeader` "Talk to us" defaults here). No Twitter/X links in this section—LinkedIn appears only in the footer Community column.
+7. **Team** (`bg-white`): **`AboutMarketingSection`** — **landing-only** (no **`/about`** page). Outer shell **`id="about-calibrate"`** + **`scroll-mt-20`**, inner **`max-w-5xl mx-auto`**, **between** Community and **Get Started**. Deep link **`/#about-calibrate`**. **`GET /about`** **redirects** in **`middleware.ts`** to **`/#about-calibrate`** for legacy links.
+8. **Get Started section** (`bg-gray-50`): Two-column card layout with CTAs (**headline in source**: *“Start Calibrating today”*)
+9. **Final CTA section**: Dark background (`bg-gray-900`) with "Ready to get started?" headline and "Get started free" button linking to `/login`
+10. **Footer**: Two-column **`LandingFooter`** (**Resources**, **Community**) in **`md:grid-cols-2`** + copyright (`bg-gray-50`)
+
+**Hero eyebrow** (`src/app/page.tsx`, inside the centered hero stack above the `<h1>`):
+
+- **Why**: Trust framing before the headline—Artpark linkage (with official site outbound), IISc framing, Karnataka funding, open source—in one line above the `<h1>`. **Typography hierarchy**: **BUILT BY** and **FUNDED BY** are **quiet labels** (`text-gray-400 font-normal`) so **ARTPARK** (link), **`@ IISc`**, **GOVERNMENT OF KARNATAKA** (**semibold**), and the **open-source pill** read as the **scannable** anchors—matching the earlier “dampen lead-in / emphasize entity” treatment for GoK vs “funded by”.
+- **What**: Single `<p>` with structure **BUILT BY** in a muted **`<span className="text-gray-400 font-normal">`** (same treatment as **FUNDED BY**) → **linked ARTPARK block** (`<a>` …): **`<span>ARTPARK</span>`** then **`/artpark-mark.webp`** `<img>` — then **`@ IISc ·`** → **`FUNDED BY`** in **`<span className="text-gray-400 font-normal">`** → **`GOVERNMENT OF KARNATAKA`** in **`font-semibold text-gray-800 tracking-wide`** → middot → **open-source pill** **`<span>`**: `rounded-md border border-emerald-200/90 bg-emerald-50/90`, compact padding, **`uppercase`** + **`tracking-wider`** + **`font-semibold text-emerald-950`** (pill-only uppercase — body text **Open source** in JSX becomes **OPEN SOURCE** visually). The mark stays **decorative** `alt=""`.
+- **Styling**: Eyebrow `<p>` uses `text-[11px] md:text-[13px]`, **`font-medium`**, **`text-gray-500`**, `tracking-wide`, `text-balance`, `leading-snug`, `max-w-2xl mx-auto`, `mb-3 md:mb-4` (unwrapped runs like **`@ IISc ·`** and middots inherit this **gray-500** + **medium** weight). **Quiet labels** override with **`text-gray-400 font-normal`**. ARTPARK `<a>` remains **`inline`** with `text-inherit`, underline/decoration, hover to darker gray (`cursor-pointer`, `mx-0.5`); `<img>` **`inline-block`**, **`align-[-0.2em]`**, **`object-contain`**, **`ml-1`**, size caps **`max-h-[14px] max-w-[14px] md:max-h-4 md:max-w-4`**, **`h-[1.05em] w-[1.05em]`** — **no `rounded-sm`** on the mark. **Open source** pill: `inline-block align-baseline`, `rounded-md`, `px-1.5 py-0.5`, `text-[10px] md:text-[11px]`, `font-semibold uppercase tracking-wider`, `text-emerald-950`, `border border-emerald-200/90 bg-emerald-50/90`, `shadow-[0_1px_0_rgba(0,0,0,0.04)]` so it **pops** without dominating the hero.
+- **Relationship**: **Single placement** for ARTPARK / IISc / GoK / open-source positioning on the public shell still holds for **body copy**: `LandingFooter` does **not** repeat the old attribution block—but the eyebrow is no longer purely plain text because of the outbound ARTPARK link + mark. Coordinate marketing/legal if footer or eyebrow copy changes again.
+- **Gotcha**: Do **not** wrap the whole eyebrow (including **@ IISc**) in Tailwind **`uppercase`** / CSS **`text-transform: uppercase`**—it would corrupt **IISc** → **IISC**. **`uppercase`** is **only** on the **open-source pill** `<span>`, not on the whole `<p>`. Keep **`@ IISc`** as a literal JSX string; the **`ARTPARK`** link label stays uppercase by choice. If the institutional site URL changes, update **`ARTPARK_WEBSITE_URL`** only (`links.ts`). **`inline-flex`/`items-center` + icon before the word** was dropped: use **`inline` + `<span>` + `inline-block`** on the **`img`** with **`align-[-0.2em]`** so the favicon aligns with eyebrow caps and **reading order stays “ARTPARK” then mark**.
+- **Dependencies**: **`ARTPARK_WEBSITE_URL`** in `links.ts`; static **`public/artpark-mark.webp`**. No npm packages beyond existing stack.
 
 **Feature Tabs:**
 
-- Tabs: "Speech to text", "LLM Evaluation", "Text to speech", "Simulations"
+- Tabs: "Speech to text", "LLM Tests", "Text to speech", "Simulations"
 - State managed via `useState` with `activeTab` (default: "stt")
 - Tab data defined as array: `{ id, label, headingBold, headingLight, description, images }` where `images` is an array of image paths
 - **Desktop behavior** (`md+`): Tab switcher visible (`hidden md:flex`), clicking tabs switches content via state, two-column layout with sticky text
@@ -1267,8 +1281,8 @@ The root page serves as a marketing-style landing page with a consistent light t
 
 **Constants:**
 
-- `WHATSAPP_INVITE_URL` and `DISCORD_INVITE_URL` - imported from `@/constants/links` (shared across landing page, `LandingFooter`, and `AppLayout`)
-- `GITHUB_REPO_URL` - GitHub repo link, defined locally in landing page, used in Open Source section
+- `WHATSAPP_INVITE_URL` and **`ARTPARK_WEBSITE_URL`** — imported from `@/constants/links` (landing `page.tsx` uses both for the Community CTAs and the hero ARTPARK link; `LandingFooter` and `AppLayout` import WhatsApp only)
+- **GitHub repo URL** — landing `src/app/page.tsx` defines **`GITHUB_REPO_URL`** (`https://github.com/artpark-sahai-org/calibrate`) for the **open source section’s primary button** only (not `links.ts`). **`LandingHeader`**’s GitHub icon still uses its **own hardcoded** repo URL in **`LandingHeader.tsx`** — keep both in sync if the org/repo moves. **Removed from this page**: module-level **`CALIBRATE_SELF_HOST_README_URL`** / **`CC_BY_SA_LICENSE_URL`** (there is **no** separate self-host or Creative Commons text link under the tiles anymore; those destinations are reached via the **repo** after clicking the button, or via **`README.md`** in this repo for the frontend’s own license blurb).
 
 **Feature Section Layout:**
 
@@ -1278,46 +1292,49 @@ The root page serves as a marketing-style landing page with a consistent light t
   - **Left column**: Two-tone headline (`text-2xl md:text-3xl lg:text-4xl`) + description, sticky on scroll (`lg:sticky lg:top-8`)
   - **Right column**: Images stacked vertically (`flex-col gap-4`)
 - **Mobile layout** (below `md`): All sections shown sequentially (`space-y-12`), each with heading (`text-2xl`), description (`text-sm`), and images
-- Static files in `public/`: `logo.svg` (app logo, uses `currentColor`), `logo-dark.svg` (white stroke for dark backgrounds), `stt_1.png` to `stt_4.png`, `tts_1.png` to `tts_4.png`, `llm-leaderboard.png`, `llm-output.png`, `simulation-all.png`, `simulation-run.png`
+- Static files in `public/`: **`artpark-mark.webp`** (follows hero eyebrow **`ARTPARK`** link text—it is **after** that word inside the `<a>`), **`team/aman.jpeg`** and **`team/jigar.jpeg`** (**AboutMarketingSection** portraits), `logo.svg` (app logo, uses `currentColor`), `logo-dark.svg` (white stroke for dark backgrounds), **`integrations/`** (mirrored raster marks for the landing integrations marquee—see **Integrations Section**), `stt_1.png` to `stt_4.png`, `tts_1.png` to `tts_4.png`, `llm-leaderboard.png`, `llm-output.png`, `simulation-all.png`, `simulation-run.png`
 
 **Integrations Section:**
 
-- **Background**: White (`bg-white`) with responsive padding (`py-16 md:py-24 px-4 md:px-8 lg:px-12`)
-- **Headline**: `text-3xl md:text-4xl lg:text-5xl`
-- **Subtitle**: `text-base md:text-xl`
-- **CTA buttons** (`px-5 md:px-6 py-2.5 md:py-3 text-sm md:text-base`, open in new tab):
-  - "Integration overview" → Primary filled dark button (`bg-gray-900 text-white hover:bg-gray-800`), links to `${process.env.NEXT_PUBLIC_DOCS_URL}/integrations`
-  - "Request new integration" → Secondary outlined button (`border border-gray-300 text-gray-900 hover:bg-gray-50`), links to `https://forms.gle/AoGE6DMs7N4DNAK2A`
-- **Provider grid**: 5×4 bordered grid (text-only, no icons) showing 20 providers:
-  - Row 1: Deepgram, ElevenLabs, OpenAI, Google
-  - Row 2: Cartesia, Anthropic, Groq, DeepSeek
-  - Row 3: Smallest AI, Claude, Gemini, Qwen
-  - Row 4: Meta, Mistral, Cohere, Sarvam
-  - Row 5: AI21, Baidu, NVIDIA, Amazon
-- **Grid styling**: `grid-cols-4` (4 columns at all breakpoints), `border border-gray-200 rounded-xl`, cells with responsive padding `p-3 md:p-5`, provider names use `text-xs md:text-sm font-medium text-center` for better fit on mobile
+- **Shell** (`src/app/page.tsx`): **`bg-white py-16 md:py-24 px-4 md:px-8 lg:px-12`** — sits after procurement **`bg-gray-50` + `border-y`**, before Community (`bg-gray-50`).
+- **Placement** (`src/app/page.tsx`): Comes **after** the **open source — procurement & trust** block and **before** **Community**. Headline and subtitle in `max-w-5xl mx-auto text-center`; then the marquee as a **sibling** (full width of the section); then the “See all integrations” CTA row in `max-w-5xl` below the marquee (`mt-8 md:mt-10`; docs URL `NEXT_PUBLIC_DOCS_URL` + `/integrations`). Marquee replaces an older integrations **text grid**: marketing is now **logo + label chips** only.
+- **Component & wiring**: **`IntegrationLogoMarquee`** (`src/components/landing/IntegrationLogoMarquee.tsx`, `"use client"`). **`INTEGRATION_BRANDS`**: `{ name, slug: string | null, logoUrl? }` (~20 brands). **Custom marks** (all current **`slug: null`** rows) use **`logoUrl`** values that are **root-relative paths** served from **`public/integrations/`**: `cartesia.jpg`, `cohere.png`, `smallest-ai.jpg`, `sarvam.png`, `ai21.webp`, `groq.png`—wired through module constants **`CARTESIA_LOGO_URL`**, **`COHERE_LOGO_URL`**, **`SMALLEST_AI_LOGO_URL`**, **`SARVAM_LOGO_URL`**, **`AI21_LOGO_URL`**, **`GROQ_LOGO_URL`** (e.g. **`/integrations/cartesia.jpg`**). **Why**: bundle the rasters with the app so the marquee does **not** depend on third-party CDNs (PR Newswire, GitHub avatars, Play image hosts, image-search thumbs, mirrors) at runtime. To add or refresh an asset, drop the file under **`public/integrations/`** and point the constant at the path; use a **filename extension that matches the real decode** (some downloads are PNG even if the workflow started as “jpg”). A new **`slug: null`** row **without** **`logoUrl`** still uses **initials**. Slug rows load **Simple Icons** over the network. **`BrandChip`** mapping must **always pass `logoUrl={b.logoUrl}`** (reduced motion + **both** marquee duplicates) or custom paths are ignored.
+- **Logo resolution** (`brandImageSrc`): **`logoUrl` first** (today: same-origin **`/integrations/...`**), else **`slug`** → Simple Icons `https://cdn.jsdelivr.net/npm/simple-icons/icons/{slug}.svg`, else **initials** (`brandInitials`). **`onError`** still falls back to initials if a file is renamed or missing. **Contrast gotcha** unchanged: dark plates on **`bg-gray-50`** chips may need a different master file. **Legal / brand**: mirrored files are **vendor marks**—keep usage within each company’s guidelines when replacing sources.
+- **Assets & tooling**: Plain **`<img>`** with **`@next/next/no-img-element`** disabled for both **remote Simple Icons SVGs** and **local integration rasters**. **`next/image`** is still not required for these chip icons. **Runtime deps**: **jsDelivr Simple Icons** for slug rows only; **custom chips** resolve from **`public/`** (no extra remote hop). **Stale mirror**: promotional artwork can age out—re-copy from official press kits when marketing asks rather than trusting old scrapes indefinitely.
+- **A11y**: Animated marquee wrapper is **`aria-hidden`** with a **`sr-only`** paragraph listing **`INTEGRATION_NAMES_LIST`** sentence. **`prefers-reduced-motion: reduce`**: **`usePrefersReducedMotion`** swaps to `<section aria-label="Supported integrations">` and **`flex-wrap`** chips (same props as marquee—still pass **`logoUrl`**).
+- **Animation**: Seamless loop by rendering **`INTEGRATION_BRANDS` twice** in one `.integration-marquee-track` (`w-max`); duplicate row uses React keys like `` `${b.name}-dup` ``. CSS **`@keyframes integration-marquee`** in **`globals.css`** translates **0 → -50%** (~48s); edge fade via **`mask-image` / `-webkit-mask-image`** on the overflow wrapper.
+- **Chips styling**: `rounded-xl border border-gray-200 bg-gray-50`, `32×32` **`object-contain`** + label `text-sm font-medium whitespace-nowrap`; track gap `gap-10 pr-10 md:gap-14 md:pr-14`.
 
-**Open Source Section:**
 
-- **Background**: Light gray (`bg-gray-50`) with responsive padding (`py-16 md:py-24 px-4 md:px-8 lg:px-12`)
-- **Headline**: "Proudly open source" - same font as hero (sentence case)
-- **Subtitle**: Links to run "locally" or "self-hosted" (underlined, `hover:text-gray-900`)
-- **GitHub button**: Dark button (`bg-gray-900`) using `GITHUB_REPO_URL` constant, with GitHub logo and star icon
+**Open source — procurement & trust** (`src/app/page.tsx`, comment `{/* Open source — procurement & trust */}`):
+
+- **Why**: One **public** section carries both **product integrity** (“what we ship is what you can inspect—no paywalled ‘real’ version”) and **organizational reassurance** (tiles for infrastructure, seats, auditability, lock-in) before the integrations marquee. Section order stays **trust → provider breadth**.
+- **Placement**: **Immediately after** Feature Tabs, **immediately before** Integrations.
+- **Shell**: `bg-gray-50`, `border-y border-gray-100`, `py-16 md:py-24 px-4 md:px-8 lg:px-12`. Banding downstream (from **`src/app/page.tsx`**) stays **alternating** from integrations onward: **Integrations** `bg-white`, **Community** `bg-gray-50`, **Team** (`#about-calibrate`) `bg-white`, **Get Started** `bg-gray-50`, then **`bg-gray-900`** **Final CTA**, then **`LandingFooter`** **`bg-gray-50`**. **Gotcha**: Tweaking one section’s **`bg-*`** often means flipping an **adjacent** section so **integrations through get-started** never show **two consecutive** identical light shells (e.g. back-to-back **`bg-white`** without a gray stripe between).
+- **Intro** (`max-w-5xl mx-auto text-center`, `mb-10 md:mb-14`): **`<h2>`** — *“Proudly open source”* — `text-3xl md:text-4xl lg:text-[2.5rem] font-medium text-gray-900 mb-3 md:mb-4 leading-[1.15] tracking-[-0.02em] text-balance`. **Lead `<p>`** immediately below: *“What we open-source is what we use ourselves. Nothing hidden behind a paywall.”* — `text-base md:text-lg text-gray-500 max-w-2xl mx-auto text-pretty leading-relaxed`. **Relationship**: **CC BY-SA** and self-host detail are **not** duplicated as extra links here; users get **README / LICENSE** on **GitHub** via the button. The root **`README.md`** in **this** repo still states the frontend’s license for developers cloning the codebase.
+- **Tile grid**: `max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6`. Four **cards**: `rounded-2xl border border-gray-200 bg-white p-5 md:p-7 text-left shadow-sm`. Each card: **icon** (`h-10 w-10` rounded-xl `bg-gray-100`, Heroicons-style **stroke** SVGs inlined — **not** a shared component), **`<h3>`** (`text-lg font-semibold`), body (`text-sm md:text-[15px] text-gray-500 leading-relaxed`). **Copy convention**: Tile **bodies** are **short and parallel** — typically **two beats** (no long role lists or multi-clause paragraphs); tuned for CFO/IT **scanning** next to the **Self-hosting** card’s brevity. **Tile themes (headlines + gist)** — verify exact wording in **`page.tsx`**: (1) **Self-hosting** — we help run Calibrate on **your** infra so sensitive data stays in **environments you control**; (2) **No per-seat pricing. Ever.** — no per-user fees as programs grow; no shoving features behind a **higher tier** when headcount rises; (3) **Auditable, end to end** — full **codebase on GitHub** for pre-deploy review and **real** diligence; **IT, funders, boards** get **traceable** answers, not a **black box**; (4) **No vendor lock-in** — **fork, adapt, keep running** if maintenance stops; **evaluations and data** stay **portable** under the **same open license**. **Gotcha**: Headlines and bodies change in marketing passes often; **`page.tsx`** is canonical — this list is a **semantic** map, not a verbatim dump.
+- **GitHub CTA** (below tiles): Centered wrapper `max-w-5xl mx-auto mt-10 md:mt-12 flex justify-center`. Single **`<a>`** — **`inline-flex items-center gap-2 md:gap-3`**, **`px-4 md:px-6 py-3 md:py-4`**, **`bg-gray-900 border border-gray-900 rounded-xl`**, **`hover:bg-gray-800`**, **`cursor-pointer`**, `target="_blank"` `rel="noopener noreferrer"`, **`href={GITHUB_REPO_URL}`**. Contents: GitHub **fill** SVG (`w-6 h-6 md:w-8 md:h-8 text-white shrink-0`, `aria-hidden`), **`<span className="text-white text-sm md:text-base font-medium">`** `artpark-sahai-org/calibrate` **`</span>`**, decorative **★** in **`text-gray-400`** with **`aria-hidden`**. **Why**: Restores the **pre–text-link** treatment (one strong repo affordance instead of three underlined middot links). **Pattern**: Same **dark pill** vocabulary as other primary outbound actions on the page (e.g. integrations **See all integrations** uses `bg-gray-900` / `rounded-lg` — open source uses **`rounded-xl`** and icon + repo slug label for GitHub affordance).
+- **Gotchas**: Re-adding **self-host** or **license** links requires new constants or `links.ts` entries again — they are **intentionally** not on the landing section today. Header GitHub icon URL remains **separate** from **`GITHUB_REPO_URL`** (see **Constants**).
 
 **Community Section:**
 
 - **ID**: `id="join-community"` with `scroll-mt-20` for nav offset when scrolling
-- **Background**: White (`bg-white`) with responsive padding (`py-16 md:py-24 px-4 md:px-8 lg:px-12`)
+- **Background**: Light gray (`bg-gray-50`) with responsive padding (`py-16 md:py-24 px-4 md:px-8 lg:px-12`) — **alternate** stripe after integrations (`bg-white`) so borders between sections remain visible without extra rules
 - **Headline**: `text-3xl md:text-4xl lg:text-5xl`
 - **Subtitle**: `text-base md:text-xl`
-- **Join buttons** (row 1, bordered style with icons, `px-4 md:px-6 py-2.5 md:py-3 text-sm md:text-base`):
-  - "WhatsApp" - uses `WHATSAPP_INVITE_URL` from `@/constants/links` (green WhatsApp icon)
-  - "Discord" - uses `DISCORD_INVITE_URL` from `@/constants/links` (indigo Discord icon)
-- **Book a demo** (row 2, filled black style with calendar icon, same responsive sizing): Opens `https://cal.com/amandalmia/30min` in new tab
-- **Social links** (row 3, text links): "Follow @artikiagents" and "Connect on LinkedIn"
+- **CTA row**: Both actions are sibling `<a>` elements in one flex container (not nested in separate column wrappers). **`flex-row` + `flex-wrap`** keeps them side-by-side at typical breakpoints while allowing wrap on constrained widths (`gap-3 md:gap-4`).
+- **WhatsApp**: Bordered/light style (`border border-gray-300 … hover:bg-gray-50`), icon + label, uses `WHATSAPP_INVITE_URL` from `@/constants/links` (green WhatsApp icon), sizing `px-4 md:px-6 py-2.5 md:py-3 text-sm md:text-base`.
+- **Book a demo / Let's talk**: Filled black button (`bg-black text-white hover:bg-gray-800`), calendar icon, same responsive padding/type scale as WhatsApp link; opens `https://cal.com/amandalmia/30min` in a new tab (**button label** is whatever marketing sets in **`page.tsx`**)
+
+**Team (`#about-calibrate`, landing only)**
+
+- **Component**: **`AboutMarketingSection`** (`src/components/landing/AboutMarketingSection.tsx`) — **Team** block only (**no** “Our Vision” copy). Wrapper **`text-center`**. **`<h2>`**: `text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 mb-4 md:mb-6 leading-[1.1] tracking-[-0.02em]` (matches integrations / get-started bands). **Subtitle** (marketing copy in source): *“The people building Calibrate at ARTPARK”* — `text-base md:text-xl text-gray-500 max-w-2xl mx-auto mb-10 md:mb-14`. **Grid**: `grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 max-w-3xl mx-auto text-left` (constrains the two cards under the wide **`max-w-5xl`** page shell). Each member: whole-card **`<a>`** to LinkedIn with **`aria-label`** *“{Name} on LinkedIn”*, **`rounded-2xl border border-gray-200 bg-white p-5 md:p-7 shadow-sm hover:border-gray-300 hover:shadow-md transition-all cursor-pointer`**, **`flex flex-col sm:flex-row sm:items-center gap-4 md:gap-5`**, **`group`**. **`img`**: `/team/aman.jpeg` \| `/team/jigar.jpeg`, **`width`/`height={112}`**, tailwind **`w-24 h-24 sm:w-28 sm:h-28`**, **`rounded-full object-cover bg-gray-200`**, **`mx-auto sm:mx-0`**. **`<h3>`**: `text-lg font-semibold text-gray-900` + **`group-hover:text-gray-700`**. Role line: `text-sm md:text-[15px] text-gray-500 leading-relaxed mt-1`. **Visible** *LinkedIn →* row: **`text-sm font-medium`**, underline-on-hover on the **group** — the **`<p>`** wrapping that row is **`aria-hidden`** so SR users are not announced duplicate link text (the **`aria-label`** on **`<a>`** is sufficient). Plain **`<img>`** (same `@next/next/no-img-element` trade-offs as other landing rasters). Stateless — **no** **`"use client"`** in this file.
+- **Landing** (`src/app/page.tsx`): Full-width **`bg-white`** shell with **`id="about-calibrate"`**, **`scroll-mt-20`**, `py-16 md:py-24 px-4 md:px-8 lg:px-12`, inner **`max-w-5xl mx-auto`**.
 
 **Get Started Section:**
 
-- **Background**: Light gray (`bg-gray-50`) with responsive padding (`py-16 md:py-20 px-4 md:px-8 lg:px-12`) - alternates with Community section above
+- **Background**: Light gray (`bg-gray-50`) with responsive padding (`py-16 md:py-20 px-4 md:px-8 lg:px-12`) — **after** Team (**`bg-white`**) so bands **alternate** before the dark **Final CTA**. **Contrast gotcha**: Outer shell and **column** wrappers both use **`bg-gray-50`**; separation comes from **`border border-gray-200`**, **`rounded-2xl`**, and **`bg-white`** link cards inside each column.
+
 - **Headline**: `text-3xl md:text-4xl lg:text-5xl` with `tracking-[-0.02em]` for tight letter spacing
 - **State management**: Uses `getStartedTab` state (`"evaluate" | "learn"`) to control which column is visible on mobile
 - **Mobile behavior** (below `md`):
@@ -1354,10 +1371,10 @@ Uses `<LandingFooter />` component. See "Shared Landing Components" section abov
 
 **Styling Patterns:**
 
-- **Consistent light theme** throughout - alternating white (`bg-white`) and light gray (`bg-gray-50`) backgrounds
+- **Consistent light theme** throughout — alternating **`bg-white`** / **`bg-gray-50`** on full-width **`page.tsx`** section shells from **integrations** onward: **integrations** white → **community** gray-50 → **vision & team** white → **get started** gray-50 → **final CTA** dark → **footer** gray-50. **Get Started** uses **gray-on-gray** column chrome with **white** link cards inside (see **Get Started Section**).
 - **DM Sans font** applied via inline style: `style={{ fontFamily: 'var(--font-dm-sans), system-ui, -apple-system, sans-serif' }}`
 - **All headlines**: `font-medium text-gray-900 leading-[1.1] tracking-[-0.02em]` for consistent typography
-- **Headline casing**: Sentence case - first letter of first word capitalized, rest lowercase except proper nouns (AI, LLM, STT, TTS, Calibrate, etc.)
+- **Headline casing**: Sentence case across most marketing blocks—**exception**: the hero **eyebrow** mixes **ALL CAPS** lead-in (**BUILT BY** / institution line), link text **ARTPARK**, and a literal **@ IISc** segment that must preserve **IISc** casing (never apply `uppercase` to that slice of the eyebrow — see **Hero eyebrow**).
 - **Subtitles**: `text-base md:text-xl text-gray-500`
 - **Tabs container**: `inline-flex bg-gray-100 rounded-xl p-1` with active tab having white background and shadow; horizontally scrollable on small screens via `overflow-x-auto`
 - **Image containers**: `rounded-xl overflow-hidden shadow-xl` - simple container without fixed aspect ratio
@@ -1456,28 +1473,6 @@ Registration page for new users.
 - "Documentation" - Header text link (tertiary style, gray text), opens `process.env.NEXT_PUBLIC_DOCS_URL` in new tab; **hidden on very small screens** (`hidden sm:inline-block`)
 - "Talk to us" - Header button (outlined/secondary style), scrolls to `#join-community` section
 
-### About Page (`/about`)
-
-Public page (no auth required) with information about Calibrate and the team.
-
-**Structure:**
-
-- Uses `<LandingHeader showLogoLink talkToUsHref="/#join-community" />` - logo links to `/`, "Talk to us" button links to landing page's community section
-- Uses `<LandingFooter />` - same footer as landing page
-
-**Content sections:**
-
-- Our Vision: Voice AI challenges and Calibrate's solution
-- Team: 2-column grid (`max-w-xl`, left-aligned) with clickable team member cards linking to LinkedIn. Profile images at `/team/aman.jpeg` and `/team/jigar.jpeg` with `bg-gray-200` fallback
-
-**Responsive Design:**
-
-- Container: Responsive padding `px-4 md:px-8 py-16 md:py-24` for comfortable spacing on mobile
-- Section margins: `mb-12 md:mb-16` between sections
-- Headings: `text-2xl md:text-3xl` for responsive scaling
-- Heading margins: `mb-4 md:mb-6` for proper spacing
-- Team grid gap: `gap-6 md:gap-8` for responsive card spacing
-
 ### Authentication Flow
 
 The app supports two authentication methods:
@@ -1493,20 +1488,21 @@ The app supports two authentication methods:
 
 **Middleware** (`src/middleware.ts`) protects routes:
 
-- **Public pages** (no auth check, always accessible): `/` (landing), `/about`, `/terms`, `/privacy`, `/api/auth/*`, `/debug*`, `/docs*`
+- **Public pages** (no auth check, always accessible): `/` (landing), `/terms`, `/privacy`, `/api/auth/*`, `/debug*`, `/docs*` — plus **`/login`** and **`/signup`** as handled below. **`/about`** is **not** a page: middleware **redirects** it to **`/#about-calibrate`** on the landing page.
 - **Auth pages** (`/login`, `/signup`): Accessible to unauthenticated users; authenticated users are redirected to `/agents`
 - **Protected pages** (everything else): Unauthenticated users are redirected to `/login`
 - **Maintenance mode**: When `MAINTENANCE_MODE=true`, all non-API routes redirect to `/`
 
 **Middleware implementation details:**
 
+- **`/about` legacy URL**: After the **maintenance-mode** early-outs, **`pathname === "/about"`** returns **`NextResponse.redirect(new URL("/#about-calibrate", req.url))`** — handled **outside** the long public-route **`if`** that starts with **`isHomePage`** (so **`/about`** is never a “normal” public document route). Ensures bookmarks and external links hit the **Team** section on **`/`**.
 - **Dual auth check**: `isLoggedIn = hasNextAuthSession || hasJwtCookie` - supports both Google OAuth (NextAuth session) and email/password (JWT cookie)
 - `hasNextAuthSession` checks `!!req.auth` (NextAuth session)
 - `hasJwtCookie` checks `!!req.cookies.get("access_token")?.value` (JWT from email/password login)
 - `isHomePage` checks for `/` and is included in the public routes check (not just used for maintenance mode)
 - `isAuthPage` combines `isLoginPage` and `isSignupPage` to handle both auth pages uniformly
 - Public routes return `NextResponse.next()` early, before any auth checks
-- Order matters: public routes → auth page redirect for logged-in users → protected route redirect for logged-out users
+- Order matters: **maintenance** → **`/about` redirect** → public routes → auth page redirect for logged-in users → protected route redirect for logged-out users
 
 **Email/Password Auth:**
 
@@ -1753,12 +1749,9 @@ The entire application is fully responsive and works on mobile, tablet, and desk
 - **Button**: 48×48px circle (`w-12 h-12 rounded-full`), uses `bg-foreground text-background` (theme-aware), shows a chat bubble icon (three dots in a circle)
 - **Open state**: Icon changes to an X (close icon), button color changes to `bg-muted-foreground`
 - **Popup**: Appears above the FAB (`absolute bottom-14 right-0`), 224px wide (`w-56`), rounded card with border and shadow
-  - "Join WhatsApp" — green WhatsApp icon, uses `WHATSAPP_INVITE_URL` from `@/constants/links`
-  - "Join Discord" — indigo Discord icon, uses `DISCORD_INVITE_URL` from `@/constants/links`
-  - Both links open in new tabs (`target="_blank"`)
+  - "Join WhatsApp" — green WhatsApp icon, uses `WHATSAPP_INVITE_URL` from `@/constants/links` (same URL as landing Community section); opens in a new tab (`target="_blank"` `rel="noopener noreferrer"`)
 - **State**: `talkToUsOpen` boolean state, toggled by clicking the FAB
 - **Click-outside**: Uses a `talkToUsRef` ref with the same `mousedown` click-outside handler that manages the profile dropdown
-- **Note**: The community invite URLs here differ from those on the landing page (see naming note at the top of this file)
 - **Hidden when dialogs open**: The FAB automatically hides when any dialog, sidebar, or modal is open. This uses a global context provider (`FloatingButtonProvider`) that tracks a hide count. Any component can call the `useHideFloatingButton(isOpen)` hook to participate in this behavior:
   
   ```tsx
@@ -4895,7 +4888,7 @@ Set `MAINTENANCE_MODE=true` in `.env.local` to show a maintenance page. When ena
 
 ### Navigation
 
-- **Home redirect**: Root page (`/`) redirects to `/agents`
+- **`/` and app entry**: **`/` is the public landing page** (`src/app/page.tsx`); middleware does **not** redirect `/` → `/agents`. Logged-in users visiting `/login` or `/signup` are redirected to `/agents`; **`/` remains readable** regardless of auth (unless **`MAINTENANCE_MODE=true`**, when non-API routes redirect to `/`—see middleware).
 - **Tab persistence**: Agent detail, simulation detail, and the Evaluators list page (`/evaluators?tab=default|mine`) persist their active tab in the URL (`?tab=...`) so refreshing maintains tab state. Agent/simulation detail use `window.history.replaceState`; the evaluators list uses `router.replace` plus a `useSearchParams`-driven re-sync (see the "Active tab persistence" note in section 8).
 - **Back navigation**: Detail pages include back button to list view
 
@@ -5008,7 +5001,7 @@ window.history.replaceState(null, "", `?tab=${tabName}`);
 
 - **Middleware matcher**: Excludes static assets (`_next/static`, `_next/image`, `favicon.ico`, `*.svg`, `*.png`, `*.jpg`, `*.jpeg`, `*.gif`, `*.webp`, `*.ico`)
 - **Protected routes**: All routes except public routes require authentication
-- **Public routes** (no auth required): `/`, `/login`, `/signup`, `/about`, `/terms`, `/privacy`, `/api/auth/*`, `/debug*`, `/docs*` (proxied to Mintlify via Vercel rewrite)
+- **Public routes** (no auth required): `/`, `/login`, `/signup`, `/terms`, `/privacy`, `/api/auth/*`, `/debug*`, `/docs*` (proxied to Mintlify via Vercel rewrite). **`/about`** redirects to **`/#about-calibrate`** (see **`middleware.ts`**).
 - **Session access**: Use `useSession()` in client components, `auth()` in server components
 - **Token expiration**: Backend returns 401 when JWT expires; always handle this by clearing localStorage, cookie, and calling `signOut({ callbackUrl: "/login" })`
 - **Import pattern**: Always import both `useSession` and `signOut` from `next-auth/react` when making API calls

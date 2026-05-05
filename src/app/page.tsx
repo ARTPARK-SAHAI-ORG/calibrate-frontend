@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { LandingHeader } from "@/components/LandingHeader";
 import { LandingFooter } from "@/components/LandingFooter";
+import { IntegrationLogoMarquee } from "@/components/landing/IntegrationLogoMarquee";
+import { AboutMarketingSection } from "@/components/landing/AboutMarketingSection";
 import Link from "next/link";
 
 const tabs = [
@@ -45,20 +47,19 @@ const tabs = [
   },
 ];
 
-import { WHATSAPP_INVITE_URL, DISCORD_INVITE_URL } from "@/constants/links";
+import { ARTPARK_WEBSITE_URL, WHATSAPP_INVITE_URL } from "@/constants/links";
 
 const GITHUB_REPO_URL = "https://github.com/artpark-sahai-org/calibrate";
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState("stt");
   const [getStartedTab, setGetStartedTab] = useState<"evaluate" | "learn">(
-    "evaluate"
+    "evaluate",
   );
 
   // Set page title
   useEffect(() => {
-    document.title =
-      "Calibrate | Evaluation and testing framework for voice agents";
+    document.title = "Calibrate | AI evaluation platform for NGOs";
   }, []);
 
   return (
@@ -99,19 +100,51 @@ export default function HomePage() {
         <div className="absolute top-40 right-1/4 w-48 h-48 bg-blue-100 rounded-full blur-3xl opacity-40"></div>
 
         <div className="relative max-w-4xl mx-auto px-4 md:px-8 pt-16 md:pt-24 pb-12 md:pb-16 text-center">
+          <p className="text-balance text-[11px] md:text-[13px] font-medium text-gray-500 mb-3 md:mb-4 max-w-2xl mx-auto leading-snug tracking-wide">
+            <span className="text-gray-400 font-normal">BUILT BY</span>{" "}
+            <a
+              href={ARTPARK_WEBSITE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline text-inherit underline-offset-[3px] decoration-gray-400/80 hover:text-gray-700 hover:decoration-gray-600 transition-colors cursor-pointer mx-0.5"
+            >
+              <span className="whitespace-nowrap">ARTPARK</span>
+              <img
+                src="/artpark-mark.webp"
+                alt=""
+                width={32}
+                height={32}
+                className="inline-block align-[-0.2em] h-[1.05em] w-[1.05em] max-h-[14px] max-w-[14px] md:max-h-4 md:max-w-4 ml-1 object-contain"
+              />
+            </a>{" "}
+            @ IISc ·{" "}
+            <span className="text-gray-400 font-normal">FUNDED BY</span>{" "}
+            <span className="font-semibold text-gray-800 tracking-wide">
+              GOVERNMENT OF KARNATAKA
+            </span>{" "}
+            ·{" "}
+            <span className="inline-block align-baseline rounded-md border border-emerald-200/90 bg-emerald-50/90 px-1.5 py-0.5 text-[10px] md:text-[11px] font-semibold uppercase tracking-wider text-emerald-950 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
+              Open source
+            </span>
+          </p>
+
           <h1 className="text-4xl md:text-6xl font-medium text-gray-900 leading-[1.1] mb-4 md:mb-6 tracking-[-0.02em]">
-            Simulation and evaluation 
+            AI evaluation
             <br />
-            studio for voice agents
+            platform for NGOs
           </h1>
 
           <p className="text-base md:text-xl text-gray-500 max-w-2xl mx-auto">
-            Run simulations with realistic user personas for key scenarios and evaluate every component of your voice agent to ship with confidence  
+            Built by ML researchers with decades of experience to help teams
+            evaluate AI agents with best practices baked into every step
           </p>
 
           {/* Launch Video */}
-          <div className="mt-8 md:mt-12 w-full max-w-3xl mx-auto">
-            <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+          {/* <div className="mt-8 md:mt-12 w-full max-w-3xl mx-auto">
+            <div
+              className="relative w-full"
+              style={{ paddingBottom: "56.25%" }}
+            >
               <iframe
                 className="absolute top-0 left-0 w-full h-full rounded-xl shadow-lg"
                 src="https://www.youtube.com/embed/_VS8KQbBxKs?autoplay=1&mute=1"
@@ -120,7 +153,7 @@ export default function HomePage() {
                 allowFullScreen
               />
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
 
@@ -174,7 +207,7 @@ export default function HomePage() {
                     className="w-full h-auto"
                   />
                 </div>
-              )
+              ),
             )}
           </div>
         </div>
@@ -213,179 +246,140 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Integrations Section */}
-      <div className="bg-white py-16 md:py-24 px-4 md:px-8 lg:px-12">
-        <div className="max-w-5xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 mb-4 md:mb-6 leading-[1.1] tracking-[-0.02em]">
-            Works with any
-            <br />
-            voice agent stack
-          </h2>
-          <p className="text-base md:text-xl text-gray-500 mb-8 md:mb-10 max-w-2xl mx-auto">
-            Supports all major STT, TTS, and LLM providers
-            <br className="hidden md:block" /> with more coming soon
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 md:gap-4 mb-10 md:mb-16">
-            <a
-              href={`${process.env.NEXT_PUBLIC_DOCS_URL}/integrations`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 md:px-6 py-2.5 md:py-3 text-sm md:text-base font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
-            >
-              See all integrations
-              <span>→</span>
-            </a>
-            <a
-              href="https://forms.gle/AoGE6DMs7N4DNAK2A"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 md:px-6 py-2.5 md:py-3 text-sm md:text-base font-medium border border-gray-300 rounded-lg text-gray-900 hover:bg-gray-50 transition-colors"
-            >
-              Request an integration
-              <span>→</span>
-            </a>
-          </div>
-
-          {/* Integration Grid */}
-          <div className="grid grid-cols-4 border border-gray-200 rounded-xl overflow-hidden">
-            {/* Row 1 */}
-            <div className="flex items-center justify-center p-3 md:p-5 border-r border-b border-gray-200 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                Deepgram
-              </span>
-            </div>
-            <div className="flex items-center justify-center p-3 md:p-5 border-r border-b border-gray-200 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                ElevenLabs
-              </span>
-            </div>
-            <div className="flex items-center justify-center p-3 md:p-5 border-r border-b border-gray-200 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                OpenAI
-              </span>
-            </div>
-            <div className="flex items-center justify-center p-3 md:p-5 border-b border-gray-200 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                Google
-              </span>
-            </div>
-            {/* Row 2 */}
-            <div className="flex items-center justify-center p-3 md:p-5 border-r border-b border-gray-200 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                Cartesia
-              </span>
-            </div>
-            <div className="flex items-center justify-center p-3 md:p-5 border-r border-b border-gray-200 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                Anthropic
-              </span>
-            </div>
-            <div className="flex items-center justify-center p-3 md:p-5 border-r border-b border-gray-200 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                Groq
-              </span>
-            </div>
-            <div className="flex items-center justify-center p-3 md:p-5 border-b border-gray-200 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                DeepSeek
-              </span>
-            </div>
-            {/* Row 3 */}
-            <div className="flex items-center justify-center p-3 md:p-5 border-r border-b border-gray-200 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                Smallest AI
-              </span>
-            </div>
-            <div className="flex items-center justify-center p-3 md:p-5 border-r border-b border-gray-200 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                Claude
-              </span>
-            </div>
-            <div className="flex items-center justify-center p-3 md:p-5 border-r border-b border-gray-200 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                Gemini
-              </span>
-            </div>
-            <div className="flex items-center justify-center p-3 md:p-5 border-b border-gray-200 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                Qwen
-              </span>
-            </div>
-            {/* Row 4 */}
-            <div className="flex items-center justify-center p-3 md:p-5 border-r border-b border-gray-200 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                Meta
-              </span>
-            </div>
-            <div className="flex items-center justify-center p-3 md:p-5 border-r border-b border-gray-200 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                Mistral
-              </span>
-            </div>
-            <div className="flex items-center justify-center p-3 md:p-5 border-r border-b border-gray-200 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                Cohere
-              </span>
-            </div>
-            <div className="flex items-center justify-center p-3 md:p-5 border-b border-gray-200 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                Sarvam
-              </span>
-            </div>
-            {/* Row 5 */}
-            <div className="flex items-center justify-center p-3 md:p-5 border-r border-gray-200 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                AI21
-              </span>
-            </div>
-            <div className="flex items-center justify-center p-3 md:p-5 border-r border-gray-200 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                Baidu
-              </span>
-            </div>
-            <div className="flex items-center justify-center p-3 md:p-5 border-r border-gray-200 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                NVIDIA
-              </span>
-            </div>
-            <div className="flex items-center justify-center p-3 md:p-5 bg-gray-50">
-              <span className="text-gray-900 text-xs md:text-sm font-medium text-center">
-                Amazon
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Open Source Section */}
-      <div className="bg-gray-50 py-16 md:py-24 px-4 md:px-8 lg:px-12">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 mb-4 md:mb-6 leading-[1.1] tracking-[-0.02em]">
+      {/* Open source — procurement & trust */}
+      <div className="bg-gray-50 py-16 md:py-24 px-4 md:px-8 lg:px-12 border-y border-gray-100">
+        <div className="max-w-5xl mx-auto text-center mb-10 md:mb-14">
+          <h2 className="text-3xl md:text-4xl lg:text-[2.5rem] font-medium text-gray-900 mb-3 md:mb-4 leading-[1.15] tracking-[-0.02em] text-balance">
             Proudly open source
           </h2>
-          <p className="text-base md:text-xl text-gray-500 mb-8 md:mb-10">
-            Calibrate is committed to open source.{" "}
-            <br className="hidden md:block" />
-            You can either use the hosted version or run it{" "}
-            <a
-              href={GITHUB_REPO_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-gray-900 transition-colors"
-            >
-              locally
-            </a>
+          <p className="text-base md:text-lg text-gray-500 max-w-4xl mx-auto text-pretty leading-relaxed">
+            What we open-source is what we use ourselves. Nothing hidden behind
+            a paywall.
           </p>
+        </div>
+
+        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 md:p-7 text-left shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-gray-800 mb-4">
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3V6a3 3 0 013-3h13.5a3 3 0 013 3v5.25m-19.5 0a3 3 0 003 3h13.5a3 3 0 003-3m-16.5 0V9.75A2.25 2.25 0 016.75 12h.008v.008H6.75V12zm0 0h.008v.008h-.008V12zm0 0h.008v.008h-.008V12zm0 0h.008v.008h-.008V12zM17.25 12v.008h-.008V12h.008zm0 0v.008h.008V12h-.008zm0 0v.008h.008V12h-.008zm0 0v.008h.008V12h-.008zM6.75 19.5v-2.25m10.5 0v2.25"
+                />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Self-hosting
+            </h3>
+            <p className="text-sm md:text-[15px] text-gray-500 leading-relaxed">
+              We can help you run Calibrate on your infrastructure to ensure
+              sensitive data stays in environments you control
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 md:p-7 text-left shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-gray-800 mb-4">
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M18 18.72a9.09 9.09 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              No per-seat pricing. Ever.
+            </h3>
+            <p className="text-sm md:text-[15px] text-gray-500 leading-relaxed">
+              No per-user fees. Add staff, partners, and consultants as your
+              team grows
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 md:p-7 text-left shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-gray-800 mb-4">
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 6h.008v.008H6V6z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Auditable, end to end
+            </h3>
+            <p className="text-sm md:text-[15px] text-gray-500 leading-relaxed">
+              The full codebase is on GitHub for pre-deploy review and real
+              diligence
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 md:p-7 text-left shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-gray-800 mb-4">
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              No vendor lock-in
+            </h3>
+            <p className="text-sm md:text-[15px] text-gray-500 leading-relaxed">
+              Fork, adapt, and make changes as you wish
+            </p>
+          </div>
+        </div>
+
+        <div className="max-w-5xl mx-auto mt-10 md:mt-12 flex justify-center">
           <a
             href={GITHUB_REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 md:gap-3 px-4 md:px-6 py-3 md:py-4 bg-gray-900 border border-gray-900 rounded-xl hover:bg-gray-800 transition-colors"
+            className="inline-flex items-center gap-2 md:gap-3 px-4 md:px-6 py-3 md:py-4 bg-gray-900 border border-gray-900 rounded-xl hover:bg-gray-800 transition-colors cursor-pointer"
           >
             <svg
-              className="w-6 h-6 md:w-8 md:h-8 text-white"
+              className="w-6 h-6 md:w-8 md:h-8 text-white shrink-0"
               fill="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden
             >
               <path
                 fillRule="evenodd"
@@ -396,15 +390,52 @@ export default function HomePage() {
             <span className="text-white text-sm md:text-base font-medium">
               artpark-sahai-org/calibrate
             </span>
-            <span className="text-gray-400">★</span>
+            <span className="text-gray-400" aria-hidden>
+              ★
+            </span>
           </a>
+        </div>
+      </div>
+
+      {/* Integrations Section */}
+      <div className="bg-white py-16 md:py-24 px-4 md:px-8 lg:px-12">
+        <div className="max-w-5xl mx-auto text-center">
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 mb-4 md:mb-6 leading-[1.1] tracking-[-0.02em]">
+            Works with any AI agent stack
+          </h2>
+          <p className="text-base md:text-xl text-gray-500 max-w-2xl mx-auto">
+            Supports all major models with more coming soon
+          </p>
+        </div>
+
+        <IntegrationLogoMarquee />
+
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-3 md:gap-4 mt-8 md:mt-10 px-4 text-center">
+          <a
+            href={`${process.env.NEXT_PUBLIC_DOCS_URL}/integrations`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-5 md:px-6 py-2.5 md:py-3 text-sm md:text-base font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
+          >
+            See all integrations
+            <span>→</span>
+          </a>
+          {/* <a
+            href="https://forms.gle/AoGE6DMs7N4DNAK2A"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-5 md:px-6 py-2.5 md:py-3 text-sm md:text-base font-medium border border-gray-300 rounded-lg text-gray-900 hover:bg-gray-50 transition-colors"
+          >
+            Request an integration
+            <span>→</span>
+          </a> */}
         </div>
       </div>
 
       {/* Join the Community Section */}
       <div
         id="join-community"
-        className="bg-white py-16 md:py-24 px-4 md:px-8 lg:px-12 scroll-mt-20"
+        className="bg-gray-50 py-16 md:py-24 px-4 md:px-8 lg:px-12 scroll-mt-20"
       >
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 mb-4 md:mb-6 leading-[1.1] tracking-[-0.02em]">
@@ -414,39 +445,22 @@ export default function HomePage() {
             Talk to the team building Calibrate to get your questions answered
             and shape our roadmap
           </p>
-          <div className="flex flex-col items-center gap-4 md:gap-6">
-            <div className="flex items-center justify-center gap-3 md:gap-4">
-              <a
-                href={WHATSAPP_INVITE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 md:px-6 py-2.5 md:py-3 text-sm md:text-base border border-gray-300 rounded-lg text-gray-900 hover:bg-gray-50 transition-colors"
+          <div className="flex flex-row flex-wrap items-center justify-center gap-3 md:gap-4">
+            <a
+              href={WHATSAPP_INVITE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 md:px-6 py-2.5 md:py-3 text-sm md:text-base border border-gray-300 rounded-lg text-gray-900 hover:bg-gray-50 transition-colors"
+            >
+              <svg
+                className="w-5 h-5 text-green-500"
+                fill="currentColor"
+                viewBox="0 0 24 24"
               >
-                <svg
-                  className="w-5 h-5 text-green-500"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                </svg>
-                WhatsApp
-              </a>
-              <a
-                href={DISCORD_INVITE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 md:px-6 py-2.5 md:py-3 text-sm md:text-base border border-gray-300 rounded-lg text-gray-900 hover:bg-gray-50 transition-colors"
-              >
-                <svg
-                  className="w-5 h-5 text-indigo-500"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189z" />
-                </svg>
-                Discord
-              </a>
-            </div>
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+              </svg>
+              WhatsApp
+            </a>
             <a
               href="https://cal.com/amandalmia/30min"
               target="_blank"
@@ -466,9 +480,19 @@ export default function HomePage() {
                   d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                 />
               </svg>
-              Book a demo
+              Let's talk
             </a>
           </div>
+        </div>
+      </div>
+
+      {/* Team */}
+      <div
+        id="about-calibrate"
+        className="bg-white py-16 md:py-24 px-4 md:px-8 lg:px-12 scroll-mt-20"
+      >
+        <div className="max-w-5xl mx-auto">
+          <AboutMarketingSection />
         </div>
       </div>
 
@@ -476,10 +500,10 @@ export default function HomePage() {
       <div className="bg-gray-50 py-16 md:py-20 px-4 md:px-8 lg:px-12">
         <div className="max-w-6xl mx-auto text-center mb-10 md:mb-16">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-medium text-gray-900 mb-3 md:mb-4 tracking-[-0.02em]">
-            Start testing with Calibrate today
+            Start Calibrating today
           </h2>
           <p className="text-base md:text-xl text-gray-500">
-            Choose your path to start building better voice agents
+            Choose your path to start building reliable AI agents
           </p>
         </div>
 
@@ -576,9 +600,7 @@ export default function HomePage() {
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <div className="font-medium text-gray-900">
-                    LLM Tests
-                  </div>
+                  <div className="font-medium text-gray-900">LLM Tests</div>
                   <div className="text-sm text-gray-500">
                     Test tool calling and response quality across models
                   </div>
@@ -814,7 +836,7 @@ export default function HomePage() {
             Ready to get started?
           </h2>
           <p className="text-base md:text-xl text-gray-400 mb-8 md:mb-10">
-            Become a team that ships reliable voice agents beyond vibe checks
+            Become a team that ships trustworthy AI agents beyond vibe checks
           </p>
           <Link
             href="/login"

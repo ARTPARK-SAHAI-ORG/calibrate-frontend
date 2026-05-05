@@ -74,3 +74,25 @@ body {
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Landing: infinite horizontal logo strip (Integrations) */
+@keyframes integration-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.integration-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: integration-marquee 48s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .integration-marquee-track {
+    animation: none;
+  }
+}

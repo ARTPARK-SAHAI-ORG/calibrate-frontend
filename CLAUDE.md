@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Calibrate** (npm: `calibrate-frontend`) — a Next.js 16 / React 19 frontend for a voice-agent simulation and evaluation platform. Users create voice AI agents, unit-test STT/TTS providers, and run end-to-end simulated conversations with personas, scenarios, and custom evaluators.
 
-> Branding note: UI says "Calibrate" everywhere, but external infra (Discord etc.) still references "pense". Community URLs live in `src/constants/links.ts` — import from there, never hardcode.
+> Branding note: UI says "Calibrate" everywhere, but legacy external infra may still reference "pense". The WhatsApp community URL lives in `src/constants/links.ts` (`WHATSAPP_INVITE_URL`) — import from there, never hardcode.
 
 ## Commands
 
@@ -36,12 +36,12 @@ There is currently no test suite checked in — `jest.config.js` is configured b
 **Next.js App Router** with all pages as client components (`"use client"`). The backend is a separate service at `NEXT_PUBLIC_BACKEND_URL` — this repo is frontend only and talks to it via REST.
 
 **Routing structure** (`src/app/`):
-- Public: `/` (landing), `/login`, `/signup`, `/about`, `/public/...` (shareable result pages)
+- Public: `/` (landing), `/login`, `/signup`, `/public/...` (shareable result pages)
 - Authenticated app pages: `/agents`, `/tools`, `/evaluators`, `/stt`, `/tests`, `/tts`, `/personas`, `/scenarios`, `/simulations`, `/datasets/[id]`
 - API routes: `/api/auth` (NextAuth handler), `/api/debug-env`
 - The sidebar in `src/components/AppLayout.tsx` drives navigation: each `NavItem.id` maps to the route `/${id}`. Renaming a nav item's `id` changes the route.
 
-**Auth** (`src/middleware.ts`, `src/auth.ts`): NextAuth v5 with Google provider. The middleware accepts EITHER a NextAuth session OR an `access_token` cookie (backend-issued JWT from email/password login). On Google sign-in, `auth.ts` exchanges the Google id_token with the backend's `/auth/google` to get a backend JWT. Public routes (landing, login, signup, /public/*, /about, /terms, /privacy, /debug, /docs) bypass auth. `MAINTENANCE_MODE=true` redirects all non-API traffic to `/`.
+**Auth** (`src/middleware.ts`, `src/auth.ts`): NextAuth v5 with Google provider. The middleware accepts EITHER a NextAuth session OR an `access_token` cookie (backend-issued JWT from email/password login). On Google sign-in, `auth.ts` exchanges the Google id_token with the backend's `/auth/google` to get a backend JWT. Public routes (landing, login, signup, /public/*, /terms, /privacy, /debug, /docs) bypass auth. `GET /about` redirects to `/#about-calibrate` on the landing page (legacy About URL). `MAINTENANCE_MODE=true` redirects all non-API traffic to `/`.
 
 **Access token hook**: Use `useAuth()` / `useAccessToken()` from `src/hooks/useAccessToken.ts` in new code — it unifies NextAuth session and localStorage JWT. Do NOT use `useSession()` directly (it only covers Google OAuth, not email/password).
 

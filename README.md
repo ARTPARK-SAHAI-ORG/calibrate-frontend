@@ -2,7 +2,7 @@
 
 [![CC BY-SA 4.0][cc-by-sa-shield]][cc-by-sa]
 
-Frontend for [Calibrate](https://calibrate.artpark.ai): Evaluation platform for **AI agents** (both text and voice agents).
+Frontend for [Calibrate](https://calibrate.artpark.ai): A no-code evaluation platform for **AI agents** (both text and voice agents).
 
 ## Prerequisites
 

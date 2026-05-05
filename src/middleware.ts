@@ -16,19 +16,23 @@ export default auth((req) => {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
+  // Legacy marketing URL: standalone About page removed; vision & team live on `/` (#about-calibrate)
+  if (req.nextUrl.pathname === "/about") {
+    return NextResponse.redirect(new URL("/#about-calibrate", req.url));
+  }
+
   const isAuthRoute = req.nextUrl.pathname.startsWith("/api/auth");
   const isDebugRoute =
     req.nextUrl.pathname.startsWith("/debug") ||
     req.nextUrl.pathname.startsWith("/api/debug");
   const isDocsRoute = req.nextUrl.pathname.startsWith("/docs");
-  const isAboutPage = req.nextUrl.pathname === "/about";
   const isTermsPage = req.nextUrl.pathname === "/terms";
   const isPrivacyPage = req.nextUrl.pathname === "/privacy";
   const isPublicShareRoute = req.nextUrl.pathname.startsWith("/public/");
   const isAnnotateJobRoute = req.nextUrl.pathname.startsWith("/annotate-job/");
 
-  // Allow public pages: landing page, auth API, debug, docs, about, terms, privacy, public share links, annotate-job links
-  if (isHomePage || isAuthRoute || isDebugRoute || isDocsRoute || isAboutPage || isTermsPage || isPrivacyPage || isPublicShareRoute || isAnnotateJobRoute) {
+  // Allow public pages: landing page, auth API, debug, docs, terms, privacy, public share links, annotate-job links
+  if (isHomePage || isAuthRoute || isDebugRoute || isDocsRoute || isTermsPage || isPrivacyPage || isPublicShareRoute || isAnnotateJobRoute) {
     return NextResponse.next();
   }
 
