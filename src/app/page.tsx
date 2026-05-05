@@ -647,8 +647,8 @@ export default function HomePage() {
     >
       <LandingHeader />
 
-      {/* Hero — md+: nearly full viewport below header; mobile: shorter band (lower min-h + inner py) */}
-      <div className="relative flex min-h-[56dvh] flex-col justify-center overflow-hidden md:min-h-[calc(100dvh-5.25rem)]">
+      {/* Hero — full viewport below header; mobile: main copy vertically centered, BUILT BY / FUNDED BY anchored to bottom of first screen */}
+      <div className="relative flex min-h-[calc(100dvh-5.25rem)] flex-col overflow-hidden md:justify-center">
         {/* Background Pattern */}
         <div className="pointer-events-none absolute inset-0 opacity-[0.03]">
           <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
@@ -675,24 +675,26 @@ export default function HomePage() {
         <div className="pointer-events-none absolute top-20 left-1/4 h-64 w-64 rounded-full bg-emerald-100 opacity-40 blur-3xl"></div>
         <div className="pointer-events-none absolute top-40 right-1/4 h-48 w-48 rounded-full bg-blue-100 opacity-40 blur-3xl"></div>
 
-        <div className="relative z-10 mx-auto w-full max-w-4xl px-4 py-8 text-center md:px-8 md:py-20 lg:py-24">
-          <div className="mb-4 flex justify-center md:mb-6">
-            <span className="inline-block rounded-md border border-emerald-200/90 bg-emerald-50/90 px-1.5 py-0.5 text-[10px] md:text-[11px] font-semibold uppercase tracking-wider text-emerald-950 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
-              Open source
-            </span>
+        <div className="relative z-10 mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 py-8 text-center md:flex-none md:px-8 md:py-20 lg:py-24">
+          <div className="flex min-h-0 flex-1 flex-col justify-center md:flex-none">
+            <div className="mb-4 flex justify-center md:mb-6">
+              <span className="inline-block rounded-md border border-emerald-200/90 bg-emerald-50/90 px-1.5 py-0.5 text-[10px] md:text-[11px] font-semibold uppercase tracking-wider text-emerald-950 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
+                Open source
+              </span>
+            </div>
+            <h1 className="mb-4 text-4xl font-medium tracking-[-0.02em] text-gray-900 leading-[1.1] md:mb-7 md:text-6xl">
+              AI evaluation platform
+              <br />
+              for non-profits
+            </h1>
+
+            <p className="mx-auto max-w-2xl text-base text-gray-500 md:text-xl">
+              Built by ML engineers with decades of experience to help teams
+              evaluate AI agents with best practices baked into every step
+            </p>
           </div>
-          <h1 className="mb-4 text-4xl font-medium tracking-[-0.02em] text-gray-900 leading-[1.1] md:mb-7 md:text-6xl">
-            AI evaluation platform
-            <br />
-            for non-profits
-          </h1>
 
-          <p className="mx-auto max-w-2xl text-base text-gray-500 md:text-xl">
-            Built by ML engineers with decades of experience to help teams
-            evaluate AI agents with best practices baked into every step
-          </p>
-
-          <p className="mx-auto mt-12 flex max-w-2xl flex-col items-center gap-1 text-center text-[11px] font-medium leading-snug tracking-wide text-gray-500 md:mt-14 md:block md:text-[13px] md:text-balance">
+          <p className="mx-auto mt-10 flex max-w-2xl shrink-0 flex-col items-center gap-1 text-center text-[11px] font-medium leading-snug tracking-wide text-gray-500 md:mt-14 md:block md:text-[13px] md:text-balance">
             <span className="block md:contents">
               <span className="font-normal text-gray-400">BUILT BY</span>{" "}
               <a
