@@ -175,6 +175,8 @@ function HumanLabellingPageInner() {
   const [agreement, setAgreement] = useState<AgreementResponse | null>(null);
   const [agreementLoading, setAgreementLoading] = useState(false);
   const [agreementError, setAgreementError] = useState<string | null>(null);
+  /** False until the first agreement request for the current overview session finishes (avoids empty placeholder flash). */
+  const [agreementFetchCompleted, setAgreementFetchCompleted] = useState(false);
 
   const [tasks, setTasks] = useState<LabellingTask[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
@@ -259,6 +261,7 @@ function HumanLabellingPageInner() {
       setAgreementError(parseApiError(err, "Failed to load agreement"));
     } finally {
       setAgreementLoading(false);
+      setAgreementFetchCompleted(true);
     }
   }, [accessToken, selectedTaskId, bucket, days]);
 
@@ -436,7 +439,7 @@ function HumanLabellingPageInner() {
         {activeTab === "overview" && (
           <AgreementOverview
             agreement={agreement}
-            agreementLoading={agreementLoading}
+            agreementLoading={agreementLoading || !agreementFetchCompleted}
             agreementError={agreementError}
             bucket={bucket}
             selectedTaskId={selectedTaskId}

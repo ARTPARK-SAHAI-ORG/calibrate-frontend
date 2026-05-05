@@ -873,6 +873,13 @@ function LabellingTaskPageInner() {
   );
   const [agreementLoading, setAgreementLoading] = useState(false);
   const [agreementError, setAgreementError] = useState<string | null>(null);
+  /** False until the first agreement request for this task finishes (avoids empty placeholder flash). */
+  const [agreementFetchCompleted, setAgreementFetchCompleted] = useState(false);
+
+  useEffect(() => {
+    setAgreementFetchCompleted(false);
+    setAgreement(null);
+  }, [uuid]);
 
   const fetchAgreement = useCallback(async () => {
     if (!accessToken || !uuid) return;
@@ -888,6 +895,7 @@ function LabellingTaskPageInner() {
       setAgreementError(parseApiError(err, "Failed to load agreement"));
     } finally {
       setAgreementLoading(false);
+      setAgreementFetchCompleted(true);
     }
   }, [accessToken, uuid]);
 
@@ -1794,7 +1802,7 @@ function LabellingTaskPageInner() {
               </div>
             )}
 
-            {agreementLoading && !agreement ? (
+            {agreementLoading || !agreementFetchCompleted ? (
               <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
                 <svg
                   className="w-4 h-4 animate-spin"

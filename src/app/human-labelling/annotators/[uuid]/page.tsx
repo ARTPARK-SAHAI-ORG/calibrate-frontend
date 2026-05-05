@@ -134,6 +134,13 @@ function AnnotatorDetailPageInner() {
   const [detail, setDetail] = useState<AnnotatorDetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  /** False until the first detail request for this annotator finishes (avoids agreement empty-state flash). */
+  const [detailFetchCompleted, setDetailFetchCompleted] = useState(false);
+
+  useEffect(() => {
+    setDetailFetchCompleted(false);
+    setDetail(null);
+  }, [uuid]);
 
   const annotator = detail?.annotator ?? null;
   const stats = detail?.stats;
@@ -161,6 +168,7 @@ function AnnotatorDetailPageInner() {
       setDetailError(parseApiError(err, "Failed to load annotator"));
     } finally {
       setDetailLoading(false);
+      setDetailFetchCompleted(true);
     }
   }, [accessToken, uuid]);
 
@@ -267,6 +275,7 @@ function AnnotatorDetailPageInner() {
               const series = trend?.series ?? [];
               const hasTrend =
                 !detailLoading &&
+                detailFetchCompleted &&
                 series.length > 0 &&
                 series.some((p) => p.agreement != null);
               return (
@@ -281,7 +290,7 @@ function AnnotatorDetailPageInner() {
                     </p>
                   </div>
 
-                  {detailLoading ? (
+                  {detailLoading || !detailFetchCompleted ? (
                     <div className="flex items-center justify-center gap-2 h-56 md:h-64 text-sm text-muted-foreground">
                       <svg
                         className="w-4 h-4 animate-spin"

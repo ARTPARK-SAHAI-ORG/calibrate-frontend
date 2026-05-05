@@ -168,6 +168,8 @@ function EvaluatorDetailPageInner() {
   const [trend, setTrend] = useState<EvaluatorTrendResponse | null>(null);
   const [trendLoading, setTrendLoading] = useState(false);
   const [trendError, setTrendError] = useState<string | null>(null);
+  /** False until the first trend request for this evaluator finishes (avoids empty placeholder flash). */
+  const [trendFetchCompleted, setTrendFetchCompleted] = useState(false);
   const [trendTaskId, setTrendTaskId] = useState<string>("all");
   // Full task list from the unfiltered fetch — kept stable so the picker
   // always shows all options regardless of which task is currently selected.
@@ -207,6 +209,12 @@ function EvaluatorDetailPageInner() {
     if (!evaluator?.name) return;
     document.title = `${evaluator.name} | Calibrate`;
   }, [evaluator?.name]);
+
+  useEffect(() => {
+    setTrendFetchCompleted(false);
+    setTrend(null);
+    setTrendAllTasks([]);
+  }, [uuid]);
 
   useEffect(() => {
     const fetchEvaluator = async () => {
@@ -558,6 +566,7 @@ function EvaluatorDetailPageInner() {
       );
     } finally {
       setTrendLoading(false);
+      setTrendFetchCompleted(true);
     }
   }, [backendAccessToken, uuid, trendTaskId]);
 
@@ -759,7 +768,7 @@ function EvaluatorDetailPageInner() {
             {activeTab === "agreement" && (
               <AgreementTrendTab
                 trend={trend}
-                trendLoading={trendLoading}
+                trendLoading={trendLoading || !trendFetchCompleted}
                 trendError={trendError}
                 trendTaskId={trendTaskId}
                 onSelectTask={setTrendTaskId}
