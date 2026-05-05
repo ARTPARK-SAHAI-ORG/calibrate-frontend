@@ -5,19 +5,19 @@ alwaysApply: true
 
 # Calibrate Frontend
 
-**Voice Agent Simulation and Evaluation Platform**
+**AI Agent Simulation and Evaluation Platform** (first-class **voice** support: STT/TTS benchmarks, voice simulation runs, and speech-oriented agent configuration)
 
 ---
 
 ## What is Calibrate?
 
-Calibrate is a comprehensive platform for building, configuring, testing, and evaluating **voice-based AI agents**. It enables teams to create conversational agents that can handle voice interactions (phone calls, voice assistants) and rigorously test them before deployment.
+Calibrate is a comprehensive platform for building, configuring, testing, and evaluating **AI agents**—conversational systems you can exercise with **text** simulations, **LLM** component tests, and (where the stack supports it) **voice** end-to-end runs. **Voice** is a major focus: Built agents wire STT/TTS with the LLM for speech-in/speech-out style testing; teams also use the same product to compare speech providers and run simulations that include or omit audio depending on run type and agent type.
 
-The platform addresses the challenge of quality assurance for voice agents by providing:
+The platform addresses quality assurance for agent teams by providing:
 
-- **Component-level testing** (unit tests for STT/TTS providers)
-- **End-to-end simulation testing** (full conversations with simulated users)
-- **Benchmarking** across different AI providers to find the best configuration
+- **Component-level testing** (STT/TTS provider benchmarks; LLM tests for tool use and responses)
+- **End-to-end simulation testing** (conversations with simulated users—**text** or **voice** runs per product rules)
+- **Benchmarking** across AI providers to pick the best configuration
 
 > **Note on naming**: The app is branded as "Calibrate" in all user-facing UI, page titles, and documentation. However, external URLs and infrastructure still reference "pense" (e.g., Discord: `https://discord.gg/9dQB4AngK2`). Documentation links use `process.env.NEXT_PUBLIC_DOCS_URL` directly. The npm package name is `calibrate-frontend`.
 >
@@ -29,12 +29,12 @@ The platform addresses the challenge of quality assurance for voice agents by pr
 
 ### Primary Use Case
 
-Organizations building voice agents (customer support bots, IVR systems, voice assistants) use Calibrate to:
+Organizations building **AI agents**—including **voice-heavy** products (customer support bots, IVR, voice assistants) and teams that mostly validate over **text** first—use Calibrate to:
 
-1. Configure their agent's voice pipeline (which STT, TTS, and LLM to use)
-2. Test individual components to select the best providers
-3. Run simulated conversations to validate agent behavior
-4. Evaluate agent performance with metrics before going live
+1. Configure agent behavior and, for **Built** agents, the speech-ready stack (STT, TTS, and LLM); **Connect** agents point at an external URL and follow separate verification and run-type rules
+2. Test individual components (STT, TTS, LLM) to select the best providers
+3. Run simulated conversations (**text** and/or **voice** depending on launch options and agent type) to validate behavior
+4. Evaluate performance with metrics and custom evaluators before going live
 
 ### Workflow Overview
 
@@ -57,7 +57,7 @@ Organizations building voice agents (customer support bots, IVR systems, voice a
 │                                                                         │
 │   4. RUN SIMULATIONS                                                    │
 │      ├── Create Simulation: Select agent + personas + scenarios         │
-│      ├── Execute Run: System simulates conversations                    │
+│      ├── Execute Run: Simulated conversations (text or voice)           │
 │      └── Review Results: Transcripts, metrics, pass/fail status         │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘

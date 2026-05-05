@@ -2,7 +2,7 @@
 
 [![CC BY-SA 4.0][cc-by-sa-shield]][cc-by-sa]
 
-Voice agent simulation and evaluation platform.
+Evaluation platform for **AI agents** (supporting both text and voice agents).
 
 ## Prerequisites
 
