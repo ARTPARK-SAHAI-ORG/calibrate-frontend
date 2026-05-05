@@ -705,34 +705,32 @@ function EvaluatorDetailPageInner() {
               )}
             </div>
 
-            {/* Tabs (hidden for default evaluators) */}
-            {!isDefault && (
-              <div className="flex items-center gap-4 md:gap-6 border-b border-border overflow-x-auto">
-                <button
-                  onClick={() => handleTabChange("prompts")}
-                  className={`pb-2 text-sm md:text-base font-medium border-b-2 cursor-pointer whitespace-nowrap -mb-px transition-colors ${
-                    activeTab === "prompts"
-                      ? "border-foreground text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Prompts
-                </button>
-                <button
-                  onClick={() => handleTabChange("agreement")}
-                  className={`pb-2 text-sm md:text-base font-medium border-b-2 cursor-pointer whitespace-nowrap -mb-px transition-colors ${
-                    activeTab === "agreement"
-                      ? "border-foreground text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Agreement
-                </button>
-              </div>
-            )}
+            {/* Tabs */}
+            <div className="flex items-center gap-4 md:gap-6 border-b border-border overflow-x-auto">
+              <button
+                onClick={() => handleTabChange("prompts")}
+                className={`pb-2 text-sm md:text-base font-medium border-b-2 cursor-pointer whitespace-nowrap -mb-px transition-colors ${
+                  activeTab === "prompts"
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {isDefault ? "Prompt" : "Prompts"}
+              </button>
+              <button
+                onClick={() => handleTabChange("agreement")}
+                className={`pb-2 text-sm md:text-base font-medium border-b-2 cursor-pointer whitespace-nowrap -mb-px transition-colors ${
+                  activeTab === "agreement"
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Agreement
+              </button>
+            </div>
 
             {/* Prompts tab content */}
-            {(isDefault || activeTab === "prompts") && (
+            {activeTab === "prompts" && (
               versions.length > 0 ? (
                 <div className="space-y-3 md:space-y-4">
                   {versions.map((v) => (
@@ -758,7 +756,7 @@ function EvaluatorDetailPageInner() {
             )}
 
             {/* Agreement tab content */}
-            {!isDefault && activeTab === "agreement" && (
+            {activeTab === "agreement" && (
               <AgreementTrendTab
                 trend={trend}
                 trendLoading={trendLoading}
@@ -1402,13 +1400,7 @@ function AgreementTrendTab({
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {trendError && (
-        <div className="rounded-md border border-border bg-muted/20 p-4 text-sm text-red-500">
-          {trendError}
-        </div>
-      )}
-
-      {!trendLoading && !trendError && (
+      {!trendLoading && (
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h2 className="text-sm font-semibold">Agreement trend</h2>
@@ -1417,7 +1409,7 @@ function AgreementTrendTab({
               versions
             </p>
           </div>
-          <SingleSelectPicker
+          {allTasks.length > 0 && <SingleSelectPicker
             items={taskPickerItems}
             selectedId={trendTaskId}
             onSelect={(item) => onSelectTask(item.id)}
@@ -1438,7 +1430,13 @@ function AgreementTrendTab({
               item.name.toLowerCase().includes(q.toLowerCase())
             }
             className="w-48"
-          />
+          />}
+        </div>
+      )}
+
+      {trendError && (
+        <div className="rounded-md border border-border bg-muted/20 p-4 text-sm text-red-500">
+          {trendError}
         </div>
       )}
 
@@ -1461,7 +1459,7 @@ function AgreementTrendTab({
           </svg>
           Loading agreement
         </div>
-      ) : !hasData ? (
+      ) : trendError ? null : !hasData ? (
         <div className="border border-border rounded-xl p-8 md:p-12 flex flex-col items-center justify-center bg-muted/20 text-center">
           <svg
             className="w-7 h-7 text-muted-foreground mb-3"

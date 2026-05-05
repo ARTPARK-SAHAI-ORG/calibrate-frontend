@@ -2405,7 +2405,7 @@ function LabellingTaskPageInner() {
                             itemUuid={item.uuid}
                             onDelete={requestDeleteOneItem}
                             onViewResults={toggleItemResults}
-                            onLabel={(uuid) => {
+                            onLabel={selectedItemIds.size === 0 ? (uuid) => {
                               // Sole row → skip the select-then-bulk
                               // dance and open the assign dialog
                               // straight on this item.
@@ -2415,19 +2415,19 @@ function LabellingTaskPageInner() {
                               } else {
                                 toggleItem(uuid);
                               }
-                            }}
+                            } : undefined}
                             onEdit={(uuid) => {
                               setEditSttSingleItemUuid(uuid);
                               setEditSttItemsOpen(true);
                             }}
-                            onEvaluate={(uuid) => {
+                            onEvaluate={selectedItemIds.size === 0 ? (uuid) => {
                               if (items.length === 1) {
                                 setSelectedItemIds(new Set([uuid]));
                                 handleRunEvaluators([uuid]);
                               } else {
                                 toggleItem(uuid);
                               }
-                            }}
+                            } : undefined}
                             isResultsOpen={isResultsOpen}
                             viewResultsDisabled={
                               !!taskSummary && !itemsWithResults.has(item.uuid)
@@ -2489,7 +2489,7 @@ function LabellingTaskPageInner() {
                             itemUuid={item.uuid}
                             onDelete={requestDeleteOneItem}
                             onViewResults={toggleItemResults}
-                            onLabel={(uuid) => {
+                            onLabel={selectedItemIds.size === 0 ? (uuid) => {
                               // Sole row → skip the select-then-bulk
                               // dance and open the assign dialog
                               // straight on this item.
@@ -2499,16 +2499,16 @@ function LabellingTaskPageInner() {
                               } else {
                                 toggleItem(uuid);
                               }
-                            }}
+                            } : undefined}
                             onEdit={(uuid) => setEditLlmItemUuid(uuid)}
-                            onEvaluate={(uuid) => {
+                            onEvaluate={selectedItemIds.size === 0 ? (uuid) => {
                               if (items.length === 1) {
                                 setSelectedItemIds(new Set([uuid]));
                                 handleRunEvaluators([uuid]);
                               } else {
                                 toggleItem(uuid);
                               }
-                            }}
+                            } : undefined}
                             isResultsOpen={isResultsOpen}
                             viewResultsDisabled={
                               !!taskSummary && !itemsWithResults.has(item.uuid)
