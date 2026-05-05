@@ -1347,13 +1347,23 @@ function EvaluatorResultsPane({
           jobStatus === "completed"
             ? (humansForEvaluator?.human_annotations ?? [])
             : [];
-        const hasHumans = annotations.length > 0;
+        const annotationPills = filterDisagreements
+          ? annotations.filter(
+              (a) =>
+                !isAnnotationAligned(
+                  a.value?.value,
+                  r.value?.value,
+                  outputType,
+                ),
+            )
+          : annotations;
+        const hasHumans = annotationPills.length > 0;
 
         const rawSelection =
           selectionByEvaluator[ev.evaluator_id] ?? "evaluator";
         const selectedAnnotation =
           rawSelection !== "evaluator"
-            ? annotations.find((a) => a.annotator_id === rawSelection)
+            ? annotationPills.find((a) => a.annotator_id === rawSelection)
             : undefined;
         const showHuman = !!selectedAnnotation;
         // If a stored annotator_id has no annotation on this item, fall back
@@ -1420,7 +1430,7 @@ function EvaluatorResultsPane({
                   onClick={() => setSelection("evaluator")}
                   primaryLabel="Evaluator"
                 />
-                {annotations.map((a) => {
+                {annotationPills.map((a) => {
                   const aligned = isAnnotationAligned(
                     a.value?.value,
                     r.value?.value,

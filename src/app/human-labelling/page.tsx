@@ -159,6 +159,9 @@ function HumanLabellingPageInner() {
   const [annotators, setAnnotators] = useState<Annotator[]>([]);
   const [annotatorsLoading, setAnnotatorsLoading] = useState(false);
   const [annotatorsError, setAnnotatorsError] = useState<string | null>(null);
+  /** False until the first annotators fetch for a visited Annotators tab finishes. */
+  const [annotatorsFetchCompleted, setAnnotatorsFetchCompleted] =
+    useState(false);
 
   const [newAnnotatorName, setNewAnnotatorName] = useState("");
   const [isAdding, setIsAdding] = useState(false);
@@ -181,6 +184,8 @@ function HumanLabellingPageInner() {
   const [tasks, setTasks] = useState<LabellingTask[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [tasksError, setTasksError] = useState<string | null>(null);
+  /** False until the first tasks list fetch finishes (avoids empty placeholder flash). */
+  const [tasksFetchCompleted, setTasksFetchCompleted] = useState(false);
 
   const sortedTasks = [...tasks].sort((a, b) => a.name.localeCompare(b.name));
 
@@ -213,6 +218,7 @@ function HumanLabellingPageInner() {
       setAnnotatorsError(parseApiError(err, "Failed to load annotators"));
     } finally {
       setAnnotatorsLoading(false);
+      setAnnotatorsFetchCompleted(true);
     }
   }, [accessToken]);
 
@@ -236,6 +242,7 @@ function HumanLabellingPageInner() {
       setTasksError(parseApiError(err, "Failed to load labelling tasks"));
     } finally {
       setTasksLoading(false);
+      setTasksFetchCompleted(true);
     }
   }, [accessToken]);
 
@@ -450,7 +457,7 @@ function HumanLabellingPageInner() {
         )}
 
         {activeTab === "tasks" &&
-          (tasksLoading ? (
+          (tasksLoading || !tasksFetchCompleted ? (
             <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
               <svg
                 className="w-4 h-4 animate-spin"
@@ -698,7 +705,7 @@ function HumanLabellingPageInner() {
             {addError && <p className="text-sm text-red-500">{addError}</p>}
 
             {/* Annotator list */}
-            {annotatorsLoading ? (
+            {annotatorsLoading || !annotatorsFetchCompleted ? (
               <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
                 <svg
                   className="w-4 h-4 animate-spin"
