@@ -7,12 +7,156 @@ import { IntegrationLogoMarquee } from "@/components/landing/IntegrationLogoMarq
 import { AboutMarketingSection } from "@/components/landing/AboutMarketingSection";
 import Link from "next/link";
 
+type LandingQuickStartStep = {
+  key: string;
+  headingBold: string;
+  headingLight: string;
+  image: string;
+};
+
 type LandingFeatureSection = {
   headingBold: string;
   headingLight: string;
   description: string;
   images: string[];
+  /**
+   * Step rows: large headline beside each image (Text agents).
+   * When set, `images` should list the same paths in order (for any code that reads `images` only).
+   */
+  quickStart?: {
+    steps: LandingQuickStartStep[];
+    /** Optional centered banner below the step rows (matches section intro typography). */
+    closingHeadline?: {
+      headingBold: string;
+      headingLight: string;
+    };
+    /** Optional second step ladder after `closingHeadline`; indicator `total` is `comparisonSteps.length` (1…n independently of `steps`). */
+    comparisonSteps?: LandingQuickStartStep[];
+  };
 };
+
+function LandingFeatureImageColumn(props: {
+  section: LandingFeatureSection;
+  getAlt: (imageIndex: number) => string;
+}) {
+  const { section, getAlt } = props;
+  return (
+    <div className="flex flex-col gap-4">
+      {section.images.map((src, idx) => (
+        <div key={idx} className="rounded-xl overflow-hidden shadow-xl">
+          <img src={src} alt={getAlt(idx)} className="w-full h-auto" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Progress chip for Text agents quick-start rows (matches landing emerald accent language). */
+function QuickStartStepIndicator(props: { index: number; total: number }) {
+  const { index, total } = props;
+  return (
+    <div
+      className="mb-3 inline-flex items-center gap-2.5 rounded-full border border-emerald-200/80 bg-gradient-to-br from-emerald-50/95 via-white to-white px-3.5 py-2 shadow-[0_1px_2px_rgba(16,185,129,0.07),0_1px_0_rgba(0,0,0,0.03)]"
+      aria-label={`Step ${index + 1} of ${total}`}
+    >
+      <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-800/75">
+        Step
+      </span>
+      <span
+        className="flex h-7 min-w-[3.25rem] items-center justify-center gap-1 rounded-md bg-white/90 px-1.5 tabular-nums shadow-inner ring-1 ring-emerald-900/[0.06]"
+        aria-hidden
+      >
+        <span className="text-lg font-semibold leading-none text-emerald-950">
+          {index + 1}
+        </span>
+        <span className="pb-0.5 text-sm font-light text-emerald-300">/</span>
+        <span className="text-sm font-semibold text-gray-500">{total}</span>
+      </span>
+    </div>
+  );
+}
+
+function LandingQuickStartDesktopStepStack(props: {
+  steps: LandingQuickStartStep[];
+  secIdx: number;
+  activeSectionsLen: number;
+  tabLabel: string | undefined;
+  featureHeadlineClass: string;
+}) {
+  const { steps, secIdx, activeSectionsLen, tabLabel, featureHeadlineClass } =
+    props;
+  const stepTotal = steps.length;
+  const labelPrefix = tabLabel ?? "Feature";
+  return (
+    <div className="flex flex-col gap-14 md:gap-16 lg:gap-20">
+      {steps.map((step, idx) => (
+        <div
+          key={step.key}
+          className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6 md:gap-8 items-center"
+        >
+          <div className="text-left">
+            <QuickStartStepIndicator index={idx} total={stepTotal} />
+            <h3 className={featureHeadlineClass}>
+              <span className="font-medium text-gray-900">
+                {step.headingBold}
+              </span>{" "}
+              <span className="font-normal text-gray-400">
+                {step.headingLight}
+              </span>
+            </h3>
+          </div>
+          <div className="rounded-xl overflow-hidden shadow-xl">
+            <img
+              src={step.image}
+              alt={
+                activeSectionsLen > 1
+                  ? `${labelPrefix} ${step.key} preview ${secIdx + 1}-${idx + 1}`
+                  : `Feature ${step.key} preview ${idx + 1}`
+              }
+              className="w-full h-auto"
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LandingQuickStartMobileStepStack(props: {
+  steps: LandingQuickStartStep[];
+  secIdx: number;
+  tabLabel: string;
+  featureHeadlineClass: string;
+}) {
+  const { steps, secIdx, tabLabel, featureHeadlineClass } = props;
+  const stepTotal = steps.length;
+  return (
+    <div className="flex flex-col gap-12">
+      {steps.map((step, idx) => (
+        <div key={step.key} className="flex flex-col gap-4">
+          <div className="text-left">
+            <QuickStartStepIndicator index={idx} total={stepTotal} />
+            <h3 className={featureHeadlineClass}>
+              <span className="font-medium text-gray-900">
+                {step.headingBold}
+              </span>{" "}
+              <span className="font-normal text-gray-400">
+                {step.headingLight}
+              </span>
+            </h3>
+          </div>
+          <div className="rounded-xl overflow-hidden shadow-xl">
+            <img
+              src={step.image}
+              alt={`${tabLabel} ${step.key} preview ${secIdx + 1}-${idx + 1}`}
+              className="w-full h-auto"
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 type LandingTab = {
   id: string;
@@ -26,11 +170,58 @@ const tabs: LandingTab[] = [
     label: "Text agents",
     sections: [
       {
-        headingBold: "Choose the best LLM",
-        headingLight: "by evaluating multi-turn conversations",
+        headingBold: "Evaluate the quality",
+        headingLight: "of your AI responses",
         description:
-          "Test the agent's tool calling and response quality by defining specific edge cases and benchmark them across multiple models, proprietary or open source",
-        images: ["/llm-output.png", "/llm-ui.png"],
+          "Define edge cases and evaluate the agent's response against custom criteria",
+        quickStart: {
+          steps: [
+            {
+              key: "llm-input",
+              headingBold: "Add the conversation history",
+              headingLight: "as input to the agent",
+              image: "/llm-input.png",
+            },
+            {
+              key: "llm-evaluator",
+              headingBold:
+                "Define custom criteria to evaluate the agent's response",
+              headingLight: "given the conversation history",
+              image: "/llm-evaluator.png",
+            },
+            {
+              key: "llm-output",
+              headingBold: "Run the test and see whether",
+              headingLight: "the agent response passed the evaluation criteria",
+              image: "/llm-output.png",
+            },
+          ],
+          closingHeadline: {
+            headingBold: "Find the best LLM",
+            headingLight: "for your agent",
+          },
+          comparisonSteps: [
+            {
+              key: "llm-multi-input",
+              headingBold: "Pick the models to compare",
+              headingLight: "and run benchmarking on all tests",
+              image: "/llm-multi-input.png",
+            },
+            {
+              key: "llm-multi-output",
+              headingBold: "Get a leaderboard",
+              headingLight: "across models and evaluators to pick the best LLM",
+              image: "/llm-multi-output.png",
+            },
+          ],
+        },
+        images: [
+          "/llm-input.png",
+          "/llm-evaluator.png",
+          "/llm-output.png",
+          "/llm-multi-input.png",
+          "/llm-multi-output.png",
+        ],
       },
     ],
   },
@@ -87,35 +278,87 @@ export default function HomePage() {
   const activeLandingTab = tabs.find((t) => t.id === activeTab);
   const activeSections = activeLandingTab?.sections ?? [];
 
-  const desktopSectionRow = (sec: LandingFeatureSection, secIdx: number) => (
-    <div
-      key={secIdx}
-      className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6 md:gap-8 items-start"
-    >
-      <div className="text-left lg:sticky lg:top-8">
-        <h2 className="text-2xl md:text-3xl lg:text-4xl leading-[1.2] tracking-[-0.01em] mb-4 md:mb-6">
-          <span className="font-medium text-gray-900">{sec.headingBold}</span>{" "}
-          <span className="font-normal text-gray-400">{sec.headingLight}</span>
-        </h2>
-        <p className="text-sm md:text-base text-gray-500">{sec.description}</p>
-      </div>
-      <div className="flex flex-col gap-4">
-        {sec.images.map((src, idx) => (
-          <div key={idx} className="rounded-xl overflow-hidden shadow-xl">
-            <img
-              src={src}
-              alt={
-                activeSections.length > 1
-                  ? `${activeLandingTab?.label ?? "Feature"} preview ${secIdx + 1}-${idx + 1}`
-                  : `Feature preview ${idx + 1}`
-              }
-              className="w-full h-auto"
-            />
+  const featureHeadlineClass =
+    "text-2xl md:text-3xl lg:text-4xl leading-[1.2] tracking-[-0.01em] mb-4 md:mb-6";
+
+  const desktopSectionRow = (sec: LandingFeatureSection, secIdx: number) => {
+    if (sec.quickStart) {
+      return (
+        <div key={secIdx} className="max-w-7xl mx-auto w-full">
+          <div className="mx-auto mb-10 max-w-2xl text-center md:mb-14">
+            <h2 className={featureHeadlineClass}>
+              <span className="font-medium text-gray-900">
+                {sec.headingBold}
+              </span>{" "}
+              <span className="font-normal text-gray-400">
+                {sec.headingLight}
+              </span>
+            </h2>
+            <p className="text-sm md:text-base text-gray-500">
+              {sec.description}
+            </p>
           </div>
-        ))}
+          <LandingQuickStartDesktopStepStack
+            steps={sec.quickStart.steps}
+            secIdx={secIdx}
+            activeSectionsLen={activeSections.length}
+            tabLabel={activeLandingTab?.label}
+            featureHeadlineClass={featureHeadlineClass}
+          />
+          {sec.quickStart.closingHeadline ? (
+            <div className="mx-auto mt-14 max-w-2xl text-center md:mt-16 lg:mt-20">
+              <h2 className={featureHeadlineClass}>
+                <span className="font-medium text-gray-900">
+                  {sec.quickStart.closingHeadline.headingBold}
+                </span>{" "}
+                <span className="font-normal text-gray-400">
+                  {sec.quickStart.closingHeadline.headingLight}
+                </span>
+              </h2>
+            </div>
+          ) : null}
+          {sec.quickStart.comparisonSteps?.length ? (
+            <div className="mt-14 md:mt-16 lg:mt-20">
+              <LandingQuickStartDesktopStepStack
+                steps={sec.quickStart.comparisonSteps}
+                secIdx={secIdx}
+                activeSectionsLen={activeSections.length}
+                tabLabel={activeLandingTab?.label}
+                featureHeadlineClass={featureHeadlineClass}
+              />
+            </div>
+          ) : null}
+        </div>
+      );
+    }
+
+    return (
+      <div
+        key={secIdx}
+        className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6 md:gap-8 items-start"
+      >
+        <div className="text-left lg:sticky lg:top-8">
+          <h2 className="text-2xl md:text-3xl lg:text-4xl leading-[1.2] tracking-[-0.01em] mb-4 md:mb-6">
+            <span className="font-medium text-gray-900">{sec.headingBold}</span>{" "}
+            <span className="font-normal text-gray-400">
+              {sec.headingLight}
+            </span>
+          </h2>
+          <p className="text-sm md:text-base text-gray-500">
+            {sec.description}
+          </p>
+        </div>
+        <LandingFeatureImageColumn
+          section={sec}
+          getAlt={(idx) =>
+            activeSections.length > 1
+              ? `${activeLandingTab?.label ?? "Feature"} preview ${secIdx + 1}-${idx + 1}`
+              : `Feature preview ${idx + 1}`
+          }
+        />
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div
@@ -252,31 +495,73 @@ export default function HomePage() {
             <div key={tab.id} className="space-y-12">
               {tab.sections.map((sec, secIdx) => (
                 <div key={secIdx} className="space-y-4">
-                  <div className="text-left">
-                    <h2 className="text-2xl leading-[1.2] tracking-[-0.01em] mb-3">
-                      <span className="font-medium text-gray-900">
-                        {sec.headingBold}
-                      </span>{" "}
-                      <span className="font-normal text-gray-400">
-                        {sec.headingLight}
-                      </span>
-                    </h2>
-                    <p className="text-sm text-gray-500">{sec.description}</p>
-                  </div>
-                  <div className="flex flex-col gap-4">
-                    {sec.images.map((src, idx) => (
-                      <div
-                        key={idx}
-                        className="rounded-xl overflow-hidden shadow-xl"
-                      >
-                        <img
-                          src={src}
-                          alt={`${tab.label} preview ${secIdx + 1}-${idx + 1}`}
-                          className="w-full h-auto"
-                        />
+                  {sec.quickStart ? (
+                    <>
+                      <div className="mx-auto mb-4 max-w-2xl space-y-3 text-center">
+                        <h2 className={featureHeadlineClass}>
+                          <span className="font-medium text-gray-900">
+                            {sec.headingBold}
+                          </span>{" "}
+                          <span className="font-normal text-gray-400">
+                            {sec.headingLight}
+                          </span>
+                        </h2>
+                        <p className="text-sm text-gray-500">
+                          {sec.description}
+                        </p>
                       </div>
-                    ))}
-                  </div>
+                      <LandingQuickStartMobileStepStack
+                        steps={sec.quickStart.steps}
+                        secIdx={secIdx}
+                        tabLabel={tab.label}
+                        featureHeadlineClass={featureHeadlineClass}
+                      />
+                      {sec.quickStart.closingHeadline ? (
+                        <div className="mx-auto mt-14 max-w-2xl text-center md:mt-16 lg:mt-20">
+                          <h2 className={featureHeadlineClass}>
+                            <span className="font-medium text-gray-900">
+                              {sec.quickStart.closingHeadline.headingBold}
+                            </span>{" "}
+                            <span className="font-normal text-gray-400">
+                              {sec.quickStart.closingHeadline.headingLight}
+                            </span>
+                          </h2>
+                        </div>
+                      ) : null}
+                      {sec.quickStart.comparisonSteps?.length ? (
+                        <div className="mt-14 md:mt-16 lg:mt-20">
+                          <LandingQuickStartMobileStepStack
+                            steps={sec.quickStart.comparisonSteps}
+                            secIdx={secIdx}
+                            tabLabel={tab.label}
+                            featureHeadlineClass={featureHeadlineClass}
+                          />
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-left">
+                        <h2 className="text-2xl leading-[1.2] tracking-[-0.01em] mb-3">
+                          <span className="font-medium text-gray-900">
+                            {sec.headingBold}
+                          </span>{" "}
+                          <span className="font-normal text-gray-400">
+                            {sec.headingLight}
+                          </span>
+                        </h2>
+                        <p className="text-sm text-gray-500">
+                          {sec.description}
+                        </p>
+                      </div>
+                      <LandingFeatureImageColumn
+                        section={sec}
+                        getAlt={(idx) =>
+                          `${tab.label} preview ${secIdx + 1}-${idx + 1}`
+                        }
+                      />
+                    </>
+                  )}
                 </div>
               ))}
             </div>
