@@ -29,6 +29,8 @@ type LandingFeatureSection = {
     closingHeadline?: {
       headingBold: string;
       headingLight: string;
+      /** Optional subtitle under the banner h2 (e.g. model-comparison context). */
+      subheading?: string;
     };
     /** Optional second step ladder after `closingHeadline`; indicator `total` is `comparisonSteps.length` (1…n independently of `steps`). */
     comparisonSteps?: LandingQuickStartStep[];
@@ -41,7 +43,7 @@ function LandingFeatureImageColumn(props: {
 }) {
   const { section, getAlt } = props;
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6 md:gap-4">
       {section.images.map((src, idx) => (
         <div key={idx} className="rounded-xl overflow-hidden shadow-xl">
           <img src={src} alt={getAlt(idx)} className="w-full h-auto" />
@@ -56,7 +58,7 @@ function QuickStartStepIndicator(props: { index: number; total: number }) {
   const { index, total } = props;
   return (
     <div
-      className="mb-3 inline-flex items-center gap-2.5 rounded-full border border-emerald-200/80 bg-gradient-to-br from-emerald-50/95 via-white to-white px-3.5 py-2 shadow-[0_1px_2px_rgba(16,185,129,0.07),0_1px_0_rgba(0,0,0,0.03)]"
+      className="mb-5 md:mb-3 inline-flex items-center gap-2.5 rounded-full border border-emerald-200/80 bg-gradient-to-br from-emerald-50/95 via-white to-white px-3.5 py-2 shadow-[0_1px_2px_rgba(16,185,129,0.07),0_1px_0_rgba(0,0,0,0.03)]"
       aria-label={`Step ${index + 1} of ${total}`}
     >
       <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-800/75">
@@ -81,9 +83,9 @@ function LandingQuickStartDesktopStepStack(props: {
   secIdx: number;
   activeSectionsLen: number;
   tabLabel: string | undefined;
-  featureHeadlineClass: string;
+  stepHeadlineClass: string;
 }) {
-  const { steps, secIdx, activeSectionsLen, tabLabel, featureHeadlineClass } =
+  const { steps, secIdx, activeSectionsLen, tabLabel, stepHeadlineClass } =
     props;
   const stepTotal = steps.length;
   const labelPrefix = tabLabel ?? "Feature";
@@ -96,11 +98,11 @@ function LandingQuickStartDesktopStepStack(props: {
         >
           <div className="text-left">
             <QuickStartStepIndicator index={idx} total={stepTotal} />
-            <h3 className={featureHeadlineClass}>
-              <span className="font-medium text-gray-900">
+            <h3 className={stepHeadlineClass}>
+              <span className="font-semibold text-gray-900">
                 {step.headingBold}
               </span>{" "}
-              <span className="font-normal text-gray-400">
+              <span className="font-light text-gray-500">
                 {step.headingLight}
               </span>
             </h3>
@@ -126,21 +128,21 @@ function LandingQuickStartMobileStepStack(props: {
   steps: LandingQuickStartStep[];
   secIdx: number;
   tabLabel: string;
-  featureHeadlineClass: string;
+  stepHeadlineClass: string;
 }) {
-  const { steps, secIdx, tabLabel, featureHeadlineClass } = props;
+  const { steps, secIdx, tabLabel, stepHeadlineClass } = props;
   const stepTotal = steps.length;
   return (
-    <div className="flex flex-col gap-12">
+    <div className="flex flex-col gap-20">
       {steps.map((step, idx) => (
-        <div key={step.key} className="flex flex-col gap-4">
-          <div className="text-left">
+        <div key={step.key} className="flex flex-col gap-9">
+          <div className="text-left w-full min-w-0">
             <QuickStartStepIndicator index={idx} total={stepTotal} />
-            <h3 className={featureHeadlineClass}>
-              <span className="font-medium text-gray-900">
+            <h3 className={stepHeadlineClass}>
+              <span className="font-semibold text-gray-900">
                 {step.headingBold}
               </span>{" "}
-              <span className="font-normal text-gray-400">
+              <span className="font-light text-gray-500">
                 {step.headingLight}
               </span>
             </h3>
@@ -161,6 +163,8 @@ function LandingQuickStartMobileStepStack(props: {
 type LandingTab = {
   id: string;
   label: string;
+  /** Short copy for the horizontal product-area nav only (no in-section rail) */
+  navDescription: string;
   sections: LandingFeatureSection[];
 };
 
@@ -168,6 +172,8 @@ const tabs: LandingTab[] = [
   {
     id: "llm",
     label: "Text agents",
+    navDescription:
+      "Create tests, define custom evaluators, and find the best LLM for your agent",
     sections: [
       {
         headingBold: "Evaluate the quality",
@@ -199,6 +205,8 @@ const tabs: LandingTab[] = [
           closingHeadline: {
             headingBold: "Find the best LLM",
             headingLight: "for your agent",
+            subheading:
+              "Compare different models on your tests to find the best one for your agent",
           },
           comparisonSteps: [
             {
@@ -228,6 +236,8 @@ const tabs: LandingTab[] = [
   {
     id: "voice",
     label: "Voice agents",
+    navDescription:
+      "Benchmark speech-to-text and text-to-speech models using metrics suited for agents",
     sections: [
       {
         headingBold: "Benchmark providers",
@@ -248,6 +258,8 @@ const tabs: LandingTab[] = [
   {
     id: "simulations",
     label: "Simulations",
+    navDescription:
+      "Use personas and scenarios to simulate conversations before deploying to real users",
     sections: [
       {
         headingBold: "Simulate realistic conversations",
@@ -265,7 +277,8 @@ import { ARTPARK_WEBSITE_URL, WHATSAPP_INVITE_URL } from "@/constants/links";
 const GITHUB_REPO_URL = "https://github.com/artpark-sahai-org/calibrate";
 
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState("llm");
+  const [activeFeatureSectionId, setActiveFeatureSectionId] =
+    useState<string>("llm");
   const [getStartedTab, setGetStartedTab] = useState<"evaluate" | "learn">(
     "evaluate",
   );
@@ -275,84 +288,242 @@ export default function HomePage() {
     document.title = "Calibrate | AI evaluation platform for NGOs";
   }, []);
 
-  const activeLandingTab = tabs.find((t) => t.id === activeTab);
-  const activeSections = activeLandingTab?.sections ?? [];
+  useEffect(() => {
+    const measureActiveSection = () => {
+      const centerY = window.innerHeight * 0.5;
+      let activeId = tabs[0].id;
+      for (const tab of tabs) {
+        const el = document.getElementById(`landing-${tab.id}`);
+        if (!el) continue;
+        if (el.getBoundingClientRect().top <= centerY) {
+          activeId = tab.id;
+        }
+      }
+      setActiveFeatureSectionId((prev) =>
+        prev === activeId ? prev : activeId,
+      );
+    };
 
-  const featureHeadlineClass =
-    "text-2xl md:text-3xl lg:text-4xl leading-[1.2] tracking-[-0.01em] mb-4 md:mb-6";
+    measureActiveSection();
+    window.addEventListener("scroll", measureActiveSection, { passive: true });
+    window.addEventListener("resize", measureActiveSection);
+    return () => {
+      window.removeEventListener("scroll", measureActiveSection);
+      window.removeEventListener("resize", measureActiveSection);
+    };
+  }, []);
 
-  const desktopSectionRow = (sec: LandingFeatureSection, secIdx: number) => {
+  const scrollToLandingSection = (tabId: string) => {
+    document
+      .getElementById(`landing-${tabId}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setActiveFeatureSectionId(tabId);
+  };
+
+  /** Section-level split headlines (quick-start intro & closing, Voice/Sim columns, section rail) */
+  const landingBannerHeadlineClass =
+    "text-3xl sm:text-4xl md:text-[2.25rem] lg:text-5xl xl:text-[3rem] leading-[1.08] tracking-[-0.035em] w-full md:text-balance";
+
+  /** Per-step titles — same weight treatment, smaller scale than `landingBannerHeadlineClass` */
+  const landingStepHeadlineClass =
+    "text-xl sm:text-2xl md:text-2xl lg:text-3xl xl:text-[2.125rem] leading-[1.12] tracking-[-0.03em] w-full md:text-balance";
+
+  /** Body copy directly under `landingBannerHeadlineClass` intros — scales with large headlines */
+  const landingBannerIntroDescriptionClass =
+    "text-base md:text-lg lg:text-xl text-gray-500 leading-relaxed text-pretty";
+
+  /** Horizontal product-area nav: shared “active” affordance (scroll-driven) */
+  const landingNavIsActive = (tabId: string) =>
+    activeFeatureSectionId === tabId;
+
+  const renderLandingProductNavButton = (tab: LandingTab, index: number) => {
+    const active = landingNavIsActive(tab.id);
+    return (
+      <button
+        type="button"
+        onClick={() => scrollToLandingSection(tab.id)}
+        className={`group w-full min-w-0 rounded-2xl border px-4 py-3.5 text-left transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-offset-2 md:max-w-[20rem] md:min-w-[260px] md:w-auto md:shrink-0 lg:min-w-[280px] ${
+          active
+            ? "border-emerald-200/90 bg-gradient-to-br from-white via-emerald-50 to-white shadow-[0_8px_30px_-12px_rgba(16,185,129,0.35)] ring-1 ring-emerald-900/[0.06]"
+            : "border-gray-100/90 bg-gray-50 hover:border-gray-200 hover:bg-white hover:shadow-sm"
+        }`}
+        aria-current={active ? "location" : undefined}
+      >
+        <span
+          className={`mb-1 flex items-baseline gap-2 font-mono text-[10px] font-semibold tabular-nums tracking-wider ${
+            active ? "text-emerald-700" : "text-gray-400"
+          }`}
+          aria-hidden
+        >
+          {String(index + 1).padStart(2, "0")}
+        </span>
+        <span
+          className={`block text-[15px] font-semibold leading-snug tracking-[-0.02em] ${
+            active
+              ? "text-emerald-950"
+              : "text-gray-800 group-hover:text-gray-950"
+          }`}
+        >
+          {tab.label}
+        </span>
+        <span
+          className={`mt-2 block text-[12px] leading-relaxed ${
+            active ? "text-gray-600" : "text-gray-500"
+          }`}
+        >
+          {tab.navDescription}
+        </span>
+      </button>
+    );
+  };
+
+  const renderFeatureSection = (
+    sec: LandingFeatureSection,
+    secIdx: number,
+    tab: LandingTab,
+  ) => {
+    const activeSectionsLen = tab.sections.length;
+    const tabLabel = tab.label;
+
     if (sec.quickStart) {
       return (
-        <div key={secIdx} className="max-w-7xl mx-auto w-full">
-          <div className="mx-auto mb-10 max-w-2xl text-center md:mb-14">
-            <h2 className={featureHeadlineClass}>
-              <span className="font-medium text-gray-900">
-                {sec.headingBold}
-              </span>{" "}
-              <span className="font-normal text-gray-400">
-                {sec.headingLight}
-              </span>
-            </h2>
-            <p className="text-sm md:text-base text-gray-500">
-              {sec.description}
-            </p>
-          </div>
-          <LandingQuickStartDesktopStepStack
-            steps={sec.quickStart.steps}
-            secIdx={secIdx}
-            activeSectionsLen={activeSections.length}
-            tabLabel={activeLandingTab?.label}
-            featureHeadlineClass={featureHeadlineClass}
-          />
-          {sec.quickStart.closingHeadline ? (
-            <div className="mx-auto mt-14 max-w-2xl text-center md:mt-16 lg:mt-20">
-              <h2 className={featureHeadlineClass}>
-                <span className="font-medium text-gray-900">
-                  {sec.quickStart.closingHeadline.headingBold}
+        <div key={`${tab.id}-sec-${secIdx}`} className="w-full">
+          <div className="hidden md:block max-w-7xl mx-auto w-full">
+            <div className="mx-auto mb-10 max-w-4xl text-center md:mb-14">
+              <h2 className={`${landingBannerHeadlineClass} mb-3 md:mb-4`}>
+                <span className="font-semibold text-gray-900">
+                  {sec.headingBold}
                 </span>{" "}
-                <span className="font-normal text-gray-400">
-                  {sec.quickStart.closingHeadline.headingLight}
+                <span className="font-light text-gray-500">
+                  {sec.headingLight}
                 </span>
               </h2>
+              <p className={landingBannerIntroDescriptionClass}>
+                {sec.description}
+              </p>
             </div>
-          ) : null}
-          {sec.quickStart.comparisonSteps?.length ? (
-            <div className="mt-14 md:mt-16 lg:mt-20">
-              <LandingQuickStartDesktopStepStack
-                steps={sec.quickStart.comparisonSteps}
-                secIdx={secIdx}
-                activeSectionsLen={activeSections.length}
-                tabLabel={activeLandingTab?.label}
-                featureHeadlineClass={featureHeadlineClass}
-              />
+            <LandingQuickStartDesktopStepStack
+              steps={sec.quickStart.steps}
+              secIdx={secIdx}
+              activeSectionsLen={activeSectionsLen}
+              tabLabel={tabLabel}
+              stepHeadlineClass={landingStepHeadlineClass}
+            />
+            {sec.quickStart.closingHeadline ? (
+              <div className="mx-auto mt-14 max-w-4xl text-center md:mt-16 lg:mt-20">
+                <h2
+                  className={`${landingBannerHeadlineClass}${
+                    sec.quickStart.closingHeadline.subheading
+                      ? " mb-3 md:mb-4"
+                      : ""
+                  }`}
+                >
+                  <span className="font-semibold text-gray-900">
+                    {sec.quickStart.closingHeadline.headingBold}
+                  </span>{" "}
+                  <span className="font-light text-gray-500">
+                    {sec.quickStart.closingHeadline.headingLight}
+                  </span>
+                </h2>
+                {sec.quickStart.closingHeadline.subheading ? (
+                  <p className={landingBannerIntroDescriptionClass}>
+                    {sec.quickStart.closingHeadline.subheading}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            {sec.quickStart.comparisonSteps?.length ? (
+              <div className="mt-14 md:mt-16 lg:mt-20">
+                <LandingQuickStartDesktopStepStack
+                  steps={sec.quickStart.comparisonSteps}
+                  secIdx={secIdx}
+                  activeSectionsLen={activeSectionsLen}
+                  tabLabel={tabLabel}
+                  stepHeadlineClass={landingStepHeadlineClass}
+                />
+              </div>
+            ) : null}
+          </div>
+
+          <div className="md:hidden space-y-12">
+            <div className="mx-auto max-w-4xl w-full space-y-5 text-center">
+              <h2 className={`${landingBannerHeadlineClass} mb-1`}>
+                <span className="font-semibold text-gray-900">
+                  {sec.headingBold}
+                </span>{" "}
+                <span className="font-light text-gray-500">
+                  {sec.headingLight}
+                </span>
+              </h2>
+              <p className={landingBannerIntroDescriptionClass}>
+                {sec.description}
+              </p>
             </div>
-          ) : null}
+            <LandingQuickStartMobileStepStack
+              steps={sec.quickStart.steps}
+              secIdx={secIdx}
+              tabLabel={tabLabel}
+              stepHeadlineClass={landingStepHeadlineClass}
+            />
+            {sec.quickStart.closingHeadline ? (
+              <div className="mx-auto mt-20 max-w-4xl text-center md:mt-16 lg:mt-20">
+                <h2
+                  className={`${landingBannerHeadlineClass}${
+                    sec.quickStart.closingHeadline.subheading
+                      ? " mb-3 md:mb-4"
+                      : ""
+                  }`}
+                >
+                  <span className="font-semibold text-gray-900">
+                    {sec.quickStart.closingHeadline.headingBold}
+                  </span>{" "}
+                  <span className="font-light text-gray-500">
+                    {sec.quickStart.closingHeadline.headingLight}
+                  </span>
+                </h2>
+                {sec.quickStart.closingHeadline.subheading ? (
+                  <p className={landingBannerIntroDescriptionClass}>
+                    {sec.quickStart.closingHeadline.subheading}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            {sec.quickStart.comparisonSteps?.length ? (
+              <div className="mt-20 md:mt-16 lg:mt-20">
+                <LandingQuickStartMobileStepStack
+                  steps={sec.quickStart.comparisonSteps}
+                  secIdx={secIdx}
+                  tabLabel={tabLabel}
+                  stepHeadlineClass={landingStepHeadlineClass}
+                />
+              </div>
+            ) : null}
+          </div>
         </div>
       );
     }
 
     return (
       <div
-        key={secIdx}
-        className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6 md:gap-8 items-start"
+        key={`${tab.id}-sec-${secIdx}`}
+        className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-10 md:gap-8 items-start"
       >
-        <div className="text-left lg:sticky lg:top-8">
-          <h2 className="text-2xl md:text-3xl lg:text-4xl leading-[1.2] tracking-[-0.01em] mb-4 md:mb-6">
-            <span className="font-medium text-gray-900">{sec.headingBold}</span>{" "}
-            <span className="font-normal text-gray-400">
-              {sec.headingLight}
-            </span>
+        <div className="text-left lg:sticky lg:top-40">
+          <h2 className={`${landingBannerHeadlineClass} mb-4 md:mb-6`}>
+            <span className="font-semibold text-gray-900">
+              {sec.headingBold}
+            </span>{" "}
+            <span className="font-light text-gray-500">{sec.headingLight}</span>
           </h2>
-          <p className="text-sm md:text-base text-gray-500">
+          <p className={landingBannerIntroDescriptionClass}>
             {sec.description}
           </p>
         </div>
         <LandingFeatureImageColumn
           section={sec}
           getAlt={(idx) =>
-            activeSections.length > 1
-              ? `${activeLandingTab?.label ?? "Feature"} preview ${secIdx + 1}-${idx + 1}`
+            activeSectionsLen > 1
+              ? `${tabLabel} preview ${secIdx + 1}-${idx + 1}`
               : `Feature preview ${idx + 1}`
           }
         />
@@ -369,10 +540,10 @@ export default function HomePage() {
     >
       <LandingHeader />
 
-      {/* Hero Section */}
-      <div className="relative overflow-hidden">
+      {/* Hero — md+: nearly full viewport below header; mobile: shorter band (lower min-h + inner py) */}
+      <div className="relative flex min-h-[56dvh] flex-col justify-center overflow-hidden md:min-h-[calc(100dvh-5.25rem)]">
         {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-[0.03]">
+        <div className="pointer-events-none absolute inset-0 opacity-[0.03]">
           <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <pattern
@@ -394,17 +565,33 @@ export default function HomePage() {
         </div>
 
         {/* Decorative circles */}
-        <div className="absolute top-20 left-1/4 w-64 h-64 bg-emerald-100 rounded-full blur-3xl opacity-40"></div>
-        <div className="absolute top-40 right-1/4 w-48 h-48 bg-blue-100 rounded-full blur-3xl opacity-40"></div>
+        <div className="pointer-events-none absolute top-20 left-1/4 h-64 w-64 rounded-full bg-emerald-100 opacity-40 blur-3xl"></div>
+        <div className="pointer-events-none absolute top-40 right-1/4 h-48 w-48 rounded-full bg-blue-100 opacity-40 blur-3xl"></div>
 
-        <div className="relative max-w-4xl mx-auto px-4 md:px-8 pt-16 md:pt-24 pb-12 md:pb-16 text-center">
-          <p className="text-balance text-[11px] md:text-[13px] font-medium text-gray-500 mb-3 md:mb-4 max-w-2xl mx-auto leading-snug tracking-wide">
-            <span className="text-gray-400 font-normal">BUILT BY</span>{" "}
+        <div className="relative z-10 mx-auto w-full max-w-4xl px-4 py-8 text-center md:px-8 md:py-20 lg:py-24">
+          <div className="mb-4 flex justify-center md:mb-6">
+            <span className="inline-block rounded-md border border-emerald-200/90 bg-emerald-50/90 px-1.5 py-0.5 text-[10px] md:text-[11px] font-semibold uppercase tracking-wider text-emerald-950 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
+              Open source
+            </span>
+          </div>
+          <h1 className="mb-4 text-4xl font-medium tracking-[-0.02em] text-gray-900 leading-[1.1] md:mb-7 md:text-6xl">
+            AI evaluation platform
+            <br />
+            for non-profits
+          </h1>
+
+          <p className="mx-auto max-w-2xl text-base text-gray-500 md:text-xl">
+            Built by ML researchers with decades of experience to help teams
+            evaluate AI agents with best practices baked into every step
+          </p>
+
+          <p className="mx-auto mt-5 max-w-2xl text-balance text-center text-[11px] font-medium leading-snug tracking-wide text-gray-500 md:mt-14 md:text-[13px]">
+            <span className="font-normal text-gray-400">BUILT BY</span>{" "}
             <a
               href={ARTPARK_WEBSITE_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline text-inherit underline-offset-[3px] decoration-gray-400/80 hover:text-gray-700 hover:decoration-gray-600 transition-colors cursor-pointer mx-0.5"
+              className="mx-0.5 inline cursor-pointer text-inherit underline-offset-[3px] decoration-gray-400/80 transition-colors hover:text-gray-700 hover:decoration-gray-600"
             >
               <span className="whitespace-nowrap">ARTPARK</span>
               <img
@@ -412,29 +599,14 @@ export default function HomePage() {
                 alt=""
                 width={32}
                 height={32}
-                className="inline-block align-[-0.2em] h-[1.05em] w-[1.05em] max-h-[14px] max-w-[14px] md:max-h-4 md:max-w-4 ml-1 object-contain"
+                className="ml-1 inline-block h-[1.05em] w-[1.05em] max-h-[14px] max-w-[14px] object-contain align-[-0.2em] md:max-h-4 md:max-w-4"
               />
             </a>{" "}
             @ IISc ·{" "}
-            <span className="text-gray-400 font-normal">FUNDED BY</span>{" "}
-            <span className="font-semibold text-gray-800 tracking-wide">
+            <span className="font-normal text-gray-400">FUNDED BY</span>{" "}
+            <span className="font-semibold tracking-wide text-gray-800">
               GOVERNMENT OF KARNATAKA
-            </span>{" "}
-            ·{" "}
-            <span className="inline-block align-baseline rounded-md border border-emerald-200/90 bg-emerald-50/90 px-1.5 py-0.5 text-[10px] md:text-[11px] font-semibold uppercase tracking-wider text-emerald-950 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
-              Open source
             </span>
-          </p>
-
-          <h1 className="text-4xl md:text-6xl font-medium text-gray-900 leading-[1.1] mb-4 md:mb-6 tracking-[-0.02em]">
-            AI evaluation platform
-            <br />
-            for non-profits
-          </h1>
-
-          <p className="text-base md:text-xl text-gray-500 max-w-2xl mx-auto">
-            Built by ML researchers with decades of experience to help teams
-            evaluate AI agents with best practices baked into every step
           </p>
 
           {/* Launch Video */}
@@ -455,117 +627,44 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Feature Tabs Section */}
-      <div className="px-6 md:px-8 lg:px-12 pb-16 md:pb-20">
-        {/* Tabs - Hidden on mobile */}
-        <div className="hidden md:flex justify-center mb-8 md:mb-12 max-w-7xl mx-auto">
-          <div className="inline-flex items-center gap-1 p-1 bg-gray-100 rounded-xl">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Desktop: Tabbed view */}
-        {activeSections.length > 1 ? (
-          <div className="hidden md:flex flex-col gap-12 md:gap-16 max-w-7xl mx-auto">
-            {activeSections.map((sec, secIdx) =>
-              desktopSectionRow(sec, secIdx),
-            )}
-          </div>
-        ) : activeSections[0] ? (
-          <div className="hidden md:block">
-            {desktopSectionRow(activeSections[0], 0)}
-          </div>
-        ) : null}
-
-        {/* Mobile: All sections stacked */}
-        <div className="md:hidden space-y-12">
-          {tabs.map((tab) => (
-            <div key={tab.id} className="space-y-12">
-              {tab.sections.map((sec, secIdx) => (
-                <div key={secIdx} className="space-y-4">
-                  {sec.quickStart ? (
-                    <>
-                      <div className="mx-auto mb-4 max-w-2xl space-y-3 text-center">
-                        <h2 className={featureHeadlineClass}>
-                          <span className="font-medium text-gray-900">
-                            {sec.headingBold}
-                          </span>{" "}
-                          <span className="font-normal text-gray-400">
-                            {sec.headingLight}
-                          </span>
-                        </h2>
-                        <p className="text-sm text-gray-500">
-                          {sec.description}
-                        </p>
-                      </div>
-                      <LandingQuickStartMobileStepStack
-                        steps={sec.quickStart.steps}
-                        secIdx={secIdx}
-                        tabLabel={tab.label}
-                        featureHeadlineClass={featureHeadlineClass}
-                      />
-                      {sec.quickStart.closingHeadline ? (
-                        <div className="mx-auto mt-14 max-w-2xl text-center md:mt-16 lg:mt-20">
-                          <h2 className={featureHeadlineClass}>
-                            <span className="font-medium text-gray-900">
-                              {sec.quickStart.closingHeadline.headingBold}
-                            </span>{" "}
-                            <span className="font-normal text-gray-400">
-                              {sec.quickStart.closingHeadline.headingLight}
-                            </span>
-                          </h2>
-                        </div>
-                      ) : null}
-                      {sec.quickStart.comparisonSteps?.length ? (
-                        <div className="mt-14 md:mt-16 lg:mt-20">
-                          <LandingQuickStartMobileStepStack
-                            steps={sec.quickStart.comparisonSteps}
-                            secIdx={secIdx}
-                            tabLabel={tab.label}
-                            featureHeadlineClass={featureHeadlineClass}
-                          />
-                        </div>
-                      ) : null}
-                    </>
-                  ) : (
-                    <>
-                      <div className="text-left">
-                        <h2 className="text-2xl leading-[1.2] tracking-[-0.01em] mb-3">
-                          <span className="font-medium text-gray-900">
-                            {sec.headingBold}
-                          </span>{" "}
-                          <span className="font-normal text-gray-400">
-                            {sec.headingLight}
-                          </span>
-                        </h2>
-                        <p className="text-sm text-gray-500">
-                          {sec.description}
-                        </p>
-                      </div>
-                      <LandingFeatureImageColumn
-                        section={sec}
-                        getAlt={(idx) =>
-                          `${tab.label} preview ${secIdx + 1}-${idx + 1}`
-                        }
-                      />
-                    </>
-                  )}
-                </div>
+      {/* Feature sections — md+: sticky nav row then sections; mobile: each section’s button directly above its content */}
+      <div className="px-6 pb-20 pt-8 md:px-8 md:pb-20 md:pt-12 lg:px-12 lg:pt-14">
+        <div className="mx-auto flex max-w-7xl flex-col">
+          <nav
+            aria-label="Product areas"
+            className="sticky top-0 z-40 -mx-6 mb-8 hidden justify-center bg-white px-6 py-2 md:mx-0 md:mb-10 md:flex md:overflow-x-auto md:scroll-smooth md:px-0 md:py-3 lg:mb-12 hide-scrollbar"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
+            <div className="flex w-max max-w-full flex-row flex-nowrap gap-3">
+              {tabs.map((tab, index) => (
+                <div key={tab.id}>{renderLandingProductNavButton(tab, index)}</div>
               ))}
             </div>
-          ))}
+          </nav>
+
+          <div className="flex min-w-0 flex-col gap-24 md:gap-24 lg:gap-28">
+            {tabs.map((tab, tabIndex) => (
+              <div
+                key={tab.id}
+                className="flex flex-col gap-10 md:gap-0"
+              >
+                <div className="md:hidden">
+                  {renderLandingProductNavButton(tab, tabIndex)}
+                </div>
+                <section
+                  id={`landing-${tab.id}`}
+                  data-landing-tab={tab.id}
+                  className="scroll-mt-8 md:scroll-mt-40"
+                >
+                  <div className="flex flex-col gap-20 md:gap-16">
+                    {tab.sections.map((sec, secIdx) =>
+                      renderFeatureSection(sec, secIdx, tab),
+                    )}
+                  </div>
+                </section>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
