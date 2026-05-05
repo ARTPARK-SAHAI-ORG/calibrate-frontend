@@ -129,9 +129,9 @@ export default function HomePage() {
           </p>
 
           <h1 className="text-4xl md:text-6xl font-medium text-gray-900 leading-[1.1] mb-4 md:mb-6 tracking-[-0.02em]">
-            AI evaluation
+            AI evaluation platform
             <br />
-            platform for NGOs
+            for non-profits
           </h1>
 
           <p className="text-base md:text-xl text-gray-500 max-w-2xl mx-auto">
