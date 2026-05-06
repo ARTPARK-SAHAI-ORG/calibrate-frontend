@@ -69,7 +69,7 @@ cp env.example .env.local
 | Variable | Description |
 |---|---|
 | `NEXT_PUBLIC_APP_URL` | Same as `AUTH_URL`. Used by client code for absolute links. |
-| `NEXT_PUBLIC_DOCS_URL` | Base URL of your docs site. Sidebar/help links route here. Leave unset to hide doc links. |
+| `NEXT_PUBLIC_DOCS_URL` | Base URL of your docs site, e.g. `https://docs.your-domain.com`. Required if you don't want broken links — the sidebar, landing page, and footer always render docs links unconditionally, so leaving this unset produces visible `undefined/...` hrefs. Point it at a valid docs site (your own, or the upstream Calibrate docs). |
 | `NEXT_PUBLIC_SENTRY_DSN` | Sentry project DSN for error monitoring. Leave empty to disable. |
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | `production`, `preview`, or `development`. |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | Google Analytics 4 ID (`G-...`). Leave empty to disable analytics. |
@@ -141,18 +141,28 @@ If you can't or don't want to use Vercel, the app runs anywhere Node.js runs.
 
 ### Build and run
 
+`NEXT_PUBLIC_*` vars are inlined into the client bundle at **build time**, so they must be present in the environment when you run `npm run build` — not just at runtime. Server-only vars (`AUTH_SECRET`, `GOOGLE_CLIENT_*`, `AUTH_URL`) are read at runtime and only need to be set when starting the server.
+
 ```bash
-# Build
-npm run build
+# Build — NEXT_PUBLIC_* values must be set here
+NEXT_PUBLIC_BACKEND_URL=https://api.your-domain.com \
+NEXT_PUBLIC_APP_URL=https://app.your-domain.com \
+NEXT_PUBLIC_DOCS_URL=https://docs.your-domain.com \
+NEXT_PUBLIC_SENTRY_ENVIRONMENT=production \
+  npm run build
 
-# Start (defaults to port 3000)
-npm start
+# Start — server-only vars required here, NEXT_PUBLIC_* already baked in
+AUTH_SECRET=... \
+AUTH_URL=https://app.your-domain.com \
+GOOGLE_CLIENT_ID=... \
+GOOGLE_CLIENT_SECRET=... \
+  npm start
 
-# Or with a custom port
+# Custom port
 PORT=8080 npm start
 ```
 
-Set all env vars in your process manager (`systemd`, `pm2`, Docker, etc.) — `.env.local` is loaded by `next dev` but **not** by `next start` in all cases, so prefer real env vars for production.
+Set the **server-only** env vars in your process manager (`systemd`, `pm2`, Docker, etc.). `.env.local` is loaded by `next dev` but **not** reliably by `next start`, so prefer real env vars for production. If you change any `NEXT_PUBLIC_*` value, rerun `npm run build` — restarting the server alone won't pick it up.
 
 ### Behind a reverse proxy
 
