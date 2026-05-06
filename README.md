@@ -42,7 +42,7 @@ npm start
 
 ## Self-hosting
 
-To deploy Calibrate frontend for your own tenant (Vercel, Node.js, or Docker), see [SELF_HOSTING.md](SELF_HOSTING.md).
+To deploy your own instance of Calibrate's frontend, see [SELF_HOSTING.md](SELF_HOSTING.md).
 
 ## License
 
