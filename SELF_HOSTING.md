@@ -74,6 +74,7 @@ cp env.example .env.local
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | `production`, `preview`, or `development`. |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | Google Analytics 4 ID (`G-...`). Leave empty to disable analytics. |
 | `MAINTENANCE_MODE` | Set to `true` to redirect all non-API traffic to `/`. Useful for cutover windows. |
+| `AUTH_TRUST_HOST` | Set to `true` for self-hosted Node/Docker deployments behind a reverse proxy (Nginx, Caddy, etc.). Without it, NextAuth returns `UntrustedHost` on `/api/auth/*` and Google sign-in fails. Not needed on Vercel — auto-detected. |
 
 ## 4. Run locally
 
@@ -159,6 +160,7 @@ NEXT_PUBLIC_SENTRY_ENVIRONMENT=production \
 NEXT_PUBLIC_BACKEND_URL=https://api.your-domain.com \
 AUTH_SECRET=... \
 AUTH_URL=https://app.your-domain.com \
+AUTH_TRUST_HOST=true \
 GOOGLE_CLIENT_ID=... \
 GOOGLE_CLIENT_SECRET=... \
   npm start
@@ -257,6 +259,7 @@ docker run -d \
   -e NEXT_PUBLIC_BACKEND_URL=https://api.your-domain.com \
   -e AUTH_SECRET=... \
   -e AUTH_URL=https://app.your-domain.com \
+  -e AUTH_TRUST_HOST=true \
   -e GOOGLE_CLIENT_ID=... \
   -e GOOGLE_CLIENT_SECRET=... \
   calibrate-frontend
