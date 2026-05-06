@@ -244,6 +244,7 @@ Build with `NEXT_PUBLIC_*` baked in:
 docker build \
   --build-arg NEXT_PUBLIC_BACKEND_URL=https://api.your-domain.com \
   --build-arg NEXT_PUBLIC_APP_URL=https://app.your-domain.com \
+  --build-arg NEXT_PUBLIC_DOCS_URL=https://docs.your-domain.com \
   --build-arg NEXT_PUBLIC_SENTRY_ENVIRONMENT=production \
   -t calibrate-frontend .
 ```
