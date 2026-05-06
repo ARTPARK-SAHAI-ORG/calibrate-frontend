@@ -151,7 +151,12 @@ NEXT_PUBLIC_DOCS_URL=https://docs.your-domain.com \
 NEXT_PUBLIC_SENTRY_ENVIRONMENT=production \
   npm run build
 
-# Start — server-only vars required here, NEXT_PUBLIC_* already baked in
+# Start — server-only vars required here.
+# NEXT_PUBLIC_BACKEND_URL must ALSO be set at runtime: the NextAuth `jwt`
+# callback (src/auth.ts) reads it server-side to exchange the Google id_token
+# for a backend JWT. Without it, sign-in succeeds with Google but no backend
+# token is issued and API calls fail.
+NEXT_PUBLIC_BACKEND_URL=https://api.your-domain.com \
 AUTH_SECRET=... \
 AUTH_URL=https://app.your-domain.com \
 GOOGLE_CLIENT_ID=... \
@@ -243,11 +248,12 @@ docker build \
   -t calibrate-frontend .
 ```
 
-Run with server-only vars at runtime:
+Run with server-only vars at runtime. **Note**: `NEXT_PUBLIC_BACKEND_URL` is read both at build time (for the client bundle) **and** at runtime (the NextAuth `jwt` callback in `src/auth.ts` calls the backend server-side), so pass it in both places:
 
 ```bash
 docker run -d \
   -p 3000:3000 \
+  -e NEXT_PUBLIC_BACKEND_URL=https://api.your-domain.com \
   -e AUTH_SECRET=... \
   -e AUTH_URL=https://app.your-domain.com \
   -e GOOGLE_CLIENT_ID=... \
@@ -255,7 +261,7 @@ docker run -d \
   calibrate-frontend
 ```
 
-If you change any `NEXT_PUBLIC_*` value, rebuild the image — runtime `-e` flags will not affect them.
+For other `NEXT_PUBLIC_*` values (`NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_DOCS_URL`, etc.), runtime `-e` flags do **not** affect the client bundle — rebuild the image to change them.
 
 ## 7. Verify the deploy
 
