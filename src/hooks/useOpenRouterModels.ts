@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { LLMProvider, LLMModel } from "@/components/agent-tabs/constants/providers";
+import { getBackendUrl } from "@/lib/api";
 
 type CacheEntry = {
   providers: LLMProvider[];
@@ -9,6 +10,17 @@ type CacheEntry = {
 };
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
+
+export const OPENROUTER_DISABLED_MESSAGE =
+  "OpenRouter models are not supported in this deployment. Please talk to your admin.";
+
+type AllowedProvider = { slug: string; name: string };
+type AllowedProviders = "all" | AllowedProvider[];
+
+type ProvidersResponse =
+  | null
+  | { providers: "all" }
+  | { providers: AllowedProvider[] };
 
 let cache: CacheEntry | null = null;
 let inflightPromise: Promise<LLMProvider[]> | null = null;
@@ -61,7 +73,40 @@ function isDeprecated(model: { expiration_date?: string | null }): boolean {
   return ts < Date.now();
 }
 
-async function fetchModelsFromOpenRouter(): Promise<LLMProvider[]> {
+async function fetchAllowedProviders(): Promise<AllowedProviders> {
+  const backendUrl = getBackendUrl();
+  const response = await fetch(`${backendUrl}/openrouter/providers`, {
+    headers: { accept: "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load OpenRouter providers: ${response.status}`);
+  }
+
+  const text = await response.text();
+  const json: ProvidersResponse = text ? JSON.parse(text) : null;
+
+  if (json === null) {
+    throw new Error(OPENROUTER_DISABLED_MESSAGE);
+  }
+
+  if (json.providers === "all") return "all";
+
+  if (Array.isArray(json.providers)) {
+    return json.providers
+      .filter(
+        (p): p is AllowedProvider =>
+          !!p && typeof p.slug === "string" && typeof p.name === "string",
+      )
+      .map((p) => ({ slug: p.slug, name: p.name }));
+  }
+
+  throw new Error("Unexpected response format from /openrouter/providers");
+}
+
+async function fetchModelsFromOpenRouter(
+  allowed: AllowedProviders,
+): Promise<LLMProvider[]> {
   const response = await fetch("https://openrouter.ai/api/v1/models");
   if (!response.ok) throw new Error(`OpenRouter API error: ${response.status}`);
 
@@ -71,6 +116,13 @@ async function fetchModelsFromOpenRouter(): Promise<LLMProvider[]> {
     throw new Error("Unexpected response format from OpenRouter API");
   }
 
+  const allowedSlugSet =
+    allowed === "all" ? null : new Set(allowed.map((p) => p.slug));
+  const allowedNameOverrides =
+    allowed === "all"
+      ? null
+      : new Map(allowed.map((p) => [p.slug, p.name] as const));
+
   const grouped = new Map<string, LLMModel[]>();
 
   for (const model of json.data) {
@@ -79,6 +131,8 @@ async function fetchModelsFromOpenRouter(): Promise<LLMProvider[]> {
 
     const slashIndex = model.id.indexOf("/");
     const providerSlug = slashIndex !== -1 ? model.id.slice(0, slashIndex) : "other";
+
+    if (allowedSlugSet && !allowedSlugSet.has(providerSlug)) continue;
 
     const arch = model.architecture ?? {};
     const inputModalities = Array.isArray(arch.input_modalities)
@@ -106,7 +160,7 @@ async function fetchModelsFromOpenRouter(): Promise<LLMProvider[]> {
   return Array.from(grouped.entries())
     .map(([slug, models]) => ({
       slug,
-      name: getProviderDisplayName(slug),
+      name: allowedNameOverrides?.get(slug) ?? getProviderDisplayName(slug),
       models: models.sort((a, b) => a.name.localeCompare(b.name)),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -118,7 +172,8 @@ function getOrFetchProviders(): Promise<LLMProvider[]> {
   }
 
   if (!inflightPromise) {
-    inflightPromise = fetchModelsFromOpenRouter()
+    inflightPromise = fetchAllowedProviders()
+      .then((allowed) => fetchModelsFromOpenRouter(allowed))
       .then((providers) => {
         cache = { providers, timestamp: Date.now() };
         inflightPromise = null;
@@ -166,11 +221,15 @@ export function useOpenRouterModels(): {
             setError(null);
           }
         })
-        .catch((err) => {
+        .catch((err: unknown) => {
           console.error("Failed to fetch OpenRouter models:", err);
           if (!cancelled) {
             setIsLoading(false);
-            setError("Failed to load models. Please check your connection.");
+            const message =
+              err instanceof Error && err.message === OPENROUTER_DISABLED_MESSAGE
+                ? OPENROUTER_DISABLED_MESSAGE
+                : "Failed to load models. Please check your connection.";
+            setError(message);
           }
         });
     };
