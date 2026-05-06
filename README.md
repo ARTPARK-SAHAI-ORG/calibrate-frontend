@@ -40,6 +40,10 @@ npm run build
 npm start
 ```
 
+## Self-hosting
+
+To deploy your own instance of Calibrate's frontend, see [SELF_HOSTING.md](SELF_HOSTING.md).
+
 ## License
 
 This work is licensed under a
