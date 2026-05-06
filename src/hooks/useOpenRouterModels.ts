@@ -225,11 +225,17 @@ export function useOpenRouterModels(): {
           console.error("Failed to fetch OpenRouter models:", err);
           if (!cancelled) {
             setIsLoading(false);
-            const message =
-              err instanceof Error && err.message === OPENROUTER_DISABLED_MESSAGE
+            const isDisabled =
+              err instanceof Error && err.message === OPENROUTER_DISABLED_MESSAGE;
+            if (isDisabled) {
+              cache = null;
+              setProviders([]);
+            }
+            setError(
+              isDisabled
                 ? OPENROUTER_DISABLED_MESSAGE
-                : "Failed to load models. Please check your connection.";
-            setError(message);
+                : "Failed to load models. Please check your connection.",
+            );
           }
         });
     };
