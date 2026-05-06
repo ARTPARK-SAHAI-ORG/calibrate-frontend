@@ -706,14 +706,6 @@ function NewAgentDialog({
           : {
               name: agentName.trim(),
               type: "agent",
-              config: {
-                system_prompt: "You are a helpful assistant.",
-                stt: { provider: "google" },
-                tts: { provider: "google" },
-                llm: { model: "google/gemini-3-flash-preview" },
-                settings: { agent_speaks_first: false },
-                system_tools: { end_call: true },
-              },
             };
 
       const response = await fetch(`${backendUrl}/agents`, {
