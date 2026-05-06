@@ -683,14 +683,15 @@ export default function HomePage() {
               </span>
             </div>
             <h1 className="mb-4 text-4xl font-medium tracking-[-0.02em] text-gray-900 leading-[1.1] md:mb-7 md:text-6xl">
-              AI evaluation platform
+              AI agent evaluation for {"non\u2011profits"}
               <br />
-              for non-profits
             </h1>
 
             <p className="mx-auto max-w-2xl text-base text-gray-500 md:text-xl">
-              Built by ML engineers with decades of experience to help teams
-              evaluate AI agents with best practices baked into every step
+              Existing AI evaluation tools are too complex or overly expensive
+              for {"non\u2011profits"} to use. Calibrate is built by ML
+              engineers with decades of experience to make AI evaluation
+              accessible with best practices baked into every step
             </p>
           </div>
 
