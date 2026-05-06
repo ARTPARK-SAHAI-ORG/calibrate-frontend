@@ -13,7 +13,7 @@ To run Calibrate end-to-end, you need:
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 20.9+ (required by Next.js 16)
 - npm
 - A GitHub account (for Vercel deploys)
 - Access to a Calibrate backend deployment with its base URL
@@ -180,21 +180,39 @@ Make sure `X-Forwarded-Proto` is forwarded — NextAuth uses it to build correct
 
 ### Docker
 
+`NEXT_PUBLIC_*` vars are inlined into the JS bundle at **build time**, so they must be passed as `--build-arg` when building the image. Server-only vars (`AUTH_SECRET`, `GOOGLE_CLIENT_SECRET`, etc.) are read at runtime and should be passed with `-e` on `docker run`.
+
 A minimal Dockerfile:
 
 ```dockerfile
-FROM node:20-alpine AS deps
+FROM node:20.9-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-FROM node:20-alpine AS builder
+FROM node:20.9-alpine AS builder
 WORKDIR /app
+
+# NEXT_PUBLIC_* must be available at build time — declare them as build args
+# and re-export as env vars before `next build`.
+ARG NEXT_PUBLIC_BACKEND_URL
+ARG NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_DOCS_URL
+ARG NEXT_PUBLIC_SENTRY_DSN
+ARG NEXT_PUBLIC_SENTRY_ENVIRONMENT
+ARG NEXT_PUBLIC_GA_MEASUREMENT_ID
+ENV NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL \
+    NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL \
+    NEXT_PUBLIC_DOCS_URL=$NEXT_PUBLIC_DOCS_URL \
+    NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN \
+    NEXT_PUBLIC_SENTRY_ENVIRONMENT=$NEXT_PUBLIC_SENTRY_ENVIRONMENT \
+    NEXT_PUBLIC_GA_MEASUREMENT_ID=$NEXT_PUBLIC_GA_MEASUREMENT_ID
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-FROM node:20-alpine AS runner
+FROM node:20.9-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=builder /app/.next ./.next
@@ -205,12 +223,21 @@ EXPOSE 3000
 CMD ["npm", "start"]
 ```
 
-Pass env vars at runtime:
+Build with `NEXT_PUBLIC_*` baked in:
+
+```bash
+docker build \
+  --build-arg NEXT_PUBLIC_BACKEND_URL=https://api.your-domain.com \
+  --build-arg NEXT_PUBLIC_APP_URL=https://app.your-domain.com \
+  --build-arg NEXT_PUBLIC_SENTRY_ENVIRONMENT=production \
+  -t calibrate-frontend .
+```
+
+Run with server-only vars at runtime:
 
 ```bash
 docker run -d \
   -p 3000:3000 \
-  -e NEXT_PUBLIC_BACKEND_URL=https://api.your-domain.com \
   -e AUTH_SECRET=... \
   -e AUTH_URL=https://app.your-domain.com \
   -e GOOGLE_CLIENT_ID=... \
@@ -218,7 +245,7 @@ docker run -d \
   calibrate-frontend
 ```
 
-`NEXT_PUBLIC_*` vars are baked in at **build time**, not runtime — if you change them, rebuild the image.
+If you change any `NEXT_PUBLIC_*` value, rebuild the image — runtime `-e` flags will not affect them.
 
 ## 7. Verify the deploy
 
