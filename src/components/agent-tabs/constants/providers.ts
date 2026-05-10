@@ -609,7 +609,7 @@ export const sttProviders: STTProvider[] = [
   { label: "ElevenLabs", value: "elevenlabs", model: "scribe-v2", website: "https://elevenlabs.io", supportedLanguages: elevenlabsSTTSupportedLanguages },
   { label: "Groq", value: "groq", model: "whisper-large-v3-turbo", website: "https://groq.com", supportedLanguages: openaiSTTSupportedLanguages },
   { label: "Google", value: "google", model: "chirp-3", website: "https://cloud.google.com/speech-to-text", supportedLanguages: googleSTTSupportedLanguages, modelOverrides: { "Sindhi": "chirp-2" } },
-  { label: "Sarvam", value: "sarvam", model: "saarika-v2.5", website: "https://sarvam.ai", supportedLanguages: sarvamSTTSupportedLanguages },
+  { label: "Sarvam", value: "sarvam", model: "saarika-v3", website: "https://sarvam.ai", supportedLanguages: sarvamSTTSupportedLanguages },
   { label: "Smallest AI", value: "smallest", model: "pulse", website: "https://smallest.ai", supportedLanguages: smallestAiSTTSupportedLanguages },
 ];
 
@@ -623,19 +623,19 @@ export const sttProviders: STTProvider[] = [
 │ ElevenLabs  │ scribe-v2                │
 │ Groq        │ whisper-large-v3-turbo   │
 │ Google      │ chirp-3                  │
-│ Sarvam      │ saarika-v2.5             │
+│ Sarvam      │ saarika-v3               │
 │ Smallest    │ pulse                    │
 └─────────────┴──────────────────────────┘
 */
 
 export const ttsProviders: TTSProvider[] = [
-  { label: "Cartesia", value: "cartesia", model: "sonic-3", voiceId: "Riya", website: "https://cartesia.ai", supportedLanguages: cartesiaTTSSupportedLanguages },
+  { label: "Cartesia", value: "cartesia", model: "sonic-3.5", voiceId: "Riya", website: "https://cartesia.ai", supportedLanguages: cartesiaTTSSupportedLanguages },
   { label: "OpenAI", value: "openai", model: "gpt-4o-mini-tts", voiceId: "coral", website: "https://openai.com", supportedLanguages: openaiSTTSupportedLanguages },
   { label: "Groq", value: "groq", model: "orpheus", voiceId: "troy", website: "https://groq.com", supportedLanguages: groqTTSSupportedLanguages },
   { label: "Google", value: "google", model: "chirp_3", voiceId: "Charon", website: "https://cloud.google.com/text-to-speech", supportedLanguages: googleTTSSupportedLanguages, modelOverrides: { "Sindhi": "gemini" } },
   { label: "ElevenLabs", value: "elevenlabs", model: "eleven_multilingual_v2", voiceId: "Krishna", website: "https://elevenlabs.io", supportedLanguages: elevenlabsTTSSupportedLanguages, modelOverrides: { "Sindhi": "eleven_v3" } },
-  { label: "Sarvam", value: "sarvam", model: "bulbul:v3-beta", voiceId: "aditya", website: "https://sarvam.ai", supportedLanguages: sarvamSTTSupportedLanguages },
-  { label: "Smallest AI", value: "smallest", model: "lightning", voiceId: "aditi", website: "https://smallest.ai", supportedLanguages: smallestAiSTTSupportedLanguages },
+  { label: "Sarvam", value: "sarvam", model: "bulbul:v3", voiceId: "aditya", website: "https://sarvam.ai", supportedLanguages: sarvamSTTSupportedLanguages },
+  { label: "Smallest AI", value: "smallest", model: "lightning:v2", voiceId: "aditi", website: "https://smallest.ai", supportedLanguages: smallestAiSTTSupportedLanguages },
 ];
 
 /*
@@ -647,7 +647,7 @@ export const ttsProviders: TTSProvider[] = [
 │ Groq        │ playai-tts               │ Arista-PlayAI                            │
 │ Google      │ chirp-3                  │ Aoede                                    │
 │ ElevenLabs  │ eleven_multilingual_v2   │ IbEzPPGLXlYUvxNGhJQp                     │
-│ Sarvam      │ bulbul:v2                │ meera                                    │
-│ Smallest    │ lightning                │ emily                                    │
+│ Sarvam      │ bulbul:v3                │ aditya                                    │
+│ Smallest    │ lightning:v2             │ emily                                    │
 └─────────────┴──────────────────────────┴──────────────────────────────────────────┘
 */

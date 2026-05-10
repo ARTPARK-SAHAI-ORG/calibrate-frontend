@@ -159,7 +159,7 @@ type STTProvider = {
 type TTSProvider = {
   label: string; // Provider name (e.g., "Cartesia")
   value: string; // API identifier (e.g., "cartesia")
-  model: string; // Model name (e.g., "sonic-3")
+  model: string; // Model name (e.g., "sonic-3.5")
   voiceId: string; // Voice identifier (e.g., "Riya")
   website: string; // Provider website URL (e.g., "https://cartesia.ai")
   supportedLanguages?: string[];
@@ -176,18 +176,18 @@ type TTSProvider = {
 | ElevenLabs | scribe-v2 | https://elevenlabs.io |
 | Groq | whisper-large-v3-turbo | https://groq.com |
 | Google | chirp-3 | https://cloud.google.com/speech-to-text |
-| Sarvam | saarika-v2.5 | https://sarvam.ai |
+| Sarvam | saarika-v3 | https://sarvam.ai |
 | Smallest | pulse | https://smallest.ai |
 
 **TTS Providers Table:**
 | Label | Model | Voice ID | Website |
 |-------|-------|----------|---------|
-| Cartesia | sonic-3 | Riya | https://cartesia.ai |
+| Cartesia | sonic-3.5 | Riya | https://cartesia.ai |
 | OpenAI | gpt-4o-mini-tts | coral | https://openai.com |
 | Groq | orpheus | troy | https://groq.com |
 | Google | chirp_3 | Charon | https://cloud.google.com/text-to-speech |
 | ElevenLabs | eleven_multilingual_v2 | Krishna | https://elevenlabs.io |
-| Sarvam | bulbul:v3-beta | aditya | https://sarvam.ai |
+| Sarvam | bulbul:v3 | aditya | https://sarvam.ai |
 | Smallest | lightning | aditi | https://smallest.ai |
 
 **Provider Website Links in UI:**
