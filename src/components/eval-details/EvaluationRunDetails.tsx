@@ -329,11 +329,15 @@ export function STTEvaluationOutputs({
             return <ProviderErrorState />;
           }
 
+          // Show per-row metric columns as soon as this provider's results
+          // arrive — don't wait for the overall task (other providers) to
+          // finish. Rows without computed values still render "—" in the
+          // metric cells.
           const showMetrics =
-            status === "done" ||
-            (providerResult.results?.every((r) => {
-              if (r.wer === undefined || r.wer === "") return false;
-              return evaluatorColumns.every((col) => {
+            providerResult.success === true ||
+            (providerResult.results?.some((r) => {
+              if (r.wer !== undefined && r.wer !== "") return true;
+              return evaluatorColumns.some((col) => {
                 const v = r[col.scoreField ?? `${col.key}_score`];
                 return v !== undefined && v !== null && v !== "";
               });
@@ -425,10 +429,13 @@ export function TTSEvaluationOutputs({
             return <ProviderErrorState />;
           }
 
+          // Show per-row metric columns as soon as this provider's results
+          // arrive — don't wait for the overall task (other providers) to
+          // finish.
           const showMetrics =
-            status === "done" ||
-            (providerResult.results?.every((r) =>
-              evaluatorColumns.every((col) => {
+            providerResult.success === true ||
+            (providerResult.results?.some((r) =>
+              evaluatorColumns.some((col) => {
                 const v = r[col.scoreField ?? `${col.key}_score`];
                 return v !== undefined && v !== null && v !== "";
               }),

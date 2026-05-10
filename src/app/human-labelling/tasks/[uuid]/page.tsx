@@ -1064,6 +1064,21 @@ function LabellingTaskPageInner() {
     });
   };
 
+  /**
+   * Selects an item AND scrolls back to the top of the page so the newly
+   * visible bulk-action toolbar (Evaluate selected / Label selected) is in
+   * view. Used by the per-row Label/Evaluate buttons when no rows are yet
+   * selected — those buttons enter bulk mode rather than acting on the row
+   * directly. When bulk mode is already on (some other row is checked),
+   * the row buttons are hidden, so this helper isn't called in that case.
+   */
+  const enterBulkModeWithScroll = (uuid: string) => {
+    toggleItem(uuid);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
   const allSelected = items.length > 0 && selectedItemIds.size === items.length;
   const someSelected = selectedItemIds.size > 0 && !allSelected;
   const toggleSelectAll = () => {
@@ -2433,7 +2448,7 @@ function LabellingTaskPageInner() {
                                 setSelectedItemIds(new Set([uuid]));
                                 setAssignOpen(true);
                               } else {
-                                toggleItem(uuid);
+                                enterBulkModeWithScroll(uuid);
                               }
                             } : undefined}
                             onEdit={(uuid) => {
@@ -2445,7 +2460,7 @@ function LabellingTaskPageInner() {
                                 setSelectedItemIds(new Set([uuid]));
                                 handleRunEvaluators([uuid]);
                               } else {
-                                toggleItem(uuid);
+                                enterBulkModeWithScroll(uuid);
                               }
                             } : undefined}
                             isResultsOpen={isResultsOpen}
@@ -2517,7 +2532,7 @@ function LabellingTaskPageInner() {
                                 setSelectedItemIds(new Set([uuid]));
                                 setAssignOpen(true);
                               } else {
-                                toggleItem(uuid);
+                                enterBulkModeWithScroll(uuid);
                               }
                             } : undefined}
                             onEdit={(uuid) => setEditLlmItemUuid(uuid)}
@@ -2526,7 +2541,7 @@ function LabellingTaskPageInner() {
                                 setSelectedItemIds(new Set([uuid]));
                                 handleRunEvaluators([uuid]);
                               } else {
-                                toggleItem(uuid);
+                                enterBulkModeWithScroll(uuid);
                               }
                             } : undefined}
                             isResultsOpen={isResultsOpen}

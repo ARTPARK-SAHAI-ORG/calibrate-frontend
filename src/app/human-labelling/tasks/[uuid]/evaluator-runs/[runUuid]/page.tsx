@@ -15,6 +15,10 @@ import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { type Item } from "@/components/human-labelling/AnnotationJobView";
 import {
+  RunEvaluatorsDialog,
+  type RunEvaluatorsSelection,
+} from "@/components/human-labelling/RunEvaluatorsDialog";
+import {
   EvaluatorRunDetailView,
   type EvaluatorRunJob,
   type EvaluatorRunRow,
@@ -77,6 +81,12 @@ export default function EvaluatorRunDetailPage() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const startTime = useRef(Date.now());
+  // Re-run flow: opens the same RunEvaluatorsDialog used on the items table,
+  // but pre-targeting this job's items so the user just picks evaluators /
+  // versions and a fresh run is kicked off.
+  const [rerunOpen, setRerunOpen] = useState(false);
+  const [rerunSubmitting, setRerunSubmitting] = useState(false);
+  const [rerunError, setRerunError] = useState<string | null>(null);
 
   const evaluatorNamesById = useMemo(() => {
     const m: Record<string, string> = {};
@@ -230,6 +240,42 @@ export default function EvaluatorRunDetailPage() {
     }
     return m;
   }, [job]);
+
+  /** Item UUIDs covered by this job, used to pre-target a re-run. */
+  const rerunItemIds = useMemo<string[]>(
+    () => itemsForRun.map((it) => it.uuid).filter(Boolean),
+    [itemsForRun],
+  );
+
+  const submitRerun = useCallback(
+    async (selections: RunEvaluatorsSelection[]) => {
+      if (!accessToken || !taskUuid || rerunSubmitting) return;
+      setRerunSubmitting(true);
+      setRerunError(null);
+      try {
+        const body: Record<string, unknown> = { evaluators: selections };
+        if (rerunItemIds.length > 0) body.item_ids = rerunItemIds;
+        const result = await apiClient<{
+          job_uuid: string;
+          status: string;
+          evaluator_count: number;
+          item_count: number;
+        }>(`/annotation-tasks/${taskUuid}/evaluator-runs`, accessToken, {
+          method: "POST",
+          body,
+        });
+        setRerunOpen(false);
+        // Navigate to the new run; rerunSubmitting stays true through unmount.
+        router.push(
+          `/human-labelling/tasks/${taskUuid}/evaluator-runs/${result.job_uuid}`,
+        );
+      } catch (err) {
+        setRerunError(parseApiError(err, "Failed to start evaluation run"));
+        setRerunSubmitting(false);
+      }
+    },
+    [accessToken, taskUuid, rerunItemIds, rerunSubmitting, router],
+  );
 
   const handleExport = useCallback(async () => {
     const exportItems = itemsForRun;
@@ -479,35 +525,18 @@ export default function EvaluatorRunDetailPage() {
               ) : null
             }
             actionsSlot={
-              job.status === "completed" && itemsForRun.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={handleExport}
-                  disabled={exporting}
-                  title="Download spreadsheet (XLSX)"
-                  className="inline-flex items-center gap-2 h-11 px-6 rounded-md text-[14px] font-semibold bg-foreground text-background shadow-sm hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {exporting ? (
-                    <svg
-                      className="w-4 h-4 shrink-0 animate-spin"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                  ) : (
+              <div className="flex items-center gap-2 flex-wrap">
+                {accessToken && rerunItemIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRerunError(null);
+                      setRerunOpen(true);
+                    }}
+                    disabled={rerunSubmitting}
+                    title="Run a new evaluation on the same items"
+                    className="inline-flex items-center gap-2 h-11 px-5 rounded-md text-[14px] font-semibold border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
                     <svg
                       className="w-4 h-4 shrink-0"
                       fill="none"
@@ -518,13 +547,59 @@ export default function EvaluatorRunDetailPage() {
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                        d="M4 4v5h.582a8 8 0 0114.95-2M20 20v-5h-.581a8 8 0 01-14.95 2"
                       />
                     </svg>
-                  )}
-                  {exporting ? "Exporting…" : "Export results"}
-                </button>
-              ) : null
+                    Re-run
+                  </button>
+                )}
+                {job.status === "completed" && itemsForRun.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleExport}
+                    disabled={exporting}
+                    title="Download spreadsheet (XLSX)"
+                    className="inline-flex items-center gap-2 h-11 px-6 rounded-md text-[14px] font-semibold bg-foreground text-background shadow-sm hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {exporting ? (
+                      <svg
+                        className="w-4 h-4 shrink-0 animate-spin"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        className="w-4 h-4 shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                        />
+                      </svg>
+                    )}
+                    {exporting ? "Exporting…" : "Export results"}
+                  </button>
+                )}
+              </div>
             }
             topError={
               exportError ? `Export failed: ${exportError}` : null
@@ -532,6 +607,26 @@ export default function EvaluatorRunDetailPage() {
           />
         ) : null}
       </div>
+
+      {accessToken && task && (
+        <RunEvaluatorsDialog
+          isOpen={rerunOpen}
+          accessToken={accessToken}
+          evaluators={(task.evaluators ?? []).map((e) => ({
+            uuid: e.uuid,
+            name: e.name,
+          }))}
+          submitting={rerunSubmitting}
+          submitError={rerunError}
+          onClose={() => {
+            if (!rerunSubmitting) {
+              setRerunOpen(false);
+              setRerunError(null);
+            }
+          }}
+          onConfirm={submitRerun}
+        />
+      )}
     </AppLayout>
   );
 }
