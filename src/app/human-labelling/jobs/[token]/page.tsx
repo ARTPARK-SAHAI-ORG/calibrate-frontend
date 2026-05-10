@@ -8,11 +8,14 @@ import {
   AnnotationJobView,
   type AnnotationJobMeta,
 } from "@/components/human-labelling/AnnotationJobView";
+import { ShareButton } from "@/components/ShareButton";
+import { useAccessToken } from "@/hooks";
 import { useSidebarState } from "@/lib/sidebar";
 
 export default function AdminAnnotateJobPage() {
   const router = useRouter();
   const params = useParams();
+  const accessToken = useAccessToken();
   const [sidebarOpen, setSidebarOpen] = useSidebarState();
   const [meta, setMeta] = useState<AnnotationJobMeta | null>(null);
 
@@ -59,7 +62,7 @@ export default function AdminAnnotateJobPage() {
 
         {meta && (
           <>
-            <div>
+            <div className="flex items-center gap-2 flex-wrap">
               <span
                 className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${jobStatusPillClass(
                   meta.jobStatus,
@@ -67,6 +70,15 @@ export default function AdminAnnotateJobPage() {
               >
                 {jobStatusLabel(meta.jobStatus)}
               </span>
+              {meta.jobStatus === "completed" && accessToken && (
+                <ShareButton
+                  entityType="annotation-job"
+                  entityId={`${meta.task.uuid}:${meta.job.uuid}`}
+                  accessToken={accessToken}
+                  initialIsPublic={meta.job.is_public}
+                  initialShareToken={meta.job.view_token}
+                />
+              )}
             </div>
             <div className="flex flex-wrap gap-3">
               <FieldRow label="Labelling task">
@@ -157,4 +169,3 @@ function FieldRow({
     </div>
   );
 }
-
