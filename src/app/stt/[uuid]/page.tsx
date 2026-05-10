@@ -594,7 +594,22 @@ export default function STTEvaluationDetailPage() {
       .map((pr) => pr.metrics)
       .find((m): m is ProviderMetrics => !!m);
 
-    const dataDriven: { key: string; outputType: "binary" | "rating" }[] = [];
+    // (2a) Legacy `_info` format — each evaluator has a `${prefix}_info`
+    //      metric and per-row columns named `${prefix}_score` /
+    //      `${prefix}_reasoning`.
+    // (2b) Intermediate format used while a run is still in_progress and
+    //      `evaluator_runs` hasn't been populated yet — the evaluator metric
+    //      lives directly on the metrics object as
+    //      `"Evaluator name": { type, mean }` and per-row columns share the
+    //      raw evaluator name (no `_score` suffix), with reasoning at
+    //      `"Evaluator name_reasoning"`.
+    type ColInfo = {
+      key: string;
+      outputType: "binary" | "rating";
+      scoreField: string;
+      reasoningField: string;
+    };
+    const dataDriven: ColInfo[] = [];
     if (firstMetrics) {
       for (const k of Object.keys(firstMetrics)) {
         if (k === "wer" || k === "string_similarity" || k === "llm_judge_score") {
@@ -606,6 +621,25 @@ export default function STTEvaluationDetailPage() {
           dataDriven.push({
             key: prefix,
             outputType: info?.type === "rating" ? "rating" : "binary",
+            scoreField: `${prefix}_score`,
+            reasoningField: `${prefix}_reasoning`,
+          });
+          continue;
+        }
+        // (2b) — `{ type, mean }` shape under the evaluator's display name.
+        const v = firstMetrics[k];
+        if (
+          v &&
+          typeof v === "object" &&
+          !Array.isArray(v) &&
+          "type" in (v as Record<string, unknown>)
+        ) {
+          const info = v as { type?: string };
+          dataDriven.push({
+            key: k,
+            outputType: info.type === "rating" ? "rating" : "binary",
+            scoreField: k,
+            reasoningField: `${k}_reasoning`,
           });
         }
       }
@@ -621,8 +655,8 @@ export default function STTEvaluationDetailPage() {
           // the label updates once the detail-fetch lands.
           label: a ? a.name : c.key,
           outputType: c.outputType,
-          scoreField: `${c.key}_score`,
-          reasoningField: `${c.key}_reasoning`,
+          scoreField: c.scoreField,
+          reasoningField: c.reasoningField,
         };
       });
     }

@@ -597,7 +597,19 @@ export default function TTSEvaluationDetailPage() {
       .map((pr) => pr.metrics)
       .find((m): m is ProviderMetrics => !!m);
 
-    const dataDriven: { key: string; outputType: "binary" | "rating" }[] = [];
+    // (2a) Legacy `_info` format — `${prefix}_info` metric + per-row
+    //      `${prefix}_score` / `${prefix}_reasoning`.
+    // (2b) Intermediate (in_progress) format — evaluator metric directly
+    //      under its display name with `{ type, mean }` shape; per-row
+    //      column shares the raw evaluator name and reasoning at
+    //      `"<name>_reasoning"`.
+    type ColInfo = {
+      key: string;
+      outputType: "binary" | "rating";
+      scoreField: string;
+      reasoningField: string;
+    };
+    const dataDriven: ColInfo[] = [];
     if (firstMetrics) {
       for (const k of Object.keys(firstMetrics)) {
         if (k === "llm_judge_score" || k === "ttfb" || k === "processing_time") {
@@ -609,6 +621,24 @@ export default function TTSEvaluationDetailPage() {
           dataDriven.push({
             key: prefix,
             outputType: info?.type === "rating" ? "rating" : "binary",
+            scoreField: `${prefix}_score`,
+            reasoningField: `${prefix}_reasoning`,
+          });
+          continue;
+        }
+        const v = firstMetrics[k];
+        if (
+          v &&
+          typeof v === "object" &&
+          !Array.isArray(v) &&
+          "type" in (v as Record<string, unknown>)
+        ) {
+          const info = v as { type?: string };
+          dataDriven.push({
+            key: k,
+            outputType: info.type === "rating" ? "rating" : "binary",
+            scoreField: k,
+            reasoningField: `${k}_reasoning`,
           });
         }
       }
@@ -624,8 +654,8 @@ export default function TTSEvaluationDetailPage() {
           // the label updates once the detail-fetch lands.
           label: a ? a.name : c.key,
           outputType: c.outputType,
-          scoreField: `${c.key}_score`,
-          reasoningField: `${c.key}_reasoning`,
+          scoreField: c.scoreField,
+          reasoningField: c.reasoningField,
         };
       });
     }
