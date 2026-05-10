@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { PublicPageLayout } from "@/components/PublicPageLayout";
 import {
@@ -11,6 +11,13 @@ import {
 export default function PublicAnnotationJobViewerPage() {
   const params = useParams();
   const [meta, setMeta] = useState<AnnotationJobMeta | null>(null);
+  // Stable callback — `AnnotationJobView` lists onLoaded in its fetch
+  // effect deps, so an inline arrow would trip a refetch on every state
+  // update and loop forever.
+  const handleLoaded = useCallback(
+    (m: AnnotationJobMeta) => setMeta(m),
+    [],
+  );
 
   const token =
     typeof params?.token === "string"
@@ -71,7 +78,7 @@ export default function PublicAnnotationJobViewerPage() {
             token={token}
             mode="public-readonly"
             fillViewport={false}
-            onLoaded={(m) => setMeta(m)}
+            onLoaded={handleLoaded}
           />
         </div>
       </div>
