@@ -1,5 +1,5 @@
 import React from "react";
-import { formatMetricValue, readProviderEvaluatorMean } from "@/lib/evaluatorMetrics";
+import { formatEvaluatorAggregate, readProviderEvaluatorMean } from "@/lib/evaluatorMetrics";
 import { AboutMetricsTable, type MetricDescription } from "./AboutMetricsTable";
 import { LeaderboardTab, type ChartConfig } from "./LeaderboardTab";
 import { ProviderMetricsCard } from "./ProviderMetricsCard";
@@ -193,12 +193,30 @@ export function STTEvaluationLeaderboard({
 }) {
   const allCharts: ChartConfig[] = [
     { title: "WER", dataKey: "wer" },
-    ...evaluatorColumns.map((col) => ({
-      title: col.label,
-      dataKey: col.scoreField ?? `${col.key}_score`,
-      yDomain:
-        col.outputType === "binary" ? ([0, 1] as [number, number]) : undefined,
-    })),
+    ...evaluatorColumns.map((col) => {
+      const isBinary = col.outputType === "binary";
+      const scaleMax =
+        typeof col.scaleMax === "number" ? col.scaleMax : undefined;
+      return {
+        title: col.label,
+        dataKey: col.scoreField ?? `${col.key}_score`,
+        // Binary stays in [0,1] but rendered as %; rating spans [0, scaleMax]
+        // when known so all providers are comparable on the same axis.
+        yDomain: isBinary
+          ? ([0, 1] as [number, number])
+          : scaleMax != null
+            ? ([0, scaleMax] as [number, number])
+            : undefined,
+        yTickFormatter: isBinary
+          ? (v: number) => `${Math.round(v * 100)}%`
+          : undefined,
+        formatTooltip: isBinary
+          ? (v: number) => `${Math.round(v * 100)}%`
+          : scaleMax != null
+            ? (v: number) => `${parseFloat(v.toFixed(4))}/${scaleMax}`
+            : undefined,
+      };
+    }),
   ];
   const chartRows: ChartConfig[][] = [];
   for (let i = 0; i < allCharts.length; i += 2) {
@@ -214,6 +232,12 @@ export function STTEvaluationLeaderboard({
         ...evaluatorColumns.map((col) => ({
           key: col.scoreField ?? `${col.key}_score`,
           header: col.label,
+          render: (v: unknown) =>
+            formatEvaluatorAggregate(
+              typeof v === "number" ? v : null,
+              col.outputType,
+              col.scaleMax,
+            ),
         })),
       ]}
       data={leaderboardSummary}
@@ -236,12 +260,28 @@ export function TTSEvaluationLeaderboard({
   className?: string;
 }) {
   const allCharts: ChartConfig[] = [
-    ...evaluatorColumns.map((col) => ({
-      title: col.label,
-      dataKey: col.scoreField ?? `${col.key}_score`,
-      yDomain:
-        col.outputType === "binary" ? ([0, 1] as [number, number]) : undefined,
-    })),
+    ...evaluatorColumns.map((col) => {
+      const isBinary = col.outputType === "binary";
+      const scaleMax =
+        typeof col.scaleMax === "number" ? col.scaleMax : undefined;
+      return {
+        title: col.label,
+        dataKey: col.scoreField ?? `${col.key}_score`,
+        yDomain: isBinary
+          ? ([0, 1] as [number, number])
+          : scaleMax != null
+            ? ([0, scaleMax] as [number, number])
+            : undefined,
+        yTickFormatter: isBinary
+          ? (v: number) => `${Math.round(v * 100)}%`
+          : undefined,
+        formatTooltip: isBinary
+          ? (v: number) => `${Math.round(v * 100)}%`
+          : scaleMax != null
+            ? (v: number) => `${parseFloat(v.toFixed(4))}/${scaleMax}`
+            : undefined,
+      };
+    }),
     { title: "TTFB (s)", dataKey: "ttfb" },
   ];
   const chartRows: ChartConfig[][] = [];
@@ -257,6 +297,12 @@ export function TTSEvaluationLeaderboard({
         ...evaluatorColumns.map((col) => ({
           key: col.scoreField ?? `${col.key}_score`,
           header: col.label,
+          render: (v: unknown) =>
+            formatEvaluatorAggregate(
+              typeof v === "number" ? v : null,
+              col.outputType,
+              col.scaleMax,
+            ),
         })),
         {
           key: "ttfb",
@@ -364,7 +410,11 @@ export function STTEvaluationOutputs({
                     },
                     ...evaluatorColumns.map((col) => ({
                       label: col.label,
-                      value: formatMetricValue(readProviderEvaluatorMean(col, providerResult)),
+                      value: formatEvaluatorAggregate(
+                        readProviderEvaluatorMean(col, providerResult),
+                        col.outputType,
+                        col.scaleMax,
+                      ),
                     })),
                   ]}
                 />
@@ -469,7 +519,11 @@ export function TTSEvaluationOutputs({
                   metrics={[
                     ...evaluatorColumns.map((col) => ({
                       label: col.label,
-                      value: formatMetricValue(readProviderEvaluatorMean(col, providerResult)),
+                      value: formatEvaluatorAggregate(
+                        readProviderEvaluatorMean(col, providerResult),
+                        col.outputType,
+                        col.scaleMax,
+                      ),
                     })),
                     { label: "TTFB (s)", value: ttfbValue },
                   ]}

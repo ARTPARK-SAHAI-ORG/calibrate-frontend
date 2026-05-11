@@ -600,6 +600,8 @@ export default function STTEvaluationDetailPage() {
         evaluatorUuid: run.evaluator_uuid,
         scoreField: run.metric_key,
         reasoningField: `${run.metric_key}_reasoning`,
+        scaleMin: run.aggregate?.scale_min ?? null,
+        scaleMax: run.aggregate?.scale_max ?? null,
       }));
     }
 

@@ -47,6 +47,7 @@ type LeaderboardBarChartProps = {
   height?: number;
   yDomain?: [number, number];
   formatTooltip?: (value: number) => string;
+  yTickFormatter?: (value: number) => string;
   colorMap?: Map<string, string>;
   filename?: string;
 };
@@ -57,6 +58,7 @@ export function LeaderboardBarChart({
   height = 300,
   yDomain,
   formatTooltip,
+  yTickFormatter,
   colorMap,
   filename,
 }: LeaderboardBarChartProps) {
@@ -210,7 +212,7 @@ export function LeaderboardBarChart({
               textAnchor="end"
               height={60}
             />
-            <YAxis tick={{ fontSize: 12 }} domain={yDomain} />
+            <YAxis tick={{ fontSize: 12 }} domain={yDomain} tickFormatter={yTickFormatter} />
             <Tooltip
               formatter={(value: any) =>
                 typeof value === "number"

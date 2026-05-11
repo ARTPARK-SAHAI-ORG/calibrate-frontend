@@ -56,6 +56,10 @@ export type TTSEvaluatorColumn = {
   scoreField?: string;
   /** Row data field for the reasoning (defaults to `${key}_reasoning` for legacy callers). */
   reasoningField?: string;
+  /** Optional bounds for rating evaluators — drives the "score/max" cell
+   * format and the leaderboard chart's y-axis domain. */
+  scaleMin?: number | null;
+  scaleMax?: number | null;
 };
 
 type TTSResultsTableProps = {
@@ -140,6 +144,7 @@ export function TTSResultsTable({ results, showMetrics = true, judgeLabel = "Eva
                               reasoning={cell.reasoning}
                               error={cell.error}
                               outputType={col.outputType}
+                              scaleMax={col.scaleMax}
                             />
                           </td>
                         );
@@ -198,7 +203,7 @@ export function TTSResultsTable({ results, showMetrics = true, judgeLabel = "Eva
                         <div key={col.key} className="pt-1 border-t border-border">
                           <div className="flex items-center gap-2">
                             <span className="text-[11px] text-muted-foreground uppercase tracking-wide">{col.label}</span>
-                            <EvaluatorScoreCell score={score} reasoning={reasoning} error={error} outputType={col.outputType} hideTooltipButton />
+                            <EvaluatorScoreCell score={score} reasoning={reasoning} error={error} outputType={col.outputType} scaleMax={col.scaleMax} hideTooltipButton />
                           </div>
                           {reasoning && (
                             <p className="text-[12px] text-muted-foreground mt-0.5">{reasoning}</p>
@@ -265,12 +270,14 @@ function EvaluatorScoreCell({
   score,
   reasoning,
   outputType,
+  scaleMax,
   error = false,
   hideTooltipButton = false,
 }: {
   score?: string;
   reasoning?: string;
   outputType: "binary" | "rating";
+  scaleMax?: number | null;
   /** When true, the per-row judge call failed (timeout / parse / 5xx). */
   error?: boolean;
   hideTooltipButton?: boolean;
@@ -323,8 +330,16 @@ function EvaluatorScoreCell({
     );
   } else {
     const numeric = Number(score);
-    const display = Number.isFinite(numeric) ? parseFloat(numeric.toFixed(4)) : score;
-    badge = <span className="text-[13px] text-foreground">{display}</span>;
+    const rounded = Number.isFinite(numeric)
+      ? parseFloat(numeric.toFixed(4))
+      : null;
+    const text =
+      rounded == null
+        ? score
+        : typeof scaleMax === "number" && Number.isFinite(scaleMax)
+          ? `${rounded}/${scaleMax}`
+          : `${rounded}`;
+    badge = <span className="text-[13px] text-foreground">{text}</span>;
   }
 
   if (hideTooltipButton) return badge;

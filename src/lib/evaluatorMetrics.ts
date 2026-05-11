@@ -45,3 +45,48 @@ export function formatMetricValue(value: unknown): string | number {
   }
   return "-";
 }
+
+/**
+ * Formats an evaluator aggregate (or per-row score for rating) according to
+ * its output type:
+ * - binary  → success rate as a percentage  e.g. "60%"
+ * - rating  → "mean/max" when a scale_max is known, else the bare number
+ *
+ * Used by the per-provider metrics card, the leaderboard table, and the
+ * leaderboard chart tooltip so the surfaces all agree.
+ */
+export function formatEvaluatorAggregate(
+  value: number | null | undefined,
+  outputType: "binary" | "rating",
+  scaleMax?: number | null,
+): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "-";
+  if (outputType === "binary") {
+    return `${Math.round(value * 100)}%`;
+  }
+  const rounded = parseFloat(value.toFixed(4));
+  if (typeof scaleMax === "number" && Number.isFinite(scaleMax)) {
+    return `${rounded}/${scaleMax}`;
+  }
+  return `${rounded}`;
+}
+
+/**
+ * Same as the aggregate formatter but for a single per-row value (already
+ * coerced to a string by the row cell renderer). Returns the raw score string
+ * untouched when scale info is missing so legacy payloads still render.
+ */
+export function formatEvaluatorRowValue(
+  score: string,
+  outputType: "binary" | "rating",
+  scaleMax?: number | null,
+): string {
+  if (outputType === "binary") return score;
+  const numeric = Number(score);
+  if (!Number.isFinite(numeric)) return score;
+  const rounded = parseFloat(numeric.toFixed(4));
+  if (typeof scaleMax === "number" && Number.isFinite(scaleMax)) {
+    return `${rounded}/${scaleMax}`;
+  }
+  return `${rounded}`;
+}
