@@ -166,6 +166,13 @@ export function TestRunOutputsPanel({
             <EvaluationCriteriaPanel
               evaluation={selectedResult.testCase?.evaluation}
               testCaseEvaluators={selectedResult.testCase?.evaluators}
+              passed={
+                selectedResult.status === "passed"
+                  ? true
+                  : selectedResult.status === "failed"
+                    ? false
+                    : null
+              }
               judgeResults={selectedResult.judgeResults}
               reasoning={selectedResult.reasoning}
               scaleByEvaluatorUuid={scaleByEvaluatorUuid}

@@ -24,7 +24,10 @@ import {
 import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
 import { useSidebarState } from "@/lib/sidebar";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
-import { readNameConflictMessage } from "@/lib/parseBackendError";
+import {
+  readBulkNameConflictMessage,
+  readNameConflictMessage,
+} from "@/lib/parseBackendError";
 
 // Hydrated evaluator row as returned by GET /tests / GET /tests/{uuid}.evaluators[].
 // `uuid` is the evaluator's id (used as `evaluator_uuid` when writing back).
@@ -587,7 +590,8 @@ function LLMPageInner() {
     }
   };
 
-  // Create test via POST API
+  // Create test via POST /tests/bulk (used for both single and bulk flows for
+  // a consistent backend contract — see also BulkUploadTestsModal).
   const createTest = async (
     config: TestConfig,
     evaluators: EvaluatorRefPayload[]
@@ -604,30 +608,33 @@ function LLMPageInner() {
         throw new Error("BACKEND_URL environment variable is not set");
       }
 
-      // Only attach `evaluators` for next-reply tests. Tool-invocation tests
-      // don't carry evaluators and must not have their links touched server-side.
-      const body: {
+      const isResponse = config.evaluation.type === "response";
+      const testItem: {
         name: string;
-        type: "response" | "tool_call";
-        config: TestConfig;
+        conversation_history: TestConfig["history"];
         evaluators?: EvaluatorRefPayload[];
+        tool_calls?: NonNullable<TestConfig["evaluation"]["tool_calls"]>;
       } = {
         name: newTestName.trim(),
-        type: config.evaluation.type,
-        config: config,
+        conversation_history: config.history,
       };
-      if (config.evaluation.type === "response") {
-        body.evaluators = evaluators;
+      if (isResponse) {
+        testItem.evaluators = evaluators;
+      } else {
+        testItem.tool_calls = config.evaluation.tool_calls ?? [];
       }
 
-      const response = await fetch(`${backendUrl}/tests`, {
+      const response = await fetch(`${backendUrl}/tests/bulk`, {
         method: "POST",
         headers: {
           accept: "application/json",
           "Content-Type": "application/json",
           Authorization: `Bearer ${backendAccessToken}`,
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          type: config.evaluation.type,
+          tests: [testItem],
+        }),
       });
 
       if (response.status === 401) {
@@ -636,7 +643,10 @@ function LLMPageInner() {
       }
 
       if (!response.ok) {
-        const conflict = await readNameConflictMessage(response);
+        // Bulk endpoint returns 400 (not 409) for name conflicts. Route the
+        // duplicate-name case to the inline name-field error slot so it
+        // matches the single-test create UX users expect.
+        const conflict = await readBulkNameConflictMessage(response);
         if (conflict) {
           setNameConflictError(conflict);
           setIsCreating(false);

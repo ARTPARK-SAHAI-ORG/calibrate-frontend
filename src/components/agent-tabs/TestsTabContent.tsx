@@ -8,8 +8,20 @@ import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog"
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { BenchmarkDialog } from "@/components/BenchmarkDialog";
 import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
+import {
+  AddTestDialog,
+  TestConfig,
+  EvaluatorRefPayload,
+  AttachedEvaluatorInit,
+  EvaluatorVariableDef,
+} from "@/components/AddTestDialog";
+import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { showLimitToast } from "@/constants/limits";
+import {
+  readBulkNameConflictMessage,
+  readNameConflictMessage,
+} from "@/lib/parseBackendError";
 
 type TestData = {
   uuid: string;
@@ -19,6 +31,20 @@ type TestData = {
   config: Record<string, any>;
   created_at: string;
   updated_at: string;
+};
+
+// Shape returned by GET /tests/{uuid} — same as TestData but with hydrated
+// evaluators (joined rows from get_evaluators_for_test()). Used by the
+// open-for-edit flow to seed the AddTestDialog.
+type TestDetail = TestData & {
+  evaluators?: Array<{
+    uuid: string;
+    name: string;
+    description?: string | null;
+    slug: string | null;
+    variables?: EvaluatorVariableDef[] | null;
+    variable_values?: Record<string, string> | null;
+  }> | null;
 };
 
 type TestRunResult = {
@@ -152,7 +178,44 @@ export function TestsTabContent({
   const [showTestDropdown, setShowTestDropdown] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [testsSearchQuery, setTestsSearchQuery] = useState("");
+  // Filter the agent's tests by test type. "all" shows both kinds; "response"
+  // is Next Reply, "tool_call" is Tool Call. The "select all" checkbox keys
+  // off `filteredAgentTests`, so this filter also narrows what gets selected.
+  const [typeFilter, setTypeFilter] = useState<"all" | "response" | "tool_call">(
+    "all",
+  );
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Create-test dialog state (single test created in-place from the agent
+  // page; submits via POST /tests/bulk with agent_uuids so the new test is
+  // auto-attached to this agent in one call).
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [newTestName, setNewTestName] = useState("");
+  const [validationAttempted, setValidationAttempted] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [nameConflictError, setNameConflictError] = useState<string | null>(
+    null,
+  );
+
+  // Bulk-upload modal state (CSV upload; locked to this agent).
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
+
+  // Open/edit-test state. When `editingTestUuid` is set, the AddTestDialog is
+  // in edit mode: it submits via PUT /tests/{uuid}. Otherwise (and when
+  // createDialogOpen is true) it's in create mode and submits via the bulk
+  // endpoint with agent_uuids: [agentUuid].
+  const [editingTestUuid, setEditingTestUuid] = useState<string | null>(null);
+  const [isLoadingTest, setIsLoadingTest] = useState(false);
+  const [initialTab, setInitialTab] = useState<
+    "next-reply" | "tool-invocation" | undefined
+  >(undefined);
+  const [initialConfig, setInitialConfig] = useState<TestConfig | undefined>(
+    undefined,
+  );
+  const [initialEvaluators, setInitialEvaluators] = useState<
+    AttachedEvaluatorInit[] | undefined
+  >(undefined);
 
   // Selection state for bulk operations
   const [selectedTestUuids, setSelectedTestUuids] = useState<Set<string>>(
@@ -220,55 +283,57 @@ export function TestsTabContent({
     pastRunsRef.current = pastRuns;
   }, [pastRuns]);
 
-  // Fetch tests attached to this agent
-  useEffect(() => {
-    const fetchAgentTests = async () => {
-      if (!backendAccessToken) return;
+  // Fetch tests attached to this agent. Exposed as a callback so the
+  // create/bulk-upload flows below can refresh the list after the bulk API
+  // auto-attaches new tests to this agent.
+  const fetchAgentTests = useCallback(async () => {
+    if (!backendAccessToken) return;
 
-      try {
-        setAgentTestsLoading(true);
-        setAgentTestsError(null);
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-        if (!backendUrl) {
-          throw new Error("BACKEND_URL environment variable is not set");
-        }
-
-        const response = await fetch(
-          `${backendUrl}/agent-tests/agent/${agentUuid}/tests`,
-          {
-            method: "GET",
-            headers: {
-              accept: "application/json",
-              Authorization: `Bearer ${backendAccessToken}`,
-            },
-          },
-        );
-
-        if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch agent tests");
-        }
-
-        const data: TestData[] = await response.json();
-        setAgentTests(data);
-      } catch (err) {
-        console.error("Error fetching agent tests:", err);
-        setAgentTestsError(
-          err instanceof Error ? err.message : "Failed to load agent tests",
-        );
-      } finally {
-        setAgentTestsLoading(false);
+    try {
+      setAgentTestsLoading(true);
+      setAgentTestsError(null);
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) {
+        throw new Error("BACKEND_URL environment variable is not set");
       }
-    };
 
+      const response = await fetch(
+        `${backendUrl}/agent-tests/agent/${agentUuid}/tests`,
+        {
+          method: "GET",
+          headers: {
+            accept: "application/json",
+            Authorization: `Bearer ${backendAccessToken}`,
+          },
+        },
+      );
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch agent tests");
+      }
+
+      const data: TestData[] = await response.json();
+      setAgentTests(data);
+    } catch (err) {
+      console.error("Error fetching agent tests:", err);
+      setAgentTestsError(
+        err instanceof Error ? err.message : "Failed to load agent tests",
+      );
+    } finally {
+      setAgentTestsLoading(false);
+    }
+  }, [agentUuid, backendAccessToken]);
+
+  useEffect(() => {
     if (agentUuid && backendAccessToken) {
       fetchAgentTests();
     }
-  }, [agentUuid, backendAccessToken]);
+  }, [agentUuid, backendAccessToken, fetchAgentTests]);
 
   // Fetch all available tests when dropdown opens
   useEffect(() => {
@@ -517,15 +582,18 @@ export function TestsTabContent({
         test.description.toLowerCase().includes(searchQuery.toLowerCase())),
   );
 
-  // Filter agent tests based on search query
-  const filteredAgentTests = agentTests.filter(
-    (test) =>
-      test.name.toLowerCase().includes(testsSearchQuery.toLowerCase()) ||
-      (test.description &&
-        test.description
-          .toLowerCase()
-          .includes(testsSearchQuery.toLowerCase())),
-  );
+  // Filter agent tests by search query AND test type. Both filters apply
+  // together (AND). The type filter also constrains the select-all checkbox
+  // since it operates on `filteredAgentTests`.
+  const filteredAgentTests = agentTests.filter((test) => {
+    if (typeFilter !== "all" && test.type !== typeFilter) return false;
+    const q = testsSearchQuery.toLowerCase();
+    if (!q) return true;
+    return (
+      test.name.toLowerCase().includes(q) ||
+      (test.description ? test.description.toLowerCase().includes(q) : false)
+    );
+  });
 
   // Add test to agent
   const handleSelectTest = async (test: TestData) => {
@@ -563,6 +631,242 @@ export function TestsTabContent({
       setSearchQuery("");
     } catch (err) {
       console.error("Error adding test to agent:", err);
+    }
+  };
+
+  // Create a single test in-place from this agent's Tests tab and
+  // auto-attach it to the agent in one call by going through the bulk
+  // endpoint with `agent_uuids: [agentUuid]`. The bulk API atomically
+  // creates the test and best-effort links it to the agent (per
+  // .cursor/rules/app-details.md); partial-link failures surface as
+  // `warnings` in the response, which we treat as a soft success.
+  const createTestForAgent = async (
+    config: TestConfig,
+    evaluators: EvaluatorRefPayload[],
+  ) => {
+    setValidationAttempted(true);
+    if (!newTestName.trim()) return;
+
+    try {
+      setIsCreating(true);
+      setCreateError(null);
+      setNameConflictError(null);
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) {
+        throw new Error("BACKEND_URL environment variable is not set");
+      }
+
+      const isResponse = config.evaluation.type === "response";
+      const testItem: {
+        name: string;
+        conversation_history: TestConfig["history"];
+        evaluators?: EvaluatorRefPayload[];
+        tool_calls?: NonNullable<TestConfig["evaluation"]["tool_calls"]>;
+      } = {
+        name: newTestName.trim(),
+        conversation_history: config.history,
+      };
+      if (isResponse) {
+        testItem.evaluators = evaluators;
+      } else {
+        testItem.tool_calls = config.evaluation.tool_calls ?? [];
+      }
+
+      const response = await fetch(`${backendUrl}/tests/bulk`, {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${backendAccessToken}`,
+        },
+        body: JSON.stringify({
+          type: config.evaluation.type,
+          tests: [testItem],
+          agent_uuids: [agentUuid],
+        }),
+      });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
+      if (!response.ok) {
+        const conflict = await readBulkNameConflictMessage(response);
+        if (conflict) {
+          setNameConflictError(conflict);
+          setIsCreating(false);
+          return;
+        }
+        throw new Error("Failed to create test");
+      }
+
+      // Refresh the agent's test list so the new test appears immediately.
+      await fetchAgentTests();
+      setNewTestName("");
+      setValidationAttempted(false);
+      setCreateDialogOpen(false);
+    } catch (err) {
+      console.error("Error creating test:", err);
+      setCreateError(
+        err instanceof Error ? err.message : "Failed to create test",
+      );
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  // Reset all edit/create-related state. Called when closing the dialog.
+  const resetTestDialog = () => {
+    setEditingTestUuid(null);
+    setIsLoadingTest(false);
+    setInitialTab(undefined);
+    setInitialConfig(undefined);
+    setInitialEvaluators(undefined);
+    setNewTestName("");
+    setValidationAttempted(false);
+    setCreateError(null);
+    setNameConflictError(null);
+  };
+
+  // Fetch a test's details by UUID and open the dialog in edit mode.
+  // Hydrates the same shape the standalone /tests page uses, so the dialog
+  // can be reused as-is.
+  const openEditTest = async (uuid: string) => {
+    try {
+      setIsLoadingTest(true);
+      setEditingTestUuid(uuid);
+      setCreateDialogOpen(true);
+      setCreateError(null);
+      setNameConflictError(null);
+
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) {
+        throw new Error("BACKEND_URL environment variable is not set");
+      }
+
+      const response = await fetch(`${backendUrl}/tests/${uuid}`, {
+        method: "GET",
+        headers: {
+          accept: "application/json",
+          Authorization: `Bearer ${backendAccessToken}`,
+        },
+      });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch test details");
+      }
+
+      const testData: TestDetail = await response.json();
+
+      setNewTestName(testData.name || "");
+      setInitialTab(
+        testData.type === "tool_call" ? "tool-invocation" : "next-reply",
+      );
+      if (testData.config) {
+        setInitialConfig(testData.config as TestConfig);
+      }
+      if (Array.isArray(testData.evaluators)) {
+        setInitialEvaluators(
+          testData.evaluators.map((e) => ({
+            evaluator_uuid: e.uuid,
+            name: e.name,
+            description: e.description ?? null,
+            slug: e.slug,
+            variables: Array.isArray(e.variables) ? e.variables : [],
+            variable_values: e.variable_values ?? null,
+          })),
+        );
+      } else {
+        setInitialEvaluators([]);
+      }
+    } catch (err) {
+      console.error("Error fetching test:", err);
+      setCreateError(
+        err instanceof Error ? err.message : "Failed to load test",
+      );
+    } finally {
+      setIsLoadingTest(false);
+    }
+  };
+
+  // Update an existing test via PUT /tests/{uuid}. The test's agent links
+  // are not touched here — this only edits the test itself.
+  const updateTest = async (
+    config: TestConfig,
+    evaluators: EvaluatorRefPayload[],
+  ) => {
+    setValidationAttempted(true);
+    if (!newTestName.trim() || !editingTestUuid) return;
+
+    try {
+      setIsCreating(true);
+      setCreateError(null);
+      setNameConflictError(null);
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) {
+        throw new Error("BACKEND_URL environment variable is not set");
+      }
+
+      // Mirror the standalone tests page: send `evaluators` for next-reply
+      // tests so the pivot set is replaced; omit it for tool-invocation tests
+      // so existing links are left untouched.
+      const body: {
+        name: string;
+        type: "response" | "tool_call";
+        config: TestConfig;
+        evaluators?: EvaluatorRefPayload[];
+      } = {
+        name: newTestName.trim(),
+        type: config.evaluation.type,
+        config: config,
+      };
+      if (config.evaluation.type === "response") {
+        body.evaluators = evaluators;
+      }
+
+      const response = await fetch(`${backendUrl}/tests/${editingTestUuid}`, {
+        method: "PUT",
+        headers: {
+          accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${backendAccessToken}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
+      if (!response.ok) {
+        // PUT /tests/{uuid} returns 409 for name conflicts (single-test
+        // contract), not the 400 used by /tests/bulk.
+        const conflict = await readNameConflictMessage(response);
+        if (conflict) {
+          setNameConflictError(conflict);
+          setIsCreating(false);
+          return;
+        }
+        throw new Error("Failed to update test");
+      }
+
+      await fetchAgentTests();
+      setCreateDialogOpen(false);
+      resetTestDialog();
+    } catch (err) {
+      console.error("Error updating test:", err);
+      setCreateError(
+        err instanceof Error ? err.message : "Failed to update test",
+      );
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -797,6 +1101,43 @@ export function TestsTabContent({
     }
   };
 
+  // Two new entry points sit alongside "Add test" (which attaches an existing
+  // test). "Create test" opens the in-place creation dialog; "Bulk upload"
+  // opens the CSV modal locked to this agent. Both use POST /tests/bulk with
+  // `agent_uuids: [agentUuid]` so new tests auto-attach to this agent.
+  const renderNewTestButtons = (
+    variant: "outline" | "primary" = "outline",
+  ) => {
+    const baseClass =
+      variant === "primary"
+        ? "h-9 md:h-10 px-4 md:px-5 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+        : "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer";
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => {
+            setNewTestName("");
+            setValidationAttempted(false);
+            setCreateError(null);
+            setNameConflictError(null);
+            setCreateDialogOpen(true);
+          }}
+          className={baseClass}
+        >
+          Create test
+        </button>
+        <button
+          type="button"
+          onClick={() => setBulkUploadOpen(true)}
+          className={baseClass}
+        >
+          Bulk upload
+        </button>
+      </>
+    );
+  };
+
   const renderAddTestControl = (variant: "outline" | "primary" = "outline") => (
     <div className="relative" ref={dropdownRef}>
       <button
@@ -1023,6 +1364,58 @@ export function TestsTabContent({
           <div className="flex flex-wrap items-center gap-2 md:gap-3">
             {selectedTestUuids.size > 0 && (
               <>
+                {/* Run only the checked subset. Same connection-unverified
+                    gate and maxRowsPerEval limit as "Run all tests" — the
+                    backend cap applies regardless of how the subset was
+                    chosen. Selection is cleared on submit so the table
+                    visibly resets to a neutral state. */}
+                <div className="relative group/runselected">
+                  <button
+                    onClick={() => {
+                      if (isConnectionUnverified) return;
+                      if (selectedTestUuids.size > maxRowsPerEval) {
+                        showLimitToast(
+                          `You can only run up to ${maxRowsPerEval} tests at a time.`,
+                        );
+                        return;
+                      }
+                      const selected = agentTests.filter((t) =>
+                        selectedTestUuids.has(t.uuid),
+                      );
+                      if (selected.length === 0) return;
+                      setTestsToRun(selected);
+                      setRunAllLinked(false);
+                      setTestRunnerOpen(true);
+                      setSelectedTestUuids(new Set());
+                    }}
+                    disabled={isConnectionUnverified}
+                    className={`h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background transition-opacity flex items-center gap-2 ${
+                      isConnectionUnverified
+                        ? "opacity-50 cursor-not-allowed"
+                        : "hover:opacity-90 cursor-pointer"
+                    }`}
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
+                      />
+                    </svg>
+                    Run selected ({selectedTestUuids.size})
+                  </button>
+                  {isConnectionUnverified && (
+                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/runselected:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                      Verify agent connection first
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={() => openBulkDeleteDialog("remove")}
                   className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-red-500 text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
@@ -1142,6 +1535,8 @@ export function TestsTabContent({
                 </div>
               )}
             </div>
+            {/* Create test / Bulk upload (new tests, auto-attached to this agent) */}
+            {renderNewTestButtons("outline")}
             {/* Run all tests */}
             <div className="relative group/runall">
               <button
@@ -1289,8 +1684,9 @@ export function TestsTabContent({
           <p className="text-sm md:text-base text-muted-foreground mb-3 md:mb-4 text-center max-w-md">
             This agent doesn&apos;t have any tests attached to it.
           </p>
-          <div className="flex items-center gap-2 md:gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
             {renderAddTestControl("primary")}
+            {renderNewTestButtons("outline")}
           </div>
         </div>
       ) : agentTests.length === 0 ? (
@@ -1312,8 +1708,9 @@ export function TestsTabContent({
               <p className="text-sm md:text-base text-muted-foreground text-center max-w-md mb-0">
                 This agent doesn&apos;t have any tests linked right now
               </p>
-              <div className="flex justify-center mt-3 md:mt-4 w-full">
+              <div className="flex flex-wrap justify-center gap-2 md:gap-3 mt-3 md:mt-4 w-full">
                 {renderAddTestControl("primary")}
+                {renderNewTestButtons("outline")}
               </div>
             </div>
           </div>
@@ -1323,30 +1720,72 @@ export function TestsTabContent({
         <div className="flex-1 flex flex-col lg:flex-row gap-4 md:gap-6">
           {/* Left Panel - Tests Table */}
           <div className="flex-1 flex flex-col min-w-0">
-            {/* Search Input */}
-            <div className="relative mb-3 md:mb-4">
-              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <svg
-                  className="w-4 md:w-5 h-4 md:h-5 text-muted-foreground"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                  />
-                </svg>
+            {/* Search Input + Type Filter */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3 md:mb-4">
+              <div className="relative flex-1 min-w-0">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <svg
+                    className="w-4 md:w-5 h-4 md:h-5 text-muted-foreground"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                    />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  value={testsSearchQuery}
+                  onChange={(e) => setTestsSearchQuery(e.target.value)}
+                  placeholder="Search tests"
+                  className="w-full h-9 md:h-10 pl-9 md:pl-10 pr-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                />
               </div>
-              <input
-                type="text"
-                value={testsSearchQuery}
-                onChange={(e) => setTestsSearchQuery(e.target.value)}
-                placeholder="Search tests"
-                className="w-full h-9 md:h-10 pl-9 md:pl-10 pr-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-              />
+              {/* Type filter — segmented toggle. Matches the "Next Reply /
+                  Tool Call" pattern used in BulkUploadTestsModal. */}
+              <div className="flex rounded-lg border border-border overflow-hidden w-fit self-start sm:self-auto">
+                {(
+                  [
+                    { value: "all", label: "All" },
+                    { value: "response", label: "Next Reply" },
+                    { value: "tool_call", label: "Tool Call" },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      setTypeFilter(opt.value);
+                      // Drop any selection that no longer matches the new
+                      // filter so the bulk-action counts don't drift from
+                      // what's visible.
+                      setSelectedTestUuids((prev) => {
+                        if (prev.size === 0) return prev;
+                        const next = new Set<string>();
+                        for (const t of agentTests) {
+                          if (!prev.has(t.uuid)) continue;
+                          if (opt.value !== "all" && t.type !== opt.value)
+                            continue;
+                          next.add(t.uuid);
+                        }
+                        return next;
+                      });
+                    }}
+                    className={`h-9 md:h-10 px-3 text-sm font-medium transition-colors cursor-pointer ${
+                      typeFilter === opt.value
+                        ? "bg-foreground text-background"
+                        : "bg-background text-foreground hover:bg-muted/50"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <p className="text-sm text-muted-foreground mb-3 md:mb-4">
@@ -1410,7 +1849,8 @@ export function TestsTabContent({
                   {filteredAgentTests.map((test) => (
                     <div
                       key={test.uuid}
-                      className="grid grid-cols-[40px_minmax(0,1fr)_120px_auto_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
+                      onClick={() => openEditTest(test.uuid)}
+                      className="grid grid-cols-[40px_minmax(0,1fr)_120px_auto_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                     >
                       {/* Checkbox */}
                       <div className="flex items-center">
@@ -1490,7 +1930,8 @@ export function TestsTabContent({
                       {/* Run Button */}
                       <div className="flex items-center">
                         <button
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setTestsToRun([test]);
                             setRunAllLinked(false);
                             setTestRunnerOpen(true);
@@ -1517,7 +1958,10 @@ export function TestsTabContent({
                           remove-from-agent action to a permanent library delete. */}
                       <div className="flex items-center">
                         <button
-                          onClick={() => openDeleteDialog(test, "remove")}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDeleteDialog(test, "remove");
+                          }}
                           className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                           title="Delete test"
                         >
@@ -1544,7 +1988,8 @@ export function TestsTabContent({
                   {filteredAgentTests.map((test) => (
                     <div
                       key={test.uuid}
-                      className="border border-border rounded-xl p-3 bg-background"
+                      onClick={() => openEditTest(test.uuid)}
+                      className="border border-border rounded-xl p-3 bg-background hover:bg-muted/20 transition-colors cursor-pointer"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-start gap-2 flex-1 min-w-0">
@@ -1590,7 +2035,8 @@ export function TestsTabContent({
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
                           <button
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setTestsToRun([test]);
                               setRunAllLinked(false);
                               setTestRunnerOpen(true);
@@ -1613,7 +2059,10 @@ export function TestsTabContent({
                             </svg>
                           </button>
                           <button
-                            onClick={() => openDeleteDialog(test, "remove")}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openDeleteDialog(test, "remove");
+                            }}
                             className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                             title="Delete test"
                           >
@@ -1696,6 +2145,46 @@ export function TestsTabContent({
             </label>
           ) : null
         }
+      />
+
+      {/* Create/edit test dialog. In create mode, submits via POST
+          /tests/bulk with agent_uuids: [agentUuid] so the new test
+          auto-attaches to this agent in one call. In edit mode (when
+          editingTestUuid is set), submits via PUT /tests/{uuid}. */}
+      {createDialogOpen && (
+        <AddTestDialog
+          isOpen={createDialogOpen}
+          onClose={() => {
+            setCreateDialogOpen(false);
+            resetTestDialog();
+          }}
+          isEditing={!!editingTestUuid}
+          isLoading={isLoadingTest}
+          isCreating={isCreating}
+          createError={createError}
+          nameError={nameConflictError}
+          testName={newTestName}
+          setTestName={(name) => {
+            setNewTestName(name);
+            if (nameConflictError) setNameConflictError(null);
+          }}
+          validationAttempted={validationAttempted}
+          onSubmit={editingTestUuid ? updateTest : createTestForAgent}
+          initialTab={initialTab}
+          initialConfig={initialConfig}
+          initialEvaluators={initialEvaluators}
+        />
+      )}
+
+      {/* Bulk-upload modal locked to this agent. The agent picker is
+          hidden and `agent_uuids: [agentUuid]` is sent with the upload. */}
+      <BulkUploadTestsModal
+        isOpen={bulkUploadOpen}
+        onClose={() => setBulkUploadOpen(false)}
+        onSuccess={() => {
+          fetchAgentTests();
+        }}
+        lockedAgentUuid={agentUuid}
       />
 
       {/* Test Runner Dialog */}

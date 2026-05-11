@@ -21,6 +21,7 @@ import {
 import { useSidebarState } from "@/lib/sidebar";
 import { getDataset } from "@/lib/datasets";
 import { ShareButton } from "@/components/ShareButton";
+import { ExportResultsButton, ExportColumn } from "@/components/ExportResultsButton";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { retryEvaluation } from "@/lib/retryEvaluation";
 import {
@@ -722,6 +723,63 @@ export default function STTEvaluationDetailPage() {
                     initialShareToken={evaluationResult.share_token ?? null}
                   />
                 )}
+                {/* Export per-row results to CSV. One row per (provider, row);
+                    columns: reference / predicted text, WER, and one column
+                    per attached evaluator (binary → "true"/"false", rating →
+                    raw numeric score). Built at click time so it reflects
+                    the latest state if the user re-runs the page. */}
+                {evaluationResult.status === "done" &&
+                  (evaluationResult.provider_results ?? []).some(
+                    (pr) => (pr.results?.length ?? 0) > 0,
+                  ) && (
+                    <ExportResultsButton
+                      filename={`stt-results-${evaluationResult.dataset_name ?? taskId}`}
+                      getRows={() => {
+                        const columns: ExportColumn[] = [
+                          { key: "provider", header: "Provider" },
+                          { key: "row", header: "Row" },
+                          { key: "reference_text", header: "Reference text" },
+                          { key: "predicted_text", header: "Predicted text" },
+                          { key: "wer", header: "WER" },
+                          ...evaluatorColumns.map((c) => ({
+                            key: c.key,
+                            header: c.label,
+                          })),
+                        ];
+                        const rows: Record<string, unknown>[] = [];
+                        for (const pr of evaluationResult.provider_results ??
+                          []) {
+                          for (const r of pr.results ?? []) {
+                            const row: Record<string, unknown> = {
+                              provider: getProviderLabel(pr.provider),
+                              row: r.id,
+                              reference_text: r.gt,
+                              predicted_text: r.pred,
+                              wer: r.wer,
+                            };
+                            for (const c of evaluatorColumns) {
+                              const raw = r[c.scoreField ?? c.key];
+                              if (raw === undefined || raw === null) {
+                                row[c.key] = "";
+                                continue;
+                              }
+                              const s = String(raw);
+                              if (c.outputType === "binary") {
+                                // Mirrors EvaluatorScoreCell: "true"/"1" → Pass.
+                                row[c.key] =
+                                  s === "true" || s === "1" ? "true" : "false";
+                              } else {
+                                const n = parseFloat(s);
+                                row[c.key] = Number.isFinite(n) ? n : s;
+                              }
+                            }
+                            rows.push(row);
+                          }
+                        }
+                        return { columns, rows };
+                      }}
+                    />
+                  )}
                 {evaluationResult.status === "failed" &&
                   backendAccessToken &&
                   evaluationResult.dataset_id && (

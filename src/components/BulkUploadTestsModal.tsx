@@ -52,6 +52,13 @@ type BulkUploadTestsModalProps = {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  /**
+   * If set, the modal is locked to this agent: the "Assign tests to agents"
+   * picker is hidden and `agent_uuids: [lockedAgentUuid]` is sent with the
+   * upload so the new tests auto-attach to the agent the user came from.
+   * Used by the agent page's Tests tab.
+   */
+  lockedAgentUuid?: string;
 };
 
 // Column header for an evaluator variable in the response-type CSV. We
@@ -150,6 +157,7 @@ export function BulkUploadTestsModal({
   isOpen,
   onClose,
   onSuccess,
+  lockedAgentUuid,
 }: BulkUploadTestsModalProps) {
   const backendAccessToken = useAccessToken();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -854,7 +862,9 @@ export function BulkUploadTestsModal({
         tests: typeof tests;
         agent_uuids?: string[];
       } = { type: testType, tests };
-      if (assignToAgents && selectedAgentUuids.length > 0) {
+      if (lockedAgentUuid) {
+        body.agent_uuids = [lockedAgentUuid];
+      } else if (assignToAgents && selectedAgentUuids.length > 0) {
         body.agent_uuids = selectedAgentUuids;
       }
 
@@ -1612,8 +1622,9 @@ export function BulkUploadTestsModal({
             </div>
           )}
 
-          {/* Step 3: Assign to Agents (optional) */}
-          {testType && parsedTests.length > 0 && (
+          {/* Step 3: Assign to Agents (optional, hidden when modal is
+              locked to a specific agent — see lockedAgentUuid prop). */}
+          {testType && parsedTests.length > 0 && !lockedAgentUuid && (
             <div ref={assignAgentsSectionRef}>
               <div className="flex items-center gap-3 mb-3">
                 <button
@@ -1707,7 +1718,9 @@ export function BulkUploadTestsModal({
                   disabled={
                     isUploading ||
                     parsedTests.length === 0 ||
-                    (assignToAgents && selectedAgentUuids.length === 0)
+                    (!lockedAgentUuid &&
+                      assignToAgents &&
+                      selectedAgentUuids.length === 0)
                   }
                   className="h-10 px-5 rounded-lg text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >

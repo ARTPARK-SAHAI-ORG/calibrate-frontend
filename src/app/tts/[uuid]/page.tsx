@@ -19,6 +19,8 @@ import {
 import { useSidebarState } from "@/lib/sidebar";
 import { getDataset } from "@/lib/datasets";
 import { ShareButton } from "@/components/ShareButton";
+import { ExportZipButton } from "@/components/ExportZipButton";
+import type { ExportColumn } from "@/components/ExportResultsButton";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { retryEvaluation } from "@/lib/retryEvaluation";
 import {
@@ -727,6 +729,92 @@ export default function TTSEvaluationDetailPage() {
                     initialShareToken={evaluationResult.share_token ?? null}
                   />
                 )}
+                {/* Export per-row results as a zip containing `results.csv`
+                    (row id, audio_name, evaluator scores — same convention
+                    as the STT CSV) and an `audios/` folder of every
+                    synthesized clip. Each audio is named
+                    `<provider>_<row>.<ext>` so the audio_name CSV column
+                    points directly at the file inside the zip. */}
+                {evaluationResult.status === "done" &&
+                  (evaluationResult.provider_results ?? []).some(
+                    (pr) => (pr.results?.length ?? 0) > 0,
+                  ) && (
+                    <ExportZipButton
+                      filename={`tts-results-${evaluationResult.dataset_name ?? taskId}`}
+                      getContents={() => {
+                        const columns: ExportColumn[] = [
+                          { key: "provider", header: "Provider" },
+                          { key: "row", header: "Row" },
+                          { key: "audio_name", header: "Audio name" },
+                          { key: "text", header: "Text" },
+                          ...evaluatorColumns.map((c) => ({
+                            key: c.key,
+                            header: c.label,
+                          })),
+                        ];
+                        const rows: Record<string, unknown>[] = [];
+                        const files: { path: string; url: string }[] = [];
+                        for (const pr of evaluationResult.provider_results ??
+                          []) {
+                          for (const r of pr.results ?? []) {
+                            // audio_path is rendered as <audio src=...> on the
+                            // page, so it's already a fetchable URL. Use the
+                            // path's extension if present; fall back to `.wav`
+                            // (the backend's default container) when the URL
+                            // has no extension or has querystring noise.
+                            const ext = (() => {
+                              try {
+                                const u = new URL(
+                                  r.audio_path,
+                                  window.location.origin,
+                                );
+                                const m = u.pathname.match(/\.([a-z0-9]+)$/i);
+                                return m ? m[1].toLowerCase() : "wav";
+                              } catch {
+                                const m = r.audio_path.match(/\.([a-z0-9]+)(?:\?|$)/i);
+                                return m ? m[1].toLowerCase() : "wav";
+                              }
+                            })();
+                            const audioName = r.audio_path
+                              ? `${pr.provider}_${r.id}.${ext}`
+                              : "";
+                            const row: Record<string, unknown> = {
+                              provider: getProviderLabel(pr.provider),
+                              row: r.id,
+                              audio_name: audioName,
+                              text: r.text,
+                            };
+                            for (const c of evaluatorColumns) {
+                              const raw = r[c.scoreField ?? c.key];
+                              if (raw === undefined || raw === null) {
+                                row[c.key] = "";
+                                continue;
+                              }
+                              const s = String(raw);
+                              if (c.outputType === "binary") {
+                                row[c.key] =
+                                  s === "true" || s === "1" ? "true" : "false";
+                              } else {
+                                const n = parseFloat(s);
+                                row[c.key] = Number.isFinite(n) ? n : s;
+                              }
+                            }
+                            rows.push(row);
+                            if (audioName && r.audio_path) {
+                              files.push({
+                                path: `audios/${audioName}`,
+                                url: r.audio_path,
+                              });
+                            }
+                          }
+                        }
+                        return {
+                          csv: { columns, rows },
+                          files,
+                        };
+                      }}
+                    />
+                  )}
                 {evaluationResult.status === "failed" &&
                   backendAccessToken &&
                   evaluationResult.dataset_id && (
