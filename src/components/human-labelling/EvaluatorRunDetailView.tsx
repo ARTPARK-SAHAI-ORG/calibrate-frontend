@@ -1095,21 +1095,23 @@ export function EvaluatorRunDetailView({
 
   return (
     <>
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap">
-          {!hideStatusPill && (
-            <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusPillClass(
-                job.status,
-              )}`}
-            >
-              {statusLabel(job.status)}
-            </span>
-          )}
-          {shareSlot}
+      {(!hideStatusPill || shareSlot || actionsSlot) && (
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            {!hideStatusPill && (
+              <span
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusPillClass(
+                  job.status,
+                )}`}
+              >
+                {statusLabel(job.status)}
+              </span>
+            )}
+            {shareSlot}
+          </div>
+          {actionsSlot}
         </div>
-        {actionsSlot}
-      </div>
+      )}
       {topError && (
         <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-500">
           {topError}
