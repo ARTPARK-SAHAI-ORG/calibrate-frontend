@@ -817,60 +817,23 @@ export default function STTEvaluationDetailPage() {
         {/* Evaluation Results */}
         {!isLoading && !error && !errorCode && evaluationResult && (
           <div className="space-y-4">
-            {/* Language Pill, Dataset link, Status Badge, and Share */}
-            <div className="flex items-center gap-3 flex-wrap">
-              {evaluationResult.language && (
-                <span className="px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground capitalize">
-                  {evaluationResult.language}
-                </span>
-              )}
-              {evaluationResult.dataset_id && evaluationResult.dataset_name && (
-                <Link
-                  href={`/datasets/${evaluationResult.dataset_id}`}
-                  className="flex items-center gap-1.5 px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground hover:bg-muted/70 transition-colors"
-                >
-                  <svg
-                    className="w-3 h-3"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
-                    />
-                  </svg>
-                  {evaluationResult.dataset_name}
-                </Link>
-              )}
-              {evaluationResult.status !== "done" && (
-                <StatusBadge status={evaluationResult.status} showSpinner />
-              )}
-              {/* Sharing only makes sense once the run is complete — earlier
-                  state changes too quickly and a shared link would render
-                  partial results. */}
-              {evaluationResult.status === "done" && backendAccessToken && (
-                <ShareButton
-                  entityType="stt"
-                  entityId={taskId}
-                  accessToken={backendAccessToken}
-                  initialIsPublic={evaluationResult.is_public ?? false}
-                  initialShareToken={evaluationResult.share_token ?? null}
-                />
-              )}
-              {evaluationResult.status === "failed" &&
-                backendAccessToken &&
-                evaluationResult.dataset_id && (
-                  <button
-                    onClick={() => setRetryConfirmOpen(true)}
-                    disabled={retrying}
-                    title="Re-run this evaluation on the same dataset, providers, and evaluators"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            {/* Header row: language / dataset / status on the left,
+                Share / Retry on the right — matches the labelling-job
+                and evaluator-run page layouts. */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3 flex-wrap">
+                {evaluationResult.language && (
+                  <span className="px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground capitalize">
+                    {evaluationResult.language}
+                  </span>
+                )}
+                {evaluationResult.dataset_id && evaluationResult.dataset_name && (
+                  <Link
+                    href={`/datasets/${evaluationResult.dataset_id}`}
+                    className="flex items-center gap-1.5 px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground hover:bg-muted/70 transition-colors"
                   >
                     <svg
-                      className="w-3.5 h-3.5 shrink-0"
+                      className="w-3 h-3"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -879,12 +842,55 @@ export default function STTEvaluationDetailPage() {
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        d="M4 4v5h.582a8 8 0 0114.95-2M20 20v-5h-.581a8 8 0 01-14.95 2"
+                        d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
                       />
                     </svg>
-                    {retrying ? "Retrying…" : "Retry"}
-                  </button>
+                    {evaluationResult.dataset_name}
+                  </Link>
                 )}
+                {evaluationResult.status !== "done" && (
+                  <StatusBadge status={evaluationResult.status} showSpinner />
+                )}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Sharing only makes sense once the run is complete — earlier
+                    state changes too quickly and a shared link would render
+                    partial results. */}
+                {evaluationResult.status === "done" && backendAccessToken && (
+                  <ShareButton
+                    entityType="stt"
+                    entityId={taskId}
+                    accessToken={backendAccessToken}
+                    initialIsPublic={evaluationResult.is_public ?? false}
+                    initialShareToken={evaluationResult.share_token ?? null}
+                  />
+                )}
+                {evaluationResult.status === "failed" &&
+                  backendAccessToken &&
+                  evaluationResult.dataset_id && (
+                    <button
+                      onClick={() => setRetryConfirmOpen(true)}
+                      disabled={retrying}
+                      title="Re-run this evaluation on the same dataset, providers, and evaluators"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <svg
+                        className="w-3.5 h-3.5 shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M4 4v5h.582a8 8 0 0114.95-2M20 20v-5h-.581a8 8 0 01-14.95 2"
+                        />
+                      </svg>
+                      {retrying ? "Retrying…" : "Retry"}
+                    </button>
+                  )}
+              </div>
             </div>
 
             <DeleteConfirmationDialog
