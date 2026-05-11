@@ -1,5 +1,9 @@
 import React from "react";
 import { Tooltip } from "@/components/Tooltip";
+import {
+  EvaluatorScoreCell,
+  readEvaluatorCell,
+} from "./EvaluatorScoreCell";
 
 // Per-row results table for STT. Two modes:
 //
@@ -307,145 +311,6 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
         })}
       </div>
     </>
-  );
-}
-
-// Coerces a row's evaluator field (which is typed as `unknown` because the row
-// is open-ended) into a string we can render. Returns `undefined` for missing
-// values so the cell renderer can show its empty state.
-function asScoreString(value: unknown): string | undefined {
-  if (value === null || value === undefined) return undefined;
-  if (typeof value === "string") return value;
-  return String(value);
-}
-
-/**
- * Reads an evaluator's cell for one row. Prefers the canonical namespaced
- * shape (`result.evaluator_outputs[<evaluator_uuid>]`) introduced by the
- * STT/TTS API refresh, and falls back to the legacy flat keys
- * (`result[<scoreField>]` / `result[<reasoningField>]`) for older cached
- * responses. Also surfaces the explicit per-row `error: true` flag so the
- * cell renderer can show a "couldn't grade" affordance instead of treating
- * a missing/null value as a Fail.
- */
-export function readEvaluatorCell(
-  row: Record<string, unknown>,
-  col: Pick<STTEvaluatorColumn, "key" | "evaluatorUuid" | "scoreField" | "reasoningField">,
-): { score: string | undefined; reasoning: string | undefined; error: boolean } {
-  if (col.evaluatorUuid) {
-    const outputs = row.evaluator_outputs;
-    if (outputs && typeof outputs === "object" && !Array.isArray(outputs)) {
-      const entry = (outputs as Record<string, unknown>)[col.evaluatorUuid];
-      if (entry && typeof entry === "object" && !Array.isArray(entry)) {
-        const e = entry as { value?: unknown; reasoning?: unknown; error?: unknown };
-        return {
-          score: asScoreString(e.value),
-          reasoning: asScoreString(e.reasoning),
-          error: e.error === true,
-        };
-      }
-    }
-  }
-  return {
-    score: asScoreString(row[col.scoreField ?? `${col.key}_score`]),
-    reasoning: asScoreString(row[col.reasoningField ?? `${col.key}_reasoning`]),
-    error: false,
-  };
-}
-
-function EvaluatorScoreCell({
-  score,
-  reasoning,
-  outputType,
-  scaleMax,
-  error = false,
-  hideTooltipButton = false,
-}: {
-  score?: string;
-  reasoning?: string;
-  outputType: "binary" | "rating";
-  /** Rating max — when present, the cell renders as `${score}/${scaleMax}`. */
-  scaleMax?: number | null;
-  /** When true, the per-row judge call failed (timeout / parse / 5xx).
-   * Render a distinct "couldn't grade" pill instead of Pass/Fail. */
-  error?: boolean;
-  hideTooltipButton?: boolean;
-}) {
-  // Errored rows render their own affordance with the error message as the
-  // tooltip, regardless of whether `score` is null/undefined.
-  if (error) {
-    const tooltipContent = reasoning || "Evaluator could not grade this row.";
-    const badge = (
-      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-        </svg>
-        Error
-      </span>
-    );
-    if (hideTooltipButton) return badge;
-    return (
-      <div className="flex items-center gap-1.5">
-        {badge}
-        <Tooltip content={tooltipContent}>
-          <button type="button" className="p-1 rounded-md hover:bg-muted transition-colors cursor-pointer" aria-label="View error">
-            <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </button>
-        </Tooltip>
-      </div>
-    );
-  }
-
-  if (!score) return <span className="text-muted-foreground text-[12px]">-</span>;
-
-  const tooltipContent = reasoning || `Score: ${score}`;
-
-  // Binary evaluators render the same Pass/Fail pill the page has always used
-  // for the LLM-judge column. Rating evaluators show the raw numeric value
-  // (rounded to 4 dp when possible) — colorless, matching how WER/similarity
-  // values are rendered elsewhere in the table.
-  let badge: React.ReactNode;
-  if (outputType === "binary") {
-    const scoreStr = score.toLowerCase();
-    const passed = scoreStr === "true" || scoreStr === "1";
-    badge = (
-      <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
-        passed
-          ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
-          : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
-      }`}>
-        {passed ? "Pass" : "Fail"}
-      </span>
-    );
-  } else {
-    const numeric = Number(score);
-    const rounded = Number.isFinite(numeric)
-      ? parseFloat(numeric.toFixed(4))
-      : null;
-    const text =
-      rounded == null
-        ? score
-        : typeof scaleMax === "number" && Number.isFinite(scaleMax)
-          ? `${rounded}/${scaleMax}`
-          : `${rounded}`;
-    badge = <span className="text-[13px] text-foreground">{text}</span>;
-  }
-
-  if (hideTooltipButton) return badge;
-
-  return (
-    <div className="flex items-center gap-1.5">
-      {badge}
-      <Tooltip content={tooltipContent}>
-        <button type="button" className="p-1 rounded-md hover:bg-muted transition-colors cursor-pointer" aria-label="View reasoning">
-          <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </button>
-      </Tooltip>
-    </div>
   );
 }
 
