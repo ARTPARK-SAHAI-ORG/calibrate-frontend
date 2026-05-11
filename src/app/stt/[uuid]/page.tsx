@@ -23,6 +23,10 @@ import { getDataset } from "@/lib/datasets";
 import { ShareButton } from "@/components/ShareButton";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { retryEvaluation } from "@/lib/retryEvaluation";
+import {
+  deriveEvaluatorColumns,
+  STT_RESERVED_METRIC_KEYS,
+} from "@/lib/evaluatorColumns";
 
 // The STT evaluate API response now carries per-attached-evaluator data in
 // three formats we need to support side-by-side:
@@ -588,139 +592,23 @@ export default function STTEvaluationDetailPage() {
   const judgeLabel = defaultEvaluator?.name ?? "Evaluator";
 
   // Derive the per-evaluator columns rendered in the Outputs results table,
-  // the per-provider metrics card and the Leaderboard chart/columns. Three
-  // sources, in priority order:
-  //
-  //   1) New format — `evaluator_runs` on the response. Each entry gives us
-  //      the live `name`, stable `evaluator_uuid`, the artefact column key
-  //      (`metric_key` — the per-row CSV column with NO `_score` suffix),
-  //      and the `aggregate.type` we use to pick the cell renderer.
-  //   2) Legacy `_info` format — `${prefix}_info` keys in the first
-  //      provider's `metrics`. The per-row column is `${prefix}_score` and
-  //      the leaderboard summary key matches.
-  //   3) Truly legacy single-evaluator jobs — synthesize one column reading
-  //      `result.llm_judge_score` / `result.llm_judge_reasoning`, attributed
-  //      to the default STT evaluator so the column header still shows a
-  //      meaningful name and links cleanly in the About tab.
-  //
-  // The column carries explicit `scoreField` / `reasoningField` so the
-  // results table doesn't need to know which format produced the row.
-  const evaluatorColumns: STTEvaluatorColumn[] = useMemo(() => {
-    const providerResults = evaluationResult?.provider_results ?? [];
-
-    // (1) New format.
-    const firstRuns = providerResults
-      .map((pr) => pr.evaluator_runs)
-      .find((er): er is EvaluatorRun[] => Array.isArray(er) && er.length > 0);
-
-    if (firstRuns) {
-      return firstRuns.map((run) => ({
-        key: run.metric_key,
-        label: run.name ?? run.metric_key,
-        // Backend now supplies `output_type` directly; fall back to the
-        // aggregate inference for older cached responses.
-        outputType:
-          run.output_type === "rating" || run.output_type === "binary"
-            ? run.output_type
-            : run.aggregate?.type === "rating"
-              ? "rating"
-              : "binary",
-        // Stable UUID lets the row renderer prefer the canonical
-        // `result.evaluator_outputs[uuid]` over the flat per-row keys.
-        evaluatorUuid: run.evaluator_uuid,
-        scoreField: run.metric_key,
-        reasoningField: `${run.metric_key}_reasoning`,
-        scaleMin: run.aggregate?.scale_min ?? null,
-        scaleMax: run.aggregate?.scale_max ?? null,
-      }));
-    }
-
-    // (2) Legacy `_info` format.
-    const firstMetrics = providerResults
-      .map((pr) => pr.metrics)
-      .find((m): m is ProviderMetrics => !!m);
-
-    // (2a) Legacy `_info` format — each evaluator has a `${prefix}_info`
-    //      metric and per-row columns named `${prefix}_score` /
-    //      `${prefix}_reasoning`.
-    // (2b) Intermediate format used while a run is still in_progress and
-    //      `evaluator_runs` hasn't been populated yet — the evaluator metric
-    //      lives directly on the metrics object as
-    //      `"Evaluator name": { type, mean }` and per-row columns share the
-    //      raw evaluator name (no `_score` suffix), with reasoning at
-    //      `"Evaluator name_reasoning"`.
-    type ColInfo = {
-      key: string;
-      outputType: "binary" | "rating";
-      scoreField: string;
-      reasoningField: string;
-    };
-    const dataDriven: ColInfo[] = [];
-    if (firstMetrics) {
-      for (const k of Object.keys(firstMetrics)) {
-        if (k === "wer" || k === "string_similarity" || k === "llm_judge_score") {
-          continue;
-        }
-        if (k.endsWith("_info")) {
-          const prefix = k.slice(0, -"_info".length);
-          const info = firstMetrics[k] as { type?: string } | undefined;
-          dataDriven.push({
-            key: prefix,
-            outputType: info?.type === "rating" ? "rating" : "binary",
-            scoreField: `${prefix}_score`,
-            reasoningField: `${prefix}_reasoning`,
-          });
-          continue;
-        }
-        // (2b) — `{ type, mean }` shape under the evaluator's display name.
-        const v = firstMetrics[k];
-        if (
-          v &&
-          typeof v === "object" &&
-          !Array.isArray(v) &&
-          "type" in (v as Record<string, unknown>)
-        ) {
-          const info = v as { type?: string };
-          dataDriven.push({
-            key: k,
-            outputType: info.type === "rating" ? "rating" : "binary",
-            scoreField: k,
-            reasoningField: `${k}_reasoning`,
-          });
-        }
-      }
-    }
-
-    if (dataDriven.length > 0) {
-      return dataDriven.map((c) => {
-        const a = aboutEvaluators.find((e) => e.name === c.key);
-        return {
-          key: c.key,
-          // The label is the evaluator's stored name. Falls back to the raw
-          // data prefix when the about-fetch hasn't resolved (e.g. mid-poll);
-          // the label updates once the detail-fetch lands.
-          label: a ? a.name : c.key,
-          outputType: c.outputType,
-          scoreField: c.scoreField,
-          reasoningField: c.reasoningField,
-        };
-      });
-    }
-
-    // (3) Legacy single-evaluator fallback.
-    const defaultAbout = defaultEvaluator
-      ? aboutEvaluators.find((e) => e.uuid === defaultEvaluator.uuid)
-      : undefined;
-    return [
-      {
-        key: "llm_judge",
-        label: defaultAbout?.name ?? judgeLabel,
-        outputType: defaultAbout?.outputType ?? "binary",
-        scoreField: "llm_judge_score",
-        reasoningField: "llm_judge_reasoning",
-      },
-    ];
-  }, [aboutEvaluators, evaluationResult, defaultEvaluator, judgeLabel]);
+  // the per-provider metrics card and the Leaderboard chart/columns. See
+  // `deriveEvaluatorColumns` for the priority order across the four shapes
+  // the backend has emitted.
+  const evaluatorColumns: STTEvaluatorColumn[] = useMemo(
+    () =>
+      deriveEvaluatorColumns({
+        providerResults: evaluationResult?.provider_results ?? [],
+        aboutEvaluators,
+        reservedMetricKeys: STT_RESERVED_METRIC_KEYS,
+        singleJudgeFallback: {
+          defaultEvaluatorUuid: defaultEvaluator?.uuid,
+          defaultLabel: judgeLabel,
+          defaultOutputType: "binary",
+        },
+      }),
+    [aboutEvaluators, evaluationResult, defaultEvaluator, judgeLabel],
+  );
 
   const canShowLeaderboard =
     evaluationResult?.status === "done" && !!evaluationResult.leaderboard_summary;
