@@ -475,6 +475,29 @@ export default function EvaluatorRunDetailPage() {
         className="py-4 md:py-6 flex flex-col gap-4"
         style={{ height: "calc(100dvh - 56px)" }}
       >
+        {/* Mobile-only back button — AppLayout hides `customHeader` below md. */}
+        <button
+          onClick={() =>
+            router.push(`/human-labelling/tasks/${taskUuid}?tab=runs`)
+          }
+          className="md:hidden text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1.5"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15.75 19.5L8.25 12l7.5-7.5"
+            />
+          </svg>
+          Back to evaluation runs
+        </button>
+
         {loading && !job && (
           <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
             <svg
