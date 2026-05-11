@@ -1065,18 +1065,33 @@ function LabellingTaskPageInner() {
   };
 
   /**
-   * Selects an item AND scrolls back to the top of the page so the newly
-   * visible bulk-action toolbar (Evaluate selected / Label selected) is in
-   * view. Used by the per-row Label/Evaluate buttons when no rows are yet
-   * selected — those buttons enter bulk mode rather than acting on the row
-   * directly. When bulk mode is already on (some other row is checked),
+   * Anchored to the top of the items section so the bulk-action toolbar
+   * (which renders here when `selectedItemIds.size > 0`) is scrolled into
+   * view when the user triggers bulk mode from a row's Label/Evaluate.
+   *
+   * `window.scrollTo` doesn't work here because AppLayout puts page content
+   * inside its own `overflow-y-auto` container — the window itself isn't
+   * the scroller. `scrollIntoView` finds the correct scrollable ancestor.
+   */
+  const itemsSectionTopRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * Selects an item AND scrolls back to the top of the items section so the
+   * newly visible bulk-action toolbar (Evaluate selected / Label selected)
+   * is in view. Used by the per-row Label/Evaluate buttons when no rows are
+   * yet selected — those buttons enter bulk mode rather than acting on the
+   * row directly. When bulk mode is already on (some other row is checked),
    * the row buttons are hidden, so this helper isn't called in that case.
    */
   const enterBulkModeWithScroll = (uuid: string) => {
     toggleItem(uuid);
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
+    // rAF so the bulk toolbar has rendered before we scroll.
+    requestAnimationFrame(() => {
+      itemsSectionTopRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
   };
 
   const allSelected = items.length > 0 && selectedItemIds.size === items.length;
@@ -2305,7 +2320,7 @@ function LabellingTaskPageInner() {
               description="Add items for humans to label or load existing human labelled items"
             />
           ) : (
-            <div className="space-y-3">
+            <div ref={itemsSectionTopRef} className="space-y-3 scroll-mt-4">
               {/* Bulk-action toolbar (shown when at least one row is selected) */}
               {selectedItemIds.size > 0 && (
                 <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
