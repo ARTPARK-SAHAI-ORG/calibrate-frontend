@@ -20,6 +20,7 @@ import { useSidebarState } from "@/lib/sidebar";
 import { getDataset } from "@/lib/datasets";
 import { ShareButton } from "@/components/ShareButton";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
+import { retryEvaluation } from "@/lib/retryEvaluation";
 
 type LatencyMetric = {
   mean: number;
@@ -170,6 +171,7 @@ export default function TTSEvaluationDetailPage() {
   // Retry flow for failed runs.
   const [retryConfirmOpen, setRetryConfirmOpen] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
   // Persist the active tab across reloads via the `?tab=` query param.
   // Tabs that are not available yet fall back visually to Outputs below.
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
@@ -191,55 +193,24 @@ export default function TTSEvaluationDetailPage() {
 
   const handleRetry = async () => {
     if (!evaluationResult || !backendAccessToken || retrying) return;
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!backendUrl) return;
-    const datasetId = evaluationResult.dataset_id;
-    if (!datasetId) return;
-    const providers = (evaluationResult.provider_results ?? [])
-      .map((p) => p.provider)
-      .filter(Boolean);
-    const evaluatorUuidsSet = new Set<string>();
-    for (const pr of evaluationResult.provider_results ?? []) {
-      for (const run of pr.evaluator_runs ?? []) {
-        if (run.evaluator_uuid) evaluatorUuidsSet.add(run.evaluator_uuid);
-      }
-    }
-    for (const u of evaluationResult.evaluator_uuids ?? []) {
-      if (u) evaluatorUuidsSet.add(u);
-    }
-    const evaluatorUuids = Array.from(evaluatorUuidsSet);
     setRetrying(true);
-    try {
-      const res = await fetch(`${backendUrl}/tts/evaluate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          accept: "application/json",
-          Authorization: `Bearer ${backendAccessToken}`,
-        },
-        body: JSON.stringify({
-          dataset_id: datasetId,
-          providers,
-          language: evaluationResult.language,
-          evaluator_uuids: evaluatorUuids,
-        }),
-      });
-      if (res.status === 401) {
-        await signOut({ callbackUrl: "/login" });
-        return;
-      }
-      if (!res.ok) throw new Error(`Retry failed (${res.status})`);
-      const { task_id: newTaskId } = (await res.json()) as { task_id?: string };
-      if (newTaskId) {
-        setRetryConfirmOpen(false);
-        router.push(`/tts/${newTaskId}`);
-        return;
-      }
-      throw new Error("Retry succeeded but no task id returned");
-    } catch (err) {
-      console.error("Error retrying TTS evaluation:", err);
-      setRetrying(false);
+    setRetryError(null);
+    const result = await retryEvaluation(
+      "tts",
+      evaluationResult,
+      backendAccessToken,
+    );
+    if (result.ok) {
+      setRetryConfirmOpen(false);
+      router.push(`/tts/${result.taskId}`);
+      return;
     }
+    if (result.status === 401) {
+      await signOut({ callbackUrl: "/login" });
+      return;
+    }
+    setRetryError(result.error);
+    setRetrying(false);
   };
   const [activeProviderTab, setActiveProviderTab] = useState<string | null>(
     null
@@ -865,7 +836,10 @@ export default function TTSEvaluationDetailPage() {
                   backendAccessToken &&
                   evaluationResult.dataset_id && (
                     <button
-                      onClick={() => setRetryConfirmOpen(true)}
+                      onClick={() => {
+                        setRetryError(null);
+                        setRetryConfirmOpen(true);
+                      }}
                       disabled={retrying}
                       title="Re-run this evaluation on the same dataset, providers, and evaluators"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -892,13 +866,23 @@ export default function TTSEvaluationDetailPage() {
             <DeleteConfirmationDialog
               isOpen={retryConfirmOpen}
               onClose={() => {
-                if (!retrying) setRetryConfirmOpen(false);
+                if (!retrying) {
+                  setRetryConfirmOpen(false);
+                  setRetryError(null);
+                }
               }}
               onConfirm={handleRetry}
               title="Retry evaluation"
               message={`This will start a new TTS evaluation on the same dataset (${evaluationResult.dataset_name ?? "—"}), providers, and evaluators as the failed run.`}
               confirmText="Retry"
               isDeleting={retrying}
+              extraContent={
+                retryError ? (
+                  <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+                    {retryError}
+                  </div>
+                ) : null
+              }
             />
 
             {/* Only show tabs and content when we have at least one provider result */}
