@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Human Labelling | Calibrate",
+  title: "Human alignment | Calibrate",
 };
 
 export default function HumanLabellingLayout({

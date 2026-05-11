@@ -406,7 +406,7 @@ export function AnnotationOptIn({
             <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-foreground">
               No annotators exist yet.{" "}
               <Link
-                href="/human-labelling?tab=annotators"
+                href="/human-alignment?tab=annotators"
                 className="underline underline-offset-2 hover:opacity-80 transition-opacity"
               >
                 Add an annotator

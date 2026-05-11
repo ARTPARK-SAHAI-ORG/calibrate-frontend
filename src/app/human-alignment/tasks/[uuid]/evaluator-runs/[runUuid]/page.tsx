@@ -267,7 +267,7 @@ export default function EvaluatorRunDetailPage() {
         setRerunOpen(false);
         // Navigate to the new run; rerunSubmitting stays true through unmount.
         router.push(
-          `/human-labelling/tasks/${taskUuid}/evaluator-runs/${result.job_uuid}`,
+          `/human-alignment/tasks/${taskUuid}/evaluator-runs/${result.job_uuid}`,
         );
       } catch (err) {
         setRerunError(parseApiError(err, "Failed to start evaluation run"));
@@ -442,7 +442,7 @@ export default function EvaluatorRunDetailPage() {
   const customHeader = (
     <button
       onClick={() =>
-        router.push(`/human-labelling/tasks/${taskUuid}?tab=runs`)
+        router.push(`/human-alignment/tasks/${taskUuid}?tab=runs`)
       }
       className="inline-flex items-center gap-1.5 px-2 h-8 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
     >
@@ -465,7 +465,7 @@ export default function EvaluatorRunDetailPage() {
 
   return (
     <AppLayout
-      activeItem="human-labelling"
+      activeItem="human-alignment"
       onItemChange={(id) => router.push(`/${id}`)}
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
@@ -478,7 +478,7 @@ export default function EvaluatorRunDetailPage() {
         {/* Mobile-only back button — AppLayout hides `customHeader` below md. */}
         <button
           onClick={() =>
-            router.push(`/human-labelling/tasks/${taskUuid}?tab=runs`)
+            router.push(`/human-alignment/tasks/${taskUuid}?tab=runs`)
           }
           className="md:hidden text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1.5"
         >

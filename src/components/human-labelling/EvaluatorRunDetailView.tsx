@@ -2,7 +2,7 @@
 
 /**
  * Shared presentational view for an evaluator-run job. Used by both the
- * authenticated detail page (`/human-labelling/tasks/{taskUuid}/evaluator-runs/{runUuid}`)
+ * authenticated detail page (`/human-alignment/tasks/{taskUuid}/evaluator-runs/{runUuid}`)
  * and the public viewer page (`/public/annotation-eval/{share_token}`). Owns
  * UI state (current item, disagreement filter, source selection) but is
  * data-agnostic — caller fetches the job & task and passes them in.

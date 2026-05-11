@@ -107,7 +107,7 @@ type AddTestDialogProps = {
   /**
    * "test" (default) — original behaviour with Next reply / Tool invocation
    * tabs and "Test" labels.
-   * "labelItem" — used by the human-labelling task page. Hides the tabs
+   * "labelItem" — used by the human-alignment task page. Hides the tabs
    * (always next-reply view), and rewords any user-visible "Test" copy to
    * "Item". The caller is responsible for hooking onSubmit up to the
    * labelling-items API.

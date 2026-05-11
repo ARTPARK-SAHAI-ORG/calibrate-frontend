@@ -689,7 +689,7 @@ function JobsList({ jobs }: { jobs: LabellingJob[] }) {
             key={job.uuid}
             onClick={() => {
               if (!isImported)
-                router.push(`/human-labelling/jobs/${job.public_token}`);
+                router.push(`/human-alignment/jobs/${job.public_token}`);
             }}
             className={`grid grid-cols-[180px_minmax(0,1fr)_120px_120px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-3 border-b border-border last:border-b-0 items-center hover:bg-muted/20 transition-colors ${
               isImported ? "" : "cursor-pointer"
@@ -799,7 +799,7 @@ function LabellingTaskPageInner() {
       window.history.replaceState(
         null,
         "",
-        `/human-labelling/tasks/${uuid}?tab=${tab}`,
+        `/human-alignment/tasks/${uuid}?tab=${tab}`,
       );
     },
     [uuid],
@@ -839,7 +839,9 @@ function LabellingTaskPageInner() {
   const [deleteSelectedOpen, setDeleteSelectedOpen] = useState(false);
   const [deletingSelected, setDeletingSelected] = useState(false);
   const [editSttItemsOpen, setEditSttItemsOpen] = useState(false);
-  const [editSttSingleItemUuid, setEditSttSingleItemUuid] = useState<string | null>(null);
+  const [editSttSingleItemUuid, setEditSttSingleItemUuid] = useState<
+    string | null
+  >(null);
   const [editLlmItemUuid, setEditLlmItemUuid] = useState<string | null>(null);
   const [editLlmItemName, setEditLlmItemName] = useState("");
   const [savingLlmItem, setSavingLlmItem] = useState(false);
@@ -1166,7 +1168,7 @@ function LabellingTaskPageInner() {
       });
       setRunDialogOpen(false);
       router.push(
-        `/human-labelling/tasks/${uuid}/evaluator-runs/${result.job_uuid}`,
+        `/human-alignment/tasks/${uuid}/evaluator-runs/${result.job_uuid}`,
       );
     } catch (err) {
       const msg = parseApiError(err, "Failed to start evaluation run");
@@ -1598,7 +1600,7 @@ function LabellingTaskPageInner() {
 
   const customHeader = (
     <button
-      onClick={() => router.push("/human-labelling?tab=tasks")}
+      onClick={() => router.push("/human-alignment?tab=tasks")}
       className="inline-flex items-center gap-1.5 px-2 h-8 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
     >
       <svg
@@ -1614,13 +1616,13 @@ function LabellingTaskPageInner() {
           d="M15.75 19.5L8.25 12l7.5-7.5"
         />
       </svg>
-      All labelling tasks
+      All tasks
     </button>
   );
 
   return (
     <AppLayout
-      activeItem="human-labelling"
+      activeItem="human-alignment"
       onItemChange={(id) => router.push(`/${id}`)}
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
@@ -1631,7 +1633,7 @@ function LabellingTaskPageInner() {
             md, so without this small-screen users would lose the back
             affordance. */}
         <button
-          onClick={() => router.push("/human-labelling?tab=tasks")}
+          onClick={() => router.push("/human-alignment?tab=tasks")}
           className="md:hidden text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1.5"
         >
           <svg
@@ -1647,7 +1649,7 @@ function LabellingTaskPageInner() {
               d="M15.75 19.5L8.25 12l7.5-7.5"
             />
           </svg>
-          All labelling tasks
+          All tasks
         </button>
 
         {error && (
@@ -2481,29 +2483,37 @@ function LabellingTaskPageInner() {
                             itemUuid={item.uuid}
                             onDelete={requestDeleteOneItem}
                             onViewResults={toggleItemResults}
-                            onLabel={selectedItemIds.size === 0 ? (uuid) => {
-                              // Sole row → skip the select-then-bulk
-                              // dance and open the assign dialog
-                              // straight on this item.
-                              if (items.length === 1) {
-                                setSelectedItemIds(new Set([uuid]));
-                                setAssignOpen(true);
-                              } else {
-                                enterBulkModeWithScroll(uuid);
-                              }
-                            } : undefined}
+                            onLabel={
+                              selectedItemIds.size === 0
+                                ? (uuid) => {
+                                    // Sole row → skip the select-then-bulk
+                                    // dance and open the assign dialog
+                                    // straight on this item.
+                                    if (items.length === 1) {
+                                      setSelectedItemIds(new Set([uuid]));
+                                      setAssignOpen(true);
+                                    } else {
+                                      enterBulkModeWithScroll(uuid);
+                                    }
+                                  }
+                                : undefined
+                            }
                             onEdit={(uuid) => {
                               setEditSttSingleItemUuid(uuid);
                               setEditSttItemsOpen(true);
                             }}
-                            onEvaluate={selectedItemIds.size === 0 ? (uuid) => {
-                              if (items.length === 1) {
-                                setSelectedItemIds(new Set([uuid]));
-                                handleRunEvaluators([uuid]);
-                              } else {
-                                enterBulkModeWithScroll(uuid);
-                              }
-                            } : undefined}
+                            onEvaluate={
+                              selectedItemIds.size === 0
+                                ? (uuid) => {
+                                    if (items.length === 1) {
+                                      setSelectedItemIds(new Set([uuid]));
+                                      handleRunEvaluators([uuid]);
+                                    } else {
+                                      enterBulkModeWithScroll(uuid);
+                                    }
+                                  }
+                                : undefined
+                            }
                             isResultsOpen={isResultsOpen}
                             viewResultsDisabled={
                               !!taskSummary && !itemsWithResults.has(item.uuid)
@@ -2565,26 +2575,34 @@ function LabellingTaskPageInner() {
                             itemUuid={item.uuid}
                             onDelete={requestDeleteOneItem}
                             onViewResults={toggleItemResults}
-                            onLabel={selectedItemIds.size === 0 ? (uuid) => {
-                              // Sole row → skip the select-then-bulk
-                              // dance and open the assign dialog
-                              // straight on this item.
-                              if (items.length === 1) {
-                                setSelectedItemIds(new Set([uuid]));
-                                setAssignOpen(true);
-                              } else {
-                                enterBulkModeWithScroll(uuid);
-                              }
-                            } : undefined}
+                            onLabel={
+                              selectedItemIds.size === 0
+                                ? (uuid) => {
+                                    // Sole row → skip the select-then-bulk
+                                    // dance and open the assign dialog
+                                    // straight on this item.
+                                    if (items.length === 1) {
+                                      setSelectedItemIds(new Set([uuid]));
+                                      setAssignOpen(true);
+                                    } else {
+                                      enterBulkModeWithScroll(uuid);
+                                    }
+                                  }
+                                : undefined
+                            }
                             onEdit={(uuid) => setEditLlmItemUuid(uuid)}
-                            onEvaluate={selectedItemIds.size === 0 ? (uuid) => {
-                              if (items.length === 1) {
-                                setSelectedItemIds(new Set([uuid]));
-                                handleRunEvaluators([uuid]);
-                              } else {
-                                enterBulkModeWithScroll(uuid);
-                              }
-                            } : undefined}
+                            onEvaluate={
+                              selectedItemIds.size === 0
+                                ? (uuid) => {
+                                    if (items.length === 1) {
+                                      setSelectedItemIds(new Set([uuid]));
+                                      handleRunEvaluators([uuid]);
+                                    } else {
+                                      enterBulkModeWithScroll(uuid);
+                                    }
+                                  }
+                                : undefined
+                            }
                             isResultsOpen={isResultsOpen}
                             viewResultsDisabled={
                               !!taskSummary && !itemsWithResults.has(item.uuid)
@@ -2631,7 +2649,7 @@ function LabellingTaskPageInner() {
               </svg>
               Loading jobs
             </div>
-  ) : jobs.length === 0 ? (
+          ) : jobs.length === 0 ? (
             <EmptyState
               icon={
                 <svg
@@ -2664,7 +2682,7 @@ function LabellingTaskPageInner() {
             onRequestDelete={(runUuid) => setDeletingRunUuid(runUuid)}
             onOpen={(runUuid) =>
               router.push(
-                `/human-labelling/tasks/${uuid}/evaluator-runs/${runUuid}`,
+                `/human-alignment/tasks/${uuid}/evaluator-runs/${runUuid}`,
               )
             }
           />
@@ -3037,7 +3055,10 @@ function LabellingTaskPageInner() {
                   : "",
             };
           })}
-        onClose={() => { setEditSttItemsOpen(false); setEditSttSingleItemUuid(null); }}
+        onClose={() => {
+          setEditSttItemsOpen(false);
+          setEditSttSingleItemUuid(null);
+        }}
         onSubmit={async (rows) => {
           if (!accessToken) return;
           await apiClient<{ updated_count: number }>(

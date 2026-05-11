@@ -125,7 +125,7 @@ function AnnotatorDetailPageInner() {
       window.history.replaceState(
         null,
         "",
-        `/human-labelling/annotators/${uuid}?tab=${tab}`,
+        `/human-alignment/annotators/${uuid}?tab=${tab}`,
       );
     },
     [uuid],
@@ -193,14 +193,14 @@ function AnnotatorDetailPageInner() {
 
   return (
     <AppLayout
-      activeItem="human-labelling"
+      activeItem="human-alignment"
       onItemChange={(id) => router.push(`/${id}`)}
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
     >
       <div className="py-4 md:py-6 space-y-6">
         <button
-          onClick={() => router.push("/human-labelling?tab=annotators")}
+          onClick={() => router.push("/human-alignment?tab=annotators")}
           className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1.5"
         >
           <svg
@@ -502,7 +502,7 @@ function AnnotatorJobsList({ jobs }: { jobs: AnnotatorJob[] }) {
             key={job.uuid}
             onClick={() => {
               if (!isImported)
-                router.push(`/human-labelling/jobs/${job.public_token}`);
+                router.push(`/human-alignment/jobs/${job.public_token}`);
             }}
             className={`grid grid-cols-[180px_minmax(0,1fr)_120px_120px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-3 border-b border-border last:border-b-0 items-center hover:bg-muted/20 transition-colors ${
               isImported ? "" : "cursor-pointer"

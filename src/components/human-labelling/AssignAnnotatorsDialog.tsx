@@ -184,7 +184,7 @@ export function AssignAnnotatorsDialog({
               description={
                 <>
                   <Link
-                    href="/human-labelling?tab=annotators"
+                    href="/human-alignment?tab=annotators"
                     className="underline underline-offset-2 hover:text-foreground transition-colors"
                   >
                     Add annotators

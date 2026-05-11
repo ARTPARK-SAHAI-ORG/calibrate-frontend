@@ -303,7 +303,7 @@ export function CreateLabellingTaskDialog({
                 />
               </svg>
               <span className="text-xs md:text-sm text-foreground inline-flex items-center gap-1.5 flex-wrap">
-                Human labelling for
+                Human alignment for
                 <EvaluatorTypePill evaluatorType="tts" />
                 evaluators is not supported yet
               </span>

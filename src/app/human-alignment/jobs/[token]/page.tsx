@@ -56,7 +56,7 @@ export default function AdminAnnotateJobPage() {
 
   return (
     <AppLayout
-      activeItem="human-labelling"
+      activeItem="human-alignment"
       onItemChange={(id) => router.push(`/${id}`)}
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
@@ -107,7 +107,7 @@ export default function AdminAnnotateJobPage() {
             <div className="flex flex-wrap gap-3">
               <FieldRow label="Labelling task">
                 <Link
-                  href={`/human-labelling/tasks/${meta.task.uuid}`}
+                  href={`/human-alignment/tasks/${meta.task.uuid}`}
                   className="text-sm font-medium text-foreground hover:underline underline-offset-2"
                 >
                   {meta.task.name}
@@ -115,7 +115,7 @@ export default function AdminAnnotateJobPage() {
               </FieldRow>
               <FieldRow label="Annotator">
                 <Link
-                  href={`/human-labelling/annotators/${meta.annotator.uuid}`}
+                  href={`/human-alignment/annotators/${meta.annotator.uuid}`}
                   className="text-sm font-medium text-foreground hover:underline underline-offset-2"
                 >
                   {meta.annotator.name}
