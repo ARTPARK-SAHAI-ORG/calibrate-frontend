@@ -26,6 +26,12 @@ export default function PublicAnnotationJobViewerPage() {
         ? params.token[0]
         : "";
 
+  const headerTitle = meta
+    ? meta.annotator.name
+      ? `${meta.task.name} | Annotated by ${meta.annotator.name}`
+      : meta.task.name
+    : "Annotation job";
+
   useEffect(() => {
     document.title = meta?.task.name
       ? `${meta.task.name} | Annotation job | Calibrate`
@@ -34,7 +40,7 @@ export default function PublicAnnotationJobViewerPage() {
 
   return (
     <PublicPageLayout
-      title={meta?.task.name ?? "Annotation job"}
+      title={headerTitle}
       pills={
         meta ? (
           <span
@@ -49,27 +55,22 @@ export default function PublicAnnotationJobViewerPage() {
       contentClassName="max-w-7xl"
     >
       <div className="flex flex-col gap-4" style={{ height: "calc(100dvh - 140px)" }}>
-        {meta && (
-          <div className="flex flex-wrap gap-3">
-            <FieldRow label="Annotator">
-              <span className="text-sm font-medium text-foreground">
-                {meta.annotator.name}
-              </span>
-            </FieldRow>
-            {meta.evaluators.length > 0 && (
-              <FieldRow label="Evaluators">
-                <div className="flex flex-wrap gap-1.5">
-                  {meta.evaluators.map((ev) => (
-                    <span
-                      key={ev.uuid}
-                      className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground"
-                    >
-                      {ev.name}
-                    </span>
-                  ))}
-                </div>
-              </FieldRow>
-            )}
+        {meta && meta.evaluators.length > 0 && (
+          // Same uncarded evaluator pills as the admin annotation-job page.
+          <div className="space-y-2">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Evaluators
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {meta.evaluators.map((ev) => (
+                <span
+                  key={ev.uuid}
+                  className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground"
+                >
+                  {ev.name}
+                </span>
+              ))}
+            </div>
           </div>
         )}
 
@@ -103,22 +104,5 @@ function jobStatusLabel(status: AnnotationJobMeta["jobStatus"]): string {
   if (status === "in_progress") return "In progress";
   if (status === "completed") return "Completed";
   return "Pending";
-}
-
-function FieldRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="border border-border rounded-lg px-4 py-3 bg-background">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-        {label}
-      </div>
-      <div>{children}</div>
-    </div>
-  );
 }
 
