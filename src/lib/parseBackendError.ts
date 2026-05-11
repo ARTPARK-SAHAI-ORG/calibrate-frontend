@@ -20,6 +20,57 @@
 const GENERIC_5XX_MESSAGE =
   "Something went wrong on our end. Please try again in a moment.";
 
+/**
+ * Reads a duplicate-name 409 (the backend returns
+ * `{ detail: "<Resource> name already exists" }` per the API docs).
+ *
+ * Returns the detail string on a 409 whose body matches that shape; null
+ * otherwise. Use it from create/rename handlers to route the message to the
+ * inline name-field error slot instead of a global toast/banner.
+ *
+ * Per the API docs:
+ *   - 409 on any name endpoint always means "name collision";
+ *   - the backend message is FE-displayable verbatim, no rewording needed.
+ */
+export async function readNameConflictMessage(
+  response: Response,
+): Promise<string | null> {
+  if (response.status !== 409) return null;
+  try {
+    const data = (await response.clone().json()) as { detail?: unknown };
+    if (typeof data?.detail === "string" && /already exists/i.test(data.detail)) {
+      return data.detail;
+    }
+  } catch {
+    // body wasn't JSON — fall through
+  }
+  return null;
+}
+
+/**
+ * Same check as `readNameConflictMessage` but for an apiClient-thrown
+ * Error (whose message follows "Request failed: <status> - <body>"). Returns
+ * the detail string when the error is a 409 name-collision, null otherwise.
+ */
+export function readNameConflictFromError(err: unknown): string | null {
+  if (!(err instanceof Error)) return null;
+  const m = err.message.match(/Request failed:\s*409\s*-\s*(.+)$/);
+  if (!m) return null;
+  try {
+    const parsed = JSON.parse(m[1]) as { detail?: unknown };
+    if (
+      typeof parsed?.detail === "string" &&
+      /already exists/i.test(parsed.detail)
+    ) {
+      return parsed.detail;
+    }
+  } catch {
+    // not JSON; try the raw body
+    if (/already exists/i.test(m[1])) return m[1];
+  }
+  return null;
+}
+
 type DetailObject = { detail?: unknown; message?: unknown };
 
 /**

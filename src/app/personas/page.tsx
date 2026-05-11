@@ -9,6 +9,7 @@ import { AppLayout, useHideFloatingButton } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { Tooltip } from "@/components/Tooltip";
 import { useSidebarState } from "@/lib/sidebar";
+import { readNameConflictMessage } from "@/lib/parseBackendError";
 
 type PersonaData = {
   uuid: string;
@@ -44,6 +45,11 @@ export default function PersonasPage() {
   const [personasError, setPersonasError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  // Duplicate-name 409 messages render inline next to the name field
+  // instead of in the bottom banner.
+  const [nameConflictError, setNameConflictError] = useState<string | null>(
+    null,
+  );
   const [editingPersonaUuid, setEditingPersonaUuid] = useState<string | null>(
     null
   );
@@ -180,6 +186,7 @@ export default function PersonasPage() {
     setPersonaLanguage("english");
     setEditingPersonaUuid(null);
     setCreateError(null);
+    setNameConflictError(null);
     setValidationAttempted(false);
   };
 
@@ -220,6 +227,14 @@ export default function PersonasPage() {
       }
 
       if (!response.ok) {
+        // Route a 409 "Persona name already exists" to the inline
+        // nameConflictError slot instead of the bottom banner.
+        const conflict = await readNameConflictMessage(response);
+        if (conflict) {
+          setNameConflictError(conflict);
+          setIsCreating(false);
+          return;
+        }
         throw new Error("Failed to create persona");
       }
 
@@ -347,6 +362,12 @@ export default function PersonasPage() {
       }
 
       if (!response.ok) {
+        const conflict = await readNameConflictMessage(response);
+        if (conflict) {
+          setNameConflictError(conflict);
+          setIsCreating(false);
+          return;
+        }
         throw new Error("Failed to update persona");
       }
 
@@ -776,14 +797,23 @@ export default function PersonasPage() {
                       <input
                         type="text"
                         value={personaLabel}
-                        onChange={(e) => setPersonaLabel(e.target.value)}
+                        onChange={(e) => {
+                          setPersonaLabel(e.target.value);
+                          if (nameConflictError) setNameConflictError(null);
+                        }}
                         placeholder="e.g., Rural Farmer - Karnataka"
                         className={`w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
-                          validationAttempted && !personaLabel.trim()
+                          nameConflictError ||
+                          (validationAttempted && !personaLabel.trim())
                             ? "border-red-500"
                             : "border-border"
                         }`}
                       />
+                      {nameConflictError && (
+                        <p className="mt-1 text-xs md:text-sm text-red-500">
+                          {nameConflictError}
+                        </p>
+                      )}
                     </div>
 
                     {/* Characteristics */}

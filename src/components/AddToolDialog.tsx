@@ -5,6 +5,7 @@ import { signOut } from "next-auth/react";
 import { ParameterCard, Parameter } from "@/components/ParameterCard";
 import { NestedContainer } from "@/components/ui/NestedContainer";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { readNameConflictMessage } from "@/lib/parseBackendError";
 
 type ToolData = {
   uuid: string;
@@ -60,6 +61,10 @@ export function AddToolDialog({
   const [parameters, setParameters] = useState<Parameter[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  // Duplicate-name 409 messages render inline next to the name field.
+  const [nameConflictError, setNameConflictError] = useState<string | null>(
+    null,
+  );
   const [isLoadingTool, setIsLoadingTool] = useState(false);
   const [validationAttempted, setValidationAttempted] = useState(false);
   const sidebarContentRef = useRef<HTMLDivElement>(null);
@@ -121,6 +126,7 @@ export function AddToolDialog({
     setToolDescription("");
     setParameters([]);
     setCreateError(null);
+    setNameConflictError(null);
     setValidationAttempted(false);
     // Reset webhook-specific fields
     setWebhookMethod("POST");
@@ -890,6 +896,7 @@ export function AddToolDialog({
     try {
       setIsCreating(true);
       setCreateError(null);
+      setNameConflictError(null);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
         throw new Error("BACKEND_URL environment variable is not set");
@@ -945,6 +952,12 @@ export function AddToolDialog({
       }
 
       if (!response.ok) {
+        const conflict = await readNameConflictMessage(response);
+        if (conflict) {
+          setNameConflictError(conflict);
+          setIsCreating(false);
+          return;
+        }
         throw new Error("Failed to create tool");
       }
 
@@ -988,6 +1001,7 @@ export function AddToolDialog({
     try {
       setIsCreating(true);
       setCreateError(null);
+      setNameConflictError(null);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
         throw new Error("BACKEND_URL environment variable is not set");
@@ -1043,6 +1057,12 @@ export function AddToolDialog({
       }
 
       if (!response.ok) {
+        const conflict = await readNameConflictMessage(response);
+        if (conflict) {
+          setNameConflictError(conflict);
+          setIsCreating(false);
+          return;
+        }
         throw new Error("Failed to update tool");
       }
 
@@ -1171,14 +1191,23 @@ export function AddToolDialog({
                   <input
                     type="text"
                     value={toolName}
-                    onChange={(e) => setToolName(e.target.value)}
+                    onChange={(e) => {
+                      setToolName(e.target.value);
+                      if (nameConflictError) setNameConflictError(null);
+                    }}
                     placeholder="An informative name for the tool that reflects its purpose"
                     className={`w-full h-10 px-4 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
-                      validationAttempted && !toolName.trim()
+                      nameConflictError ||
+                      (validationAttempted && !toolName.trim())
                         ? "border-red-500"
                         : "border-border"
                     }`}
                   />
+                  {nameConflictError && (
+                    <p className="mt-1 text-sm text-red-500">
+                      {nameConflictError}
+                    </p>
+                  )}
                 </div>
 
                 {/* Description */}
