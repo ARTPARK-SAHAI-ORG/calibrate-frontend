@@ -36,20 +36,22 @@ import {
   runOutputType,
   snapshotToItem,
 } from "@/components/human-labelling/EvaluatorRunDetailView";
+import { parseBackendErrorMessage } from "@/lib/parseBackendError";
 
+/**
+ * Surface a user-renderable string from an apiClient-thrown Error.
+ *
+ * The Re-run flow (POST /annotation-tasks/{uuid}/evaluator-runs) can hit:
+ *   - 404 `Annotation task not found`
+ *   - 400 `task has no items` / `item_ids not in this task`
+ *   - 400 EvaluatorResolutionError / DatasetBuildError pass-throughs
+ *   - 422 (validation array) and 5xx (rendered as generic message + log)
+ *
+ * Backend messages on 4xx are user-facing per the API docs; 5xx are
+ * replaced with a generic toast.
+ */
 function parseApiError(err: unknown, fallback: string): string {
-  if (!(err instanceof Error)) return fallback;
-  const m = err.message.match(/Request failed: \d+ - (.+)$/);
-  if (m) {
-    try {
-      const parsed = JSON.parse(m[1]);
-      if (parsed && typeof parsed.detail === "string") return parsed.detail;
-    } catch {
-      // ignore
-    }
-    return m[1];
-  }
-  return err.message || fallback;
+  return parseBackendErrorMessage(err, fallback);
 }
 
 export default function EvaluatorRunDetailPage() {

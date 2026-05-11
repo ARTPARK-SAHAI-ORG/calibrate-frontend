@@ -7,7 +7,18 @@
  * Returns either the new run's task id or a human-readable error string —
  * the caller is responsible for rendering the error and for
  * `router.push`ing to the new task.
+ *
+ * Plausible backend failures we surface:
+ *   - 404 `Dataset not found`          — dataset deleted since the run
+ *   - 404 `Evaluator <uuid> not found` — evaluator deleted
+ *   - 400 `Evaluator … has no live version`
+ *   - 400 `Evaluator … has evaluator_type='X' …` — rare; type changed
+ *   - 400 `Dataset has no items`
+ *   - 400 `At least one provider …`    — pre-empted below
+ *   - 500 (infra)                       — generic message
  */
+
+import { parseBackendErrorResponse } from "./parseBackendError";
 
 export type EvaluationKind = "stt" | "tts";
 
@@ -50,6 +61,15 @@ export async function retryEvaluation(
   const providers = (evaluation.provider_results ?? [])
     .map((p) => p.provider)
     .filter((p): p is string => !!p);
+
+  if (providers.length === 0) {
+    // Pre-empt the backend's `At least one provider must be specified` 400.
+    return {
+      ok: false,
+      error:
+        "Couldn't determine which providers to run for the retry. Try re-creating the evaluation manually.",
+    };
+  }
 
   // Union the canonical new-format `evaluator_runs[].evaluator_uuid` with
   // the legacy top-level `evaluator_uuids`, so a payload that only carries
@@ -102,20 +122,10 @@ export async function retryEvaluation(
   }
 
   if (!res.ok) {
-    let detail = `Retry failed (${res.status})`;
-    try {
-      const body = (await res.json()) as { detail?: string; message?: string };
-      if (typeof body?.detail === "string" && body.detail.length > 0) {
-        detail = body.detail;
-      } else if (
-        typeof body?.message === "string" &&
-        body.message.length > 0
-      ) {
-        detail = body.message;
-      }
-    } catch {
-      // ignore — keep the status-based fallback message
-    }
+    const detail = await parseBackendErrorResponse(
+      res,
+      `retryEvaluation(${kind})`,
+    );
     return { ok: false, error: detail, status: res.status };
   }
 
