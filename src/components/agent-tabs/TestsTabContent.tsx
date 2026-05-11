@@ -168,7 +168,9 @@ export function TestsTabContent({
    * "remove": detach test from this agent only (DELETE /agent-tests).
    * "permanent": delete the test record itself (DELETE /tests/{uuid}); affects all agents.
    */
-  const [deleteMode, setDeleteMode] = useState<"remove" | "permanent">("remove");
+  const [deleteMode, setDeleteMode] = useState<"remove" | "permanent">(
+    "remove",
+  );
 
   // Test runner dialog state
   const [testRunnerOpen, setTestRunnerOpen] = useState(false);
@@ -596,9 +598,7 @@ export function TestsTabContent({
   };
 
   // Open bulk delete confirmation dialog
-  const openBulkDeleteDialog = (
-    mode: "remove" | "permanent" = "remove",
-  ) => {
+  const openBulkDeleteDialog = (mode: "remove" | "permanent" = "remove") => {
     if (selectedTestUuids.size === 0) return;
     setTestToDelete(null);
     setTestsToDeleteBulk(Array.from(selectedTestUuids));
@@ -1035,7 +1035,7 @@ export function TestsTabContent({
                   className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium bg-red-700 text-white hover:bg-red-800 transition-colors cursor-pointer"
                   title="Permanently delete selected tests from your test library"
                 >
-                  Delete selected permanently ({selectedTestUuids.size})
+                  Delete selected ({selectedTestUuids.size})
                 </button>
               </>
             )}
@@ -1513,31 +1513,13 @@ export function TestsTabContent({
                           </svg>
                         </button>
                       </div>
-                      {/* Delete Buttons */}
-                      <div className="flex items-center gap-0.5">
+                      {/* Delete Button — opens a dialog whose checkbox upgrades the
+                          remove-from-agent action to a permanent library delete. */}
+                      <div className="flex items-center">
                         <button
                           onClick={() => openDeleteDialog(test, "remove")}
                           className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                          title="Remove test from this agent"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={1.5}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M18 12H6"
-                            />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => openDeleteDialog(test, "permanent")}
-                          className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-white hover:bg-red-700 transition-colors cursor-pointer"
-                          title="Delete test permanently from your test library"
+                          title="Delete test"
                         >
                           <svg
                             className="w-4 h-4"
@@ -1633,26 +1615,7 @@ export function TestsTabContent({
                           <button
                             onClick={() => openDeleteDialog(test, "remove")}
                             className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                            title="Remove test from this agent"
-                          >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={1.5}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M18 12H6"
-                              />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => openDeleteDialog(test, "permanent")}
-                            className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-white hover:bg-red-700 transition-colors cursor-pointer"
-                            title="Delete test permanently from your test library"
+                            title="Delete test"
                           >
                             <svg
                               className="w-4 h-4"
@@ -1692,7 +1655,7 @@ export function TestsTabContent({
           deleteMode === "permanent"
             ? testsToDeleteBulk.length > 0
               ? "Delete tests permanently"
-              : "Delete test permanently"
+              : "Delete test"
             : testsToDeleteBulk.length > 0
               ? "Remove tests"
               : "Remove test"
@@ -1701,13 +1664,38 @@ export function TestsTabContent({
           deleteMode === "permanent"
             ? testsToDeleteBulk.length > 0
               ? `Are you sure you want to permanently delete ${testsToDeleteBulk.length} test${testsToDeleteBulk.length > 1 ? "s" : ""} from your library? This will remove them from every agent and cannot be undone.`
-              : `Are you sure you want to permanently delete "${testToDelete?.name}" from your library? This will remove it from every agent and cannot be undone.`
+              : `Permanently deleting "${testToDelete?.name}" will remove it from every agent that uses it and cannot be undone.`
             : testsToDeleteBulk.length > 0
               ? `Are you sure you want to remove ${testsToDeleteBulk.length} test${testsToDeleteBulk.length > 1 ? "s" : ""} from this agent?`
-              : `Are you sure you want to remove "${testToDelete?.name}" from this agent?`
+              : `Are you sure you want to remove "${testToDelete?.name}" from this agent? It will stay in your test library and on any other agents that use it.`
         }
+        // Keep confirmText a single word — the dialog auto-suffixes "ing..." while
+        // submitting by stripping a trailing 'e', which only works on one-token labels.
         confirmText={deleteMode === "permanent" ? "Delete" : "Remove"}
         isDeleting={isDeleting}
+        extraContent={
+          // Checkbox only on single-test deletes. Bulk deletes still pick their
+          // mode from the two top-bar buttons.
+          testToDelete && testsToDeleteBulk.length === 0 ? (
+            <label className="flex items-start gap-2.5 rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={deleteMode === "permanent"}
+                onChange={(e) =>
+                  setDeleteMode(e.target.checked ? "permanent" : "remove")
+                }
+                disabled={isDeleting}
+                className="mt-0.5 w-4 h-4 accent-red-600 cursor-pointer flex-shrink-0 disabled:cursor-not-allowed"
+              />
+              <span className="text-sm text-foreground">
+                Also delete this test permanently from my test library
+                <span className="block text-xs text-muted-foreground mt-0.5">
+                  Removes the test from every agent that uses it. Cannot be undone.
+                </span>
+              </span>
+            </label>
+          ) : null
+        }
       />
 
       {/* Test Runner Dialog */}
