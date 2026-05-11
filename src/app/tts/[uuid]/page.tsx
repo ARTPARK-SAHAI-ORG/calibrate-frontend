@@ -6,7 +6,12 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
-import { BackHeader, StatusBadge, NotFoundState } from "@/components/ui";
+import {
+  BackHeader,
+  StatusBadge,
+  NotFoundState,
+  RetryIcon,
+} from "@/components/ui";
 import { ttsProviders } from "@/components/agent-tabs/constants/providers";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import {
@@ -219,7 +224,7 @@ export default function TTSEvaluationDetailPage() {
     setRetrying(false);
   };
   const [activeProviderTab, setActiveProviderTab] = useState<string | null>(
-    null
+    null,
   );
   const [ttsEvaluators, setTtsEvaluators] = useState<EvaluatorSummary[]>([]);
   const [aboutEvaluators, setAboutEvaluators] = useState<EvaluatorAbout[]>([]);
@@ -259,7 +264,7 @@ export default function TTSEvaluationDetailPage() {
               accept: "application/json",
               Authorization: `Bearer ${backendAccessToken}`,
             },
-          }
+          },
         );
 
         if (response.status === 401) {
@@ -273,8 +278,7 @@ export default function TTSEvaluationDetailPage() {
         const items: EvaluatorSummary[] = Array.isArray(data)
           ? data
               .filter(
-                (m: { evaluator_type?: string }) =>
-                  m.evaluator_type === "tts"
+                (m: { evaluator_type?: string }) => m.evaluator_type === "tts",
               )
               .map(
                 (m: {
@@ -287,7 +291,7 @@ export default function TTSEvaluationDetailPage() {
                   name: m.name,
                   description: m.description ?? null,
                   isDefault: !m.owner_user_id,
-                })
+                }),
               )
           : [];
         setTtsEvaluators(items);
@@ -331,10 +335,7 @@ export default function TTSEvaluationDetailPage() {
           const a = run.aggregate ?? {};
           const scaleValues: number[] = [];
           if (typeof a.scale_min === "number") scaleValues.push(a.scale_min);
-          if (
-            typeof a.scale_max === "number" &&
-            a.scale_max !== a.scale_min
-          ) {
+          if (typeof a.scale_max === "number" && a.scale_max !== a.scale_min) {
             scaleValues.push(a.scale_max);
           }
           byUuid.set(run.evaluator_uuid, {
@@ -365,7 +366,11 @@ export default function TTSEvaluationDetailPage() {
         .find((m): m is ProviderMetrics => !!m);
       if (firstMetrics) {
         for (const k of Object.keys(firstMetrics)) {
-          if (k === "llm_judge_score" || k === "ttfb" || k === "processing_time") {
+          if (
+            k === "llm_judge_score" ||
+            k === "ttfb" ||
+            k === "processing_time"
+          ) {
             continue;
           }
           if (k.endsWith("_info")) {
@@ -378,7 +383,9 @@ export default function TTSEvaluationDetailPage() {
 
       let targetUuids: string[] = Array.from(uuidSet);
       if (targetUuids.length === 0) {
-        targetUuids = ttsEvaluators.filter((e) => e.isDefault).map((e) => e.uuid);
+        targetUuids = ttsEvaluators
+          .filter((e) => e.isDefault)
+          .map((e) => e.uuid);
       }
 
       if (targetUuids.length === 0) {
@@ -423,10 +430,12 @@ export default function TTSEvaluationDetailPage() {
               outputType: data.output_type,
               scaleValues,
             } satisfies EvaluatorAbout;
-          })
+          }),
         );
 
-        setAboutEvaluators(results.filter((e): e is EvaluatorAbout => e !== null));
+        setAboutEvaluators(
+          results.filter((e): e is EvaluatorAbout => e !== null),
+        );
       } catch (err) {
         console.error("Error fetching evaluator details:", err);
       }
@@ -491,7 +500,7 @@ export default function TTSEvaluationDetailPage() {
         // Set first provider as active tab if results exist (use functional setState to avoid stale closures)
         if (result.provider_results && result.provider_results.length > 0) {
           setActiveProviderTab(
-            (current) => current || result.provider_results![0].provider
+            (current) => current || result.provider_results![0].provider,
           );
         }
 
@@ -500,9 +509,9 @@ export default function TTSEvaluationDetailPage() {
         // This way deep-linking to `?tab=outputs` or `?tab=about` is respected
         // even on completed jobs.
         if (result.status === "done") {
-          const explicitTab = new URLSearchParams(
-            window.location.search
-          ).get("tab");
+          const explicitTab = new URLSearchParams(window.location.search).get(
+            "tab",
+          );
           if (!explicitTab) handleTabChange("leaderboard");
         }
 
@@ -519,7 +528,7 @@ export default function TTSEvaluationDetailPage() {
       } catch (err) {
         console.error("Error fetching evaluation result:", err);
         setError(
-          err instanceof Error ? err.message : "Failed to load evaluation"
+          err instanceof Error ? err.message : "Failed to load evaluation",
         );
       } finally {
         setIsLoading(false);
@@ -554,7 +563,7 @@ export default function TTSEvaluationDetailPage() {
       // Set first provider as active tab if results exist (use functional setState to avoid stale closures)
       if (result.provider_results && result.provider_results.length > 0) {
         setActiveProviderTab(
-          (current) => current || result.provider_results![0].provider
+          (current) => current || result.provider_results![0].provider,
         );
       }
 
@@ -565,9 +574,9 @@ export default function TTSEvaluationDetailPage() {
         // than the captured `searchParams` so a click that happened mid-poll
         // is reflected.
         if (result.status === "done") {
-          const explicitTab = new URLSearchParams(
-            window.location.search
-          ).get("tab");
+          const explicitTab = new URLSearchParams(window.location.search).get(
+            "tab",
+          );
           if (!explicitTab) handleTabChange("leaderboard");
         }
         if (pollingIntervalRef.current) {
@@ -579,7 +588,7 @@ export default function TTSEvaluationDetailPage() {
       console.error("Error polling task status:", error);
       // Set status to failed so the UI shows the error state
       setEvaluationResult((prev) =>
-        prev ? { ...prev, status: "failed" } : prev
+        prev ? { ...prev, status: "failed" } : prev,
       );
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
@@ -614,9 +623,11 @@ export default function TTSEvaluationDetailPage() {
   );
 
   const canShowLeaderboard =
-    evaluationResult?.status === "done" && !!evaluationResult.leaderboard_summary;
+    evaluationResult?.status === "done" &&
+    !!evaluationResult.leaderboard_summary;
   const displayedActiveTab =
-    (activeTab === "leaderboard" || activeTab === "about") && !canShowLeaderboard
+    (activeTab === "leaderboard" || activeTab === "about") &&
+    !canShowLeaderboard
       ? "outputs"
       : activeTab;
 
@@ -681,169 +692,152 @@ export default function TTSEvaluationDetailPage() {
         {/* Evaluation Results */}
         {!isLoading && !error && !errorCode && evaluationResult && (
           <div className="space-y-4">
-            {/* Header row: language / dataset / status on the left,
-                Share / Retry on the right — matches the labelling-job
-                and evaluator-run page layouts. */}
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-3 flex-wrap">
-                {evaluationResult.language && (
-                  <span className="px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground capitalize">
-                    {evaluationResult.language}
-                  </span>
-                )}
-                {evaluationResult.dataset_id && evaluationResult.dataset_name && (
-                  <Link
-                    href={`/datasets/${evaluationResult.dataset_id}`}
-                    className="flex items-center gap-1.5 px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground hover:bg-muted/70 transition-colors"
+            {/* Header row: language / dataset / status / Share / Retry,
+                all left-aligned. */}
+            <div className="flex items-center gap-3 flex-wrap">
+              {evaluationResult.language && (
+                <span className="px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground capitalize">
+                  {evaluationResult.language}
+                </span>
+              )}
+              {evaluationResult.dataset_id && evaluationResult.dataset_name && (
+                <Link
+                  href={`/datasets/${evaluationResult.dataset_id}`}
+                  className="flex items-center gap-1.5 px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground hover:bg-muted/70 transition-colors"
+                >
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
                   >
-                    <svg
-                      className="w-3 h-3"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
-                      />
-                    </svg>
-                    {evaluationResult.dataset_name}
-                  </Link>
-                )}
-                {evaluationResult.status !== "done" && (
-                  <StatusBadge status={evaluationResult.status} showSpinner />
-                )}
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Sharing only makes sense once the run is complete — earlier
-                    state changes too quickly and a shared link would render
-                    partial results. */}
-                {evaluationResult.status === "done" && backendAccessToken && (
-                  <ShareButton
-                    entityType="tts"
-                    entityId={taskId}
-                    accessToken={backendAccessToken}
-                    initialIsPublic={evaluationResult.is_public ?? false}
-                    initialShareToken={evaluationResult.share_token ?? null}
-                  />
-                )}
-                {/* Export per-row results as a zip containing `results.csv`
-                    (row id, audio_name, evaluator scores — same convention
-                    as the STT CSV) and an `audios/` folder of every
-                    synthesized clip. Each audio is named
-                    `<provider>_<row>.<ext>` so the audio_name CSV column
-                    points directly at the file inside the zip. */}
-                {evaluationResult.status === "done" &&
-                  (evaluationResult.provider_results ?? []).some(
-                    (pr) => (pr.results?.length ?? 0) > 0,
-                  ) && (
-                    <ExportZipButton
-                      filename={`tts-results-${evaluationResult.dataset_name ?? taskId}`}
-                      getContents={() => {
-                        const columns: ExportColumn[] = [
-                          { key: "provider", header: "Provider" },
-                          { key: "row", header: "Row" },
-                          { key: "audio_name", header: "Audio name" },
-                          { key: "text", header: "Text" },
-                          ...evaluatorColumns.map((c) => ({
-                            key: c.key,
-                            header: c.label,
-                          })),
-                        ];
-                        const rows: Record<string, unknown>[] = [];
-                        const files: { path: string; url: string }[] = [];
-                        for (const pr of evaluationResult.provider_results ??
-                          []) {
-                          for (const r of pr.results ?? []) {
-                            // audio_path is rendered as <audio src=...> on the
-                            // page, so it's already a fetchable URL. Use the
-                            // path's extension if present; fall back to `.wav`
-                            // (the backend's default container) when the URL
-                            // has no extension or has querystring noise.
-                            const ext = (() => {
-                              try {
-                                const u = new URL(
-                                  r.audio_path,
-                                  window.location.origin,
-                                );
-                                const m = u.pathname.match(/\.([a-z0-9]+)$/i);
-                                return m ? m[1].toLowerCase() : "wav";
-                              } catch {
-                                const m = r.audio_path.match(/\.([a-z0-9]+)(?:\?|$)/i);
-                                return m ? m[1].toLowerCase() : "wav";
-                              }
-                            })();
-                            const audioName = r.audio_path
-                              ? `${pr.provider}_${r.id}.${ext}`
-                              : "";
-                            const row: Record<string, unknown> = {
-                              provider: getProviderLabel(pr.provider),
-                              row: r.id,
-                              audio_name: audioName,
-                              text: r.text,
-                            };
-                            for (const c of evaluatorColumns) {
-                              const raw = r[c.scoreField ?? c.key];
-                              if (raw === undefined || raw === null) {
-                                row[c.key] = "";
-                                continue;
-                              }
-                              const s = String(raw);
-                              if (c.outputType === "binary") {
-                                row[c.key] =
-                                  s === "true" || s === "1" ? "true" : "false";
-                              } else {
-                                const n = parseFloat(s);
-                                row[c.key] = Number.isFinite(n) ? n : s;
-                              }
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
+                    />
+                  </svg>
+                  {evaluationResult.dataset_name}
+                </Link>
+              )}
+              {evaluationResult.status !== "done" && (
+                <StatusBadge status={evaluationResult.status} showSpinner />
+              )}
+              {/* Sharing only makes sense once the run is complete — earlier
+                  state changes too quickly and a shared link would render
+                  partial results. */}
+              {evaluationResult.status === "done" && backendAccessToken && (
+                <ShareButton
+                  entityType="tts"
+                  entityId={taskId}
+                  accessToken={backendAccessToken}
+                  initialIsPublic={evaluationResult.is_public ?? false}
+                  initialShareToken={evaluationResult.share_token ?? null}
+                />
+              )}
+              {/* Export per-row results as a zip containing `results.csv`
+                  (row id, audio_name, evaluator scores — same convention
+                  as the STT CSV) and an `audios/` folder of every
+                  synthesized clip. Each audio is named
+                  `<provider>_<row>.<ext>` so the audio_name CSV column
+                  points directly at the file inside the zip. */}
+              {evaluationResult.status === "done" &&
+                (evaluationResult.provider_results ?? []).some(
+                  (pr) => (pr.results?.length ?? 0) > 0,
+                ) && (
+                  <ExportZipButton
+                    filename={`tts-results-${evaluationResult.dataset_name ?? taskId}`}
+                    getContents={() => {
+                      const columns: ExportColumn[] = [
+                        { key: "provider", header: "Provider" },
+                        { key: "row", header: "Row" },
+                        { key: "audio_name", header: "Audio name" },
+                        { key: "text", header: "Text" },
+                        ...evaluatorColumns.map((c) => ({
+                          key: c.key,
+                          header: c.label,
+                        })),
+                      ];
+                      const rows: Record<string, unknown>[] = [];
+                      const files: { path: string; url: string }[] = [];
+                      for (const pr of evaluationResult.provider_results ??
+                        []) {
+                        for (const r of pr.results ?? []) {
+                          // audio_path is rendered as <audio src=...> on the
+                          // page, so it's already a fetchable URL. Use the
+                          // path's extension if present; fall back to `.wav`
+                          // (the backend's default container) when the URL
+                          // has no extension or has querystring noise.
+                          const ext = (() => {
+                            try {
+                              const u = new URL(
+                                r.audio_path,
+                                window.location.origin,
+                              );
+                              const m = u.pathname.match(/\.([a-z0-9]+)$/i);
+                              return m ? m[1].toLowerCase() : "wav";
+                            } catch {
+                              const m = r.audio_path.match(/\.([a-z0-9]+)(?:\?|$)/i);
+                              return m ? m[1].toLowerCase() : "wav";
                             }
-                            rows.push(row);
-                            if (audioName && r.audio_path) {
-                              files.push({
-                                path: `audios/${audioName}`,
-                                url: r.audio_path,
-                              });
+                          })();
+                          const audioName = r.audio_path
+                            ? `${pr.provider}_${r.id}.${ext}`
+                            : "";
+                          const row: Record<string, unknown> = {
+                            provider: getProviderLabel(pr.provider),
+                            row: r.id,
+                            audio_name: audioName,
+                            text: r.text,
+                          };
+                          for (const c of evaluatorColumns) {
+                            const raw = r[c.scoreField ?? c.key];
+                            if (raw === undefined || raw === null) {
+                              row[c.key] = "";
+                              continue;
+                            }
+                            const s = String(raw);
+                            if (c.outputType === "binary") {
+                              row[c.key] =
+                                s === "true" || s === "1" ? "true" : "false";
+                            } else {
+                              const n = parseFloat(s);
+                              row[c.key] = Number.isFinite(n) ? n : s;
                             }
                           }
+                          rows.push(row);
+                          if (audioName && r.audio_path) {
+                            files.push({
+                              path: `audios/${audioName}`,
+                              url: r.audio_path,
+                            });
+                          }
                         }
-                        return {
-                          csv: { columns, rows },
-                          files,
-                        };
-                      }}
-                    />
-                  )}
-                {evaluationResult.status === "failed" &&
-                  backendAccessToken &&
-                  evaluationResult.dataset_id && (
-                    <button
-                      onClick={() => {
-                        setRetryError(null);
-                        setRetryConfirmOpen(true);
-                      }}
-                      disabled={retrying}
-                      title="Re-run this evaluation on the same dataset, providers, and evaluators"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <svg
-                        className="w-3.5 h-3.5 shrink-0"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M4 4v5h.582a8 8 0 0114.95-2M20 20v-5h-.581a8 8 0 01-14.95 2"
-                        />
-                      </svg>
-                      {retrying ? "Retrying…" : "Retry"}
-                    </button>
-                  )}
-              </div>
+                      }
+                      return {
+                        csv: { columns, rows },
+                        files,
+                      };
+                    }}
+                  />
+                )}
+              {evaluationResult.status === "failed" &&
+                backendAccessToken &&
+                evaluationResult.dataset_id && (
+                  <button
+                    onClick={() => {
+                      setRetryError(null);
+                      setRetryConfirmOpen(true);
+                    }}
+                    disabled={retrying}
+                    title="Re-run this evaluation on the same dataset, providers, and evaluators"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RetryIcon />
+                    {retrying ? "Retrying…" : "Retry"}
+                  </button>
+                )}
             </div>
 
             <DeleteConfirmationDialog
@@ -896,7 +890,7 @@ export default function TTSEvaluationDetailPage() {
                           evaluationResult.provider_results.length > 0
                         ) {
                           setActiveProviderTab(
-                            evaluationResult.provider_results[0].provider
+                            evaluationResult.provider_results[0].provider,
                           );
                         }
                       }}
@@ -926,36 +920,42 @@ export default function TTSEvaluationDetailPage() {
                   {displayedActiveTab === "about" && canShowLeaderboard && (
                     <TTSEvaluationAbout
                       evaluatorRows={aboutEvaluators.map((e) => ({
-                          key: e.uuid,
-                          metric: (
-                            <Link
-                              href={`/evaluators/${e.uuid}`}
-                              className="text-foreground underline-offset-2 hover:underline"
-                              title={`Open evaluator: ${e.name}`}
-                            >
-                              {e.name}
-                            </Link>
-                          ),
-                          description:
-                            e.description ||
-                            (e.uuid === defaultEvaluator?.uuid
-                              ? (defaultEvaluator.description ?? "")
-                              : ""),
-                          outputType: e.outputType,
-                          range: e.outputType === "binary" ? "Pass / Fail" : ratingRange(e.scaleValues),
-                        }))}
+                        key: e.uuid,
+                        metric: (
+                          <Link
+                            href={`/evaluators/${e.uuid}`}
+                            className="text-foreground underline-offset-2 hover:underline"
+                            title={`Open evaluator: ${e.name}`}
+                          >
+                            {e.name}
+                          </Link>
+                        ),
+                        description:
+                          e.description ||
+                          (e.uuid === defaultEvaluator?.uuid
+                            ? (defaultEvaluator.description ?? "")
+                            : ""),
+                        outputType: e.outputType,
+                        range:
+                          e.outputType === "binary"
+                            ? "Pass / Fail"
+                            : ratingRange(e.scaleValues),
+                      }))}
                     />
                   )}
 
                   {/* Leaderboard Tab */}
-                  {displayedActiveTab === "leaderboard" && evaluationResult.leaderboard_summary && (
-                    <TTSEvaluationLeaderboard
-                      className="-mx-4 md:-mx-8 px-4 md:px-8 relative"
-                      leaderboardSummary={evaluationResult.leaderboard_summary}
-                      evaluatorColumns={evaluatorColumns}
-                      getProviderLabel={getProviderLabel}
-                    />
-                  )}
+                  {displayedActiveTab === "leaderboard" &&
+                    evaluationResult.leaderboard_summary && (
+                      <TTSEvaluationLeaderboard
+                        className="-mx-4 md:-mx-8 px-4 md:px-8 relative"
+                        leaderboardSummary={
+                          evaluationResult.leaderboard_summary
+                        }
+                        evaluatorColumns={evaluatorColumns}
+                        getProviderLabel={getProviderLabel}
+                      />
+                    )}
 
                   {/* Outputs Tab */}
                   {displayedActiveTab === "outputs" && (

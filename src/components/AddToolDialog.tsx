@@ -1499,7 +1499,6 @@ export function AddToolDialog({
                       siblingNames={parameters
                         .filter((p) => p.id !== param.id)
                         .map((p) => p.name)}
-                      hideDelete={parameters.length === 1}
                     />
                   ))}
                 </div>

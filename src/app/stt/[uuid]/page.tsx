@@ -6,7 +6,12 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
-import { BackHeader, StatusBadge, NotFoundState } from "@/components/ui";
+import {
+  BackHeader,
+  StatusBadge,
+  NotFoundState,
+  RetryIcon,
+} from "@/components/ui";
 import { sttProviders } from "@/components/agent-tabs/constants/providers";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import {
@@ -273,8 +278,7 @@ export default function STTEvaluationDetailPage() {
         const items: EvaluatorSummary[] = Array.isArray(data)
           ? data
               .filter(
-                (m: { evaluator_type?: string }) =>
-                  m.evaluator_type === "stt",
+                (m: { evaluator_type?: string }) => m.evaluator_type === "stt",
               )
               .map(
                 (m: {
@@ -331,10 +335,7 @@ export default function STTEvaluationDetailPage() {
           const a = run.aggregate ?? {};
           const scaleValues: number[] = [];
           if (typeof a.scale_min === "number") scaleValues.push(a.scale_min);
-          if (
-            typeof a.scale_max === "number" &&
-            a.scale_max !== a.scale_min
-          ) {
+          if (typeof a.scale_max === "number" && a.scale_max !== a.scale_min) {
             scaleValues.push(a.scale_max);
           }
           byUuid.set(run.evaluator_uuid, {
@@ -365,7 +366,11 @@ export default function STTEvaluationDetailPage() {
         .find((m): m is ProviderMetrics => !!m);
       if (firstMetrics) {
         for (const k of Object.keys(firstMetrics)) {
-          if (k === "wer" || k === "string_similarity" || k === "llm_judge_score") {
+          if (
+            k === "wer" ||
+            k === "string_similarity" ||
+            k === "llm_judge_score"
+          ) {
             continue;
           }
           if (k.endsWith("_info")) {
@@ -378,7 +383,9 @@ export default function STTEvaluationDetailPage() {
 
       let targetUuids: string[] = Array.from(uuidSet);
       if (targetUuids.length === 0) {
-        targetUuids = sttEvaluators.filter((e) => e.isDefault).map((e) => e.uuid);
+        targetUuids = sttEvaluators
+          .filter((e) => e.isDefault)
+          .map((e) => e.uuid);
       }
 
       if (targetUuids.length === 0) {
@@ -426,7 +433,9 @@ export default function STTEvaluationDetailPage() {
           }),
         );
 
-        setAboutEvaluators(results.filter((e): e is EvaluatorAbout => e !== null));
+        setAboutEvaluators(
+          results.filter((e): e is EvaluatorAbout => e !== null),
+        );
       } catch (err) {
         console.error("Error fetching evaluator details:", err);
       }
@@ -498,9 +507,9 @@ export default function STTEvaluationDetailPage() {
         // This way deep-linking to `?tab=outputs` or `?tab=about` is respected
         // even on completed jobs.
         if (result.status === "done") {
-          const explicitTab = new URLSearchParams(
-            window.location.search,
-          ).get("tab");
+          const explicitTab = new URLSearchParams(window.location.search).get(
+            "tab",
+          );
           if (!explicitTab) handleTabChange("leaderboard");
         }
 
@@ -563,9 +572,9 @@ export default function STTEvaluationDetailPage() {
         // than the captured `searchParams` so a click that happened mid-poll
         // is reflected.
         if (result.status === "done") {
-          const explicitTab = new URLSearchParams(
-            window.location.search,
-          ).get("tab");
+          const explicitTab = new URLSearchParams(window.location.search).get(
+            "tab",
+          );
           if (!explicitTab) handleTabChange("leaderboard");
         }
         if (pollingIntervalRef.current) {
@@ -612,9 +621,11 @@ export default function STTEvaluationDetailPage() {
   );
 
   const canShowLeaderboard =
-    evaluationResult?.status === "done" && !!evaluationResult.leaderboard_summary;
+    evaluationResult?.status === "done" &&
+    !!evaluationResult.leaderboard_summary;
   const displayedActiveTab =
-    (activeTab === "leaderboard" || activeTab === "about") && !canShowLeaderboard
+    (activeTab === "leaderboard" || activeTab === "about") &&
+    !canShowLeaderboard
       ? "outputs"
       : activeTab;
 
@@ -675,140 +686,123 @@ export default function STTEvaluationDetailPage() {
         {/* Evaluation Results */}
         {!isLoading && !error && !errorCode && evaluationResult && (
           <div className="space-y-4">
-            {/* Header row: language / dataset / status on the left,
-                Share / Retry on the right — matches the labelling-job
-                and evaluator-run page layouts. */}
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-3 flex-wrap">
-                {evaluationResult.language && (
-                  <span className="px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground capitalize">
-                    {evaluationResult.language}
-                  </span>
-                )}
-                {evaluationResult.dataset_id && evaluationResult.dataset_name && (
-                  <Link
-                    href={`/datasets/${evaluationResult.dataset_id}`}
-                    className="flex items-center gap-1.5 px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground hover:bg-muted/70 transition-colors"
+            {/* Header row: language / dataset / status / Share / Retry,
+                all left-aligned. */}
+            <div className="flex items-center gap-3 flex-wrap">
+              {evaluationResult.language && (
+                <span className="px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground capitalize">
+                  {evaluationResult.language}
+                </span>
+              )}
+              {evaluationResult.dataset_id && evaluationResult.dataset_name && (
+                <Link
+                  href={`/datasets/${evaluationResult.dataset_id}`}
+                  className="flex items-center gap-1.5 px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground hover:bg-muted/70 transition-colors"
+                >
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
                   >
-                    <svg
-                      className="w-3 h-3"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
-                      />
-                    </svg>
-                    {evaluationResult.dataset_name}
-                  </Link>
-                )}
-                {evaluationResult.status !== "done" && (
-                  <StatusBadge status={evaluationResult.status} showSpinner />
-                )}
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Sharing only makes sense once the run is complete — earlier
-                    state changes too quickly and a shared link would render
-                    partial results. */}
-                {evaluationResult.status === "done" && backendAccessToken && (
-                  <ShareButton
-                    entityType="stt"
-                    entityId={taskId}
-                    accessToken={backendAccessToken}
-                    initialIsPublic={evaluationResult.is_public ?? false}
-                    initialShareToken={evaluationResult.share_token ?? null}
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
+                    />
+                  </svg>
+                  {evaluationResult.dataset_name}
+                </Link>
+              )}
+              {evaluationResult.status !== "done" && (
+                <StatusBadge status={evaluationResult.status} showSpinner />
+              )}
+              {/* Sharing only makes sense once the run is complete — earlier
+                  state changes too quickly and a shared link would render
+                  partial results. */}
+              {evaluationResult.status === "done" && backendAccessToken && (
+                <ShareButton
+                  entityType="stt"
+                  entityId={taskId}
+                  accessToken={backendAccessToken}
+                  initialIsPublic={evaluationResult.is_public ?? false}
+                  initialShareToken={evaluationResult.share_token ?? null}
+                />
+              )}
+              {/* Export per-row results to CSV. One row per (provider, row);
+                  columns: reference / predicted text, WER, and one column
+                  per attached evaluator (binary → "true"/"false", rating →
+                  raw numeric score). Built at click time so it reflects
+                  the latest state if the user re-runs the page. */}
+              {evaluationResult.status === "done" &&
+                (evaluationResult.provider_results ?? []).some(
+                  (pr) => (pr.results?.length ?? 0) > 0,
+                ) && (
+                  <ExportResultsButton
+                    filename={`stt-results-${evaluationResult.dataset_name ?? taskId}`}
+                    getRows={() => {
+                      const columns: ExportColumn[] = [
+                        { key: "provider", header: "Provider" },
+                        { key: "row", header: "Row" },
+                        { key: "reference_text", header: "Reference text" },
+                        { key: "predicted_text", header: "Predicted text" },
+                        { key: "wer", header: "WER" },
+                        ...evaluatorColumns.map((c) => ({
+                          key: c.key,
+                          header: c.label,
+                        })),
+                      ];
+                      const rows: Record<string, unknown>[] = [];
+                      for (const pr of evaluationResult.provider_results ??
+                        []) {
+                        for (const r of pr.results ?? []) {
+                          const row: Record<string, unknown> = {
+                            provider: getProviderLabel(pr.provider),
+                            row: r.id,
+                            reference_text: r.gt,
+                            predicted_text: r.pred,
+                            wer: r.wer,
+                          };
+                          for (const c of evaluatorColumns) {
+                            const raw = r[c.scoreField ?? c.key];
+                            if (raw === undefined || raw === null) {
+                              row[c.key] = "";
+                              continue;
+                            }
+                            const s = String(raw);
+                            if (c.outputType === "binary") {
+                              // Mirrors EvaluatorScoreCell: "true"/"1" → Pass.
+                              row[c.key] =
+                                s === "true" || s === "1" ? "true" : "false";
+                            } else {
+                              const n = parseFloat(s);
+                              row[c.key] = Number.isFinite(n) ? n : s;
+                            }
+                          }
+                          rows.push(row);
+                        }
+                      }
+                      return { columns, rows };
+                    }}
                   />
                 )}
-                {/* Export per-row results to CSV. One row per (provider, row);
-                    columns: reference / predicted text, WER, and one column
-                    per attached evaluator (binary → "true"/"false", rating →
-                    raw numeric score). Built at click time so it reflects
-                    the latest state if the user re-runs the page. */}
-                {evaluationResult.status === "done" &&
-                  (evaluationResult.provider_results ?? []).some(
-                    (pr) => (pr.results?.length ?? 0) > 0,
-                  ) && (
-                    <ExportResultsButton
-                      filename={`stt-results-${evaluationResult.dataset_name ?? taskId}`}
-                      getRows={() => {
-                        const columns: ExportColumn[] = [
-                          { key: "provider", header: "Provider" },
-                          { key: "row", header: "Row" },
-                          { key: "reference_text", header: "Reference text" },
-                          { key: "predicted_text", header: "Predicted text" },
-                          { key: "wer", header: "WER" },
-                          ...evaluatorColumns.map((c) => ({
-                            key: c.key,
-                            header: c.label,
-                          })),
-                        ];
-                        const rows: Record<string, unknown>[] = [];
-                        for (const pr of evaluationResult.provider_results ??
-                          []) {
-                          for (const r of pr.results ?? []) {
-                            const row: Record<string, unknown> = {
-                              provider: getProviderLabel(pr.provider),
-                              row: r.id,
-                              reference_text: r.gt,
-                              predicted_text: r.pred,
-                              wer: r.wer,
-                            };
-                            for (const c of evaluatorColumns) {
-                              const raw = r[c.scoreField ?? c.key];
-                              if (raw === undefined || raw === null) {
-                                row[c.key] = "";
-                                continue;
-                              }
-                              const s = String(raw);
-                              if (c.outputType === "binary") {
-                                // Mirrors EvaluatorScoreCell: "true"/"1" → Pass.
-                                row[c.key] =
-                                  s === "true" || s === "1" ? "true" : "false";
-                              } else {
-                                const n = parseFloat(s);
-                                row[c.key] = Number.isFinite(n) ? n : s;
-                              }
-                            }
-                            rows.push(row);
-                          }
-                        }
-                        return { columns, rows };
-                      }}
-                    />
-                  )}
-                {evaluationResult.status === "failed" &&
-                  backendAccessToken &&
-                  evaluationResult.dataset_id && (
-                    <button
-                      onClick={() => {
-                        setRetryError(null);
-                        setRetryConfirmOpen(true);
-                      }}
-                      disabled={retrying}
-                      title="Re-run this evaluation on the same dataset, providers, and evaluators"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <svg
-                        className="w-3.5 h-3.5 shrink-0"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M4 4v5h.582a8 8 0 0114.95-2M20 20v-5h-.581a8 8 0 01-14.95 2"
-                        />
-                      </svg>
-                      {retrying ? "Retrying…" : "Retry"}
-                    </button>
-                  )}
-              </div>
+              {evaluationResult.status === "failed" &&
+                backendAccessToken &&
+                evaluationResult.dataset_id && (
+                  <button
+                    onClick={() => {
+                      setRetryError(null);
+                      setRetryConfirmOpen(true);
+                    }}
+                    disabled={retrying}
+                    title="Re-run this evaluation on the same dataset, providers, and evaluators"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RetryIcon />
+                    {retrying ? "Retrying…" : "Retry"}
+                  </button>
+                )}
             </div>
 
             <DeleteConfirmationDialog
@@ -891,36 +885,42 @@ export default function STTEvaluationDetailPage() {
                   {displayedActiveTab === "about" && canShowLeaderboard && (
                     <STTEvaluationAbout
                       evaluatorRows={aboutEvaluators.map((e) => ({
-                          key: e.uuid,
-                          metric: (
-                            <Link
-                              href={`/evaluators/${e.uuid}`}
-                              className="text-foreground underline-offset-2 hover:underline"
-                              title={`Open evaluator: ${e.name}`}
-                            >
-                              {e.name}
-                            </Link>
-                          ),
-                          description:
-                            e.description ||
-                            (e.uuid === defaultEvaluator?.uuid
-                              ? (defaultEvaluator.description ?? "")
-                              : ""),
-                          outputType: e.outputType,
-                          range: e.outputType === "binary" ? "Pass / Fail" : ratingRange(e.scaleValues),
-                        }))}
+                        key: e.uuid,
+                        metric: (
+                          <Link
+                            href={`/evaluators/${e.uuid}`}
+                            className="text-foreground underline-offset-2 hover:underline"
+                            title={`Open evaluator: ${e.name}`}
+                          >
+                            {e.name}
+                          </Link>
+                        ),
+                        description:
+                          e.description ||
+                          (e.uuid === defaultEvaluator?.uuid
+                            ? (defaultEvaluator.description ?? "")
+                            : ""),
+                        outputType: e.outputType,
+                        range:
+                          e.outputType === "binary"
+                            ? "Pass / Fail"
+                            : ratingRange(e.scaleValues),
+                      }))}
                     />
                   )}
 
                   {/* Leaderboard Tab */}
-                  {displayedActiveTab === "leaderboard" && evaluationResult.leaderboard_summary && (
-                    <STTEvaluationLeaderboard
-                      className="-mx-4 md:-mx-8 px-4 md:px-8 relative"
-                      leaderboardSummary={evaluationResult.leaderboard_summary}
-                      evaluatorColumns={evaluatorColumns}
-                      getProviderLabel={getProviderLabel}
-                    />
-                  )}
+                  {displayedActiveTab === "leaderboard" &&
+                    evaluationResult.leaderboard_summary && (
+                      <STTEvaluationLeaderboard
+                        className="-mx-4 md:-mx-8 px-4 md:px-8 relative"
+                        leaderboardSummary={
+                          evaluationResult.leaderboard_summary
+                        }
+                        evaluatorColumns={evaluatorColumns}
+                        getProviderLabel={getProviderLabel}
+                      />
+                    )}
 
                   {/* Outputs Tab */}
                   {displayedActiveTab === "outputs" && (
@@ -929,13 +929,25 @@ export default function STTEvaluationDetailPage() {
                       activeProviderKey={activeProviderTab}
                       onProviderSelect={(key) => {
                         setActiveProviderTab(key);
-                        const pr = evaluationResult.provider_results!.find((p) => p.provider === key);
+                        const pr = evaluationResult.provider_results!.find(
+                          (p) => p.provider === key,
+                        );
                         if (pr && hasSTTEmptyPredictions(pr)) {
                           setTimeout(() => {
-                            const firstEmptyIndex = getFirstSTTEmptyPredictionIndex(pr);
-                            if (firstEmptyIndex >= 0 && tableContainerRef.current) {
-                              const row = tableContainerRef.current.querySelector(`[data-row-index="${firstEmptyIndex}"]`);
-                              row?.scrollIntoView({ behavior: "smooth", block: "center" });
+                            const firstEmptyIndex =
+                              getFirstSTTEmptyPredictionIndex(pr);
+                            if (
+                              firstEmptyIndex >= 0 &&
+                              tableContainerRef.current
+                            ) {
+                              const row =
+                                tableContainerRef.current.querySelector(
+                                  `[data-row-index="${firstEmptyIndex}"]`,
+                                );
+                              row?.scrollIntoView({
+                                behavior: "smooth",
+                                block: "center",
+                              });
                             }
                           }, 100);
                         }
