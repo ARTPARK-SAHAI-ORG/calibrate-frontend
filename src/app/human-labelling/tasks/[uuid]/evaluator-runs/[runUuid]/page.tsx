@@ -513,19 +513,17 @@ export default function EvaluatorRunDetailPage() {
             task={task}
             versionLabels={versionLabels}
             linkEvaluators
-            shareSlot={
-              job.status === "completed" && accessToken ? (
-                <ShareButton
-                  entityType="annotation-evaluator-run"
-                  entityId={`${taskUuid}:${runUuid}`}
-                  accessToken={accessToken}
-                  initialIsPublic={job.is_public ?? false}
-                  initialShareToken={job.share_token ?? null}
-                />
-              ) : null
-            }
             actionsSlot={
               <div className="flex items-center gap-2 flex-wrap">
+                {job.status === "completed" && accessToken && (
+                  <ShareButton
+                    entityType="annotation-evaluator-run"
+                    entityId={`${taskUuid}:${runUuid}`}
+                    accessToken={accessToken}
+                    initialIsPublic={job.is_public ?? false}
+                    initialShareToken={job.share_token ?? null}
+                  />
+                )}
                 {accessToken && rerunItemIds.length > 0 && (
                   <button
                     type="button"

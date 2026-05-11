@@ -62,7 +62,7 @@ export default function AdminAnnotateJobPage() {
 
         {meta && (
           <>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               <span
                 className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${jobStatusPillClass(
                   meta.jobStatus,
