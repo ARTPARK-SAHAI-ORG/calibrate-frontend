@@ -337,6 +337,13 @@ export function STTEvaluationOutputs({
             providerResult.success === true ||
             (providerResult.results?.some((r) => {
               if (r.wer !== undefined && r.wer !== "") return true;
+              // Canonical namespaced shape from the API refresh.
+              const outputs = (r as Record<string, unknown>).evaluator_outputs;
+              if (outputs && typeof outputs === "object") {
+                for (const v of Object.values(outputs as Record<string, unknown>)) {
+                  if (v && typeof v === "object") return true;
+                }
+              }
               return evaluatorColumns.some((col) => {
                 const v = r[col.scoreField ?? `${col.key}_score`];
                 return v !== undefined && v !== null && v !== "";
@@ -434,12 +441,18 @@ export function TTSEvaluationOutputs({
           // finish.
           const showMetrics =
             providerResult.success === true ||
-            (providerResult.results?.some((r) =>
-              evaluatorColumns.some((col) => {
+            (providerResult.results?.some((r) => {
+              const outputs = (r as Record<string, unknown>).evaluator_outputs;
+              if (outputs && typeof outputs === "object") {
+                for (const v of Object.values(outputs as Record<string, unknown>)) {
+                  if (v && typeof v === "object") return true;
+                }
+              }
+              return evaluatorColumns.some((col) => {
                 const v = r[col.scoreField ?? `${col.key}_score`];
                 return v !== undefined && v !== null && v !== "";
-              }),
-            ) ?? false);
+              });
+            }) ?? false);
 
           const ttfbValue = (() => {
             const t = providerResult.metrics?.ttfb;

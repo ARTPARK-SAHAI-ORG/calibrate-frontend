@@ -50,6 +50,11 @@ export type STTEvaluatorColumn = {
   label: string;
   /** Drives the cell renderer: binary → Pass/Fail badge, rating → numeric value with tooltip. */
   outputType: "binary" | "rating";
+  /** Stable evaluator UUID. When present, the cell renderer reads
+   * `result.evaluator_outputs[uuid]` (canonical, properly typed, surfaces
+   * per-row `error: true`) and falls back to the flat `scoreField` /
+   * `reasoningField` only if that lookup misses. */
+  evaluatorUuid?: string;
   /** Row data field for the score (defaults to `${key}_score` for legacy callers). */
   scoreField?: string;
   /** Row data field for the reasoning (defaults to `${key}_reasoning` for legacy callers). */
@@ -179,11 +184,17 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                         {useDynamic ? (
                           evaluatorColumns!.map((col) => (
                             <td key={col.key} className="px-4 py-3">
-                              <EvaluatorScoreCell
-                                score={asScoreString(result[col.scoreField ?? `${col.key}_score`])}
-                                reasoning={asScoreString(result[col.reasoningField ?? `${col.key}_reasoning`])}
-                                outputType={col.outputType}
-                              />
+                              {(() => {
+                                const cell = readEvaluatorCell(result, col);
+                                return (
+                                  <EvaluatorScoreCell
+                                    score={cell.score}
+                                    reasoning={cell.reasoning}
+                                    error={cell.error}
+                                    outputType={col.outputType}
+                                  />
+                                );
+                              })()}
                             </td>
                           ))
                         ) : (
@@ -264,14 +275,13 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                   </div>
                   {useDynamic
                     ? evaluatorColumns!.map((col) => {
-                        const score = asScoreString(result[col.scoreField ?? `${col.key}_score`]);
-                        const reasoning = asScoreString(result[col.reasoningField ?? `${col.key}_reasoning`]);
-                        if (!score && !reasoning) return null;
+                        const { score, reasoning, error } = readEvaluatorCell(result, col);
+                        if (!score && !reasoning && !error) return null;
                         return (
                           <div key={col.key}>
                             <div className="flex items-center gap-2">
                               <span className="text-[11px] text-muted-foreground uppercase tracking-wide">{col.label}</span>
-                              <EvaluatorScoreCell score={score} reasoning={reasoning} outputType={col.outputType} hideTooltipButton />
+                              <EvaluatorScoreCell score={score} reasoning={reasoning} error={error} outputType={col.outputType} hideTooltipButton />
                             </div>
                             {reasoning && (
                               <p className="text-[12px] text-muted-foreground mt-0.5">{reasoning}</p>
@@ -304,17 +314,82 @@ function asScoreString(value: unknown): string | undefined {
   return String(value);
 }
 
+/**
+ * Reads an evaluator's cell for one row. Prefers the canonical namespaced
+ * shape (`result.evaluator_outputs[<evaluator_uuid>]`) introduced by the
+ * STT/TTS API refresh, and falls back to the legacy flat keys
+ * (`result[<scoreField>]` / `result[<reasoningField>]`) for older cached
+ * responses. Also surfaces the explicit per-row `error: true` flag so the
+ * cell renderer can show a "couldn't grade" affordance instead of treating
+ * a missing/null value as a Fail.
+ */
+export function readEvaluatorCell(
+  row: Record<string, unknown>,
+  col: Pick<STTEvaluatorColumn, "key" | "evaluatorUuid" | "scoreField" | "reasoningField">,
+): { score: string | undefined; reasoning: string | undefined; error: boolean } {
+  if (col.evaluatorUuid) {
+    const outputs = row.evaluator_outputs;
+    if (outputs && typeof outputs === "object" && !Array.isArray(outputs)) {
+      const entry = (outputs as Record<string, unknown>)[col.evaluatorUuid];
+      if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+        const e = entry as { value?: unknown; reasoning?: unknown; error?: unknown };
+        return {
+          score: asScoreString(e.value),
+          reasoning: asScoreString(e.reasoning),
+          error: e.error === true,
+        };
+      }
+    }
+  }
+  return {
+    score: asScoreString(row[col.scoreField ?? `${col.key}_score`]),
+    reasoning: asScoreString(row[col.reasoningField ?? `${col.key}_reasoning`]),
+    error: false,
+  };
+}
+
 function EvaluatorScoreCell({
   score,
   reasoning,
   outputType,
+  error = false,
   hideTooltipButton = false,
 }: {
   score?: string;
   reasoning?: string;
   outputType: "binary" | "rating";
+  /** When true, the per-row judge call failed (timeout / parse / 5xx).
+   * Render a distinct "couldn't grade" pill instead of Pass/Fail. */
+  error?: boolean;
   hideTooltipButton?: boolean;
 }) {
+  // Errored rows render their own affordance with the error message as the
+  // tooltip, regardless of whether `score` is null/undefined.
+  if (error) {
+    const tooltipContent = reasoning || "Evaluator could not grade this row.";
+    const badge = (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+        </svg>
+        Error
+      </span>
+    );
+    if (hideTooltipButton) return badge;
+    return (
+      <div className="flex items-center gap-1.5">
+        {badge}
+        <Tooltip content={tooltipContent}>
+          <button type="button" className="p-1 rounded-md hover:bg-muted transition-colors cursor-pointer" aria-label="View error">
+            <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+        </Tooltip>
+      </div>
+    );
+  }
+
   if (!score) return <span className="text-muted-foreground text-[12px]">-</span>;
 
   const tooltipContent = reasoning || `Score: ${score}`;

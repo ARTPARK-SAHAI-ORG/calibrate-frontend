@@ -63,6 +63,10 @@ type EvaluatorRun = {
   /** Current human-readable evaluator name from the DB at response time. May lag the artefact `metric_key` after a rename. */
   name?: string;
   description?: string;
+  /** Drives cell rendering; prefer over inferring from `aggregate.type`. */
+  output_type?: "binary" | "rating";
+  /** Pinned at job-submit time. */
+  evaluator_version_id?: string;
 };
 
 type ProviderMetrics = {
@@ -583,7 +587,17 @@ export default function STTEvaluationDetailPage() {
       return firstRuns.map((run) => ({
         key: run.metric_key,
         label: run.name ?? run.metric_key,
-        outputType: run.aggregate?.type === "rating" ? "rating" : "binary",
+        // Backend now supplies `output_type` directly; fall back to the
+        // aggregate inference for older cached responses.
+        outputType:
+          run.output_type === "rating" || run.output_type === "binary"
+            ? run.output_type
+            : run.aggregate?.type === "rating"
+              ? "rating"
+              : "binary",
+        // Stable UUID lets the row renderer prefer the canonical
+        // `result.evaluator_outputs[uuid]` over the flat per-row keys.
+        evaluatorUuid: run.evaluator_uuid,
         scoreField: run.metric_key,
         reasoningField: `${run.metric_key}_reasoning`,
       }));
@@ -771,7 +785,10 @@ export default function STTEvaluationDetailPage() {
               {evaluationResult.status !== "done" && (
                 <StatusBadge status={evaluationResult.status} showSpinner />
               )}
-              {(evaluationResult.status === "done" || evaluationResult.status === "failed") && backendAccessToken && (
+              {/* Backend populates is_public / share_token from the moment the
+                  run is created, so render the share toggle whenever the run
+                  exists regardless of status. */}
+              {backendAccessToken && (
                 <ShareButton
                   entityType="stt"
                   entityId={taskId}
