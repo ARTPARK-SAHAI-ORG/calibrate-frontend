@@ -1690,7 +1690,7 @@ export function TestsTabContent({
               <span className="text-sm text-foreground">
                 Also delete this test permanently from my test library
                 <span className="block text-xs text-muted-foreground mt-0.5">
-                  Removes the test from every agent that uses it. Cannot be undone.
+                  Removes the test from every agent that uses it
                 </span>
               </span>
             </label>

@@ -533,10 +533,10 @@ export default function EvaluatorRunDetailPage() {
                     }}
                     disabled={rerunSubmitting}
                     title="Run a new evaluation on the same items"
-                    className="inline-flex items-center gap-2 h-11 px-5 rounded-md text-[14px] font-semibold border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <svg
-                      className="w-4 h-4 shrink-0"
+                      className="w-3.5 h-3.5 shrink-0"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -557,11 +557,11 @@ export default function EvaluatorRunDetailPage() {
                     onClick={handleExport}
                     disabled={exporting}
                     title="Download spreadsheet (XLSX)"
-                    className="inline-flex items-center gap-2 h-11 px-6 rounded-md text-[14px] font-semibold bg-foreground text-background shadow-sm hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium bg-foreground text-background shadow-sm hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {exporting ? (
                       <svg
-                        className="w-4 h-4 shrink-0 animate-spin"
+                        className="w-3.5 h-3.5 shrink-0 animate-spin"
                         fill="none"
                         viewBox="0 0 24 24"
                       >
@@ -581,7 +581,7 @@ export default function EvaluatorRunDetailPage() {
                       </svg>
                     ) : (
                       <svg
-                        className="w-4 h-4 shrink-0"
+                        className="w-3.5 h-3.5 shrink-0"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
