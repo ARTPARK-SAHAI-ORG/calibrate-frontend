@@ -24,6 +24,7 @@ import {
 import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
 import { useSidebarState } from "@/lib/sidebar";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
+import { readNameConflictMessage } from "@/lib/parseBackendError";
 
 // Hydrated evaluator row as returned by GET /tests / GET /tests/{uuid}.evaluators[].
 // `uuid` is the evaluator's id (used as `evaluator_uuid` when writing back).
@@ -157,6 +158,10 @@ function LLMPageInner() {
   const [testsError, setTestsError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  // Duplicate-name 409 messages render inline next to the name field.
+  const [nameConflictError, setNameConflictError] = useState<string | null>(
+    null,
+  );
   const [editingTestUuid, setEditingTestUuid] = useState<string | null>(null);
   const [isLoadingTest, setIsLoadingTest] = useState(false);
   const [validationAttempted, setValidationAttempted] = useState(false);
@@ -593,6 +598,7 @@ function LLMPageInner() {
     try {
       setIsCreating(true);
       setCreateError(null);
+      setNameConflictError(null);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
         throw new Error("BACKEND_URL environment variable is not set");
@@ -630,6 +636,12 @@ function LLMPageInner() {
       }
 
       if (!response.ok) {
+        const conflict = await readNameConflictMessage(response);
+        if (conflict) {
+          setNameConflictError(conflict);
+          setIsCreating(false);
+          return;
+        }
         throw new Error("Failed to create test");
       }
 
@@ -746,6 +758,7 @@ function LLMPageInner() {
     try {
       setIsCreating(true);
       setCreateError(null);
+      setNameConflictError(null);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
         throw new Error("BACKEND_URL environment variable is not set");
@@ -784,6 +797,12 @@ function LLMPageInner() {
       }
 
       if (!response.ok) {
+        const conflict = await readNameConflictMessage(response);
+        if (conflict) {
+          setNameConflictError(conflict);
+          setIsCreating(false);
+          return;
+        }
         throw new Error("Failed to update test");
       }
 
@@ -820,6 +839,7 @@ function LLMPageInner() {
     setNewTestDescription("");
     setEditingTestUuid(null);
     setCreateError(null);
+    setNameConflictError(null);
     setValidationAttempted(false);
     setInitialTab(undefined);
     setInitialConfig(undefined);
@@ -1518,8 +1538,12 @@ function LLMPageInner() {
           isLoading={isLoadingTest}
           isCreating={isCreating}
           createError={createError}
+          nameError={nameConflictError}
           testName={newTestName}
-          setTestName={setNewTestName}
+          setTestName={(name) => {
+            setNewTestName(name);
+            if (nameConflictError) setNameConflictError(null);
+          }}
           validationAttempted={validationAttempted}
           onSubmit={editingTestUuid ? updateTest : createTest}
           initialTab={initialTab}

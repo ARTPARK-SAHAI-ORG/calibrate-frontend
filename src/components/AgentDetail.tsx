@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
+import { readNameConflictMessage } from "@/lib/parseBackendError";
 import {
   AgentTabContent,
   AgentConnectionTabContent,
@@ -105,6 +106,10 @@ export function AgentDetail({
   // Name editing dialog state
   const [isEditNameDialogOpen, setIsEditNameDialogOpen] = useState(false);
   const [editedName, setEditedName] = useState("");
+  // Duplicate-name 409 messages render inline under the rename input.
+  const [renameNameConflictError, setRenameNameConflictError] = useState<
+    string | null
+  >(null);
 
   // Track the last-saved benchmark provider so we can detect unsaved changes
   const [savedBenchmarkProvider, setSavedBenchmarkProvider] = useState<string | undefined>(undefined);
@@ -562,6 +567,7 @@ export function AgentDetail({
   const handleOpenEditNameDialog = () => {
     if (agent) {
       setEditedName(agent.name);
+      setRenameNameConflictError(null);
       setIsEditNameDialogOpen(true);
     }
   };
@@ -575,6 +581,7 @@ export function AgentDetail({
 
     try {
       setIsSaving(true);
+      setRenameNameConflictError(null);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
         throw new Error("BACKEND_URL environment variable is not set");
@@ -599,6 +606,12 @@ export function AgentDetail({
       }
 
       if (!response.ok) {
+        const conflict = await readNameConflictMessage(response);
+        if (conflict) {
+          setRenameNameConflictError(conflict);
+          setIsSaving(false);
+          return;
+        }
         throw new Error("Failed to save agent name");
       }
 
@@ -618,6 +631,7 @@ export function AgentDetail({
   const handleCancelEditName = () => {
     setIsEditNameDialogOpen(false);
     setEditedName("");
+    setRenameNameConflictError(null);
   };
 
   // Unsaved benchmark provider dialog: discard changes and switch tab
@@ -929,7 +943,12 @@ export function AgentDetail({
             <input
               type="text"
               value={editedName}
-              onChange={(e) => setEditedName(e.target.value)}
+              onChange={(e) => {
+                setEditedName(e.target.value);
+                if (renameNameConflictError) {
+                  setRenameNameConflictError(null);
+                }
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   handleSaveName();
@@ -937,10 +956,19 @@ export function AgentDetail({
                   handleCancelEditName();
                 }
               }}
-              className="w-full h-9 md:h-10 px-3 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent mb-4"
+              className={`w-full h-9 md:h-10 px-3 rounded-md text-sm border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
+                renameNameConflictError
+                  ? "border-red-500 mb-1"
+                  : "border-border mb-4"
+              }`}
               maxLength={50}
               autoFocus
             />
+            {renameNameConflictError && (
+              <p className="text-sm text-red-500 mb-4">
+                {renameNameConflictError}
+              </p>
+            )}
             <div className="flex items-center justify-end gap-2 md:gap-3">
               <button
                 onClick={handleCancelEditName}
