@@ -126,6 +126,7 @@ export default function PublicEvaluatorRunPage() {
           task={task}
           versionLabels={{}}
           linkEvaluators={false}
+          hideStatusPill
         />
       </div>
     </PublicPageLayout>

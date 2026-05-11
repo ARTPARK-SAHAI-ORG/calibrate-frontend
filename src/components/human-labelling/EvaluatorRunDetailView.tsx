@@ -954,6 +954,10 @@ export interface EvaluatorRunDetailViewProps {
   actionsSlot?: React.ReactNode;
   /** Optional banner shown above the body (e.g. caller's export error). */
   topError?: string | null;
+  /** Hide the in-body status pill — useful when the host page already
+   * surfaces it (e.g. public pages render it in the title bar via
+   * PublicPageLayout's `pills` slot). */
+  hideStatusPill?: boolean;
 }
 
 /**
@@ -969,6 +973,7 @@ export function EvaluatorRunDetailView({
   shareSlot,
   actionsSlot,
   topError,
+  hideStatusPill = false,
 }: EvaluatorRunDetailViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [filterDisagreements, setFilterDisagreements] = useState(false);
@@ -1092,13 +1097,15 @@ export function EvaluatorRunDetailView({
     <>
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
-          <span
-            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusPillClass(
-              job.status,
-            )}`}
-          >
-            {statusLabel(job.status)}
-          </span>
+          {!hideStatusPill && (
+            <span
+              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusPillClass(
+                job.status,
+              )}`}
+            >
+              {statusLabel(job.status)}
+            </span>
+          )}
           {shareSlot}
         </div>
         {actionsSlot}
