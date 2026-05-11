@@ -21,6 +21,7 @@ import {
   ratingRange,
   type TTSEvaluatorColumn,
 } from "@/components/eval-details";
+import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
 import { useSidebarState } from "@/lib/sidebar";
 import { getDataset } from "@/lib/datasets";
 import { ShareButton } from "@/components/ShareButton";
@@ -791,19 +792,27 @@ export default function TTSEvaluationDetailPage() {
                             audio_name: audioName,
                             text: r.text,
                           };
+                          // Read via `readEvaluatorCell` so the refreshed
+                          // `evaluator_outputs[<uuid>]` shape is preferred
+                          // over the legacy flat scoreField. Matches what
+                          // TTSResultsTable renders on screen.
                           for (const c of evaluatorColumns) {
-                            const raw = r[c.scoreField ?? c.key];
-                            if (raw === undefined || raw === null) {
+                            const { score, error } = readEvaluatorCell(
+                              r as unknown as Record<string, unknown>,
+                              c,
+                            );
+                            if (error || score === undefined) {
                               row[c.key] = "";
                               continue;
                             }
-                            const s = String(raw);
                             if (c.outputType === "binary") {
                               row[c.key] =
-                                s === "true" || s === "1" ? "true" : "false";
+                                score === "true" || score === "1"
+                                  ? "true"
+                                  : "false";
                             } else {
-                              const n = parseFloat(s);
-                              row[c.key] = Number.isFinite(n) ? n : s;
+                              const n = parseFloat(score);
+                              row[c.key] = Number.isFinite(n) ? n : score;
                             }
                           }
                           rows.push(row);
