@@ -1,15 +1,10 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
+import { RetryIcon } from "@/components/ui";
 import { useAccessToken } from "@/hooks";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
@@ -294,8 +289,12 @@ export default function EvaluatorRunDetailPage() {
         const versionLabel = ev.evaluator_version_id
           ? (versionLabels[ev.evaluator_version_id] ?? null)
           : null;
-        const rawSheetName = versionLabel ? `${evName} ${versionLabel}` : evName;
-        const sheetName = rawSheetName.replace(/[:\\/?*[\]]/g, "_").slice(0, 31);
+        const rawSheetName = versionLabel
+          ? `${evName} ${versionLabel}`
+          : evName;
+        const sheetName = rawSheetName
+          .replace(/[:\\/?*[\]]/g, "_")
+          .slice(0, 31);
 
         const allVarNames = new Set<string>();
         for (const item of exportItems) {
@@ -443,9 +442,7 @@ export default function EvaluatorRunDetailPage() {
 
   const customHeader = (
     <button
-      onClick={() =>
-        router.push(`/human-alignment/tasks/${taskUuid}?tab=runs`)
-      }
+      onClick={() => router.push(`/human-alignment/tasks/${taskUuid}?tab=runs`)}
       className="inline-flex items-center gap-1.5 px-2 h-8 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
     >
       <svg
@@ -563,19 +560,7 @@ export default function EvaluatorRunDetailPage() {
                     title="Run a new evaluation on the same items"
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <svg
-                      className="w-3.5 h-3.5 shrink-0"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M4 4v5h.582a8 8 0 0114.95-2M20 20v-5h-.581a8 8 0 01-14.95 2"
-                      />
-                    </svg>
+                    <RetryIcon />
                     Re-run
                   </button>
                 )}
@@ -627,9 +612,7 @@ export default function EvaluatorRunDetailPage() {
                 )}
               </div>
             }
-            topError={
-              exportError ? `Export failed: ${exportError}` : null
-            }
+            topError={exportError ? `Export failed: ${exportError}` : null}
           />
         ) : null}
       </div>
