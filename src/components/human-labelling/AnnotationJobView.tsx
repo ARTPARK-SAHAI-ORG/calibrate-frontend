@@ -31,6 +31,9 @@ type Job = {
   status: "pending" | "in_progress" | "completed";
   created_at: string;
   completed_at: string | null;
+  /** Backend marks the read-only viewer link state on completed jobs. */
+  is_public?: boolean;
+  view_token?: string | null;
 };
 
 type Annotator = { uuid: string; name: string };
@@ -81,6 +84,8 @@ type JobResponse = {
   evaluators: Evaluator[];
   items: Item[];
   annotations: Annotation[];
+  /** True when fetched via the read-only viewer token; false on the annotator route. */
+  read_only?: boolean;
 };
 
 type LoadState =
@@ -143,14 +148,47 @@ async function publicFetch<T>(
   return { ok: true, data };
 }
 
-export type AnnotationJobMode = "public" | "admin";
+export type AnnotationJobMode = "public" | "admin" | "public-readonly";
 
 export type AnnotationJobMeta = {
   task: { uuid: string; name: string; type: string };
   annotator: { uuid: string; name: string };
   jobStatus: "pending" | "in_progress" | "completed";
   evaluators: { uuid: string; name: string }[];
+  /** Job UUID + share state, threaded through so the admin wrapper can render
+   * the visibility toggle for the read-only viewer link. */
+  job: {
+    uuid: string;
+    is_public: boolean;
+    view_token: string | null;
+  };
 };
+
+/**
+ * Shared status-pill styling for annotation jobs. Both the admin job page
+ * and the public read-only viewer render the same pill — keep the colour
+ * map + label here so they don't drift.
+ */
+export function jobStatusPillClass(
+  status: AnnotationJobMeta["jobStatus"],
+): string {
+  switch (status) {
+    case "completed":
+      return "border-green-200 bg-green-100 text-green-700 dark:border-green-500/30 dark:bg-green-500/20 dark:text-green-400";
+    case "in_progress":
+      return "border-yellow-200 bg-yellow-100 text-yellow-700 dark:border-yellow-500/30 dark:bg-yellow-500/20 dark:text-yellow-400";
+    default:
+      return "border-gray-200 bg-gray-100 text-gray-700 dark:border-gray-500/30 dark:bg-gray-500/20 dark:text-gray-300";
+  }
+}
+
+export function jobStatusLabel(
+  status: AnnotationJobMeta["jobStatus"],
+): string {
+  if (status === "in_progress") return "In progress";
+  if (status === "completed") return "Completed";
+  return "Pending";
+}
 
 export function AnnotationJobView({
   token,
@@ -172,6 +210,8 @@ export function AnnotationJobView({
   const [submitting, setSubmitting] = useState(false);
   const [topError, setTopError] = useState<string | null>(null);
 
+  const isReadOnlyMode = mode === "admin" || mode === "public-readonly";
+
   const initialise = useCallback(
     (data: JobResponse) => {
       const next: Record<FieldKey, FieldValue> = {};
@@ -188,11 +228,11 @@ export function AnnotationJobView({
       setFields(next);
       setSavedKeys(saved);
 
-      // Admin (read-only) view always starts on the first item — admins
-      // are reviewing what's been labelled, not picking up where the
-      // annotator left off. Write mode jumps to the first item that
+      // Read-only views (admin, public-readonly) always start on the first
+      // item — they're reviewing what's been labelled, not picking up where
+      // the annotator left off. Write mode jumps to the first item that
       // still has at least one unlabelled evaluator.
-      if (mode === "admin") {
+      if (isReadOnlyMode) {
         setCurrentIndex(0);
         return;
       }
@@ -201,16 +241,20 @@ export function AnnotationJobView({
       );
       setCurrentIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
     },
-    [mode],
+    [isReadOnlyMode],
   );
 
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
+    // The viewer-token endpoint is mounted under …/jobs/view/{token}; the
+    // annotator's own (read+write) endpoint stays at …/jobs/{token}.
+    const fetchPath =
+      mode === "public-readonly"
+        ? `/public/annotation-jobs/view/${encodeURIComponent(token)}`
+        : `/public/annotation-jobs/${encodeURIComponent(token)}`;
     const run = async () => {
-      const result = await publicFetch<JobResponse>(
-        `/public/annotation-jobs/${encodeURIComponent(token)}`,
-      );
+      const result = await publicFetch<JobResponse>(fetchPath);
       if (cancelled) return;
       if (!result.ok) {
         if (result.status === 404) setState({ status: "not_found" });
@@ -238,6 +282,11 @@ export function AnnotationJobView({
           uuid: e.uuid,
           name: e.name,
         })),
+        job: {
+          uuid: result.data.job.uuid,
+          is_public: result.data.job.is_public ?? false,
+          view_token: result.data.job.view_token ?? null,
+        },
       });
     };
     run().catch((err) => {
@@ -307,7 +356,9 @@ export function AnnotationJobView({
   }
 
   const { data } = state;
-  const isAdmin = mode === "admin";
+  // Inner view treats `isAdmin` as a generic read-only flag — both the admin
+  // wrapper and the public read-only viewer should disable writes.
+  const isAdmin = isReadOnlyMode;
   const items = data.items;
   const evaluators = data.evaluators;
   const total = items.length;

@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Labelling task | Calibrate",
+  title: "Alignment task | Calibrate",
 };
 
 export default function LabellingTaskLayout({

@@ -97,6 +97,8 @@ type AddTestDialogProps = {
   isLoading: boolean;
   isCreating: boolean;
   createError: string | null;
+  /** Duplicate-name 409 message rendered inline next to the name input. */
+  nameError?: string | null;
   testName: string;
   setTestName: (name: string) => void;
   validationAttempted: boolean;
@@ -107,7 +109,7 @@ type AddTestDialogProps = {
   /**
    * "test" (default) — original behaviour with Next reply / Tool invocation
    * tabs and "Test" labels.
-   * "labelItem" — used by the human-labelling task page. Hides the tabs
+   * "labelItem" — used by the human-alignment task page. Hides the tabs
    * (always next-reply view), and rewords any user-visible "Test" copy to
    * "Item". The caller is responsible for hooking onSubmit up to the
    * labelling-items API.
@@ -134,6 +136,7 @@ export function AddTestDialog({
   isLoading,
   isCreating,
   createError,
+  nameError,
   testName,
   setTestName,
   validationAttempted,
@@ -1401,20 +1404,25 @@ export function AddTestDialog({
                     onChange={(e) => setTestName(e.target.value)}
                     placeholder={`Your ${itemNoun} name`}
                     className={`w-full h-11 px-4 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
-                      localValidationAttempted &&
-                      activeTab === "next-reply" &&
-                      !testName.trim()
+                      nameError ||
+                      (localValidationAttempted &&
+                        activeTab === "next-reply" &&
+                        !testName.trim())
                         ? "border-red-500"
                         : "border-border"
                     }`}
                   />
-                  {localValidationAttempted &&
+                  {nameError ? (
+                    <p className="text-xs text-red-500 mt-1">{nameError}</p>
+                  ) : (
+                    localValidationAttempted &&
                     activeTab === "next-reply" &&
                     !testName.trim() && (
                       <p className="text-xs text-red-500 mt-1">
                         {ItemNoun} name cannot be empty
                       </p>
-                    )}
+                    )
+                  )}
                 </div>
 
                 {/* Evaluators (next-reply tab only) */}
@@ -1718,13 +1726,17 @@ export function AddTestDialog({
                     onChange={(e) => setTestName(e.target.value)}
                     placeholder="Your test name"
                     className={`w-full h-11 px-4 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
-                      localValidationAttempted &&
-                      activeTab === "tool-invocation" &&
-                      !testName.trim()
+                      nameError ||
+                      (localValidationAttempted &&
+                        activeTab === "tool-invocation" &&
+                        !testName.trim())
                         ? "border-red-500"
                         : "border-border"
                     }`}
                   />
+                  {nameError && (
+                    <p className="text-xs text-red-500 mt-1">{nameError}</p>
+                  )}
                 </div>
 
                 {/* Tools to test */}

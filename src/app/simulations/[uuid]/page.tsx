@@ -20,6 +20,7 @@ import {
 } from "@/components/simulation-tabs";
 import { LIMITS, showLimitToast } from "@/constants/limits";
 import { useSidebarState } from "@/lib/sidebar";
+import { readNameConflictMessage } from "@/lib/parseBackendError";
 
 type PersonaData = {
   uuid: string;
@@ -130,6 +131,9 @@ export default function SimulationDetailPage() {
   // Name editing state
   const [isEditNameDialogOpen, setIsEditNameDialogOpen] = useState(false);
   const [editedName, setEditedName] = useState("");
+  const [renameNameConflictError, setRenameNameConflictError] = useState<
+    string | null
+  >(null);
   const [isSavingName, setIsSavingName] = useState(false);
 
   // Launch dropdown state
@@ -534,6 +538,7 @@ export default function SimulationDetailPage() {
   const handleOpenEditName = () => {
     if (simulation) {
       setEditedName(simulation.name);
+      setRenameNameConflictError(null);
       setIsEditNameDialogOpen(true);
     }
   };
@@ -546,6 +551,7 @@ export default function SimulationDetailPage() {
 
     try {
       setIsSavingName(true);
+      setRenameNameConflictError(null);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
         throw new Error("BACKEND_URL environment variable is not set");
@@ -567,6 +573,12 @@ export default function SimulationDetailPage() {
       }
 
       if (!response.ok) {
+        const conflict = await readNameConflictMessage(response);
+        if (conflict) {
+          setRenameNameConflictError(conflict);
+          setIsSavingName(false);
+          return;
+        }
         throw new Error("Failed to update simulation name");
       }
 
@@ -584,6 +596,7 @@ export default function SimulationDetailPage() {
   const handleCancelEditName = () => {
     setIsEditNameDialogOpen(false);
     setEditedName("");
+    setRenameNameConflictError(null);
   };
 
   // Header with back button and simulation name
@@ -881,7 +894,12 @@ export default function SimulationDetailPage() {
             <input
               type="text"
               value={editedName}
-              onChange={(e) => setEditedName(e.target.value)}
+              onChange={(e) => {
+                setEditedName(e.target.value);
+                if (renameNameConflictError) {
+                  setRenameNameConflictError(null);
+                }
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   handleSaveName();
@@ -889,10 +907,19 @@ export default function SimulationDetailPage() {
                   handleCancelEditName();
                 }
               }}
-              className="w-full h-9 md:h-10 px-3 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent mb-4"
+              className={`w-full h-9 md:h-10 px-3 rounded-md text-sm border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
+                renameNameConflictError
+                  ? "border-red-500 mb-1"
+                  : "border-border mb-4"
+              }`}
               maxLength={50}
               autoFocus
             />
+            {renameNameConflictError && (
+              <p className="text-sm text-red-500 mb-4">
+                {renameNameConflictError}
+              </p>
+            )}
             <div className="flex items-center justify-end gap-2 md:gap-3">
               <button
                 onClick={handleCancelEditName}

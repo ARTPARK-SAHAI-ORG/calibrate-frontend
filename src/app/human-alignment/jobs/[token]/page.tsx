@@ -6,13 +6,18 @@ import { useParams, useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import {
   AnnotationJobView,
+  jobStatusLabel,
+  jobStatusPillClass,
   type AnnotationJobMeta,
 } from "@/components/human-labelling/AnnotationJobView";
+import { ShareButton } from "@/components/ShareButton";
+import { useAccessToken } from "@/hooks";
 import { useSidebarState } from "@/lib/sidebar";
 
 export default function AdminAnnotateJobPage() {
   const router = useRouter();
   const params = useParams();
+  const accessToken = useAccessToken();
   const [sidebarOpen, setSidebarOpen] = useSidebarState();
   const [meta, setMeta] = useState<AnnotationJobMeta | null>(null);
 
@@ -29,17 +34,41 @@ export default function AdminAnnotateJobPage() {
 
   const handleLoaded = useCallback((m: AnnotationJobMeta) => setMeta(m), []);
 
+  const customHeader = (
+    <button
+      onClick={() => router.back()}
+      className="inline-flex items-center gap-1.5 px-2 h-8 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+    >
+      <svg
+        className="w-4 h-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M15.75 19.5L8.25 12l7.5-7.5"
+        />
+      </svg>
+      Back to labelling jobs
+    </button>
+  );
+
   return (
     <AppLayout
-      activeItem="human-labelling"
+      activeItem="human-alignment"
       onItemChange={(id) => router.push(`/${id}`)}
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+      customHeader={customHeader}
     >
       <div className="py-4 md:py-6 flex flex-col gap-4" style={{ height: "calc(100dvh - 56px)" }}>
+        {/* Mobile-only back button — AppLayout hides `customHeader` below md. */}
         <button
           onClick={() => router.back()}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1.5"
+          className="md:hidden text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1.5"
         >
           <svg
             className="w-4 h-4"
@@ -51,15 +80,15 @@ export default function AdminAnnotateJobPage() {
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              d="M15 19l-7-7 7-7"
+              d="M15.75 19.5L8.25 12l7.5-7.5"
             />
           </svg>
-          Back
+          Back to labelling jobs
         </button>
 
         {meta && (
           <>
-            <div>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               <span
                 className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${jobStatusPillClass(
                   meta.jobStatus,
@@ -67,11 +96,20 @@ export default function AdminAnnotateJobPage() {
               >
                 {jobStatusLabel(meta.jobStatus)}
               </span>
+              {meta.jobStatus === "completed" && accessToken && (
+                <ShareButton
+                  entityType="annotation-job"
+                  entityId={`${meta.task.uuid}:${meta.job.uuid}`}
+                  accessToken={accessToken}
+                  initialIsPublic={meta.job.is_public}
+                  initialShareToken={meta.job.view_token}
+                />
+              )}
             </div>
             <div className="flex flex-wrap gap-3">
               <FieldRow label="Labelling task">
                 <Link
-                  href={`/human-labelling/tasks/${meta.task.uuid}`}
+                  href={`/human-alignment/tasks/${meta.task.uuid}`}
                   className="text-sm font-medium text-foreground hover:underline underline-offset-2"
                 >
                   {meta.task.name}
@@ -79,7 +117,7 @@ export default function AdminAnnotateJobPage() {
               </FieldRow>
               <FieldRow label="Annotator">
                 <Link
-                  href={`/human-labelling/annotators/${meta.annotator.uuid}`}
+                  href={`/human-alignment/annotators/${meta.annotator.uuid}`}
                   className="text-sm font-medium text-foreground hover:underline underline-offset-2"
                 >
                   {meta.annotator.name}
@@ -122,25 +160,6 @@ export default function AdminAnnotateJobPage() {
   );
 }
 
-function jobStatusPillClass(
-  status: AnnotationJobMeta["jobStatus"],
-): string {
-  switch (status) {
-    case "completed":
-      return "border-green-200 bg-green-100 text-green-700 dark:border-green-500/30 dark:bg-green-500/20 dark:text-green-400";
-    case "in_progress":
-      return "border-yellow-200 bg-yellow-100 text-yellow-700 dark:border-yellow-500/30 dark:bg-yellow-500/20 dark:text-yellow-400";
-    default:
-      return "border-gray-200 bg-gray-100 text-gray-700 dark:border-gray-500/30 dark:bg-gray-500/20 dark:text-gray-300";
-  }
-}
-
-function jobStatusLabel(status: AnnotationJobMeta["jobStatus"]): string {
-  if (status === "in_progress") return "In progress";
-  if (status === "completed") return "Completed";
-  return "Pending";
-}
-
 function FieldRow({
   label,
   children,
@@ -157,4 +176,3 @@ function FieldRow({
     </div>
   );
 }
-

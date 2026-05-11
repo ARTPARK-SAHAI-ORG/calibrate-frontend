@@ -12,6 +12,9 @@ type DeleteConfirmationDialogProps = {
   confirmText?: string;
   cancelText?: string;
   isDeleting?: boolean;
+  /** Optional content rendered between the message and the action row
+   * (e.g. a "permanently delete" checkbox). */
+  extraContent?: React.ReactNode;
 };
 
 export function DeleteConfirmationDialog({
@@ -23,6 +26,7 @@ export function DeleteConfirmationDialog({
   confirmText = "Remove",
   cancelText = "Cancel",
   isDeleting = false,
+  extraContent,
 }: DeleteConfirmationDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
@@ -41,9 +45,10 @@ export function DeleteConfirmationDialog({
         <h2 className="text-base md:text-lg font-semibold text-foreground mb-2">
           {title}
         </h2>
-        <p className="text-sm md:text-base text-muted-foreground mb-5 md:mb-6">
+        <p className="text-sm md:text-base text-muted-foreground mb-4">
           {message}
         </p>
+        {extraContent && <div className="mb-5">{extraContent}</div>}
         <div className="flex items-center justify-end gap-2 md:gap-3">
           <button
             onClick={handleClose}

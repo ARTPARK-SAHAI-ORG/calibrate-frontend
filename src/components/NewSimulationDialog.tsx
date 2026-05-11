@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { readNameConflictMessage } from "@/lib/parseBackendError";
 
 type NewSimulationDialogProps = {
   onClose: () => void;
@@ -22,6 +23,9 @@ export function NewSimulationDialog({
   const [simulationName, setSimulationName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nameConflictError, setNameConflictError] = useState<string | null>(
+    null,
+  );
   const maxLength = 50;
 
   const handleCreate = async () => {
@@ -30,6 +34,7 @@ export function NewSimulationDialog({
     try {
       setIsCreating(true);
       setError(null);
+      setNameConflictError(null);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
         throw new Error("BACKEND_URL environment variable is not set");
@@ -53,6 +58,11 @@ export function NewSimulationDialog({
       }
 
       if (!response.ok) {
+        const conflict = await readNameConflictMessage(response);
+        if (conflict) {
+          setNameConflictError(conflict);
+          return;
+        }
         throw new Error("Failed to create simulation");
       }
 
@@ -104,10 +114,13 @@ export function NewSimulationDialog({
               onChange={(e) => {
                 if (e.target.value.length <= maxLength) {
                   setSimulationName(e.target.value);
+                  if (nameConflictError) setNameConflictError(null);
                 }
               }}
               placeholder="Enter simulation name"
-              className="w-full h-9 md:h-10 px-3 pr-16 rounded-md text-xs md:text-[13px] border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              className={`w-full h-9 md:h-10 px-3 pr-16 rounded-md text-xs md:text-[13px] border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
+                nameConflictError ? "border-red-500" : "border-border"
+              }`}
               maxLength={maxLength}
             />
             <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
@@ -116,6 +129,11 @@ export function NewSimulationDialog({
               </span>
             </div>
           </div>
+          {nameConflictError && (
+            <p className="mt-1 text-[13px] text-red-500">
+              {nameConflictError}
+            </p>
+          )}
         </div>
 
         {/* Error Message */}

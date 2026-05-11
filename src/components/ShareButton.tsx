@@ -8,7 +8,19 @@ export type ShareableEntityType =
   | "tts"
   | "test-run"
   | "benchmark"
-  | "simulation-run";
+  | "simulation-run"
+  | "annotation-evaluator-run"
+  | "annotation-job";
+
+/**
+ * Composite-id entity types accept `entityId` as `${taskUuid}:${jobUuid}`
+ * because their visibility routes are nested under the parent task.
+ */
+function splitComposite(id: string): [string, string] {
+  const idx = id.indexOf(":");
+  if (idx < 0) return [id, ""];
+  return [id.slice(0, idx), id.slice(idx + 1)];
+}
 
 const VISIBILITY_ENDPOINTS: Record<
   ShareableEntityType,
@@ -19,6 +31,14 @@ const VISIBILITY_ENDPOINTS: Record<
   "test-run": (id) => `/agent-tests/run/${id}/visibility`,
   benchmark: (id) => `/agent-tests/benchmark/${id}/visibility`,
   "simulation-run": (id) => `/simulations/run/${id}/visibility`,
+  "annotation-evaluator-run": (id) => {
+    const [taskUuid, jobUuid] = splitComposite(id);
+    return `/annotation-tasks/${taskUuid}/evaluator-runs/${jobUuid}/visibility`;
+  },
+  "annotation-job": (id) => {
+    const [taskUuid, jobUuid] = splitComposite(id);
+    return `/annotation-tasks/${taskUuid}/jobs/${jobUuid}/visibility`;
+  },
 };
 
 const PUBLIC_PATHS: Record<ShareableEntityType, string> = {
@@ -27,6 +47,8 @@ const PUBLIC_PATHS: Record<ShareableEntityType, string> = {
   "test-run": "test-run",
   benchmark: "benchmark",
   "simulation-run": "simulation-run",
+  "annotation-evaluator-run": "annotation-eval",
+  "annotation-job": "annotation-jobs/view",
 };
 
 interface ShareButtonProps {
@@ -87,7 +109,9 @@ export function ShareButton({
 
       const data = await res.json();
       setIsPublic(data.is_public);
-      setShareToken(data.share_token ?? null);
+      // Eval-runs/STT/TTS/etc. return `share_token`; annotator-job visibility
+      // returns `view_token` (read-only credential). Accept either.
+      setShareToken(data.share_token ?? data.view_token ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -120,8 +144,8 @@ export function ShareButton({
       <Tooltip
         content={
           isPublic
-            ? "Make this benchmark private"
-            : "Make this benchmark publicly shareable"
+            ? "Make this private"
+            : "Make this publicly shareable"
         }
         position="bottom"
       >
@@ -195,7 +219,7 @@ export function ShareButton({
           onClick={copyLink}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border transition-colors cursor-pointer ${
             copied
-              ? "bg-rose-500/16 border-rose-500/48 text-rose-950 dark:text-rose-50 hover:bg-rose-500/24 dark:hover:bg-rose-500/22"
+              ? "bg-emerald-500/15 border-emerald-500/45 text-emerald-900 dark:text-emerald-200 hover:bg-emerald-500/25 dark:hover:bg-emerald-500/20"
               : "bg-amber-500/16 border-amber-500/50 text-amber-950 dark:text-amber-100 hover:bg-amber-500/28 dark:hover:bg-amber-500/22"
           }`}
           title="Copy public link"
@@ -203,7 +227,7 @@ export function ShareButton({
           {copied ? (
             <>
               <svg
-                className="w-3.5 h-3.5 text-rose-600 dark:text-rose-300"
+                className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"

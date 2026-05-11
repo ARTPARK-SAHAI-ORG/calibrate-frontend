@@ -1,5 +1,5 @@
 import React from "react";
-import { formatMetricValue, readProviderEvaluatorMean } from "@/lib/evaluatorMetrics";
+import { formatEvaluatorAggregate, readProviderEvaluatorMean } from "@/lib/evaluatorMetrics";
 import { AboutMetricsTable, type MetricDescription } from "./AboutMetricsTable";
 import { LeaderboardTab, type ChartConfig } from "./LeaderboardTab";
 import { ProviderMetricsCard } from "./ProviderMetricsCard";
@@ -156,6 +156,64 @@ function evaluatorRowsToMetricDescriptions(
   }));
 }
 
+/**
+ * Builds the per-evaluator chart configs (axis bounds, tick + tooltip
+ * formatters) used by both the STT and TTS leaderboards. Binary stays in
+ * [0,1] but renders as %; rating spans [0, scale_max] when known so
+ * providers compare on the same axis.
+ */
+function evaluatorChartConfigs(
+  evaluatorColumns: Array<STTEvaluatorColumn | TTSEvaluatorColumn>,
+): ChartConfig[] {
+  return evaluatorColumns.map((col) => {
+    const isBinary = col.outputType === "binary";
+    const scaleMax =
+      typeof col.scaleMax === "number" ? col.scaleMax : undefined;
+    return {
+      title: col.label,
+      dataKey: col.scoreField ?? `${col.key}_score`,
+      yDomain: isBinary
+        ? ([0, 1] as [number, number])
+        : scaleMax != null
+          ? ([0, scaleMax] as [number, number])
+          : undefined,
+      yTickFormatter: isBinary
+        ? (v: number) => `${Math.round(v * 100)}%`
+        : undefined,
+      formatTooltip: isBinary
+        ? (v: number) => `${Math.round(v * 100)}%`
+        : scaleMax != null
+          ? (v: number) => `${parseFloat(v.toFixed(4))}/${scaleMax}`
+          : undefined,
+    };
+  });
+}
+
+/** Builds the per-evaluator leaderboard table columns (matching cell format). */
+function evaluatorLeaderboardColumns(
+  evaluatorColumns: Array<STTEvaluatorColumn | TTSEvaluatorColumn>,
+) {
+  return evaluatorColumns.map((col) => ({
+    key: col.scoreField ?? `${col.key}_score`,
+    header: col.label,
+    render: (v: unknown) =>
+      formatEvaluatorAggregate(
+        typeof v === "number" ? v : null,
+        col.outputType,
+        col.scaleMax,
+      ),
+  }));
+}
+
+/** Pairs charts into rows of two for the LeaderboardTab grid. */
+function chunkChartRows(charts: ChartConfig[]): ChartConfig[][] {
+  const rows: ChartConfig[][] = [];
+  for (let i = 0; i < charts.length; i += 2) {
+    rows.push(charts.slice(i, i + 2));
+  }
+  return rows;
+}
+
 export function STTEvaluationAbout({
   evaluatorRows,
 }: {
@@ -193,17 +251,9 @@ export function STTEvaluationLeaderboard({
 }) {
   const allCharts: ChartConfig[] = [
     { title: "WER", dataKey: "wer" },
-    ...evaluatorColumns.map((col) => ({
-      title: col.label,
-      dataKey: col.scoreField ?? `${col.key}_score`,
-      yDomain:
-        col.outputType === "binary" ? ([0, 1] as [number, number]) : undefined,
-    })),
+    ...evaluatorChartConfigs(evaluatorColumns),
   ];
-  const chartRows: ChartConfig[][] = [];
-  for (let i = 0; i < allCharts.length; i += 2) {
-    chartRows.push(allCharts.slice(i, i + 2));
-  }
+  const chartRows = chunkChartRows(allCharts);
 
   return (
     <LeaderboardTab
@@ -211,10 +261,7 @@ export function STTEvaluationLeaderboard({
       columns={[
         { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
         { key: "wer", header: "WER" },
-        ...evaluatorColumns.map((col) => ({
-          key: col.scoreField ?? `${col.key}_score`,
-          header: col.label,
-        })),
+        ...evaluatorLeaderboardColumns(evaluatorColumns),
       ]}
       data={leaderboardSummary}
       charts={chartRows}
@@ -236,28 +283,17 @@ export function TTSEvaluationLeaderboard({
   className?: string;
 }) {
   const allCharts: ChartConfig[] = [
-    ...evaluatorColumns.map((col) => ({
-      title: col.label,
-      dataKey: col.scoreField ?? `${col.key}_score`,
-      yDomain:
-        col.outputType === "binary" ? ([0, 1] as [number, number]) : undefined,
-    })),
+    ...evaluatorChartConfigs(evaluatorColumns),
     { title: "TTFB (s)", dataKey: "ttfb" },
   ];
-  const chartRows: ChartConfig[][] = [];
-  for (let i = 0; i < allCharts.length; i += 2) {
-    chartRows.push(allCharts.slice(i, i + 2));
-  }
+  const chartRows = chunkChartRows(allCharts);
 
   return (
     <LeaderboardTab
       className={className}
       columns={[
         { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
-        ...evaluatorColumns.map((col) => ({
-          key: col.scoreField ?? `${col.key}_score`,
-          header: col.label,
-        })),
+        ...evaluatorLeaderboardColumns(evaluatorColumns),
         {
           key: "ttfb",
           header: "TTFB (s)",
@@ -329,11 +365,22 @@ export function STTEvaluationOutputs({
             return <ProviderErrorState />;
           }
 
+          // Show per-row metric columns as soon as this provider's results
+          // arrive — don't wait for the overall task (other providers) to
+          // finish. Rows without computed values still render "—" in the
+          // metric cells.
           const showMetrics =
-            status === "done" ||
-            (providerResult.results?.every((r) => {
-              if (r.wer === undefined || r.wer === "") return false;
-              return evaluatorColumns.every((col) => {
+            providerResult.success === true ||
+            (providerResult.results?.some((r) => {
+              if (r.wer !== undefined && r.wer !== "") return true;
+              // Canonical namespaced shape from the API refresh.
+              const outputs = (r as Record<string, unknown>).evaluator_outputs;
+              if (outputs && typeof outputs === "object") {
+                for (const v of Object.values(outputs as Record<string, unknown>)) {
+                  if (v && typeof v === "object") return true;
+                }
+              }
+              return evaluatorColumns.some((col) => {
                 const v = r[col.scoreField ?? `${col.key}_score`];
                 return v !== undefined && v !== null && v !== "";
               });
@@ -353,7 +400,11 @@ export function STTEvaluationOutputs({
                     },
                     ...evaluatorColumns.map((col) => ({
                       label: col.label,
-                      value: formatMetricValue(readProviderEvaluatorMean(col, providerResult)),
+                      value: formatEvaluatorAggregate(
+                        readProviderEvaluatorMean(col, providerResult),
+                        col.outputType,
+                        col.scaleMax,
+                      ),
                     })),
                   ]}
                 />
@@ -425,14 +476,23 @@ export function TTSEvaluationOutputs({
             return <ProviderErrorState />;
           }
 
+          // Show per-row metric columns as soon as this provider's results
+          // arrive — don't wait for the overall task (other providers) to
+          // finish.
           const showMetrics =
-            status === "done" ||
-            (providerResult.results?.every((r) =>
-              evaluatorColumns.every((col) => {
+            providerResult.success === true ||
+            (providerResult.results?.some((r) => {
+              const outputs = (r as Record<string, unknown>).evaluator_outputs;
+              if (outputs && typeof outputs === "object") {
+                for (const v of Object.values(outputs as Record<string, unknown>)) {
+                  if (v && typeof v === "object") return true;
+                }
+              }
+              return evaluatorColumns.some((col) => {
                 const v = r[col.scoreField ?? `${col.key}_score`];
                 return v !== undefined && v !== null && v !== "";
-              }),
-            ) ?? false);
+              });
+            }) ?? false);
 
           const ttfbValue = (() => {
             const t = providerResult.metrics?.ttfb;
@@ -449,7 +509,11 @@ export function TTSEvaluationOutputs({
                   metrics={[
                     ...evaluatorColumns.map((col) => ({
                       label: col.label,
-                      value: formatMetricValue(readProviderEvaluatorMean(col, providerResult)),
+                      value: formatEvaluatorAggregate(
+                        readProviderEvaluatorMean(col, providerResult),
+                        col.outputType,
+                        col.scaleMax,
+                      ),
                     })),
                     { label: "TTFB (s)", value: ttfbValue },
                   ]}

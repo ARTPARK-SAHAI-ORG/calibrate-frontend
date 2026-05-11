@@ -19,6 +19,12 @@ import {
 import { useSidebarState } from "@/lib/sidebar";
 import { getDataset } from "@/lib/datasets";
 import { ShareButton } from "@/components/ShareButton";
+import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
+import { retryEvaluation } from "@/lib/retryEvaluation";
+import {
+  deriveEvaluatorColumns,
+  TTS_RESERVED_METRIC_KEYS,
+} from "@/lib/evaluatorColumns";
 
 type LatencyMetric = {
   mean: number;
@@ -67,6 +73,10 @@ type EvaluatorRun = {
   /** Current human-readable evaluator name from the DB at response time. May lag the artefact `metric_key` after a rename. */
   name?: string;
   description?: string;
+  /** Drives cell rendering; prefer over inferring from `aggregate.type`. */
+  output_type?: "binary" | "rating";
+  /** Pinned at job-submit time. */
+  evaluator_version_id?: string;
 };
 
 type ProviderMetrics = {
@@ -162,6 +172,10 @@ export default function TTSEvaluationDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<401 | 403 | 404 | null>(null);
+  // Retry flow for failed runs.
+  const [retryConfirmOpen, setRetryConfirmOpen] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
   // Persist the active tab across reloads via the `?tab=` query param.
   // Tabs that are not available yet fall back visually to Outputs below.
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
@@ -179,6 +193,28 @@ export default function TTSEvaluationDetailPage() {
     const next = new URLSearchParams(searchParams.toString());
     next.set("tab", tab);
     window.history.replaceState(null, "", `?${next.toString()}`);
+  };
+
+  const handleRetry = async () => {
+    if (!evaluationResult || !backendAccessToken || retrying) return;
+    setRetrying(true);
+    setRetryError(null);
+    const result = await retryEvaluation(
+      "tts",
+      evaluationResult,
+      backendAccessToken,
+    );
+    if (result.ok) {
+      setRetryConfirmOpen(false);
+      router.push(`/tts/${result.taskId}`);
+      return;
+    }
+    if (result.status === 401) {
+      await signOut({ callbackUrl: "/login" });
+      return;
+    }
+    setRetryError(result.error);
+    setRetrying(false);
   };
   const [activeProviderTab, setActiveProviderTab] = useState<string | null>(
     null
@@ -557,93 +593,23 @@ export default function TTSEvaluationDetailPage() {
   const judgeLabel = defaultEvaluator?.name ?? "Evaluator";
 
   // Derive the per-evaluator columns rendered in the Outputs results table,
-  // the per-provider metrics card and the Leaderboard chart/columns. Three
-  // sources, in priority order:
-  //
-  //   1) New format — `evaluator_runs` on the response. Each entry gives us
-  //      the live `name`, stable `evaluator_uuid`, the artefact column key
-  //      (`metric_key` — the per-row CSV column with NO `_score` suffix),
-  //      and the `aggregate.type` we use to pick the cell renderer.
-  //   2) Legacy `_info` format — `${prefix}_info` keys in the first
-  //      provider's `metrics`. The per-row column is `${prefix}_score` and
-  //      the leaderboard summary key matches.
-  //   3) Truly legacy single-evaluator jobs — synthesize one column reading
-  //      `result.llm_judge_score` / `result.llm_judge_reasoning`, attributed
-  //      to the default TTS evaluator so the column header still shows a
-  //      meaningful name and links cleanly in the About tab.
-  //
-  // The column carries explicit `scoreField` / `reasoningField` so the
-  // results table doesn't need to know which format produced the row.
-  const evaluatorColumns: TTSEvaluatorColumn[] = useMemo(() => {
-    const providerResults = evaluationResult?.provider_results ?? [];
-
-    // (1) New format.
-    const firstRuns = providerResults
-      .map((pr) => pr.evaluator_runs)
-      .find((er): er is EvaluatorRun[] => Array.isArray(er) && er.length > 0);
-
-    if (firstRuns) {
-      return firstRuns.map((run) => ({
-        key: run.metric_key,
-        label: run.name ?? run.metric_key,
-        outputType: run.aggregate?.type === "rating" ? "rating" : "binary",
-        scoreField: run.metric_key,
-        reasoningField: `${run.metric_key}_reasoning`,
-      }));
-    }
-
-    // (2) Legacy `_info` format.
-    const firstMetrics = providerResults
-      .map((pr) => pr.metrics)
-      .find((m): m is ProviderMetrics => !!m);
-
-    const dataDriven: { key: string; outputType: "binary" | "rating" }[] = [];
-    if (firstMetrics) {
-      for (const k of Object.keys(firstMetrics)) {
-        if (k === "llm_judge_score" || k === "ttfb" || k === "processing_time") {
-          continue;
-        }
-        if (k.endsWith("_info")) {
-          const prefix = k.slice(0, -"_info".length);
-          const info = firstMetrics[k] as { type?: string } | undefined;
-          dataDriven.push({
-            key: prefix,
-            outputType: info?.type === "rating" ? "rating" : "binary",
-          });
-        }
-      }
-    }
-
-    if (dataDriven.length > 0) {
-      return dataDriven.map((c) => {
-        const a = aboutEvaluators.find((e) => e.name === c.key);
-        return {
-          key: c.key,
-          // The label is the evaluator's stored name. Falls back to the raw
-          // data prefix when the about-fetch hasn't resolved (e.g. mid-poll);
-          // the label updates once the detail-fetch lands.
-          label: a ? a.name : c.key,
-          outputType: c.outputType,
-          scoreField: `${c.key}_score`,
-          reasoningField: `${c.key}_reasoning`,
-        };
-      });
-    }
-
-    // (3) Legacy single-evaluator fallback.
-    const defaultAbout = defaultEvaluator
-      ? aboutEvaluators.find((e) => e.uuid === defaultEvaluator.uuid)
-      : undefined;
-    return [
-      {
-        key: "llm_judge",
-        label: defaultAbout?.name ?? judgeLabel,
-        outputType: defaultAbout?.outputType ?? "binary",
-        scoreField: "llm_judge_score",
-        reasoningField: "llm_judge_reasoning",
-      },
-    ];
-  }, [aboutEvaluators, evaluationResult, defaultEvaluator, judgeLabel]);
+  // the per-provider metrics card and the Leaderboard chart/columns. See
+  // `deriveEvaluatorColumns` for the priority order across the four shapes
+  // the backend has emitted.
+  const evaluatorColumns: TTSEvaluatorColumn[] = useMemo(
+    () =>
+      deriveEvaluatorColumns({
+        providerResults: evaluationResult?.provider_results ?? [],
+        aboutEvaluators,
+        reservedMetricKeys: TTS_RESERVED_METRIC_KEYS,
+        singleJudgeFallback: {
+          defaultEvaluatorUuid: defaultEvaluator?.uuid,
+          defaultLabel: judgeLabel,
+          defaultOutputType: "binary",
+        },
+      }),
+    [aboutEvaluators, evaluationResult, defaultEvaluator, judgeLabel],
+  );
 
   const canShowLeaderboard =
     evaluationResult?.status === "done" && !!evaluationResult.leaderboard_summary;
@@ -713,47 +679,106 @@ export default function TTSEvaluationDetailPage() {
         {/* Evaluation Results */}
         {!isLoading && !error && !errorCode && evaluationResult && (
           <div className="space-y-4">
-            {/* Language Pill, Dataset link, and Status Badge */}
-            <div className="flex items-center gap-3 flex-wrap">
-              {evaluationResult.language && (
-                <span className="px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground capitalize">
-                  {evaluationResult.language}
-                </span>
-              )}
-              {evaluationResult.dataset_id && evaluationResult.dataset_name && (
-                <Link
-                  href={`/datasets/${evaluationResult.dataset_id}`}
-                  className="flex items-center gap-1.5 px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground hover:bg-muted/70 transition-colors"
-                >
-                  <svg
-                    className="w-3 h-3"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
+            {/* Header row: language / dataset / status on the left,
+                Share / Retry on the right — matches the labelling-job
+                and evaluator-run page layouts. */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3 flex-wrap">
+                {evaluationResult.language && (
+                  <span className="px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground capitalize">
+                    {evaluationResult.language}
+                  </span>
+                )}
+                {evaluationResult.dataset_id && evaluationResult.dataset_name && (
+                  <Link
+                    href={`/datasets/${evaluationResult.dataset_id}`}
+                    className="flex items-center gap-1.5 px-3 py-1 text-[12px] font-medium bg-muted rounded-full text-foreground hover:bg-muted/70 transition-colors"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
-                    />
-                  </svg>
-                  {evaluationResult.dataset_name}
-                </Link>
-              )}
-              {evaluationResult.status !== "done" && (
-                <StatusBadge status={evaluationResult.status} showSpinner />
-              )}
-              {(evaluationResult.status === "done" || evaluationResult.status === "failed") && backendAccessToken && (
-                <ShareButton
-                  entityType="tts"
-                  entityId={taskId}
-                  accessToken={backendAccessToken}
-                  initialIsPublic={evaluationResult.is_public ?? false}
-                  initialShareToken={evaluationResult.share_token ?? null}
-                />
-              )}
+                    <svg
+                      className="w-3 h-3"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
+                      />
+                    </svg>
+                    {evaluationResult.dataset_name}
+                  </Link>
+                )}
+                {evaluationResult.status !== "done" && (
+                  <StatusBadge status={evaluationResult.status} showSpinner />
+                )}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Sharing only makes sense once the run is complete — earlier
+                    state changes too quickly and a shared link would render
+                    partial results. */}
+                {evaluationResult.status === "done" && backendAccessToken && (
+                  <ShareButton
+                    entityType="tts"
+                    entityId={taskId}
+                    accessToken={backendAccessToken}
+                    initialIsPublic={evaluationResult.is_public ?? false}
+                    initialShareToken={evaluationResult.share_token ?? null}
+                  />
+                )}
+                {evaluationResult.status === "failed" &&
+                  backendAccessToken &&
+                  evaluationResult.dataset_id && (
+                    <button
+                      onClick={() => {
+                        setRetryError(null);
+                        setRetryConfirmOpen(true);
+                      }}
+                      disabled={retrying}
+                      title="Re-run this evaluation on the same dataset, providers, and evaluators"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <svg
+                        className="w-3.5 h-3.5 shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M4 4v5h.582a8 8 0 0114.95-2M20 20v-5h-.581a8 8 0 01-14.95 2"
+                        />
+                      </svg>
+                      {retrying ? "Retrying…" : "Retry"}
+                    </button>
+                  )}
+              </div>
             </div>
+
+            <DeleteConfirmationDialog
+              isOpen={retryConfirmOpen}
+              onClose={() => {
+                if (!retrying) {
+                  setRetryConfirmOpen(false);
+                  setRetryError(null);
+                }
+              }}
+              onConfirm={handleRetry}
+              title="Retry evaluation"
+              message={`This will start a new TTS evaluation on the same dataset (${evaluationResult.dataset_name ?? "—"}), providers, and evaluators as the failed run.`}
+              confirmText="Retry"
+              isDeleting={retrying}
+              extraContent={
+                retryError ? (
+                  <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+                    {retryError}
+                  </div>
+                ) : null
+              }
+            />
 
             {/* Only show tabs and content when we have at least one provider result */}
             {evaluationResult.provider_results &&
@@ -837,7 +862,7 @@ export default function TTSEvaluationDetailPage() {
                   {/* Leaderboard Tab */}
                   {displayedActiveTab === "leaderboard" && evaluationResult.leaderboard_summary && (
                     <TTSEvaluationLeaderboard
-                      className="-mx-4 md:-mx-8 px-4 md:px-8 w-[calc(100vw-32px)] md:w-[calc(100vw-56px)] ml-[calc((32px-100vw)/2+50%)] md:ml-[calc((56px-100vw)/2+50%)] relative"
+                      className="-mx-4 md:-mx-8 px-4 md:px-8 relative"
                       leaderboardSummary={evaluationResult.leaderboard_summary}
                       evaluatorColumns={evaluatorColumns}
                       getProviderLabel={getProviderLabel}

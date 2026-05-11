@@ -522,6 +522,12 @@ function EvaluatorDetailPageInner() {
         setEvaluator(data);
       }
       setNewVersionOpen(false);
+      // The new version slots in at the top of the version list — scroll back
+      // up so the user can see it without manually scrolling past the (now
+      // collapsed) "New version" form.
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
     } catch (err) {
       console.error("Error creating version:", err);
       setNewVersionError(

@@ -8,6 +8,7 @@ import { useAccessToken } from "@/hooks";
 import { AppLayout, useHideFloatingButton } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { useSidebarState } from "@/lib/sidebar";
+import { readNameConflictMessage } from "@/lib/parseBackendError";
 
 type ScenarioData = {
   uuid: string;
@@ -38,6 +39,10 @@ export default function ScenariosPage() {
   const [scenariosError, setScenariosError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  // Duplicate-name 409 messages render inline next to the name field.
+  const [nameConflictError, setNameConflictError] = useState<string | null>(
+    null,
+  );
   const [editingScenarioUuid, setEditingScenarioUuid] = useState<string | null>(
     null
   );
@@ -164,6 +169,7 @@ export default function ScenariosPage() {
     setScenarioDescription(DEFAULT_DESCRIPTION);
     setEditingScenarioUuid(null);
     setCreateError(null);
+    setNameConflictError(null);
     setValidationAttempted(false);
   };
 
@@ -199,6 +205,12 @@ export default function ScenariosPage() {
       }
 
       if (!response.ok) {
+        const conflict = await readNameConflictMessage(response);
+        if (conflict) {
+          setNameConflictError(conflict);
+          setIsCreating(false);
+          return;
+        }
         throw new Error("Failed to create scenario");
       }
 
@@ -314,6 +326,12 @@ export default function ScenariosPage() {
       }
 
       if (!response.ok) {
+        const conflict = await readNameConflictMessage(response);
+        if (conflict) {
+          setNameConflictError(conflict);
+          setIsCreating(false);
+          return;
+        }
         throw new Error("Failed to update scenario");
       }
 
@@ -675,14 +693,23 @@ export default function ScenariosPage() {
                       <input
                         type="text"
                         value={scenarioLabel}
-                        onChange={(e) => setScenarioLabel(e.target.value)}
+                        onChange={(e) => {
+                          setScenarioLabel(e.target.value);
+                          if (nameConflictError) setNameConflictError(null);
+                        }}
                         placeholder="e.g., Crop Insurance Inquiry"
                         className={`w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
-                          validationAttempted && !scenarioLabel.trim()
+                          nameConflictError ||
+                          (validationAttempted && !scenarioLabel.trim())
                             ? "border-red-500"
                             : "border-border"
                         }`}
                       />
+                      {nameConflictError && (
+                        <p className="mt-1 text-xs md:text-sm text-red-500">
+                          {nameConflictError}
+                        </p>
+                      )}
                     </div>
 
                     {/* Description */}

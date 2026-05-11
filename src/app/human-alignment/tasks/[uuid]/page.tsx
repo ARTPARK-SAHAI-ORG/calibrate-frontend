@@ -689,7 +689,7 @@ function JobsList({ jobs }: { jobs: LabellingJob[] }) {
             key={job.uuid}
             onClick={() => {
               if (!isImported)
-                router.push(`/human-labelling/jobs/${job.public_token}`);
+                router.push(`/human-alignment/jobs/${job.public_token}`);
             }}
             className={`grid grid-cols-[180px_minmax(0,1fr)_120px_120px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-3 border-b border-border last:border-b-0 items-center hover:bg-muted/20 transition-colors ${
               isImported ? "" : "cursor-pointer"
@@ -799,7 +799,7 @@ function LabellingTaskPageInner() {
       window.history.replaceState(
         null,
         "",
-        `/human-labelling/tasks/${uuid}?tab=${tab}`,
+        `/human-alignment/tasks/${uuid}?tab=${tab}`,
       );
     },
     [uuid],
@@ -839,7 +839,9 @@ function LabellingTaskPageInner() {
   const [deleteSelectedOpen, setDeleteSelectedOpen] = useState(false);
   const [deletingSelected, setDeletingSelected] = useState(false);
   const [editSttItemsOpen, setEditSttItemsOpen] = useState(false);
-  const [editSttSingleItemUuid, setEditSttSingleItemUuid] = useState<string | null>(null);
+  const [editSttSingleItemUuid, setEditSttSingleItemUuid] = useState<
+    string | null
+  >(null);
   const [editLlmItemUuid, setEditLlmItemUuid] = useState<string | null>(null);
   const [editLlmItemName, setEditLlmItemName] = useState("");
   const [savingLlmItem, setSavingLlmItem] = useState(false);
@@ -1064,6 +1066,36 @@ function LabellingTaskPageInner() {
     });
   };
 
+  /**
+   * Anchored to the top of the items section so the bulk-action toolbar
+   * (which renders here when `selectedItemIds.size > 0`) is scrolled into
+   * view when the user triggers bulk mode from a row's Label/Evaluate.
+   *
+   * `window.scrollTo` doesn't work here because AppLayout puts page content
+   * inside its own `overflow-y-auto` container — the window itself isn't
+   * the scroller. `scrollIntoView` finds the correct scrollable ancestor.
+   */
+  const itemsSectionTopRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * Selects an item AND scrolls back to the top of the items section so the
+   * newly visible bulk-action toolbar (Evaluate selected / Label selected)
+   * is in view. Used by the per-row Label/Evaluate buttons when no rows are
+   * yet selected — those buttons enter bulk mode rather than acting on the
+   * row directly. When bulk mode is already on (some other row is checked),
+   * the row buttons are hidden, so this helper isn't called in that case.
+   */
+  const enterBulkModeWithScroll = (uuid: string) => {
+    toggleItem(uuid);
+    // rAF so the bulk toolbar has rendered before we scroll.
+    requestAnimationFrame(() => {
+      itemsSectionTopRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  };
+
   const allSelected = items.length > 0 && selectedItemIds.size === items.length;
   const someSelected = selectedItemIds.size > 0 && !allSelected;
   const toggleSelectAll = () => {
@@ -1136,7 +1168,7 @@ function LabellingTaskPageInner() {
       });
       setRunDialogOpen(false);
       router.push(
-        `/human-labelling/tasks/${uuid}/evaluator-runs/${result.job_uuid}`,
+        `/human-alignment/tasks/${uuid}/evaluator-runs/${result.job_uuid}`,
       );
     } catch (err) {
       const msg = parseApiError(err, "Failed to start evaluation run");
@@ -1566,17 +1598,43 @@ function LabellingTaskPageInner() {
   const [createItemError, setCreateItemError] = useState<string | null>(null);
   const [validationAttempted, setValidationAttempted] = useState(false);
 
+  const customHeader = (
+    <button
+      onClick={() => router.push("/human-alignment?tab=tasks")}
+      className="inline-flex items-center gap-1.5 px-2 h-8 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+    >
+      <svg
+        className="w-4 h-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M15.75 19.5L8.25 12l7.5-7.5"
+        />
+      </svg>
+      All tasks
+    </button>
+  );
+
   return (
     <AppLayout
-      activeItem="human-labelling"
+      activeItem="human-alignment"
       onItemChange={(id) => router.push(`/${id}`)}
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+      customHeader={customHeader}
     >
       <div className="py-4 md:py-6 space-y-6">
+        {/* Mobile-only back button — AppLayout hides `customHeader` below
+            md, so without this small-screen users would lose the back
+            affordance. */}
         <button
-          onClick={() => router.push("/human-labelling?tab=tasks")}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1.5"
+          onClick={() => router.push("/human-alignment?tab=tasks")}
+          className="md:hidden text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1.5"
         >
           <svg
             className="w-4 h-4"
@@ -1591,7 +1649,7 @@ function LabellingTaskPageInner() {
               d="M15.75 19.5L8.25 12l7.5-7.5"
             />
           </svg>
-          All labelling tasks
+          All tasks
         </button>
 
         {error && (
@@ -2290,7 +2348,7 @@ function LabellingTaskPageInner() {
               description="Add items for humans to label or load existing human labelled items"
             />
           ) : (
-            <div className="space-y-3">
+            <div ref={itemsSectionTopRef} className="space-y-3 scroll-mt-4">
               {/* Bulk-action toolbar (shown when at least one row is selected) */}
               {selectedItemIds.size > 0 && (
                 <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
@@ -2425,29 +2483,37 @@ function LabellingTaskPageInner() {
                             itemUuid={item.uuid}
                             onDelete={requestDeleteOneItem}
                             onViewResults={toggleItemResults}
-                            onLabel={selectedItemIds.size === 0 ? (uuid) => {
-                              // Sole row → skip the select-then-bulk
-                              // dance and open the assign dialog
-                              // straight on this item.
-                              if (items.length === 1) {
-                                setSelectedItemIds(new Set([uuid]));
-                                setAssignOpen(true);
-                              } else {
-                                toggleItem(uuid);
-                              }
-                            } : undefined}
+                            onLabel={
+                              selectedItemIds.size === 0
+                                ? (uuid) => {
+                                    // Sole row → skip the select-then-bulk
+                                    // dance and open the assign dialog
+                                    // straight on this item.
+                                    if (items.length === 1) {
+                                      setSelectedItemIds(new Set([uuid]));
+                                      setAssignOpen(true);
+                                    } else {
+                                      enterBulkModeWithScroll(uuid);
+                                    }
+                                  }
+                                : undefined
+                            }
                             onEdit={(uuid) => {
                               setEditSttSingleItemUuid(uuid);
                               setEditSttItemsOpen(true);
                             }}
-                            onEvaluate={selectedItemIds.size === 0 ? (uuid) => {
-                              if (items.length === 1) {
-                                setSelectedItemIds(new Set([uuid]));
-                                handleRunEvaluators([uuid]);
-                              } else {
-                                toggleItem(uuid);
-                              }
-                            } : undefined}
+                            onEvaluate={
+                              selectedItemIds.size === 0
+                                ? (uuid) => {
+                                    if (items.length === 1) {
+                                      setSelectedItemIds(new Set([uuid]));
+                                      handleRunEvaluators([uuid]);
+                                    } else {
+                                      enterBulkModeWithScroll(uuid);
+                                    }
+                                  }
+                                : undefined
+                            }
                             isResultsOpen={isResultsOpen}
                             viewResultsDisabled={
                               !!taskSummary && !itemsWithResults.has(item.uuid)
@@ -2509,26 +2575,34 @@ function LabellingTaskPageInner() {
                             itemUuid={item.uuid}
                             onDelete={requestDeleteOneItem}
                             onViewResults={toggleItemResults}
-                            onLabel={selectedItemIds.size === 0 ? (uuid) => {
-                              // Sole row → skip the select-then-bulk
-                              // dance and open the assign dialog
-                              // straight on this item.
-                              if (items.length === 1) {
-                                setSelectedItemIds(new Set([uuid]));
-                                setAssignOpen(true);
-                              } else {
-                                toggleItem(uuid);
-                              }
-                            } : undefined}
+                            onLabel={
+                              selectedItemIds.size === 0
+                                ? (uuid) => {
+                                    // Sole row → skip the select-then-bulk
+                                    // dance and open the assign dialog
+                                    // straight on this item.
+                                    if (items.length === 1) {
+                                      setSelectedItemIds(new Set([uuid]));
+                                      setAssignOpen(true);
+                                    } else {
+                                      enterBulkModeWithScroll(uuid);
+                                    }
+                                  }
+                                : undefined
+                            }
                             onEdit={(uuid) => setEditLlmItemUuid(uuid)}
-                            onEvaluate={selectedItemIds.size === 0 ? (uuid) => {
-                              if (items.length === 1) {
-                                setSelectedItemIds(new Set([uuid]));
-                                handleRunEvaluators([uuid]);
-                              } else {
-                                toggleItem(uuid);
-                              }
-                            } : undefined}
+                            onEvaluate={
+                              selectedItemIds.size === 0
+                                ? (uuid) => {
+                                    if (items.length === 1) {
+                                      setSelectedItemIds(new Set([uuid]));
+                                      handleRunEvaluators([uuid]);
+                                    } else {
+                                      enterBulkModeWithScroll(uuid);
+                                    }
+                                  }
+                                : undefined
+                            }
                             isResultsOpen={isResultsOpen}
                             viewResultsDisabled={
                               !!taskSummary && !itemsWithResults.has(item.uuid)
@@ -2575,7 +2649,7 @@ function LabellingTaskPageInner() {
               </svg>
               Loading jobs
             </div>
-  ) : jobs.length === 0 ? (
+          ) : jobs.length === 0 ? (
             <EmptyState
               icon={
                 <svg
@@ -2608,7 +2682,7 @@ function LabellingTaskPageInner() {
             onRequestDelete={(runUuid) => setDeletingRunUuid(runUuid)}
             onOpen={(runUuid) =>
               router.push(
-                `/human-labelling/tasks/${uuid}/evaluator-runs/${runUuid}`,
+                `/human-alignment/tasks/${uuid}/evaluator-runs/${runUuid}`,
               )
             }
           />
@@ -2981,7 +3055,10 @@ function LabellingTaskPageInner() {
                   : "",
             };
           })}
-        onClose={() => { setEditSttItemsOpen(false); setEditSttSingleItemUuid(null); }}
+        onClose={() => {
+          setEditSttItemsOpen(false);
+          setEditSttSingleItemUuid(null);
+        }}
         onSubmit={async (rows) => {
           if (!accessToken) return;
           await apiClient<{ updated_count: number }>(

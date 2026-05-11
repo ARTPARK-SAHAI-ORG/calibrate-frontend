@@ -13,6 +13,8 @@ export type ChartConfig = {
   dataKey: string;
   yDomain?: [number, number];
   formatTooltip?: (value: number) => string;
+  /** Optional y-axis tick formatter (e.g. `(v) => `${Math.round(v*100)}%`` for binary success rates). */
+  yTickFormatter?: (value: number) => string;
 };
 
 type LeaderboardTabProps = {
@@ -80,6 +82,7 @@ export function LeaderboardTab({
                 colorMap={colorMap}
                 yDomain={chart.yDomain}
                 formatTooltip={chart.formatTooltip}
+                yTickFormatter={chart.yTickFormatter}
               />
             );
           })}

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { Suspense, useState, useEffect } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
@@ -887,10 +888,18 @@ function MetricsPageInner() {
               return (
                 <div
                   key={evaluator.uuid}
-                  onClick={() => router.push(`/evaluators/${evaluator.uuid}`)}
-                  className="border border-border rounded-xl bg-background dark:bg-muted px-4 py-4 md:px-5 md:py-4 transition-colors cursor-pointer hover:bg-muted/20 dark:hover:bg-accent"
+                  className="relative border border-border rounded-xl bg-background dark:bg-muted px-4 py-4 md:px-5 md:py-4 transition-colors cursor-pointer hover:bg-muted/20 dark:hover:bg-accent"
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  {/* Stretched link: covers the whole row so the card behaves
+                      like a real <a> — left-click navigates, right-click /
+                      cmd-click opens in a new tab. The action buttons below
+                      restore pointer-events to sit above this overlay. */}
+                  <Link
+                    href={`/evaluators/${evaluator.uuid}`}
+                    aria-label={`Open ${evaluator.name}`}
+                    className="absolute inset-0 rounded-xl z-0"
+                  />
+                  <div className="relative z-10 pointer-events-none flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-base md:text-lg font-semibold text-foreground">
@@ -911,7 +920,7 @@ function MetricsPageInner() {
                         </p>
                       )}
                     </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
+                    <div className="flex items-center gap-1 flex-shrink-0 pointer-events-auto">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

@@ -64,10 +64,20 @@ export function MultiSelectPicker({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  /**
+   * Positioning state for the portaled dropdown.
+   * - `placement: "below"` → anchored to the trigger's bottom edge via `top`
+   * - `placement: "above"` → anchored to the trigger's top edge via `bottom`
+   * - `maxHeight` clamps the popup so it never extends past the viewport
+   *   even when the trigger is near a corner.
+   */
   const [menuRect, setMenuRect] = useState<{
     left: number;
-    top: number;
     width: number;
+    placement: "above" | "below";
+    top?: number;
+    bottom?: number;
+    maxHeight: number;
   } | null>(null);
 
   // Anchor the portaled dropdown to the trigger via fixed positioning.
@@ -81,7 +91,28 @@ export function MultiSelectPicker({
       const el = triggerRef.current;
       if (!el) return;
       const r = el.getBoundingClientRect();
-      setMenuRect({ left: r.left, top: r.bottom + 8, width: r.width });
+      const margin = 8;
+      const viewportH = window.innerHeight;
+      const spaceBelow = viewportH - r.bottom - margin;
+      const spaceAbove = r.top - margin;
+      // Preferred popup height (search bar ~64 + options list 240 = 304).
+      // When the space below the trigger can't fit the popup AND there's
+      // more room above, render upwards instead so the popup is always in
+      // the viewport.
+      const preferred = 304;
+      const placeAbove = spaceBelow < preferred && spaceAbove > spaceBelow;
+      const maxHeight = Math.max(
+        180,
+        Math.floor((placeAbove ? spaceAbove : spaceBelow)),
+      );
+      setMenuRect({
+        left: r.left,
+        width: r.width,
+        placement: placeAbove ? "above" : "below",
+        top: placeAbove ? undefined : r.bottom + margin,
+        bottom: placeAbove ? viewportH - r.top + margin : undefined,
+        maxHeight,
+      });
     };
     updateRect();
     window.addEventListener("scroll", updateRect, true);
@@ -215,13 +246,18 @@ export function MultiSelectPicker({
               style={{
                 position: "fixed",
                 left: menuRect.left,
-                top: menuRect.top,
                 width: menuRect.width,
+                ...(menuRect.placement === "above"
+                  ? { bottom: menuRect.bottom }
+                  : { top: menuRect.top }),
+                maxHeight: menuRect.maxHeight,
+                display: "flex",
+                flexDirection: "column",
               }}
               className="bg-popover text-foreground border border-border rounded-xl shadow-xl z-[100] overflow-hidden"
             >
               {/* Search */}
-              <div className="p-3 border-b border-border">
+              <div className="p-3 border-b border-border flex-shrink-0">
                 <input
                   type="text"
                   value={searchQuery}
@@ -232,8 +268,9 @@ export function MultiSelectPicker({
                 />
               </div>
 
-              {/* Options */}
-              <div className="max-h-60 overflow-y-auto">
+              {/* Options — flex-1/min-h-0 so the list scrolls within
+                  whatever maxHeight the outer popup got. */}
+              <div className="flex-1 min-h-0 overflow-y-auto">
                 {isLoading ? (
                   <div className="px-4 py-3 text-sm text-muted-foreground flex items-center gap-2">
                     <svg

@@ -86,7 +86,7 @@ const navSections: NavSection[] = [
         ),
       },
       {
-        id: "human-labelling",
+        id: "human-alignment",
         label: "Human alignment",
         icon: (
           <svg

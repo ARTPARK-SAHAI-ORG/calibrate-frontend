@@ -1,5 +1,9 @@
 import React from "react";
 import { Tooltip } from "@/components/Tooltip";
+import {
+  EvaluatorScoreCell,
+  readEvaluatorCell,
+} from "./EvaluatorScoreCell";
 
 // Per-row results table for STT. Two modes:
 //
@@ -50,10 +54,19 @@ export type STTEvaluatorColumn = {
   label: string;
   /** Drives the cell renderer: binary → Pass/Fail badge, rating → numeric value with tooltip. */
   outputType: "binary" | "rating";
+  /** Stable evaluator UUID. When present, the cell renderer reads
+   * `result.evaluator_outputs[uuid]` (canonical, properly typed, surfaces
+   * per-row `error: true`) and falls back to the flat `scoreField` /
+   * `reasoningField` only if that lookup misses. */
+  evaluatorUuid?: string;
   /** Row data field for the score (defaults to `${key}_score` for legacy callers). */
   scoreField?: string;
   /** Row data field for the reasoning (defaults to `${key}_reasoning` for legacy callers). */
   reasoningField?: string;
+  /** Optional bounds for rating evaluators — drives the "score/max" cell
+   * format and the leaderboard chart's y-axis domain. */
+  scaleMin?: number | null;
+  scaleMax?: number | null;
 };
 
 type STTResultsTableProps = {
@@ -179,11 +192,18 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                         {useDynamic ? (
                           evaluatorColumns!.map((col) => (
                             <td key={col.key} className="px-4 py-3">
-                              <EvaluatorScoreCell
-                                score={asScoreString(result[col.scoreField ?? `${col.key}_score`])}
-                                reasoning={asScoreString(result[col.reasoningField ?? `${col.key}_reasoning`])}
-                                outputType={col.outputType}
-                              />
+                              {(() => {
+                                const cell = readEvaluatorCell(result, col);
+                                return (
+                                  <EvaluatorScoreCell
+                                    score={cell.score}
+                                    reasoning={cell.reasoning}
+                                    error={cell.error}
+                                    outputType={col.outputType}
+                                    scaleMax={col.scaleMax}
+                                  />
+                                );
+                              })()}
                             </td>
                           ))
                         ) : (
@@ -264,14 +284,13 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                   </div>
                   {useDynamic
                     ? evaluatorColumns!.map((col) => {
-                        const score = asScoreString(result[col.scoreField ?? `${col.key}_score`]);
-                        const reasoning = asScoreString(result[col.reasoningField ?? `${col.key}_reasoning`]);
-                        if (!score && !reasoning) return null;
+                        const { score, reasoning, error } = readEvaluatorCell(result, col);
+                        if (!score && !reasoning && !error) return null;
                         return (
                           <div key={col.key}>
                             <div className="flex items-center gap-2">
                               <span className="text-[11px] text-muted-foreground uppercase tracking-wide">{col.label}</span>
-                              <EvaluatorScoreCell score={score} reasoning={reasoning} outputType={col.outputType} hideTooltipButton />
+                              <EvaluatorScoreCell score={score} reasoning={reasoning} error={error} outputType={col.outputType} scaleMax={col.scaleMax} hideTooltipButton />
                             </div>
                             {reasoning && (
                               <p className="text-[12px] text-muted-foreground mt-0.5">{reasoning}</p>
@@ -292,69 +311,6 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
         })}
       </div>
     </>
-  );
-}
-
-// Coerces a row's evaluator field (which is typed as `unknown` because the row
-// is open-ended) into a string we can render. Returns `undefined` for missing
-// values so the cell renderer can show its empty state.
-function asScoreString(value: unknown): string | undefined {
-  if (value === null || value === undefined) return undefined;
-  if (typeof value === "string") return value;
-  return String(value);
-}
-
-function EvaluatorScoreCell({
-  score,
-  reasoning,
-  outputType,
-  hideTooltipButton = false,
-}: {
-  score?: string;
-  reasoning?: string;
-  outputType: "binary" | "rating";
-  hideTooltipButton?: boolean;
-}) {
-  if (!score) return <span className="text-muted-foreground text-[12px]">-</span>;
-
-  const tooltipContent = reasoning || `Score: ${score}`;
-
-  // Binary evaluators render the same Pass/Fail pill the page has always used
-  // for the LLM-judge column. Rating evaluators show the raw numeric value
-  // (rounded to 4 dp when possible) — colorless, matching how WER/similarity
-  // values are rendered elsewhere in the table.
-  let badge: React.ReactNode;
-  if (outputType === "binary") {
-    const scoreStr = score.toLowerCase();
-    const passed = scoreStr === "true" || scoreStr === "1";
-    badge = (
-      <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
-        passed
-          ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
-          : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
-      }`}>
-        {passed ? "Pass" : "Fail"}
-      </span>
-    );
-  } else {
-    const numeric = Number(score);
-    const display = Number.isFinite(numeric) ? parseFloat(numeric.toFixed(4)) : score;
-    badge = <span className="text-[13px] text-foreground">{display}</span>;
-  }
-
-  if (hideTooltipButton) return badge;
-
-  return (
-    <div className="flex items-center gap-1.5">
-      {badge}
-      <Tooltip content={tooltipContent}>
-        <button type="button" className="p-1 rounded-md hover:bg-muted transition-colors cursor-pointer" aria-label="View reasoning">
-          <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </button>
-      </Tooltip>
-    </div>
   );
 }
 

@@ -153,7 +153,7 @@ function HumanLabellingPageInner() {
 
   const handleTabChange = useCallback((tab: Tab) => {
     setActiveTab(tab);
-    window.history.replaceState(null, "", `/human-labelling?tab=${tab}`);
+    window.history.replaceState(null, "", `/human-alignment?tab=${tab}`);
   }, []);
 
   const [annotators, setAnnotators] = useState<Annotator[]>([]);
@@ -204,7 +204,7 @@ function HumanLabellingPageInner() {
     .map((t) => ({ uuid: t.uuid, name: t.name }));
 
   useEffect(() => {
-    document.title = "Human Labelling | Calibrate";
+    document.title = "Human alignment | Calibrate";
   }, []);
 
   const fetchAnnotators = useCallback(async () => {
@@ -386,7 +386,7 @@ function HumanLabellingPageInner() {
 
   return (
     <AppLayout
-      activeItem="human-labelling"
+      activeItem="human-alignment"
       onItemChange={(id) => router.push(`/${id}`)}
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
@@ -396,12 +396,11 @@ function HumanLabellingPageInner() {
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
             <h1 className="text-xl md:text-2xl font-semibold">
-              Human Labelling
+              Human alignment
             </h1>
             <p className="text-muted-foreground text-sm md:text-base leading-relaxed mt-1 max-w-3xl">
-              Manage labelling tasks and the annotators who review them. Use the
-              collected judgments to measure how well your evaluators agree with
-              human experts.
+              Collect human labels, measure consistency between labellers and
+              track human alignment with your evaluators
             </p>
           </div>
           <button
@@ -535,7 +534,7 @@ function HumanLabellingPageInner() {
                     <div
                       key={task.uuid}
                       onClick={() =>
-                        router.push(`/human-labelling/tasks/${task.uuid}`)
+                        router.push(`/human-alignment/tasks/${task.uuid}`)
                       }
                       className="grid grid-cols-[minmax(0,1fr)_160px_100px_minmax(0,1.2fr)_40px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                     >
@@ -611,7 +610,7 @@ function HumanLabellingPageInner() {
                     <div
                       key={task.uuid}
                       onClick={() =>
-                        router.push(`/human-labelling/tasks/${task.uuid}`)
+                        router.push(`/human-alignment/tasks/${task.uuid}`)
                       }
                       className="border border-border rounded-xl p-4 hover:bg-muted/20 transition-colors cursor-pointer flex items-start gap-3"
                     >
@@ -775,7 +774,7 @@ function HumanLabellingPageInner() {
                         key={annotator.uuid}
                         onClick={() =>
                           router.push(
-                            `/human-labelling/annotators/${annotator.uuid}`,
+                            `/human-alignment/annotators/${annotator.uuid}`,
                           )
                         }
                         className="grid grid-cols-[minmax(0,1fr)_120px_180px_40px] gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
@@ -830,7 +829,7 @@ function HumanLabellingPageInner() {
                         key={annotator.uuid}
                         onClick={() =>
                           router.push(
-                            `/human-labelling/annotators/${annotator.uuid}`,
+                            `/human-alignment/annotators/${annotator.uuid}`,
                           )
                         }
                         className="border border-border rounded-xl p-4 hover:bg-muted/20 transition-colors cursor-pointer flex items-start gap-3"
@@ -890,7 +889,7 @@ function HumanLabellingPageInner() {
           onClose={() => setCreateDialogOpen(false)}
           onCreated={(taskUuid) => {
             setCreateDialogOpen(false);
-            router.push(`/human-labelling/tasks/${taskUuid}`);
+            router.push(`/human-alignment/tasks/${taskUuid}`);
           }}
         />
       )}
@@ -1148,8 +1147,8 @@ function AgreementOverview({
             <>
               Agreement between annotators and evaluators will appear here
               <br />
-              once annotators start labelling and evaluators are run on the
-              task items
+              once annotators start labelling and evaluators are run on the task
+              items
             </>
           }
         />

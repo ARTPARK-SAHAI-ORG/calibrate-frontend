@@ -6,6 +6,7 @@ import { signOut } from "next-auth/react";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { useAccessToken } from "@/hooks";
+import { readNameConflictMessage } from "@/lib/parseBackendError";
 
 type Agent = {
   uuid: string;
@@ -676,6 +677,9 @@ function NewAgentDialog({
   const [agentKind, setAgentKind] = useState<"agent" | "connection">("agent");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nameConflictError, setNameConflictError] = useState<string | null>(
+    null,
+  );
   const maxLength = 50;
 
   const handleCreate = async () => {
@@ -684,6 +688,7 @@ function NewAgentDialog({
     try {
       setIsCreating(true);
       setError(null);
+      setNameConflictError(null);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
         throw new Error("BACKEND_URL environment variable is not set");
@@ -724,6 +729,12 @@ function NewAgentDialog({
       }
 
       if (!response.ok) {
+        const conflict = await readNameConflictMessage(response);
+        if (conflict) {
+          setNameConflictError(conflict);
+          setIsCreating(false);
+          return;
+        }
         throw new Error("Failed to create agent");
       }
 
@@ -773,6 +784,7 @@ function NewAgentDialog({
               onChange={(e) => {
                 if (e.target.value.length <= maxLength) {
                   setAgentName(e.target.value);
+                  if (nameConflictError) setNameConflictError(null);
                 }
               }}
               onKeyDown={(e) => {
@@ -781,7 +793,9 @@ function NewAgentDialog({
                 }
               }}
               placeholder="Enter agent name"
-              className="w-full h-10 px-3 pr-16 rounded-md text-[13px] border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              className={`w-full h-10 px-3 pr-16 rounded-md text-[13px] border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
+                nameConflictError ? "border-red-500" : "border-border"
+              }`}
               maxLength={maxLength}
               autoFocus
             />
@@ -791,6 +805,11 @@ function NewAgentDialog({
               </span>
             </div>
           </div>
+          {nameConflictError && (
+            <p className="mt-1 text-[13px] text-red-500">
+              {nameConflictError}
+            </p>
+          )}
         </div>
 
         {/* Agent Kind Selection */}
@@ -938,6 +957,9 @@ function DuplicateAgentDialog({
   const [agentName, setAgentName] = useState(`Copy of ${originalAgent.name}`);
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nameConflictError, setNameConflictError] = useState<string | null>(
+    null,
+  );
   const maxLength = 50;
 
   const handleDuplicate = async () => {
@@ -946,6 +968,7 @@ function DuplicateAgentDialog({
     try {
       setIsDuplicating(true);
       setError(null);
+      setNameConflictError(null);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
         throw new Error("BACKEND_URL environment variable is not set");
@@ -973,6 +996,12 @@ function DuplicateAgentDialog({
       }
 
       if (!response.ok) {
+        const conflict = await readNameConflictMessage(response);
+        if (conflict) {
+          setNameConflictError(conflict);
+          setIsDuplicating(false);
+          return;
+        }
         throw new Error("Failed to duplicate agent");
       }
 
@@ -1032,10 +1061,13 @@ function DuplicateAgentDialog({
               onChange={(e) => {
                 if (e.target.value.length <= maxLength) {
                   setAgentName(e.target.value);
+                  if (nameConflictError) setNameConflictError(null);
                 }
               }}
               placeholder="Enter agent name"
-              className="w-full h-10 px-3 pr-16 rounded-md text-[13px] border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              className={`w-full h-10 px-3 pr-16 rounded-md text-[13px] border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
+                nameConflictError ? "border-red-500" : "border-border"
+              }`}
               maxLength={maxLength}
             />
             <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
@@ -1044,6 +1076,11 @@ function DuplicateAgentDialog({
               </span>
             </div>
           </div>
+          {nameConflictError && (
+            <p className="mt-1 text-[13px] text-red-500">
+              {nameConflictError}
+            </p>
+          )}
         </div>
 
         {/* Error Message */}

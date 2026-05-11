@@ -8,6 +8,7 @@ import {
   type EvaluatorType,
 } from "@/components/EvaluatorPills";
 import { apiClient } from "@/lib/api";
+import { readNameConflictFromError } from "@/lib/parseBackendError";
 
 // Only these three task types are allowed for labelling tasks
 type TaskType = Extract<EvaluatorType, "llm" | "stt" | "simulation">;
@@ -110,6 +111,10 @@ export function CreateLabellingTaskDialog({
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Duplicate-name 409 messages render inline next to the name field.
+  const [nameConflictError, setNameConflictError] = useState<string | null>(
+    null,
+  );
 
   // Fetch evaluator list once on mount; filter client-side by selected type.
   useEffect(() => {
@@ -177,6 +182,7 @@ export function CreateLabellingTaskDialog({
     if (!canSubmit || !taskType) return;
     setSubmitting(true);
     setSubmitError(null);
+    setNameConflictError(null);
     try {
       const body: {
         name: string;
@@ -194,7 +200,12 @@ export function CreateLabellingTaskDialog({
       );
       onCreated(res.uuid);
     } catch (err) {
-      setSubmitError(parseApiError(err, "Failed to create task"));
+      const conflict = readNameConflictFromError(err);
+      if (conflict) {
+        setNameConflictError(conflict);
+      } else {
+        setSubmitError(parseApiError(err, "Failed to create task"));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -260,10 +271,18 @@ export function CreateLabellingTaskDialog({
             <input
               autoFocus
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (nameConflictError) setNameConflictError(null);
+              }}
               placeholder="e.g., Helpfulness review — Q2 batch"
-              className="w-full h-10 px-3 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+              className={`w-full h-10 px-3 rounded-md text-sm border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent ${
+                nameConflictError ? "border-red-500" : "border-border"
+              }`}
             />
+            {nameConflictError && (
+              <p className="mt-1 text-sm text-red-500">{nameConflictError}</p>
+            )}
           </div>
 
           {/* Description */}
@@ -303,7 +322,7 @@ export function CreateLabellingTaskDialog({
                 />
               </svg>
               <span className="text-xs md:text-sm text-foreground inline-flex items-center gap-1.5 flex-wrap">
-                Human labelling for
+                Human alignment for
                 <EvaluatorTypePill evaluatorType="tts" />
                 evaluators is not supported yet
               </span>
