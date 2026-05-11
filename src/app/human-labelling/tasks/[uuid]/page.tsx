@@ -1596,34 +1596,37 @@ function LabellingTaskPageInner() {
   const [createItemError, setCreateItemError] = useState<string | null>(null);
   const [validationAttempted, setValidationAttempted] = useState(false);
 
+  const customHeader = (
+    <button
+      onClick={() => router.push("/human-labelling?tab=tasks")}
+      className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
+      title="All labelling tasks"
+    >
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M15.75 19.5L8.25 12l7.5-7.5"
+        />
+      </svg>
+    </button>
+  );
+
   return (
     <AppLayout
       activeItem="human-labelling"
       onItemChange={(id) => router.push(`/${id}`)}
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+      customHeader={customHeader}
     >
       <div className="py-4 md:py-6 space-y-6">
-        <button
-          onClick={() => router.push("/human-labelling?tab=tasks")}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1.5"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15.75 19.5L8.25 12l7.5-7.5"
-            />
-          </svg>
-          All labelling tasks
-        </button>
-
         {error && (
           <div className="rounded-md border border-border bg-muted/20 p-4 text-sm text-red-500">
             {error}

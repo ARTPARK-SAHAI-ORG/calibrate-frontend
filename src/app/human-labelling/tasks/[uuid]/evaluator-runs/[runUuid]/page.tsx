@@ -439,39 +439,42 @@ export default function EvaluatorRunDetailPage() {
     }
   }, [job, task, itemsForRun, runsByItem, versionLabels, evaluatorNamesById]);
 
+  const customHeader = (
+    <button
+      onClick={() =>
+        router.push(`/human-labelling/tasks/${taskUuid}?tab=runs`)
+      }
+      className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
+      title="Back to evaluation runs"
+    >
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M15.75 19.5L8.25 12l7.5-7.5"
+        />
+      </svg>
+    </button>
+  );
+
   return (
     <AppLayout
       activeItem="human-labelling"
       onItemChange={(id) => router.push(`/${id}`)}
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+      customHeader={customHeader}
     >
       <div
         className="py-4 md:py-6 flex flex-col gap-4"
         style={{ height: "calc(100dvh - 56px)" }}
       >
-        <button
-          onClick={() =>
-            router.push(`/human-labelling/tasks/${taskUuid}?tab=runs`)
-          }
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1.5"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-          Back to evaluation runs
-        </button>
-
         {loading && !job && (
           <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
             <svg
