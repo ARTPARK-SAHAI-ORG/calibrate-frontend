@@ -785,10 +785,10 @@ export default function TTSEvaluationDetailPage() {
               {evaluationResult.status !== "done" && (
                 <StatusBadge status={evaluationResult.status} showSpinner />
               )}
-              {/* Backend populates is_public / share_token from the moment the
-                  run is created, so render the share toggle whenever the run
-                  exists regardless of status. */}
-              {backendAccessToken && (
+              {/* Sharing only makes sense once the run is complete — earlier
+                  state changes too quickly and a shared link would render
+                  partial results. */}
+              {evaluationResult.status === "done" && backendAccessToken && (
                 <ShareButton
                   entityType="tts"
                   entityId={taskId}
