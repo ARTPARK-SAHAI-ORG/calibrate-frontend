@@ -206,7 +206,7 @@ export function VersionCard({
         </div>
       ) : null}
 
-      {outputType === "rating" && version.output_config?.scale?.length ? (
+      {promptVisible && outputType === "rating" && version.output_config?.scale?.length ? (
         <div className="space-y-2">
           <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
             Output
