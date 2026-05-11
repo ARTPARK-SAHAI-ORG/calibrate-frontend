@@ -21,6 +21,7 @@ import {
 import { useSidebarState } from "@/lib/sidebar";
 import { getDataset } from "@/lib/datasets";
 import { ShareButton } from "@/components/ShareButton";
+import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 
 // The STT evaluate API response now carries per-attached-evaluator data in
 // three formats we need to support side-by-side:
@@ -164,6 +165,11 @@ export default function STTEvaluationDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<401 | 403 | 404 | null>(null);
+  // Retry flow for failed runs: confirms with the user, then POSTs a new
+  // /stt/evaluate job using this run's dataset_id + providers + language +
+  // evaluator uuids, and redirects to the new task page.
+  const [retryConfirmOpen, setRetryConfirmOpen] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   // Persist the active tab across reloads via the `?tab=` query param.
   // Tabs that are not available yet fall back visually to Outputs below.
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
@@ -181,6 +187,61 @@ export default function STTEvaluationDetailPage() {
     const next = new URLSearchParams(searchParams.toString());
     next.set("tab", tab);
     window.history.replaceState(null, "", `?${next.toString()}`);
+  };
+
+  const handleRetry = async () => {
+    if (!evaluationResult || !backendAccessToken || retrying) return;
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl) return;
+    const datasetId = evaluationResult.dataset_id;
+    if (!datasetId) return;
+    // Recover the provider keys, evaluator uuids, and language from the
+    // failed run so the user doesn't have to re-pick anything.
+    const providers = (evaluationResult.provider_results ?? [])
+      .map((p) => p.provider)
+      .filter(Boolean);
+    const evaluatorUuidsSet = new Set<string>();
+    for (const pr of evaluationResult.provider_results ?? []) {
+      for (const run of pr.evaluator_runs ?? []) {
+        if (run.evaluator_uuid) evaluatorUuidsSet.add(run.evaluator_uuid);
+      }
+    }
+    for (const u of evaluationResult.evaluator_uuids ?? []) {
+      if (u) evaluatorUuidsSet.add(u);
+    }
+    const evaluatorUuids = Array.from(evaluatorUuidsSet);
+    setRetrying(true);
+    try {
+      const res = await fetch(`${backendUrl}/stt/evaluate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          accept: "application/json",
+          Authorization: `Bearer ${backendAccessToken}`,
+        },
+        body: JSON.stringify({
+          dataset_id: datasetId,
+          providers,
+          language: evaluationResult.language,
+          evaluator_uuids: evaluatorUuids,
+        }),
+      });
+      if (res.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+      if (!res.ok) throw new Error(`Retry failed (${res.status})`);
+      const { task_id: newTaskId } = (await res.json()) as { task_id?: string };
+      if (newTaskId) {
+        setRetryConfirmOpen(false);
+        router.push(`/stt/${newTaskId}`);
+        return;
+      }
+      throw new Error("Retry succeeded but no task id returned");
+    } catch (err) {
+      console.error("Error retrying STT evaluation:", err);
+      setRetrying(false);
+    }
   };
   const [activeProviderTab, setActiveProviderTab] = useState<string | null>(
     null,
@@ -799,7 +860,44 @@ export default function STTEvaluationDetailPage() {
                   initialShareToken={evaluationResult.share_token ?? null}
                 />
               )}
+              {evaluationResult.status === "failed" &&
+                backendAccessToken &&
+                evaluationResult.dataset_id && (
+                  <button
+                    onClick={() => setRetryConfirmOpen(true)}
+                    disabled={retrying}
+                    title="Re-run this evaluation on the same dataset, providers, and evaluators"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg
+                      className="w-3.5 h-3.5 shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4 4v5h.582a8 8 0 0114.95-2M20 20v-5h-.581a8 8 0 01-14.95 2"
+                      />
+                    </svg>
+                    {retrying ? "Retrying…" : "Retry"}
+                  </button>
+                )}
             </div>
+
+            <DeleteConfirmationDialog
+              isOpen={retryConfirmOpen}
+              onClose={() => {
+                if (!retrying) setRetryConfirmOpen(false);
+              }}
+              onConfirm={handleRetry}
+              title="Retry evaluation"
+              message={`This will start a new STT evaluation on the same dataset (${evaluationResult.dataset_name ?? "—"}), providers, and evaluators as the failed run.`}
+              confirmText="Retry"
+              isDeleting={retrying}
+            />
 
             {/* Only show tabs and content when we have at least one provider result */}
             {evaluationResult.provider_results &&
