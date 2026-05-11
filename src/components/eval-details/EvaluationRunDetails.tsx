@@ -156,6 +156,64 @@ function evaluatorRowsToMetricDescriptions(
   }));
 }
 
+/**
+ * Builds the per-evaluator chart configs (axis bounds, tick + tooltip
+ * formatters) used by both the STT and TTS leaderboards. Binary stays in
+ * [0,1] but renders as %; rating spans [0, scale_max] when known so
+ * providers compare on the same axis.
+ */
+function evaluatorChartConfigs(
+  evaluatorColumns: Array<STTEvaluatorColumn | TTSEvaluatorColumn>,
+): ChartConfig[] {
+  return evaluatorColumns.map((col) => {
+    const isBinary = col.outputType === "binary";
+    const scaleMax =
+      typeof col.scaleMax === "number" ? col.scaleMax : undefined;
+    return {
+      title: col.label,
+      dataKey: col.scoreField ?? `${col.key}_score`,
+      yDomain: isBinary
+        ? ([0, 1] as [number, number])
+        : scaleMax != null
+          ? ([0, scaleMax] as [number, number])
+          : undefined,
+      yTickFormatter: isBinary
+        ? (v: number) => `${Math.round(v * 100)}%`
+        : undefined,
+      formatTooltip: isBinary
+        ? (v: number) => `${Math.round(v * 100)}%`
+        : scaleMax != null
+          ? (v: number) => `${parseFloat(v.toFixed(4))}/${scaleMax}`
+          : undefined,
+    };
+  });
+}
+
+/** Builds the per-evaluator leaderboard table columns (matching cell format). */
+function evaluatorLeaderboardColumns(
+  evaluatorColumns: Array<STTEvaluatorColumn | TTSEvaluatorColumn>,
+) {
+  return evaluatorColumns.map((col) => ({
+    key: col.scoreField ?? `${col.key}_score`,
+    header: col.label,
+    render: (v: unknown) =>
+      formatEvaluatorAggregate(
+        typeof v === "number" ? v : null,
+        col.outputType,
+        col.scaleMax,
+      ),
+  }));
+}
+
+/** Pairs charts into rows of two for the LeaderboardTab grid. */
+function chunkChartRows(charts: ChartConfig[]): ChartConfig[][] {
+  const rows: ChartConfig[][] = [];
+  for (let i = 0; i < charts.length; i += 2) {
+    rows.push(charts.slice(i, i + 2));
+  }
+  return rows;
+}
+
 export function STTEvaluationAbout({
   evaluatorRows,
 }: {
@@ -193,35 +251,9 @@ export function STTEvaluationLeaderboard({
 }) {
   const allCharts: ChartConfig[] = [
     { title: "WER", dataKey: "wer" },
-    ...evaluatorColumns.map((col) => {
-      const isBinary = col.outputType === "binary";
-      const scaleMax =
-        typeof col.scaleMax === "number" ? col.scaleMax : undefined;
-      return {
-        title: col.label,
-        dataKey: col.scoreField ?? `${col.key}_score`,
-        // Binary stays in [0,1] but rendered as %; rating spans [0, scaleMax]
-        // when known so all providers are comparable on the same axis.
-        yDomain: isBinary
-          ? ([0, 1] as [number, number])
-          : scaleMax != null
-            ? ([0, scaleMax] as [number, number])
-            : undefined,
-        yTickFormatter: isBinary
-          ? (v: number) => `${Math.round(v * 100)}%`
-          : undefined,
-        formatTooltip: isBinary
-          ? (v: number) => `${Math.round(v * 100)}%`
-          : scaleMax != null
-            ? (v: number) => `${parseFloat(v.toFixed(4))}/${scaleMax}`
-            : undefined,
-      };
-    }),
+    ...evaluatorChartConfigs(evaluatorColumns),
   ];
-  const chartRows: ChartConfig[][] = [];
-  for (let i = 0; i < allCharts.length; i += 2) {
-    chartRows.push(allCharts.slice(i, i + 2));
-  }
+  const chartRows = chunkChartRows(allCharts);
 
   return (
     <LeaderboardTab
@@ -229,16 +261,7 @@ export function STTEvaluationLeaderboard({
       columns={[
         { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
         { key: "wer", header: "WER" },
-        ...evaluatorColumns.map((col) => ({
-          key: col.scoreField ?? `${col.key}_score`,
-          header: col.label,
-          render: (v: unknown) =>
-            formatEvaluatorAggregate(
-              typeof v === "number" ? v : null,
-              col.outputType,
-              col.scaleMax,
-            ),
-        })),
+        ...evaluatorLeaderboardColumns(evaluatorColumns),
       ]}
       data={leaderboardSummary}
       charts={chartRows}
@@ -260,50 +283,17 @@ export function TTSEvaluationLeaderboard({
   className?: string;
 }) {
   const allCharts: ChartConfig[] = [
-    ...evaluatorColumns.map((col) => {
-      const isBinary = col.outputType === "binary";
-      const scaleMax =
-        typeof col.scaleMax === "number" ? col.scaleMax : undefined;
-      return {
-        title: col.label,
-        dataKey: col.scoreField ?? `${col.key}_score`,
-        yDomain: isBinary
-          ? ([0, 1] as [number, number])
-          : scaleMax != null
-            ? ([0, scaleMax] as [number, number])
-            : undefined,
-        yTickFormatter: isBinary
-          ? (v: number) => `${Math.round(v * 100)}%`
-          : undefined,
-        formatTooltip: isBinary
-          ? (v: number) => `${Math.round(v * 100)}%`
-          : scaleMax != null
-            ? (v: number) => `${parseFloat(v.toFixed(4))}/${scaleMax}`
-            : undefined,
-      };
-    }),
+    ...evaluatorChartConfigs(evaluatorColumns),
     { title: "TTFB (s)", dataKey: "ttfb" },
   ];
-  const chartRows: ChartConfig[][] = [];
-  for (let i = 0; i < allCharts.length; i += 2) {
-    chartRows.push(allCharts.slice(i, i + 2));
-  }
+  const chartRows = chunkChartRows(allCharts);
 
   return (
     <LeaderboardTab
       className={className}
       columns={[
         { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
-        ...evaluatorColumns.map((col) => ({
-          key: col.scoreField ?? `${col.key}_score`,
-          header: col.label,
-          render: (v: unknown) =>
-            formatEvaluatorAggregate(
-              typeof v === "number" ? v : null,
-              col.outputType,
-              col.scaleMax,
-            ),
-        })),
+        ...evaluatorLeaderboardColumns(evaluatorColumns),
         {
           key: "ttfb",
           header: "TTFB (s)",
