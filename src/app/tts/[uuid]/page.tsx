@@ -983,7 +983,7 @@ export default function TTSEvaluationDetailPage() {
                   {/* Leaderboard Tab */}
                   {displayedActiveTab === "leaderboard" && evaluationResult.leaderboard_summary && (
                     <TTSEvaluationLeaderboard
-                      className="-mx-4 md:-mx-8 px-4 md:px-8 w-[calc(100vw-32px)] md:w-[calc(100vw-56px)] ml-[calc((32px-100vw)/2+50%)] md:ml-[calc((56px-100vw)/2+50%)] relative"
+                      className="-mx-4 md:-mx-8 px-4 md:px-8 relative"
                       leaderboardSummary={evaluationResult.leaderboard_summary}
                       evaluatorColumns={evaluatorColumns}
                       getProviderLabel={getProviderLabel}
