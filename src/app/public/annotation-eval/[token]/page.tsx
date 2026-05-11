@@ -9,6 +9,8 @@ import {
 } from "@/components/PublicPageLayout";
 import {
   EvaluatorRunDetailView,
+  statusLabel,
+  statusPillClass,
   type EvaluatorRunJob,
   type LabellingTaskFull,
 } from "@/components/human-labelling/EvaluatorRunDetailView";
@@ -105,7 +107,19 @@ export default function PublicEvaluatorRunPage() {
   }
 
   return (
-    <PublicPageLayout title={task.name ?? "Evaluation run"} contentClassName="max-w-7xl">
+    <PublicPageLayout
+      title={task.name ?? "Evaluation run"}
+      pills={
+        <span
+          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${statusPillClass(
+            job.status,
+          )}`}
+        >
+          {statusLabel(job.status)}
+        </span>
+      }
+      contentClassName="max-w-7xl"
+    >
       <div className="flex flex-col gap-4" style={{ height: "calc(100dvh - 140px)" }}>
         <EvaluatorRunDetailView
           job={job}
