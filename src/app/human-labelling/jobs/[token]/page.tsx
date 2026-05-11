@@ -35,11 +35,10 @@ export default function AdminAnnotateJobPage() {
   const customHeader = (
     <button
       onClick={() => router.back()}
-      className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
-      title="Back"
+      className="inline-flex items-center gap-1.5 px-2 h-8 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
     >
       <svg
-        className="w-5 h-5"
+        className="w-4 h-4"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -51,6 +50,7 @@ export default function AdminAnnotateJobPage() {
           d="M15.75 19.5L8.25 12l7.5-7.5"
         />
       </svg>
+      Back to labelling jobs
     </button>
   );
 
@@ -81,7 +81,7 @@ export default function AdminAnnotateJobPage() {
               d="M15.75 19.5L8.25 12l7.5-7.5"
             />
           </svg>
-          Back
+          Back to labelling jobs
         </button>
 
         {meta && (
