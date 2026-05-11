@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import { PublicPageLayout } from "@/components/PublicPageLayout";
 import {
   AnnotationJobView,
+  jobStatusLabel,
+  jobStatusPillClass,
   type AnnotationJobMeta,
 } from "@/components/human-labelling/AnnotationJobView";
 
@@ -85,24 +87,5 @@ export default function PublicAnnotationJobViewerPage() {
       </div>
     </PublicPageLayout>
   );
-}
-
-function jobStatusPillClass(
-  status: AnnotationJobMeta["jobStatus"],
-): string {
-  switch (status) {
-    case "completed":
-      return "border-green-200 bg-green-100 text-green-700 dark:border-green-500/30 dark:bg-green-500/20 dark:text-green-400";
-    case "in_progress":
-      return "border-yellow-200 bg-yellow-100 text-yellow-700 dark:border-yellow-500/30 dark:bg-yellow-500/20 dark:text-yellow-400";
-    default:
-      return "border-gray-200 bg-gray-100 text-gray-700 dark:border-gray-500/30 dark:bg-gray-500/20 dark:text-gray-300";
-  }
-}
-
-function jobStatusLabel(status: AnnotationJobMeta["jobStatus"]): string {
-  if (status === "in_progress") return "In progress";
-  if (status === "completed") return "Completed";
-  return "Pending";
 }
 
