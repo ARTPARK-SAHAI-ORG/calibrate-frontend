@@ -701,8 +701,22 @@ export function TestsTabContent({
         throw new Error("Failed to create test");
       }
 
-      // Refresh the agent's test list so the new test appears immediately.
+      // Bulk endpoint creates the test atomically but links it best-effort.
+      // If linking to this agent failed, the test is in the user's library
+      // but won't show up in this agent's list — refresh anyway (it's still
+      // a no-op for the agent table) but surface the warning and keep the
+      // dialog open so the user knows they need to retry the attach.
+      const result = (await response.json().catch(() => null)) as
+        | { warnings?: string[] | null }
+        | null;
       await fetchAgentTests();
+      if (result?.warnings && result.warnings.length > 0) {
+        setCreateError(
+          `Test created but could not be attached to this agent: ${result.warnings.join("; ")}`,
+        );
+        setIsCreating(false);
+        return;
+      }
       setNewTestName("");
       setValidationAttempted(false);
       setCreateDialogOpen(false);
