@@ -742,7 +742,6 @@ export default function TTSEvaluationDetailPage() {
                     getContents={() => {
                       const columns: ExportColumn[] = [
                         { key: "provider", header: "Provider" },
-                        { key: "row", header: "Row" },
                         { key: "audio_name", header: "Audio name" },
                         { key: "text", header: "Text" },
                         ...evaluatorColumns.map((c) => ({
@@ -778,7 +777,6 @@ export default function TTSEvaluationDetailPage() {
                             : "";
                           const row: Record<string, unknown> = {
                             provider: getProviderLabel(pr.provider),
-                            row: r.id,
                             audio_name: audioName,
                             text: r.text,
                           };

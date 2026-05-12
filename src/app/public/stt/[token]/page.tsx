@@ -206,7 +206,6 @@ export default function PublicSTTPage() {
                   getRows={() => {
                     const columns: ExportColumn[] = [
                       { key: "provider", header: "Provider" },
-                      { key: "row", header: "Row" },
                       { key: "reference_text", header: "Reference text" },
                       { key: "predicted_text", header: "Predicted text" },
                       { key: "wer", header: "WER" },
@@ -220,7 +219,6 @@ export default function PublicSTTPage() {
                       for (const r of pr.results ?? []) {
                         const row: Record<string, unknown> = {
                           provider: getProviderLabel(pr.provider),
-                          row: r.id,
                           reference_text: r.gt,
                           predicted_text: r.pred,
                           wer: r.wer,

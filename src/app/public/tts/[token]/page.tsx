@@ -206,7 +206,6 @@ export default function PublicTTSPage() {
                   getContents={() => {
                     const columns: ExportColumn[] = [
                       { key: "provider", header: "Provider" },
-                      { key: "row", header: "Row" },
                       { key: "audio_name", header: "Audio name" },
                       { key: "text", header: "Text" },
                       ...evaluatorColumns.map((c) => ({
@@ -238,7 +237,6 @@ export default function PublicTTSPage() {
                           : "";
                         const row: Record<string, unknown> = {
                           provider: getProviderLabel(pr.provider),
-                          row: r.id,
                           audio_name: audioName,
                           text: r.text,
                         };

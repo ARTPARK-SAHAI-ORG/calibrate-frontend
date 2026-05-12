@@ -1182,8 +1182,8 @@ export function BulkUploadTestsModal({
                       : "text-muted-foreground"
                   }`}
                 >
-                  Grade the agent&apos;s text reply to the last user message
-                  against your evaluators.
+                  Evaluate the agent&apos;s response given a conversation
+                  history
                 </div>
               </button>
               <button
@@ -1213,8 +1213,8 @@ export function BulkUploadTestsModal({
                       : "text-muted-foreground"
                   }`}
                 >
-                  Check which tool the agent invokes and the arguments it
-                  passes.
+                  Check whether the agent invokes the correct tool with the
+                  correct arguments
                 </div>
               </button>
             </div>
