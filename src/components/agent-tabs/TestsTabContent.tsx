@@ -1734,72 +1734,72 @@ export function TestsTabContent({
         <div className="flex-1 flex flex-col lg:flex-row gap-4 md:gap-6">
           {/* Left Panel - Tests Table */}
           <div className="flex-1 flex flex-col min-w-0">
-            {/* Search Input + Type Filter */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3 md:mb-4">
-              <div className="relative flex-1 min-w-0">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <svg
-                    className="w-4 md:w-5 h-4 md:h-5 text-muted-foreground"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                    />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  value={testsSearchQuery}
-                  onChange={(e) => setTestsSearchQuery(e.target.value)}
-                  placeholder="Search tests"
-                  className="w-full h-9 md:h-10 pl-9 md:pl-10 pr-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                />
+            {/* Search input — full width so long test names have room to
+                wrap; the type filter sits below it on its own row. */}
+            <div className="relative mb-2 md:mb-3">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <svg
+                  className="w-4 md:w-5 h-4 md:h-5 text-muted-foreground"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                  />
+                </svg>
               </div>
-              {/* Type filter — segmented toggle. Matches the "Next Reply /
-                  Tool Call" pattern used in BulkUploadTestsModal. */}
-              <div className="flex rounded-lg border border-border overflow-hidden w-fit self-start sm:self-auto">
-                {(
-                  [
-                    { value: "all", label: "All" },
-                    { value: "response", label: "Next Reply" },
-                    { value: "tool_call", label: "Tool Call" },
-                  ] as const
-                ).map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => {
-                      setTypeFilter(opt.value);
-                      // Drop any selection that no longer matches the new
-                      // filter so the bulk-action counts don't drift from
-                      // what's visible.
-                      setSelectedTestUuids((prev) => {
-                        if (prev.size === 0) return prev;
-                        const next = new Set<string>();
-                        for (const t of agentTests) {
-                          if (!prev.has(t.uuid)) continue;
-                          if (opt.value !== "all" && t.type !== opt.value)
-                            continue;
-                          next.add(t.uuid);
-                        }
-                        return next;
-                      });
-                    }}
-                    className={`h-9 md:h-10 px-3 text-sm font-medium transition-colors cursor-pointer ${
-                      typeFilter === opt.value
-                        ? "bg-foreground text-background"
-                        : "bg-background text-foreground hover:bg-muted/50"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+              <input
+                type="text"
+                value={testsSearchQuery}
+                onChange={(e) => setTestsSearchQuery(e.target.value)}
+                placeholder="Search tests"
+                className="w-full h-9 md:h-10 pl-9 md:pl-10 pr-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              />
+            </div>
+            {/* Type filter — segmented toggle. Sits on its own row below
+                the search bar. Matches the "Next Reply / Tool Call" pattern
+                used in BulkUploadTestsModal. */}
+            <div className="flex rounded-lg border border-border overflow-hidden w-fit mb-3 md:mb-4">
+              {(
+                [
+                  { value: "all", label: "All" },
+                  { value: "response", label: "Next Reply" },
+                  { value: "tool_call", label: "Tool Call" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    setTypeFilter(opt.value);
+                    // Drop any selection that no longer matches the new
+                    // filter so the bulk-action counts don't drift from
+                    // what's visible.
+                    setSelectedTestUuids((prev) => {
+                      if (prev.size === 0) return prev;
+                      const next = new Set<string>();
+                      for (const t of agentTests) {
+                        if (!prev.has(t.uuid)) continue;
+                        if (opt.value !== "all" && t.type !== opt.value)
+                          continue;
+                        next.add(t.uuid);
+                      }
+                      return next;
+                    });
+                  }}
+                  className={`h-9 md:h-10 px-3 text-sm font-medium transition-colors cursor-pointer ${
+                    typeFilter === opt.value
+                      ? "bg-foreground text-background"
+                      : "bg-background text-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
 
             <p className="text-sm text-muted-foreground mb-3 md:mb-4">
