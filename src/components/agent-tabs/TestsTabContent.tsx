@@ -1770,7 +1770,7 @@ export function TestsTabContent({
                   { value: "response", label: "Next Reply" },
                   { value: "tool_call", label: "Tool Call" },
                 ] as const
-              ).map((opt) => (
+              ).map((opt, i, arr) => (
                 <button
                   key={opt.value}
                   type="button"
@@ -1791,7 +1791,13 @@ export function TestsTabContent({
                       return next;
                     });
                   }}
+                  // Right-border on every segment except the last gives a
+                  // visible divider between options regardless of active
+                  // state (the parent's `overflow-hidden` clips the
+                  // trailing border against the rounded container edge).
                   className={`h-9 md:h-10 px-3 text-sm font-medium transition-colors cursor-pointer ${
+                    i < arr.length - 1 ? "border-r border-border" : ""
+                  } ${
                     typeFilter === opt.value
                       ? "bg-foreground text-background"
                       : "bg-background text-foreground hover:bg-muted/50"
