@@ -1156,12 +1156,12 @@ export function TestsTabContent({
   // Share/Public/Copy-link (purple/blue/amber) and Export (teal) actions.
   //
   //   Add test (attach existing) → indigo
-  //   Create test               → pink
+  //   Create test               → emerald (pink read as "danger" — swapped)
   //   Bulk upload               → orange
   const ADD_TEST_BUTTON_CLASS =
     "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-indigo-500/12 border-indigo-500/45 text-indigo-950 dark:text-indigo-100 hover:bg-indigo-500/22 dark:hover:bg-indigo-500/18";
   const CREATE_TEST_BUTTON_CLASS =
-    "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-pink-500/12 border-pink-500/45 text-pink-950 dark:text-pink-100 hover:bg-pink-500/22 dark:hover:bg-pink-500/18";
+    "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18";
   const BULK_UPLOAD_BUTTON_CLASS =
     "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-orange-500/12 border-orange-500/45 text-orange-950 dark:text-orange-100 hover:bg-orange-500/22 dark:hover:bg-orange-500/18";
 
