@@ -2653,7 +2653,7 @@ export function AddTestDialog({
                                       }
                                     />
                                     <div
-                                      className={`absolute bg-background border border-border rounded-lg shadow-xl z-[200] overflow-hidden py-1 whitespace-nowrap ${
+                                      className={`absolute bg-background border border-border rounded-lg shadow-xl z-[200] overflow-hidden whitespace-nowrap ${
                                         message.role === "user"
                                           ? chatMessages.length <= 2
                                             ? "right-0 top-10"
@@ -2663,11 +2663,12 @@ export function AddTestDialog({
                                             : "left-0 bottom-full mb-2"
                                       }`}
                                     >
-                                      {/* Semantic hue per message kind,
-                                          rendered as a tinted row chip so
-                                          each option reads as its own
-                                          coloured cell. Cyan for Agent
-                                          tool call keeps it visually
+                                      {/* Three clearly separated hues so
+                                          adjacent rows don't read as the
+                                          same family: amber (warm yellow)
+                                          for User, sky (cool blue) for
+                                          Agent, fuchsia (pink-magenta)
+                                          for Agent tool call — also
                                           distinct from the violet
                                           "Add evaluator" button above. */}
                                       <button
@@ -2723,7 +2724,7 @@ export function AddTestDialog({
                                           setAddMessageDropdownOpen(false);
                                           setToolCallDropdownOpen(true);
                                         }}
-                                        className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-cyan-500/15 text-cyan-900 dark:bg-cyan-500/20 dark:text-cyan-100 hover:bg-cyan-500/25 dark:hover:bg-cyan-500/30"
+                                        className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-fuchsia-500/15 text-fuchsia-900 dark:bg-fuchsia-500/20 dark:text-fuchsia-100 hover:bg-fuchsia-500/25 dark:hover:bg-fuchsia-500/30"
                                       >
                                         <svg
                                           className="w-4 h-4"
