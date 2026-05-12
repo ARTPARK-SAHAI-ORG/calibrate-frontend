@@ -725,24 +725,14 @@ export default function TTSEvaluationDetailPage() {
               {evaluationResult.status !== "done" && (
                 <StatusBadge status={evaluationResult.status} showSpinner />
               )}
-              {/* Sharing only makes sense once the run is complete — earlier
-                  state changes too quickly and a shared link would render
-                  partial results. */}
-              {evaluationResult.status === "done" && backendAccessToken && (
-                <ShareButton
-                  entityType="tts"
-                  entityId={taskId}
-                  accessToken={backendAccessToken}
-                  initialIsPublic={evaluationResult.is_public ?? false}
-                  initialShareToken={evaluationResult.share_token ?? null}
-                />
-              )}
               {/* Export per-row results as a zip containing `results.csv`
                   (row id, audio_name, evaluator scores — same convention
                   as the STT CSV) and an `audios/` folder of every
                   synthesized clip. Each audio is named
                   `<provider>_<row>.<ext>` so the audio_name CSV column
-                  points directly at the file inside the zip. */}
+                  points directly at the file inside the zip. Placed
+                  before Share so the Export ↔ Share ordering matches
+                  TestRunnerDialog / BenchmarkResultsDialog / STT. */}
               {evaluationResult.status === "done" &&
                 (evaluationResult.provider_results ?? []).some(
                   (pr) => (pr.results?.length ?? 0) > 0,
@@ -806,8 +796,12 @@ export default function TTSEvaluationDetailPage() {
                               continue;
                             }
                             if (c.outputType === "binary") {
+                              // Mirrors EvaluatorScoreCell: lowercase the
+                              // raw string before comparing so judges that
+                              // emit "True"/"TRUE" still register as Pass.
+                              const norm = score.toLowerCase();
                               row[c.key] =
-                                score === "true" || score === "1"
+                                norm === "true" || norm === "1"
                                   ? "true"
                                   : "false";
                             } else {
@@ -831,6 +825,18 @@ export default function TTSEvaluationDetailPage() {
                     }}
                   />
                 )}
+              {/* Sharing only makes sense once the run is complete — earlier
+                  state changes too quickly and a shared link would render
+                  partial results. */}
+              {evaluationResult.status === "done" && backendAccessToken && (
+                <ShareButton
+                  entityType="tts"
+                  entityId={taskId}
+                  accessToken={backendAccessToken}
+                  initialIsPublic={evaluationResult.is_public ?? false}
+                  initialShareToken={evaluationResult.share_token ?? null}
+                />
+              )}
               {evaluationResult.status === "failed" &&
                 backendAccessToken &&
                 evaluationResult.dataset_id && (

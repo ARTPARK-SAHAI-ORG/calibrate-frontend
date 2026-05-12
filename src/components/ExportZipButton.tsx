@@ -65,7 +65,7 @@ export function ExportZipButton({
   filename,
   getContents,
   disabled,
-  label = "Export",
+  label = "Export results",
   className,
 }: ExportZipButtonProps) {
   const [isExporting, setIsExporting] = useState(false);

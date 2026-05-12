@@ -41,7 +41,7 @@ export function ExportResultsButton({
   filename,
   getRows,
   disabled,
-  label = "Export",
+  label = "Export results",
   className,
 }: ExportResultsButtonProps) {
   const handleClick = () => {

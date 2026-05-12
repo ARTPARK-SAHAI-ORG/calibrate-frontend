@@ -719,19 +719,9 @@ export default function STTEvaluationDetailPage() {
               {evaluationResult.status !== "done" && (
                 <StatusBadge status={evaluationResult.status} showSpinner />
               )}
-              {/* Sharing only makes sense once the run is complete — earlier
-                  state changes too quickly and a shared link would render
-                  partial results. */}
-              {evaluationResult.status === "done" && backendAccessToken && (
-                <ShareButton
-                  entityType="stt"
-                  entityId={taskId}
-                  accessToken={backendAccessToken}
-                  initialIsPublic={evaluationResult.is_public ?? false}
-                  initialShareToken={evaluationResult.share_token ?? null}
-                />
-              )}
-              {/* Export per-row results to CSV. One row per (provider, row);
+              {/* Export per-row results to CSV. Placed before Share so the
+                  Export ↔ Share button order matches TestRunnerDialog /
+                  BenchmarkResultsDialog. One row per (provider, row);
                   columns: reference / predicted text, WER, and one column
                   per attached evaluator (binary → "true"/"false", rating →
                   raw numeric score). Built at click time so it reflects
@@ -779,9 +769,12 @@ export default function STTEvaluationDetailPage() {
                               continue;
                             }
                             if (c.outputType === "binary") {
-                              // Mirrors EvaluatorScoreCell: "true"/"1" → Pass.
+                              // Mirrors EvaluatorScoreCell: lowercase the
+                              // raw string before comparing so judges that
+                              // emit "True"/"TRUE" still register as Pass.
+                              const norm = score.toLowerCase();
                               row[c.key] =
-                                score === "true" || score === "1"
+                                norm === "true" || norm === "1"
                                   ? "true"
                                   : "false";
                             } else {
@@ -796,6 +789,18 @@ export default function STTEvaluationDetailPage() {
                     }}
                   />
                 )}
+              {/* Sharing only makes sense once the run is complete — earlier
+                  state changes too quickly and a shared link would render
+                  partial results. */}
+              {evaluationResult.status === "done" && backendAccessToken && (
+                <ShareButton
+                  entityType="stt"
+                  entityId={taskId}
+                  accessToken={backendAccessToken}
+                  initialIsPublic={evaluationResult.is_public ?? false}
+                  initialShareToken={evaluationResult.share_token ?? null}
+                />
+              )}
               {evaluationResult.status === "failed" &&
                 backendAccessToken &&
                 evaluationResult.dataset_id && (
