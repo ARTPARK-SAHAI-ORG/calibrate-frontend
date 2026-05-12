@@ -887,7 +887,12 @@ function LLMPageInner() {
               Create and manage tests to evaluate your LLM
             </p>
           </div>
-          {activeTab === "tests" && (
+          {/* Top-right action area. Hidden when the library is fully empty
+              — in that case the placeholder card below renders the
+              Create test / Bulk upload buttons instead, since there are
+              no tests to manage and no bulk-delete / search context that
+              would put the action buttons up here. */}
+          {activeTab === "tests" && !testsLoading && tests.length > 0 && (
             <div className="flex items-center gap-2">
               {selectedTestUuids.size > 0 && (
                 <button
@@ -897,9 +902,11 @@ function LLMPageInner() {
                   Delete selected ({selectedTestUuids.size})
                 </button>
               )}
+              {/* Same tinted styling as the agent page's Tests tab:
+                  Create test → emerald, Bulk upload → orange. */}
               <button
                 onClick={() => setBulkUploadOpen(true)}
-                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer flex-shrink-0"
+                className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors flex-shrink-0 bg-orange-500/12 border-orange-500/45 text-orange-950 dark:text-orange-100 hover:bg-orange-500/22 dark:hover:bg-orange-500/18"
               >
                 Bulk upload
               </button>
@@ -908,9 +915,9 @@ function LLMPageInner() {
                   resetForm();
                   setAddTestSidebarOpen(true);
                 }}
-                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
+                className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors flex-shrink-0 bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
               >
-                Add test
+                Create test
               </button>
             </div>
           )}
@@ -1029,15 +1036,30 @@ function LLMPageInner() {
                 ? "No tests match your search"
                 : "You haven't created any tests yet"}
             </p>
-            <button
-              onClick={() => {
-                resetForm();
-                setAddTestSidebarOpen(true);
-              }}
-              className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-            >
-              Add test
-            </button>
+            {/* When the library is truly empty (no search filter), show
+                both create affordances inline — the top-right area is
+                hidden in that case so this is the only entry point.
+                When the empty state is search-driven, render no button
+                (the user can clear the search). */}
+            {!searchQuery && (
+              <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
+                <button
+                  onClick={() => {
+                    resetForm();
+                    setAddTestSidebarOpen(true);
+                  }}
+                  className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
+                >
+                  Create test
+                </button>
+                <button
+                  onClick={() => setBulkUploadOpen(true)}
+                  className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-orange-500/12 border-orange-500/45 text-orange-950 dark:text-orange-100 hover:bg-orange-500/22 dark:hover:bg-orange-500/18"
+                >
+                  Bulk upload
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <>
