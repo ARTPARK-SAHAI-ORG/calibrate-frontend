@@ -173,6 +173,12 @@ export function TestsTabContent({
   // All available tests state
   const [allTests, setAllTests] = useState<TestData[]>([]);
   const [allTestsLoading, setAllTestsLoading] = useState(false);
+  // Tracks whether `/tests` has been fetched at least once during this
+  // session. Used by the empty state to decide whether the "Add test"
+  // (attach-existing) button is meaningful — if the user has no tests at
+  // all, the button is dropped entirely rather than offering an empty
+  // dropdown.
+  const [allTestsFetched, setAllTestsFetched] = useState(false);
 
   // UI state
   const [showTestDropdown, setShowTestDropdown] = useState(false);
@@ -181,9 +187,9 @@ export function TestsTabContent({
   // Filter the agent's tests by test type. "all" shows both kinds; "response"
   // is Next Reply, "tool_call" is Tool Call. The "select all" checkbox keys
   // off `filteredAgentTests`, so this filter also narrows what gets selected.
-  const [typeFilter, setTypeFilter] = useState<"all" | "response" | "tool_call">(
-    "all",
-  );
+  const [typeFilter, setTypeFilter] = useState<
+    "all" | "response" | "tool_call"
+  >("all");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Create-test dialog state (single test created in-place from the agent
@@ -335,46 +341,74 @@ export function TestsTabContent({
     }
   }, [agentUuid, backendAccessToken, fetchAgentTests]);
 
-  // Fetch all available tests when dropdown opens
+  // Fetch the user's full /tests library. Triggered from two places: when
+  // the attach-existing dropdown opens, and when the agent's tests list
+  // is empty (so the empty state can decide whether the Add-test button
+  // is meaningful).
+  const fetchAllTests = useCallback(async () => {
+    if (!backendAccessToken) return;
+    try {
+      setAllTestsLoading(true);
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) {
+        throw new Error("BACKEND_URL environment variable is not set");
+      }
+
+      const response = await fetch(`${backendUrl}/tests`, {
+        method: "GET",
+        headers: {
+          accept: "application/json",
+          Authorization: `Bearer ${backendAccessToken}`,
+        },
+      });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch tests");
+      }
+
+      const data: TestData[] = await response.json();
+      setAllTests(data);
+      setAllTestsFetched(true);
+    } catch (err) {
+      console.error("Error fetching tests:", err);
+    } finally {
+      setAllTestsLoading(false);
+    }
+  }, [backendAccessToken]);
+
+  // (1) Fetch when the attach-existing dropdown opens.
   useEffect(() => {
     if (showTestDropdown && backendAccessToken) {
-      const fetchTests = async () => {
-        try {
-          setAllTestsLoading(true);
-          const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-          if (!backendUrl) {
-            throw new Error("BACKEND_URL environment variable is not set");
-          }
-
-          const response = await fetch(`${backendUrl}/tests`, {
-            method: "GET",
-            headers: {
-              accept: "application/json",
-              Authorization: `Bearer ${backendAccessToken}`,
-            },
-          });
-
-          if (response.status === 401) {
-            await signOut({ callbackUrl: "/login" });
-            return;
-          }
-
-          if (!response.ok) {
-            throw new Error("Failed to fetch tests");
-          }
-
-          const data: TestData[] = await response.json();
-          setAllTests(data);
-        } catch (err) {
-          console.error("Error fetching tests:", err);
-        } finally {
-          setAllTestsLoading(false);
-        }
-      };
-
-      fetchTests();
+      fetchAllTests();
     }
-  }, [showTestDropdown, backendAccessToken]);
+  }, [showTestDropdown, backendAccessToken, fetchAllTests]);
+
+  // (2) Fetch when the agent's tests list is known to be empty, so the
+  // empty state can decide whether to show the Add-test button. Only
+  // fires once per session (gated on `allTestsFetched`).
+  useEffect(() => {
+    if (
+      !agentTestsLoading &&
+      agentTests.length === 0 &&
+      !allTestsFetched &&
+      !allTestsLoading &&
+      backendAccessToken
+    ) {
+      fetchAllTests();
+    }
+  }, [
+    agentTestsLoading,
+    agentTests.length,
+    allTestsFetched,
+    allTestsLoading,
+    backendAccessToken,
+    fetchAllTests,
+  ]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -706,9 +740,9 @@ export function TestsTabContent({
       // but won't show up in this agent's list — refresh anyway (it's still
       // a no-op for the agent table) but surface the warning and keep the
       // dialog open so the user knows they need to retry the attach.
-      const result = (await response.json().catch(() => null)) as
-        | { warnings?: string[] | null }
-        | null;
+      const result = (await response.json().catch(() => null)) as {
+        warnings?: string[] | null;
+      } | null;
       await fetchAgentTests();
       if (result?.warnings && result.warnings.length > 0) {
         setCreateError(
@@ -1119,9 +1153,7 @@ export function TestsTabContent({
   // test). "Create test" opens the in-place creation dialog; "Bulk upload"
   // opens the CSV modal locked to this agent. Both use POST /tests/bulk with
   // `agent_uuids: [agentUuid]` so new tests auto-attach to this agent.
-  const renderNewTestButtons = (
-    variant: "outline" | "primary" = "outline",
-  ) => {
+  const renderNewTestButtons = (variant: "outline" | "primary" = "outline") => {
     const baseClass =
       variant === "primary"
         ? "h-9 md:h-10 px-4 md:px-5 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
@@ -1697,10 +1729,18 @@ export function TestsTabContent({
           </h3>
           <p className="text-sm md:text-base text-muted-foreground mb-3 md:mb-4 text-center max-w-md">
             This agent doesn&apos;t have any tests attached to it.
+            {allTestsFetched && allTests.length === 0
+              ? " Create a new test or upload tests in bulk."
+              : " Add an existing test or create a new one."}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
-            {renderAddTestControl("primary")}
-            {renderNewTestButtons("outline")}
+            {/* Only show the attach-existing button when the user actually
+                has tests to attach — otherwise the dropdown is empty and
+                the affordance is misleading. */}
+            {allTests.length > 0 && renderAddTestControl("primary")}
+            {renderNewTestButtons(
+              allTests.length > 0 ? "outline" : "primary",
+            )}
           </div>
         </div>
       ) : agentTests.length === 0 ? (
@@ -1723,8 +1763,10 @@ export function TestsTabContent({
                 This agent doesn&apos;t have any tests linked right now
               </p>
               <div className="flex flex-wrap justify-center gap-2 md:gap-3 mt-3 md:mt-4 w-full">
-                {renderAddTestControl("primary")}
-                {renderNewTestButtons("outline")}
+                {allTests.length > 0 && renderAddTestControl("primary")}
+                {renderNewTestButtons(
+                  allTests.length > 0 ? "outline" : "primary",
+                )}
               </div>
             </div>
           </div>
