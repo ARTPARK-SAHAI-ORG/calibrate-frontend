@@ -18,7 +18,11 @@ import type {
   LLMModel,
   DataExtractionFieldData,
 } from "@/components/agent-tabs";
-import { useOpenRouterModels, findModelInProviders, useVerifyConnection } from "@/hooks";
+import {
+  useOpenRouterModels,
+  findModelInProviders,
+  useVerifyConnection,
+} from "@/hooks";
 import { SpinnerIcon, CheckCircleIcon } from "@/components/icons";
 import { VerifyErrorPopover } from "@/components/VerifyErrorPopover";
 import {
@@ -65,7 +69,13 @@ type ToolData = {
   updated_at: string;
 };
 
-type TabType = "agent" | "connection" | "tools" | "data-extraction" | "tests" | "settings";
+type TabType =
+  | "agent"
+  | "connection"
+  | "tools"
+  | "data-extraction"
+  | "tests"
+  | "settings";
 
 const tabLabels: Record<TabType, string> = {
   agent: "Agent",
@@ -76,7 +86,13 @@ const tabLabels: Record<TabType, string> = {
   settings: "Settings",
 };
 
-const calibrateTabs: TabType[] = ["agent", "tools", "data-extraction", "tests", "settings"];
+const calibrateTabs: TabType[] = [
+  "agent",
+  "tools",
+  "data-extraction",
+  "tests",
+  "settings",
+];
 const connectionTabs: TabType[] = ["connection", "tests", "settings"];
 
 export function AgentDetail({
@@ -90,7 +106,10 @@ export function AgentDetail({
   // Get initial tab from URL or default based on agent type
   const getInitialTab = (): TabType => {
     const tabParam = searchParams.get("tab");
-    if (tabParam && [...calibrateTabs, ...connectionTabs].includes(tabParam as TabType)) {
+    if (
+      tabParam &&
+      [...calibrateTabs, ...connectionTabs].includes(tabParam as TabType)
+    ) {
       return tabParam as TabType;
     }
     return "agent";
@@ -112,10 +131,13 @@ export function AgentDetail({
   >(null);
 
   // Track the last-saved benchmark provider so we can detect unsaved changes
-  const [savedBenchmarkProvider, setSavedBenchmarkProvider] = useState<string | undefined>(undefined);
+  const [savedBenchmarkProvider, setSavedBenchmarkProvider] = useState<
+    string | undefined
+  >(undefined);
 
   // Unsaved changes dialog state (shown when switching tabs with unsaved benchmark provider)
-  const [unsavedChangesDialogOpen, setUnsavedChangesDialogOpen] = useState(false);
+  const [unsavedChangesDialogOpen, setUnsavedChangesDialogOpen] =
+    useState(false);
   const [pendingTab, setPendingTab] = useState<TabType | null>(null);
 
   // Hide the floating "Talk to Us" button when the edit name dialog is open
@@ -160,7 +182,9 @@ export function AgentDetail({
   // Save state
   const [isSaving, setIsSaving] = useState(false);
   const [showSaveToast, setShowSaveToast] = useState(false);
-  const saveRef = useRef<(options?: { silent?: boolean }) => void | Promise<void>>(() => {});
+  const saveRef = useRef<
+    (options?: { silent?: boolean }) => void | Promise<void>
+  >(() => {});
   const isSavingRef = useRef(false);
 
   // Tracks the verified state of the connection agent at the moment data was
@@ -172,6 +196,30 @@ export function AgentDetail({
   // Snapshot used to skip redundant auto-save PUTs.
   const lastAutoSaveSnapshotRef = useRef<string>("");
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /**
+   * Build the auto-save snapshot string. We strip three fields from the
+   * config object — `agent_url`, `agent_headers`, `settings` — because the
+   * post-save merge in `saveRef` doesn't echo them back into
+   * `connectionConfig`. Without stripping, the snapshot computed on the
+   * next render (`config: connectionConfig`, with stale agent_url) would
+   * never equal the snapshot we just stored (`config: configPayload`, with
+   * the freshly-typed agent_url) — and the auto-save effect would loop
+   * forever after the user types into the URL field. The url + headers are
+   * already tracked at the top level of the snapshot, so dropping them from
+   * config doesn't lose any signal.
+   */
+  const computeAutoSaveSnapshot = (
+    url: string,
+    headers: Array<{ key: string; value: string }>,
+    config: ConnectionConfig & Record<string, unknown>,
+  ) => {
+    const stripped: Record<string, unknown> = { ...config };
+    delete stripped.agent_url;
+    delete stripped.agent_headers;
+    delete stripped.settings;
+    return JSON.stringify({ url, headers, config: stripped });
+  };
 
   // Snapshot of the last *saved* connection identity (URL + headers only).
   // Used by the post-verify flow to decide whether to prompt the user — if
@@ -242,7 +290,9 @@ export function AgentDetail({
   // Connection verification via shared hook
   const verify = useVerifyConnection();
 
-  const isConnectionUnverified = agent?.type === "connection" && connectionConfig.connection_verified !== true;
+  const isConnectionUnverified =
+    agent?.type === "connection" &&
+    connectionConfig.connection_verified !== true;
 
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
 
@@ -326,11 +376,11 @@ export function AgentDetail({
             data.config.connection_verified === true,
           );
           // Seed snapshot so the auto-save effect does not fire on initial load.
-          lastAutoSaveSnapshotRef.current = JSON.stringify({
+          lastAutoSaveSnapshotRef.current = computeAutoSaveSnapshot(
             url,
-            headers: headerRows,
-            config: data.config,
-          });
+            headerRows,
+            data.config,
+          );
           lastSavedConnectionIdentityRef.current = computeConnectionIdentity(
             url,
             headerRows,
@@ -387,7 +437,7 @@ export function AgentDetail({
                 agent_id: agentUuid,
                 created_at: field.created_at || new Date().toISOString(),
                 updated_at: field.updated_at || new Date().toISOString(),
-              })
+              }),
             );
             setDataExtractionFields(fields);
           }
@@ -435,7 +485,7 @@ export function AgentDetail({
               accept: "application/json",
               Authorization: `Bearer ${backendAccessToken}`,
             },
-          }
+          },
         );
 
         if (response.status === 401) {
@@ -452,7 +502,7 @@ export function AgentDetail({
       } catch (err) {
         console.error("Error fetching agent tools:", err);
         setAgentToolsError(
-          err instanceof Error ? err.message : "Failed to load agent tools"
+          err instanceof Error ? err.message : "Failed to load agent tools",
         );
       } finally {
         setAgentToolsLoading(false);
@@ -497,7 +547,7 @@ export function AgentDetail({
       } catch (err) {
         console.error("Error fetching tools:", err);
         setAllToolsError(
-          err instanceof Error ? err.message : "Failed to load tools"
+          err instanceof Error ? err.message : "Failed to load tools",
         );
       } finally {
         setAllToolsLoading(false);
@@ -530,7 +580,7 @@ export function AgentDetail({
                 agent_headers: Object.fromEntries(
                   connectionHeaders
                     .filter((h) => h.key.trim())
-                    .map((h) => [h.key.trim(), h.value])
+                    .map((h) => [h.key.trim(), h.value]),
                 ),
                 settings: {
                   agent_speaks_first: agentSpeaksFirst,
@@ -586,8 +636,7 @@ export function AgentDetail({
         if (agent.type === "connection" && savedAgent.config) {
           setConnectionConfig((prev) => ({
             ...prev,
-            connection_verified:
-              savedAgent.config.connection_verified ?? false,
+            connection_verified: savedAgent.config.connection_verified ?? false,
             connection_verified_at:
               savedAgent.config.connection_verified_at ?? null,
             connection_verified_error:
@@ -601,11 +650,11 @@ export function AgentDetail({
         // Refresh the auto-save snapshot so the next debounced effect run
         // does not re-fire for the state we just persisted.
         if (agent.type === "connection") {
-          lastAutoSaveSnapshotRef.current = JSON.stringify({
-            url: connectionUrl,
-            headers: connectionHeaders,
-            config: configPayload,
-          });
+          lastAutoSaveSnapshotRef.current = computeAutoSaveSnapshot(
+            connectionUrl,
+            connectionHeaders,
+            configPayload,
+          );
           lastSavedConnectionIdentityRef.current = computeConnectionIdentity(
             connectionUrl,
             connectionHeaders,
@@ -650,11 +699,11 @@ export function AgentDetail({
     if (initialConnectionVerified !== false) return;
     if (isLoading) return;
 
-    const snapshot = JSON.stringify({
-      url: connectionUrl,
-      headers: connectionHeaders,
-      config: connectionConfig,
-    });
+    const snapshot = computeAutoSaveSnapshot(
+      connectionUrl,
+      connectionHeaders,
+      connectionConfig,
+    );
     if (snapshot === lastAutoSaveSnapshotRef.current) return;
 
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
@@ -833,7 +882,17 @@ export function AgentDetail({
         onDismissVerifyError: verify.dismiss,
       });
     }
-  }, [agent?.name, activeTab, isLoading, isSaving, onHeaderStateChange, isConnectionUnverified, verify.isVerifying, verify.verifyError, verify.verifySampleResponse]);
+  }, [
+    agent?.name,
+    activeTab,
+    isLoading,
+    isSaving,
+    onHeaderStateChange,
+    isConnectionUnverified,
+    verify.isVerifying,
+    verify.verifyError,
+    verify.verifySampleResponse,
+  ]);
 
   if (isLoading) {
     return (
