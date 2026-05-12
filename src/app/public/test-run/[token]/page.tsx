@@ -111,7 +111,6 @@ export default function PublicTestRunPage() {
                     testCase: r.test_case,
                     reasoning: r.reasoning,
                     judgeResults: r.judge_results,
-                    error: r.error,
                   })),
                 )
               }

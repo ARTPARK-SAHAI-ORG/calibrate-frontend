@@ -4,7 +4,6 @@ import type {
   TestCaseOutput,
   JudgeResult,
 } from "@/components/test-results/shared";
-import { normalizeToolCall } from "@/components/test-results/shared";
 import type { ExportColumn } from "@/components/ExportResultsButton";
 
 export type ExportTestRow = {
@@ -21,9 +20,8 @@ export type ExportTestRow = {
   testCase?: TestCaseData | null;
   reasoning?: string;
   /** Per-evaluator verdicts for response tests (null/absent for tool-call
-   * and legacy snapshots). When present, drives the "Next reply" cell. */
+   * and legacy snapshots). Drives the dynamic per-evaluator columns. */
   judgeResults?: JudgeResult[] | null;
-  error?: string;
 };
 
 export type ExportBenchmarkRow = {
@@ -34,7 +32,7 @@ export type ExportBenchmarkRow = {
   output?: TestCaseOutput | null;
   testCase?: TestCaseData | null;
   /** Per-evaluator verdicts for response tests (null/absent for tool-call
-   * and legacy snapshots). When present, drives the "Next reply" cell. */
+   * and legacy snapshots). Drives the dynamic per-evaluator columns. */
   judgeResults?: JudgeResult[] | null;
 };
 
@@ -63,143 +61,191 @@ function isToolCallTest(
   return !!output?.tool_calls && output.tool_calls.length > 0;
 }
 
-// Multi-line text dump of the agent's tool calls for tool-call tests.
-// One block per call (`Tool: <name>` + `Arguments: <json>`), blocks
-// separated by a blank line. Routes through `normalizeToolCall` so the
-// historical `{name, arguments}` / `{tool, arguments}` / `{function: ...}`
-// shapes all render consistently.
-function toolCallsCell(output: TestCaseOutput | null | undefined): string {
-  if (!output?.tool_calls || output.tool_calls.length === 0) return "";
-  return output.tool_calls
-    .map((tc) => {
-      const { toolName, args } = normalizeToolCall(tc);
-      const argsStr =
-        args && Object.keys(args).length > 0 ? JSON.stringify(args) : "{}";
-      return `Tool: ${toolName}\nArguments: ${argsStr}`;
-    })
-    .join("\n\n");
+// Format a single evaluator verdict: "true"/"false" for binary, "score/max"
+// for rating (or "score" when scale_max is unknown), empty string when the
+// evaluator has no result on this row.
+function evaluatorVerdict(jr: JudgeResult | undefined): string {
+  if (!jr) return "";
+  if (jr.match !== null && jr.match !== undefined) {
+    return jr.match ? "true" : "false";
+  }
+  if (jr.score !== null && jr.score !== undefined) {
+    return typeof jr.scale_max === "number"
+      ? `${jr.score}/${jr.scale_max}`
+      : String(jr.score);
+  }
+  return "";
 }
 
-// Multi-line text dump of the per-evaluator verdicts for response tests.
-// One block per evaluator: `<name>: <verdict>`, optional `Variables:` list
-// (one indented line per `{{var}}: <value>`), and `Reasoning: ...` line.
-// Falls back to the top-level `reasoning` string for legacy response
-// snapshots that pre-date the `judge_results` rollout (rendered as a
-// single un-keyed reasoning block).
-function nextReplyCell(
-  judgeResults: JudgeResult[] | null | undefined,
-  reasoning: string | undefined,
-): string {
-  if (Array.isArray(judgeResults) && judgeResults.length > 0) {
-    return judgeResults
-      .map((jr) => {
-        const lines: string[] = [];
+// Stable key for an evaluator: prefer uuid (canonical across runs), fall
+// back to name for legacy snapshots that pre-date uuid capture.
+function evaluatorKey(jr: JudgeResult): string {
+  return jr.evaluator_uuid ? `uuid:${jr.evaluator_uuid}` : `name:${jr.name}`;
+}
 
-        // Verdict line (binary → Pass/Fail; rating → score / scale_max,
-        // or Score: N when scale is unknown).
-        let verdict = "—";
-        if (jr.match !== null && jr.match !== undefined) {
-          verdict = jr.match ? "Pass" : "Fail";
-        } else if (jr.score !== null && jr.score !== undefined) {
-          verdict =
-            typeof jr.scale_max === "number"
-              ? `${jr.score} / ${jr.scale_max}`
-              : `Score: ${jr.score}`;
-        }
-        lines.push(`${jr.name}: ${verdict}`);
+// Walk every row's `judgeResults` and build the union of evaluators present
+// in the batch, preserving first-seen order so columns stay stable across
+// re-exports. Returns paired `<name>` / `<name> reasoning` column specs.
+type EvaluatorColumn = {
+  key: string;         // unique column key (e.g. "eval:uuid:abc")
+  reasoningKey: string;
+  displayName: string; // header shown in the CSV
+  matchKey: string;    // stable key used to look up the row's verdict
+};
 
-        // Per-test variable substitutions (frozen at submission time).
-        if (
-          jr.variable_values &&
-          typeof jr.variable_values === "object" &&
-          Object.keys(jr.variable_values).length > 0
-        ) {
-          lines.push("Variables:");
-          for (const [name, value] of Object.entries(jr.variable_values)) {
-            lines.push(`  ${name}: ${String(value)}`);
-          }
-        }
+function collectEvaluatorColumns(
+  rows: Array<{ judgeResults?: JudgeResult[] | null }>,
+): EvaluatorColumn[] {
+  const seen = new Map<string, EvaluatorColumn>();
+  const nameCounts = new Map<string, number>();
 
-        if (jr.reasoning) {
-          lines.push(`Reasoning: ${jr.reasoning}`);
-        }
-        return lines.join("\n");
-      })
-      .join("\n\n");
+  for (const row of rows) {
+    const jrs = row.judgeResults;
+    if (!Array.isArray(jrs)) continue;
+    for (const jr of jrs) {
+      const key = evaluatorKey(jr);
+      if (seen.has(key)) continue;
+
+      // Disambiguate when two distinct evaluators share a display name.
+      const baseName = jr.name || "Evaluator";
+      const count = (nameCounts.get(baseName) ?? 0) + 1;
+      nameCounts.set(baseName, count);
+      const displayName = count === 1 ? baseName : `${baseName} (${count})`;
+
+      seen.set(key, {
+        key: `eval:${key}`,
+        reasoningKey: `eval_reasoning:${key}`,
+        displayName,
+        matchKey: key,
+      });
+    }
   }
 
-  // Legacy response-test fallback: surface the single top-level reasoning
-  // (which historically came from the default `default-llm-next-reply`
-  // evaluator). Returns empty when no reasoning was captured.
-  return reasoning ? `Reasoning: ${reasoning}` : "";
+  return Array.from(seen.values());
 }
 
-const TEST_RUN_COLUMNS: ExportColumn[] = [
-  { key: "name", header: "Test name" },
-  { key: "status", header: "Status" },
-  { key: "history", header: "Conversation history" },
-  { key: "agent_response", header: "Agent response" },
-  { key: "tool_calls", header: "Tool calls" },
-  { key: "next_reply", header: "Next reply" },
-  { key: "error", header: "Error" },
-];
+function buildEvaluatorColumnSpecs(cols: EvaluatorColumn[]): ExportColumn[] {
+  const specs: ExportColumn[] = [];
+  for (const c of cols) {
+    specs.push({ key: c.key, header: c.displayName });
+    specs.push({ key: c.reasoningKey, header: `${c.displayName} reasoning` });
+  }
+  return specs;
+}
+
+// Build a key→value map of evaluator verdicts and reasonings for one row.
+// Returns empty cells for any evaluator the row didn't include.
+function evaluatorCellsForRow(
+  judgeResults: JudgeResult[] | null | undefined,
+  cols: EvaluatorColumn[],
+): Record<string, string> {
+  const byKey = new Map<string, JudgeResult>();
+  if (Array.isArray(judgeResults)) {
+    for (const jr of judgeResults) byKey.set(evaluatorKey(jr), jr);
+  }
+  const out: Record<string, string> = {};
+  for (const c of cols) {
+    const jr = byKey.get(c.matchKey);
+    out[c.key] = evaluatorVerdict(jr);
+    out[c.reasoningKey] = jr?.reasoning ?? "";
+  }
+  return out;
+}
 
 export function buildTestRunCsv(results: ExportTestRow[]): {
   columns: ExportColumn[];
   rows: Record<string, unknown>[];
 } {
-  const rows = results
-    .filter(
-      (r) => r.status === "passed" || r.status === "failed" || r.status === "error",
-    )
-    .map((r) => {
-      const isToolCall = isToolCallTest(r.testCase, r.output);
-      return {
-        name: r.name ?? "",
-        status: statusLabel(r.status),
-        history: historyToString(r.testCase?.history),
-        agent_response: r.output?.response ?? "",
-        tool_calls: isToolCall ? toolCallsCell(r.output ?? undefined) : "",
-        next_reply: isToolCall
-          ? ""
-          : nextReplyCell(r.judgeResults, r.reasoning),
-        error: r.error ?? "",
-      };
-    });
+  const filtered = results.filter(
+    (r) => r.status === "passed" || r.status === "failed" || r.status === "error",
+  );
 
-  return { columns: TEST_RUN_COLUMNS, rows };
+  const flags = filtered.map((r) => isToolCallTest(r.testCase, r.output));
+  const hasToolCall = flags.some(Boolean);
+  const evalCols = collectEvaluatorColumns(filtered);
+
+  const columns: ExportColumn[] = [
+    { key: "name", header: "Test name" },
+    { key: "status", header: "Status" },
+    { key: "history", header: "Conversation history" },
+    { key: "agent_response", header: "Agent response" },
+    ...(hasToolCall
+      ? [
+          { key: "tool_call_result", header: "Tool call test result" },
+          { key: "tool_call_reasoning", header: "Tool call test reasoning" },
+        ]
+      : []),
+    ...buildEvaluatorColumnSpecs(evalCols),
+  ];
+
+  const rows = filtered.map((r, i) => {
+    const isToolCall = flags[i];
+    return {
+      name: r.name ?? "",
+      status: statusLabel(r.status),
+      history: historyToString(r.testCase?.history),
+      agent_response: r.output?.response ?? "",
+      ...(hasToolCall
+        ? {
+            tool_call_result: isToolCall
+              ? r.status === "passed"
+                ? "true"
+                : r.status === "failed"
+                  ? "false"
+                  : ""
+              : "",
+            tool_call_reasoning: isToolCall ? (r.reasoning ?? "") : "",
+          }
+        : {}),
+      ...evaluatorCellsForRow(isToolCall ? null : r.judgeResults, evalCols),
+    };
+  });
+
+  return { columns, rows };
 }
-
-const BENCHMARK_COLUMNS: ExportColumn[] = [
-  { key: "model", header: "Model" },
-  { key: "name", header: "Test name" },
-  { key: "status", header: "Status" },
-  { key: "history", header: "Conversation history" },
-  { key: "agent_response", header: "Agent response" },
-  { key: "tool_calls", header: "Tool calls" },
-  { key: "next_reply", header: "Next reply" },
-];
 
 export function buildBenchmarkCsv(rows: ExportBenchmarkRow[]): {
   columns: ExportColumn[];
   rows: Record<string, unknown>[];
 } {
-  const csvRows = rows
-    .filter((r) => r.passed !== null)
-    .map((r) => {
-      const isToolCall = isToolCallTest(r.testCase, r.output);
-      return {
-        model: r.model,
-        name: r.name ?? "",
-        status: r.passed ? "passed" : "failed",
-        history: historyToString(r.testCase?.history),
-        agent_response: r.output?.response ?? "",
-        tool_calls: isToolCall ? toolCallsCell(r.output ?? undefined) : "",
-        next_reply: isToolCall
-          ? ""
-          : nextReplyCell(r.judgeResults, r.reasoning),
-      };
-    });
+  const filtered = rows.filter((r) => r.passed !== null);
 
-  return { columns: BENCHMARK_COLUMNS, rows: csvRows };
+  const flags = filtered.map((r) => isToolCallTest(r.testCase, r.output));
+  const hasToolCall = flags.some(Boolean);
+  const evalCols = collectEvaluatorColumns(filtered);
+
+  const columns: ExportColumn[] = [
+    { key: "model", header: "Model" },
+    { key: "name", header: "Test name" },
+    { key: "status", header: "Status" },
+    { key: "history", header: "Conversation history" },
+    { key: "agent_response", header: "Agent response" },
+    ...(hasToolCall
+      ? [
+          { key: "tool_call_result", header: "Tool call test result" },
+          { key: "tool_call_reasoning", header: "Tool call test reasoning" },
+        ]
+      : []),
+    ...buildEvaluatorColumnSpecs(evalCols),
+  ];
+
+  const csvRows = filtered.map((r, i) => {
+    const isToolCall = flags[i];
+    return {
+      model: r.model,
+      name: r.name ?? "",
+      status: r.passed ? "passed" : "failed",
+      history: historyToString(r.testCase?.history),
+      agent_response: r.output?.response ?? "",
+      ...(hasToolCall
+        ? {
+            tool_call_result: isToolCall ? (r.passed ? "true" : "false") : "",
+            tool_call_reasoning: isToolCall ? (r.reasoning ?? "") : "",
+          }
+        : {}),
+      ...evaluatorCellsForRow(isToolCall ? null : r.judgeResults, evalCols),
+    };
+  });
+
+  return { columns, rows: csvRows };
 }

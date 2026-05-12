@@ -905,7 +905,6 @@ export function TestRunnerDialog({
                         testCase: r.testCase,
                         reasoning: r.reasoning,
                         judgeResults: r.judgeResults,
-                        error: r.error,
                       })),
                     )
                   }
