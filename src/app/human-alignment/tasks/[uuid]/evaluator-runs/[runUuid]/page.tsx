@@ -539,16 +539,13 @@ export default function EvaluatorRunDetailPage() {
             versionLabels={versionLabels}
             linkEvaluators
             actionsSlot={
+              /* Button order is fixed across all results pages so users
+                 build the same muscle memory: Re-run (leftmost, page-
+                 specific action), then Export results, then Share. The
+                 Export ↔ Share ordering matches TestRunnerDialog,
+                 BenchmarkResultsDialog, and the auth/public STT & TTS
+                 pages. */
               <div className="flex items-center gap-2 flex-wrap">
-                {job.status === "completed" && accessToken && (
-                  <ShareButton
-                    entityType="annotation-evaluator-run"
-                    entityId={`${taskUuid}:${runUuid}`}
-                    accessToken={accessToken}
-                    initialIsPublic={job.is_public ?? false}
-                    initialShareToken={job.share_token ?? null}
-                  />
-                )}
                 {accessToken && rerunItemIds.length > 0 && (
                   <button
                     type="button"
@@ -614,6 +611,15 @@ export default function EvaluatorRunDetailPage() {
                     )}
                     {exporting ? "Exporting…" : "Export results"}
                   </button>
+                )}
+                {job.status === "completed" && accessToken && (
+                  <ShareButton
+                    entityType="annotation-evaluator-run"
+                    entityId={`${taskUuid}:${runUuid}`}
+                    accessToken={accessToken}
+                    initialIsPublic={job.is_public ?? false}
+                    initialShareToken={job.share_token ?? null}
+                  />
                 )}
               </div>
             }
