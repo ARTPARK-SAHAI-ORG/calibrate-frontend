@@ -1146,12 +1146,15 @@ export function BulkUploadTestsModal({
           ref={dialogBodyRef}
           className="flex-1 overflow-y-auto px-6 py-5 space-y-6"
         >
-          {/* Step 1: Test Type */}
+          {/* Step 1: Test Type — two side-by-side option cards so the
+              one-line description sits next to each title, helping the
+              user pick before clicking. Selected card uses the same
+              filled-foreground look the old segmented toggle had. */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-3">
               Select the type of test
             </label>
-            <div className="flex rounded-lg border border-border overflow-hidden w-fit">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl">
               <button
                 type="button"
                 onClick={() => {
@@ -1165,13 +1168,23 @@ export function BulkUploadTestsModal({
                   setCommittedEvaluators([]);
                   if (fileInputRef.current) fileInputRef.current.value = "";
                 }}
-                className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
+                className={`text-left px-4 py-3 rounded-lg border transition-colors cursor-pointer ${
                   isResponseType
-                    ? "bg-foreground text-background"
-                    : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "bg-foreground text-background border-foreground"
+                    : "bg-background border-border hover:bg-muted/50"
                 }`}
               >
-                Next Reply
+                <div className="text-sm font-medium mb-0.5">Next Reply</div>
+                <div
+                  className={`text-xs leading-snug ${
+                    isResponseType
+                      ? "text-background/80"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  Grade the agent&apos;s text reply to the last user message
+                  against your evaluators.
+                </div>
               </button>
               <button
                 type="button"
@@ -1186,13 +1199,23 @@ export function BulkUploadTestsModal({
                   setCommittedEvaluators([]);
                   if (fileInputRef.current) fileInputRef.current.value = "";
                 }}
-                className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer border-l border-border ${
+                className={`text-left px-4 py-3 rounded-lg border transition-colors cursor-pointer ${
                   testType === "tool_call"
-                    ? "bg-foreground text-background"
-                    : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "bg-foreground text-background border-foreground"
+                    : "bg-background border-border hover:bg-muted/50"
                 }`}
               >
-                Tool Call
+                <div className="text-sm font-medium mb-0.5">Tool Call</div>
+                <div
+                  className={`text-xs leading-snug ${
+                    testType === "tool_call"
+                      ? "text-background/80"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  Check which tool the agent invokes and the arguments it
+                  passes.
+                </div>
               </button>
             </div>
           </div>
