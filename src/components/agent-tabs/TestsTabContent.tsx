@@ -1410,76 +1410,12 @@ export function TestsTabContent({
       {agentTests.length > 0 && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div className="flex flex-wrap items-center gap-2 md:gap-3">
-            {selectedTestUuids.size > 0 && (
-              <>
-                {/* Run only the checked subset. Same connection-unverified
-                    gate and maxRowsPerEval limit as "Run all tests" — the
-                    backend cap applies regardless of how the subset was
-                    chosen. Selection is cleared on submit so the table
-                    visibly resets to a neutral state. */}
-                <div className="relative group/runselected">
-                  <button
-                    onClick={() => {
-                      if (isConnectionUnverified) return;
-                      if (selectedTestUuids.size > maxRowsPerEval) {
-                        showLimitToast(
-                          `You can only run up to ${maxRowsPerEval} tests at a time.`,
-                        );
-                        return;
-                      }
-                      const selected = agentTests.filter((t) =>
-                        selectedTestUuids.has(t.uuid),
-                      );
-                      if (selected.length === 0) return;
-                      setTestsToRun(selected);
-                      setRunAllLinked(false);
-                      setTestRunnerOpen(true);
-                      setSelectedTestUuids(new Set());
-                    }}
-                    disabled={isConnectionUnverified}
-                    className={`h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background transition-opacity flex items-center gap-2 ${
-                      isConnectionUnverified
-                        ? "opacity-50 cursor-not-allowed"
-                        : "hover:opacity-90 cursor-pointer"
-                    }`}
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
-                      />
-                    </svg>
-                    Run ({selectedTestUuids.size})
-                  </button>
-                  {isConnectionUnverified && (
-                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/runselected:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
-                      Verify agent connection first
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={() => openBulkDeleteDialog("remove")}
-                  className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-red-500 text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                  title="Remove selected tests from this agent only"
-                >
-                  Remove ({selectedTestUuids.size})
-                </button>
-                <button
-                  onClick={() => openBulkDeleteDialog("permanent")}
-                  className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium bg-red-700 text-white hover:bg-red-800 transition-colors cursor-pointer"
-                  title="Permanently delete selected tests from your test library"
-                >
-                  Delete ({selectedTestUuids.size})
-                </button>
-              </>
-            )}
+            {/* Multi-select bulk-action toolbar lives right above the
+                table (further down in this component), modelled on the
+                same pattern used by the labelling task's items table.
+                The header here keeps just the Add / Create / Bulk /
+                Run-all / Compare actions, independent of selection
+                state. */}
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setShowTestDropdown(!showTestDropdown)}
@@ -1869,6 +1805,92 @@ export function TestsTabContent({
             <p className="text-sm text-muted-foreground mb-3 md:mb-4">
               {agentTests.length} {agentTests.length === 1 ? "test" : "tests"}
             </p>
+
+            {/* Bulk-action toolbar — sits immediately above the table when
+                at least one row is selected. Modelled on the same pattern
+                as the human-alignment items table so the two surfaces
+                feel consistent: a muted strip with an "N selected"
+                count on the left and unprefixed action buttons on the
+                right (count is on the strip, not duplicated per button). */}
+            {selectedTestUuids.size > 0 && (
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 rounded-md border border-border bg-muted/30 px-3 py-2 mb-3 md:mb-4">
+                <span className="text-sm">
+                  <span className="font-medium">
+                    {selectedTestUuids.size}
+                  </span>{" "}
+                  {selectedTestUuids.size === 1 ? "test" : "tests"} selected
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => setSelectedTestUuids(new Set())}
+                    className="h-8 px-3 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    onClick={() => openBulkDeleteDialog("remove")}
+                    title="Detach from this agent only — the test stays in your library"
+                    className="h-8 px-3 rounded-md text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors cursor-pointer"
+                  >
+                    Remove
+                  </button>
+                  <button
+                    onClick={() => openBulkDeleteDialog("permanent")}
+                    title="Permanently delete from your test library"
+                    className="h-8 px-3 rounded-md text-sm font-medium bg-red-700 text-white hover:bg-red-800 transition-colors cursor-pointer"
+                  >
+                    Delete
+                  </button>
+                  <div className="relative group/runselected">
+                    <button
+                      onClick={() => {
+                        if (isConnectionUnverified) return;
+                        if (selectedTestUuids.size > maxRowsPerEval) {
+                          showLimitToast(
+                            `You can only run up to ${maxRowsPerEval} tests at a time.`,
+                          );
+                          return;
+                        }
+                        const selected = agentTests.filter((t) =>
+                          selectedTestUuids.has(t.uuid),
+                        );
+                        if (selected.length === 0) return;
+                        setTestsToRun(selected);
+                        setRunAllLinked(false);
+                        setTestRunnerOpen(true);
+                        setSelectedTestUuids(new Set());
+                      }}
+                      disabled={isConnectionUnverified}
+                      className={`h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background transition-opacity flex items-center gap-1.5 ${
+                        isConnectionUnverified
+                          ? "opacity-50 cursor-not-allowed"
+                          : "hover:opacity-90 cursor-pointer"
+                      }`}
+                    >
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
+                        />
+                      </svg>
+                      Run
+                    </button>
+                    {isConnectionUnverified && (
+                      <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/runselected:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                        Verify agent connection first
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Tests Table */}
             {filteredAgentTests.length === 0 ? (
