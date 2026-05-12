@@ -1730,7 +1730,7 @@ export function TestsTabContent({
           <p className="text-sm md:text-base text-muted-foreground mb-3 md:mb-4 text-center max-w-md">
             This agent doesn&apos;t have any tests attached to it.
             {allTestsFetched && allTests.length === 0
-              ? " Create a new test or upload tests in bulk."
+              ? " Create a new test or upload tests from a CSV file to get started."
               : " Add an existing test or create a new one."}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
@@ -1738,9 +1738,7 @@ export function TestsTabContent({
                 has tests to attach — otherwise the dropdown is empty and
                 the affordance is misleading. */}
             {allTests.length > 0 && renderAddTestControl("primary")}
-            {renderNewTestButtons(
-              allTests.length > 0 ? "outline" : "primary",
-            )}
+            {renderNewTestButtons(allTests.length > 0 ? "outline" : "primary")}
           </div>
         </div>
       ) : agentTests.length === 0 ? (
@@ -1760,7 +1758,10 @@ export function TestsTabContent({
                 No tests attached
               </h3>
               <p className="text-sm md:text-base text-muted-foreground text-center max-w-md mb-0">
-                This agent doesn&apos;t have any tests linked right now
+                This agent doesn&apos;t have any tests linked right now.
+                {allTestsFetched && allTests.length === 0
+                  ? " Create a new test or upload tests in bulk."
+                  : " Add an existing test or create a new one."}
               </p>
               <div className="flex flex-wrap justify-center gap-2 md:gap-3 mt-3 md:mt-4 w-full">
                 {allTests.length > 0 && renderAddTestControl("primary")}
