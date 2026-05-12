@@ -1456,7 +1456,7 @@ export function TestsTabContent({
                         d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
                       />
                     </svg>
-                    Run selected ({selectedTestUuids.size})
+                    Run ({selectedTestUuids.size})
                   </button>
                   {isConnectionUnverified && (
                     <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/runselected:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
@@ -1469,14 +1469,14 @@ export function TestsTabContent({
                   className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-red-500 text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                   title="Remove selected tests from this agent only"
                 >
-                  Remove selected ({selectedTestUuids.size})
+                  Remove ({selectedTestUuids.size})
                 </button>
                 <button
                   onClick={() => openBulkDeleteDialog("permanent")}
                   className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium bg-red-700 text-white hover:bg-red-800 transition-colors cursor-pointer"
                   title="Permanently delete selected tests from your test library"
                 >
-                  Delete selected ({selectedTestUuids.size})
+                  Delete ({selectedTestUuids.size})
                 </button>
               </>
             )}
