@@ -48,6 +48,33 @@ export async function readNameConflictMessage(
 }
 
 /**
+ * Variant of `readNameConflictMessage` for `POST /tests/bulk`, which surfaces
+ * test-name conflicts as **400** (e.g. `{detail: "Test names already exist:
+ * <name>"}`) rather than 409. Matches both the singular ("name already
+ * exists") and plural ("names already exist") forms the backend emits.
+ * Returns the detail string for the duplicate-name case; null otherwise —
+ * including null for unrelated 400s, so callers fall through to their
+ * general error path.
+ */
+export async function readBulkNameConflictMessage(
+  response: Response,
+): Promise<string | null> {
+  if (response.status !== 400) return null;
+  try {
+    const data = (await response.clone().json()) as { detail?: unknown };
+    if (
+      typeof data?.detail === "string" &&
+      /already exists?|duplicate/i.test(data.detail)
+    ) {
+      return data.detail;
+    }
+  } catch {
+    // body wasn't JSON — fall through
+  }
+  return null;
+}
+
+/**
  * Same check as `readNameConflictMessage` but for an apiClient-thrown
  * Error (whose message follows "Request failed: <status> - <body>"). Returns
  * the detail string when the error is a 409 name-collision, null otherwise.

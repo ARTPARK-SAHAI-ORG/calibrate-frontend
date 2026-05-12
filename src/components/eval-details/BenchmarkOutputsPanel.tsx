@@ -226,6 +226,7 @@ export function BenchmarkOutputsPanel({
             <EvaluationCriteriaPanel
               evaluation={selectedTestResult.test_case?.evaluation}
               testCaseEvaluators={selectedTestResult.test_case?.evaluators}
+              passed={selectedTestResult.passed}
               judgeResults={selectedTestResult.judge_results}
               reasoning={selectedTestResult.reasoning}
               scaleByEvaluatorUuid={scaleByEvaluatorUuid}

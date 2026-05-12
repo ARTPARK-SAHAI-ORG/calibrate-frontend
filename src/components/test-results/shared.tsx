@@ -792,6 +792,7 @@ function EvaluatorPanelCard({
 export function EvaluationCriteriaPanel({
   evaluation,
   testType,
+  passed,
   judgeResults,
   reasoning,
   testCaseEvaluators,
@@ -801,6 +802,10 @@ export function EvaluationCriteriaPanel({
 }: {
   evaluation?: TestCaseEvaluation;
   testType?: string;
+  /** Top-level test verdict. Used to colour the tool-call evaluator card
+   * (green=pass, red=fail). Null/undefined leaves the card neutral, which
+   * is the right default while a run is still in progress. */
+  passed?: boolean | null;
   /** Per-evaluator verdicts from `result.judge_results`. Response tests
    * only — null/absent for tool-call and legacy response runs. */
   judgeResults?: JudgeResult[] | null;
@@ -863,7 +868,14 @@ export function EvaluationCriteriaPanel({
         {isToolCall ? "Expected Tool Calls" : "Evaluators"}
       </h3>
 
-      {/* Tool-call test: expected tool calls + top-level reasoning verdict. */}
+      {/* Tool-call test: expected tool calls + verdict-coloured reasoning
+          card. The deterministic tool-call match is binary, so we surface
+          it through the same `EvaluatorVerdictCard` (read mode) the
+          response-test per-evaluator cards use — name fixed to "Tool call
+          test", verdict driven by the top-level `passed` field, reasoning
+          attached as the collapsible explainer. While the run is still
+          pending (`passed` null/undefined), we fall back to the neutral
+          reasoning strip so the card doesn't show a misleading colour. */}
       {isToolCall && (
         <>
           {hasExpectedToolCalls ? (
@@ -880,11 +892,22 @@ export function EvaluationCriteriaPanel({
               No expected tool calls specified
             </p>
           )}
-          <CollapsibleReasoningStrip
-            text={reasoning}
-            mutedBody={false}
-            leadingLabel="Reasoning"
-          />
+          {typeof passed === "boolean" ? (
+            <EvaluatorVerdictCard
+              mode="read"
+              name="Tool call test"
+              outputType="binary"
+              enableLink={false}
+              match={passed}
+              reasoning={reasoning ?? null}
+            />
+          ) : (
+            <CollapsibleReasoningStrip
+              text={reasoning}
+              mutedBody={false}
+              leadingLabel="Reasoning"
+            />
+          )}
         </>
       )}
 

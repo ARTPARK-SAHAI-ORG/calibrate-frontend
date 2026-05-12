@@ -539,16 +539,13 @@ export default function EvaluatorRunDetailPage() {
             versionLabels={versionLabels}
             linkEvaluators
             actionsSlot={
+              /* Button order is fixed across all results pages so users
+                 build the same muscle memory: Re-run (leftmost, page-
+                 specific action), then Export results, then Share. The
+                 Export ↔ Share ordering matches TestRunnerDialog,
+                 BenchmarkResultsDialog, and the auth/public STT & TTS
+                 pages. */
               <div className="flex items-center gap-2 flex-wrap">
-                {job.status === "completed" && accessToken && (
-                  <ShareButton
-                    entityType="annotation-evaluator-run"
-                    entityId={`${taskUuid}:${runUuid}`}
-                    accessToken={accessToken}
-                    initialIsPublic={job.is_public ?? false}
-                    initialShareToken={job.share_token ?? null}
-                  />
-                )}
                 {accessToken && rerunItemIds.length > 0 && (
                   <button
                     type="button"
@@ -565,16 +562,21 @@ export default function EvaluatorRunDetailPage() {
                   </button>
                 )}
                 {job.status === "completed" && itemsForRun.length > 0 && (
+                  /* Tinted teal styling matches `ExportResultsButton` and
+                     `ExportZipButton` so the export affordance reads the
+                     same on every results page. Stays inline (not the
+                     shared component) because the XLSX builder is
+                     page-specific. */
                   <button
                     type="button"
                     onClick={handleExport}
                     disabled={exporting}
                     title="Download spreadsheet (XLSX)"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium bg-foreground text-background shadow-sm hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-teal-500/12 border-teal-500/45 text-teal-950 dark:text-teal-100 hover:bg-teal-500/22 dark:hover:bg-teal-500/18"
                   >
                     {exporting ? (
                       <svg
-                        className="w-3.5 h-3.5 shrink-0 animate-spin"
+                        className="w-4 h-4 animate-spin"
                         fill="none"
                         viewBox="0 0 24 24"
                       >
@@ -594,7 +596,7 @@ export default function EvaluatorRunDetailPage() {
                       </svg>
                     ) : (
                       <svg
-                        className="w-3.5 h-3.5 shrink-0"
+                        className="w-4 h-4"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -603,12 +605,21 @@ export default function EvaluatorRunDetailPage() {
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                          d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
                         />
                       </svg>
                     )}
                     {exporting ? "Exporting…" : "Export results"}
                   </button>
+                )}
+                {job.status === "completed" && accessToken && (
+                  <ShareButton
+                    entityType="annotation-evaluator-run"
+                    entityId={`${taskUuid}:${runUuid}`}
+                    accessToken={accessToken}
+                    initialIsPublic={job.is_public ?? false}
+                    initialShareToken={job.share_token ?? null}
+                  />
                 )}
               </div>
             }

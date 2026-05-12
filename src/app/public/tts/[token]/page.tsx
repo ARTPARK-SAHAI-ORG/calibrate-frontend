@@ -14,6 +14,9 @@ import {
   ratingRange,
   type TTSEvaluatorColumn,
 } from "@/components/eval-details";
+import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
+import { ExportZipButton } from "@/components/ExportZipButton";
+import type { ExportColumn } from "@/components/ExportResultsButton";
 import {
   getPublicDefaultEvaluator,
   type PublicDefaultEvaluator,
@@ -192,6 +195,85 @@ export default function PublicTTSPage() {
       <div className="space-y-4 md:space-y-6">
         {data.provider_results && data.provider_results.length > 0 && (
           <>
+            {/* Actions row — Export results as a zip (results.csv + an
+                audios/ folder), matching the auth TTS page. */}
+            {data.provider_results.some(
+              (pr) => (pr.results?.length ?? 0) > 0,
+            ) && (
+              <div className="flex items-center justify-end">
+                <ExportZipButton
+                  filename={`tts-results-${data.dataset_name ?? data.task_id}`}
+                  getContents={() => {
+                    const columns: ExportColumn[] = [
+                      { key: "provider", header: "Provider" },
+                      { key: "audio_name", header: "Audio name" },
+                      { key: "text", header: "Text" },
+                      ...evaluatorColumns.map((c) => ({
+                        key: c.key,
+                        header: c.label,
+                      })),
+                    ];
+                    const rows: Record<string, unknown>[] = [];
+                    const files: { path: string; url: string }[] = [];
+                    for (const pr of data.provider_results ?? []) {
+                      for (const r of pr.results ?? []) {
+                        const ext = (() => {
+                          try {
+                            const u = new URL(
+                              r.audio_path,
+                              window.location.origin,
+                            );
+                            const m = u.pathname.match(/\.([a-z0-9]+)$/i);
+                            return m ? m[1].toLowerCase() : "wav";
+                          } catch {
+                            const m = r.audio_path.match(
+                              /\.([a-z0-9]+)(?:\?|$)/i,
+                            );
+                            return m ? m[1].toLowerCase() : "wav";
+                          }
+                        })();
+                        const audioName = r.audio_path
+                          ? `${pr.provider}_${r.id}.${ext}`
+                          : "";
+                        const row: Record<string, unknown> = {
+                          provider: getProviderLabel(pr.provider),
+                          audio_name: audioName,
+                          text: r.text,
+                        };
+                        for (const c of evaluatorColumns) {
+                          const { score, error } = readEvaluatorCell(
+                            r as unknown as Record<string, unknown>,
+                            c,
+                          );
+                          if (error || score === undefined) {
+                            row[c.key] = "";
+                            continue;
+                          }
+                          if (c.outputType === "binary") {
+                            const norm = score.toLowerCase();
+                            row[c.key] =
+                              norm === "true" || norm === "1"
+                                ? "true"
+                                : "false";
+                          } else {
+                            const n = parseFloat(score);
+                            row[c.key] = Number.isFinite(n) ? n : score;
+                          }
+                        }
+                        rows.push(row);
+                        if (audioName && r.audio_path) {
+                          files.push({
+                            path: `audios/${audioName}`,
+                            url: r.audio_path,
+                          });
+                        }
+                      }
+                    }
+                    return { csv: { columns, rows }, files };
+                  }}
+                />
+              </div>
+            )}
             {/* Tab Nav */}
             <div className="flex gap-2 border-b border-border">
               {(["leaderboard", "outputs", "about"] as const).map((tab) => (

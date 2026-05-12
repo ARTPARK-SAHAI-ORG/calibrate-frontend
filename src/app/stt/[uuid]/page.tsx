@@ -23,9 +23,11 @@ import {
   getFirstSTTEmptyPredictionIndex,
   type STTEvaluatorColumn,
 } from "@/components/eval-details";
+import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
 import { useSidebarState } from "@/lib/sidebar";
 import { getDataset } from "@/lib/datasets";
 import { ShareButton } from "@/components/ShareButton";
+import { ExportResultsButton, ExportColumn } from "@/components/ExportResultsButton";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { retryEvaluation } from "@/lib/retryEvaluation";
 import {
@@ -717,6 +719,74 @@ export default function STTEvaluationDetailPage() {
               {evaluationResult.status !== "done" && (
                 <StatusBadge status={evaluationResult.status} showSpinner />
               )}
+              {/* Export per-row results to CSV. Placed before Share so the
+                  Export ↔ Share button order matches TestRunnerDialog /
+                  BenchmarkResultsDialog. One row per (provider, row);
+                  columns: reference / predicted text, WER, and one column
+                  per attached evaluator (binary → "true"/"false", rating →
+                  raw numeric score). Built at click time so it reflects
+                  the latest state if the user re-runs the page. */}
+              {evaluationResult.status === "done" &&
+                (evaluationResult.provider_results ?? []).some(
+                  (pr) => (pr.results?.length ?? 0) > 0,
+                ) && (
+                  <ExportResultsButton
+                    filename={`stt-results-${evaluationResult.dataset_name ?? taskId}`}
+                    getRows={() => {
+                      const columns: ExportColumn[] = [
+                        { key: "provider", header: "Provider" },
+                        { key: "reference_text", header: "Reference text" },
+                        { key: "predicted_text", header: "Predicted text" },
+                        { key: "wer", header: "WER" },
+                        ...evaluatorColumns.map((c) => ({
+                          key: c.key,
+                          header: c.label,
+                        })),
+                      ];
+                      const rows: Record<string, unknown>[] = [];
+                      for (const pr of evaluationResult.provider_results ??
+                        []) {
+                        for (const r of pr.results ?? []) {
+                          const row: Record<string, unknown> = {
+                            provider: getProviderLabel(pr.provider),
+                            reference_text: r.gt,
+                            predicted_text: r.pred,
+                            wer: r.wer,
+                          };
+                          // Read via `readEvaluatorCell` so the refreshed
+                          // `evaluator_outputs[<uuid>]` shape is preferred
+                          // over the legacy flat scoreField. Matches what
+                          // STTResultsTable renders on screen.
+                          for (const c of evaluatorColumns) {
+                            const { score, error } = readEvaluatorCell(
+                              r as unknown as Record<string, unknown>,
+                              c,
+                            );
+                            if (error || score === undefined) {
+                              row[c.key] = "";
+                              continue;
+                            }
+                            if (c.outputType === "binary") {
+                              // Mirrors EvaluatorScoreCell: lowercase the
+                              // raw string before comparing so judges that
+                              // emit "True"/"TRUE" still register as Pass.
+                              const norm = score.toLowerCase();
+                              row[c.key] =
+                                norm === "true" || norm === "1"
+                                  ? "true"
+                                  : "false";
+                            } else {
+                              const n = parseFloat(score);
+                              row[c.key] = Number.isFinite(n) ? n : score;
+                            }
+                          }
+                          rows.push(row);
+                        }
+                      }
+                      return { columns, rows };
+                    }}
+                  />
+                )}
               {/* Sharing only makes sense once the run is complete — earlier
                   state changes too quickly and a shared link would render
                   partial results. */}

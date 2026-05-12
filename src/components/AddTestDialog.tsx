@@ -1452,11 +1452,14 @@ export function AddTestDialog({
                             disabled={
                               evaluatorsLoading || isLoading || noOptionsLeft
                             }
-                            className={`px-3 py-1.5 text-sm font-medium bg-background text-foreground rounded-lg hover:bg-muted transition-colors cursor-pointer border border-border disabled:opacity-50 disabled:cursor-not-allowed ${
+                            // Tinted violet so the action stands out from
+                            // the neutral form chrome around it. Validation
+                            // error state overrides border/text to red.
+                            className={`px-3 py-1.5 text-sm font-medium rounded-lg border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-500/12 border-violet-500/45 text-violet-950 dark:text-violet-100 hover:bg-violet-500/22 dark:hover:bg-violet-500/18 ${
                               localValidationAttempted &&
                               activeTab === "next-reply" &&
                               attachedEvaluators.length === 0
-                                ? "border-red-500 text-red-400"
+                                ? "!border-red-500 !text-red-500 !bg-red-500/10"
                                 : ""
                             }`}
                           >
@@ -2122,13 +2125,16 @@ export function AddTestDialog({
                   Create conversation context starting with
                 </p>
 
+                {/* Conversation starter buttons. Semantic tint per role so
+                    they match the per-row +-menu items below — agent = sky,
+                    user = amber. */}
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => addChatMessage("agent")}
-                    className="px-4 py-2.5 rounded-xl border border-border bg-transparent text-foreground hover:bg-muted transition-colors cursor-pointer flex items-center gap-2"
+                    className="px-4 py-2.5 rounded-xl border cursor-pointer transition-colors flex items-center gap-2 bg-sky-500/12 border-sky-500/45 text-sky-950 dark:text-sky-100 hover:bg-sky-500/22 dark:hover:bg-sky-500/18"
                   >
                     <svg
-                      className="w-5 h-5 text-muted-foreground"
+                      className="w-5 h-5"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -2144,10 +2150,10 @@ export function AddTestDialog({
                   </button>
                   <button
                     onClick={() => addChatMessage("user")}
-                    className="px-4 py-2.5 rounded-xl border border-border bg-transparent text-foreground hover:bg-muted transition-colors cursor-pointer flex items-center gap-2"
+                    className="px-4 py-2.5 rounded-xl border cursor-pointer transition-colors flex items-center gap-2 bg-amber-500/12 border-amber-500/45 text-amber-950 dark:text-amber-100 hover:bg-amber-500/22 dark:hover:bg-amber-500/18"
                   >
                     <svg
-                      className="w-5 h-5 text-muted-foreground"
+                      className="w-5 h-5"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -2220,7 +2226,7 @@ export function AddTestDialog({
                           const inlineDeleteBtn = showInlineDelete ? (
                             <button
                               onClick={() => removeChatMessage(message.id)}
-                              className="w-8 h-8 flex-shrink-0 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-red-400 hover:border-red-400/50 transition-colors cursor-pointer"
+                              className="w-8 h-8 flex-shrink-0 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60"
                               title="Remove message"
                             >
                               <svg
@@ -2296,6 +2302,33 @@ export function AddTestDialog({
                       {/* Tool Call Display */}
                       {message.role === "tool_call" && (
                         <div className="flex w-full items-start gap-2">
+                          {/* Delete button on the LEFT of the tool-call card
+                              so it aligns with how previous agent message
+                              rows place it (tool calls are always an agent
+                              action, never a user one). Rendered first in
+                              source order so flexbox lays it out at the
+                              start of the row. */}
+                          {showInlineDelete && (
+                            <button
+                              onClick={() => removeChatMessage(message.id)}
+                              className="w-8 h-8 flex-shrink-0 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60"
+                              title="Remove message"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                                />
+                              </svg>
+                            </button>
+                          )}
                           <div className="w-1/2">
                             <div className="bg-muted border border-border rounded-2xl p-4">
                               <div className="flex items-center gap-2 mb-2">
@@ -2489,27 +2522,6 @@ export function AddTestDialog({
                                 )}
                             </div>
                           </div>
-                          {showInlineDelete && (
-                            <button
-                              onClick={() => removeChatMessage(message.id)}
-                              className="w-8 h-8 flex-shrink-0 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-red-400 hover:border-red-400/50 transition-colors cursor-pointer"
-                              title="Remove message"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                                />
-                              </svg>
-                            </button>
-                          )}
                         </div>
                       )}
 
@@ -2585,7 +2597,7 @@ export function AddTestDialog({
                           isLastNonToolResponse && (
                             <button
                               onClick={() => removeChatMessage(message.id)}
-                              className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-red-400 hover:border-red-400/50 transition-colors cursor-pointer"
+                              className="w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60"
                               title="Remove message"
                             >
                               <svg
@@ -2619,7 +2631,7 @@ export function AddTestDialog({
                                       !addMessageDropdownOpen,
                                     )
                                   }
-                                  className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-muted-foreground transition-colors cursor-pointer"
+                                  className="w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
                                   title="Add message"
                                 >
                                   <svg
@@ -2647,7 +2659,7 @@ export function AddTestDialog({
                                       }
                                     />
                                     <div
-                                      className={`absolute bg-background border border-border rounded-lg shadow-xl z-[200] overflow-hidden py-1 whitespace-nowrap ${
+                                      className={`absolute bg-background border border-border rounded-lg shadow-xl z-[200] overflow-hidden whitespace-nowrap ${
                                         message.role === "user"
                                           ? chatMessages.length <= 2
                                             ? "right-0 top-10"
@@ -2657,15 +2669,23 @@ export function AddTestDialog({
                                             : "left-0 bottom-full mb-2"
                                       }`}
                                     >
+                                      {/* Three clearly separated hues so
+                                          adjacent rows don't read as the
+                                          same family: amber (warm yellow)
+                                          for User, sky (cool blue) for
+                                          Agent, fuchsia (pink-magenta)
+                                          for Agent tool call — also
+                                          distinct from the violet
+                                          "Add evaluator" button above. */}
                                       <button
                                         onClick={() => {
                                           addChatMessage("user");
                                           setAddMessageDropdownOpen(false);
                                         }}
-                                        className="w-full px-3 py-1.5 flex items-center gap-2 text-foreground hover:bg-muted transition-colors cursor-pointer"
+                                        className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-amber-500/15 text-amber-900 dark:bg-amber-500/20 dark:text-amber-100 hover:bg-amber-500/25 dark:hover:bg-amber-500/30"
                                       >
                                         <svg
-                                          className="w-4 h-4 text-muted-foreground"
+                                          className="w-4 h-4"
                                           fill="none"
                                           viewBox="0 0 24 24"
                                           stroke="currentColor"
@@ -2686,10 +2706,10 @@ export function AddTestDialog({
                                           addChatMessage("agent");
                                           setAddMessageDropdownOpen(false);
                                         }}
-                                        className="w-full px-3 py-1.5 flex items-center gap-2 text-foreground hover:bg-muted transition-colors cursor-pointer"
+                                        className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-sky-500/15 text-sky-900 dark:bg-sky-500/20 dark:text-sky-100 hover:bg-sky-500/25 dark:hover:bg-sky-500/30"
                                       >
                                         <svg
-                                          className="w-4 h-4 text-muted-foreground"
+                                          className="w-4 h-4"
                                           fill="none"
                                           viewBox="0 0 24 24"
                                           stroke="currentColor"
@@ -2710,10 +2730,10 @@ export function AddTestDialog({
                                           setAddMessageDropdownOpen(false);
                                           setToolCallDropdownOpen(true);
                                         }}
-                                        className="w-full px-3 py-1.5 flex items-center gap-2 text-foreground hover:bg-muted transition-colors cursor-pointer"
+                                        className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-fuchsia-500/15 text-fuchsia-900 dark:bg-fuchsia-500/20 dark:text-fuchsia-100 hover:bg-fuchsia-500/25 dark:hover:bg-fuchsia-500/30"
                                       >
                                         <svg
-                                          className="w-4 h-4 text-muted-foreground"
+                                          className="w-4 h-4"
                                           fill="none"
                                           viewBox="0 0 24 24"
                                           stroke="currentColor"

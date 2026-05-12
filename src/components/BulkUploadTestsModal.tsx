@@ -52,6 +52,13 @@ type BulkUploadTestsModalProps = {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  /**
+   * If set, the modal is locked to this agent: the "Assign tests to agents"
+   * picker is hidden and `agent_uuids: [lockedAgentUuid]` is sent with the
+   * upload so the new tests auto-attach to the agent the user came from.
+   * Used by the agent page's Tests tab.
+   */
+  lockedAgentUuid?: string;
 };
 
 // Column header for an evaluator variable in the response-type CSV. We
@@ -150,6 +157,7 @@ export function BulkUploadTestsModal({
   isOpen,
   onClose,
   onSuccess,
+  lockedAgentUuid,
 }: BulkUploadTestsModalProps) {
   const backendAccessToken = useAccessToken();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -854,7 +862,9 @@ export function BulkUploadTestsModal({
         tests: typeof tests;
         agent_uuids?: string[];
       } = { type: testType, tests };
-      if (assignToAgents && selectedAgentUuids.length > 0) {
+      if (lockedAgentUuid) {
+        body.agent_uuids = [lockedAgentUuid];
+      } else if (assignToAgents && selectedAgentUuids.length > 0) {
         body.agent_uuids = selectedAgentUuids;
       }
 
@@ -1136,12 +1146,15 @@ export function BulkUploadTestsModal({
           ref={dialogBodyRef}
           className="flex-1 overflow-y-auto px-6 py-5 space-y-6"
         >
-          {/* Step 1: Test Type */}
+          {/* Step 1: Test Type — two side-by-side option cards so the
+              one-line description sits next to each title, helping the
+              user pick before clicking. Selected card uses the same
+              filled-foreground look the old segmented toggle had. */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-3">
               Select the type of test
             </label>
-            <div className="flex rounded-lg border border-border overflow-hidden w-fit">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl">
               <button
                 type="button"
                 onClick={() => {
@@ -1155,13 +1168,23 @@ export function BulkUploadTestsModal({
                   setCommittedEvaluators([]);
                   if (fileInputRef.current) fileInputRef.current.value = "";
                 }}
-                className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
+                className={`text-left px-4 py-3 rounded-lg border transition-colors cursor-pointer ${
                   isResponseType
-                    ? "bg-foreground text-background"
-                    : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "bg-foreground text-background border-foreground"
+                    : "bg-background border-border hover:bg-muted/50"
                 }`}
               >
-                Next Reply
+                <div className="text-sm font-medium mb-0.5">Next Reply</div>
+                <div
+                  className={`text-xs leading-snug ${
+                    isResponseType
+                      ? "text-background/80"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  Evaluate the agent&apos;s response given a conversation
+                  history
+                </div>
               </button>
               <button
                 type="button"
@@ -1176,13 +1199,23 @@ export function BulkUploadTestsModal({
                   setCommittedEvaluators([]);
                   if (fileInputRef.current) fileInputRef.current.value = "";
                 }}
-                className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer border-l border-border ${
+                className={`text-left px-4 py-3 rounded-lg border transition-colors cursor-pointer ${
                   testType === "tool_call"
-                    ? "bg-foreground text-background"
-                    : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "bg-foreground text-background border-foreground"
+                    : "bg-background border-border hover:bg-muted/50"
                 }`}
               >
-                Tool Call
+                <div className="text-sm font-medium mb-0.5">Tool Call</div>
+                <div
+                  className={`text-xs leading-snug ${
+                    testType === "tool_call"
+                      ? "text-background/80"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  Check whether the agent invokes the correct tool with the
+                  correct arguments
+                </div>
               </button>
             </div>
           </div>
@@ -1612,8 +1645,9 @@ export function BulkUploadTestsModal({
             </div>
           )}
 
-          {/* Step 3: Assign to Agents (optional) */}
-          {testType && parsedTests.length > 0 && (
+          {/* Step 3: Assign to Agents (optional, hidden when modal is
+              locked to a specific agent — see lockedAgentUuid prop). */}
+          {testType && parsedTests.length > 0 && !lockedAgentUuid && (
             <div ref={assignAgentsSectionRef}>
               <div className="flex items-center gap-3 mb-3">
                 <button
@@ -1707,7 +1741,9 @@ export function BulkUploadTestsModal({
                   disabled={
                     isUploading ||
                     parsedTests.length === 0 ||
-                    (assignToAgents && selectedAgentUuids.length === 0)
+                    (!lockedAgentUuid &&
+                      assignToAgents &&
+                      selectedAgentUuids.length === 0)
                   }
                   className="h-10 px-5 rounded-lg text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >

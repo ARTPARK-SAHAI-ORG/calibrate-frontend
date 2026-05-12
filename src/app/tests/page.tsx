@@ -24,7 +24,10 @@ import {
 import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
 import { useSidebarState } from "@/lib/sidebar";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
-import { readNameConflictMessage } from "@/lib/parseBackendError";
+import {
+  readBulkNameConflictMessage,
+  readNameConflictMessage,
+} from "@/lib/parseBackendError";
 
 // Hydrated evaluator row as returned by GET /tests / GET /tests/{uuid}.evaluators[].
 // `uuid` is the evaluator's id (used as `evaluator_uuid` when writing back).
@@ -587,7 +590,8 @@ function LLMPageInner() {
     }
   };
 
-  // Create test via POST API
+  // Create test via POST /tests/bulk (used for both single and bulk flows for
+  // a consistent backend contract — see also BulkUploadTestsModal).
   const createTest = async (
     config: TestConfig,
     evaluators: EvaluatorRefPayload[]
@@ -604,30 +608,33 @@ function LLMPageInner() {
         throw new Error("BACKEND_URL environment variable is not set");
       }
 
-      // Only attach `evaluators` for next-reply tests. Tool-invocation tests
-      // don't carry evaluators and must not have their links touched server-side.
-      const body: {
+      const isResponse = config.evaluation.type === "response";
+      const testItem: {
         name: string;
-        type: "response" | "tool_call";
-        config: TestConfig;
+        conversation_history: TestConfig["history"];
         evaluators?: EvaluatorRefPayload[];
+        tool_calls?: NonNullable<TestConfig["evaluation"]["tool_calls"]>;
       } = {
         name: newTestName.trim(),
-        type: config.evaluation.type,
-        config: config,
+        conversation_history: config.history,
       };
-      if (config.evaluation.type === "response") {
-        body.evaluators = evaluators;
+      if (isResponse) {
+        testItem.evaluators = evaluators;
+      } else {
+        testItem.tool_calls = config.evaluation.tool_calls ?? [];
       }
 
-      const response = await fetch(`${backendUrl}/tests`, {
+      const response = await fetch(`${backendUrl}/tests/bulk`, {
         method: "POST",
         headers: {
           accept: "application/json",
           "Content-Type": "application/json",
           Authorization: `Bearer ${backendAccessToken}`,
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          type: config.evaluation.type,
+          tests: [testItem],
+        }),
       });
 
       if (response.status === 401) {
@@ -636,9 +643,14 @@ function LLMPageInner() {
       }
 
       if (!response.ok) {
-        const conflict = await readNameConflictMessage(response);
+        // Bulk endpoint returns 400 (not 409) for name conflicts. Route
+        // the duplicate-name case to the inline name-field error slot
+        // with a friendly fixed message, matching the agent-create UX
+        // (the backend's verbatim "Test names already exist: <name>" is
+        // awkward for a single-test dialog).
+        const conflict = await readBulkNameConflictMessage(response);
         if (conflict) {
-          setNameConflictError(conflict);
+          setNameConflictError("A test with this name already exists");
           setIsCreating(false);
           return;
         }
@@ -799,7 +811,7 @@ function LLMPageInner() {
       if (!response.ok) {
         const conflict = await readNameConflictMessage(response);
         if (conflict) {
-          setNameConflictError(conflict);
+          setNameConflictError("A test with this name already exists");
           setIsCreating(false);
           return;
         }
@@ -877,7 +889,12 @@ function LLMPageInner() {
               Create and manage tests to evaluate your LLM
             </p>
           </div>
-          {activeTab === "tests" && (
+          {/* Top-right action area. Hidden when the library is fully empty
+              — in that case the placeholder card below renders the
+              Create test / Bulk upload buttons instead, since there are
+              no tests to manage and no bulk-delete / search context that
+              would put the action buttons up here. */}
+          {activeTab === "tests" && !testsLoading && tests.length > 0 && (
             <div className="flex items-center gap-2">
               {selectedTestUuids.size > 0 && (
                 <button
@@ -887,9 +904,11 @@ function LLMPageInner() {
                   Delete selected ({selectedTestUuids.size})
                 </button>
               )}
+              {/* Same tinted styling as the agent page's Tests tab:
+                  Create test → emerald, Bulk upload → orange. */}
               <button
                 onClick={() => setBulkUploadOpen(true)}
-                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer flex-shrink-0"
+                className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors flex-shrink-0 bg-orange-500/12 border-orange-500/45 text-orange-950 dark:text-orange-100 hover:bg-orange-500/22 dark:hover:bg-orange-500/18"
               >
                 Bulk upload
               </button>
@@ -898,9 +917,9 @@ function LLMPageInner() {
                   resetForm();
                   setAddTestSidebarOpen(true);
                 }}
-                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer flex-shrink-0"
+                className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors flex-shrink-0 bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
               >
-                Add test
+                Create test
               </button>
             </div>
           )}
@@ -1019,15 +1038,30 @@ function LLMPageInner() {
                 ? "No tests match your search"
                 : "You haven't created any tests yet"}
             </p>
-            <button
-              onClick={() => {
-                resetForm();
-                setAddTestSidebarOpen(true);
-              }}
-              className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-            >
-              Add test
-            </button>
+            {/* When the library is truly empty (no search filter), show
+                both create affordances inline — the top-right area is
+                hidden in that case so this is the only entry point.
+                When the empty state is search-driven, render no button
+                (the user can clear the search). */}
+            {!searchQuery && (
+              <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
+                <button
+                  onClick={() => {
+                    resetForm();
+                    setAddTestSidebarOpen(true);
+                  }}
+                  className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
+                >
+                  Create test
+                </button>
+                <button
+                  onClick={() => setBulkUploadOpen(true)}
+                  className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-orange-500/12 border-orange-500/45 text-orange-950 dark:text-orange-100 hover:bg-orange-500/22 dark:hover:bg-orange-500/18"
+                >
+                  Bulk upload
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <>

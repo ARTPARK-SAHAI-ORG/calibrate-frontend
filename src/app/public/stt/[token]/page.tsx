@@ -14,6 +14,11 @@ import {
   ratingRange,
   type STTEvaluatorColumn,
 } from "@/components/eval-details";
+import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
+import {
+  ExportResultsButton,
+  type ExportColumn,
+} from "@/components/ExportResultsButton";
 import {
   getPublicDefaultEvaluator,
   type PublicDefaultEvaluator,
@@ -190,6 +195,62 @@ export default function PublicSTTPage() {
       <div className="space-y-4 md:space-y-6">
         {data.provider_results && data.provider_results.length > 0 && (
           <>
+            {/* Actions row — Export results, matching the auth STT page.
+                Built at click time so it reflects the latest fetched state. */}
+            {data.provider_results.some(
+              (pr) => (pr.results?.length ?? 0) > 0,
+            ) && (
+              <div className="flex items-center justify-end">
+                <ExportResultsButton
+                  filename={`stt-results-${data.task_id}`}
+                  getRows={() => {
+                    const columns: ExportColumn[] = [
+                      { key: "provider", header: "Provider" },
+                      { key: "reference_text", header: "Reference text" },
+                      { key: "predicted_text", header: "Predicted text" },
+                      { key: "wer", header: "WER" },
+                      ...evaluatorColumns.map((c) => ({
+                        key: c.key,
+                        header: c.label,
+                      })),
+                    ];
+                    const rows: Record<string, unknown>[] = [];
+                    for (const pr of data.provider_results ?? []) {
+                      for (const r of pr.results ?? []) {
+                        const row: Record<string, unknown> = {
+                          provider: getProviderLabel(pr.provider),
+                          reference_text: r.gt,
+                          predicted_text: r.pred,
+                          wer: r.wer,
+                        };
+                        for (const c of evaluatorColumns) {
+                          const { score, error } = readEvaluatorCell(
+                            r as unknown as Record<string, unknown>,
+                            c,
+                          );
+                          if (error || score === undefined) {
+                            row[c.key] = "";
+                            continue;
+                          }
+                          if (c.outputType === "binary") {
+                            const norm = score.toLowerCase();
+                            row[c.key] =
+                              norm === "true" || norm === "1"
+                                ? "true"
+                                : "false";
+                          } else {
+                            const n = parseFloat(score);
+                            row[c.key] = Number.isFinite(n) ? n : score;
+                          }
+                        }
+                        rows.push(row);
+                      }
+                    }
+                    return { columns, rows };
+                  }}
+                />
+              </div>
+            )}
             {/* Tab Nav */}
             <div className="flex gap-2 border-b border-border">
               {(["leaderboard", "outputs", "about"] as const).map((tab) => (
