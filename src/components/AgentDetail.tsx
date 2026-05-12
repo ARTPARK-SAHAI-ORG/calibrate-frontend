@@ -160,8 +160,55 @@ export function AgentDetail({
   // Save state
   const [isSaving, setIsSaving] = useState(false);
   const [showSaveToast, setShowSaveToast] = useState(false);
-  const saveRef = useRef<() => void>(() => {});
+  const saveRef = useRef<(options?: { silent?: boolean }) => void | Promise<void>>(() => {});
   const isSavingRef = useRef(false);
+
+  // Tracks the verified state of the connection agent at the moment data was
+  // first fetched. Determines auto-save vs. confirmation-popup behavior.
+  const [initialConnectionVerified, setInitialConnectionVerified] = useState<
+    boolean | null
+  >(null);
+
+  // Snapshot used to skip redundant auto-save PUTs.
+  const lastAutoSaveSnapshotRef = useRef<string>("");
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Snapshot of the last *saved* connection identity (URL + headers only).
+  // Used by the post-verify flow to decide whether to prompt the user — if
+  // they re-verified the same URL + headers that's already on the backend,
+  // there's nothing to persist and we suppress the "Save new configuration?"
+  // popup. Refreshed on initial load and after every successful save.
+  const lastSavedConnectionIdentityRef = useRef<string>("");
+  const computeConnectionIdentity = (
+    url: string,
+    headers: Array<{ key: string; value: string }>,
+  ) => {
+    const obj: Record<string, string> = {};
+    for (const h of headers) {
+      if (h.key.trim()) obj[h.key.trim()] = h.value;
+    }
+    // Sort keys so re-ordering headers doesn't register as a change.
+    const sortedKeys = Object.keys(obj).sort();
+    const normalizedHeaders = sortedKeys.map((k) => [k, obj[k]]);
+    return JSON.stringify({
+      url: url.trim(),
+      headers: normalizedHeaders,
+    });
+  };
+
+  // Popup shown when an initially-verified agent is re-verified after edits,
+  // asking the user to confirm saving the new configuration.
+  const [saveAfterVerifyDialogOpen, setSaveAfterVerifyDialogOpen] =
+    useState(false);
+
+  // Set when verification succeeds and we want to immediately persist the
+  // newly-verified config. We can't call saveRef.current() inline because
+  // setConnectionConfig from the verify hasn't been committed yet, and
+  // saveRef is a closure over the previous render's connectionConfig — saving
+  // synchronously would write the stale `connection_verified: false`. Instead,
+  // we flag this and let an effect fire the save once the verified state has
+  // landed and saveRef has been rebuilt.
+  const [pendingSaveAfterVerify, setPendingSaveAfterVerify] = useState(false);
 
   // Tools linked to this agent
   const [agentTools, setAgentTools] = useState<ToolData[]>([]);
@@ -263,17 +310,31 @@ export function AgentDetail({
 
         // Initialize connection fields if agent is a connection type
         if (data.type === "connection" && data.config) {
-          setConnectionUrl(data.config.agent_url || "");
+          const url = data.config.agent_url || "";
           const headers = data.config.agent_headers || {};
           const parsed = Object.entries(headers).map(([key, value]) => ({
             key,
             value: String(value),
           }));
-          setConnectionHeaders(
-            parsed.length > 0 ? parsed : [{ key: "", value: "" }],
-          );
+          const headerRows =
+            parsed.length > 0 ? parsed : [{ key: "", value: "" }];
+          setConnectionUrl(url);
+          setConnectionHeaders(headerRows);
           setConnectionConfig(data.config);
           setSavedBenchmarkProvider(data.config.benchmark_provider);
+          setInitialConnectionVerified(
+            data.config.connection_verified === true,
+          );
+          // Seed snapshot so the auto-save effect does not fire on initial load.
+          lastAutoSaveSnapshotRef.current = JSON.stringify({
+            url,
+            headers: headerRows,
+            config: data.config,
+          });
+          lastSavedConnectionIdentityRef.current = computeConnectionIdentity(
+            url,
+            headerRows,
+          );
         }
 
         // Initialize form fields from agent config if available
@@ -448,8 +509,9 @@ export function AgentDetail({
 
   // Update save function ref when relevant state changes
   useEffect(() => {
-    saveRef.current = async () => {
+    saveRef.current = async (options?: { silent?: boolean }) => {
       if (!agent) return;
+      const silent = options?.silent === true;
 
       try {
         setIsSaving(true);
@@ -536,11 +598,28 @@ export function AgentDetail({
           setSavedBenchmarkProvider(connectionConfig.benchmark_provider);
         }
 
-        // Show success toast
-        setShowSaveToast(true);
+        // Refresh the auto-save snapshot so the next debounced effect run
+        // does not re-fire for the state we just persisted.
+        if (agent.type === "connection") {
+          lastAutoSaveSnapshotRef.current = JSON.stringify({
+            url: connectionUrl,
+            headers: connectionHeaders,
+            config: configPayload,
+          });
+          lastSavedConnectionIdentityRef.current = computeConnectionIdentity(
+            connectionUrl,
+            connectionHeaders,
+          );
+        }
+
+        if (!silent) {
+          setShowSaveToast(true);
+        }
       } catch (err) {
         console.error("Error saving agent:", err);
-        alert(err instanceof Error ? err.message : "Failed to save agent");
+        if (!silent) {
+          alert(err instanceof Error ? err.message : "Failed to save agent");
+        }
       } finally {
         setIsSaving(false);
         isSavingRef.current = false;
@@ -562,6 +641,75 @@ export function AgentDetail({
     connectionConfig,
     backendAccessToken,
   ]);
+
+  // Auto-save changes for initially-unverified connection agents.
+  // Intentionally skipped when the agent was already verified at fetch time —
+  // those changes only persist after the user re-verifies and confirms.
+  useEffect(() => {
+    if (!agent || agent.type !== "connection") return;
+    if (initialConnectionVerified !== false) return;
+    if (isLoading) return;
+
+    const snapshot = JSON.stringify({
+      url: connectionUrl,
+      headers: connectionHeaders,
+      config: connectionConfig,
+    });
+    if (snapshot === lastAutoSaveSnapshotRef.current) return;
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      if (isSavingRef.current) return;
+      saveRef.current({ silent: true });
+    }, 800);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [
+    agent,
+    initialConnectionVerified,
+    isLoading,
+    connectionUrl,
+    connectionHeaders,
+    connectionConfig,
+  ]);
+
+  // Called when an ad-hoc verify in the Connection tab succeeds.
+  const handleConnectionVerifySuccess = () => {
+    if (initialConnectionVerified === false) {
+      // Flush any pending debounce. Defer the actual save to an effect — the
+      // verified connectionConfig hasn't been committed to React state yet,
+      // so saving synchronously would persist a stale connection_verified=false.
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+      setPendingSaveAfterVerify(true);
+    } else if (initialConnectionVerified === true) {
+      // If the user re-verified the same URL + headers that's already on the
+      // backend, there's nothing new to persist — skip the popup so we don't
+      // ask them to "save" a no-op.
+      const currentIdentity = computeConnectionIdentity(
+        connectionUrl,
+        connectionHeaders,
+      );
+      if (currentIdentity === lastSavedConnectionIdentityRef.current) {
+        return;
+      }
+      setSaveAfterVerifyDialogOpen(true);
+    }
+  };
+
+  // Fires the deferred save once the verified connectionConfig has landed.
+  // Declared after the saveRef-updating effect, so by the time this runs
+  // saveRef.current already reflects the verified config.
+  useEffect(() => {
+    if (!pendingSaveAfterVerify) return;
+    if (connectionConfig.connection_verified !== true) return;
+    setPendingSaveAfterVerify(false);
+    saveRef.current();
+  }, [pendingSaveAfterVerify, connectionConfig]);
 
   // Handle name edit dialog open
   const handleOpenEditNameDialog = () => {
@@ -843,6 +991,7 @@ export function AgentDetail({
             onConnectionConfigChange={setConnectionConfig}
             onSave={() => saveRef.current()}
             isSaving={isSaving}
+            onVerificationSuccess={handleConnectionVerifySuccess}
           />
         )}
 
@@ -1041,6 +1190,46 @@ export function AgentDetail({
                     ></path>
                   </svg>
                 )}
+                {isSaving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save-After-Verify Confirmation Dialog */}
+      {saveAfterVerifyDialogOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => setSaveAfterVerifyDialogOpen(false)}
+        >
+          <div
+            className="bg-background border border-border rounded-xl p-5 md:p-6 max-w-md w-full shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-base md:text-lg font-semibold mb-2">
+              Save new configuration?
+            </h2>
+            <p className="text-sm md:text-base text-muted-foreground mb-5 md:mb-6">
+              Your new agent connection has been verified successfully. Would
+              you like to save this new configuration?
+            </p>
+            <div className="flex items-center justify-end gap-2 md:gap-3">
+              <button
+                onClick={() => setSaveAfterVerifyDialogOpen(false)}
+                className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+              >
+                Not now
+              </button>
+              <button
+                onClick={async () => {
+                  await saveRef.current();
+                  setSaveAfterVerifyDialogOpen(false);
+                }}
+                disabled={isSaving}
+                className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isSaving && <SpinnerIcon className="w-4 h-4 animate-spin" />}
                 {isSaving ? "Saving..." : "Save"}
               </button>
             </div>
