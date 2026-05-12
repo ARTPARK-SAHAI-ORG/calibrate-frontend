@@ -726,9 +726,12 @@ export function TestsTabContent({
       }
 
       if (!response.ok) {
+        // Friendly fixed message instead of the backend's verbatim
+        // "Test names already exist: <name>" (plural reads awkwardly
+        // for a single-test create dialog).
         const conflict = await readBulkNameConflictMessage(response);
         if (conflict) {
-          setNameConflictError(conflict);
+          setNameConflictError("A test with this name already exists");
           setIsCreating(false);
           return;
         }
@@ -898,7 +901,7 @@ export function TestsTabContent({
         // contract), not the 400 used by /tests/bulk.
         const conflict = await readNameConflictMessage(response);
         if (conflict) {
-          setNameConflictError(conflict);
+          setNameConflictError("A test with this name already exists");
           setIsCreating(false);
           return;
         }

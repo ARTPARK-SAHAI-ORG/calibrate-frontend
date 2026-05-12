@@ -643,12 +643,14 @@ function LLMPageInner() {
       }
 
       if (!response.ok) {
-        // Bulk endpoint returns 400 (not 409) for name conflicts. Route the
-        // duplicate-name case to the inline name-field error slot so it
-        // matches the single-test create UX users expect.
+        // Bulk endpoint returns 400 (not 409) for name conflicts. Route
+        // the duplicate-name case to the inline name-field error slot
+        // with a friendly fixed message, matching the agent-create UX
+        // (the backend's verbatim "Test names already exist: <name>" is
+        // awkward for a single-test dialog).
         const conflict = await readBulkNameConflictMessage(response);
         if (conflict) {
-          setNameConflictError(conflict);
+          setNameConflictError("A test with this name already exists");
           setIsCreating(false);
           return;
         }
@@ -809,7 +811,7 @@ function LLMPageInner() {
       if (!response.ok) {
         const conflict = await readNameConflictMessage(response);
         if (conflict) {
-          setNameConflictError(conflict);
+          setNameConflictError("A test with this name already exists");
           setIsCreating(false);
           return;
         }

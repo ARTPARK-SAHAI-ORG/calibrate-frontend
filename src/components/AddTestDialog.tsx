@@ -2591,7 +2591,7 @@ export function AddTestDialog({
                           isLastNonToolResponse && (
                             <button
                               onClick={() => removeChatMessage(message.id)}
-                              className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-red-400 hover:border-red-400/50 transition-colors cursor-pointer"
+                              className="w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60"
                               title="Remove message"
                             >
                               <svg
@@ -2663,17 +2663,19 @@ export function AddTestDialog({
                                             : "left-0 bottom-full mb-2"
                                       }`}
                                     >
-                                      {/* Semantic hue per message kind so
-                                          options at a glance map to the
-                                          chat-bubble role. User = amber
-                                          (human/warm), Agent = sky (AI),
-                                          Tool call = violet (action). */}
+                                      {/* Semantic hue per message kind,
+                                          rendered as a tinted row chip so
+                                          each option reads as its own
+                                          coloured cell. Cyan for Agent
+                                          tool call keeps it visually
+                                          distinct from the violet
+                                          "Add evaluator" button above. */}
                                       <button
                                         onClick={() => {
                                           addChatMessage("user");
                                           setAddMessageDropdownOpen(false);
                                         }}
-                                        className="w-full px-3 py-1.5 flex items-center gap-2 text-amber-700 dark:text-amber-200 hover:bg-amber-500/15 transition-colors cursor-pointer"
+                                        className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-amber-500/15 text-amber-900 dark:bg-amber-500/20 dark:text-amber-100 hover:bg-amber-500/25 dark:hover:bg-amber-500/30"
                                       >
                                         <svg
                                           className="w-4 h-4"
@@ -2697,7 +2699,7 @@ export function AddTestDialog({
                                           addChatMessage("agent");
                                           setAddMessageDropdownOpen(false);
                                         }}
-                                        className="w-full px-3 py-1.5 flex items-center gap-2 text-sky-700 dark:text-sky-200 hover:bg-sky-500/15 transition-colors cursor-pointer"
+                                        className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-sky-500/15 text-sky-900 dark:bg-sky-500/20 dark:text-sky-100 hover:bg-sky-500/25 dark:hover:bg-sky-500/30"
                                       >
                                         <svg
                                           className="w-4 h-4"
@@ -2721,7 +2723,7 @@ export function AddTestDialog({
                                           setAddMessageDropdownOpen(false);
                                           setToolCallDropdownOpen(true);
                                         }}
-                                        className="w-full px-3 py-1.5 flex items-center gap-2 text-violet-700 dark:text-violet-200 hover:bg-violet-500/15 transition-colors cursor-pointer"
+                                        className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-cyan-500/15 text-cyan-900 dark:bg-cyan-500/20 dark:text-cyan-100 hover:bg-cyan-500/25 dark:hover:bg-cyan-500/30"
                                       >
                                         <svg
                                           className="w-4 h-4"
