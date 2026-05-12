@@ -2125,13 +2125,16 @@ export function AddTestDialog({
                   Create conversation context starting with
                 </p>
 
+                {/* Conversation starter buttons. Semantic tint per role so
+                    they match the per-row +-menu items below — agent = sky,
+                    user = amber. */}
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => addChatMessage("agent")}
-                    className="px-4 py-2.5 rounded-xl border border-border bg-transparent text-foreground hover:bg-muted transition-colors cursor-pointer flex items-center gap-2"
+                    className="px-4 py-2.5 rounded-xl border cursor-pointer transition-colors flex items-center gap-2 bg-sky-500/12 border-sky-500/45 text-sky-950 dark:text-sky-100 hover:bg-sky-500/22 dark:hover:bg-sky-500/18"
                   >
                     <svg
-                      className="w-5 h-5 text-muted-foreground"
+                      className="w-5 h-5"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -2147,10 +2150,10 @@ export function AddTestDialog({
                   </button>
                   <button
                     onClick={() => addChatMessage("user")}
-                    className="px-4 py-2.5 rounded-xl border border-border bg-transparent text-foreground hover:bg-muted transition-colors cursor-pointer flex items-center gap-2"
+                    className="px-4 py-2.5 rounded-xl border cursor-pointer transition-colors flex items-center gap-2 bg-amber-500/12 border-amber-500/45 text-amber-950 dark:text-amber-100 hover:bg-amber-500/22 dark:hover:bg-amber-500/18"
                   >
                     <svg
-                      className="w-5 h-5 text-muted-foreground"
+                      className="w-5 h-5"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -2223,7 +2226,7 @@ export function AddTestDialog({
                           const inlineDeleteBtn = showInlineDelete ? (
                             <button
                               onClick={() => removeChatMessage(message.id)}
-                              className="w-8 h-8 flex-shrink-0 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-red-400 hover:border-red-400/50 transition-colors cursor-pointer"
+                              className="w-8 h-8 flex-shrink-0 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60"
                               title="Remove message"
                             >
                               <svg
@@ -2495,7 +2498,7 @@ export function AddTestDialog({
                           {showInlineDelete && (
                             <button
                               onClick={() => removeChatMessage(message.id)}
-                              className="w-8 h-8 flex-shrink-0 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-red-400 hover:border-red-400/50 transition-colors cursor-pointer"
+                              className="w-8 h-8 flex-shrink-0 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60"
                               title="Remove message"
                             >
                               <svg
@@ -2622,7 +2625,7 @@ export function AddTestDialog({
                                       !addMessageDropdownOpen,
                                     )
                                   }
-                                  className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-muted-foreground transition-colors cursor-pointer"
+                                  className="w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
                                   title="Add message"
                                 >
                                   <svg
@@ -2660,15 +2663,20 @@ export function AddTestDialog({
                                             : "left-0 bottom-full mb-2"
                                       }`}
                                     >
+                                      {/* Semantic hue per message kind so
+                                          options at a glance map to the
+                                          chat-bubble role. User = amber
+                                          (human/warm), Agent = sky (AI),
+                                          Tool call = violet (action). */}
                                       <button
                                         onClick={() => {
                                           addChatMessage("user");
                                           setAddMessageDropdownOpen(false);
                                         }}
-                                        className="w-full px-3 py-1.5 flex items-center gap-2 text-foreground hover:bg-muted transition-colors cursor-pointer"
+                                        className="w-full px-3 py-1.5 flex items-center gap-2 text-amber-700 dark:text-amber-200 hover:bg-amber-500/15 transition-colors cursor-pointer"
                                       >
                                         <svg
-                                          className="w-4 h-4 text-muted-foreground"
+                                          className="w-4 h-4"
                                           fill="none"
                                           viewBox="0 0 24 24"
                                           stroke="currentColor"
@@ -2689,10 +2697,10 @@ export function AddTestDialog({
                                           addChatMessage("agent");
                                           setAddMessageDropdownOpen(false);
                                         }}
-                                        className="w-full px-3 py-1.5 flex items-center gap-2 text-foreground hover:bg-muted transition-colors cursor-pointer"
+                                        className="w-full px-3 py-1.5 flex items-center gap-2 text-sky-700 dark:text-sky-200 hover:bg-sky-500/15 transition-colors cursor-pointer"
                                       >
                                         <svg
-                                          className="w-4 h-4 text-muted-foreground"
+                                          className="w-4 h-4"
                                           fill="none"
                                           viewBox="0 0 24 24"
                                           stroke="currentColor"
@@ -2713,10 +2721,10 @@ export function AddTestDialog({
                                           setAddMessageDropdownOpen(false);
                                           setToolCallDropdownOpen(true);
                                         }}
-                                        className="w-full px-3 py-1.5 flex items-center gap-2 text-foreground hover:bg-muted transition-colors cursor-pointer"
+                                        className="w-full px-3 py-1.5 flex items-center gap-2 text-violet-700 dark:text-violet-200 hover:bg-violet-500/15 transition-colors cursor-pointer"
                                       >
                                         <svg
-                                          className="w-4 h-4 text-muted-foreground"
+                                          className="w-4 h-4"
                                           fill="none"
                                           viewBox="0 0 24 24"
                                           stroke="currentColor"
