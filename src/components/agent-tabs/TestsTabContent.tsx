@@ -1760,52 +1760,67 @@ export function TestsTabContent({
                 className="w-full h-9 md:h-10 pl-9 md:pl-10 pr-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
               />
             </div>
-            {/* Type filter — segmented toggle. Sits on its own row below
-                the search bar. Matches the "Next Reply / Tool Call" pattern
-                used in BulkUploadTestsModal. */}
-            <div className="flex rounded-lg border border-border overflow-hidden w-fit mb-3 md:mb-4">
-              {(
-                [
-                  { value: "all", label: "All" },
-                  { value: "response", label: "Next Reply" },
-                  { value: "tool_call", label: "Tool Call" },
-                ] as const
-              ).map((opt, i, arr) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    setTypeFilter(opt.value);
-                    // Drop any selection that no longer matches the new
-                    // filter so the bulk-action counts don't drift from
-                    // what's visible.
-                    setSelectedTestUuids((prev) => {
-                      if (prev.size === 0) return prev;
-                      const next = new Set<string>();
-                      for (const t of agentTests) {
-                        if (!prev.has(t.uuid)) continue;
-                        if (opt.value !== "all" && t.type !== opt.value)
-                          continue;
-                        next.add(t.uuid);
-                      }
-                      return next;
-                    });
-                  }}
-                  // Right-border on every segment except the last gives a
-                  // visible divider between options regardless of active
-                  // state (the parent's `overflow-hidden` clips the
-                  // trailing border against the rounded container edge).
-                  className={`h-9 md:h-10 px-3 text-sm font-medium transition-colors cursor-pointer ${
-                    i < arr.length - 1 ? "border-r border-border" : ""
-                  } ${
-                    typeFilter === opt.value
-                      ? "bg-foreground text-background"
-                      : "bg-background text-foreground hover:bg-muted/50"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+            {/* Type filter — iOS-style segmented control. Visually
+                differentiated from the action buttons in the page header
+                (rectangular, h-9/h-10, foreground/border styling) by
+                using a muted pill track with smaller rounded chips, a
+                leading "Filter" label, and a softer height. Sits on its
+                own row below the search bar. */}
+            <div className="flex items-center gap-2 mb-3 md:mb-4">
+              <svg
+                className="w-3.5 h-3.5 text-muted-foreground"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 4.5h18M6 12h12M10.5 19.5h3"
+                />
+              </svg>
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Type
+              </span>
+              <div className="flex items-center gap-0.5 rounded-full bg-muted/60 p-0.5">
+                {(
+                  [
+                    { value: "all", label: "All" },
+                    { value: "response", label: "Next Reply" },
+                    { value: "tool_call", label: "Tool Call" },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      setTypeFilter(opt.value);
+                      // Drop any selection that no longer matches the new
+                      // filter so the bulk-action counts don't drift from
+                      // what's visible.
+                      setSelectedTestUuids((prev) => {
+                        if (prev.size === 0) return prev;
+                        const next = new Set<string>();
+                        for (const t of agentTests) {
+                          if (!prev.has(t.uuid)) continue;
+                          if (opt.value !== "all" && t.type !== opt.value)
+                            continue;
+                          next.add(t.uuid);
+                        }
+                        return next;
+                      });
+                    }}
+                    className={`h-7 px-3 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                      typeFilter === opt.value
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <p className="text-sm text-muted-foreground mb-3 md:mb-4">
