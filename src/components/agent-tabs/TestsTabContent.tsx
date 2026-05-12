@@ -1149,51 +1149,53 @@ export function TestsTabContent({
     }
   };
 
-  // Two new entry points sit alongside "Add test" (which attaches an existing
-  // test). "Create test" opens the in-place creation dialog; "Bulk upload"
-  // opens the CSV modal locked to this agent. Both use POST /tests/bulk with
-  // `agent_uuids: [agentUuid]` so new tests auto-attach to this agent.
-  const renderNewTestButtons = (variant: "outline" | "primary" = "outline") => {
-    const baseClass =
-      variant === "primary"
-        ? "h-9 md:h-10 px-4 md:px-5 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
-        : "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer";
-    return (
-      <>
-        <button
-          type="button"
-          onClick={() => {
-            setNewTestName("");
-            setValidationAttempted(false);
-            setCreateError(null);
-            setNameConflictError(null);
-            setCreateDialogOpen(true);
-          }}
-          className={baseClass}
-        >
-          Create test
-        </button>
-        <button
-          type="button"
-          onClick={() => setBulkUploadOpen(true)}
-          className={baseClass}
-        >
-          Bulk upload
-        </button>
-      </>
-    );
-  };
+  // The three test-creation entry points get their own fixed tint so they
+  // read as distinct actions in every layout: header bar and both empty
+  // states use the same colour mapping regardless of which other buttons
+  // are present. Hue palette is picked to avoid colliding with the
+  // Share/Public/Copy-link (purple/blue/amber) and Export (teal) actions.
+  //
+  //   Add test (attach existing) → indigo
+  //   Create test               → pink
+  //   Bulk upload               → orange
+  const ADD_TEST_BUTTON_CLASS =
+    "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-indigo-500/12 border-indigo-500/45 text-indigo-950 dark:text-indigo-100 hover:bg-indigo-500/22 dark:hover:bg-indigo-500/18";
+  const CREATE_TEST_BUTTON_CLASS =
+    "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-pink-500/12 border-pink-500/45 text-pink-950 dark:text-pink-100 hover:bg-pink-500/22 dark:hover:bg-pink-500/18";
+  const BULK_UPLOAD_BUTTON_CLASS =
+    "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-orange-500/12 border-orange-500/45 text-orange-950 dark:text-orange-100 hover:bg-orange-500/22 dark:hover:bg-orange-500/18";
 
-  const renderAddTestControl = (variant: "outline" | "primary" = "outline") => (
+  const renderNewTestButtons = () => (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setNewTestName("");
+          setValidationAttempted(false);
+          setCreateError(null);
+          setNameConflictError(null);
+          setCreateDialogOpen(true);
+        }}
+        className={CREATE_TEST_BUTTON_CLASS}
+      >
+        Create test
+      </button>
+      <button
+        type="button"
+        onClick={() => setBulkUploadOpen(true)}
+        className={BULK_UPLOAD_BUTTON_CLASS}
+      >
+        Bulk upload
+      </button>
+    </>
+  );
+
+  const renderAddTestControl = () => (
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setShowTestDropdown(!showTestDropdown)}
         type="button"
-        className={
-          variant === "primary"
-            ? "h-9 md:h-10 px-4 md:px-5 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
-            : "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-        }
+        className={ADD_TEST_BUTTON_CLASS}
       >
         Add test
       </button>
@@ -1481,7 +1483,7 @@ export function TestsTabContent({
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setShowTestDropdown(!showTestDropdown)}
-                className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+                className={ADD_TEST_BUTTON_CLASS}
               >
                 Add test
               </button>
@@ -1582,7 +1584,7 @@ export function TestsTabContent({
               )}
             </div>
             {/* Create test / Bulk upload (new tests, auto-attached to this agent) */}
-            {renderNewTestButtons("outline")}
+            {renderNewTestButtons()}
             {/* Run all tests */}
             <div className="relative group/runall">
               <button
@@ -1737,8 +1739,8 @@ export function TestsTabContent({
             {/* Only show the attach-existing button when the user actually
                 has tests to attach — otherwise the dropdown is empty and
                 the affordance is misleading. */}
-            {allTests.length > 0 && renderAddTestControl("primary")}
-            {renderNewTestButtons(allTests.length > 0 ? "outline" : "primary")}
+            {allTests.length > 0 && renderAddTestControl()}
+            {renderNewTestButtons()}
           </div>
         </div>
       ) : agentTests.length === 0 ? (
@@ -1764,10 +1766,8 @@ export function TestsTabContent({
                   : " Add an existing test or create a new one."}
               </p>
               <div className="flex flex-wrap justify-center gap-2 md:gap-3 mt-3 md:mt-4 w-full">
-                {allTests.length > 0 && renderAddTestControl("primary")}
-                {renderNewTestButtons(
-                  allTests.length > 0 ? "outline" : "primary",
-                )}
+                {allTests.length > 0 && renderAddTestControl()}
+                {renderNewTestButtons()}
               </div>
             </div>
           </div>
