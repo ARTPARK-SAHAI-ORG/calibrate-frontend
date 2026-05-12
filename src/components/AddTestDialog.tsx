@@ -1452,11 +1452,14 @@ export function AddTestDialog({
                             disabled={
                               evaluatorsLoading || isLoading || noOptionsLeft
                             }
-                            className={`px-3 py-1.5 text-sm font-medium bg-background text-foreground rounded-lg hover:bg-muted transition-colors cursor-pointer border border-border disabled:opacity-50 disabled:cursor-not-allowed ${
+                            // Tinted violet so the action stands out from
+                            // the neutral form chrome around it. Validation
+                            // error state overrides border/text to red.
+                            className={`px-3 py-1.5 text-sm font-medium rounded-lg border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-500/12 border-violet-500/45 text-violet-950 dark:text-violet-100 hover:bg-violet-500/22 dark:hover:bg-violet-500/18 ${
                               localValidationAttempted &&
                               activeTab === "next-reply" &&
                               attachedEvaluators.length === 0
-                                ? "border-red-500 text-red-400"
+                                ? "!border-red-500 !text-red-500 !bg-red-500/10"
                                 : ""
                             }`}
                           >
