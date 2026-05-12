@@ -173,12 +173,19 @@ export function TestsTabContent({
   // All available tests state
   const [allTests, setAllTests] = useState<TestData[]>([]);
   const [allTestsLoading, setAllTestsLoading] = useState(false);
-  // Tracks whether `/tests` has been fetched at least once during this
-  // session. Used by the empty state to decide whether the "Add test"
-  // (attach-existing) button is meaningful — if the user has no tests at
-  // all, the button is dropped entirely rather than offering an empty
-  // dropdown.
+  // Tracks the eager `/tests` library fetch used by the empty state.
+  // Two booleans, deliberately separate:
+  //   - `allTestsAttempted`: an attempt has completed (success OR failure).
+  //     Used by the retry guard so a failed fetch does not loop —
+  //     instead we wait for the user to open the attach-existing
+  //     dropdown, which is the natural retry trigger.
+  //   - `allTestsFetched`: an attempt SUCCEEDED. Used by the empty
+  //     state's copy + Add-test visibility so we only confidently hide
+  //     the button when we know the library is empty; on a failed
+  //     fetch we leave the button visible (clicking it will re-fetch
+  //     via the dropdown's own effect).
   const [allTestsFetched, setAllTestsFetched] = useState(false);
+  const [allTestsAttempted, setAllTestsAttempted] = useState(false);
 
   // UI state
   const [showTestDropdown, setShowTestDropdown] = useState(false);
@@ -378,6 +385,11 @@ export function TestsTabContent({
       console.error("Error fetching tests:", err);
     } finally {
       setAllTestsLoading(false);
+      // Mark the attempt complete regardless of outcome so the empty-
+      // state retry effect doesn't fire again as soon as
+      // `allTestsLoading` flips back to false. A failed fetch will be
+      // retried only when the user opens the attach-existing dropdown.
+      setAllTestsAttempted(true);
     }
   }, [backendAccessToken]);
 
@@ -389,13 +401,14 @@ export function TestsTabContent({
   }, [showTestDropdown, backendAccessToken, fetchAllTests]);
 
   // (2) Fetch when the agent's tests list is known to be empty, so the
-  // empty state can decide whether to show the Add-test button. Only
-  // fires once per session (gated on `allTestsFetched`).
+  // empty state can decide whether to show the Add-test button. Gated
+  // on `allTestsAttempted` so a failure doesn't trigger a tight retry
+  // loop — see comment on the state declarations above.
   useEffect(() => {
     if (
       !agentTestsLoading &&
       agentTests.length === 0 &&
-      !allTestsFetched &&
+      !allTestsAttempted &&
       !allTestsLoading &&
       backendAccessToken
     ) {
@@ -404,7 +417,7 @@ export function TestsTabContent({
   }, [
     agentTestsLoading,
     agentTests.length,
-    allTestsFetched,
+    allTestsAttempted,
     allTestsLoading,
     backendAccessToken,
     fetchAllTests,
@@ -1682,7 +1695,13 @@ export function TestsTabContent({
             {/* Only show the attach-existing button when the user actually
                 has tests to attach — otherwise the dropdown is empty and
                 the affordance is misleading. */}
-            {allTests.length > 0 && renderAddTestControl()}
+            {/* Hide Add-test only when we've confirmed the library is
+                empty. On a fetch failure (`allTestsAttempted && !allTestsFetched`)
+                leave it visible — clicking it re-fetches via the
+                dropdown's own effect. */}
+            {(allTests.length > 0 ||
+              (allTestsAttempted && !allTestsFetched)) &&
+              renderAddTestControl()}
             {renderNewTestButtons()}
           </div>
         </div>
@@ -1709,7 +1728,13 @@ export function TestsTabContent({
                   : " Add an existing test or create a new one."}
               </p>
               <div className="flex flex-wrap justify-center gap-2 md:gap-3 mt-3 md:mt-4 w-full">
-                {allTests.length > 0 && renderAddTestControl()}
+                {/* Hide Add-test only when we've confirmed the library is
+                empty. On a fetch failure (`allTestsAttempted && !allTestsFetched`)
+                leave it visible — clicking it re-fetches via the
+                dropdown's own effect. */}
+            {(allTests.length > 0 ||
+              (allTestsAttempted && !allTestsFetched)) &&
+              renderAddTestControl()}
                 {renderNewTestButtons()}
               </div>
             </div>
