@@ -36,6 +36,7 @@ type AgentConnectionTabContentProps = {
   onConnectionConfigChange: (config: ConnectionConfig) => void;
   onSave: () => Promise<void> | void;
   isSaving: boolean;
+  onVerificationSuccess?: () => void;
 };
 
 export function AgentConnectionTabContent({
@@ -48,6 +49,7 @@ export function AgentConnectionTabContent({
   onConnectionConfigChange,
   onSave,
   isSaving,
+  onVerificationSuccess,
 }: AgentConnectionTabContentProps) {
   const verify = useVerifyConnection();
 
@@ -84,6 +86,12 @@ export function AgentConnectionTabContent({
 
   // Snapshot of the last successfully verified URL + headers.
   // Used to restore "verified" status if the user edits then reverts.
+  // The URL is trimmed here to match how the comparison effect below trims
+  // the draft (`agentUrl.trim()`) and how `handleVerifyConfirm` stores the
+  // post-verify snapshot. Without trimming, a saved URL with leading or
+  // trailing whitespace would never compare equal to the draft on mount,
+  // and the page would show "Not verified" for an agent the backend still
+  // considers verified.
   const verifiedSnapshotRef = useRef<{
     url: string;
     headers: string;
@@ -92,7 +100,7 @@ export function AgentConnectionTabContent({
   } | null>(
     connectionConfig.connection_verified === true
       ? {
-          url: connectionConfig.agent_url || "",
+          url: (connectionConfig.agent_url || "").trim(),
           headers: JSON.stringify(connectionConfig.agent_headers || {}),
           status: "verified" as const,
           at: connectionConfig.connection_verified_at || null,
@@ -197,6 +205,7 @@ export function AgentConnectionTabContent({
     setVerifyStatus(newStatus);
     if (success) {
       setVerifyDialogOpen(false);
+      onVerificationSuccess?.();
     }
   };
 
