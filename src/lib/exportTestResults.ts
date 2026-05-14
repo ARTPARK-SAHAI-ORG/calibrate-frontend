@@ -85,18 +85,23 @@ function evaluatorKey(jr: JudgeResult): string {
 
 // Walk every row's `judgeResults` and build the union of evaluators present
 // in the batch, preserving first-seen order so columns stay stable across
-// re-exports. Returns paired `<name>` / `<name> reasoning` column specs.
+// re-exports. Returns paired `<name>/value` / `<name>/reasoning` column
+// specs, plus one `<name>/<varName>` column per distinct variable seen for
+// that evaluator (union across rows, first-seen order). Header naming
+// matches the labelling bulk-upload format so exports round-trip.
 type EvaluatorColumn = {
-  key: string;         // unique column key (e.g. "eval:uuid:abc")
-  reasoningKey: string;
-  displayName: string; // header shown in the CSV
-  matchKey: string;    // stable key used to look up the row's verdict
+  valueKey: string;     // unique column key for the verdict
+  reasoningKey: string; // unique column key for the reasoning
+  displayName: string;  // evaluator name used as the header prefix
+  matchKey: string;     // stable key used to look up the row's verdict
+  variableNames: string[]; // distinct variable names seen for this evaluator
 };
 
 function collectEvaluatorColumns(
   rows: Array<{ judgeResults?: JudgeResult[] | null }>,
 ): EvaluatorColumn[] {
   const seen = new Map<string, EvaluatorColumn>();
+  const variableSets = new Map<string, Set<string>>();
   const nameCounts = new Map<string, number>();
 
   for (const row of rows) {
@@ -104,20 +109,32 @@ function collectEvaluatorColumns(
     if (!Array.isArray(jrs)) continue;
     for (const jr of jrs) {
       const key = evaluatorKey(jr);
-      if (seen.has(key)) continue;
+      if (!seen.has(key)) {
+        // Disambiguate when two distinct evaluators share a display name.
+        const baseName = jr.name || "Evaluator";
+        const count = (nameCounts.get(baseName) ?? 0) + 1;
+        nameCounts.set(baseName, count);
+        const displayName = count === 1 ? baseName : `${baseName} (${count})`;
 
-      // Disambiguate when two distinct evaluators share a display name.
-      const baseName = jr.name || "Evaluator";
-      const count = (nameCounts.get(baseName) ?? 0) + 1;
-      nameCounts.set(baseName, count);
-      const displayName = count === 1 ? baseName : `${baseName} (${count})`;
-
-      seen.set(key, {
-        key: `eval:${key}`,
-        reasoningKey: `eval_reasoning:${key}`,
-        displayName,
-        matchKey: key,
-      });
+        seen.set(key, {
+          valueKey: `eval:${key}/value`,
+          reasoningKey: `eval:${key}/reasoning`,
+          displayName,
+          matchKey: key,
+          variableNames: [],
+        });
+        variableSets.set(key, new Set());
+      }
+      const vars = variableSets.get(key)!;
+      const col = seen.get(key)!;
+      if (jr.variable_values) {
+        for (const varName of Object.keys(jr.variable_values)) {
+          if (!vars.has(varName)) {
+            vars.add(varName);
+            col.variableNames.push(varName);
+          }
+        }
+      }
     }
   }
 
@@ -127,14 +144,20 @@ function collectEvaluatorColumns(
 function buildEvaluatorColumnSpecs(cols: EvaluatorColumn[]): ExportColumn[] {
   const specs: ExportColumn[] = [];
   for (const c of cols) {
-    specs.push({ key: c.key, header: c.displayName });
-    specs.push({ key: c.reasoningKey, header: `${c.displayName} reasoning` });
+    specs.push({ key: c.valueKey, header: `${c.displayName}/value` });
+    for (const varName of c.variableNames) {
+      specs.push({
+        key: `eval:${c.matchKey}/var:${varName}`,
+        header: `${c.displayName}/${varName}`,
+      });
+    }
+    specs.push({ key: c.reasoningKey, header: `${c.displayName}/reasoning` });
   }
   return specs;
 }
 
-// Build a key→value map of evaluator verdicts and reasonings for one row.
-// Returns empty cells for any evaluator the row didn't include.
+// Build a key→value map of evaluator verdicts, variables, and reasonings
+// for one row. Returns empty cells for any evaluator the row didn't include.
 function evaluatorCellsForRow(
   judgeResults: JudgeResult[] | null | undefined,
   cols: EvaluatorColumn[],
@@ -146,7 +169,11 @@ function evaluatorCellsForRow(
   const out: Record<string, string> = {};
   for (const c of cols) {
     const jr = byKey.get(c.matchKey);
-    out[c.key] = evaluatorVerdict(jr);
+    out[c.valueKey] = evaluatorVerdict(jr);
+    for (const varName of c.variableNames) {
+      out[`eval:${c.matchKey}/var:${varName}`] =
+        jr?.variable_values?.[varName] ?? "";
+    }
     out[c.reasoningKey] = jr?.reasoning ?? "";
   }
   return out;
@@ -165,14 +192,14 @@ export function buildTestRunCsv(results: ExportTestRow[]): {
   const evalCols = collectEvaluatorColumns(filtered);
 
   const columns: ExportColumn[] = [
-    { key: "name", header: "Test name" },
-    { key: "status", header: "Status" },
-    { key: "history", header: "Conversation history" },
-    { key: "agent_response", header: "Agent response" },
+    { key: "name", header: "name" },
+    { key: "status", header: "status" },
+    { key: "history", header: "conversation_history" },
+    { key: "agent_response", header: "agent_response" },
     ...(hasToolCall
       ? [
-          { key: "tool_call_result", header: "Tool call test result" },
-          { key: "tool_call_reasoning", header: "Tool call test reasoning" },
+          { key: "tool_call_result", header: "tool_call_result" },
+          { key: "tool_call_reasoning", header: "tool_call_reasoning" },
         ]
       : []),
     ...buildEvaluatorColumnSpecs(evalCols),
@@ -215,15 +242,15 @@ export function buildBenchmarkCsv(rows: ExportBenchmarkRow[]): {
   const evalCols = collectEvaluatorColumns(filtered);
 
   const columns: ExportColumn[] = [
-    { key: "model", header: "Model" },
-    { key: "name", header: "Test name" },
-    { key: "status", header: "Status" },
-    { key: "history", header: "Conversation history" },
-    { key: "agent_response", header: "Agent response" },
+    { key: "model", header: "model" },
+    { key: "name", header: "name" },
+    { key: "status", header: "status" },
+    { key: "history", header: "conversation_history" },
+    { key: "agent_response", header: "agent_response" },
     ...(hasToolCall
       ? [
-          { key: "tool_call_result", header: "Tool call test result" },
-          { key: "tool_call_reasoning", header: "Tool call test reasoning" },
+          { key: "tool_call_result", header: "tool_call_result" },
+          { key: "tool_call_reasoning", header: "tool_call_reasoning" },
         ]
       : []),
     ...buildEvaluatorColumnSpecs(evalCols),
