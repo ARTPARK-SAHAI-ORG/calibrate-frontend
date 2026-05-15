@@ -2,7 +2,7 @@
 
 [![CC BY-SA 4.0][cc-by-sa-shield]][cc-by-sa]
 
-Frontend for [Calibrate](https://calibrate.artpark.ai): an AI evaluation platform for non-profits
+Frontend for [Calibrate](https://calibrate.artpark.ai): an AI agent evaluation platform for non-profits
 
 ## Prerequisites
 
