@@ -1,6 +1,6 @@
 # Self-Hosting Guide
 
-This guide walks through deploying your own instance of Calibrate's frontend. It is a Next.js app that talks to a separate Calibrate backend over REST.
+This guide walks through deploying your own instance of Calibrate's frontend. It is a Next.js app that talks to the Calibrate backend (self-hosting guide for the backend can be found [here](https://github.com/ARTPARK-SAHAI-ORG/calibrate-backend/blob/main/SELF_HOSTING.md)).
 
 ## Steps
 
