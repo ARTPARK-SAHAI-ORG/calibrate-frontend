@@ -18,6 +18,7 @@ import {
 import type { EvaluatorRefPayload } from "@/components/AddTestDialog";
 import type { AvailableTool } from "@/components/ToolPicker";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
+import { sanitizeJsonString, parseJsonLenient } from "@/lib/jsonSanitize";
 
 // Inline link styling for the in-modal helper text. Tuned to read as a link
 // inside small muted body copy without shouting — `text-foreground` plus a
@@ -670,8 +671,17 @@ export function BulkUploadTestsModal({
             return;
           }
 
+          // Sanitise smart-quotes etc. up front so the value we hand back
+          // to handleSubmit (and any downstream JSON.parse) already has
+          // ASCII-only quote characters. The original cell text may have
+          // been pasted out of Word / Google Sheets which silently swaps
+          // straight quotes for curly ones; bail out only if the cleanup
+          // still doesn't yield valid JSON.
+          row.conversation_history = sanitizeJsonString(
+            row.conversation_history,
+          );
           try {
-            const history = JSON.parse(row.conversation_history);
+            const history = parseJsonLenient(row.conversation_history);
             if (!Array.isArray(history)) {
               errors.push(
                 `Row ${rowNum}: conversation_history must be a JSON array`,
@@ -731,9 +741,10 @@ export function BulkUploadTestsModal({
               errors.push(`Row ${rowNum}: missing tool_calls`);
               return;
             }
+            row.tool_calls = sanitizeJsonString(row.tool_calls);
             let toolCalls: Array<{ tool?: unknown }>;
             try {
-              const parsed = JSON.parse(row.tool_calls);
+              const parsed = parseJsonLenient(row.tool_calls);
               if (!Array.isArray(parsed)) {
                 errors.push(`Row ${rowNum}: tool_calls must be a JSON array`);
                 return;
@@ -834,7 +845,7 @@ export function BulkUploadTestsModal({
       }
 
       const tests = parsedTests.map((test) => {
-        const conversation_history = JSON.parse(test.conversation_history);
+        const conversation_history = parseJsonLenient(test.conversation_history);
 
         if (isResponseType) {
           // Send the resolved EvaluatorRefPayload[] (same shape as the
@@ -848,7 +859,7 @@ export function BulkUploadTestsModal({
             evaluators: test.evaluators ?? [],
           };
         } else {
-          const tool_calls = JSON.parse(test.tool_calls!);
+          const tool_calls = parseJsonLenient(test.tool_calls!);
           return {
             name: test.name,
             conversation_history,

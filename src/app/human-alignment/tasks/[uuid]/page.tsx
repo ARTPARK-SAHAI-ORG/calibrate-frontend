@@ -844,6 +844,7 @@ function LabellingTaskPageInner() {
   >(null);
   const [editLlmItemUuid, setEditLlmItemUuid] = useState<string | null>(null);
   const [editLlmItemName, setEditLlmItemName] = useState("");
+  const [editLlmItemDescription, setEditLlmItemDescription] = useState("");
   const [savingLlmItem, setSavingLlmItem] = useState(false);
   const [editLlmError, setEditLlmError] = useState<string | null>(null);
 
@@ -1337,23 +1338,28 @@ function LabellingTaskPageInner() {
         const toolCalls = obj.tool_calls;
         const toolCallId =
           typeof obj.tool_call_id === "string" ? obj.tool_call_id : undefined;
+        const createdAt =
+          typeof obj.created_at === "string" ? obj.created_at : undefined;
+        const tsField = createdAt ? { created_at: createdAt } : {};
         if (role === "assistant") {
           if (Array.isArray(toolCalls) && toolCalls.length > 0) {
             out.push({
               role: "assistant",
               ...(content != null ? { content } : {}),
               tool_calls: toolCalls as HistoryItem["tool_calls"],
+              ...tsField,
             });
           } else if (content != null) {
-            out.push({ role: "assistant", content });
+            out.push({ role: "assistant", content, ...tsField });
           }
         } else if (role === "user" && content != null) {
-          out.push({ role: "user", content });
+          out.push({ role: "user", content, ...tsField });
         } else if (role === "tool" && content != null) {
           out.push({
             role: "tool",
             content,
             ...(toolCallId ? { tool_call_id: toolCallId } : {}),
+            ...tsField,
           });
         }
       }
@@ -1387,6 +1393,11 @@ function LabellingTaskPageInner() {
           ? (editingPayload.name as string)
           : `Item ${editingItem.id}`;
       setEditLlmItemName(n);
+      const d =
+        typeof editingPayload?.description === "string"
+          ? (editingPayload.description as string)
+          : "";
+      setEditLlmItemDescription(d);
       setEditLlmError(null);
     }
   }, [editingItem?.uuid, editingPayload]);
@@ -1594,6 +1605,7 @@ function LabellingTaskPageInner() {
     useState(false);
   const [bulkUploadLlmOpen, setBulkUploadLlmOpen] = useState(false);
   const [newItemName, setNewItemName] = useState("");
+  const [newItemDescription, setNewItemDescription] = useState("");
   const [creatingItem, setCreatingItem] = useState(false);
   const [createItemError, setCreateItemError] = useState<string | null>(null);
   const [validationAttempted, setValidationAttempted] = useState(false);
@@ -1740,6 +1752,7 @@ function LabellingTaskPageInner() {
                 onClick={() => {
                   if (taskType === "llm" || taskType === "simulation") {
                     setNewItemName("");
+                    setNewItemDescription("");
                     setCreateItemError(null);
                     setValidationAttempted(false);
                     setAddItemOpen(true);
@@ -2531,7 +2544,7 @@ function LabellingTaskPageInner() {
                 </div>
               ) : (
                 <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[40px_minmax(0,1fr)_440px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
+                  <div className="grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_440px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
                     <input
                       type="checkbox"
                       checked={allSelected}
@@ -2545,6 +2558,9 @@ function LabellingTaskPageInner() {
                     <div className="text-sm font-medium text-muted-foreground">
                       Name
                     </div>
+                    <div className="text-sm font-medium text-muted-foreground">
+                      Description
+                    </div>
                     <div className="text-sm font-medium text-muted-foreground text-center">
                       Actions
                     </div>
@@ -2552,11 +2568,20 @@ function LabellingTaskPageInner() {
                   {items.map((item) => {
                     const isSelected = selectedItemIds.has(item.uuid);
                     const isResultsOpen = expandedResultsItemId === item.uuid;
+                    const itemPayloadObj =
+                      item.payload && typeof item.payload === "object"
+                        ? (item.payload as Record<string, unknown>)
+                        : null;
+                    const itemDescription =
+                      itemPayloadObj &&
+                      typeof itemPayloadObj.description === "string"
+                        ? (itemPayloadObj.description as string)
+                        : "";
                     return (
                       <Fragment key={item.uuid}>
                         <div
                           onClick={() => setEditLlmItemUuid(item.uuid)}
-                          className={`grid grid-cols-[40px_minmax(0,1fr)_440px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
+                          className={`grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_440px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
                             isSelected ? "bg-muted/30" : "hover:bg-muted/20"
                           }`}
                         >
@@ -2570,6 +2595,14 @@ function LabellingTaskPageInner() {
                           />
                           <p className="text-sm text-foreground line-clamp-1">
                             {previewItemPayload(item.payload, taskType)}
+                          </p>
+                          <p
+                            className="text-sm text-muted-foreground line-clamp-2"
+                            title={itemDescription || undefined}
+                          >
+                            {itemDescription || (
+                              <span className="text-muted-foreground/60">—</span>
+                            )}
                           </p>
                           <ItemRowActions
                             itemUuid={item.uuid}
@@ -2721,6 +2754,8 @@ function LabellingTaskPageInner() {
           createError={createItemError}
           testName={newItemName}
           setTestName={setNewItemName}
+          itemDescription={newItemDescription}
+          setItemDescription={setNewItemDescription}
           validationAttempted={validationAttempted}
           mode="labelItem"
           allowAgentLastMessage={taskType === "simulation"}
@@ -2767,10 +2802,16 @@ function LabellingTaskPageInner() {
               }
             }
 
+            const trimmedDescription = newItemDescription.trim();
+            const descriptionField = trimmedDescription
+              ? { description: trimmedDescription }
+              : {};
+
             let payload: Record<string, unknown>;
             if (taskType === "simulation") {
               payload = {
                 name: newItemName.trim(),
+                ...descriptionField,
                 transcript: history,
                 evaluator_variables,
               };
@@ -2794,6 +2835,7 @@ function LabellingTaskPageInner() {
               }
               payload = {
                 name: newItemName.trim(),
+                ...descriptionField,
                 chat_history,
                 agent_response,
                 evaluator_variables,
@@ -2832,6 +2874,8 @@ function LabellingTaskPageInner() {
           createError={editLlmError}
           testName={editLlmItemName}
           setTestName={setEditLlmItemName}
+          itemDescription={editLlmItemDescription}
+          setItemDescription={setEditLlmItemDescription}
           validationAttempted={false}
           mode="labelItem"
           allowAgentLastMessage={taskType === "simulation"}
@@ -2869,10 +2913,14 @@ function LabellingTaskPageInner() {
                 };
               }
             }
+            const trimmedDescription = editLlmItemDescription.trim();
+            const descriptionField = { description: trimmedDescription };
+
             let payload: Record<string, unknown>;
             if (taskType === "simulation") {
               payload = {
                 name: editLlmItemName.trim(),
+                ...descriptionField,
                 transcript: history,
                 evaluator_variables,
               };
@@ -2893,6 +2941,7 @@ function LabellingTaskPageInner() {
               }
               payload = {
                 name: editLlmItemName.trim(),
+                ...descriptionField,
                 chat_history,
                 agent_response,
                 evaluator_variables,

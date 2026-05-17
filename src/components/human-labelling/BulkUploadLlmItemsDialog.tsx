@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Papa from "papaparse";
 import { apiClient } from "@/lib/api";
+import { parseJsonLenient } from "@/lib/jsonSanitize";
 import {
   AnnotationOptIn,
   BulkUploadDialogShell,
@@ -49,6 +50,7 @@ type EvaluatorRef = {
 
 type ParsedItem = {
   name: string;
+  description: string;
   chat_history: TurnObject[];
   agent_response: string;
   evaluators: EvaluatorRef[];
@@ -56,6 +58,7 @@ type ParsedItem = {
 };
 
 const NAME_HEADERS = ["name", "title"];
+const DESCRIPTION_HEADERS = ["description", "desc", "notes"];
 const CONVERSATION_HEADERS = [
   "conversation_history",
   "conversation",
@@ -106,15 +109,16 @@ function buildSampleCsv(
   const rows = [
     {
       name: "Greeting reply",
+      description: "Return policy explanation, friendly tone expected.",
       conversation: [{ role: "user", content: "What is your return policy?" }],
       response: "You can return any item within 30 days for a full refund.",
       sampleVariableValue:
         "The agent should clearly explain the return policy in a helpful and friendly tone.",
-      sampleReasoning:
-        "The agent answered the policy clearly and politely.",
+      sampleReasoning: "The agent answered the policy clearly and politely.",
     },
     {
       name: "Refund flow",
+      description: "",
       conversation: [{ role: "user", content: "I was charged twice" }],
       response:
         "I'm sorry to hear that. Can you confirm the order ID so I can investigate?",
@@ -126,6 +130,7 @@ function buildSampleCsv(
 
   const headerCells = [
     "name",
+    "description",
     "conversation_history",
     "agent_response",
     ...variableColumns.map((c) =>
@@ -141,6 +146,7 @@ function buildSampleCsv(
   const lines = rows.map((r) =>
     [
       csvEscape(r.name),
+      csvEscape(r.description),
       csvEscape(JSON.stringify(r.conversation)),
       csvEscape(r.response),
       ...variableColumns.map(() => csvEscape(r.sampleVariableValue)),
@@ -192,9 +198,7 @@ export function BulkUploadLlmItemsDialog({
   const annotatorsState = useAnnotators(isOpen, accessToken);
   const { annotatedCheck, annotatedCheckLoading } = useAnnotatedItemsCheck({
     enabled:
-      uploadAnnotations &&
-      !!selectedAnnotatorId &&
-      parsedItems.length > 0,
+      uploadAnnotations && !!selectedAnnotatorId && parsedItems.length > 0,
     taskUuid,
     accessToken,
     annotatorId: selectedAnnotatorId,
@@ -271,6 +275,7 @@ export function BulkUploadLlmItemsDialog({
       complete: (results) => {
         const headers = results.meta.fields ?? [];
         const nameKey = findHeaderKey(headers, NAME_HEADERS);
+        const descriptionKey = findHeaderKey(headers, DESCRIPTION_HEADERS);
         const conversationKey = findHeaderKey(headers, CONVERSATION_HEADERS);
         const responseKey = findHeaderKey(headers, RESPONSE_HEADERS);
 
@@ -347,6 +352,9 @@ export function BulkUploadLlmItemsDialog({
         for (let i = 0; i < results.data.length; i++) {
           const row = results.data[i];
           const name = (row[nameKey] ?? "").trim();
+          const description = descriptionKey
+            ? (row[descriptionKey] ?? "").trim()
+            : "";
           const conversationRaw = (row[conversationKey] ?? "").trim();
           const responseRaw = (row[responseKey] ?? "").trim();
 
@@ -373,7 +381,7 @@ export function BulkUploadLlmItemsDialog({
 
           let conversation: unknown;
           try {
-            conversation = JSON.parse(conversationRaw);
+            conversation = parseJsonLenient(conversationRaw);
           } catch {
             setParseError(
               `Row ${i + 1}: "conversation_history" must be valid JSON. Wrap the JSON in double quotes and escape inner double quotes by doubling them.`,
@@ -431,7 +439,10 @@ export function BulkUploadLlmItemsDialog({
           const annotations: ParsedAnnotation[] = [];
           if (uploadAnnotations) {
             for (const meta of annotationEvaluatorsMeta) {
-              if (meta.output_type !== "binary" && meta.output_type !== "rating")
+              if (
+                meta.output_type !== "binary" &&
+                meta.output_type !== "rating"
+              )
                 continue;
               const valueHeader = evaluatorValueColumn(meta.name);
               const reasoningHeader = evaluatorReasoningColumn(meta.name);
@@ -459,6 +470,7 @@ export function BulkUploadLlmItemsDialog({
 
           items.push({
             name,
+            description,
             chat_history: turns,
             agent_response: responseRaw,
             evaluators: refs,
@@ -492,10 +504,7 @@ export function BulkUploadLlmItemsDialog({
     setUploadError(null);
     try {
       const itemsBody = parsedItems.map((p) => {
-        const evaluator_variables: Record<
-          string,
-          Record<string, string>
-        > = {};
+        const evaluator_variables: Record<string, Record<string, string>> = {};
         for (const ref of p.evaluators) {
           if (ref.variable_values) {
             evaluator_variables[ref.evaluator_uuid] = {
@@ -509,6 +518,7 @@ export function BulkUploadLlmItemsDialog({
         return {
           payload: {
             name: p.name,
+            ...(p.description ? { description: p.description } : {}),
             chat_history: p.chat_history,
             agent_response: p.agent_response,
             evaluator_variables,
@@ -543,9 +553,9 @@ export function BulkUploadLlmItemsDialog({
       {
         name: "conversation_history",
         description:
-          'A JSON array of chat messages that represents the conversation that has happened so far, before the agent response being judged. Each message is an object with a "role" and "content" field.\n\nrole — either "user" or "assistant"\ncontent — the message said by that role',
+          'A JSON array of chat messages that represents the conversation that has happened so far, before the agent response being judged. Each message is an object with a "role" and "content" field.\n\nrole — either "user" or "assistant"\ncontent — the message said by that role\ncreated_at — (optional) ISO-8601 timestamp for when this turn happened',
         example: `[
-  {"role": "user", "content": "What is your return policy?"},
+  {"role": "user", "content": "What is your return policy?", "created_at": "2026-05-18T09:14:02Z"},
   {"role": "assistant", "content": "You can return any item within 30 days."}
 ]`,
       },
@@ -586,9 +596,16 @@ export function BulkUploadLlmItemsDialog({
       }
     }
 
+    columns.push({
+      name: "description",
+      description:
+        "(optional) A description of this item. Shown to annotators alongside the evaluators while they label.",
+    });
+
     return {
       title: "Bulk upload — LLM labelling items",
-      intro: "Upload a CSV with the following columns. Each row creates one LLM annotation item.",
+      intro:
+        "Upload a CSV with the following columns. Each row creates one LLM annotation item.",
       columns,
     };
   };
@@ -618,18 +635,23 @@ export function BulkUploadLlmItemsDialog({
           },
         ])
       : [];
+  // Surface a Description column in the preview only when at least one
+  // uploaded row carries a non-empty description — keeps the preview tight
+  // for the common case where descriptions aren't used.
+  const showDescriptionColumn = parsedItems.some(
+    (p) => p.description.trim().length > 0,
+  );
   // Capped column widths so preview cells stay readable without stretching
   // to fill the dialog; extra columns scroll horizontally.
   const gridStyle = {
     gridTemplateColumns: [
       "minmax(96px, 132px)",
+      ...(showDescriptionColumn ? ["minmax(120px, 200px)"] : []),
       "minmax(120px, 200px)",
       "minmax(120px, 200px)",
       ...variableColumns.map(() => "minmax(120px, 200px)"),
       ...annotationColumns.map((c) =>
-        c.kind === "value"
-          ? "minmax(64px, 88px)"
-          : "minmax(100px, 176px)",
+        c.kind === "value" ? "minmax(64px, 88px)" : "minmax(100px, 176px)",
       ),
     ].join(" "),
   };
@@ -640,108 +662,119 @@ export function BulkUploadLlmItemsDialog({
       annotatedCheckLoading={annotatedCheckLoading}
       annotatedCheck={annotatedCheck}
     >
+      <div
+        className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
+        style={gridStyle}
+      >
+        <div className="text-xs font-medium text-muted-foreground">Name</div>
+        {showDescriptionColumn && (
+          <div className="text-xs font-medium text-muted-foreground">
+            Description
+          </div>
+        )}
+        <div className="text-xs font-medium text-muted-foreground">
+          Chat history
+        </div>
+        <div className="text-xs font-medium text-muted-foreground">
+          AI reply
+        </div>
+        {variableColumns.map((c) => (
           <div
-            className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
-            style={gridStyle}
+            key={`h-${c.evaluatorUuid}-${c.varName}`}
+            className="text-xs font-medium text-muted-foreground font-mono truncate"
+            title={c.header}
           >
-            <div className="text-xs font-medium text-muted-foreground">
-              Name
-            </div>
-            <div className="text-xs font-medium text-muted-foreground">
-              Chat history
-            </div>
-            <div className="text-xs font-medium text-muted-foreground">
-              AI reply
-            </div>
-            {variableColumns.map((c) => (
-              <div
-                key={`h-${c.evaluatorUuid}-${c.varName}`}
-                className="text-xs font-medium text-muted-foreground font-mono truncate"
-                title={c.header}
-              >
-                {c.header}
-              </div>
-            ))}
-            {annotationColumns.map((c) => (
-              <div
-                key={`ah-${c.evaluatorUuid}-${c.kind}`}
-                className="text-xs font-medium text-muted-foreground font-mono truncate"
-                title={c.header}
-              >
-                {c.header}
-              </div>
-            ))}
+            {c.header}
           </div>
-          <div className="divide-y divide-border">
-            {parsedItems.slice(0, 50).map((p, idx) => {
-              const valuesByKey = new Map<string, string>();
-              for (const ref of p.evaluators) {
-                if (!ref.variable_values) continue;
-                for (const [varName, value] of Object.entries(
-                  ref.variable_values,
-                )) {
-                  valuesByKey.set(`${ref.evaluator_uuid}/${varName}`, value);
-                }
-              }
-              return (
+        ))}
+        {annotationColumns.map((c) => (
+          <div
+            key={`ah-${c.evaluatorUuid}-${c.kind}`}
+            className="text-xs font-medium text-muted-foreground font-mono truncate"
+            title={c.header}
+          >
+            {c.header}
+          </div>
+        ))}
+      </div>
+      <div className="divide-y divide-border">
+        {parsedItems.slice(0, 50).map((p, idx) => {
+          const valuesByKey = new Map<string, string>();
+          for (const ref of p.evaluators) {
+            if (!ref.variable_values) continue;
+            for (const [varName, value] of Object.entries(
+              ref.variable_values,
+            )) {
+              valuesByKey.set(`${ref.evaluator_uuid}/${varName}`, value);
+            }
+          }
+          return (
+            <div
+              key={idx}
+              className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
+              style={gridStyle}
+            >
+              <div className="truncate text-foreground" title={p.name}>
+                {p.name}
+              </div>
+              {showDescriptionColumn && (
                 <div
-                  key={idx}
-                  className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
-                  style={gridStyle}
+                  className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                  title={p.description || undefined}
                 >
-                  <div className="truncate text-foreground" title={p.name}>
-                    {p.name}
-                  </div>
-                  <div className="min-w-0">
-                    <ChatHistoryPreview turns={p.chat_history} />
-                  </div>
-                  <div className="min-w-0">
-                    <AgentReplyPreview agentResponse={p.agent_response} />
-                  </div>
-                  {variableColumns.map((c) => {
-                    const value =
-                      valuesByKey.get(`${c.evaluatorUuid}/${c.varName}`) ?? "";
-                    return (
-                      <div
-                        key={`${idx}-${c.evaluatorUuid}-${c.varName}`}
-                        className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
-                      >
-                        {value}
-                      </div>
-                    );
-                  })}
-                  {annotationColumns.map((c) => {
-                    const ann = p.annotations.find(
-                      (a) => a.evaluator_uuid === c.evaluatorUuid,
-                    );
-                    const display =
-                      c.kind === "value"
-                        ? ann
-                          ? typeof ann.value === "boolean"
-                            ? ann.value
-                              ? "true"
-                              : "false"
-                            : String(ann.value)
-                          : ""
-                        : (ann?.reasoning ?? "");
-                    return (
-                      <div
-                        key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
-                        className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
-                      >
-                        {display}
-                      </div>
-                    );
-                  })}
+                  {p.description}
                 </div>
-              );
-            })}
-            {parsedItems.length > 50 && (
-              <div className="px-4 py-2 text-xs text-muted-foreground">
-                + {parsedItems.length - 50} more rows
+              )}
+              <div className="min-w-0">
+                <ChatHistoryPreview turns={p.chat_history} />
               </div>
-            )}
+              <div className="min-w-0">
+                <AgentReplyPreview agentResponse={p.agent_response} />
+              </div>
+              {variableColumns.map((c) => {
+                const value =
+                  valuesByKey.get(`${c.evaluatorUuid}/${c.varName}`) ?? "";
+                return (
+                  <div
+                    key={`${idx}-${c.evaluatorUuid}-${c.varName}`}
+                    className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                  >
+                    {value}
+                  </div>
+                );
+              })}
+              {annotationColumns.map((c) => {
+                const ann = p.annotations.find(
+                  (a) => a.evaluator_uuid === c.evaluatorUuid,
+                );
+                const display =
+                  c.kind === "value"
+                    ? ann
+                      ? typeof ann.value === "boolean"
+                        ? ann.value
+                          ? "true"
+                          : "false"
+                        : String(ann.value)
+                      : ""
+                    : (ann?.reasoning ?? "");
+                return (
+                  <div
+                    key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
+                    className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                  >
+                    {display}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+        {parsedItems.length > 50 && (
+          <div className="px-4 py-2 text-xs text-muted-foreground">
+            + {parsedItems.length - 50} more rows
           </div>
+        )}
+      </div>
     </BulkUploadItemsPreviewShell>
   );
 
@@ -762,17 +795,15 @@ export function BulkUploadLlmItemsDialog({
         {duplicateNames.length > 0 && (
           <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
             Two or more linked evaluators share the same name (
-            {duplicateNames.map((n) => `"${n}"`).join(", ")}). Their
-            variable and annotation columns would collide in the CSV —
-            rename one on the evaluators page before uploading.
+            {duplicateNames.map((n) => `"${n}"`).join(", ")}). Their variable
+            and annotation columns would collide in the CSV — rename one on the
+            evaluators page before uploading.
           </div>
         )}
         {uploadAnnotations && evaluatorsMissingOutputType.length > 0 && (
           <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
             Annotation upload isn&apos;t available — evaluator(s){" "}
-            {evaluatorsMissingOutputType
-              .map((e) => `"${e.name}"`)
-              .join(", ")}{" "}
+            {evaluatorsMissingOutputType.map((e) => `"${e.name}"`).join(", ")}{" "}
             have no binary/rating output configured.
           </div>
         )}

@@ -38,25 +38,30 @@ function normaliseHistoryItem(raw: unknown): TestCaseHistory | null {
   const toolCalls = obj.tool_calls;
   const toolCallId =
     typeof obj.tool_call_id === "string" ? obj.tool_call_id : undefined;
+  const createdAt =
+    typeof obj.created_at === "string" ? obj.created_at : undefined;
+  const tsField = createdAt ? { created_at: createdAt } : {};
   if (role === "assistant") {
     if (Array.isArray(toolCalls) && toolCalls.length > 0) {
       return {
         role: "assistant",
         ...(content != null ? { content } : {}),
         tool_calls: toolCalls as TestCaseHistory["tool_calls"],
+        ...tsField,
       };
     }
-    if (content != null) return { role: "assistant", content };
+    if (content != null) return { role: "assistant", content, ...tsField };
     return null;
   }
   if (role === "user" && content != null) {
-    return { role: "user", content };
+    return { role: "user", content, ...tsField };
   }
   if (role === "tool" && content != null) {
     return {
       role: "tool",
       content,
       ...(toolCallId ? { tool_call_id: toolCallId } : {}),
+      ...tsField,
     };
   }
   return null;

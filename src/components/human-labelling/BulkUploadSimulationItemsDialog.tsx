@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Papa from "papaparse";
 import { apiClient } from "@/lib/api";
+import { parseJsonLenient } from "@/lib/jsonSanitize";
 import {
   AnnotationOptIn,
   BulkUploadDialogShell,
@@ -35,6 +36,7 @@ const TRANSCRIPT_HEADERS = [
   "conversation_history",
 ];
 const NAME_HEADERS = ["name", "title", "simulation_name"];
+const DESCRIPTION_HEADERS = ["description", "desc", "notes"];
 
 function csvEscape(s: string): string {
   return `"${s.replace(/"/g, '""')}"`;
@@ -42,11 +44,14 @@ function csvEscape(s: string): string {
 
 const SAMPLE_SIMULATION_BASE_ROWS: Array<{
   name: string;
+  description: string;
   transcript: string;
   reasoning: string;
 }> = [
   {
     name: "Card lost - happy path",
+    description:
+      "Lost card flow — agent should verify identity before blocking.",
     transcript: JSON.stringify([
       { role: "assistant", content: "Hi, how can I help?" },
       { role: "user", content: "I lost my card" },
@@ -60,6 +65,7 @@ const SAMPLE_SIMULATION_BASE_ROWS: Array<{
   },
   {
     name: "Refund flow",
+    description: "",
     transcript: JSON.stringify([
       { role: "user", content: "I was charged twice" },
       {
@@ -78,6 +84,7 @@ function buildSampleSimulationCsv(
 ): string {
   const headerCells = [
     "name",
+    "description",
     "transcript",
     ...(includeAnnotations
       ? evaluators.flatMap((e) => [
@@ -89,6 +96,7 @@ function buildSampleSimulationCsv(
   const lines = SAMPLE_SIMULATION_BASE_ROWS.map((r) =>
     [
       csvEscape(r.name),
+      csvEscape(r.description),
       csvEscape(r.transcript),
       ...(includeAnnotations
         ? evaluators.flatMap((e) => [
@@ -103,6 +111,7 @@ function buildSampleSimulationCsv(
 
 type ParsedItem = {
   name: string;
+  description: string;
   transcript: TurnObject[];
   annotations: ParsedAnnotation[];
 };
@@ -171,9 +180,7 @@ export function BulkUploadSimulationItemsDialog({
   const annotatorsState = useAnnotators(isOpen, accessToken);
   const { annotatedCheck, annotatedCheckLoading } = useAnnotatedItemsCheck({
     enabled:
-      uploadAnnotations &&
-      !!selectedAnnotatorId &&
-      parsedItems.length > 0,
+      uploadAnnotations && !!selectedAnnotatorId && parsedItems.length > 0,
     taskUuid,
     accessToken,
     annotatorId: selectedAnnotatorId,
@@ -235,6 +242,7 @@ export function BulkUploadSimulationItemsDialog({
         const headers = results.meta.fields ?? [];
         const transcriptKey = findHeaderKey(headers, TRANSCRIPT_HEADERS);
         const nameKey = findHeaderKey(headers, NAME_HEADERS);
+        const descriptionKey = findHeaderKey(headers, DESCRIPTION_HEADERS);
         if (!nameKey || !transcriptKey) {
           setParseError(
             `CSV must include "name" and "transcript" columns. Found: ${headers.join(", ") || "(none)"}`,
@@ -269,6 +277,9 @@ export function BulkUploadSimulationItemsDialog({
           const row = results.data[i];
           const raw = (row[transcriptKey] ?? "").trim();
           const name = (row[nameKey] ?? "").trim();
+          const description = descriptionKey
+            ? (row[descriptionKey] ?? "").trim()
+            : "";
           if (!raw && !name) continue;
           if (!name) {
             setParseError(`Row ${i + 1}: "name" is required.`);
@@ -280,7 +291,7 @@ export function BulkUploadSimulationItemsDialog({
           }
           let parsed: unknown;
           try {
-            parsed = JSON.parse(raw);
+            parsed = parseJsonLenient(raw);
           } catch {
             setParseError(
               `Row ${i + 1}: "transcript" must be valid JSON. Wrap the JSON in double quotes and escape inner double quotes by doubling them.`,
@@ -311,7 +322,10 @@ export function BulkUploadSimulationItemsDialog({
           const annotations: ParsedAnnotation[] = [];
           if (uploadAnnotations) {
             for (const meta of annotationEvaluatorsMeta) {
-              if (meta.output_type !== "binary" && meta.output_type !== "rating")
+              if (
+                meta.output_type !== "binary" &&
+                meta.output_type !== "rating"
+              )
                 continue;
               const valueHeader = evaluatorValueColumn(meta.name);
               const reasoningHeader = evaluatorReasoningColumn(meta.name);
@@ -338,6 +352,7 @@ export function BulkUploadSimulationItemsDialog({
           }
           items.push({
             name,
+            description,
             transcript: parsed as TurnObject[],
             annotations,
           });
@@ -372,7 +387,11 @@ export function BulkUploadSimulationItemsDialog({
           ? buildItemAnnotationsPayload(p.annotations)
           : undefined;
         return {
-          payload: { name: p.name, transcript: p.transcript },
+          payload: {
+            name: p.name,
+            ...(p.description ? { description: p.description } : {}),
+            transcript: p.transcript,
+          },
           ...(annotationsObj ? { annotations: annotationsObj } : {}),
         };
       });
@@ -403,9 +422,9 @@ export function BulkUploadSimulationItemsDialog({
       {
         name: "transcript",
         description:
-          'A JSON array of chat messages representing the full conversation. Each message is an object with a "role" and "content" field.\n\nrole — either "user" or "assistant"\ncontent — the message said by that role',
+          'A JSON array of chat messages representing the full conversation. Each message is an object with a "role" and "content" field.\n\nrole — either "user" or "assistant"\ncontent — the message said by that role\ncreated_at — (optional) ISO-8601 timestamp for when this turn happened',
         example: `[
-  {"role": "assistant", "content": "Hi, how can I help?"},
+  {"role": "assistant", "content": "Hi, how can I help?", "created_at": "2026-05-18T09:14:02Z"},
   {"role": "user", "content": "I lost my card"}
 ]`,
       },
@@ -432,6 +451,12 @@ export function BulkUploadSimulationItemsDialog({
       }
     }
 
+    columns.push({
+      name: "description",
+      description:
+        "(optional) A description of this item. Shown to annotators alongside the evaluators while they label.",
+    });
+
     return {
       title: "Bulk upload — Simulation labelling items",
       intro:
@@ -455,15 +480,19 @@ export function BulkUploadSimulationItemsDialog({
           },
         ])
       : [];
+  // Surface a Description column in the preview only when at least one
+  // uploaded row carries a non-empty description.
+  const showDescriptionColumn = parsedItems.some(
+    (p) => p.description.trim().length > 0,
+  );
   const simGridStyle = {
     gridTemplateColumns: [
       "minmax(100px, 152px)",
+      ...(showDescriptionColumn ? ["minmax(120px, 200px)"] : []),
       "minmax(140px, 220px)",
       "48px",
       ...annotationColumns.map((c) =>
-        c.kind === "value"
-          ? "minmax(64px, 88px)"
-          : "minmax(100px, 176px)",
+        c.kind === "value" ? "minmax(64px, 88px)" : "minmax(100px, 176px)",
       ),
     ].join(" "),
   };
@@ -474,76 +503,87 @@ export function BulkUploadSimulationItemsDialog({
       annotatedCheckLoading={annotatedCheckLoading}
       annotatedCheck={annotatedCheck}
     >
+      <div
+        className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
+        style={simGridStyle}
+      >
+        <div className="text-xs font-medium text-muted-foreground">Name</div>
+        {showDescriptionColumn && (
+          <div className="text-xs font-medium text-muted-foreground">
+            Description
+          </div>
+        )}
+        <div className="text-xs font-medium text-muted-foreground">
+          Transcript
+        </div>
+        <div className="text-xs font-medium text-muted-foreground text-right">
+          Turns
+        </div>
+        {annotationColumns.map((c) => (
           <div
-            className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
+            key={`ah-${c.evaluatorUuid}-${c.kind}`}
+            className="text-xs font-medium text-muted-foreground font-mono truncate"
+            title={c.header}
+          >
+            {c.header}
+          </div>
+        ))}
+      </div>
+      <div className="divide-y divide-border">
+        {parsedItems.slice(0, 50).map((p, idx) => (
+          <div
+            key={idx}
+            className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
             style={simGridStyle}
           >
-            <div className="text-xs font-medium text-muted-foreground">
-              Name
+            <div className="truncate text-foreground" title={p.name}>
+              {p.name}
             </div>
-            <div className="text-xs font-medium text-muted-foreground">
-              Transcript
-            </div>
-            <div className="text-xs font-medium text-muted-foreground text-right">
-              Turns
-            </div>
-            {annotationColumns.map((c) => (
+            {showDescriptionColumn && (
               <div
-                key={`ah-${c.evaluatorUuid}-${c.kind}`}
-                className="text-xs font-medium text-muted-foreground font-mono truncate"
-                title={c.header}
+                className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                title={p.description || undefined}
               >
-                {c.header}
-              </div>
-            ))}
-          </div>
-          <div className="divide-y divide-border">
-            {parsedItems.slice(0, 50).map((p, idx) => (
-              <div
-                key={idx}
-                className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
-                style={simGridStyle}
-              >
-                <div className="truncate text-foreground" title={p.name}>
-                  {p.name}
-                </div>
-                <div className="min-w-0">
-                  <TranscriptPreview turns={p.transcript} />
-                </div>
-                <div className="text-right tabular-nums text-muted-foreground">
-                  {p.transcript.length}
-                </div>
-                {annotationColumns.map((c) => {
-                  const ann = p.annotations.find(
-                    (a) => a.evaluator_uuid === c.evaluatorUuid,
-                  );
-                  const display =
-                    c.kind === "value"
-                      ? ann
-                        ? typeof ann.value === "boolean"
-                          ? ann.value
-                            ? "true"
-                            : "false"
-                          : String(ann.value)
-                        : ""
-                      : (ann?.reasoning ?? "");
-                  return (
-                    <div
-                      key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
-                      className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
-                    >
-                      {display}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-            {parsedItems.length > 50 && (
-              <div className="px-4 py-2 text-xs text-muted-foreground">
-                + {parsedItems.length - 50} more rows
+                {p.description}
               </div>
             )}
+            <div className="min-w-0">
+              <TranscriptPreview turns={p.transcript} />
+            </div>
+            <div className="text-right tabular-nums text-muted-foreground">
+              {p.transcript.length}
+            </div>
+            {annotationColumns.map((c) => {
+              const ann = p.annotations.find(
+                (a) => a.evaluator_uuid === c.evaluatorUuid,
+              );
+              const display =
+                c.kind === "value"
+                  ? ann
+                    ? typeof ann.value === "boolean"
+                      ? ann.value
+                        ? "true"
+                        : "false"
+                      : String(ann.value)
+                    : ""
+                  : (ann?.reasoning ?? "");
+              return (
+                <div
+                  key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
+                  className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                >
+                  {display}
+                </div>
+              );
+            })}
           </div>
+        ))}
+        {parsedItems.length > 50 && (
+          <div className="px-4 py-2 text-xs text-muted-foreground">
+            + {parsedItems.length - 50} more rows
+          </div>
+        )}
+      </div>
     </BulkUploadItemsPreviewShell>
   );
 
@@ -562,16 +602,14 @@ export function BulkUploadSimulationItemsDialog({
         {uploadAnnotations && duplicateNames.length > 0 && (
           <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
             Two or more linked evaluators share the same name (
-            {duplicateNames.map((n) => `"${n}"`).join(", ")}). Rename one
-            on the evaluators page before uploading annotations.
+            {duplicateNames.map((n) => `"${n}"`).join(", ")}). Rename one on the
+            evaluators page before uploading annotations.
           </div>
         )}
         {uploadAnnotations && evaluatorsMissingOutputType.length > 0 && (
           <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
             Annotation upload isn&apos;t available — evaluator(s){" "}
-            {evaluatorsMissingOutputType
-              .map((e) => `"${e.name}"`)
-              .join(", ")}{" "}
+            {evaluatorsMissingOutputType.map((e) => `"${e.name}"`).join(", ")}{" "}
             have no binary/rating output configured.
           </div>
         )}

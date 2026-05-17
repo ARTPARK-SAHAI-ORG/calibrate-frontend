@@ -6,6 +6,7 @@ import { useAccessToken } from "@/hooks";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { formatTurnTimestamp } from "@/components/test-results/shared";
 
 type SelectedToolConfig = {
   id: string;
@@ -33,6 +34,10 @@ export type TestConfig = {
       type: "function";
     }>;
     tool_call_id?: string;
+    /** Optional per-turn timestamp. Round-tripped opaquely through the
+     * dialog so bulk-uploaded labelling items don't lose timestamps when
+     * edited. The dialog never asks the user to set this. */
+    created_at?: string;
   }>;
   evaluation: {
     type: "tool_call" | "response";
@@ -101,6 +106,12 @@ type AddTestDialogProps = {
   nameError?: string | null;
   testName: string;
   setTestName: (name: string) => void;
+  /**
+   * Optional free-form description for a labelling item. Shown only when
+   * `mode === "labelItem"` (LLM / simulation item creation & edit).
+   */
+  itemDescription?: string;
+  setItemDescription?: (description: string) => void;
   validationAttempted: boolean;
   onSubmit: (config: TestConfig, evaluators: EvaluatorRefPayload[]) => void;
   initialTab?: "next-reply" | "tool-invocation";
@@ -139,6 +150,8 @@ export function AddTestDialog({
   nameError,
   testName,
   setTestName,
+  itemDescription,
+  setItemDescription,
   validationAttempted,
   onSubmit,
   initialTab,
@@ -189,6 +202,7 @@ export function AddTestDialog({
           toolParams?: Array<{ name: string; value: string; group?: string }>;
           isWebhook?: boolean;
           linkedToolCallId?: string;
+          createdAt?: string;
         }> = [];
 
         // Helper to format value - stringify objects/arrays for display
@@ -209,6 +223,10 @@ export function AddTestDialog({
         const toolCallIds: string[] = [];
 
         initialConfig.history.forEach((historyItem, index) => {
+          const createdAt =
+            typeof historyItem.created_at === "string"
+              ? historyItem.created_at
+              : undefined;
           if (historyItem.role === "assistant") {
             if (historyItem.tool_calls && historyItem.tool_calls.length > 0) {
               // This is a tool call message
@@ -274,6 +292,7 @@ export function AddTestDialog({
                 toolName: toolCall.function.name,
                 toolParams,
                 isWebhook,
+                ...(createdAt ? { createdAt } : {}),
               });
             } else {
               // Regular assistant message
@@ -281,6 +300,7 @@ export function AddTestDialog({
                 id: `msg-${index}`,
                 role: "agent",
                 content: historyItem.content || "",
+                ...(createdAt ? { createdAt } : {}),
               });
             }
           } else if (historyItem.role === "user") {
@@ -288,6 +308,7 @@ export function AddTestDialog({
               id: `msg-${index}`,
               role: "user",
               content: historyItem.content || "",
+              ...(createdAt ? { createdAt } : {}),
             });
           } else if (historyItem.role === "tool" && historyItem.content) {
             // Tool response message - link to the tool call
@@ -307,6 +328,7 @@ export function AddTestDialog({
               content: historyItem.content,
               linkedToolCallId,
               toolName: linkedToolCall?.toolName || "",
+              ...(createdAt ? { createdAt } : {}),
             });
           }
         });
@@ -405,6 +427,7 @@ export function AddTestDialog({
       toolParams?: Array<{ name: string; value: string; group?: string }>;
       isWebhook?: boolean;
       linkedToolCallId?: string; // For tool_response to link back to tool_call
+      createdAt?: string;
     }>
   >(() => {
     const u = (id: string) => ({
@@ -1033,15 +1056,18 @@ export function AddTestDialog({
 
     // Convert chat messages to the API format
     for (const message of chatMessages) {
+      const ts = message.createdAt ? { created_at: message.createdAt } : {};
       if (message.role === "agent") {
         history.push({
           role: "assistant",
           content: message.content,
+          ...ts,
         });
       } else if (message.role === "user") {
         history.push({
           role: "user",
           content: message.content,
+          ...ts,
         });
       } else if (message.role === "tool_call") {
         // Generate a unique ID for this tool call
@@ -1080,6 +1106,7 @@ export function AddTestDialog({
               type: "function",
             },
           ],
+          ...ts,
         });
 
         // For webhook tools, find the linked tool_response message and add it to history
@@ -1094,6 +1121,9 @@ export function AddTestDialog({
               role: "tool",
               content: linkedResponse.content,
               tool_call_id: toolCallId,
+              ...(linkedResponse.createdAt
+                ? { created_at: linkedResponse.createdAt }
+                : {}),
             });
           }
         }
@@ -1424,6 +1454,22 @@ export function AddTestDialog({
                     )
                   )}
                 </div>
+
+                {/* Description (labelling items only) */}
+                {isLabelItem && setItemDescription && (
+                  <div>
+                    <label className="block text-base font-medium text-foreground mb-2">
+                      Description
+                    </label>
+                    <textarea
+                      value={itemDescription ?? ""}
+                      onChange={(e) => setItemDescription(e.target.value)}
+                      placeholder="Optional — what is this item about? Shown to annotators alongside the evaluators."
+                      rows={3}
+                      className="w-full px-4 py-2.5 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-y"
+                    />
+                  </div>
+                )}
 
                 {/* Evaluators (next-reply tab only) */}
                 <div className="relative">
@@ -2190,6 +2236,7 @@ export function AddTestDialog({
                     index === lastNonToolResponseIndex;
                   const showInlineDelete =
                     message.role !== "tool_response" && !isLastNonToolResponse;
+                  const turnTimestamp = formatTurnTimestamp(message.createdAt);
                   return (
                     <div
                       key={message.id}
@@ -2204,7 +2251,7 @@ export function AddTestDialog({
                       {/* Message Header - show for agent messages and tool calls */}
                       {(message.role === "agent" ||
                         message.role === "tool_call") && (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-medium text-foreground">
                             {message.role === "tool_call"
                               ? "Agent Tool Call"
@@ -2253,7 +2300,7 @@ export function AddTestDialog({
                               }`}
                             >
                               {inlineDeleteBtn}
-                              <div className="w-1/2">
+                              <div className="w-1/2 flex flex-col">
                                 <textarea
                                   value={message.content}
                                   placeholder={
@@ -2294,6 +2341,17 @@ export function AddTestDialog({
                                     Message cannot be empty
                                   </p>
                                 )}
+                                {turnTimestamp && (
+                                  <span
+                                    className={`text-[11px] text-muted-foreground tabular-nums mt-1 ${
+                                      message.role === "user"
+                                        ? "self-start"
+                                        : "self-end"
+                                    }`}
+                                  >
+                                    {turnTimestamp}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           );
@@ -2329,7 +2387,7 @@ export function AddTestDialog({
                               </svg>
                             </button>
                           )}
-                          <div className="w-1/2">
+                          <div className="w-1/2 flex flex-col">
                             <div className="bg-muted border border-border rounded-2xl p-4">
                               <div className="flex items-center gap-2 mb-2">
                                 <svg
@@ -2521,6 +2579,11 @@ export function AddTestDialog({
                                   </div>
                                 )}
                             </div>
+                            {turnTimestamp && (
+                              <span className="self-end text-[11px] text-muted-foreground tabular-nums mt-1">
+                                {turnTimestamp}
+                              </span>
+                            )}
                           </div>
                         </div>
                       )}

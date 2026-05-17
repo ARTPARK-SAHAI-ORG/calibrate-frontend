@@ -803,19 +803,31 @@ function EvaluatorsPane({
   setField: (key: FieldKey, partial: Partial<FieldValue>) => void;
   readOnly: boolean;
 }) {
-  if (evaluators.length === 0) {
-    return (
-      <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
-        No evaluators are attached to this task.
-      </div>
-    );
-  }
-
   // Per-item, per-evaluator variable values live on
   // `payload.evaluator_variables[<evaluator_uuid>]`. Surface them on
   // each card so annotators (and admins reviewing) can see the criteria
   // / variable values they're judging against.
   const itemPayload = (item.payload ?? {}) as Record<string, unknown>;
+  const itemDescription =
+    typeof itemPayload.description === "string"
+      ? (itemPayload.description as string).trim()
+      : "";
+  const descriptionBlock = itemDescription ? (
+    <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+      {itemDescription}
+    </p>
+  ) : null;
+
+  if (evaluators.length === 0) {
+    return (
+      <div className="space-y-3">
+        {descriptionBlock}
+        <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
+          No evaluators are attached to this task.
+        </div>
+      </div>
+    );
+  }
   const itemEvaluatorVariables = (() => {
     const raw = itemPayload.evaluator_variables;
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
@@ -836,6 +848,7 @@ function EvaluatorsPane({
 
   return (
     <div className="space-y-3 pb-4 md:pb-6">
+      {descriptionBlock}
       {evaluators.map((ev) => {
         const k = fieldKey(item.uuid, ev.uuid);
         const f = fields[k];

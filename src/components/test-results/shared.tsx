@@ -72,6 +72,10 @@ export type TestCaseHistory = {
     type: string;
   }>;
   tool_call_id?: string;
+  /** Optional per-turn timestamp. Set by labelling items that bulk-upload a
+   * conversation with `created_at` on each turn; rendered next to the role
+   * label so annotators see when each message happened. */
+  created_at?: string;
 };
 
 export type TestCaseEvaluation = {
@@ -444,6 +448,20 @@ export function JudgeResultsList({
   );
 }
 
+// Format an optional per-turn timestamp for display. Accepts ISO-8601 or
+// epoch milliseconds; falls back to the raw string when parsing fails so
+// bulk-uploaded freeform timestamps still show up. Returns `null` for empty
+// or missing input so callers can skip rendering entirely.
+export function formatTurnTimestamp(raw: unknown): string | null {
+  if (raw == null) return null;
+  const s = typeof raw === "string" ? raw.trim() : String(raw);
+  if (!s) return null;
+  const asNumber = /^\d+$/.test(s) ? Number(s) : NaN;
+  const d = Number.isFinite(asNumber) ? new Date(asNumber) : new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleString();
+}
+
 // Shared Test Detail View Component
 export function TestDetailView({
   history,
@@ -517,6 +535,7 @@ export function TestDetailView({
           <div className="space-y-4">
             {history.map((message, index) => {
               const isEvalTarget = index === evalTargetIndex;
+              const timestamp = formatTurnTimestamp(message.created_at);
               return (
               <div
                 key={index}
@@ -530,19 +549,24 @@ export function TestDetailView({
               >
                 {/* User Message */}
                 {message.role === "user" && (
-                  <div className="w-[88%] md:w-3/4">
+                  <div className="w-[88%] md:w-3/4 flex flex-col">
                     <div className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-muted border border-border">
                       <p className="text-sm text-foreground whitespace-pre-wrap">
                         {message.content}
                       </p>
                     </div>
+                    {timestamp && (
+                      <span className="self-start text-[11px] text-muted-foreground tabular-nums mt-1">
+                        {timestamp}
+                      </span>
+                    )}
                   </div>
                 )}
 
                 {/* Agent Message (text response) */}
                 {message.role === "assistant" && !message.tool_calls && (
                   <>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-medium text-foreground">
                         Agent
                       </span>
@@ -552,12 +576,17 @@ export function TestDetailView({
                         </span>
                       )}
                     </div>
-                    <div className="w-[88%] md:w-3/4">
+                    <div className="w-[88%] md:w-3/4 flex flex-col">
                       <div className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-background border border-border">
                         <p className="text-sm text-foreground whitespace-pre-wrap">
                           {message.content}
                         </p>
                       </div>
+                      {timestamp && (
+                        <span className="self-end text-[11px] text-muted-foreground tabular-nums mt-1">
+                          {timestamp}
+                        </span>
+                      )}
                     </div>
                   </>
                 )}
@@ -567,7 +596,7 @@ export function TestDetailView({
                   message.tool_calls &&
                   message.tool_calls.length > 0 && (
                     <>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-medium text-foreground">
                           Agent Tool Call
                         </span>
@@ -577,7 +606,7 @@ export function TestDetailView({
                           </span>
                         )}
                       </div>
-                      <div className="w-[88%] md:w-3/4">
+                      <div className="w-[88%] md:w-3/4 flex flex-col">
                         {message.tool_calls.map((toolCall, tcIndex) => {
                           const { toolName, args } =
                             normalizeToolCall(toolCall);
@@ -589,6 +618,11 @@ export function TestDetailView({
                             />
                           );
                         })}
+                        {timestamp && (
+                          <span className="self-end text-[11px] text-muted-foreground tabular-nums mt-1">
+                            {timestamp}
+                          </span>
+                        )}
                       </div>
                     </>
                   )}
