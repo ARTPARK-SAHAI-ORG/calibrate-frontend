@@ -72,14 +72,22 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
     organizations[0] ??
     null;
 
+  const navigateAfterSwitch = () => {
+    // Stay on workspace settings if that's where the user is — switching
+    // workspaces from there should just reload settings for the new one.
+    // Everywhere else, land on /agents (a known-good page for any workspace).
+    if (window.location.pathname === "/workspace-settings") {
+      window.location.reload();
+    } else {
+      window.location.assign("/agents");
+    }
+  };
+
   const handleSelect = (uuid: string) => {
     if (uuid !== activeUuid) {
       setActiveUuid(uuid);
       setOpen(false);
-      // Send the user to the agents home so they land on a known-good page
-      // for the new workspace. Full navigation (not router.push) ensures
-      // every in-flight data fetch re-runs under the new context.
-      window.location.assign("/agents");
+      navigateAfterSwitch();
       return;
     }
     setOpen(false);
@@ -90,7 +98,7 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
     if (created) {
       setActiveUuid(created.uuid);
       await refetch();
-      window.location.assign("/agents");
+      navigateAfterSwitch();
     }
   };
 

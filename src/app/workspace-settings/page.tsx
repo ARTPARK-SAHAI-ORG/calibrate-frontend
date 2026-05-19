@@ -89,10 +89,6 @@ export default function WorkspaceSettingsPage() {
         ) : (
           <>
             <section className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Edit the name of this workspace.
-              </p>
-
               <label className="block text-sm font-medium text-foreground">
                 Name
               </label>
