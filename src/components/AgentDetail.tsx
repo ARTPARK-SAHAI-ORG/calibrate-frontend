@@ -691,6 +691,43 @@ export function AgentDetail({
     backendAccessToken,
   ]);
 
+  // Auto-save the benchmarking toggle every time it changes, regardless of
+  // verification state. Toggling `supports_benchmark` doesn't change the
+  // connection identity (URL + headers), so there's no risk of persisting a
+  // configuration the user hasn't re-verified. For initially-unverified
+  // agents the debounced auto-save below already covers this; this effect
+  // is what lets verified agents persist the toggle without going through
+  // the Save button or the re-verify popup.
+  const lastAutoSavedBenchmarkRef = useRef<boolean | null | undefined>(
+    undefined,
+  );
+  useEffect(() => {
+    if (!agent || agent.type !== "connection") return;
+    if (isLoading) return;
+    // Skip the initially-unverified path — it already auto-saves config
+    // changes (with debounce) and we don't want a double-save race.
+    if (initialConnectionVerified === false) {
+      lastAutoSavedBenchmarkRef.current = connectionConfig.supports_benchmark;
+      return;
+    }
+    const current = connectionConfig.supports_benchmark;
+    // Seed the ref on first run so the initial render doesn't trigger a
+    // save of the value we just loaded from the backend.
+    if (lastAutoSavedBenchmarkRef.current === undefined) {
+      lastAutoSavedBenchmarkRef.current = current;
+      return;
+    }
+    if (lastAutoSavedBenchmarkRef.current === current) return;
+    lastAutoSavedBenchmarkRef.current = current;
+    if (isSavingRef.current) return;
+    saveRef.current({ silent: true });
+  }, [
+    agent,
+    isLoading,
+    initialConnectionVerified,
+    connectionConfig.supports_benchmark,
+  ]);
+
   // Auto-save changes for initially-unverified connection agents.
   // Intentionally skipped when the agent was already verified at fetch time —
   // those changes only persist after the user re-verifies and confirms.
