@@ -78,9 +78,9 @@ export function CreateEvaluatorSidebar({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full md:max-w-xl bg-background md:border-l border-border flex flex-col h-full shadow-2xl">
+      <div className="relative w-full md:max-w-2xl max-h-[90vh] bg-background border border-border rounded-xl flex flex-col shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-border">
           <div className="flex items-center gap-3">
             <svg
