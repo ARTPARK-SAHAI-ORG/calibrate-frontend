@@ -13,6 +13,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { useSidebarState } from "@/lib/sidebar";
 import { apiGet } from "@/lib/api";
+import { parseBackendErrorMessage } from "@/lib/parseBackendError";
 import {
   clearActiveOrgUuid,
   notifyOrganizationsChanged,
@@ -68,9 +69,7 @@ export default function WorkspaceSettingsPage() {
       await renameOrganization(activeOrg.uuid, trimmed);
       setRenameSuccess(true);
     } catch (err) {
-      setRenameError(
-        err instanceof Error ? err.message : "Failed to rename workspace",
-      );
+      setRenameError(parseBackendErrorMessage(err, "Failed to rename workspace"));
     } finally {
       setIsRenaming(false);
     }
@@ -123,12 +122,10 @@ export default function WorkspaceSettingsPage() {
                 </button>
               </div>
               {renameError && (
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {renameError}
-                </p>
+                <p className="mt-1 text-[13px] text-red-500">{renameError}</p>
               )}
               {renameSuccess && !renameError && (
-                <p className="text-sm text-muted-foreground">Saved.</p>
+                <p className="mt-1 text-[13px] text-muted-foreground">Saved.</p>
               )}
             </section>
 
@@ -206,7 +203,7 @@ function MembersSection({
       await addMember(email);
       setInviteEmail("");
     } catch (err) {
-      setAddError(err instanceof Error ? err.message : "Failed to add member");
+      setAddError(parseBackendErrorMessage(err, "Failed to add member"));
     } finally {
       setIsAdding(false);
     }
@@ -287,16 +284,14 @@ function MembersSection({
         </button>
       </form>
       {addError && (
-        <p className="text-sm text-red-600 dark:text-red-400">{addError}</p>
+        <p className="mt-1 text-[13px] text-red-500">{addError}</p>
       )}
 
       <div className="border border-border rounded-lg overflow-hidden">
         {isLoading && members.length === 0 ? (
           <p className="px-4 py-6 text-sm text-muted-foreground">Loading…</p>
         ) : loadError ? (
-          <p className="px-4 py-6 text-sm text-red-600 dark:text-red-400">
-            {loadError}
-          </p>
+          <p className="px-4 py-6 text-[13px] text-red-500">{loadError}</p>
         ) : members.length === 0 ? (
           <p className="px-4 py-6 text-sm text-muted-foreground">
             No members yet.
