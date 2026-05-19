@@ -245,7 +245,13 @@ function MembersSection({ orgUuid }: { orgUuid: string }) {
                       <p className="text-sm font-medium text-foreground truncate">
                         {displayName}
                       </p>
-                      <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
+                      <span
+                        className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                          member.role === "owner"
+                            ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30"
+                            : "bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/30"
+                        }`}
+                      >
                         {member.role}
                       </span>
                     </div>
