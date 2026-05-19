@@ -39,6 +39,13 @@ export function installOrgFetchInterceptor(): void {
       return originalFetch(input, init);
     }
 
+    // The /organizations management surface (list/create/rename + members)
+    // operates above any single workspace — don't scope it with X-Org-UUID.
+    const path = url.slice(backendUrl.length);
+    if (path.startsWith("/organizations")) {
+      return originalFetch(input, init);
+    }
+
     const activeOrgUuid = getActiveOrgUuid();
     if (!activeOrgUuid) {
       return originalFetch(input, init);

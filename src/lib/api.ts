@@ -64,6 +64,14 @@ export async function apiClient<T>(
     ...customHeaders,
   };
 
+  // /organizations is the workspace-management surface (list, create,
+  // rename, members) and operates above any single workspace. Sending the
+  // active workspace header would either be ignored or — worse — cause a
+  // 403/404 after the user leaves the active workspace.
+  if (endpoint.startsWith("/organizations")) {
+    delete headers["X-Org-UUID"];
+  }
+
   // Add Content-Type for requests with body
   if (body && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
