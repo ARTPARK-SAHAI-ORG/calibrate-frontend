@@ -1,4 +1,5 @@
 import { signOut } from "next-auth/react";
+import { getActiveOrgUuid } from "@/lib/orgs";
 
 type RequestOptions = {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
@@ -24,11 +25,19 @@ export function getDefaultHeaders(accessToken?: string): Record<string, string> 
   const headers: Record<string, string> = {
     accept: "application/json",
   };
-  
+
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
   }
-  
+
+  // Active workspace is resolved by the backend from this header. When absent
+  // the backend falls back to the user's personal workspace, so this is safe
+  // to omit (e.g. during initial boot before /organizations resolves).
+  const activeOrgUuid = getActiveOrgUuid();
+  if (activeOrgUuid) {
+    headers["X-Org-UUID"] = activeOrgUuid;
+  }
+
   return headers;
 }
 
@@ -71,6 +80,7 @@ export async function apiClient<T>(
     // Clear localStorage
     localStorage.removeItem("access_token");
     localStorage.removeItem("user");
+    localStorage.removeItem("activeOrgUuid");
     // Clear cookie
     document.cookie = "access_token=; path=/; max-age=0; SameSite=Lax";
     // Sign out via NextAuth

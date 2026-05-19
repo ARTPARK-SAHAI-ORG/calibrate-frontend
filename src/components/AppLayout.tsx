@@ -8,6 +8,7 @@ import {
   useHideFloatingButton,
   useFloatingButtonHideCount,
 } from "@/components/providers/FloatingButtonProvider";
+import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
 
 // Re-export the hook so existing imports continue to work
 export { useHideFloatingButton } from "@/components/providers/FloatingButtonProvider";
@@ -482,6 +483,9 @@ export function AppLayout({
           </div>
         </div>
 
+        {/* Workspace switcher - Expanded */}
+        {sidebarOpen && <WorkspaceSwitcher collapsed={false} />}
+
         {/* Navigation - Expanded */}
         {sidebarOpen && (
           <>
@@ -552,6 +556,9 @@ export function AppLayout({
             </nav>
           </>
         )}
+
+        {/* Workspace switcher - Collapsed */}
+        {!sidebarOpen && <WorkspaceSwitcher collapsed={true} />}
 
         {/* Navigation - Collapsed (icons only with tooltips) */}
         {!sidebarOpen && (
@@ -712,6 +719,7 @@ export function AppLayout({
                         // Clear localStorage
                         localStorage.removeItem("access_token");
                         localStorage.removeItem("user");
+                        localStorage.removeItem("activeOrgUuid");
                         // Clear cookie
                         document.cookie =
                           "access_token=; path=/; max-age=0; SameSite=Lax";
