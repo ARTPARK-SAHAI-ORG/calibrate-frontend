@@ -273,7 +273,8 @@ export function AgentConnectionTabContent({
             <button
               type="button"
               onClick={handleBenchmarkToggle}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer ${
+              disabled={isSaving}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                 supportsBenchmark ? "bg-foreground" : "bg-border"
               }`}
             >
