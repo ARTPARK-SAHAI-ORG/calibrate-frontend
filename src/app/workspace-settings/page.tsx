@@ -124,10 +124,7 @@ export default function WorkspaceSettingsPage() {
               )}
             </section>
 
-            <MembersSection
-              orgUuid={activeOrg.uuid}
-              orgName={activeOrg.name}
-            />
+            <MembersSection orgUuid={activeOrg.uuid} orgName={activeOrg.name} />
           </>
         )}
       </div>
@@ -308,23 +305,24 @@ function MembersSection({
                       {member.email}
                     </p>
                   </div>
-                  {!isOwner && (() => {
-                    const isSelf = member.user_id === currentUserId;
-                    return (
-                      <button
-                        type="button"
-                        onClick={() => setMemberToRemove(member)}
-                        title={
-                          isSelf
-                            ? "Leave this workspace"
-                            : "Remove from workspace"
-                        }
-                        className="h-9 px-3 rounded-md text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-                      >
-                        {isSelf ? "Leave" : "Remove"}
-                      </button>
-                    );
-                  })()}
+                  {!isOwner &&
+                    (() => {
+                      const isSelf = member.user_id === currentUserId;
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => setMemberToRemove(member)}
+                          title={
+                            isSelf
+                              ? "Leave this workspace"
+                              : "Remove from workspace"
+                          }
+                          className="h-9 px-3 rounded-md text-xs font-medium text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors cursor-pointer"
+                        >
+                          {isSelf ? "Leave" : "Remove"}
+                        </button>
+                      );
+                    })()}
                 </li>
               );
             })}
@@ -342,7 +340,7 @@ function MembersSection({
         message={
           memberToRemove
             ? isSelfRemoval
-              ? `Are you sure you want to leave ${orgName}? You'll lose access to its agents, tests, and simulations immediately.`
+              ? `Are you sure you want to leave ${orgName}? You will lose all access immediately.`
               : `Remove ${
                   `${memberToRemove.first_name} ${memberToRemove.last_name}`.trim() ||
                   memberToRemove.email

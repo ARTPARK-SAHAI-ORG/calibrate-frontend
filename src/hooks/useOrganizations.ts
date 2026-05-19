@@ -4,9 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { apiClient, apiDelete, apiGet, apiPost } from "@/lib/api";
 import {
   ACTIVE_ORG_CHANGED_EVENT,
+  ORGANIZATIONS_CHANGED_EVENT,
   type Organization,
   type OrganizationMember,
   getActiveOrgUuid,
+  notifyOrganizationsChanged,
   setActiveOrgUuid as persistActiveOrgUuid,
 } from "@/lib/orgs";
 
@@ -57,6 +59,18 @@ export function useOrganizations(
     refetch();
   }, [refetch]);
 
+  // Keep multiple mounted `useOrganizations` instances in sync: when one
+  // mutates a workspace, others refetch so the sidebar switcher reflects
+  // changes made on the settings page (and vice versa).
+  useEffect(() => {
+    const handler = () => {
+      refetch();
+    };
+    window.addEventListener(ORGANIZATIONS_CHANGED_EVENT, handler);
+    return () =>
+      window.removeEventListener(ORGANIZATIONS_CHANGED_EVENT, handler);
+  }, [refetch]);
+
   const createOrganization = useCallback(
     async (name: string): Promise<Organization | null> => {
       if (!accessToken) return null;
@@ -67,6 +81,7 @@ export function useOrganizations(
           { name },
         );
         setOrganizations((prev) => [...prev, created]);
+        notifyOrganizationsChanged();
         return created;
       } catch (err) {
         console.error("Error creating organization:", err);
@@ -88,6 +103,7 @@ export function useOrganizations(
         setOrganizations((prev) =>
           prev.map((o) => (o.uuid === uuid ? updated : o)),
         );
+        notifyOrganizationsChanged();
         return updated;
       } catch (err) {
         console.error("Error renaming organization:", err);

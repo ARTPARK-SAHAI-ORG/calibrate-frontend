@@ -10,6 +10,18 @@
 
 export const ACTIVE_ORG_UUID_KEY = "activeOrgUuid";
 export const ACTIVE_ORG_CHANGED_EVENT = "calibrate:active-org-changed";
+/**
+ * Fired when the user's set of workspaces (or one workspace's fields, e.g.
+ * its name) changes locally. Any mounted `useOrganizations` instance
+ * refetches when it sees this so the sidebar switcher stays in sync with
+ * actions taken on the settings page, and vice versa.
+ */
+export const ORGANIZATIONS_CHANGED_EVENT = "calibrate:organizations-changed";
+
+export function notifyOrganizationsChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(ORGANIZATIONS_CHANGED_EVENT));
+}
 
 export type OrganizationRole = "owner" | "admin";
 
