@@ -29,7 +29,6 @@ export type OrganizationMember = {
   first_name: string;
   last_name: string;
   role: OrganizationRole;
-  has_logged_in: boolean;
   created_at: string;
 };
 

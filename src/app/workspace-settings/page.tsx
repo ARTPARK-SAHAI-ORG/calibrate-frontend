@@ -245,11 +245,6 @@ function MembersSection({ orgUuid }: { orgUuid: string }) {
                       <p className="text-sm font-medium text-foreground truncate">
                         {displayName}
                       </p>
-                      {!member.has_logged_in && (
-                        <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
-                          Pending
-                        </span>
-                      )}
                       <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
                         {member.role}
                       </span>
