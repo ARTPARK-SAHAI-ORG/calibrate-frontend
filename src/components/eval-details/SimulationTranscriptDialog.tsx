@@ -97,7 +97,7 @@ export function SimulationTranscriptDialog({ simulation, runType, onClose, onAud
                     )}
 
                     {entry.role === "user" && entry.content && (
-                      <div className="w-full md:w-1/2">
+                      <div className="max-w-full md:max-w-1/2 w-fit">
                         <div className="px-4 py-3 rounded-xl text-sm text-foreground bg-muted border border-border whitespace-pre-wrap">
                           {entry.content}
                         </div>
@@ -105,7 +105,7 @@ export function SimulationTranscriptDialog({ simulation, runType, onClose, onAud
                     )}
 
                     {entry.role === "assistant" && entry.content && !entry.tool_calls && (
-                      <div className="w-full md:w-1/2">
+                      <div className="max-w-full md:max-w-1/2 w-fit">
                         <div className="px-4 py-3 rounded-xl text-sm text-foreground bg-accent border border-border whitespace-pre-wrap">
                           {entry.content}
                         </div>

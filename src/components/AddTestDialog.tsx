@@ -2300,7 +2300,7 @@ export function AddTestDialog({
                               }`}
                             >
                               {inlineDeleteBtn}
-                              <div className="w-1/2 flex flex-col">
+                              <div className="w-fit max-w-[50%] min-w-[180px] flex flex-col">
                                 <textarea
                                   value={message.content}
                                   placeholder={
@@ -2327,7 +2327,7 @@ export function AddTestDialog({
                                   ref={autoSizeOnMount}
                                   data-msg-id={message.id}
                                   rows={1}
-                                  className={`w-full px-4 py-2 rounded-xl text-sm text-foreground border focus:outline-none focus:ring-1 resize-none overflow-hidden placeholder:text-muted-foreground ${
+                                  className={`[field-sizing:content] min-w-[180px] max-w-full px-4 py-2 rounded-xl text-sm text-foreground border focus:outline-none focus:ring-1 resize-none overflow-hidden placeholder:text-muted-foreground ${
                                     isEmpty
                                       ? "border-red-500 focus:ring-red-500"
                                       : "focus:ring-accent " +

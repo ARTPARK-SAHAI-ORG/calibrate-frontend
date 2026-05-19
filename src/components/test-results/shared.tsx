@@ -549,7 +549,7 @@ export function TestDetailView({
               >
                 {/* User Message */}
                 {message.role === "user" && (
-                  <div className="w-[88%] md:w-3/4 flex flex-col">
+                  <div className="max-w-[88%] md:max-w-3/4 w-fit flex flex-col">
                     <div className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-muted border border-border">
                       <p className="text-sm text-foreground whitespace-pre-wrap">
                         {message.content}
@@ -576,7 +576,7 @@ export function TestDetailView({
                         </span>
                       )}
                     </div>
-                    <div className="w-[88%] md:w-3/4 flex flex-col">
+                    <div className="max-w-[88%] md:max-w-3/4 w-fit flex flex-col">
                       <div className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-background border border-border">
                         <p className="text-sm text-foreground whitespace-pre-wrap">
                           {message.content}
@@ -669,7 +669,7 @@ export function TestDetailView({
                   />
                 </div>
               )}
-              <div className="w-[88%] md:w-3/4">
+              <div className="max-w-[88%] md:max-w-3/4 w-fit">
                 <div className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-background border border-border">
                   <p className="text-sm text-foreground whitespace-pre-wrap">
                     {output.response}
