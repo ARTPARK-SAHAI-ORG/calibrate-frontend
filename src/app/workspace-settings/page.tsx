@@ -135,8 +135,6 @@ export default function WorkspaceSettingsPage() {
   );
 }
 
-// ----- Members section (only shown for non-personal workspaces) -----
-
 function MembersSection({ orgUuid }: { orgUuid: string }) {
   const accessToken = useAccessToken();
   const {
@@ -166,9 +164,7 @@ function MembersSection({ orgUuid }: { orgUuid: string }) {
       await addMember(email);
       setInviteEmail("");
     } catch (err) {
-      setAddError(
-        err instanceof Error ? err.message : "Failed to add member",
-      );
+      setAddError(err instanceof Error ? err.message : "Failed to add member");
     } finally {
       setIsAdding(false);
     }
@@ -194,9 +190,7 @@ function MembersSection({ orgUuid }: { orgUuid: string }) {
           Members
         </h2>
         <p className="text-sm text-muted-foreground">
-          Invite teammates by email. New invites can access the workspace
-          immediately; their name will show as &quot;pending&quot; until they
-          finish signing up.
+          Invite team members by email
         </p>
       </div>
 
