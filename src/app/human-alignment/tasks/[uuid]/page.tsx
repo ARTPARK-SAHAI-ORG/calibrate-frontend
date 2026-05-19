@@ -649,7 +649,23 @@ function ItemRowActions({
   );
 }
 
-function JobsList({ jobs }: { jobs: LabellingJob[] }) {
+function JobsList({
+  jobs,
+  selectedJobUuids,
+  onToggleJob,
+  onToggleSelectAll,
+  allSelected,
+  someSelected,
+  onRequestDelete,
+}: {
+  jobs: LabellingJob[];
+  selectedJobUuids: Set<string>;
+  onToggleJob: (jobUuid: string) => void;
+  onToggleSelectAll: () => void;
+  allSelected: boolean;
+  someSelected: boolean;
+  onRequestDelete: (jobUuid: string) => void;
+}) {
   const router = useRouter();
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
@@ -670,7 +686,17 @@ function JobsList({ jobs }: { jobs: LabellingJob[] }) {
 
   return (
     <div className="border border-border rounded-xl overflow-hidden">
-      <div className="grid grid-cols-[180px_minmax(0,1fr)_120px_120px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-2 border-b border-border bg-muted/30 items-center">
+      <div className="grid grid-cols-[40px_180px_minmax(0,1fr)_120px_120px_60px] gap-4 [&>*:nth-child(4)]:pl-6 px-4 py-2 border-b border-border bg-muted/30 items-center">
+        <input
+          type="checkbox"
+          checked={allSelected}
+          ref={(el) => {
+            if (el) el.indeterminate = someSelected;
+          }}
+          onChange={onToggleSelectAll}
+          aria-label="Select all jobs"
+          className="w-4 h-4 cursor-pointer accent-foreground"
+        />
         <div className="text-sm font-medium text-muted-foreground">
           Annotator
         </div>
@@ -679,11 +705,15 @@ function JobsList({ jobs }: { jobs: LabellingJob[] }) {
         <div className="text-sm font-medium text-muted-foreground">
           Progress
         </div>
+        <div className="text-sm font-medium text-muted-foreground text-center">
+          Actions
+        </div>
       </div>
       {jobs.map((job) => {
         const isImported = job.public_token.startsWith("import:");
         const copied = copiedToken === job.public_token;
         const url = buildAnnotateUrl(job.public_token);
+        const isSelected = selectedJobUuids.has(job.uuid);
         return (
           <div
             key={job.uuid}
@@ -691,10 +721,18 @@ function JobsList({ jobs }: { jobs: LabellingJob[] }) {
               if (!isImported)
                 router.push(`/human-alignment/jobs/${job.public_token}`);
             }}
-            className={`grid grid-cols-[180px_minmax(0,1fr)_120px_120px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-3 border-b border-border last:border-b-0 items-center hover:bg-muted/20 transition-colors ${
-              isImported ? "" : "cursor-pointer"
-            }`}
+            className={`grid grid-cols-[40px_180px_minmax(0,1fr)_120px_120px_60px] gap-4 [&>*:nth-child(4)]:pl-6 px-4 py-3 border-b border-border last:border-b-0 items-center transition-colors ${
+              isSelected ? "bg-muted/30" : "hover:bg-muted/20"
+            } ${isImported ? "" : "cursor-pointer"}`}
           >
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => onToggleJob(job.uuid)}
+              onClick={(e) => e.stopPropagation()}
+              aria-label={`Select job ${job.annotator_name}`}
+              className="w-4 h-4 cursor-pointer accent-foreground"
+            />
             <div className="text-sm font-medium truncate">
               {job.annotator_name}
             </div>
@@ -763,6 +801,32 @@ function JobsList({ jobs }: { jobs: LabellingJob[] }) {
             </div>
             <div className="text-sm text-muted-foreground tabular-nums">
               {job.completed_item_count} / {job.item_count}
+            </div>
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRequestDelete(job.uuid);
+                }}
+                aria-label="Delete job"
+                title="Delete job"
+                className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-colors cursor-pointer"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                  />
+                </svg>
+              </button>
             </div>
           </div>
         );
@@ -838,6 +902,14 @@ function LabellingTaskPageInner() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [deleteSelectedOpen, setDeleteSelectedOpen] = useState(false);
   const [deletingSelected, setDeletingSelected] = useState(false);
+
+  const [selectedJobUuids, setSelectedJobUuids] = useState<Set<string>>(
+    new Set(),
+  );
+  const [deleteJobsOpen, setDeleteJobsOpen] = useState(false);
+  const [deletingJobs, setDeletingJobs] = useState(false);
+  const [deletingJobUuid, setDeletingJobUuid] = useState<string | null>(null);
+  const [deletingJobInFlight, setDeletingJobInFlight] = useState(false);
   const [editSttItemsOpen, setEditSttItemsOpen] = useState(false);
   const [editSttSingleItemUuid, setEditSttSingleItemUuid] = useState<
     string | null
@@ -1120,6 +1192,38 @@ function LabellingTaskPageInner() {
     });
   }, [items]);
 
+  const toggleJob = (jobUuid: string) => {
+    setSelectedJobUuids((prev) => {
+      const next = new Set(prev);
+      if (next.has(jobUuid)) next.delete(jobUuid);
+      else next.add(jobUuid);
+      return next;
+    });
+  };
+
+  const allJobsSelected =
+    jobs.length > 0 && selectedJobUuids.size === jobs.length;
+  const someJobsSelected = selectedJobUuids.size > 0 && !allJobsSelected;
+  const toggleSelectAllJobs = () => {
+    setSelectedJobUuids((prev) =>
+      prev.size === jobs.length
+        ? new Set()
+        : new Set(jobs.map((j) => j.uuid)),
+    );
+  };
+
+  useEffect(() => {
+    setSelectedJobUuids((prev) => {
+      if (prev.size === 0) return prev;
+      const ids = new Set(jobs.map((j) => j.uuid));
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (ids.has(id)) next.add(id);
+      });
+      return next.size === prev.size ? prev : next;
+    });
+  }, [jobs]);
+
   const [startingRun, setStartingRun] = useState(false);
   // Run evaluators dialog state. itemUuids: null = all items in task,
   // []/non-empty = the specific items to run for.
@@ -1235,6 +1339,52 @@ function LabellingTaskPageInner() {
       setError(parseApiError(err, "Failed to delete item"));
     } finally {
       setDeletingOneInFlight(false);
+    }
+  };
+
+  const confirmDeleteOneJob = async () => {
+    if (!accessToken || !deletingJobUuid) return;
+    const jobUuid = deletingJobUuid;
+    setDeletingJobInFlight(true);
+    try {
+      await apiClient<{ message: string }>(
+        `/annotation-tasks/${uuid}/jobs/${jobUuid}`,
+        accessToken,
+        { method: "DELETE" },
+      );
+      setSelectedJobUuids((prev) => {
+        const next = new Set(prev);
+        next.delete(jobUuid);
+        return next;
+      });
+      setDeletingJobUuid(null);
+      await fetchTask();
+    } catch (err) {
+      toast.error(parseApiError(err, "Failed to delete labelling job"));
+    } finally {
+      setDeletingJobInFlight(false);
+    }
+  };
+
+  const handleDeleteSelectedJobs = async () => {
+    if (selectedJobUuids.size === 0 || !accessToken) return;
+    setDeletingJobs(true);
+    try {
+      await apiClient<{ deleted_count: number }>(
+        `/annotation-tasks/${uuid}/jobs`,
+        accessToken,
+        {
+          method: "DELETE",
+          body: { job_uuids: Array.from(selectedJobUuids) },
+        },
+      );
+      setDeleteJobsOpen(false);
+      setSelectedJobUuids(new Set());
+      await fetchTask();
+    } catch (err) {
+      toast.error(parseApiError(err, "Failed to delete labelling jobs"));
+    } finally {
+      setDeletingJobs(false);
     }
   };
 
@@ -2703,7 +2853,39 @@ function LabellingTaskPageInner() {
               description="Assigning items to annotators creates a job they need to complete"
             />
           ) : (
-            <JobsList jobs={jobs} />
+            <div className="space-y-3">
+              {selectedJobUuids.size > 0 && (
+                <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
+                  <span className="text-sm">
+                    <span className="font-medium">{selectedJobUuids.size}</span>{" "}
+                    job{selectedJobUuids.size === 1 ? "" : "s"} selected
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setSelectedJobUuids(new Set())}
+                      className="h-8 px-3 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      onClick={() => setDeleteJobsOpen(true)}
+                      className="h-8 px-3 rounded-md text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors cursor-pointer"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
+              <JobsList
+                jobs={jobs}
+                selectedJobUuids={selectedJobUuids}
+                onToggleJob={toggleJob}
+                onToggleSelectAll={toggleSelectAllJobs}
+                allSelected={allJobsSelected}
+                someSelected={someJobsSelected}
+                onRequestDelete={(jobUuid) => setDeletingJobUuid(jobUuid)}
+              />
+            </div>
           ))}
 
         {activeTab === "runs" && (
@@ -3174,6 +3356,30 @@ function LabellingTaskPageInner() {
         message="Delete this item? Any annotations on it will also be lost. This cannot be undone."
         confirmText="Delete"
         isDeleting={deletingOneInFlight}
+      />
+
+      <DeleteConfirmationDialog
+        isOpen={deleteJobsOpen}
+        onClose={() => {
+          if (!deletingJobs) setDeleteJobsOpen(false);
+        }}
+        onConfirm={handleDeleteSelectedJobs}
+        title="Delete labelling jobs"
+        message={`Delete ${selectedJobUuids.size} labelling job${selectedJobUuids.size === 1 ? "" : "s"}? Any annotations recorded against ${selectedJobUuids.size === 1 ? "this job" : "these jobs"} will be lost. This cannot be undone.`}
+        confirmText="Delete"
+        isDeleting={deletingJobs}
+      />
+
+      <DeleteConfirmationDialog
+        isOpen={!!deletingJobUuid}
+        onClose={() => {
+          if (!deletingJobInFlight) setDeletingJobUuid(null);
+        }}
+        onConfirm={confirmDeleteOneJob}
+        title="Delete labelling job"
+        message="Delete this labelling job? Any annotations recorded against it will be lost. This cannot be undone."
+        confirmText="Delete"
+        isDeleting={deletingJobInFlight}
       />
 
       <DeleteConfirmationDialog
