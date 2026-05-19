@@ -571,7 +571,7 @@ export function turnContentString(t: TurnObject): string {
 
 export function roleLabel(role: string): string {
   if (role === "user") return "User";
-  if (role === "assistant") return "AI";
+  if (role === "assistant") return "Agent";
   if (role === "system") return "System";
   if (role === "tool") return "Tool";
   return role;

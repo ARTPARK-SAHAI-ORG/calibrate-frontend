@@ -82,3 +82,8 @@ Use `useSidebarState()` from `src/lib/sidebar.ts` for the open/closed state — 
 - All interactive elements need `cursor-pointer`; disabled elements `cursor-not-allowed disabled:opacity-50`.
 - Mobile-first. Primary breakpoint is `md:` (768px). Tables convert to card layouts on mobile (`hidden md:block` for the table, `md:hidden` for the card version).
 - Page titles are set via `document.title` in a `useEffect` in the page component AND via `metadata` export in the route's `layout.tsx` — keep them in sync when renaming.
+
+## Workflow
+
+- **Auto-commit when done**: once all changes for the user's request are complete and verified, create a git commit without waiting for the user to ask. Use a clear, scoped commit message that explains the why. Do not push unless the user asks.
+- **Keep CLAUDE.md in sync with reality**: after making changes, check whether any high-level understanding of the app has shifted — new routes, new top-level concepts, renamed nav items, changed auth flow, new architectural patterns, new conventions, retired features, etc. If yes, update CLAUDE.md in the same commit so this file stays an accurate map of the codebase. Skip updates for low-level details (individual component tweaks, copy changes, bug fixes that don't change architecture).
