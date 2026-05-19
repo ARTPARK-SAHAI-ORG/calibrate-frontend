@@ -76,9 +76,10 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
     if (uuid !== activeUuid) {
       setActiveUuid(uuid);
       setOpen(false);
-      // Reload to refetch all data under the new workspace context. The
-      // header is read from localStorage so subsequent requests pick it up.
-      window.location.reload();
+      // Send the user to the agents home so they land on a known-good page
+      // for the new workspace. Full navigation (not router.push) ensures
+      // every in-flight data fetch re-runs under the new context.
+      window.location.assign("/agents");
       return;
     }
     setOpen(false);
@@ -88,10 +89,8 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
     const created = await createOrganization(name);
     if (created) {
       setActiveUuid(created.uuid);
-      // Refresh the list so the new workspace appears next time the
-      // dropdown opens, then reload so the page reflects the new context.
       await refetch();
-      window.location.reload();
+      window.location.assign("/agents");
     }
   };
 
