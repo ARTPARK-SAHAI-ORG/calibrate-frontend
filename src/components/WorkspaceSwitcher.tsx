@@ -180,7 +180,7 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
         </button>
 
         {open && (
-          <div className="absolute left-3 right-3 top-full z-50 mt-1">
+          <div className="absolute left-3 top-full z-50 mt-1">
             <DropdownPanel
               organizations={organizations}
               isLoading={isLoading}
@@ -227,7 +227,7 @@ function DropdownPanel({
   return (
     <div
       role="menu"
-      className="w-64 bg-background border border-border rounded-xl shadow-lg overflow-hidden"
+      className="w-max min-w-[240px] max-w-sm bg-background border border-border rounded-xl shadow-lg overflow-hidden"
     >
       <div className="p-2 max-h-64 overflow-y-auto">
         <p className="px-2 py-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -255,7 +255,7 @@ function DropdownPanel({
                     }`}
                   >
                     <WorkspaceAvatar org={org} size="sm" />
-                    <span className="flex-1 min-w-0 truncate text-left">
+                    <span className="flex-1 whitespace-nowrap text-left">
                       {org.name}
                     </span>
                     {isActive && (
