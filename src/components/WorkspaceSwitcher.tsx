@@ -250,11 +250,6 @@ function DropdownPanel({
                     <span className="flex-1 min-w-0 truncate text-left">
                       {org.name}
                     </span>
-                    {org.is_personal && (
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                        Personal
-                      </span>
-                    )}
                     {isActive && (
                       <svg
                         className="w-4 h-4 text-foreground flex-shrink-0"

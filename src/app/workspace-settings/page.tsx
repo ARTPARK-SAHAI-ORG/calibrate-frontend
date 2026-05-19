@@ -89,16 +89,9 @@ export default function WorkspaceSettingsPage() {
         ) : (
           <>
             <section className="space-y-3">
-              <div>
-                <h2 className="text-base md:text-lg font-semibold text-foreground">
-                  General
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {activeOrg.is_personal
-                    ? "This is your personal workspace."
-                    : "Edit the name of this workspace."}
-                </p>
-              </div>
+              <p className="text-sm text-muted-foreground">
+                Edit the name of this workspace.
+              </p>
 
               <label className="block text-sm font-medium text-foreground">
                 Name
@@ -134,9 +127,7 @@ export default function WorkspaceSettingsPage() {
               )}
             </section>
 
-            {!activeOrg.is_personal && (
-              <MembersSection orgUuid={activeOrg.uuid} />
-            )}
+            <MembersSection orgUuid={activeOrg.uuid} />
           </>
         )}
       </div>

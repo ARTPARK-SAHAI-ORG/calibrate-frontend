@@ -56,7 +56,7 @@ There is currently no test suite checked in — `jest.config.js` is configured b
 - `src/components/OrganizationBootstrapper.tsx` — mounted in the root layout. Installs the interceptor and, on first authenticated load, fetches `/organizations` and stashes a default uuid (preferring the personal workspace).
 - `src/hooks/useOrganizations.ts` — `useOrganizations` (list + create + rename), `useActiveOrgUuid` (subscribes to the event), `useOrgMembers` (list + invite + remove).
 - `src/components/WorkspaceSwitcher.tsx` — sidebar dropdown rendered above the nav in both expanded and collapsed sidebar modes. Switching workspaces triggers `window.location.reload()` so all in-flight resource fetches re-run under the new context.
-- `/workspace-settings` — rename the active workspace, and (for non-personal workspaces) manage members. The "Remove" button is disabled for `role === "owner"`; pending invitees (`has_logged_in === false`) render with a "Pending" badge.
+- `/workspace-settings` — rename the active workspace and manage members (shown for all workspaces, including personal). The "Remove" button is disabled for `role === "owner"`; pending invitees (`has_logged_in === false`) render with a "Pending" badge.
 
 **Page skeleton**: every authenticated page is:
 ```tsx
