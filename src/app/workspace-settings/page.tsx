@@ -259,19 +259,16 @@ function MembersSection({ orgUuid }: { orgUuid: string }) {
                       {member.email}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setMemberToRemove(member)}
-                    disabled={isOwner}
-                    title={
-                      isOwner
-                        ? "The workspace owner cannot be removed."
-                        : "Remove from workspace"
-                    }
-                    className="h-9 px-3 rounded-md text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Remove
-                  </button>
+                  {!isOwner && (
+                    <button
+                      type="button"
+                      onClick={() => setMemberToRemove(member)}
+                      title="Remove from workspace"
+                      className="h-9 px-3 rounded-md text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                    >
+                      Remove
+                    </button>
+                  )}
                 </li>
               );
             })}
