@@ -8,10 +8,11 @@ import {
   useOrganizations,
   useOrgMembers,
 } from "@/hooks";
+import { useSession } from "next-auth/react";
 import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { useSidebarState } from "@/lib/sidebar";
-import type { OrganizationMember } from "@/lib/orgs";
+import { clearActiveOrgUuid, type OrganizationMember } from "@/lib/orgs";
 
 export default function WorkspaceSettingsPage() {
   const router = useRouter();
@@ -123,7 +124,10 @@ export default function WorkspaceSettingsPage() {
               )}
             </section>
 
-            <MembersSection orgUuid={activeOrg.uuid} />
+            <MembersSection
+              orgUuid={activeOrg.uuid}
+              orgName={activeOrg.name}
+            />
           </>
         )}
       </div>
@@ -131,8 +135,42 @@ export default function WorkspaceSettingsPage() {
   );
 }
 
-function MembersSection({ orgUuid }: { orgUuid: string }) {
+/**
+ * Resolve the current user's uuid from either NextAuth (Google sign-in,
+ * exposed as `session.backendUser`) or localStorage (email/password login,
+ * stored under "user").
+ */
+function useCurrentUserId(): string | null {
+  const { data: session } = useSession();
+  const [localUuid, setLocalUuid] = useState<string | null>(null);
+
+  useEffect(() => {
+    const raw = localStorage.getItem("user");
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as { uuid?: string };
+      if (typeof parsed.uuid === "string") setLocalUuid(parsed.uuid);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const sessionUuid =
+    (session as { backendUser?: { uuid?: string } } | null)?.backendUser
+      ?.uuid ?? null;
+  return sessionUuid || localUuid;
+}
+
+function MembersSection({
+  orgUuid,
+  orgName,
+}: {
+  orgUuid: string;
+  orgName: string;
+}) {
+  const router = useRouter();
   const accessToken = useAccessToken();
+  const currentUserId = useCurrentUserId();
   const {
     members,
     isLoading,
@@ -149,6 +187,9 @@ function MembersSection({ orgUuid }: { orgUuid: string }) {
   const [memberToRemove, setMemberToRemove] =
     useState<OrganizationMember | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
+
+  const isSelfRemoval =
+    !!memberToRemove && memberToRemove.user_id === currentUserId;
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,14 +209,22 @@ function MembersSection({ orgUuid }: { orgUuid: string }) {
 
   const handleRemove = async () => {
     if (!memberToRemove) return;
+    const wasSelf = memberToRemove.user_id === currentUserId;
     setIsRemoving(true);
     const ok = await removeMember(memberToRemove.user_id);
     setIsRemoving(false);
-    if (ok) {
-      setMemberToRemove(null);
-    } else {
+    if (!ok) {
       // Bring fresh data from server in case state is out of sync.
       refetch();
+      return;
+    }
+    setMemberToRemove(null);
+    if (wasSelf) {
+      // The user just left the workspace they were viewing — they no longer
+      // have access here. Drop the active uuid so the bootstrapper picks a
+      // new default (typically the personal workspace) and send them home.
+      clearActiveOrgUuid();
+      router.replace("/agents");
     }
   };
 
@@ -259,16 +308,23 @@ function MembersSection({ orgUuid }: { orgUuid: string }) {
                       {member.email}
                     </p>
                   </div>
-                  {!isOwner && (
-                    <button
-                      type="button"
-                      onClick={() => setMemberToRemove(member)}
-                      title="Remove from workspace"
-                      className="h-9 px-3 rounded-md text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-                    >
-                      Remove
-                    </button>
-                  )}
+                  {!isOwner && (() => {
+                    const isSelf = member.user_id === currentUserId;
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => setMemberToRemove(member)}
+                        title={
+                          isSelf
+                            ? "Leave this workspace"
+                            : "Remove from workspace"
+                        }
+                        className="h-9 px-3 rounded-md text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                      >
+                        {isSelf ? "Leave" : "Remove"}
+                      </button>
+                    );
+                  })()}
                 </li>
               );
             })}
@@ -282,16 +338,18 @@ function MembersSection({ orgUuid }: { orgUuid: string }) {
           if (!isRemoving) setMemberToRemove(null);
         }}
         onConfirm={handleRemove}
-        title="Remove member"
+        title={isSelfRemoval ? "Leave workspace" : "Remove member"}
         message={
           memberToRemove
-            ? `Remove ${
-                `${memberToRemove.first_name} ${memberToRemove.last_name}`.trim() ||
-                memberToRemove.email
-              } from this workspace? They will lose access immediately.`
+            ? isSelfRemoval
+              ? `Are you sure you want to leave ${orgName}? You'll lose access to its agents, tests, and simulations immediately.`
+              : `Remove ${
+                  `${memberToRemove.first_name} ${memberToRemove.last_name}`.trim() ||
+                  memberToRemove.email
+                } from this workspace? They will lose access immediately.`
             : ""
         }
-        confirmText="Remove"
+        confirmText={isSelfRemoval ? "Leave" : "Remove"}
         isDeleting={isRemoving}
       />
     </section>
