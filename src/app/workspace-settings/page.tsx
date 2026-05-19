@@ -9,6 +9,7 @@ import {
   useOrgMembers,
 } from "@/hooks";
 import { useSession } from "next-auth/react";
+import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { useSidebarState } from "@/lib/sidebar";
@@ -48,15 +49,13 @@ export default function WorkspaceSettingsPage() {
   const [nameInput, setNameInput] = useState("");
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
-  const [renameSuccess, setRenameSuccess] = useState(false);
 
-  // Only reset the form when the active workspace itself changes (uuid).
-  // Don't include `activeOrg.name` in the dep list — that would fire right
-  // after a successful rename and immediately wipe the "Saved." indicator.
+  // Sync the input with the currently active workspace. Keyed on uuid only —
+  // we deliberately don't refresh from `activeOrg.name` so a successful
+  // rename doesn't briefly snap the input back.
   useEffect(() => {
     setNameInput(activeOrg?.name ?? "");
     setRenameError(null);
-    setRenameSuccess(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeOrg?.uuid]);
 
@@ -68,10 +67,9 @@ export default function WorkspaceSettingsPage() {
     if (!trimmed || trimmed === activeOrg.name) return;
     setIsRenaming(true);
     setRenameError(null);
-    setRenameSuccess(false);
     try {
       await renameOrganization(activeOrg.uuid, trimmed);
-      setRenameSuccess(true);
+      toast.success("Workspace name updated");
     } catch (err) {
       setRenameError(parseBackendErrorMessage(err, "Failed to rename workspace"));
     } finally {
@@ -111,7 +109,6 @@ export default function WorkspaceSettingsPage() {
                     value={nameInput}
                     onChange={(e) => {
                       setNameInput(e.target.value);
-                      setRenameSuccess(false);
                       setRenameError(null);
                     }}
                     disabled={isRenaming}
@@ -132,11 +129,6 @@ export default function WorkspaceSettingsPage() {
                 </div>
                 {renameError && (
                   <p className="mt-1 text-[13px] text-red-500">{renameError}</p>
-                )}
-                {renameSuccess && !renameError && (
-                  <p className="mt-1 text-[13px] text-muted-foreground">
-                    Saved.
-                  </p>
                 )}
               </div>
             </section>
