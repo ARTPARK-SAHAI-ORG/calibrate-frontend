@@ -50,11 +50,15 @@ export default function WorkspaceSettingsPage() {
   const [renameError, setRenameError] = useState<string | null>(null);
   const [renameSuccess, setRenameSuccess] = useState(false);
 
+  // Only reset the form when the active workspace itself changes (uuid).
+  // Don't include `activeOrg.name` in the dep list — that would fire right
+  // after a successful rename and immediately wipe the "Saved." indicator.
   useEffect(() => {
     setNameInput(activeOrg?.name ?? "");
     setRenameError(null);
     setRenameSuccess(false);
-  }, [activeOrg?.uuid, activeOrg?.name]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeOrg?.uuid]);
 
   const isDirty = !!activeOrg && nameInput.trim() !== activeOrg.name;
 
