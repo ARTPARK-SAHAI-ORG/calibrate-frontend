@@ -12,7 +12,15 @@ import { useSession } from "next-auth/react";
 import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { useSidebarState } from "@/lib/sidebar";
-import { clearActiveOrgUuid, type OrganizationMember } from "@/lib/orgs";
+import { apiGet } from "@/lib/api";
+import {
+  clearActiveOrgUuid,
+  notifyOrganizationsChanged,
+  pickDefaultOrg,
+  setActiveOrgUuid,
+  type Organization,
+  type OrganizationMember,
+} from "@/lib/orgs";
 
 export default function WorkspaceSettingsPage() {
   const router = useRouter();
@@ -217,10 +225,32 @@ function MembersSection({
     }
     setMemberToRemove(null);
     if (wasSelf) {
-      // The user just left the workspace they were viewing — they no longer
-      // have access here. Drop the active uuid so the bootstrapper picks a
-      // new default (typically the personal workspace) and send them home.
-      clearActiveOrgUuid();
+      // User just left the workspace they were viewing. We need to:
+      //   1. Pick a new active workspace from the workspaces they still
+      //      belong to (the bootstrapper only runs once at app load, so it
+      //      won't auto-recover here).
+      //   2. Tell every mounted useOrganizations to refetch so the sidebar
+      //      switcher drops the just-left workspace.
+      //   3. Navigate to /agents under the new context.
+      if (accessToken) {
+        try {
+          const orgs = await apiGet<Organization[]>(
+            "/organizations",
+            accessToken,
+          );
+          const chosen = pickDefaultOrg(orgs);
+          if (chosen) {
+            setActiveOrgUuid(chosen.uuid);
+          } else {
+            clearActiveOrgUuid();
+          }
+        } catch {
+          clearActiveOrgUuid();
+        }
+      } else {
+        clearActiveOrgUuid();
+      }
+      notifyOrganizationsChanged();
       router.replace("/agents");
     }
   };
