@@ -957,16 +957,6 @@ function LabellingTaskPageInner() {
     fetchTask();
   }, [fetchTask]);
 
-  useEffect(() => {
-    if (autoTabSwitchedRef.current) return;
-    if (!task) return;
-    autoTabSwitchedRef.current = true;
-    if (isTab(initialTab)) return; // user pinned a tab via URL
-    if ((task.items?.length ?? 0) === 0) {
-      handleTabChange("items");
-    }
-  }, [task, initialTab, handleTabChange]);
-
   const fetchAgreement = useCallback(async () => {
     if (!accessToken || !uuid) return;
     setAgreementLoading(true);
@@ -1038,6 +1028,43 @@ function LabellingTaskPageInner() {
   useEffect(() => {
     if (activeTab === "overview" || activeTab === "items") fetchTaskSummary();
   }, [activeTab, fetchTaskSummary]);
+
+  useEffect(() => {
+    if (autoTabSwitchedRef.current) return;
+    if (!task) return;
+    if (isTab(initialTab)) {
+      autoTabSwitchedRef.current = true;
+      return; // user pinned a tab via URL
+    }
+    if ((task.items?.length ?? 0) === 0) {
+      autoTabSwitchedRef.current = true;
+      handleTabChange("items");
+      return;
+    }
+    // Items exist — peek at overview's data sources to decide if the
+    // overview would just be empty states. If both the agreement panel
+    // and the per-item summary table have nothing to show, jump straight
+    // to the items tab. Wait for both fetches to complete first.
+    if (!agreementFetchCompleted) return;
+    if (taskSummary === null) return;
+    const agreementEmpty =
+      !agreement ||
+      ((agreement.human_human?.pair_count ?? 0) === 0 &&
+        (agreement.evaluators ?? []).every((e) => (e.pair_count ?? 0) === 0));
+    const summaryEmpty =
+      (taskSummary.rows ?? []).filter(summaryRowHasAnyValue).length === 0;
+    autoTabSwitchedRef.current = true;
+    if (agreementEmpty && summaryEmpty) {
+      handleTabChange("items");
+    }
+  }, [
+    task,
+    initialTab,
+    handleTabChange,
+    agreement,
+    agreementFetchCompleted,
+    taskSummary,
+  ]);
 
   // Set of item uuids that have at least one summary row with a value
   // worth displaying. Used to disable the per-item "View results" button
