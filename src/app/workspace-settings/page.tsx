@@ -100,33 +100,41 @@ export default function WorkspaceSettingsPage() {
               <label className="block text-sm font-medium text-foreground">
                 Name
               </label>
-              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                <input
-                  type="text"
-                  value={nameInput}
-                  onChange={(e) => {
-                    setNameInput(e.target.value);
-                    setRenameSuccess(false);
-                    setRenameError(null);
-                  }}
-                  disabled={isRenaming}
-                  className="flex-1 h-10 px-3 rounded-md border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/10 disabled:opacity-50"
-                />
-                <button
-                  type="button"
-                  onClick={handleRename}
-                  disabled={!isDirty || isRenaming || !nameInput.trim()}
-                  className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isRenaming ? "Saving..." : "Save"}
-                </button>
+              <div>
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                  <input
+                    type="text"
+                    value={nameInput}
+                    onChange={(e) => {
+                      setNameInput(e.target.value);
+                      setRenameSuccess(false);
+                      setRenameError(null);
+                    }}
+                    disabled={isRenaming}
+                    className={`flex-1 h-10 px-3 rounded-md border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 disabled:opacity-50 ${
+                      renameError
+                        ? "border-red-500/60 focus:ring-red-500/20"
+                        : "border-border focus:ring-foreground/10"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRename}
+                    disabled={!isDirty || isRenaming || !nameInput.trim()}
+                    className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isRenaming ? "Saving..." : "Save"}
+                  </button>
+                </div>
+                {renameError && (
+                  <p className="mt-1 text-[13px] text-red-500">{renameError}</p>
+                )}
+                {renameSuccess && !renameError && (
+                  <p className="mt-1 text-[13px] text-muted-foreground">
+                    Saved.
+                  </p>
+                )}
               </div>
-              {renameError && (
-                <p className="mt-1 text-[13px] text-red-500">{renameError}</p>
-              )}
-              {renameSuccess && !renameError && (
-                <p className="mt-1 text-[13px] text-muted-foreground">Saved.</p>
-              )}
             </section>
 
             <MembersSection orgUuid={activeOrg.uuid} orgName={activeOrg.name} />
@@ -263,29 +271,35 @@ function MembersSection({
         </p>
       </div>
 
-      <form onSubmit={handleAdd} className="flex flex-col sm:flex-row gap-2">
-        <input
-          type="email"
-          value={inviteEmail}
-          onChange={(e) => {
-            setInviteEmail(e.target.value);
-            setAddError(null);
-          }}
-          placeholder="teammate@example.com"
-          disabled={isAdding}
-          className="flex-1 h-10 px-3 rounded-md border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/10 disabled:opacity-50"
-        />
-        <button
-          type="submit"
-          disabled={!inviteEmail.trim() || isAdding}
-          className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isAdding ? "Adding..." : "Add member"}
-        </button>
-      </form>
-      {addError && (
-        <p className="mt-1 text-[13px] text-red-500">{addError}</p>
-      )}
+      <div>
+        <form onSubmit={handleAdd} className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="email"
+            value={inviteEmail}
+            onChange={(e) => {
+              setInviteEmail(e.target.value);
+              setAddError(null);
+            }}
+            placeholder="teammate@example.com"
+            disabled={isAdding}
+            className={`flex-1 h-10 px-3 rounded-md border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 disabled:opacity-50 ${
+              addError
+                ? "border-red-500/60 focus:ring-red-500/20"
+                : "border-border focus:ring-foreground/10"
+            }`}
+          />
+          <button
+            type="submit"
+            disabled={!inviteEmail.trim() || isAdding}
+            className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isAdding ? "Adding..." : "Add member"}
+          </button>
+        </form>
+        {addError && (
+          <p className="mt-1 text-[13px] text-red-500">{addError}</p>
+        )}
+      </div>
 
       <div className="border border-border rounded-lg overflow-hidden">
         {isLoading && members.length === 0 ? (

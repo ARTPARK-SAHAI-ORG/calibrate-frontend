@@ -58,8 +58,8 @@ export function CreateWorkspaceDialog({
           Create workspace
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Workspaces let you collaborate with teammates on a shared set of
-          agents, tests, and simulations.
+          Workspaces help you easily collaborate. Create a new workspace and add
+          team members to it.
         </p>
 
         <label className="block text-sm font-medium text-foreground mb-1.5">
