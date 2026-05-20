@@ -122,16 +122,16 @@ export default function AdminAnnotateJobPage() {
                 <button
                   type="button"
                   onClick={handleCopyJobLink}
-                  className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs md:text-sm font-medium border transition-colors cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border transition-colors cursor-pointer ${
                     copied
-                      ? "border-green-200 bg-green-100 text-green-700 dark:border-green-500/40 dark:bg-green-500/20 dark:text-green-400"
-                      : "border-border bg-background text-foreground hover:bg-muted/50"
+                      ? "bg-emerald-500/15 border-emerald-500/45 text-emerald-900 dark:text-emerald-200 hover:bg-emerald-500/25 dark:hover:bg-emerald-500/20"
+                      : "bg-indigo-500/14 border-indigo-500/45 text-indigo-900 dark:text-indigo-200 hover:bg-indigo-500/26 dark:hover:bg-indigo-500/20"
                   }`}
                   aria-label={copied ? "Copied job link" : "Copy job link"}
                 >
                   {copied ? (
                     <svg
-                      className="w-4 h-4"
+                      className="w-3.5 h-3.5"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -145,11 +145,11 @@ export default function AdminAnnotateJobPage() {
                     </svg>
                   ) : (
                     <svg
-                      className="w-4 h-4"
+                      className="w-3.5 h-3.5"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
-                      strokeWidth={1.75}
+                      strokeWidth={1.8}
                     >
                       <path
                         strokeLinecap="round"
