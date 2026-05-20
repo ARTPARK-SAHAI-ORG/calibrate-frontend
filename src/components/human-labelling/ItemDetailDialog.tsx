@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiClient } from "@/lib/api";
+import { Tooltip } from "@/components/Tooltip";
 import { type Item } from "@/components/human-labelling/AnnotationJobView";
 import {
   ItemDetailPane,
@@ -289,39 +290,40 @@ export function ItemDetailDialog({
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => setLiveOnly((v) => !v)}
-              aria-pressed={liveOnly}
-              title="Show results for only the live versions of each evaluator. Toggle to see results for all versions."
-              className={`h-8 px-3 inline-flex items-center gap-1.5 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
-                liveOnly
-                  ? "bg-foreground text-background border-foreground"
-                  : "bg-transparent text-muted-foreground border-border hover:border-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {liveOnly ? (
-                <svg
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M4.5 12.75l6 6 9-13.5"
+            <Tooltip content="Show results for only the live versions of each evaluator. Toggle to see the results for all versions.">
+              <button
+                type="button"
+                onClick={() => setLiveOnly((v) => !v)}
+                aria-pressed={liveOnly}
+                className={`h-8 px-3 inline-flex items-center gap-1.5 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
+                  liveOnly
+                    ? "bg-foreground text-background border-foreground"
+                    : "bg-transparent text-muted-foreground border-border hover:border-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {liveOnly ? (
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M4.5 12.75l6 6 9-13.5"
+                    />
+                  </svg>
+                ) : (
+                  <span
+                    className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground"
+                    aria-hidden
                   />
-                </svg>
-              ) : (
-                <span
-                  className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground"
-                  aria-hidden
-                />
-              )}
-              Live versions only
-            </button>
+                )}
+                Live versions only
+              </button>
+            </Tooltip>
           <button
             onClick={onClose}
             aria-label="Close"
