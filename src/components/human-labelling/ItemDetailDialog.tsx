@@ -118,6 +118,17 @@ export function ItemDetailDialog({
     [item],
   );
 
+  const hasAnyLabel = useMemo(() => {
+    if (!summary) return false;
+    for (const row of summary.rows) {
+      if (row.evaluator_value !== null) return true;
+      for (const ann of Object.values(row.annotations ?? {})) {
+        if (ann && ann.value !== null && ann.value !== undefined) return true;
+      }
+    }
+    return false;
+  }, [summary]);
+
   const adapted = useMemo(() => {
     if (!summary || !task || !item) return null;
     const taskEvaluatorByUuid = new Map(
@@ -244,11 +255,29 @@ export function ItemDetailDialog({
         onClick={(e) => e.stopPropagation()}
         className="bg-background rounded-none md:rounded-xl w-full max-w-[92rem] h-full md:h-[92vh] flex flex-col shadow-2xl overflow-hidden"
       >
-        <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-border">
-          <div className="min-w-0">
+        <div className="flex items-center justify-between gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-border">
+          <div className="min-w-0 flex items-center gap-2 flex-wrap">
             <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
               {itemTitle(item)}
             </h2>
+            {!loading && !error && summary && !hasAnyLabel && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                  />
+                </svg>
+                No labels yet
+              </span>
+            )}
           </div>
           <button
             onClick={onClose}
