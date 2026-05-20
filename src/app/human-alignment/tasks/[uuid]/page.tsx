@@ -40,10 +40,7 @@ import {
   agreementColor,
 } from "@/components/human-labelling/AgreementStatCard";
 import { EmptyState } from "@/components/ui/LoadingState";
-import {
-  MultiSelectPicker,
-  type PickerItem,
-} from "@/components/MultiSelectPicker";
+import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { useAccessToken } from "@/hooks";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
@@ -110,20 +107,6 @@ function summaryRowHasAnyValue(r: SummaryRow): boolean {
     if (v && v.value !== null && v.value !== undefined) return true;
   }
   return false;
-}
-
-function formatVerdictValue(v: boolean | number | null | undefined): string {
-  if (v === null || v === undefined) return "—";
-  if (typeof v === "boolean") return v ? "Correct" : "Wrong";
-  if (typeof v === "number") return String(v);
-  return "—";
-}
-
-function verdictTextClass(v: boolean | number | null | undefined): string {
-  if (v === null || v === undefined) return "text-muted-foreground";
-  if (v === true) return "text-green-600 dark:text-green-400";
-  if (v === false) return "text-red-600 dark:text-red-400";
-  return "text-foreground";
 }
 
 const TABS: Tab[] = ["overview", "items", "jobs", "runs"];
@@ -498,23 +481,15 @@ function EvaluatorRunsList({
 function ItemRowActions({
   itemUuid,
   onDelete,
-  onViewResults,
   onLabel,
   onEdit,
   onEvaluate,
-  isResultsOpen,
-  viewResultsDisabled,
-  viewResultsDisabledTooltip,
 }: {
   itemUuid: string;
   onDelete: (uuid: string) => void | Promise<void>;
-  onViewResults: (uuid: string) => void;
   onLabel?: (uuid: string) => void;
   onEdit?: (uuid: string) => void;
   onEvaluate?: (uuid: string) => void;
-  isResultsOpen?: boolean;
-  viewResultsDisabled?: boolean;
-  viewResultsDisabledTooltip?: string;
 }) {
   return (
     <div
@@ -551,79 +526,6 @@ function ItemRowActions({
           Evaluate
         </button>
       )}
-      {/* View / Hide results (toggle) */}
-      {viewResultsDisabled ? (
-        <Tooltip
-          content={
-            viewResultsDisabledTooltip ??
-            "Results can be seen once annotators label the data or evaluator is run for this item"
-          }
-        >
-          <button
-            type="button"
-            disabled
-            aria-label="View results"
-            className="h-8 px-3 inline-flex items-center gap-1.5 rounded-md text-sm font-semibold border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 transition-colors disabled:opacity-50 cursor-not-allowed"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.8}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
-            View results
-          </button>
-        </Tooltip>
-      ) : (
-        <button
-          type="button"
-          onClick={() => onViewResults(itemUuid)}
-          aria-label={isResultsOpen ? "Hide results" : "View results"}
-          className="h-8 px-3 inline-flex items-center gap-1.5 rounded-md text-sm font-semibold border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 hover:bg-fuchsia-500/20 hover:border-fuchsia-500/60 transition-colors cursor-pointer"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.8}
-          >
-            {isResultsOpen ? (
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"
-              />
-            ) : (
-              <>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </>
-            )}
-          </svg>
-          {isResultsOpen ? "Hide results" : "View results"}
-        </button>
-      )}
       {/* Delete Button */}
       <button
         type="button"
@@ -645,6 +547,173 @@ function ItemRowActions({
           />
         </svg>
       </button>
+    </div>
+  );
+}
+
+type EvaluatorMetaLite = {
+  uuid: string;
+  description?: string | null;
+  scale_min?: number | boolean | null;
+  scale_max?: number | boolean | null;
+};
+
+function annotatorPillTone(
+  annotationValue: boolean | number | null | undefined,
+  evaluatorValue: boolean | number | null,
+): "aligned" | "misaligned" | "neutral" {
+  if (annotationValue === null || annotationValue === undefined) return "neutral";
+  if (evaluatorValue === null || evaluatorValue === undefined) return "neutral";
+  return annotationValue === evaluatorValue ? "aligned" : "misaligned";
+}
+
+function ItemResultsCards({
+  rows,
+  evaluatorMeta,
+  annotatorNamesById,
+}: {
+  rows: SummaryRow[];
+  evaluatorMeta: Map<string, EvaluatorMetaLite>;
+  annotatorNamesById: Map<string, string>;
+}) {
+  const [selectionByKey, setSelectionByKey] = useState<Record<string, string>>(
+    {},
+  );
+
+  return (
+    <div className="space-y-4">
+      {rows.map((row, idx) => {
+        const rowKey = `${row.evaluator_id}-${row.evaluator_version_id ?? ""}-${idx}`;
+        const versionLabel =
+          typeof row.evaluator_version_number === "number"
+            ? `v${row.evaluator_version_number}`
+            : null;
+        const meta = evaluatorMeta.get(row.evaluator_id);
+        const scaleMin =
+          typeof meta?.scale_min === "number" ? meta.scale_min : undefined;
+        const scaleMax =
+          typeof meta?.scale_max === "number" ? meta.scale_max : undefined;
+
+        const annotationEntries = Object.entries(row.annotations ?? {})
+          .map(([uuid, annotation]) => ({ uuid, annotation }))
+          .filter(
+            (e) =>
+              e.annotation &&
+              e.annotation.value !== null &&
+              e.annotation.value !== undefined,
+          );
+
+        const selection = selectionByKey[rowKey] ?? "evaluator";
+        const selectedAnnotation =
+          selection !== "evaluator"
+            ? (annotationEntries.find((e) => e.uuid === selection)?.annotation ??
+              null)
+            : null;
+        const showHuman = !!selectedAnnotation;
+
+        let displayMatch: boolean | null = null;
+        let displayScore: number | null = null;
+        let displayReasoning: string | null = null;
+        if (showHuman && selectedAnnotation) {
+          const v = selectedAnnotation.value;
+          if (row.output_type === "binary" && typeof v === "boolean") {
+            displayMatch = v;
+          } else if (row.output_type === "rating" && typeof v === "number") {
+            displayScore = v;
+          }
+          if (
+            typeof selectedAnnotation.reasoning === "string" &&
+            selectedAnnotation.reasoning.trim().length > 0
+          ) {
+            displayReasoning = selectedAnnotation.reasoning;
+          }
+        } else {
+          const v = row.evaluator_value;
+          if (row.output_type === "binary" && typeof v === "boolean") {
+            displayMatch = v;
+          } else if (row.output_type === "rating" && typeof v === "number") {
+            displayScore = v;
+          }
+          if (
+            typeof row.evaluator_reasoning === "string" &&
+            row.evaluator_reasoning.trim().length > 0
+          ) {
+            displayReasoning = row.evaluator_reasoning;
+          }
+        }
+
+        const annotatorById = annotatorNamesById;
+
+        return (
+          <div key={rowKey} className="space-y-2">
+            {annotationEntries.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectionByKey((p) => ({ ...p, [rowKey]: "evaluator" }))
+                  }
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
+                    selection === "evaluator"
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30"
+                  }`}
+                >
+                  Evaluator
+                </button>
+                {annotationEntries.map(({ uuid, annotation }) => {
+                  const tone = annotatorPillTone(
+                    annotation?.value ?? null,
+                    row.evaluator_value,
+                  );
+                  const isSelected = selection === uuid;
+                  const labelToneClass =
+                    !isSelected && tone === "aligned"
+                      ? "text-green-700 dark:text-green-400"
+                      : !isSelected && tone === "misaligned"
+                        ? "text-red-700 dark:text-red-400"
+                        : "";
+                  const name = annotatorById.get(uuid) ?? uuid.slice(0, 8);
+                  return (
+                    <button
+                      key={uuid}
+                      type="button"
+                      onClick={() =>
+                        setSelectionByKey((p) => ({ ...p, [rowKey]: uuid }))
+                      }
+                      className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
+                        isSelected
+                          ? "border-foreground bg-foreground text-background"
+                          : "border-border bg-muted/40 hover:bg-muted hover:border-foreground/30"
+                      }`}
+                    >
+                      <span
+                        className={`truncate max-w-[160px] ${labelToneClass}`}
+                      >
+                        {name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <EvaluatorVerdictCard
+              mode="read"
+              name={row.evaluator_name}
+              description={meta?.description ?? null}
+              versionLabel={versionLabel}
+              outputType={row.output_type}
+              evaluatorUuid={row.evaluator_id}
+              enableLink
+              match={displayMatch}
+              score={displayScore}
+              scaleMin={scaleMin}
+              scaleMax={scaleMax}
+              reasoning={displayReasoning}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -982,48 +1051,21 @@ function LabellingTaskPageInner() {
   const [taskSummary, setTaskSummary] = useState<TaskSummaryResponse | null>(
     null,
   );
-  // setter is kept; the boolean is no longer rendered (the agreement
-  // spinner above stands in for both fetches), but we still flip it so
-  // future code can subscribe if needed.
-  const [, setTaskSummaryLoading] = useState(false);
-  const [taskSummaryError, setTaskSummaryError] = useState<string | null>(null);
-  const [summaryEvaluatorFilter, setSummaryEvaluatorFilter] = useState<
-    PickerItem[]
-  >([]);
-  // sortColKey: "evaluator" for the evaluator-value column, or an annotator
-  // uuid for that annotator's column. null → keep API order.
-  const [summarySortColKey, setSummarySortColKey] = useState<string | null>(
-    null,
-  );
-  const [summarySortDir, setSummarySortDir] = useState<"asc" | "desc">("desc");
-  // Toggle next to the evaluator filter that constrains the summary table
-  // to each evaluator's live version. Sent as ?live_only=true on the
-  // /summary endpoint when checked.
-  const [summaryLiveOnly, setSummaryLiveOnly] = useState(true);
+  const [, setTaskSummaryError] = useState<string | null>(null);
 
   const fetchTaskSummary = useCallback(async () => {
     if (!accessToken || !uuid) return;
-    setTaskSummaryLoading(true);
     setTaskSummaryError(null);
     try {
-      // `live_only` only constrains the *overview* table; the items tab
-      // uses the same summary to decide which rows can show results, and
-      // there it should reflect every version — otherwise toggling the
-      // overview filter would also disable "View results" buttons on the
-      // items tab.
-      const useLiveOnly = activeTab === "overview" && summaryLiveOnly;
-      const qs = useLiveOnly ? "?live_only=true" : "";
       const data = await apiClient<TaskSummaryResponse>(
-        `/annotation-tasks/${uuid}/summary${qs}`,
+        `/annotation-tasks/${uuid}/summary`,
         accessToken,
       );
       setTaskSummary(data);
     } catch (err) {
       setTaskSummaryError(parseApiError(err, "Failed to load task summary"));
-    } finally {
-      setTaskSummaryLoading(false);
     }
-  }, [accessToken, uuid, activeTab, summaryLiveOnly]);
+  }, [accessToken, uuid]);
 
   useEffect(() => {
     if (activeTab === "overview" || activeTab === "items") fetchTaskSummary();
@@ -1076,6 +1118,28 @@ function LabellingTaskPageInner() {
       if (summaryRowHasAnyValue(row)) set.add(row.item_id);
     }
     return set;
+  }, [taskSummary]);
+
+  // Map item_id -> annotator uuids who have at least one labelled annotation
+  // for that item. Drives the "Labelled by" column on the items tab.
+  const labellersByItem = useMemo(() => {
+    const out = new Map<string, Set<string>>();
+    if (!taskSummary) return out;
+    for (const row of taskSummary.rows) {
+      for (const [annotatorUuid, ann] of Object.entries(row.annotations ?? {})) {
+        if (ann && ann.value !== null && ann.value !== undefined) {
+          if (!out.has(row.item_id)) out.set(row.item_id, new Set());
+          out.get(row.item_id)!.add(annotatorUuid);
+        }
+      }
+    }
+    return out;
+  }, [taskSummary]);
+
+  const annotatorNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const a of taskSummary?.annotators ?? []) map.set(a.uuid, a.name);
+    return map;
   }, [taskSummary]);
   // Map evaluator_id -> { version_id: "v1" }, populated on demand from
   // /evaluators/{uuid}/versions so we can label runs by version number.
@@ -1628,100 +1692,18 @@ function LabellingTaskPageInner() {
         </p>
       );
     }
-    const annotators = summary.annotators ?? [];
-    const evalColTpl = "minmax(180px,1fr) 170px 170px 140px";
-    const annotatorColTpl =
-      annotators.length > 0 ? annotators.map(() => "120px").join(" ") : "";
-    const gridTemplate = [evalColTpl, annotatorColTpl]
-      .filter(Boolean)
-      .join(" ");
+    const evaluatorMeta = new Map(
+      (task?.evaluators ?? []).map((e) => [e.uuid, e]),
+    );
+    const annotatorNamesById = new Map(
+      (summary.annotators ?? []).map((a) => [a.uuid, a.name]),
+    );
     return (
-      <div className="border border-border rounded-xl overflow-hidden bg-background">
-        <div
-          className="grid gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center min-w-fit"
-          style={{ gridTemplateColumns: gridTemplate }}
-        >
-          <div className="text-sm font-medium text-muted-foreground">
-            Evaluator
-          </div>
-          <div className="text-sm font-medium text-muted-foreground whitespace-nowrap">
-            Annotator agreement
-          </div>
-          <div className="text-sm font-medium text-muted-foreground whitespace-nowrap">
-            Evaluator agreement
-          </div>
-          <div className="text-sm font-medium text-muted-foreground">
-            Evaluator value
-          </div>
-          {annotators.map((a) => (
-            <div
-              key={a.uuid}
-              className="text-sm font-medium text-muted-foreground truncate"
-              title={a.name}
-            >
-              {a.name}
-            </div>
-          ))}
-        </div>
-        {visibleRows.map((row, idx) => {
-          const versionLabel =
-            typeof row.evaluator_version_number === "number"
-              ? `v${row.evaluator_version_number}`
-              : null;
-          return (
-            <div
-              key={`${row.evaluator_id}-${row.evaluator_version_id ?? ""}-${idx}`}
-              className="grid gap-4 px-4 py-3 border-b border-border last:border-b-0 items-center min-w-fit"
-              style={{ gridTemplateColumns: gridTemplate }}
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <Link
-                  href={`/evaluators/${row.evaluator_id}`}
-                  title={`Open ${row.evaluator_name}`}
-                  className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate max-w-full"
-                >
-                  <span className="truncate">{row.evaluator_name}</span>
-                </Link>
-                {versionLabel && (
-                  <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground flex-shrink-0">
-                    {versionLabel}
-                  </span>
-                )}
-              </div>
-              <div
-                className={`text-sm font-semibold tabular-nums ${agreementColor(row.human_agreement)}`}
-              >
-                {row.human_agreement != null
-                  ? `${Math.round(row.human_agreement * 100)}%`
-                  : "—"}
-              </div>
-              <div
-                className={`text-sm font-semibold tabular-nums ${agreementColor(row.evaluator_agreement)}`}
-              >
-                {row.evaluator_agreement != null
-                  ? `${Math.round(row.evaluator_agreement * 100)}%`
-                  : "—"}
-              </div>
-              <div
-                className={`text-sm font-medium tabular-nums ${verdictTextClass(row.evaluator_value)}`}
-              >
-                {formatVerdictValue(row.evaluator_value)}
-              </div>
-              {annotators.map((a) => {
-                const v = row.annotations?.[a.uuid] ?? null;
-                return (
-                  <div
-                    key={a.uuid}
-                    className={`text-sm font-medium tabular-nums ${verdictTextClass(v?.value ?? null)}`}
-                  >
-                    {formatVerdictValue(v?.value ?? null)}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
+      <ItemResultsCards
+        rows={visibleRows}
+        evaluatorMeta={evaluatorMeta}
+        annotatorNamesById={annotatorNamesById}
+      />
     );
   };
 
@@ -2123,7 +2105,7 @@ function LabellingTaskPageInner() {
                     closely each evaluator aligns with humans
                   </p>
                 </div>
-                <div className="flex items-stretch gap-3 overflow-x-auto pb-1">
+                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   <AgreementStatCard
                     staticPillText="Annotator agreement"
                     value={
@@ -2154,336 +2136,6 @@ function LabellingTaskPageInner() {
               </div>
             )}
 
-            {/* Per-item × per-evaluator summary table */}
-            {taskSummaryError && (
-              <div className="rounded-md border border-border bg-muted/20 p-4 text-sm text-red-500">
-                {taskSummaryError}
-              </div>
-            )}
-            {!taskSummary
-              ? null
-              : (() => {
-                  const annotators = taskSummary.annotators ?? [];
-                  const evaluators = taskSummary.evaluators ?? [];
-                  const itemColumns = [{ key: "name", label: "Name" }];
-                  const itemColTpl = "200px";
-                  const longestEvalName =
-                    evaluators.length > 0
-                      ? Math.max(...evaluators.map((e) => e.name.length))
-                      : 0;
-                  const evalNameColPx = Math.max(
-                    120,
-                    Math.ceil(longestEvalName * 6.5 + 60),
-                  );
-                  const evalColTpl = `${evalNameColPx}px 170px 170px 140px`;
-                  const annotatorColTpl =
-                    annotators.length > 0
-                      ? annotators.map(() => "120px").join(" ")
-                      : "";
-                  const gridTemplate = [itemColTpl, evalColTpl, annotatorColTpl]
-                    .filter(Boolean)
-                    .join(" ");
-
-                  const itemCellValues = (
-                    payload: Record<string, unknown> | null,
-                  ): string[] => {
-                    const p = payload ?? {};
-                    const name =
-                      typeof p.name === "string" ? (p.name as string) : "";
-                    return [name || "—"];
-                  };
-
-                  // Filter rows by selected evaluator, then sort by the
-                  // active value column. Null verdicts always sink to the
-                  // bottom regardless of asc/desc; booleans sort false<true.
-                  const selectedEvaluatorIds = new Set(
-                    summaryEvaluatorFilter.map((i) => i.uuid),
-                  );
-                  // Skip rows where everything is null — no evaluator run, no
-                  // agreement signal, and no annotator has labelled yet.
-                  const baseRows = taskSummary.rows.filter(
-                    summaryRowHasAnyValue,
-                  );
-                  if (baseRows.length === 0) return null;
-                  const filteredRows =
-                    selectedEvaluatorIds.size === 0
-                      ? baseRows
-                      : baseRows.filter((r) =>
-                          selectedEvaluatorIds.has(r.evaluator_id),
-                        );
-
-                  const valueRank = (
-                    v: boolean | number | null | undefined,
-                  ): number | null => {
-                    if (v === null || v === undefined) return null;
-                    if (typeof v === "boolean") return v ? 1 : 0;
-                    if (typeof v === "number") return v;
-                    return null;
-                  };
-                  const cellValueForSort = (
-                    row: SummaryRow,
-                  ): boolean | number | null => {
-                    if (!summarySortColKey) return null;
-                    if (summarySortColKey === "evaluator")
-                      return row.evaluator_value;
-                    if (summarySortColKey === "human_agreement")
-                      return row.human_agreement;
-                    if (summarySortColKey === "evaluator_agreement")
-                      return row.evaluator_agreement;
-                    return row.annotations?.[summarySortColKey]?.value ?? null;
-                  };
-                  const sortedRows = summarySortColKey
-                    ? [...filteredRows].sort((a, b) => {
-                        const av = valueRank(cellValueForSort(a));
-                        const bv = valueRank(cellValueForSort(b));
-                        if (av === null && bv === null) return 0;
-                        if (av === null) return 1; // nulls last
-                        if (bv === null) return -1;
-                        const dir = summarySortDir === "desc" ? -1 : 1;
-                        return av === bv ? 0 : av < bv ? -1 * dir : 1 * dir;
-                      })
-                    : filteredRows;
-
-                  const onSortClick = (key: string) => {
-                    if (summarySortColKey === key) {
-                      setSummarySortDir((d) => (d === "desc" ? "asc" : "desc"));
-                    } else {
-                      setSummarySortColKey(key);
-                      setSummarySortDir("desc");
-                    }
-                  };
-
-                  const sortIndicator = (key: string) => {
-                    if (summarySortColKey !== key) {
-                      return (
-                        <svg
-                          className="w-3 h-3 opacity-40"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M8.25 15L12 18.75 15.75 15M8.25 9L12 5.25 15.75 9"
-                          />
-                        </svg>
-                      );
-                    }
-                    return (
-                      <svg
-                        className="w-3 h-3"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d={
-                            summarySortDir === "desc"
-                              ? "M19.5 8.25l-7.5 7.5-7.5-7.5"
-                              : "M4.5 15.75l7.5-7.5 7.5 7.5"
-                          }
-                        />
-                      </svg>
-                    );
-                  };
-
-                  return (
-                    <>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <div className="w-64">
-                          <MultiSelectPicker
-                            items={evaluators.map((ev) => ({
-                              uuid: ev.evaluator_id,
-                              name: ev.name,
-                            }))}
-                            selectedItems={summaryEvaluatorFilter}
-                            onSelectionChange={setSummaryEvaluatorFilter}
-                            placeholder="All evaluators"
-                            searchPlaceholder="Search evaluators"
-                          />
-                        </div>
-                        <Tooltip content="Show results for only the live versions of each evaluator. Toggle to see the results for all versions.">
-                          <button
-                            type="button"
-                            onClick={() => setSummaryLiveOnly((v) => !v)}
-                            aria-pressed={summaryLiveOnly}
-                            className={`h-9 px-3 inline-flex items-center gap-1.5 rounded-md text-sm font-medium border transition-colors cursor-pointer ${
-                              summaryLiveOnly
-                                ? "bg-foreground text-background border-foreground"
-                                : "bg-transparent text-muted-foreground border-border hover:border-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            {summaryLiveOnly ? (
-                              <svg
-                                className="w-3.5 h-3.5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2.5}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M4.5 12.75l6 6 9-13.5"
-                                />
-                              </svg>
-                            ) : (
-                              <span
-                                className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground"
-                                aria-hidden
-                              />
-                            )}
-                            Live versions only
-                          </button>
-                        </Tooltip>
-                      </div>
-                      <div className="border border-border rounded-xl overflow-x-auto">
-                        <div
-                          className="grid gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center min-w-fit"
-                          style={{ gridTemplateColumns: gridTemplate }}
-                        >
-                          {itemColumns.map((c) => (
-                            <div
-                              key={c.key}
-                              className="text-sm font-medium text-muted-foreground truncate"
-                            >
-                              {c.label}
-                            </div>
-                          ))}
-                          <div className="text-sm font-medium text-muted-foreground">
-                            Evaluator
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => onSortClick("human_agreement")}
-                            className={`flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer w-fit whitespace-nowrap ${
-                              summarySortColKey === "human_agreement"
-                                ? "text-foreground"
-                                : "text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            Annotator agreement
-                            {sortIndicator("human_agreement")}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onSortClick("evaluator_agreement")}
-                            className={`flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer w-fit whitespace-nowrap ${
-                              summarySortColKey === "evaluator_agreement"
-                                ? "text-foreground"
-                                : "text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            Evaluator agreement
-                            {sortIndicator("evaluator_agreement")}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onSortClick("evaluator")}
-                            className={`flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer w-fit ${
-                              summarySortColKey === "evaluator"
-                                ? "text-foreground"
-                                : "text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            Evaluator value
-                            {sortIndicator("evaluator")}
-                          </button>
-                          {annotators.map((a) => (
-                            <button
-                              key={a.uuid}
-                              type="button"
-                              onClick={() => onSortClick(a.uuid)}
-                              title={a.name}
-                              className={`flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer w-fit truncate ${
-                                summarySortColKey === a.uuid
-                                  ? "text-foreground"
-                                  : "text-muted-foreground hover:text-foreground"
-                              }`}
-                            >
-                              <span className="truncate">{a.name}</span>
-                              {sortIndicator(a.uuid)}
-                            </button>
-                          ))}
-                        </div>
-                        {sortedRows.map((row, idx) => {
-                          const cells = itemCellValues(row.payload);
-                          const versionLabel =
-                            typeof row.evaluator_version_number === "number"
-                              ? `v${row.evaluator_version_number}`
-                              : null;
-                          return (
-                            <div
-                              key={`${row.item_id}-${row.evaluator_id}-${row.evaluator_version_id ?? ""}-${idx}`}
-                              className="grid gap-4 px-4 py-3 border-b border-border last:border-b-0 items-center min-w-fit"
-                              style={{ gridTemplateColumns: gridTemplate }}
-                            >
-                              {cells.map((c, i) => (
-                                <p
-                                  key={`item-${i}`}
-                                  className="text-sm text-foreground line-clamp-2"
-                                >
-                                  {c}
-                                </p>
-                              ))}
-                              <div className="flex items-center gap-2 min-w-0">
-                                <Link
-                                  href={`/evaluators/${row.evaluator_id}`}
-                                  title={`Open ${row.evaluator_name}`}
-                                  className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate max-w-full"
-                                >
-                                  <span className="truncate">
-                                    {row.evaluator_name}
-                                  </span>
-                                </Link>
-                                {versionLabel && (
-                                  <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground flex-shrink-0">
-                                    {versionLabel}
-                                  </span>
-                                )}
-                              </div>
-                              <div
-                                className={`text-sm font-semibold tabular-nums ${agreementColor(row.human_agreement)}`}
-                              >
-                                {row.human_agreement != null
-                                  ? `${Math.round(row.human_agreement * 100)}%`
-                                  : "—"}
-                              </div>
-                              <div
-                                className={`text-sm font-semibold tabular-nums ${agreementColor(row.evaluator_agreement)}`}
-                              >
-                                {row.evaluator_agreement != null
-                                  ? `${Math.round(row.evaluator_agreement * 100)}%`
-                                  : "—"}
-                              </div>
-                              <div
-                                className={`text-sm font-medium tabular-nums ${verdictTextClass(row.evaluator_value)}`}
-                              >
-                                {formatVerdictValue(row.evaluator_value)}
-                              </div>
-                              {annotators.map((a) => {
-                                const v = row.annotations?.[a.uuid] ?? null;
-                                return (
-                                  <div
-                                    key={a.uuid}
-                                    className={`text-sm font-medium tabular-nums ${verdictTextClass(v?.value ?? null)}`}
-                                  >
-                                    {formatVerdictValue(v?.value ?? null)}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  );
-                })()}
           </div>
         )}
 
@@ -2607,7 +2259,7 @@ function LabellingTaskPageInner() {
 
               {taskType === "stt" ? (
                 <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_440px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
+                  <div className="grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_180px_360px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
                     <input
                       type="checkbox"
                       checked={allSelected}
@@ -2627,6 +2279,9 @@ function LabellingTaskPageInner() {
                     <div className="text-sm font-medium text-muted-foreground">
                       Predicted transcript
                     </div>
+                    <div className="text-sm font-medium text-muted-foreground">
+                      Labelled by
+                    </div>
                     <div className="text-sm font-medium text-muted-foreground text-center">
                       Actions
                     </div>
@@ -2644,17 +2299,23 @@ function LabellingTaskPageInner() {
                         : "";
                     const isSelected = selectedItemIds.has(item.uuid);
                     const isResultsOpen = expandedResultsItemId === item.uuid;
+                    const hasResults = itemsWithResults.has(item.uuid);
+                    const labellerIds = labellersByItem.get(item.uuid);
                     return (
                       <Fragment key={item.uuid}>
                         <div
-                          className={`grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_440px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center ${
+                          onClick={() => {
+                            if (hasResults) toggleItemResults(item.uuid);
+                          }}
+                          className={`grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_180px_360px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center ${
                             isSelected ? "bg-muted/30" : "hover:bg-muted/20"
-                          }`}
+                          } ${hasResults ? "cursor-pointer" : ""}`}
                         >
                           <input
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => toggleItem(item.uuid)}
+                            onClick={(e) => e.stopPropagation()}
                             aria-label={`Select item ${item.id}`}
                             className="w-4 h-4 cursor-pointer accent-foreground"
                           />
@@ -2667,10 +2328,26 @@ function LabellingTaskPageInner() {
                           <p className="text-sm text-foreground line-clamp-2">
                             {pred || "—"}
                           </p>
+                          <div className="flex flex-wrap gap-1 min-w-0">
+                            {!labellerIds || labellerIds.size === 0 ? (
+                              <span className="text-sm text-muted-foreground">
+                                —
+                              </span>
+                            ) : (
+                              Array.from(labellerIds).map((annId) => (
+                                <span
+                                  key={annId}
+                                  className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground"
+                                >
+                                  {annotatorNameById.get(annId) ??
+                                    annId.slice(0, 8)}
+                                </span>
+                              ))
+                            )}
+                          </div>
                           <ItemRowActions
                             itemUuid={item.uuid}
                             onDelete={requestDeleteOneItem}
-                            onViewResults={toggleItemResults}
                             onLabel={
                               selectedItemIds.size === 0
                                 ? (uuid) => {
@@ -2702,10 +2379,6 @@ function LabellingTaskPageInner() {
                                   }
                                 : undefined
                             }
-                            isResultsOpen={isResultsOpen}
-                            viewResultsDisabled={
-                              !!taskSummary && !itemsWithResults.has(item.uuid)
-                            }
                           />
                         </div>
                         {isResultsOpen && (
@@ -2719,7 +2392,7 @@ function LabellingTaskPageInner() {
                 </div>
               ) : (
                 <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_440px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
+                  <div className="grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_180px_360px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
                     <input
                       type="checkbox"
                       checked={allSelected}
@@ -2736,6 +2409,9 @@ function LabellingTaskPageInner() {
                     <div className="text-sm font-medium text-muted-foreground">
                       Description
                     </div>
+                    <div className="text-sm font-medium text-muted-foreground">
+                      Labelled by
+                    </div>
                     <div className="text-sm font-medium text-muted-foreground text-center">
                       Actions
                     </div>
@@ -2743,6 +2419,8 @@ function LabellingTaskPageInner() {
                   {items.map((item) => {
                     const isSelected = selectedItemIds.has(item.uuid);
                     const isResultsOpen = expandedResultsItemId === item.uuid;
+                    const hasResults = itemsWithResults.has(item.uuid);
+                    const labellerIds = labellersByItem.get(item.uuid);
                     const itemPayloadObj =
                       item.payload && typeof item.payload === "object"
                         ? (item.payload as Record<string, unknown>)
@@ -2755,10 +2433,12 @@ function LabellingTaskPageInner() {
                     return (
                       <Fragment key={item.uuid}>
                         <div
-                          onClick={() => setEditLlmItemUuid(item.uuid)}
-                          className={`grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_440px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
+                          onClick={() => {
+                            if (hasResults) toggleItemResults(item.uuid);
+                          }}
+                          className={`grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_180px_360px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center ${
                             isSelected ? "bg-muted/30" : "hover:bg-muted/20"
-                          }`}
+                          } ${hasResults ? "cursor-pointer" : ""}`}
                         >
                           <input
                             type="checkbox"
@@ -2781,10 +2461,26 @@ function LabellingTaskPageInner() {
                               </span>
                             )}
                           </p>
+                          <div className="flex flex-wrap gap-1 min-w-0">
+                            {!labellerIds || labellerIds.size === 0 ? (
+                              <span className="text-sm text-muted-foreground">
+                                —
+                              </span>
+                            ) : (
+                              Array.from(labellerIds).map((annId) => (
+                                <span
+                                  key={annId}
+                                  className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground"
+                                >
+                                  {annotatorNameById.get(annId) ??
+                                    annId.slice(0, 8)}
+                                </span>
+                              ))
+                            )}
+                          </div>
                           <ItemRowActions
                             itemUuid={item.uuid}
                             onDelete={requestDeleteOneItem}
-                            onViewResults={toggleItemResults}
                             onLabel={
                               selectedItemIds.size === 0
                                 ? (uuid) => {
@@ -2812,10 +2508,6 @@ function LabellingTaskPageInner() {
                                     }
                                   }
                                 : undefined
-                            }
-                            isResultsOpen={isResultsOpen}
-                            viewResultsDisabled={
-                              !!taskSummary && !itemsWithResults.has(item.uuid)
                             }
                           />
                         </div>
