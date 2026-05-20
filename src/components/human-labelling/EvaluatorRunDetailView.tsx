@@ -891,27 +891,19 @@ export function EvaluatorResultsPane({
     return (
       <div className="space-y-4">
         {descriptionBlock}
-        {order.map((id) => {
-          const group = byEvaluator.get(id)!;
-          return (
-            <div
-              key={id}
-              className="grid gap-3"
-              style={{
-                gridTemplateColumns: `repeat(${group.length}, minmax(0, 1fr))`,
-              }}
-            >
-              {group.map((ev) => (
-                <div
-                  key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
-                  className="min-w-0"
-                >
-                  {renderEvaluatorCard(ev)}
-                </div>
-              ))}
-            </div>
-          );
-        })}
+        {order.map((id) => (
+          <GroupedEvaluatorCard
+            key={id}
+            evaluators={byEvaluator.get(id)!}
+            runs={runs}
+            versionLabels={versionLabels}
+            evaluatorNamesById={evaluatorNamesById}
+            humanAgreementForItem={humanAgreementForItem}
+            evaluatorVariablesByEvaluatorId={evaluatorVariablesByEvaluatorId}
+            jobStatus={jobStatus}
+            linkEvaluators={linkEvaluators}
+          />
+        ))}
       </div>
     );
   }
@@ -920,6 +912,183 @@ export function EvaluatorResultsPane({
     <div className="space-y-4">
       {descriptionBlock}
       {visibleEvaluators.map((ev) => renderEvaluatorCard(ev))}
+    </div>
+  );
+}
+
+/**
+ * Single card that lets the user toggle between every version of the same
+ * evaluator AND each annotator. The version pills sit alongside the
+ * annotator pills above one shared verdict card. Used when the modal /
+ * task per-item view wants to surface multiple evaluator versions without
+ * duplicating the card.
+ */
+function GroupedEvaluatorCard({
+  evaluators,
+  runs,
+  versionLabels,
+  evaluatorNamesById,
+  humanAgreementForItem,
+  evaluatorVariablesByEvaluatorId,
+  jobStatus,
+  linkEvaluators,
+}: {
+  evaluators: {
+    evaluator_id: string;
+    evaluator_version_id?: string;
+    name?: string;
+  }[];
+  runs: EvaluatorRunRow[];
+  versionLabels: Record<string, string>;
+  evaluatorNamesById: Record<string, string>;
+  humanAgreementForItem: HumanAgreementItem | null;
+  evaluatorVariablesByEvaluatorId: Record<string, Record<string, string>>;
+  jobStatus: EvaluatorRunJob["status"];
+  linkEvaluators: boolean;
+}) {
+  const evaluatorId = evaluators[0]?.evaluator_id ?? "";
+
+  // Per-version run + label data.
+  const versions = evaluators.map((ev) => {
+    const r =
+      runs.find(
+        (x) =>
+          x.evaluator_id === ev.evaluator_id &&
+          (!ev.evaluator_version_id ||
+            x.evaluator_version_id === ev.evaluator_version_id),
+      ) ?? null;
+    const versionLabel = ev.evaluator_version_id
+      ? (versionLabels[ev.evaluator_version_id] ?? null)
+      : null;
+    const v = r?.value?.value;
+    const hasValue = v !== null && v !== undefined;
+    return { ev, r, versionLabel, hasValue };
+  });
+
+  const humansForEvaluator =
+    humanAgreementForItem?.evaluators.find(
+      (e) => e.evaluator_id === evaluatorId,
+    ) ?? null;
+  const annotations =
+    jobStatus === "completed"
+      ? (humansForEvaluator?.human_annotations ?? [])
+      : [];
+
+  const outputType: "binary" | "rating" =
+    versions.find((x) => x.r?.evaluator?.output_type === "rating")
+      ? "rating"
+      : "binary";
+
+  // Selection token: "v:<version_id>" or "a:<annotator_id>". Default to
+  // the first version with a value, then any version, then first annotator.
+  const firstVersionWithValue = versions.find((x) => x.hasValue) ?? versions[0];
+  const defaultSelection = firstVersionWithValue?.hasValue
+    ? `v:${firstVersionWithValue.ev.evaluator_version_id ?? ""}`
+    : annotations[0]
+      ? `a:${annotations[0].annotator_id}`
+      : `v:${versions[0]?.ev.evaluator_version_id ?? ""}`;
+
+  const [selection, setSelection] = useState<string>(defaultSelection);
+
+  const selectedVersion = selection.startsWith("v:")
+    ? versions.find(
+        (x) => `v:${x.ev.evaluator_version_id ?? ""}` === selection,
+      ) ?? null
+    : null;
+  const selectedAnnotation = selection.startsWith("a:")
+    ? annotations.find((a) => `a:${a.annotator_id}` === selection) ?? null
+    : null;
+
+  // The card's "anchor" run (for description, scale, output_type lookup) is
+  // either the selected version or the first version that has run data.
+  const anchorRun =
+    selectedVersion?.r ?? versions.find((x) => x.r)?.r ?? null;
+  const evaluatorName = evaluatorDisplayName(
+    evaluators[0],
+    evaluatorNamesById,
+    anchorRun,
+  );
+  const scaleMin =
+    typeof anchorRun?.evaluator_version?.scale_min === "number"
+      ? anchorRun.evaluator_version.scale_min
+      : undefined;
+  const scaleMax =
+    typeof anchorRun?.evaluator_version?.scale_max === "number"
+      ? anchorRun.evaluator_version.scale_max
+      : undefined;
+
+  let displayMatch: boolean | null = null;
+  let displayScore: number | null = null;
+  let displayReasoning: string | null = null;
+  if (selectedAnnotation) {
+    const v = selectedAnnotation.value?.value;
+    if (outputType === "binary" && typeof v === "boolean") displayMatch = v;
+    else if (outputType === "rating" && typeof v === "number") displayScore = v;
+    const topLevelReasoning =
+      typeof selectedAnnotation.reasoning === "string"
+        ? selectedAnnotation.reasoning
+        : null;
+    const nestedReasoning =
+      typeof selectedAnnotation.value?.reasoning === "string"
+        ? (selectedAnnotation.value.reasoning as string)
+        : null;
+    const raw = topLevelReasoning ?? nestedReasoning;
+    displayReasoning = raw && raw.trim().length > 0 ? raw : null;
+  } else if (selectedVersion?.r) {
+    const v = selectedVersion.r.value?.value;
+    if (outputType === "binary" && typeof v === "boolean") displayMatch = v;
+    else if (outputType === "rating" && typeof v === "number") displayScore = v;
+    const raw =
+      typeof selectedVersion.r.value?.reasoning === "string"
+        ? (selectedVersion.r.value.reasoning as string)
+        : null;
+    displayReasoning = raw && raw.trim().length > 0 ? raw : null;
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {versions.map((x) => {
+          if (!x.hasValue) return null;
+          const token = `v:${x.ev.evaluator_version_id ?? ""}`;
+          return (
+            <SourcePill
+              key={token}
+              selected={selection === token}
+              onClick={() => setSelection(token)}
+              primaryLabel="Evaluator"
+              monoSuffix={x.versionLabel}
+            />
+          );
+        })}
+        {annotations.map((a) => {
+          const token = `a:${a.annotator_id}`;
+          return (
+            <SourcePill
+              key={token}
+              primaryLabel={annotatorDisplayName(a)}
+              selected={selection === token}
+              onClick={() => setSelection(token)}
+            />
+          );
+        })}
+      </div>
+      <EvaluatorVerdictCard
+        mode="read"
+        name={evaluatorName}
+        description={anchorRun?.evaluator?.description ?? null}
+        outputType={outputType}
+        evaluatorUuid={evaluatorId}
+        enableLink={linkEvaluators}
+        variableValues={
+          evaluatorVariablesByEvaluatorId[evaluatorId] ?? null
+        }
+        match={displayMatch}
+        score={displayScore}
+        scaleMin={scaleMin}
+        scaleMax={scaleMax}
+        reasoning={displayReasoning}
+      />
     </div>
   );
 }
