@@ -212,17 +212,11 @@ export function CreateLabellingTaskDialog({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={() => {
-        if (!submitting) onClose();
-      }}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div
         className={`bg-background border border-border rounded-xl w-full ${
           taskType ? "max-w-6xl" : "max-w-2xl"
         } shadow-2xl flex flex-col max-h-[90vh] transition-all`}
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 px-5 md:px-6 py-4 border-b border-border">
           <div>
