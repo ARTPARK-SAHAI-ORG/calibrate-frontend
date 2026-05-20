@@ -648,7 +648,11 @@ export function EvaluatorResultsPane({
 
         let match: boolean | null = null;
         let score: number | null = null;
-        let outputType: "binary" | "rating" = "binary";
+        // Prefer the evaluator's declared output type so annotations still
+        // render with the right pill when the evaluator itself produced no
+        // value yet (e.g. items labelled by humans before a run).
+        let outputType: "binary" | "rating" =
+          r?.evaluator?.output_type === "rating" ? "rating" : "binary";
 
         if (r) {
           const v = r.value?.value;
