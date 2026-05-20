@@ -533,7 +533,7 @@ function SourcePill({
         <span
           className={`font-mono text-[10px] px-1.5 py-0.5 rounded-md border ${
             selected
-              ? "border-background/30 bg-background/15 text-background"
+              ? "border-background/40 bg-background/90 text-foreground"
               : "border-foreground/20 bg-background text-foreground"
           }`}
         >
