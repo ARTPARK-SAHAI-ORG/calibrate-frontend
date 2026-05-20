@@ -578,6 +578,20 @@ function AnnotateView({
               </p>
             </>
           )}
+          {isAdmin && currentItem && (
+            <h1 className="text-base md:text-lg font-semibold truncate">
+              {(() => {
+                const p =
+                  currentItem.payload &&
+                  typeof currentItem.payload === "object"
+                    ? (currentItem.payload as Record<string, unknown>)
+                    : null;
+                const name =
+                  p && typeof p.name === "string" ? p.name.trim() : "";
+                return name || "Item";
+              })()}
+            </h1>
+          )}
         </div>
         <div className="flex items-center justify-center gap-2 flex-wrap">
           <button
