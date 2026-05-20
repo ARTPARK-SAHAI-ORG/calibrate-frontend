@@ -551,6 +551,8 @@ export function EvaluatorResultsPane({
   filterDisagreements,
   linkEvaluators,
   itemDescription,
+  hideAgreementGlyph = false,
+  alwaysShowSourcePills = false,
 }: {
   evaluators: {
     evaluator_id: string;
@@ -566,6 +568,10 @@ export function EvaluatorResultsPane({
   filterDisagreements: boolean;
   linkEvaluators: boolean;
   itemDescription?: string | null;
+  /** Suppress the per-evaluator agreement tick/cross next to the source pills. */
+  hideAgreementGlyph?: boolean;
+  /** Always render the source-pill row even when no human annotations exist. */
+  alwaysShowSourcePills?: boolean;
 }) {
   const [selectionByEvaluator, setSelectionByEvaluator] = useState<
     Record<string, string>
@@ -791,13 +797,15 @@ export function EvaluatorResultsPane({
             key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
             className="space-y-2"
           >
-            {hasHumans && (
+            {(hasHumans || alwaysShowSourcePills) && (
               <div className="flex flex-wrap items-center gap-1.5">
-                <AgreementGlyph
-                  perfect={humansForEvaluator?.agreement === 1}
-                  agreement={humansForEvaluator?.agreement ?? null}
-                  pairCount={humansForEvaluator?.pair_count ?? 0}
-                />
+                {!hideAgreementGlyph && hasHumans && (
+                  <AgreementGlyph
+                    perfect={humansForEvaluator?.agreement === 1}
+                    agreement={humansForEvaluator?.agreement ?? null}
+                    pairCount={humansForEvaluator?.pair_count ?? 0}
+                  />
+                )}
                 <SourcePill
                   selected={selection === "evaluator"}
                   onClick={() => setSelection("evaluator")}
@@ -864,6 +872,8 @@ export function ItemDetailPane({
   evaluatorVariablesByEvaluatorId,
   filterDisagreements = false,
   linkEvaluators = true,
+  hideAgreementGlyph = false,
+  alwaysShowSourcePills = false,
 }: {
   item: Item;
   taskType: LabellingTaskFull["type"];
@@ -880,6 +890,8 @@ export function ItemDetailPane({
   evaluatorVariablesByEvaluatorId: Record<string, Record<string, string>>;
   filterDisagreements?: boolean;
   linkEvaluators?: boolean;
+  hideAgreementGlyph?: boolean;
+  alwaysShowSourcePills?: boolean;
 }) {
   const itemPayload =
     item.payload && typeof item.payload === "object"
@@ -907,6 +919,8 @@ export function ItemDetailPane({
           filterDisagreements={filterDisagreements}
           linkEvaluators={linkEvaluators}
           itemDescription={itemDescription}
+          hideAgreementGlyph={hideAgreementGlyph}
+          alwaysShowSourcePills={alwaysShowSourcePills}
         />
       </div>
     </div>

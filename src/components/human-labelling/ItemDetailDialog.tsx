@@ -341,6 +341,8 @@ export function ItemDetailDialog({
               evaluatorVariablesByEvaluatorId={evaluatorVariables}
               filterDisagreements={false}
               linkEvaluators
+              hideAgreementGlyph
+              alwaysShowSourcePills
             />
           )}
         </div>
