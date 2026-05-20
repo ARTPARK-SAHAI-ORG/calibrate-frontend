@@ -2105,7 +2105,7 @@ function LabellingTaskPageInner() {
                     closely each evaluator aligns with humans
                   </p>
                 </div>
-                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="flex flex-wrap items-stretch gap-3">
                   <AgreementStatCard
                     staticPillText="Annotator agreement"
                     value={
