@@ -7,6 +7,7 @@ import {
   useActiveOrgUuid,
   useOrganizations,
   useOrgMembers,
+  seedOrgsCache,
 } from "@/hooks";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
@@ -217,28 +218,34 @@ function MembersSection({
     if (!memberToRemove) return;
     const wasSelf = memberToRemove.user_id === currentUserId;
     setIsRemoving(true);
-    const ok = await removeMember(memberToRemove.user_id);
-    setIsRemoving(false);
-    if (!ok) {
+    try {
+      await removeMember(memberToRemove.user_id);
+    } catch (err) {
+      setIsRemoving(false);
       // Bring fresh data from server in case state is out of sync.
       refetch();
+      toast.error(
+        parseBackendErrorMessage(
+          err,
+          wasSelf ? "Failed to leave workspace" : "Failed to remove member",
+        ),
+      );
       return;
     }
+    setIsRemoving(false);
     setMemberToRemove(null);
     if (wasSelf) {
-      // User just left the workspace they were viewing. We need to:
-      //   1. Pick a new active workspace from the workspaces they still
-      //      belong to (the bootstrapper only runs once at app load, so it
-      //      won't auto-recover here).
-      //   2. Tell every mounted useOrganizations to refetch so the sidebar
-      //      switcher drops the just-left workspace.
-      //   3. Navigate to /agents under the new context.
+      // User just left the workspace they were viewing. Fetch a fresh
+      // /organizations list, pick a new active workspace, seed the module
+      // cache so the next mount on /agents doesn't briefly show the
+      // just-left workspace, then navigate.
       if (accessToken) {
         try {
           const orgs = await apiGet<Organization[]>(
             "/organizations",
             accessToken,
           );
+          seedOrgsCache(orgs, accessToken);
           const chosen = pickDefaultOrg(orgs);
           if (chosen) {
             setActiveOrgUuid(chosen.uuid);

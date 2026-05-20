@@ -49,6 +49,16 @@ export function clearOrgsCache(): void {
 }
 
 /**
+ * Replace the cache with a freshly-fetched list. Useful for paths that
+ * already have the latest data in hand (e.g. self-leave) and want the
+ * next remount to hydrate without showing stale entries.
+ */
+export function seedOrgsCache(orgs: Organization[], accessToken: string): void {
+  cachedOrgs = orgs;
+  cachedForToken = accessToken;
+}
+
+/**
  * List + create + rename workspaces for the current user.
  */
 export function useOrganizations(
@@ -197,7 +207,7 @@ type UseOrgMembersReturn = {
   error: string | null;
   refetch: () => Promise<void>;
   addMember: (email: string) => Promise<OrganizationMember | null>;
-  removeMember: (userId: string) => Promise<boolean>;
+  removeMember: (userId: string) => Promise<void>;
 };
 
 /**
@@ -252,19 +262,15 @@ export function useOrgMembers(
   );
 
   const removeMember = useCallback(
-    async (userId: string): Promise<boolean> => {
-      if (!accessToken || !orgUuid) return false;
-      try {
-        await apiDelete(
-          `/organizations/${orgUuid}/members/${userId}`,
-          accessToken,
-        );
-        setMembers((prev) => prev.filter((m) => m.user_id !== userId));
-        return true;
-      } catch (err) {
-        console.error("Error removing member:", err);
-        return false;
+    async (userId: string): Promise<void> => {
+      if (!accessToken || !orgUuid) {
+        throw new Error("Not signed in");
       }
+      await apiDelete(
+        `/organizations/${orgUuid}/members/${userId}`,
+        accessToken,
+      );
+      setMembers((prev) => prev.filter((m) => m.user_id !== userId));
     },
     [accessToken, orgUuid],
   );
