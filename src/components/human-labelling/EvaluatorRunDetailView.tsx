@@ -558,6 +558,7 @@ export function EvaluatorResultsPane({
   hideAgreementGlyph = false,
   alwaysShowSourcePills = false,
   showVersionInSourcePill = false,
+  groupVersionsByEvaluator = false,
 }: {
   evaluators: {
     evaluator_id: string;
@@ -580,6 +581,8 @@ export function EvaluatorResultsPane({
   /** Move the evaluator version label into the "Evaluator" source pill (as
    *  a mono suffix) and hide it from the card. */
   showVersionInSourcePill?: boolean;
+  /** Render all versions of the same evaluator side-by-side in one row. */
+  groupVersionsByEvaluator?: boolean;
 }) {
   const [selectionByEvaluator, setSelectionByEvaluator] = useState<
     Record<string, string>
@@ -627,10 +630,9 @@ export function EvaluatorResultsPane({
     );
   }
 
-  return (
-    <div className="space-y-4">
-      {descriptionBlock}
-      {visibleEvaluators.map((ev) => {
+  const renderEvaluatorCard = (
+    ev: { evaluator_id: string; evaluator_version_id?: string; name?: string },
+  ) => {
         const versionLabel = ev.evaluator_version_id
           ? versionLabels[ev.evaluator_version_id]
           : null;
@@ -873,7 +875,51 @@ export function EvaluatorResultsPane({
             />
           </div>
         );
-      })}
+  };
+
+  if (groupVersionsByEvaluator) {
+    // Preserve input order of evaluator ids; collect versions per id.
+    const order: string[] = [];
+    const byEvaluator = new Map<string, typeof visibleEvaluators>();
+    for (const ev of visibleEvaluators) {
+      if (!byEvaluator.has(ev.evaluator_id)) {
+        order.push(ev.evaluator_id);
+        byEvaluator.set(ev.evaluator_id, []);
+      }
+      byEvaluator.get(ev.evaluator_id)!.push(ev);
+    }
+    return (
+      <div className="space-y-4">
+        {descriptionBlock}
+        {order.map((id) => {
+          const group = byEvaluator.get(id)!;
+          return (
+            <div
+              key={id}
+              className="grid gap-3"
+              style={{
+                gridTemplateColumns: `repeat(${group.length}, minmax(0, 1fr))`,
+              }}
+            >
+              {group.map((ev) => (
+                <div
+                  key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
+                  className="min-w-0"
+                >
+                  {renderEvaluatorCard(ev)}
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {descriptionBlock}
+      {visibleEvaluators.map((ev) => renderEvaluatorCard(ev))}
     </div>
   );
 }
@@ -900,6 +946,7 @@ export function ItemDetailPane({
   hideAgreementGlyph = false,
   alwaysShowSourcePills = false,
   showVersionInSourcePill = false,
+  groupVersionsByEvaluator = false,
 }: {
   item: Item;
   taskType: LabellingTaskFull["type"];
@@ -919,6 +966,7 @@ export function ItemDetailPane({
   hideAgreementGlyph?: boolean;
   alwaysShowSourcePills?: boolean;
   showVersionInSourcePill?: boolean;
+  groupVersionsByEvaluator?: boolean;
 }) {
   const itemPayload =
     item.payload && typeof item.payload === "object"
@@ -949,6 +997,7 @@ export function ItemDetailPane({
           hideAgreementGlyph={hideAgreementGlyph}
           alwaysShowSourcePills={alwaysShowSourcePills}
           showVersionInSourcePill={showVersionInSourcePill}
+          groupVersionsByEvaluator={groupVersionsByEvaluator}
         />
       </div>
     </div>

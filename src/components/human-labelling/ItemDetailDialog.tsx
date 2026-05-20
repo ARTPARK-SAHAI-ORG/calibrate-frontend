@@ -344,6 +344,7 @@ export function ItemDetailDialog({
               hideAgreementGlyph
               alwaysShowSourcePills
               showVersionInSourcePill
+              groupVersionsByEvaluator
             />
           )}
         </div>
