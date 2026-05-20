@@ -43,7 +43,7 @@ function WorkspaceAvatar({
 
 export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
   const accessToken = useAccessToken();
-  const { organizations, isLoading, refetch, createOrganization } =
+  const { organizations, isLoading, createOrganization } =
     useOrganizations(accessToken);
   const [activeUuid, setActiveUuid] = useActiveOrgUuid();
 
@@ -108,10 +108,11 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
   };
 
   const handleCreate = async (name: string) => {
+    // createOrganization already pushes the new entry into local state and
+    // updates the module cache; no need to refetch /organizations again.
     const created = await createOrganization(name);
     if (created) {
       setActiveUuid(created.uuid);
-      await refetch();
       navigateAfterSwitch();
     }
   };

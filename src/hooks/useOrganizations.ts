@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient, apiDelete, apiGet, apiPost } from "@/lib/api";
 import {
   ACTIVE_ORG_CHANGED_EVENT,
@@ -59,6 +59,41 @@ export function seedOrgsCache(orgs: Organization[], accessToken: string): void {
 }
 
 /**
+ * Shared in-flight fetch promise. When the bootstrapper and the workspace
+ * switcher mount in the same tick, they both want /organizations — without
+ * this, two requests go out in parallel. With it, the second caller awaits
+ * the first caller's promise.
+ */
+let inFlightFetch: Promise<Organization[] | null> | null = null;
+let inFlightToken: string | null = null;
+
+/**
+ * Fetch /organizations through the module-level cache + in-flight dedup.
+ * Returns null on error (logged).
+ */
+export async function fetchOrganizationsDedup(
+  accessToken: string,
+): Promise<Organization[] | null> {
+  if (inFlightFetch && inFlightToken === accessToken) return inFlightFetch;
+  inFlightToken = accessToken;
+  inFlightFetch = (async () => {
+    try {
+      const data = await apiGet<Organization[]>("/organizations", accessToken);
+      cachedOrgs = data;
+      cachedForToken = accessToken;
+      return data;
+    } catch (err) {
+      console.error("Error fetching organizations:", err);
+      return null;
+    } finally {
+      inFlightFetch = null;
+      inFlightToken = null;
+    }
+  })();
+  return inFlightFetch;
+}
+
+/**
  * List + create + rename workspaces for the current user.
  */
 export function useOrganizations(
@@ -73,6 +108,12 @@ export function useOrganizations(
   // Cached hydration skips it; background refetches don't toggle it either.
   const [isLoading, setIsLoading] = useState(!hasCache);
   const [error, setError] = useState<string | null>(null);
+  // Stable per-instance source tag so the mutator can skip the refetch
+  // its own notifyOrganizationsChanged() triggers.
+  const instanceRef = useRef<symbol>(undefined as unknown as symbol);
+  if (instanceRef.current === undefined) {
+    instanceRef.current = Symbol("useOrganizations");
+  }
 
   const refetch = useCallback(async (): Promise<Organization[] | null> => {
     if (!accessToken) {
@@ -83,34 +124,35 @@ export function useOrganizations(
       setIsLoading(false);
       return null;
     }
-    const hadCache =
-      accessToken === cachedForToken && cachedOrgs !== null;
-    try {
-      if (!hadCache) setIsLoading(true);
-      setError(null);
-      const data = await apiGet<Organization[]>("/organizations", accessToken);
-      cachedOrgs = data;
-      cachedForToken = accessToken;
-      setOrganizations(data);
-      return data;
-    } catch (err) {
-      console.error("Error fetching organizations:", err);
-      setError(err instanceof Error ? err.message : "Failed to load workspaces");
-      return null;
-    } finally {
+    setError(null);
+    const data = await fetchOrganizationsDedup(accessToken);
+    if (data === null) {
+      setError("Failed to load workspaces");
       setIsLoading(false);
+      return null;
     }
+    setOrganizations(data);
+    setIsLoading(false);
+    return data;
   }, [accessToken]);
 
+  // Fetch on mount only when we don't already have a fresh cached list for
+  // this token. The bootstrapper fetches once at app start and seeds the
+  // cache; subsequent mounts of useOrganizations (sidebar switcher,
+  // workspace settings) hydrate from cache and skip the duplicate fetch.
   useEffect(() => {
+    if (!accessToken) return;
+    if (accessToken === cachedForToken && cachedOrgs !== null) return;
     refetch();
-  }, [refetch]);
+  }, [refetch, accessToken]);
 
-  // Keep multiple mounted `useOrganizations` instances in sync: when one
-  // mutates a workspace, others refetch so the sidebar switcher reflects
-  // changes made on the settings page (and vice versa).
+  // Cross-instance sync after mutations. The instance that dispatched the
+  // event already applied the change locally + updated the cache, so we
+  // skip refetch when the event came from us.
   useEffect(() => {
-    const handler = () => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ source?: symbol }>).detail;
+      if (detail?.source === instanceRef.current) return;
       refetch();
     };
     window.addEventListener(ORGANIZATIONS_CHANGED_EVENT, handler);
@@ -133,7 +175,7 @@ export function useOrganizations(
           cachedForToken = accessToken;
           return next;
         });
-        notifyOrganizationsChanged();
+        notifyOrganizationsChanged(instanceRef.current);
         return created;
       } catch (err) {
         console.error("Error creating organization:", err);
@@ -158,7 +200,7 @@ export function useOrganizations(
           cachedForToken = accessToken;
           return next;
         });
-        notifyOrganizationsChanged();
+        notifyOrganizationsChanged(instanceRef.current);
         return updated;
       } catch (err) {
         console.error("Error renaming organization:", err);

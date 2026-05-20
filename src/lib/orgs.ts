@@ -18,9 +18,17 @@ export const ACTIVE_ORG_CHANGED_EVENT = "calibrate:active-org-changed";
  */
 export const ORGANIZATIONS_CHANGED_EVENT = "calibrate:organizations-changed";
 
-export function notifyOrganizationsChanged(): void {
+/**
+ * Notify every mounted useOrganizations hook that the workspace list has
+ * changed. Pass the originating hook instance's source token to let the
+ * dispatcher's own listener skip the refetch (the mutator already applied
+ * the change locally and updated the module cache).
+ */
+export function notifyOrganizationsChanged(source?: symbol): void {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(ORGANIZATIONS_CHANGED_EVENT));
+  window.dispatchEvent(
+    new CustomEvent(ORGANIZATIONS_CHANGED_EVENT, { detail: { source } }),
+  );
 }
 
 export type OrganizationRole = "owner" | "admin";

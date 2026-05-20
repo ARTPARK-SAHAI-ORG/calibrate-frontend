@@ -2,9 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import { useAuth } from "@/hooks";
-import { apiGet } from "@/lib/api";
+import { fetchOrganizationsDedup } from "@/hooks/useOrganizations";
 import {
-  type Organization,
   getActiveOrgUuid,
   pickDefaultOrg,
   setActiveOrgUuid,
@@ -37,21 +36,20 @@ export function OrganizationBootstrapper() {
     hasFetchedRef.current = true;
 
     (async () => {
-      try {
-        const orgs = await apiGet<Organization[]>(
-          "/organizations",
-          accessToken,
-        );
-        const chosen = pickDefaultOrg(orgs);
-        if (chosen) {
-          setActiveOrgUuid(chosen.uuid);
-        }
-      } catch (err) {
-        // Non-fatal: the backend falls back to the personal workspace when
-        // the header is missing, so the user keeps working — they just
-        // can't switch workspaces until this succeeds on a later request.
-        console.error("Failed to bootstrap active workspace:", err);
+      // Routed through the shared dedup so a concurrent useOrganizations
+      // mount (e.g. the sidebar switcher) doesn't make a second request
+      // for the same data. fetchOrganizationsDedup also seeds the module
+      // cache on success.
+      const orgs = await fetchOrganizationsDedup(accessToken);
+      if (orgs === null) {
+        // Non-fatal: backend falls back to personal workspace without the
+        // header. The next user action will trigger a retry.
         hasFetchedRef.current = false;
+        return;
+      }
+      const chosen = pickDefaultOrg(orgs);
+      if (chosen) {
+        setActiveOrgUuid(chosen.uuid);
       }
     })();
   }, [accessToken, isAuthenticated]);
