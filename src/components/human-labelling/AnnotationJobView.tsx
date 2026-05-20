@@ -556,7 +556,7 @@ function AnnotateView({
   return (
     <div className={wrapperClass}>
       {!isAdmin && (
-        <div className="px-4 md:px-6 pt-4 md:pt-6 pb-3 shrink-0">
+        <div className="px-4 md:px-6 pt-4 md:pt-6 pb-3 shrink-0 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 min-w-0 flex-wrap">
             <h1 className="text-lg md:text-xl font-semibold truncate">
               {data.task.name}
@@ -580,7 +580,7 @@ function AnnotateView({
               </span>
             )}
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground truncate shrink-0">
             {data.annotator.name}
           </p>
         </div>
