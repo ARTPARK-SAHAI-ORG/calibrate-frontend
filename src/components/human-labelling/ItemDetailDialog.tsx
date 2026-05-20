@@ -76,6 +76,9 @@ export function ItemDetailDialog({
   const [summary, setSummary] = useState<TaskSummaryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Restricts the per-evaluator version pills to each evaluator's live
+  // version. Default on (matches the previous overview filter default).
+  const [liveOnly, setLiveOnly] = useState(true);
 
   const taskUuid = task?.uuid;
   const itemUuid = item?.uuid;
@@ -86,8 +89,9 @@ export function ItemDetailDialog({
     setError(null);
     setSummary(null);
     try {
+      const qs = `?item_id=${encodeURIComponent(itemUuid)}${liveOnly ? "&live_only=true" : ""}`;
       const data = await apiClient<TaskSummaryResponse>(
-        `/annotation-tasks/${taskUuid}/summary?item_id=${encodeURIComponent(itemUuid)}`,
+        `/annotation-tasks/${taskUuid}/summary${qs}`,
         accessToken,
       );
       setSummary(data);
@@ -97,11 +101,16 @@ export function ItemDetailDialog({
     } finally {
       setLoading(false);
     }
-  }, [accessToken, taskUuid, itemUuid]);
+  }, [accessToken, taskUuid, itemUuid, liveOnly]);
 
   useEffect(() => {
     if (isOpen) fetchSummary();
   }, [isOpen, fetchSummary]);
+
+  // Reset toggle when modal closes so it opens fresh next time.
+  useEffect(() => {
+    if (!isOpen) setLiveOnly(true);
+  }, [isOpen]);
 
   // Close on Escape.
   useEffect(() => {
@@ -279,6 +288,40 @@ export function ItemDetailDialog({
               </span>
             )}
           </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setLiveOnly((v) => !v)}
+              aria-pressed={liveOnly}
+              title="Show results for only the live versions of each evaluator. Toggle to see results for all versions."
+              className={`h-8 px-3 inline-flex items-center gap-1.5 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
+                liveOnly
+                  ? "bg-foreground text-background border-foreground"
+                  : "bg-transparent text-muted-foreground border-border hover:border-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {liveOnly ? (
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M4.5 12.75l6 6 9-13.5"
+                  />
+                </svg>
+              ) : (
+                <span
+                  className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground"
+                  aria-hidden
+                />
+              )}
+              Live versions only
+            </button>
           <button
             onClick={onClose}
             aria-label="Close"
@@ -298,6 +341,7 @@ export function ItemDetailDialog({
               />
             </svg>
           </button>
+          </div>
         </div>
 
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
