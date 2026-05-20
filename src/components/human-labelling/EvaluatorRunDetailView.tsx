@@ -531,7 +531,11 @@ function SourcePill({
       </span>
       {monoSuffix && (
         <span
-          className={`font-mono text-[11px] ${selected ? "text-background/70" : "text-muted-foreground"}`}
+          className={`font-mono text-[10px] px-1.5 py-0.5 rounded-md border ${
+            selected
+              ? "border-background/30 bg-background/15 text-background"
+              : "border-foreground/20 bg-background text-foreground"
+          }`}
         >
           {monoSuffix}
         </span>
