@@ -747,9 +747,19 @@ export function EvaluatorResultsPane({
             )
           : annotations;
         const hasHumans = annotationPills.length > 0;
+        const evaluatorValue = r.value?.value;
+        const hasEvaluatorLabel =
+          evaluatorValue !== null && evaluatorValue !== undefined;
 
+        // If the row only has human annotations (evaluator hasn't produced a
+        // value), drop the "Evaluator" pill and default the selection to the
+        // first annotator so the card has something meaningful to show.
+        const defaultSelection =
+          !hasEvaluatorLabel && hasHumans
+            ? annotationPills[0].annotator_id
+            : "evaluator";
         const rawSelection =
-          selectionByEvaluator[ev.evaluator_id] ?? "evaluator";
+          selectionByEvaluator[ev.evaluator_id] ?? defaultSelection;
         const selectedAnnotation =
           rawSelection !== "evaluator"
             ? annotationPills.find((a) => a.annotator_id === rawSelection)
@@ -758,7 +768,7 @@ export function EvaluatorResultsPane({
         const selection: string =
           rawSelection === "evaluator" || selectedAnnotation
             ? rawSelection
-            : "evaluator";
+            : defaultSelection;
 
         const setSelection = (sel: string) =>
           setSelectionByEvaluator((prev) => ({
@@ -814,12 +824,14 @@ export function EvaluatorResultsPane({
                     pairCount={humansForEvaluator?.pair_count ?? 0}
                   />
                 )}
-                <SourcePill
-                  selected={selection === "evaluator"}
-                  onClick={() => setSelection("evaluator")}
-                  primaryLabel="Evaluator"
-                  monoSuffix={showVersionInSourcePill ? versionLabel : null}
-                />
+                {hasEvaluatorLabel && (
+                  <SourcePill
+                    selected={selection === "evaluator"}
+                    onClick={() => setSelection("evaluator")}
+                    primaryLabel="Evaluator"
+                    monoSuffix={showVersionInSourcePill ? versionLabel : null}
+                  />
+                )}
                 {annotationPills.map((a) => {
                   const aligned = isAnnotationAligned(
                     a.value?.value,
