@@ -540,7 +540,7 @@ function SourcePill({
   );
 }
 
-function EvaluatorResultsPane({
+export function EvaluatorResultsPane({
   evaluators,
   evaluatorNamesById,
   runs,
@@ -826,6 +826,64 @@ function EvaluatorResultsPane({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * Two-column item view: ItemPane (conversation / transcript / payload) on
+ * the left, EvaluatorResultsPane (per-evaluator cards with annotator pills)
+ * on the right. Used both by the evaluator-run detail page and the
+ * labelling-task per-item page. Stateless — caller passes the resolved item
+ * and pre-shaped evaluator / annotation data.
+ */
+export function ItemDetailPane({
+  item,
+  taskType,
+  evaluators,
+  evaluatorNamesById,
+  runs,
+  versionLabels,
+  jobStatus,
+  humanAgreementForItem,
+  evaluatorVariablesByEvaluatorId,
+  filterDisagreements = false,
+  linkEvaluators = true,
+}: {
+  item: Item;
+  taskType: LabellingTaskFull["type"];
+  evaluators: {
+    evaluator_id: string;
+    evaluator_version_id?: string;
+    name?: string;
+  }[];
+  evaluatorNamesById: Record<string, string>;
+  runs: EvaluatorRunRow[];
+  versionLabels: Record<string, string>;
+  jobStatus: EvaluatorRunJob["status"];
+  humanAgreementForItem: HumanAgreementItem | null;
+  evaluatorVariablesByEvaluatorId: Record<string, Record<string, string>>;
+  filterDisagreements?: boolean;
+  linkEvaluators?: boolean;
+}) {
+  return (
+    <div className="flex flex-col md:flex-row min-h-0 flex-1 md:overflow-hidden">
+      <div className="md:flex-1 md:min-h-0 md:overflow-y-auto p-4 md:p-6 md:border-r border-border">
+        <ItemPane item={item} taskType={taskType} />
+      </div>
+      <div className="md:flex-1 md:min-h-0 md:overflow-y-auto p-4 md:p-6">
+        <EvaluatorResultsPane
+          evaluators={evaluators}
+          evaluatorNamesById={evaluatorNamesById}
+          runs={runs}
+          versionLabels={versionLabels}
+          jobStatus={jobStatus}
+          humanAgreementForItem={humanAgreementForItem}
+          evaluatorVariablesByEvaluatorId={evaluatorVariablesByEvaluatorId}
+          filterDisagreements={filterDisagreements}
+          linkEvaluators={linkEvaluators}
+        />
+      </div>
     </div>
   );
 }
@@ -1287,30 +1345,25 @@ export function EvaluatorRunDetailView({
                   No items in this run.
                 </div>
               ) : (
-                <>
-                  <div className="md:flex-1 md:min-h-0 md:overflow-y-auto p-4 md:p-6 md:border-r border-border">
-                    <ItemPane item={currentItem} taskType={task.type} />
-                  </div>
-                  <div className="md:flex-1 md:min-h-0 md:overflow-y-auto p-4 md:p-6">
-                    <EvaluatorResultsPane
-                      evaluators={job.details?.evaluators ?? []}
-                      evaluatorNamesById={evaluatorNamesById}
-                      runs={runsByItem[currentItem.uuid] ?? []}
-                      versionLabels={versionLabels}
-                      jobStatus={job.status}
-                      humanAgreementForItem={
-                        job.human_agreement?.items.find(
-                          (i) => i.item_id === currentItem.uuid,
-                        ) ?? null
-                      }
-                      evaluatorVariablesByEvaluatorId={extractEvaluatorVariables(
-                        currentItem.payload,
-                      )}
-                      filterDisagreements={filterDisagreements}
-                      linkEvaluators={linkEvaluators}
-                    />
-                  </div>
-                </>
+                <ItemDetailPane
+                  item={currentItem}
+                  taskType={task.type}
+                  evaluators={job.details?.evaluators ?? []}
+                  evaluatorNamesById={evaluatorNamesById}
+                  runs={runsByItem[currentItem.uuid] ?? []}
+                  versionLabels={versionLabels}
+                  jobStatus={job.status}
+                  humanAgreementForItem={
+                    job.human_agreement?.items.find(
+                      (i) => i.item_id === currentItem.uuid,
+                    ) ?? null
+                  }
+                  evaluatorVariablesByEvaluatorId={extractEvaluatorVariables(
+                    currentItem.payload,
+                  )}
+                  filterDisagreements={filterDisagreements}
+                  linkEvaluators={linkEvaluators}
+                />
               )}
             </main>
           </div>

@@ -40,7 +40,6 @@ import {
   agreementColor,
 } from "@/components/human-labelling/AgreementStatCard";
 import { EmptyState } from "@/components/ui/LoadingState";
-import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { useAccessToken } from "@/hooks";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
@@ -551,172 +550,6 @@ function ItemRowActions({
   );
 }
 
-type EvaluatorMetaLite = {
-  uuid: string;
-  description?: string | null;
-  scale_min?: number | boolean | null;
-  scale_max?: number | boolean | null;
-};
-
-function annotatorPillTone(
-  annotationValue: boolean | number | null | undefined,
-  evaluatorValue: boolean | number | null,
-): "aligned" | "misaligned" | "neutral" {
-  if (annotationValue === null || annotationValue === undefined) return "neutral";
-  if (evaluatorValue === null || evaluatorValue === undefined) return "neutral";
-  return annotationValue === evaluatorValue ? "aligned" : "misaligned";
-}
-
-function ItemResultsCards({
-  rows,
-  evaluatorMeta,
-  annotatorNamesById,
-}: {
-  rows: SummaryRow[];
-  evaluatorMeta: Map<string, EvaluatorMetaLite>;
-  annotatorNamesById: Map<string, string>;
-}) {
-  const [selectionByKey, setSelectionByKey] = useState<Record<string, string>>(
-    {},
-  );
-
-  return (
-    <div className="space-y-4">
-      {rows.map((row, idx) => {
-        const rowKey = `${row.evaluator_id}-${row.evaluator_version_id ?? ""}-${idx}`;
-        const versionLabel =
-          typeof row.evaluator_version_number === "number"
-            ? `v${row.evaluator_version_number}`
-            : null;
-        const meta = evaluatorMeta.get(row.evaluator_id);
-        const scaleMin =
-          typeof meta?.scale_min === "number" ? meta.scale_min : undefined;
-        const scaleMax =
-          typeof meta?.scale_max === "number" ? meta.scale_max : undefined;
-
-        const annotationEntries = Object.entries(row.annotations ?? {})
-          .map(([uuid, annotation]) => ({ uuid, annotation }))
-          .filter(
-            (e) =>
-              e.annotation &&
-              e.annotation.value !== null &&
-              e.annotation.value !== undefined,
-          );
-
-        const selection = selectionByKey[rowKey] ?? "evaluator";
-        const selectedAnnotation =
-          selection !== "evaluator"
-            ? (annotationEntries.find((e) => e.uuid === selection)?.annotation ??
-              null)
-            : null;
-        const showHuman = !!selectedAnnotation;
-
-        let displayMatch: boolean | null = null;
-        let displayScore: number | null = null;
-        let displayReasoning: string | null = null;
-        if (showHuman && selectedAnnotation) {
-          const v = selectedAnnotation.value;
-          if (row.output_type === "binary" && typeof v === "boolean") {
-            displayMatch = v;
-          } else if (row.output_type === "rating" && typeof v === "number") {
-            displayScore = v;
-          }
-          if (
-            typeof selectedAnnotation.reasoning === "string" &&
-            selectedAnnotation.reasoning.trim().length > 0
-          ) {
-            displayReasoning = selectedAnnotation.reasoning;
-          }
-        } else {
-          const v = row.evaluator_value;
-          if (row.output_type === "binary" && typeof v === "boolean") {
-            displayMatch = v;
-          } else if (row.output_type === "rating" && typeof v === "number") {
-            displayScore = v;
-          }
-          if (
-            typeof row.evaluator_reasoning === "string" &&
-            row.evaluator_reasoning.trim().length > 0
-          ) {
-            displayReasoning = row.evaluator_reasoning;
-          }
-        }
-
-        const annotatorById = annotatorNamesById;
-
-        return (
-          <div key={rowKey} className="space-y-2">
-            {annotationEntries.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSelectionByKey((p) => ({ ...p, [rowKey]: "evaluator" }))
-                  }
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
-                    selection === "evaluator"
-                      ? "border-foreground bg-foreground text-background"
-                      : "border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30"
-                  }`}
-                >
-                  Evaluator
-                </button>
-                {annotationEntries.map(({ uuid, annotation }) => {
-                  const tone = annotatorPillTone(
-                    annotation?.value ?? null,
-                    row.evaluator_value,
-                  );
-                  const isSelected = selection === uuid;
-                  const labelToneClass =
-                    !isSelected && tone === "aligned"
-                      ? "text-green-700 dark:text-green-400"
-                      : !isSelected && tone === "misaligned"
-                        ? "text-red-700 dark:text-red-400"
-                        : "";
-                  const name = annotatorById.get(uuid) ?? uuid.slice(0, 8);
-                  return (
-                    <button
-                      key={uuid}
-                      type="button"
-                      onClick={() =>
-                        setSelectionByKey((p) => ({ ...p, [rowKey]: uuid }))
-                      }
-                      className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
-                        isSelected
-                          ? "border-foreground bg-foreground text-background"
-                          : "border-border bg-muted/40 hover:bg-muted hover:border-foreground/30"
-                      }`}
-                    >
-                      <span
-                        className={`truncate max-w-[160px] ${labelToneClass}`}
-                      >
-                        {name}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            <EvaluatorVerdictCard
-              mode="read"
-              name={row.evaluator_name}
-              description={meta?.description ?? null}
-              versionLabel={versionLabel}
-              outputType={row.output_type}
-              evaluatorUuid={row.evaluator_id}
-              enableLink
-              match={displayMatch}
-              score={displayScore}
-              scaleMin={scaleMin}
-              scaleMax={scaleMax}
-              reasoning={displayReasoning}
-            />
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 function JobsList({
   jobs,
@@ -1107,18 +940,6 @@ function LabellingTaskPageInner() {
     agreementFetchCompleted,
     taskSummary,
   ]);
-
-  // Set of item uuids that have at least one summary row with a value
-  // worth displaying. Used to disable the per-item "View results" button
-  // when there's nothing to show.
-  const itemsWithResults = useMemo(() => {
-    const set = new Set<string>();
-    if (!taskSummary) return set;
-    for (const row of taskSummary.rows) {
-      if (summaryRowHasAnyValue(row)) set.add(row.item_id);
-    }
-    return set;
-  }, [taskSummary]);
 
   // Map item_id -> annotator uuids who have at least one labelled annotation
   // for that item. Drives the "Labelled by" column on the items tab.
@@ -1643,93 +1464,12 @@ function LabellingTaskPageInner() {
 
   const [createdJobs, setCreatedJobs] = useState<CreatedJob[]>([]);
   const [jobsCreatedOpen, setJobsCreatedOpen] = useState(false);
-  // Inline expanded "results" panel below an item row. Backed by a
-  // per-item GET /summary?item_id=<uuid> fetch, cached by item uuid so
-  // toggling open the same row twice doesn't re-fetch.
-  const [expandedResultsItemId, setExpandedResultsItemId] = useState<
-    string | null
-  >(null);
-  const [itemSummaryByUuid, setItemSummaryByUuid] = useState<
-    Record<string, TaskSummaryResponse>
-  >({});
-  const [itemSummaryLoadingId, setItemSummaryLoadingId] = useState<
-    string | null
-  >(null);
-  const [itemSummaryError, setItemSummaryError] = useState<string | null>(null);
 
-  const renderItemResultsExpansion = (itemUuid: string) => {
-    const summary = itemSummaryByUuid[itemUuid];
-    if (itemSummaryLoadingId === itemUuid && !summary) {
-      return (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            />
-          </svg>
-          Loading results
-        </div>
-      );
-    }
-    if (itemSummaryError && !summary) {
-      return <p className="text-sm text-red-500">{itemSummaryError}</p>;
-    }
-    const visibleRows = summary?.rows.filter(summaryRowHasAnyValue) ?? [];
-    if (!summary || visibleRows.length === 0) {
-      return (
-        <p className="text-sm text-muted-foreground">
-          No results recorded for this item yet.
-        </p>
-      );
-    }
-    const evaluatorMeta = new Map(
-      (task?.evaluators ?? []).map((e) => [e.uuid, e]),
-    );
-    const annotatorNamesById = new Map(
-      (summary.annotators ?? []).map((a) => [a.uuid, a.name]),
-    );
-    return (
-      <ItemResultsCards
-        rows={visibleRows}
-        evaluatorMeta={evaluatorMeta}
-        annotatorNamesById={annotatorNamesById}
-      />
-    );
-  };
-
-  const toggleItemResults = useCallback(
-    async (itemUuid: string) => {
-      if (expandedResultsItemId === itemUuid) {
-        setExpandedResultsItemId(null);
-        return;
-      }
-      setExpandedResultsItemId(itemUuid);
-      setItemSummaryError(null);
-      if (itemSummaryByUuid[itemUuid] || !accessToken || !uuid) return;
-      setItemSummaryLoadingId(itemUuid);
-      try {
-        const data = await apiClient<TaskSummaryResponse>(
-          `/annotation-tasks/${uuid}/summary?item_id=${encodeURIComponent(itemUuid)}`,
-          accessToken,
-        );
-        setItemSummaryByUuid((prev) => ({ ...prev, [itemUuid]: data }));
-      } catch (err) {
-        setItemSummaryError(parseApiError(err, "Failed to load results"));
-      } finally {
-        setItemSummaryLoadingId((id) => (id === itemUuid ? null : id));
-      }
+  const openItemDetail = useCallback(
+    (itemUuid: string) => {
+      router.push(`/human-alignment/tasks/${uuid}/items/${itemUuid}`);
     },
-    [expandedResultsItemId, itemSummaryByUuid, accessToken, uuid],
+    [router, uuid],
   );
 
   const handleAssignAnnotators = async (annotatorIds: string[]) => {
@@ -2298,18 +2038,14 @@ function LabellingTaskPageInner() {
                         ? p.predicted_transcript
                         : "";
                     const isSelected = selectedItemIds.has(item.uuid);
-                    const isResultsOpen = expandedResultsItemId === item.uuid;
-                    const hasResults = itemsWithResults.has(item.uuid);
                     const labellerIds = labellersByItem.get(item.uuid);
                     return (
                       <Fragment key={item.uuid}>
                         <div
-                          onClick={() => {
-                            if (hasResults) toggleItemResults(item.uuid);
-                          }}
-                          className={`grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_180px_360px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center ${
+                          onClick={() => openItemDetail(item.uuid)}
+                          className={`grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_180px_360px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
                             isSelected ? "bg-muted/30" : "hover:bg-muted/20"
-                          } ${hasResults ? "cursor-pointer" : ""}`}
+                          }`}
                         >
                           <input
                             type="checkbox"
@@ -2381,11 +2117,6 @@ function LabellingTaskPageInner() {
                             }
                           />
                         </div>
-                        {isResultsOpen && (
-                          <div className="border-b border-border last:border-b-0 bg-muted/10 p-4">
-                            {renderItemResultsExpansion(item.uuid)}
-                          </div>
-                        )}
                       </Fragment>
                     );
                   })}
@@ -2418,8 +2149,6 @@ function LabellingTaskPageInner() {
                   </div>
                   {items.map((item) => {
                     const isSelected = selectedItemIds.has(item.uuid);
-                    const isResultsOpen = expandedResultsItemId === item.uuid;
-                    const hasResults = itemsWithResults.has(item.uuid);
                     const labellerIds = labellersByItem.get(item.uuid);
                     const itemPayloadObj =
                       item.payload && typeof item.payload === "object"
@@ -2433,12 +2162,10 @@ function LabellingTaskPageInner() {
                     return (
                       <Fragment key={item.uuid}>
                         <div
-                          onClick={() => {
-                            if (hasResults) toggleItemResults(item.uuid);
-                          }}
-                          className={`grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_180px_360px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center ${
+                          onClick={() => openItemDetail(item.uuid)}
+                          className={`grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_180px_360px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
                             isSelected ? "bg-muted/30" : "hover:bg-muted/20"
-                          } ${hasResults ? "cursor-pointer" : ""}`}
+                          }`}
                         >
                           <input
                             type="checkbox"
@@ -2511,14 +2238,6 @@ function LabellingTaskPageInner() {
                             }
                           />
                         </div>
-                        {isResultsOpen && (
-                          <div
-                            className="border-b border-border last:border-b-0 bg-muted/10 p-4"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {renderItemResultsExpansion(item.uuid)}
-                          </div>
-                        )}
                       </Fragment>
                     );
                   })}
