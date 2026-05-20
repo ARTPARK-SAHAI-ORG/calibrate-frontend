@@ -576,7 +576,7 @@ export function AgentDetail({
           agent.type === "connection"
             ? {
                 ...connectionConfig,
-                agent_url: connectionUrl,
+                agent_url: connectionUrl.trim(),
                 agent_headers: Object.fromEntries(
                   connectionHeaders
                     .filter((h) => h.key.trim())
