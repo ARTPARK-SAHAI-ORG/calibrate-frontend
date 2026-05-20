@@ -1326,26 +1326,41 @@ export function EvaluatorRunDetailView({
               </button>
             </div>
           )}
-          <header className="border-b border-border px-4 md:px-6 py-3 flex items-center justify-center gap-2">
-            <button
-              onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
-              disabled={currentIndex === 0 || total === 0}
-              className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-            <span className="text-sm text-muted-foreground tabular-nums px-2">
-              Item {Math.min(safeIndex + 1, Math.max(total, 1))} of {total}
-            </span>
-            <button
-              onClick={() =>
-                setCurrentIndex(Math.min(total - 1, currentIndex + 1))
-              }
-              disabled={currentIndex >= total - 1 || total === 0}
-              className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
+          <header className="border-b border-border px-4 md:px-6 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+            <h2 className="text-sm md:text-base font-semibold text-foreground truncate min-w-0">
+              {(() => {
+                const p =
+                  currentItem?.payload &&
+                  typeof currentItem.payload === "object"
+                    ? (currentItem.payload as Record<string, unknown>)
+                    : null;
+                const name =
+                  p && typeof p.name === "string" ? p.name.trim() : "";
+                return name || "Item";
+              })()}
+            </h2>
+            <div className="flex items-center gap-2 justify-self-center">
+              <button
+                onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
+                disabled={currentIndex === 0 || total === 0}
+                className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-muted-foreground tabular-nums px-2">
+                Item {Math.min(safeIndex + 1, Math.max(total, 1))} of {total}
+              </span>
+              <button
+                onClick={() =>
+                  setCurrentIndex(Math.min(total - 1, currentIndex + 1))
+                }
+                disabled={currentIndex >= total - 1 || total === 0}
+                className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+            <div />
           </header>
 
           <div className="flex flex-col md:flex-row flex-1 min-h-0">
