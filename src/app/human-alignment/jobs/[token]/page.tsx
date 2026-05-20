@@ -34,6 +34,28 @@ export default function AdminAnnotateJobPage() {
 
   const handleLoaded = useCallback((m: AnnotationJobMeta) => setMeta(m), []);
 
+  // Copy the annotator-facing URL (/annotate-job/{token}) to the clipboard.
+  // Mirrors the per-job copy button used in the tasks detail jobs table.
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(t);
+  }, [copied]);
+  const handleCopyJobLink = async () => {
+    if (!token) return;
+    const url =
+      typeof window === "undefined"
+        ? `/annotate-job/${token}`
+        : `${window.location.origin}/annotate-job/${token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+    } catch {
+      // ignore — clipboard can fail in insecure contexts; user can still copy manually.
+    }
+  };
+
   const customHeader = (
     <button
       onClick={() => router.back()}
@@ -96,15 +118,58 @@ export default function AdminAnnotateJobPage() {
               >
                 {jobStatusLabel(meta.jobStatus)}
               </span>
-              {meta.jobStatus === "completed" && accessToken && (
-                <ShareButton
-                  entityType="annotation-job"
-                  entityId={`${meta.task.uuid}:${meta.job.uuid}`}
-                  accessToken={accessToken}
-                  initialIsPublic={meta.job.is_public}
-                  initialShareToken={meta.job.view_token}
-                />
-              )}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyJobLink}
+                  className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs md:text-sm font-medium border transition-colors cursor-pointer ${
+                    copied
+                      ? "border-green-200 bg-green-100 text-green-700 dark:border-green-500/40 dark:bg-green-500/20 dark:text-green-400"
+                      : "border-border bg-background text-foreground hover:bg-muted/50"
+                  }`}
+                  aria-label={copied ? "Copied job link" : "Copy job link"}
+                >
+                  {copied ? (
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={1.75}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75"
+                      />
+                    </svg>
+                  )}
+                  {copied ? "Copied" : "Copy job link"}
+                </button>
+                {meta.jobStatus === "completed" && accessToken && (
+                  <ShareButton
+                    entityType="annotation-job"
+                    entityId={`${meta.task.uuid}:${meta.job.uuid}`}
+                    accessToken={accessToken}
+                    initialIsPublic={meta.job.is_public}
+                    initialShareToken={meta.job.view_token}
+                  />
+                )}
+              </div>
             </div>
             <div className="flex flex-wrap gap-3">
               <FieldRow label="Labelling task">
