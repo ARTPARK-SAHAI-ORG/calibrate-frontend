@@ -8,7 +8,11 @@ import {
   useOrganizations,
 } from "@/hooks";
 import { CreateWorkspaceDialog } from "@/components/CreateWorkspaceDialog";
-import { pickDefaultOrg, type Organization } from "@/lib/orgs";
+import {
+  getActiveOrgUuid,
+  pickDefaultOrg,
+  type Organization,
+} from "@/lib/orgs";
 
 type WorkspaceSwitcherProps = {
   collapsed: boolean;
@@ -77,11 +81,19 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
   // app was open, the stored uuid no longer matches anything in the list.
   // Without this, the sidebar silently shows the personal workspace as the
   // label while API calls still carry the stale uuid as X-Org-UUID.
+  //
+  // Read from localStorage directly rather than the React `activeUuid` state:
+  // useActiveOrgUuid initialises to null and only reads localStorage in an
+  // effect, so on every mount there's a window where the React state is null
+  // even though localStorage holds the real choice. Trusting the state here
+  // would overwrite the user's selection with the personal-fallback on every
+  // navigation.
   useEffect(() => {
     if (organizations.length === 0) return;
-    if (activeUuid && organizations.some((o) => o.uuid === activeUuid)) return;
+    const persisted = getActiveOrgUuid();
+    if (persisted && organizations.some((o) => o.uuid === persisted)) return;
     const fallback = pickDefaultOrg(organizations);
-    if (fallback && fallback.uuid !== activeUuid) {
+    if (fallback && fallback.uuid !== persisted) {
       setActiveUuid(fallback.uuid);
     }
   }, [organizations, activeUuid, setActiveUuid]);
