@@ -550,6 +550,7 @@ export function EvaluatorResultsPane({
   evaluatorVariablesByEvaluatorId,
   filterDisagreements,
   linkEvaluators,
+  itemDescription,
 }: {
   evaluators: {
     evaluator_id: string;
@@ -564,15 +565,25 @@ export function EvaluatorResultsPane({
   evaluatorVariablesByEvaluatorId: Record<string, Record<string, string>>;
   filterDisagreements: boolean;
   linkEvaluators: boolean;
+  itemDescription?: string | null;
 }) {
   const [selectionByEvaluator, setSelectionByEvaluator] = useState<
     Record<string, string>
   >({});
 
+  const descriptionBlock = itemDescription?.trim() ? (
+    <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+      {itemDescription.trim()}
+    </p>
+  ) : null;
+
   if (evaluators.length === 0) {
     return (
-      <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
-        No evaluators in this run.
+      <div className="space-y-3">
+        {descriptionBlock}
+        <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
+          No evaluators in this run.
+        </div>
       </div>
     );
   }
@@ -593,14 +604,18 @@ export function EvaluatorResultsPane({
 
   if (filterDisagreements && visibleEvaluators.length === 0) {
     return (
-      <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
-        All evaluators agree with human annotations on this item.
+      <div className="space-y-3">
+        {descriptionBlock}
+        <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
+          All evaluators agree with human annotations on this item.
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
+      {descriptionBlock}
       {visibleEvaluators.map((ev) => {
         const versionLabel = ev.evaluator_version_id
           ? versionLabels[ev.evaluator_version_id]
@@ -866,6 +881,15 @@ export function ItemDetailPane({
   filterDisagreements?: boolean;
   linkEvaluators?: boolean;
 }) {
+  const itemPayload =
+    item.payload && typeof item.payload === "object"
+      ? (item.payload as Record<string, unknown>)
+      : null;
+  const itemDescription =
+    itemPayload && typeof itemPayload.description === "string"
+      ? itemPayload.description
+      : null;
+
   return (
     <div className="flex flex-col md:flex-row min-h-0 flex-1 md:overflow-hidden">
       <div className="md:flex-1 md:min-h-0 md:overflow-y-auto p-4 md:p-6 md:border-r border-border">
@@ -882,6 +906,7 @@ export function ItemDetailPane({
           evaluatorVariablesByEvaluatorId={evaluatorVariablesByEvaluatorId}
           filterDisagreements={filterDisagreements}
           linkEvaluators={linkEvaluators}
+          itemDescription={itemDescription}
         />
       </div>
     </div>

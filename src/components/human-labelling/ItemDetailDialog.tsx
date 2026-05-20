@@ -42,6 +42,17 @@ type TaskEvaluatorDef = {
   scale_max?: number | boolean | null;
 };
 
+function itemTitle(item: Item | null): string {
+  if (!item) return "Item";
+  const payload =
+    item.payload && typeof item.payload === "object"
+      ? (item.payload as Record<string, unknown>)
+      : null;
+  const name =
+    payload && typeof payload.name === "string" ? payload.name.trim() : "";
+  return name || "Item";
+}
+
 export type ItemDetailDialogTask = {
   uuid: string;
   name: string;
@@ -236,9 +247,8 @@ export function ItemDetailDialog({
         <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-border">
           <div className="min-w-0">
             <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
-              {task?.name ?? "Item"}
+              {itemTitle(item)}
             </h2>
-            <p className="text-xs text-muted-foreground">Item view</p>
           </div>
           <button
             onClick={onClose}
