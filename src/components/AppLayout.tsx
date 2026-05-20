@@ -9,6 +9,7 @@ import {
   useFloatingButtonHideCount,
 } from "@/components/providers/FloatingButtonProvider";
 import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
+import { clearOrgsCache } from "@/hooks";
 
 // Re-export the hook so existing imports continue to work
 export { useHideFloatingButton } from "@/components/providers/FloatingButtonProvider";
@@ -720,6 +721,8 @@ export function AppLayout({
                         localStorage.removeItem("access_token");
                         localStorage.removeItem("user");
                         localStorage.removeItem("activeOrgUuid");
+                        // Clear in-memory caches scoped to this user.
+                        clearOrgsCache();
                         // Clear cookie
                         document.cookie =
                           "access_token=; path=/; max-age=0; SameSite=Lax";

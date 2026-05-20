@@ -30,9 +30,23 @@ type UseOrganizationsReturn = {
  * sidebar shows a loading flash on every navigation. The cache seeds the
  * initial state on subsequent mounts; we still refetch in the background
  * to stay fresh, but the UI no longer flickers.
+ *
+ * Cache lifetime is tied to actual sign-out, not to the access token
+ * momentarily reading null while the auth hook hydrates from localStorage.
+ * Only `clearOrgsCache()` (called from real sign-out paths) wipes it.
  */
 let cachedOrgs: Organization[] | null = null;
 let cachedForToken: string | null = null;
+
+/**
+ * Drop the in-memory workspace list cache. Call this from real sign-out
+ * paths (the user clicking Logout, or the 401-triggered auto-sign-out) —
+ * not from places where the access token is just transiently null.
+ */
+export function clearOrgsCache(): void {
+  cachedOrgs = null;
+  cachedForToken = null;
+}
 
 /**
  * List + create + rename workspaces for the current user.
@@ -52,10 +66,11 @@ export function useOrganizations(
 
   const refetch = useCallback(async (): Promise<Organization[] | null> => {
     if (!accessToken) {
-      setOrganizations([]);
+      // The auth hook briefly returns null while it hydrates from
+      // localStorage (email/password users) — don't drop the cache here,
+      // we'd just have to refetch it a few ms later. Real sign-out paths
+      // call clearOrgsCache() explicitly.
       setIsLoading(false);
-      cachedOrgs = null;
-      cachedForToken = null;
       return null;
     }
     const hadCache =

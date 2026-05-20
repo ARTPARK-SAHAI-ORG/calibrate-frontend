@@ -9,4 +9,5 @@ export {
   useOrganizations,
   useActiveOrgUuid,
   useOrgMembers,
+  clearOrgsCache,
 } from "./useOrganizations";
