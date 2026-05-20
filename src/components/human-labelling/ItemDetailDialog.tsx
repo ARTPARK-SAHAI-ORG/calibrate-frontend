@@ -290,7 +290,10 @@ export function ItemDetailDialog({
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Tooltip content="Show results for only the live versions of each evaluator. Toggle to see the results for all versions.">
+            <Tooltip
+              position="bottom"
+              content="Show results for only the live versions of each evaluator. Toggle to see the results for all versions."
+            >
               <button
                 type="button"
                 onClick={() => setLiveOnly((v) => !v)}
