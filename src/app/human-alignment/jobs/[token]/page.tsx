@@ -122,13 +122,17 @@ export default function AdminAnnotateJobPage() {
                 <button
                   type="button"
                   onClick={handleCopyJobLink}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-muted/40 text-foreground hover:bg-muted transition-colors cursor-pointer"
-                  aria-label={copied ? "Copied job link" : "Copy job link"}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border transition-colors cursor-pointer ${
+                    copied
+                      ? "bg-emerald-500/15 border-emerald-500/45 text-emerald-900 dark:text-emerald-200 hover:bg-emerald-500/25 dark:hover:bg-emerald-500/20"
+                      : "bg-amber-500/16 border-amber-500/50 text-amber-950 dark:text-amber-100 hover:bg-amber-500/28 dark:hover:bg-amber-500/22"
+                  }`}
+                  title="Copy job link"
                 >
                   {copied ? (
                     <>
                       <svg
-                        className="w-3.5 h-3.5 text-emerald-500"
+                        className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -140,7 +144,7 @@ export default function AdminAnnotateJobPage() {
                           d="M4.5 12.75l6 6 9-13.5"
                         />
                       </svg>
-                      <span className="text-emerald-500">Copied</span>
+                      <span>Copied</span>
                     </>
                   ) : (
                     <>
@@ -154,7 +158,7 @@ export default function AdminAnnotateJobPage() {
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"
+                          d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"
                         />
                       </svg>
                       Copy job link
