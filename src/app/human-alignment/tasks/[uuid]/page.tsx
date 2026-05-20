@@ -29,6 +29,7 @@ import { BulkUploadSimulationItemsDialog } from "@/components/human-labelling/Bu
 import { BulkUploadLlmItemsDialog } from "@/components/human-labelling/BulkUploadLlmItemsDialog";
 import { AssignAnnotatorsDialog } from "@/components/human-labelling/AssignAnnotatorsDialog";
 import { EditTaskDialog } from "@/components/human-labelling/EditTaskDialog";
+import { ItemDetailDialog } from "@/components/human-labelling/ItemDetailDialog";
 import {
   JobsCreatedDialog,
   type CreatedJob,
@@ -1465,12 +1466,10 @@ function LabellingTaskPageInner() {
   const [createdJobs, setCreatedJobs] = useState<CreatedJob[]>([]);
   const [jobsCreatedOpen, setJobsCreatedOpen] = useState(false);
 
-  const openItemDetail = useCallback(
-    (itemUuid: string) => {
-      router.push(`/human-alignment/tasks/${uuid}/items/${itemUuid}`);
-    },
-    [router, uuid],
-  );
+  const [itemDetailUuid, setItemDetailUuid] = useState<string | null>(null);
+  const openItemDetail = useCallback((itemUuid: string) => {
+    setItemDetailUuid(itemUuid);
+  }, []);
 
   const handleAssignAnnotators = async (annotatorIds: string[]) => {
     if (selectedItemIds.size === 0 || annotatorIds.length === 0 || !accessToken)
@@ -2845,6 +2844,35 @@ function LabellingTaskPageInner() {
           }}
         />
       )}
+
+      <ItemDetailDialog
+        isOpen={!!itemDetailUuid}
+        onClose={() => setItemDetailUuid(null)}
+        task={
+          task && (task.type === "llm" || task.type === "stt" || task.type === "simulation")
+            ? {
+                uuid: task.uuid,
+                name: task.name,
+                type: task.type,
+                evaluators: task.evaluators,
+              }
+            : null
+        }
+        item={(() => {
+          if (!itemDetailUuid) return null;
+          const match = items.find((i) => i.uuid === itemDetailUuid);
+          if (!match) return null;
+          return {
+            id: match.id,
+            uuid: match.uuid,
+            task_id: match.task_id,
+            payload: match.payload,
+            created_at: match.created_at,
+            deleted_at: match.deleted_at,
+          };
+        })()}
+        accessToken={accessToken}
+      />
     </AppLayout>
   );
 }
