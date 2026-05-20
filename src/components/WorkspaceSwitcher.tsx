@@ -8,7 +8,7 @@ import {
   useOrganizations,
 } from "@/hooks";
 import { CreateWorkspaceDialog } from "@/components/CreateWorkspaceDialog";
-import type { Organization } from "@/lib/orgs";
+import { pickDefaultOrg, type Organization } from "@/lib/orgs";
 
 type WorkspaceSwitcherProps = {
   collapsed: boolean;
@@ -71,6 +71,20 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
     organizations.find((o) => o.is_personal) ??
     organizations[0] ??
     null;
+
+  // Reconcile the stored active uuid against the fetched workspaces. If the
+  // user got removed from the active workspace (or it was deleted) while the
+  // app was open, the stored uuid no longer matches anything in the list.
+  // Without this, the sidebar silently shows the personal workspace as the
+  // label while API calls still carry the stale uuid as X-Org-UUID.
+  useEffect(() => {
+    if (organizations.length === 0) return;
+    if (activeUuid && organizations.some((o) => o.uuid === activeUuid)) return;
+    const fallback = pickDefaultOrg(organizations);
+    if (fallback && fallback.uuid !== activeUuid) {
+      setActiveUuid(fallback.uuid);
+    }
+  }, [organizations, activeUuid, setActiveUuid]);
 
   const navigateAfterSwitch = () => {
     // Stay on workspace settings if that's where the user is — switching
