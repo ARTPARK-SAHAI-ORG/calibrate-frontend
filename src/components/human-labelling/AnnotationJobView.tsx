@@ -544,53 +544,60 @@ function AnnotateView({
     ? "h-screen bg-background text-foreground flex flex-col overflow-hidden"
     : "flex flex-col flex-1 min-h-0";
 
+  const currentItemName = (() => {
+    if (!currentItem) return "";
+    const p =
+      currentItem.payload && typeof currentItem.payload === "object"
+        ? (currentItem.payload as Record<string, unknown>)
+        : null;
+    return p && typeof p.name === "string" ? p.name.trim() : "";
+  })();
+
   return (
     <div className={wrapperClass}>
+      {!isAdmin && (
+        <div className="px-4 md:px-6 pt-4 md:pt-6 pb-3 shrink-0">
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+            <h1 className="text-lg md:text-xl font-semibold truncate">
+              {data.task.name}
+            </h1>
+            {isCompleted && (
+              <span className="shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border border-green-200 bg-green-100 text-green-700 dark:border-green-500/30 dark:bg-green-500/20 dark:text-green-400">
+                <svg
+                  className="w-3 h-3"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={3}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                Completed
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            {data.annotator.name}
+          </p>
+        </div>
+      )}
+      <div
+        className={
+          isAdmin
+            ? "contents"
+            : "flex-1 min-h-0 flex flex-col overflow-hidden border border-border rounded-xl mx-4 md:mx-6 mb-4 md:mb-6"
+        }
+      >
       <header className="border-b border-border px-4 md:px-6 py-3 flex flex-col gap-3 md:grid md:grid-cols-3 md:items-center md:gap-4">
         <div className="min-w-0">
-          {!isAdmin && (
-            <>
-              <div className="flex items-center gap-2 min-w-0">
-                <h1 className="text-base md:text-lg font-semibold truncate">
-                  {data.task.name}
-                </h1>
-                {isCompleted && (
-                  <span className="shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border border-green-200 bg-green-100 text-green-700 dark:border-green-500/30 dark:bg-green-500/20 dark:text-green-400">
-                    <svg
-                      className="w-3 h-3"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                    Completed
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {data.annotator.name}
-              </p>
-            </>
-          )}
-          {isAdmin && currentItem && (
-            <h1 className="text-base md:text-lg font-semibold truncate">
-              {(() => {
-                const p =
-                  currentItem.payload &&
-                  typeof currentItem.payload === "object"
-                    ? (currentItem.payload as Record<string, unknown>)
-                    : null;
-                const name =
-                  p && typeof p.name === "string" ? p.name.trim() : "";
-                return name || "Item";
-              })()}
-            </h1>
+          {currentItem && (
+            <h2 className="text-sm md:text-base font-semibold truncate">
+              {currentItemName || "Item"}
+            </h2>
           )}
         </div>
         <div className="flex items-center justify-center gap-2 flex-wrap">
@@ -776,6 +783,7 @@ function AnnotateView({
             </>
           )}
         </main>
+      </div>
       </div>
     </div>
   );
