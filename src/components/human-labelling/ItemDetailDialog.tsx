@@ -343,6 +343,7 @@ export function ItemDetailDialog({
               linkEvaluators
               hideAgreementGlyph
               alwaysShowSourcePills
+              showVersionInSourcePill
             />
           )}
         </div>

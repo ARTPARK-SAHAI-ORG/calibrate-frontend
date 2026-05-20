@@ -553,6 +553,7 @@ export function EvaluatorResultsPane({
   itemDescription,
   hideAgreementGlyph = false,
   alwaysShowSourcePills = false,
+  showVersionInSourcePill = false,
 }: {
   evaluators: {
     evaluator_id: string;
@@ -572,6 +573,9 @@ export function EvaluatorResultsPane({
   hideAgreementGlyph?: boolean;
   /** Always render the source-pill row even when no human annotations exist. */
   alwaysShowSourcePills?: boolean;
+  /** Move the evaluator version label into the "Evaluator" source pill (as
+   *  a mono suffix) and hide it from the card. */
+  showVersionInSourcePill?: boolean;
 }) {
   const [selectionByEvaluator, setSelectionByEvaluator] = useState<
     Record<string, string>
@@ -810,6 +814,7 @@ export function EvaluatorResultsPane({
                   selected={selection === "evaluator"}
                   onClick={() => setSelection("evaluator")}
                   primaryLabel="Evaluator"
+                  monoSuffix={showVersionInSourcePill ? versionLabel : null}
                 />
                 {annotationPills.map((a) => {
                   const aligned = isAnnotationAligned(
@@ -833,7 +838,7 @@ export function EvaluatorResultsPane({
               mode="read"
               name={evaluatorName}
               description={r.evaluator?.description ?? null}
-              versionLabel={versionLabel}
+              versionLabel={showVersionInSourcePill ? null : versionLabel}
               outputType={outputType}
               evaluatorUuid={ev.evaluator_id}
               enableLink={linkEvaluators}
@@ -874,6 +879,7 @@ export function ItemDetailPane({
   linkEvaluators = true,
   hideAgreementGlyph = false,
   alwaysShowSourcePills = false,
+  showVersionInSourcePill = false,
 }: {
   item: Item;
   taskType: LabellingTaskFull["type"];
@@ -892,6 +898,7 @@ export function ItemDetailPane({
   linkEvaluators?: boolean;
   hideAgreementGlyph?: boolean;
   alwaysShowSourcePills?: boolean;
+  showVersionInSourcePill?: boolean;
 }) {
   const itemPayload =
     item.payload && typeof item.payload === "object"
@@ -921,6 +928,7 @@ export function ItemDetailPane({
           itemDescription={itemDescription}
           hideAgreementGlyph={hideAgreementGlyph}
           alwaysShowSourcePills={alwaysShowSourcePills}
+          showVersionInSourcePill={showVersionInSourcePill}
         />
       </div>
     </div>
