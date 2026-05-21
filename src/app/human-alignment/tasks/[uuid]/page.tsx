@@ -77,7 +77,6 @@ type SummaryRow = {
   payload: Record<string, unknown> | null;
   evaluator_id: string;
   evaluator_name: string;
-  output_type: "binary" | "rating";
   evaluator_version_id?: string | null;
   evaluator_version_number?: number | null;
   evaluator_value: boolean | number | null;
