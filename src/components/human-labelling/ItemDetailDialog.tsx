@@ -168,8 +168,12 @@ export function ItemDetailDialog({
     return selectedAnnotators.filter((a) => valid.has(a.uuid));
   }, [availableAnnotators, selectedAnnotators]);
 
-  // Only show the live-versions toggle when at least one evaluator has
-  // produced a result on this item — otherwise there's nothing to filter.
+  // Drives toggle visibility together with the toggle's own state — see
+  // the render site for the full condition. We hide the toggle only when
+  // it is OFF and there are no results, because when it is ON the loaded
+  // summary reflects only live-version data and may be empty even though
+  // the item has results on non-live versions; hiding it in that case
+  // would strand the user with no way to flip it off.
   const hasAnyEvaluatorResult = useMemo(() => {
     if (!summary) return false;
     return summary.rows.some((r) => r.evaluator_value !== null);
@@ -387,7 +391,7 @@ export function ItemDetailDialog({
                 />
               </div>
             )}
-            {hasAnyEvaluatorResult && (
+            {(liveOnly || hasAnyEvaluatorResult) && (
             <Tooltip
               position="bottom"
               content="Show results for only the live versions of each evaluator. Toggle to see the results for all versions."
