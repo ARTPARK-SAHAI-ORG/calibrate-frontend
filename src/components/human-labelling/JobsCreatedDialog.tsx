@@ -90,7 +90,7 @@ export function JobsCreatedDialog({
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,3fr)_auto] gap-4 px-4 py-2.5 bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
               <div>Annotator</div>
               <div>Link</div>
-              <div className="w-16" />
+              <div className="w-[7.5rem]" />
             </div>
             {jobs.map((job, idx) => {
               const url = buildJobUrl(job.public_token);
@@ -108,16 +108,40 @@ export function JobsCreatedDialog({
                   <div className="text-xs font-mono text-muted-foreground break-all">
                     {url}
                   </div>
-                  <button
-                    onClick={() => handleCopy(job.public_token)}
-                    className={`h-8 px-3 rounded-md text-xs font-medium border transition-colors cursor-pointer w-16 ${
-                      copied
-                        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-500"
-                        : "border-border bg-background hover:bg-muted/50"
-                    }`}
-                  >
-                    {copied ? "Copied" : "Copy"}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleCopy(job.public_token)}
+                      className={`h-8 px-3 rounded-md text-xs font-medium border transition-colors cursor-pointer w-16 ${
+                        copied
+                          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-500"
+                          : "border-border bg-background hover:bg-muted/50"
+                      }`}
+                    >
+                      {copied ? "Copied" : "Copy"}
+                    </button>
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Open ${job.annotator_name}'s job in a new tab`}
+                      title="Open in new tab"
+                      className="h-8 w-8 flex items-center justify-center rounded-md border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                    >
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                        />
+                      </svg>
+                    </a>
+                  </div>
                 </div>
               );
             })}
