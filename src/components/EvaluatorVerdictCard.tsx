@@ -116,16 +116,23 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
     typeof props.variableValues === "object" &&
     Object.keys(props.variableValues).length > 0;
 
-  // Read mode now exposes variables and reasoning behind separate
-  // toggles so each surface can be expanded independently. Write mode
-  // still shows everything inline so annotators can see variables and
-  // write reasoning in one pass — no toggle.
+  // Read mode shows at most one toggle. When reasoning is present the
+  // toggle is labelled "See reasoning" and expanding it also reveals any
+  // variables. When reasoning is absent but variables are present the
+  // toggle is labelled "See variables". Write mode shows everything
+  // inline so annotators can see variables and write reasoning in one
+  // pass — no toggle.
   const hasReasoning = props.mode === "read" && !!props.reasoning?.trim();
-  const showVariablesToggle = props.mode === "read" && hasVariables;
-  const showReasoningToggle = props.mode === "read" && hasReasoning;
+  const toggleKind: "reasoning" | "variables" | null =
+    props.mode === "read"
+      ? hasReasoning
+        ? "reasoning"
+        : hasVariables
+          ? "variables"
+          : null
+      : null;
 
-  const [variablesOpen, setVariablesOpen] = useState(false);
-  const [reasoningOpen, setReasoningOpen] = useState(false);
+  const [open, setOpen] = useState(false);
 
   const surface = evaluatorCardSurfaceClass(tone);
 
@@ -160,17 +167,11 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
                 scaleMax={props.scaleMax}
               />
             )}
-            {showVariablesToggle && (
+            {toggleKind && (
               <ReasoningToggleButton
-                kind="variables"
-                open={variablesOpen}
-                onToggle={() => setVariablesOpen((o) => !o)}
-              />
-            )}
-            {showReasoningToggle && (
-              <ReasoningToggleButton
-                open={reasoningOpen}
-                onToggle={() => setReasoningOpen((o) => !o)}
+                kind={toggleKind}
+                open={open}
+                onToggle={() => setOpen((o) => !o)}
               />
             )}
           </div>
@@ -203,30 +204,23 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
         </>
       )}
 
-      {props.mode === "read" && variablesOpen && hasVariables && (
+      {props.mode === "read" && open && toggleKind && (
         <div
           data-reasoning-body
           className="pt-2 border-t border-border/60 space-y-3"
         >
-          <VariableValuesBlock values={props.variableValues!} />
-        </div>
-      )}
-
-      {props.mode === "read" &&
-        reasoningOpen &&
-        showReasoningToggle &&
-        props.reasoning?.trim() && (
-          <div
-            data-reasoning-body
-            className="pt-2 border-t border-border/60 space-y-3"
-          >
+          {hasVariables && (
+            <VariableValuesBlock values={props.variableValues!} />
+          )}
+          {hasReasoning && props.reasoning?.trim() && (
             <ReasoningExpandedContent
               text={props.reasoning}
               showReasoningLabel
               mutedBody={false}
             />
-          </div>
-        )}
+          )}
+        </div>
+      )}
     </div>
   );
 }
