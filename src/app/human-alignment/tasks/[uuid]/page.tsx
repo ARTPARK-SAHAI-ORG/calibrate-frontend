@@ -2873,6 +2873,33 @@ function LabellingTaskPageInner() {
           };
         })()}
         accessToken={accessToken}
+        hasPrev={(() => {
+          if (!itemDetailUuid) return false;
+          const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
+          return idx > 0;
+        })()}
+        hasNext={(() => {
+          if (!itemDetailUuid) return false;
+          const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
+          return idx >= 0 && idx < items.length - 1;
+        })()}
+        onPrev={() => {
+          if (!itemDetailUuid) return;
+          const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
+          if (idx > 0) setItemDetailUuid(items[idx - 1].uuid);
+        }}
+        onNext={() => {
+          if (!itemDetailUuid) return;
+          const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
+          if (idx >= 0 && idx < items.length - 1)
+            setItemDetailUuid(items[idx + 1].uuid);
+        }}
+        position={(() => {
+          if (!itemDetailUuid) return undefined;
+          const idx = items.findIndex((i) => i.uuid === itemDetailUuid);
+          if (idx < 0) return undefined;
+          return { index: idx, total: items.length };
+        })()}
       />
     </AppLayout>
   );
