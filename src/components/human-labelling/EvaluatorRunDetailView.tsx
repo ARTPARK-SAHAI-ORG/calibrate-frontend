@@ -1075,8 +1075,19 @@ function GroupedEvaluatorCard({
     outputType,
   );
 
+  // If no evaluator version produced a value (e.g. the parent suppressed
+  // evaluator results via the annotator filter) and there is exactly one
+  // annotation, a solitary annotator pill offers nothing to switch to —
+  // hide the pills row entirely.
+  const hasAnyVersionPill = versions.some((x) => x.hasValue);
+  const showAnnotatorPills = hasAnyVersionPill || annotations.length > 1;
+  const pillCount =
+    versions.filter((x) => x.hasValue).length +
+    (showAnnotatorPills ? annotations.length : 0);
+
   return (
     <div className="space-y-2">
+      {pillCount > 0 && (
       <div className="flex flex-wrap items-center gap-1.5">
         {versions.map((x) => {
           if (!x.hasValue) return null;
@@ -1091,7 +1102,7 @@ function GroupedEvaluatorCard({
             />
           );
         })}
-        {annotations.map((a) => {
+        {showAnnotatorPills && annotations.map((a) => {
           const token = `a:${a.annotator_id}`;
           return (
             <SourcePill
@@ -1103,6 +1114,7 @@ function GroupedEvaluatorCard({
           );
         })}
       </div>
+      )}
       <EvaluatorVerdictCard
         mode="read"
         name={evaluatorName}
