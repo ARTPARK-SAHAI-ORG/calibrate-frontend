@@ -172,6 +172,15 @@ function HumanLabellingPageInner() {
   );
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [editingAnnotatorUuid, setEditingAnnotatorUuid] = useState<
+    string | null
+  >(null);
+  const [editingAnnotatorName, setEditingAnnotatorName] = useState("");
+  const [savingAnnotatorEdit, setSavingAnnotatorEdit] = useState(false);
+  const [annotatorEditError, setAnnotatorEditError] = useState<string | null>(
+    null,
+  );
+
   const [taskToDelete, setTaskToDelete] = useState<LabellingTask | null>(null);
   const [isDeletingTask, setIsDeletingTask] = useState(false);
 
@@ -340,6 +349,48 @@ function HumanLabellingPageInner() {
       setAddError(parseApiError(err, "Failed to add annotator"));
     } finally {
       setIsAdding(false);
+    }
+  };
+
+  const startEditAnnotator = (a: Annotator) => {
+    setEditingAnnotatorUuid(a.uuid);
+    setEditingAnnotatorName(a.name);
+    setAnnotatorEditError(null);
+  };
+  const cancelEditAnnotator = () => {
+    setEditingAnnotatorUuid(null);
+    setAnnotatorEditError(null);
+  };
+  const saveEditAnnotator = async () => {
+    if (!editingAnnotatorUuid || !accessToken || savingAnnotatorEdit) return;
+    const name = editingAnnotatorName.trim();
+    const current = annotators.find((a) => a.uuid === editingAnnotatorUuid);
+    if (!name || !current || name === current.name) {
+      setEditingAnnotatorUuid(null);
+      return;
+    }
+    setSavingAnnotatorEdit(true);
+    setAnnotatorEditError(null);
+    try {
+      await apiClient<{ message: string }>(
+        `/annotators/${editingAnnotatorUuid}`,
+        accessToken,
+        { method: "PUT", body: { name } },
+      );
+      setAnnotators((prev) =>
+        prev
+          .map((a) =>
+            a.uuid === editingAnnotatorUuid ? { ...a, name } : a,
+          )
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      );
+      setEditingAnnotatorUuid(null);
+    } catch (err) {
+      setAnnotatorEditError(
+        parseApiError(err, "Failed to rename annotator"),
+      );
+    } finally {
+      setSavingAnnotatorEdit(false);
     }
   };
 
@@ -702,6 +753,9 @@ function HumanLabellingPageInner() {
             </form>
 
             {addError && <p className="text-sm text-red-500">{addError}</p>}
+            {annotatorEditError && (
+              <p className="text-sm text-red-500">{annotatorEditError}</p>
+            )}
 
             {/* Annotator list */}
             {annotatorsLoading || !annotatorsFetchCompleted ? (
@@ -755,7 +809,7 @@ function HumanLabellingPageInner() {
               <>
                 {/* Desktop table */}
                 <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[minmax(0,1fr)_120px_180px_40px] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+                  <div className="grid grid-cols-[minmax(0,1fr)_120px_180px_88px] gap-4 px-4 py-2 border-b border-border bg-muted/30">
                     <div className="text-sm font-medium text-muted-foreground">
                       Name
                     </div>
@@ -769,19 +823,48 @@ function HumanLabellingPageInner() {
                   </div>
                   {annotators.map((annotator) => {
                     const agreement = annotator.current_agreement;
+                    const isEditing = editingAnnotatorUuid === annotator.uuid;
                     return (
                       <div
                         key={annotator.uuid}
-                        onClick={() =>
+                        onClick={() => {
+                          if (isEditing) return;
                           router.push(
                             `/human-alignment/annotators/${annotator.uuid}`,
-                          )
-                        }
-                        className="grid grid-cols-[minmax(0,1fr)_120px_180px_40px] gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                          );
+                        }}
+                        className={`grid grid-cols-[minmax(0,1fr)_120px_180px_88px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center ${
+                          isEditing
+                            ? "bg-muted/20"
+                            : "hover:bg-muted/20 cursor-pointer"
+                        }`}
                       >
-                        <p className="text-sm font-medium text-foreground truncate">
-                          {annotator.name}
-                        </p>
+                        {isEditing ? (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-2 min-w-0"
+                          >
+                            <input
+                              type="text"
+                              value={editingAnnotatorName}
+                              onChange={(e) =>
+                                setEditingAnnotatorName(e.target.value)
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") saveEditAnnotator();
+                                else if (e.key === "Escape")
+                                  cancelEditAnnotator();
+                              }}
+                              disabled={savingAnnotatorEdit}
+                              autoFocus
+                              className="flex-1 min-w-0 text-sm font-medium bg-background border border-border rounded-md px-2 py-1 outline-none focus:border-foreground disabled:opacity-50"
+                            />
+                          </div>
+                        ) : (
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {annotator.name}
+                          </p>
+                        )}
                         <p className="text-sm text-muted-foreground tabular-nums">
                           {annotator.jobs_count ?? 0}
                         </p>
@@ -792,29 +875,109 @@ function HumanLabellingPageInner() {
                             ? `${Math.round(agreement * 100)}%`
                             : "—"}
                         </p>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setAnnotatorToDelete(annotator);
-                          }}
-                          aria-label={`Remove ${annotator.name}`}
-                          title="Remove annotator"
-                          className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                        <div
+                          className="flex items-center justify-end gap-1"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={1.8}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                            />
-                          </svg>
-                        </button>
+                          {isEditing ? (
+                            <>
+                              <button
+                                onClick={saveEditAnnotator}
+                                disabled={
+                                  savingAnnotatorEdit ||
+                                  !editingAnnotatorName.trim()
+                                }
+                                aria-label="Save name"
+                                title="Save"
+                                className="w-8 h-8 flex items-center justify-center rounded-md text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M4.5 12.75l6 6 9-13.5"
+                                  />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={cancelEditAnnotator}
+                                disabled={savingAnnotatorEdit}
+                                aria-label="Cancel rename"
+                                title="Cancel"
+                                className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M6 18L18 6M6 6l12 12"
+                                  />
+                                </svg>
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startEditAnnotator(annotator);
+                                }}
+                                aria-label={`Rename ${annotator.name}`}
+                                title="Rename annotator"
+                                className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={1.8}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
+                                  />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAnnotatorToDelete(annotator);
+                                }}
+                                aria-label={`Remove ${annotator.name}`}
+                                title="Remove annotator"
+                                className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={1.8}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                                  />
+                                </svg>
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -824,20 +987,45 @@ function HumanLabellingPageInner() {
                 <div className="md:hidden space-y-2">
                   {annotators.map((annotator) => {
                     const agreement = annotator.current_agreement;
+                    const isEditing = editingAnnotatorUuid === annotator.uuid;
                     return (
                       <div
                         key={annotator.uuid}
-                        onClick={() =>
+                        onClick={() => {
+                          if (isEditing) return;
                           router.push(
                             `/human-alignment/annotators/${annotator.uuid}`,
-                          )
-                        }
-                        className="border border-border rounded-xl p-4 hover:bg-muted/20 transition-colors cursor-pointer flex items-start gap-3"
+                          );
+                        }}
+                        className={`border border-border rounded-xl p-4 transition-colors flex items-start gap-3 ${
+                          isEditing
+                            ? "bg-muted/20"
+                            : "hover:bg-muted/20 cursor-pointer"
+                        }`}
                       >
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate mb-1">
-                            {annotator.name}
-                          </p>
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={editingAnnotatorName}
+                              onChange={(e) =>
+                                setEditingAnnotatorName(e.target.value)
+                              }
+                              onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") saveEditAnnotator();
+                                else if (e.key === "Escape")
+                                  cancelEditAnnotator();
+                              }}
+                              disabled={savingAnnotatorEdit}
+                              autoFocus
+                              className="w-full text-sm font-medium bg-background border border-border rounded-md px-2 py-1 mb-1 outline-none focus:border-foreground disabled:opacity-50"
+                            />
+                          ) : (
+                            <p className="text-sm font-medium text-foreground truncate mb-1">
+                              {annotator.name}
+                            </p>
+                          )}
                           <p className="text-xs text-muted-foreground">
                             {annotator.jobs_count ?? 0} job
                             {(annotator.jobs_count ?? 0) === 1 ? "" : "s"}
@@ -851,6 +1039,79 @@ function HumanLabellingPageInner() {
                             </span>
                           </p>
                         </div>
+                        {isEditing ? (
+                          <div
+                            className="flex items-center gap-1 flex-shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              onClick={saveEditAnnotator}
+                              disabled={
+                                savingAnnotatorEdit ||
+                                !editingAnnotatorName.trim()
+                              }
+                              aria-label="Save name"
+                              className="w-8 h-8 flex items-center justify-center rounded-md text-emerald-600 hover:bg-emerald-500/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M4.5 12.75l6 6 9-13.5"
+                                />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={cancelEditAnnotator}
+                              disabled={savingAnnotatorEdit}
+                              aria-label="Cancel rename"
+                              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M6 18L18 6M6 6l12 12"
+                                />
+                              </svg>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startEditAnnotator(annotator);
+                              }}
+                              aria-label={`Rename ${annotator.name}`}
+                              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={1.8}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
+                                />
+                              </svg>
+                            </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -873,6 +1134,8 @@ function HumanLabellingPageInner() {
                             />
                           </svg>
                         </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

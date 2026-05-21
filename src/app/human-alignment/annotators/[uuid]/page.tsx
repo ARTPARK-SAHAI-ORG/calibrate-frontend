@@ -176,6 +176,47 @@ function AnnotatorDetailPageInner() {
     fetchDetail();
   }, [fetchDetail]);
 
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editingName, setEditingName] = useState("");
+  const [savingName, setSavingName] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  const startEditName = () => {
+    if (!annotator) return;
+    setEditingName(annotator.name);
+    setEditError(null);
+    setIsEditingName(true);
+  };
+  const cancelEditName = () => {
+    setIsEditingName(false);
+    setEditError(null);
+  };
+  const saveEditName = async () => {
+    if (!annotator || !accessToken || savingName) return;
+    const name = editingName.trim();
+    if (!name || name === annotator.name) {
+      setIsEditingName(false);
+      return;
+    }
+    setSavingName(true);
+    setEditError(null);
+    try {
+      await apiClient<{ message: string }>(
+        `/annotators/${annotator.uuid}`,
+        accessToken,
+        { method: "PUT", body: { name } },
+      );
+      setDetail((prev) =>
+        prev ? { ...prev, annotator: { ...prev.annotator, name } } : prev,
+      );
+      setIsEditingName(false);
+    } catch (err) {
+      setEditError(parseApiError(err, "Failed to rename annotator"));
+    } finally {
+      setSavingName(false);
+    }
+  };
+
   const formatPercent = (value: number | null | undefined): string => {
     if (value == null) return "—";
     return `${Math.round(value * 100)}%`;
@@ -221,7 +262,67 @@ function AnnotatorDetailPageInner() {
 
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-semibold">{annotator?.name ?? "—"}</h1>
+          {isEditingName && annotator ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="text"
+                value={editingName}
+                onChange={(e) => setEditingName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveEditName();
+                  else if (e.key === "Escape") cancelEditName();
+                }}
+                disabled={savingName}
+                autoFocus
+                className="text-2xl font-semibold bg-background border border-border rounded-md px-2 py-1 outline-none focus:border-foreground disabled:opacity-50"
+              />
+              <button
+                onClick={saveEditName}
+                disabled={savingName || !editingName.trim()}
+                className="h-9 px-3 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingName ? "Saving..." : "Save"}
+              </button>
+              <button
+                onClick={cancelEditName}
+                disabled={savingName}
+                className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              {editError && (
+                <span className="text-sm text-red-500">{editError}</span>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 group">
+              <h1 className="text-2xl font-semibold">
+                {annotator?.name ?? "—"}
+              </h1>
+              {annotator && (
+                <button
+                  onClick={startEditName}
+                  aria-label="Rename annotator"
+                  title="Rename"
+                  className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Tabs */}
