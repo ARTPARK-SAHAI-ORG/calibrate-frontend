@@ -402,7 +402,7 @@ export function ItemDetailDialog({
                 type="button"
                 onClick={() => setLiveOnly((v) => !v)}
                 aria-pressed={liveOnly}
-                className={`h-8 px-3 inline-flex items-center gap-1.5 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
+                className={`h-11 px-4 inline-flex items-center gap-1.5 rounded-xl text-sm font-medium border transition-colors cursor-pointer ${
                   liveOnly
                     ? "bg-foreground text-background border-foreground"
                     : "bg-transparent text-muted-foreground border-border hover:border-muted-foreground hover:text-foreground"
