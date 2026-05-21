@@ -490,7 +490,6 @@ export function ReasoningToggleButton({
   );
 }
 
-
 /** Read-only reasoning body — shared with the tool-call collapsible
  * strip in shared.tsx so all reasoning content uses the same typography. */
 export function ReasoningExpandedContent({

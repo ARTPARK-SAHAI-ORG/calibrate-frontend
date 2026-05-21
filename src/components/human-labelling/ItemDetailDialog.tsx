@@ -493,6 +493,7 @@ export function ItemDetailDialog({
               alwaysShowSourcePills
               showVersionInSourcePill
               groupVersionsByEvaluator
+              annotatorFilterActive={annotatorFilter !== null}
             />
           )}
         </div>
