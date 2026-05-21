@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiClient } from "@/lib/api";
 import { Tooltip } from "@/components/Tooltip";
+import { MultiSelectPicker, type PickerItem } from "@/components/MultiSelectPicker";
 import { type Item } from "@/components/human-labelling/AnnotationJobView";
 import {
   ItemDetailPane,
@@ -80,6 +81,11 @@ export function ItemDetailDialog({
   // Restricts the per-evaluator version pills to each evaluator's live
   // version. Default on (matches the previous overview filter default).
   const [liveOnly, setLiveOnly] = useState(true);
+  // Annotator filter: when non-empty, the per-evaluator pills + selection
+  // restrict to these annotators. Empty array = show all annotators.
+  const [selectedAnnotators, setSelectedAnnotators] = useState<PickerItem[]>(
+    [],
+  );
 
   const taskUuid = task?.uuid;
   const itemUuid = item?.uuid;
@@ -109,7 +115,10 @@ export function ItemDetailDialog({
 
   // Reset toggle when modal closes so it opens fresh next time.
   useEffect(() => {
-    if (!isOpen) setLiveOnly(true);
+    if (!isOpen) {
+      setLiveOnly(true);
+      setSelectedAnnotators([]);
+    }
   }, [isOpen]);
 
   // Drop stale summary when the modal switches to a different item so we
@@ -132,6 +141,37 @@ export function ItemDetailDialog({
     () => (item ? extractEvaluatorVariables(item.payload) : {}),
     [item],
   );
+
+  // Annotators who actually labelled this item across any evaluator/version.
+  // We only surface the filter when this list is non-empty.
+  const availableAnnotators = useMemo<PickerItem[]>(() => {
+    if (!summary) return [];
+    const seen = new Set<string>();
+    for (const row of summary.rows) {
+      for (const [annUuid, ann] of Object.entries(row.annotations ?? {})) {
+        if (ann && ann.value !== null && ann.value !== undefined) {
+          seen.add(annUuid);
+        }
+      }
+    }
+    return (summary.annotators ?? [])
+      .filter((a) => seen.has(a.uuid))
+      .map((a) => ({ uuid: a.uuid, name: a.name }));
+  }, [summary]);
+
+  // Drop selections that no longer correspond to an annotator with data
+  // (e.g. after the modal re-fetches with different filters) at render
+  // time so we don't have to round-trip through setState.
+  const effectiveSelectedAnnotators = useMemo<PickerItem[]>(() => {
+    if (selectedAnnotators.length === 0) return [];
+    const valid = new Set(availableAnnotators.map((a) => a.uuid));
+    return selectedAnnotators.filter((a) => valid.has(a.uuid));
+  }, [availableAnnotators, selectedAnnotators]);
+
+  const annotatorFilter = useMemo<Set<string> | null>(() => {
+    if (effectiveSelectedAnnotators.length === 0) return null;
+    return new Set(effectiveSelectedAnnotators.map((a) => a.uuid));
+  }, [effectiveSelectedAnnotators]);
 
   const hasAnyLabel = useMemo(() => {
     if (!summary) return false;
@@ -224,6 +264,7 @@ export function ItemDetailDialog({
       const human_annotations: HumanAnnotation[] = [];
       for (const [annUuid, ann] of Object.entries(row.annotations ?? {})) {
         if (!ann || ann.value === null || ann.value === undefined) continue;
+        if (annotatorFilter && !annotatorFilter.has(annUuid)) continue;
         human_annotations.push({
           annotation_id: `${row.evaluator_id}:${row.evaluator_version_id ?? ""}:${annUuid}`,
           annotator_id: annUuid,
@@ -257,7 +298,7 @@ export function ItemDetailDialog({
       versionLabels,
       humanAgreementForItem,
     };
-  }, [summary, task, item]);
+  }, [summary, task, item, annotatorFilter]);
 
   if (!isOpen) return null;
 
@@ -316,6 +357,17 @@ export function ItemDetailDialog({
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 />
               </svg>
+            )}
+            {availableAnnotators.length > 0 && (
+              <div className="w-56">
+                <MultiSelectPicker
+                  items={availableAnnotators}
+                  selectedItems={effectiveSelectedAnnotators}
+                  onSelectionChange={setSelectedAnnotators}
+                  placeholder="All annotators"
+                  searchPlaceholder="Search annotators"
+                />
+              </div>
             )}
             <Tooltip
               position="bottom"
