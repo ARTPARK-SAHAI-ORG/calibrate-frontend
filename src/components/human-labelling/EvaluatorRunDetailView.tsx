@@ -8,7 +8,7 @@
  * data-agnostic — caller fetches the job & task and passes them in.
  */
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import {
@@ -1017,6 +1017,24 @@ function GroupedEvaluatorCard({
       : `v:${versions[0]?.ev.evaluator_version_id ?? ""}`;
 
   const [selection, setSelection] = useState<string>(defaultSelection);
+
+  // When the available versions or annotations change (e.g. the parent
+  // toggles "Live versions only" and the previously-selected version
+  // disappears from the list), the stored selection token can dangle and
+  // the card renders blank. Reconcile by snapping back to the default.
+  const availableTokens = useMemo(() => {
+    const tokens = new Set<string>();
+    for (const x of versions) {
+      if (x.hasValue) tokens.add(`v:${x.ev.evaluator_version_id ?? ""}`);
+    }
+    for (const a of annotations) tokens.add(`a:${a.annotator_id}`);
+    return tokens;
+  }, [versions, annotations]);
+
+  useEffect(() => {
+    if (availableTokens.size === 0) return;
+    if (!availableTokens.has(selection)) setSelection(defaultSelection);
+  }, [availableTokens, selection, defaultSelection]);
 
   const selectedVersion = selection.startsWith("v:")
     ? versions.find(
