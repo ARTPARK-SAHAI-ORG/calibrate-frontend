@@ -552,6 +552,34 @@ function ItemRowActions({
 }
 
 
+function LabelledByCell({
+  labellers,
+  annotatorNameById,
+}: {
+  labellers: Set<string> | undefined;
+  annotatorNameById: Map<string, string>;
+}) {
+  if (!labellers || labellers.size === 0) {
+    return (
+      <div className="flex flex-wrap gap-1 min-w-0">
+        <span className="text-sm text-muted-foreground">—</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-wrap gap-1 min-w-0">
+      {Array.from(labellers).map((annId) => (
+        <span
+          key={annId}
+          className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground"
+        >
+          {annotatorNameById.get(annId) ?? annId.slice(0, 8)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function JobsList({
   jobs,
   selectedJobUuids,
@@ -2063,23 +2091,10 @@ function LabellingTaskPageInner() {
                           <p className="text-sm text-foreground line-clamp-2">
                             {pred || "—"}
                           </p>
-                          <div className="flex flex-wrap gap-1 min-w-0">
-                            {!labellerIds || labellerIds.size === 0 ? (
-                              <span className="text-sm text-muted-foreground">
-                                —
-                              </span>
-                            ) : (
-                              Array.from(labellerIds).map((annId) => (
-                                <span
-                                  key={annId}
-                                  className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground"
-                                >
-                                  {annotatorNameById.get(annId) ??
-                                    annId.slice(0, 8)}
-                                </span>
-                              ))
-                            )}
-                          </div>
+                          <LabelledByCell
+                            labellers={labellerIds}
+                            annotatorNameById={annotatorNameById}
+                          />
                           <ItemRowActions
                             itemUuid={item.uuid}
                             onDelete={requestDeleteOneItem}
@@ -2187,23 +2202,10 @@ function LabellingTaskPageInner() {
                               </span>
                             )}
                           </p>
-                          <div className="flex flex-wrap gap-1 min-w-0">
-                            {!labellerIds || labellerIds.size === 0 ? (
-                              <span className="text-sm text-muted-foreground">
-                                —
-                              </span>
-                            ) : (
-                              Array.from(labellerIds).map((annId) => (
-                                <span
-                                  key={annId}
-                                  className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground"
-                                >
-                                  {annotatorNameById.get(annId) ??
-                                    annId.slice(0, 8)}
-                                </span>
-                              ))
-                            )}
-                          </div>
+                          <LabelledByCell
+                            labellers={labellerIds}
+                            annotatorNameById={annotatorNameById}
+                          />
                           <ItemRowActions
                             itemUuid={item.uuid}
                             onDelete={requestDeleteOneItem}
