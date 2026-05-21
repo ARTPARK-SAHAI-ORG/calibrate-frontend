@@ -114,7 +114,7 @@ export function JobsCreatedDialog({
                       className={`h-8 px-3 rounded-md text-xs font-medium border transition-colors cursor-pointer w-16 ${
                         copied
                           ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-500"
-                          : "border-border bg-background hover:bg-muted/50"
+                          : "border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20"
                       }`}
                     >
                       {copied ? "Copied" : "Copy"}
@@ -125,7 +125,7 @@ export function JobsCreatedDialog({
                       rel="noopener noreferrer"
                       aria-label={`Open ${job.annotator_name}'s job in a new tab`}
                       title="Open in new tab"
-                      className="h-8 w-8 flex items-center justify-center rounded-md border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                      className="h-8 w-8 flex items-center justify-center rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300 hover:bg-amber-500/20 transition-colors cursor-pointer"
                     >
                       <svg
                         className="w-3.5 h-3.5"
