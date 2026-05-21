@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiClient } from "@/lib/api";
 import { Tooltip } from "@/components/Tooltip";
+import { MultiSelectPicker, type PickerItem } from "@/components/MultiSelectPicker";
 import { type Item } from "@/components/human-labelling/AnnotationJobView";
 import {
   ItemDetailPane,
@@ -31,8 +32,17 @@ type SummaryRow = {
   evaluator_agreement: number | null;
   annotations: Record<string, SummaryAnnotation | null>;
 };
+type SummaryEvaluator = {
+  evaluator_id: string;
+  name?: string;
+  output_type?: "binary" | "rating";
+  // Total runs for this evaluator across every version, restricted to the
+  // items in scope. Unaffected by `live_only`.
+  run_count?: number;
+};
 type TaskSummaryResponse = {
   annotators: SummaryAnnotator[];
+  evaluators?: SummaryEvaluator[];
   rows: SummaryRow[];
 };
 
@@ -80,6 +90,11 @@ export function ItemDetailDialog({
   // Restricts the per-evaluator version pills to each evaluator's live
   // version. Default on (matches the previous overview filter default).
   const [liveOnly, setLiveOnly] = useState(true);
+  // Annotator filter: when non-empty, the per-evaluator pills + selection
+  // restrict to these annotators. Empty array = show all annotators.
+  const [selectedAnnotators, setSelectedAnnotators] = useState<PickerItem[]>(
+    [],
+  );
 
   const taskUuid = task?.uuid;
   const itemUuid = item?.uuid;
@@ -109,7 +124,10 @@ export function ItemDetailDialog({
 
   // Reset toggle when modal closes so it opens fresh next time.
   useEffect(() => {
-    if (!isOpen) setLiveOnly(true);
+    if (!isOpen) {
+      setLiveOnly(true);
+      setSelectedAnnotators([]);
+    }
   }, [isOpen]);
 
   // Drop stale summary when the modal switches to a different item so we
@@ -132,6 +150,46 @@ export function ItemDetailDialog({
     () => (item ? extractEvaluatorVariables(item.payload) : {}),
     [item],
   );
+
+  // Annotators who actually labelled this item across any evaluator/version.
+  // We only surface the filter when this list is non-empty.
+  const availableAnnotators = useMemo<PickerItem[]>(() => {
+    if (!summary) return [];
+    const seen = new Set<string>();
+    for (const row of summary.rows) {
+      for (const [annUuid, ann] of Object.entries(row.annotations ?? {})) {
+        if (ann && ann.value !== null && ann.value !== undefined) {
+          seen.add(annUuid);
+        }
+      }
+    }
+    return (summary.annotators ?? [])
+      .filter((a) => seen.has(a.uuid))
+      .map((a) => ({ uuid: a.uuid, name: a.name }));
+  }, [summary]);
+
+  // Drop selections that no longer correspond to an annotator with data
+  // (e.g. after the modal re-fetches with different filters) at render
+  // time so we don't have to round-trip through setState.
+  const effectiveSelectedAnnotators = useMemo<PickerItem[]>(() => {
+    if (selectedAnnotators.length === 0) return [];
+    const valid = new Set(availableAnnotators.map((a) => a.uuid));
+    return selectedAnnotators.filter((a) => valid.has(a.uuid));
+  }, [availableAnnotators, selectedAnnotators]);
+
+  // Hide the live-versions toggle when no evaluator has ever been run
+  // against this item — across every version, not just the live one.
+  // Backend's per-evaluator `run_count` is unaffected by the `live_only`
+  // query param, so this works even while the toggle is on.
+  const hasAnyEvaluatorRun = useMemo(() => {
+    if (!summary) return false;
+    return (summary.evaluators ?? []).some((e) => (e.run_count ?? 0) > 0);
+  }, [summary]);
+
+  const annotatorFilter = useMemo<Set<string> | null>(() => {
+    if (effectiveSelectedAnnotators.length === 0) return null;
+    return new Set(effectiveSelectedAnnotators.map((a) => a.uuid));
+  }, [effectiveSelectedAnnotators]);
 
   const hasAnyLabel = useMemo(() => {
     if (!summary) return false;
@@ -165,6 +223,26 @@ export function ItemDetailDialog({
     const haEvaluators: HumanAgreementItem["evaluators"] = [];
 
     for (const row of summary.rows) {
+      const human_annotations: HumanAnnotation[] = [];
+      for (const [annUuid, ann] of Object.entries(row.annotations ?? {})) {
+        if (!ann || ann.value === null || ann.value === undefined) continue;
+        if (annotatorFilter && !annotatorFilter.has(annUuid)) continue;
+        human_annotations.push({
+          annotation_id: `${row.evaluator_id}:${row.evaluator_version_id ?? ""}:${annUuid}`,
+          annotator_id: annUuid,
+          annotator_name: annotatorNameById.get(annUuid) ?? null,
+          job_id: "",
+          value: { value: ann.value, reasoning: ann.reasoning ?? null },
+          reasoning: ann.reasoning ?? null,
+          updated_at: "",
+        });
+      }
+
+      // When the annotator filter is active, suppress evaluator-produced
+      // values entirely (no version pill, no verdict card content) and
+      // drop rows that have no matching annotations.
+      if (annotatorFilter && human_annotations.length === 0) continue;
+
       const evKey = `${row.evaluator_id}-${row.evaluator_version_id ?? ""}`;
       if (!seenEvKey.has(evKey)) {
         seenEvKey.add(evKey);
@@ -191,6 +269,12 @@ export function ItemDetailDialog({
       const scaleMax =
         typeof taskEv?.scale_max === "number" ? taskEv.scale_max : null;
 
+      const suppressEvaluator = annotatorFilter !== null;
+      const effectiveValue = suppressEvaluator ? null : row.evaluator_value;
+      const effectiveReasoning = suppressEvaluator
+        ? null
+        : row.evaluator_reasoning;
+
       runs.push({
         uuid: `${row.item_id}:${row.evaluator_id}:${row.evaluator_version_id ?? ""}`,
         job_id: "",
@@ -198,13 +282,13 @@ export function ItemDetailDialog({
         evaluator_id: row.evaluator_id,
         evaluator_version_id: row.evaluator_version_id ?? "",
         value:
-          row.evaluator_value === null && !row.evaluator_reasoning
+          effectiveValue === null && !effectiveReasoning
             ? null
             : {
-                value: row.evaluator_value,
-                reasoning: row.evaluator_reasoning ?? null,
+                value: effectiveValue,
+                reasoning: effectiveReasoning ?? null,
               },
-        status: row.evaluator_value !== null ? "completed" : "pending",
+        status: effectiveValue !== null ? "completed" : "pending",
         created_at: "",
         completed_at: null,
         evaluator_version: {
@@ -220,20 +304,6 @@ export function ItemDetailDialog({
           output_type: row.output_type,
         },
       });
-
-      const human_annotations: HumanAnnotation[] = [];
-      for (const [annUuid, ann] of Object.entries(row.annotations ?? {})) {
-        if (!ann || ann.value === null || ann.value === undefined) continue;
-        human_annotations.push({
-          annotation_id: `${row.evaluator_id}:${row.evaluator_version_id ?? ""}:${annUuid}`,
-          annotator_id: annUuid,
-          annotator_name: annotatorNameById.get(annUuid) ?? null,
-          job_id: "",
-          value: { value: ann.value, reasoning: ann.reasoning ?? null },
-          reasoning: ann.reasoning ?? null,
-          updated_at: "",
-        });
-      }
       haEvaluators.push({
         evaluator_id: row.evaluator_id,
         agreement: row.evaluator_agreement,
@@ -257,7 +327,7 @@ export function ItemDetailDialog({
       versionLabels,
       humanAgreementForItem,
     };
-  }, [summary, task, item]);
+  }, [summary, task, item, annotatorFilter]);
 
   if (!isOpen) return null;
 
@@ -275,24 +345,6 @@ export function ItemDetailDialog({
             <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
               {itemTitle(item)}
             </h2>
-            {!loading && !error && summary && !hasAnyLabel && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400">
-                <svg
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-                  />
-                </svg>
-                No labels yet
-              </span>
-            )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {loading && summary && (
@@ -317,6 +369,36 @@ export function ItemDetailDialog({
                 />
               </svg>
             )}
+            {!loading && !error && summary && !hasAnyLabel && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                  />
+                </svg>
+                No labels yet
+              </span>
+            )}
+            {availableAnnotators.length > 0 && (
+              <div className="w-56">
+                <MultiSelectPicker
+                  items={availableAnnotators}
+                  selectedItems={effectiveSelectedAnnotators}
+                  onSelectionChange={setSelectedAnnotators}
+                  placeholder="All annotators"
+                  searchPlaceholder="Search annotators"
+                />
+              </div>
+            )}
+            {hasAnyEvaluatorRun && (
             <Tooltip
               position="bottom"
               content="Show results for only the live versions of each evaluator. Toggle to see the results for all versions."
@@ -325,7 +407,7 @@ export function ItemDetailDialog({
                 type="button"
                 onClick={() => setLiveOnly((v) => !v)}
                 aria-pressed={liveOnly}
-                className={`h-8 px-3 inline-flex items-center gap-1.5 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
+                className={`h-11 px-4 inline-flex items-center gap-1.5 rounded-xl text-sm font-medium border transition-colors cursor-pointer ${
                   liveOnly
                     ? "bg-foreground text-background border-foreground"
                     : "bg-transparent text-muted-foreground border-border hover:border-muted-foreground hover:text-foreground"
@@ -354,6 +436,7 @@ export function ItemDetailDialog({
                 Live versions only
               </button>
             </Tooltip>
+            )}
           <button
             onClick={onClose}
             aria-label="Close"
@@ -421,6 +504,7 @@ export function ItemDetailDialog({
               alwaysShowSourcePills
               showVersionInSourcePill
               groupVersionsByEvaluator
+              annotatorFilterActive={annotatorFilter !== null}
             />
           )}
         </div>

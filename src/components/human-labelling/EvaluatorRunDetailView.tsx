@@ -614,6 +614,7 @@ export function EvaluatorResultsPane({
   alwaysShowSourcePills = false,
   showVersionInSourcePill = false,
   groupVersionsByEvaluator = false,
+  annotatorFilterActive = false,
 }: {
   evaluators: {
     evaluator_id: string;
@@ -638,6 +639,9 @@ export function EvaluatorResultsPane({
   showVersionInSourcePill?: boolean;
   /** Render all versions of the same evaluator side-by-side in one row. */
   groupVersionsByEvaluator?: boolean;
+  /** Parent has narrowed annotations to a subset — lets grouped cards
+   *  hide a solitary annotator pill when only one annotation remains. */
+  annotatorFilterActive?: boolean;
 }) {
   const [selectionByEvaluator, setSelectionByEvaluator] = useState<
     Record<string, string>
@@ -930,6 +934,7 @@ export function EvaluatorResultsPane({
             evaluatorVariablesByEvaluatorId={evaluatorVariablesByEvaluatorId}
             jobStatus={jobStatus}
             linkEvaluators={linkEvaluators}
+            annotatorFilterActive={annotatorFilterActive}
           />
         ))}
       </div>
@@ -960,6 +965,7 @@ function GroupedEvaluatorCard({
   evaluatorVariablesByEvaluatorId,
   jobStatus,
   linkEvaluators,
+  annotatorFilterActive = false,
 }: {
   evaluators: {
     evaluator_id: string;
@@ -973,6 +979,10 @@ function GroupedEvaluatorCard({
   evaluatorVariablesByEvaluatorId: Record<string, Record<string, string>>;
   jobStatus: EvaluatorRunJob["status"];
   linkEvaluators: boolean;
+  /** When true, callers have filtered annotations to a subset; the card
+   * may then hide a solitary annotator pill since the user has already
+   * committed to that annotator at the parent level. */
+  annotatorFilterActive?: boolean;
 }) {
   const evaluatorId = evaluators[0]?.evaluator_id ?? "";
 
@@ -1016,7 +1026,26 @@ function GroupedEvaluatorCard({
       ? `a:${annotations[0].annotator_id}`
       : `v:${versions[0]?.ev.evaluator_version_id ?? ""}`;
 
-  const [selection, setSelection] = useState<string>(defaultSelection);
+  const [storedSelection, setSelection] = useState<string>(defaultSelection);
+
+  // When the available versions or annotations change (e.g. the parent
+  // toggles "Live versions only" or filters annotators, removing the
+  // previously-selected pill), the stored token can dangle and the card
+  // renders blank. Resolve to the default at render time instead — no
+  // effect needed.
+  const availableTokens = useMemo(() => {
+    const tokens = new Set<string>();
+    for (const x of versions) {
+      if (x.hasValue) tokens.add(`v:${x.ev.evaluator_version_id ?? ""}`);
+    }
+    for (const a of annotations) tokens.add(`a:${a.annotator_id}`);
+    return tokens;
+  }, [versions, annotations]);
+
+  const selection =
+    availableTokens.size === 0 || availableTokens.has(storedSelection)
+      ? storedSelection
+      : defaultSelection;
 
   const selectedVersion = selection.startsWith("v:")
     ? versions.find(
@@ -1056,8 +1085,20 @@ function GroupedEvaluatorCard({
     outputType,
   );
 
+  // Hide a solitary annotator pill only when the parent has narrowed
+  // annotations via a filter — there's nothing to switch between and
+  // the user already knows who they picked. Outside of that case the
+  // pill still surfaces the annotator's name.
+  const hasAnyVersionPill = versions.some((x) => x.hasValue);
+  const showAnnotatorPills =
+    !(annotatorFilterActive && annotations.length === 1);
+  const pillCount =
+    (hasAnyVersionPill ? versions.filter((x) => x.hasValue).length : 0) +
+    (showAnnotatorPills ? annotations.length : 0);
+
   return (
     <div className="space-y-2">
+      {pillCount > 0 && (
       <div className="flex flex-wrap items-center gap-1.5">
         {versions.map((x) => {
           if (!x.hasValue) return null;
@@ -1072,7 +1113,7 @@ function GroupedEvaluatorCard({
             />
           );
         })}
-        {annotations.map((a) => {
+        {showAnnotatorPills && annotations.map((a) => {
           const token = `a:${a.annotator_id}`;
           return (
             <SourcePill
@@ -1084,6 +1125,7 @@ function GroupedEvaluatorCard({
           );
         })}
       </div>
+      )}
       <EvaluatorVerdictCard
         mode="read"
         name={evaluatorName}
@@ -1127,6 +1169,7 @@ export function ItemDetailPane({
   alwaysShowSourcePills = false,
   showVersionInSourcePill = false,
   groupVersionsByEvaluator = false,
+  annotatorFilterActive = false,
 }: {
   item: Item;
   taskType: LabellingTaskFull["type"];
@@ -1147,6 +1190,7 @@ export function ItemDetailPane({
   alwaysShowSourcePills?: boolean;
   showVersionInSourcePill?: boolean;
   groupVersionsByEvaluator?: boolean;
+  annotatorFilterActive?: boolean;
 }) {
   const itemPayload =
     item.payload && typeof item.payload === "object"
@@ -1178,6 +1222,7 @@ export function ItemDetailPane({
           alwaysShowSourcePills={alwaysShowSourcePills}
           showVersionInSourcePill={showVersionInSourcePill}
           groupVersionsByEvaluator={groupVersionsByEvaluator}
+          annotatorFilterActive={annotatorFilterActive}
         />
       </div>
     </div>
