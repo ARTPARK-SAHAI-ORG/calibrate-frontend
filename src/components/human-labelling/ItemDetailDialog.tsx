@@ -88,7 +88,6 @@ export function ItemDetailDialog({
     if (!accessToken || !taskUuid || !itemUuid) return;
     setLoading(true);
     setError(null);
-    setSummary(null);
     try {
       const qs = `?item_id=${encodeURIComponent(itemUuid)}${liveOnly ? "&live_only=true" : ""}`;
       const data = await apiClient<TaskSummaryResponse>(
@@ -112,6 +111,12 @@ export function ItemDetailDialog({
   useEffect(() => {
     if (!isOpen) setLiveOnly(true);
   }, [isOpen]);
+
+  // Drop stale summary when the modal switches to a different item so we
+  // never flash the previous item's data while the new fetch is in flight.
+  useEffect(() => {
+    setSummary(null);
+  }, [taskUuid, itemUuid]);
 
   // Close on Escape.
   useEffect(() => {
@@ -290,6 +295,28 @@ export function ItemDetailDialog({
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {loading && summary && (
+              <svg
+                className="w-4 h-4 animate-spin text-muted-foreground"
+                fill="none"
+                viewBox="0 0 24 24"
+                aria-label="Refreshing"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+            )}
             <Tooltip
               position="bottom"
               content="Show results for only the live versions of each evaluator. Toggle to see the results for all versions."
@@ -350,11 +377,11 @@ export function ItemDetailDialog({
         </div>
 
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {error ? (
+          {error && !adapted ? (
             <div className="m-4 rounded-md border border-border bg-muted/20 p-4 text-sm text-red-500">
               {error}
             </div>
-          ) : loading || !task || !item || !adapted ? (
+          ) : !task || !item || !adapted ? (
             <div className="flex-1 flex items-center justify-center gap-2 text-sm text-muted-foreground">
               <svg
                 className="w-4 h-4 animate-spin"
