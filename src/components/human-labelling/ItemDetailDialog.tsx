@@ -28,16 +28,21 @@ type SummaryRow = {
   evaluator_version_number?: number | null;
   evaluator_value: boolean | number | null;
   evaluator_reasoning?: string | null;
-  // Total runs for this (item, evaluator) across every version. Unaffected
-  // by the `live_only` query param, so we can trust it even when the
-  // visible rows only cover the live version.
-  evaluator_run_count?: number;
   human_agreement: number | null;
   evaluator_agreement: number | null;
   annotations: Record<string, SummaryAnnotation | null>;
 };
+type SummaryEvaluator = {
+  evaluator_id: string;
+  name?: string;
+  output_type?: "binary" | "rating";
+  // Total runs for this evaluator across every version, restricted to the
+  // items in scope. Unaffected by `live_only`.
+  run_count?: number;
+};
 type TaskSummaryResponse = {
   annotators: SummaryAnnotator[];
+  evaluators?: SummaryEvaluator[];
   rows: SummaryRow[];
 };
 
@@ -174,11 +179,11 @@ export function ItemDetailDialog({
 
   // Hide the live-versions toggle when no evaluator has ever been run
   // against this item — across every version, not just the live one.
-  // Backend's `evaluator_run_count` is unaffected by the `live_only`
+  // Backend's per-evaluator `run_count` is unaffected by the `live_only`
   // query param, so this works even while the toggle is on.
   const hasAnyEvaluatorRun = useMemo(() => {
     if (!summary) return false;
-    return summary.rows.some((r) => (r.evaluator_run_count ?? 0) > 0);
+    return (summary.evaluators ?? []).some((e) => (e.run_count ?? 0) > 0);
   }, [summary]);
 
   const annotatorFilter = useMemo<Set<string> | null>(() => {
