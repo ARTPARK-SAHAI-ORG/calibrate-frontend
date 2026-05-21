@@ -212,6 +212,26 @@ export function ItemDetailDialog({
     const haEvaluators: HumanAgreementItem["evaluators"] = [];
 
     for (const row of summary.rows) {
+      const human_annotations: HumanAnnotation[] = [];
+      for (const [annUuid, ann] of Object.entries(row.annotations ?? {})) {
+        if (!ann || ann.value === null || ann.value === undefined) continue;
+        if (annotatorFilter && !annotatorFilter.has(annUuid)) continue;
+        human_annotations.push({
+          annotation_id: `${row.evaluator_id}:${row.evaluator_version_id ?? ""}:${annUuid}`,
+          annotator_id: annUuid,
+          annotator_name: annotatorNameById.get(annUuid) ?? null,
+          job_id: "",
+          value: { value: ann.value, reasoning: ann.reasoning ?? null },
+          reasoning: ann.reasoning ?? null,
+          updated_at: "",
+        });
+      }
+
+      // When the annotator filter is active, suppress evaluator-produced
+      // values entirely (no version pill, no verdict card content) and
+      // drop rows that have no matching annotations.
+      if (annotatorFilter && human_annotations.length === 0) continue;
+
       const evKey = `${row.evaluator_id}-${row.evaluator_version_id ?? ""}`;
       if (!seenEvKey.has(evKey)) {
         seenEvKey.add(evKey);
@@ -238,6 +258,12 @@ export function ItemDetailDialog({
       const scaleMax =
         typeof taskEv?.scale_max === "number" ? taskEv.scale_max : null;
 
+      const suppressEvaluator = annotatorFilter !== null;
+      const effectiveValue = suppressEvaluator ? null : row.evaluator_value;
+      const effectiveReasoning = suppressEvaluator
+        ? null
+        : row.evaluator_reasoning;
+
       runs.push({
         uuid: `${row.item_id}:${row.evaluator_id}:${row.evaluator_version_id ?? ""}`,
         job_id: "",
@@ -245,13 +271,13 @@ export function ItemDetailDialog({
         evaluator_id: row.evaluator_id,
         evaluator_version_id: row.evaluator_version_id ?? "",
         value:
-          row.evaluator_value === null && !row.evaluator_reasoning
+          effectiveValue === null && !effectiveReasoning
             ? null
             : {
-                value: row.evaluator_value,
-                reasoning: row.evaluator_reasoning ?? null,
+                value: effectiveValue,
+                reasoning: effectiveReasoning ?? null,
               },
-        status: row.evaluator_value !== null ? "completed" : "pending",
+        status: effectiveValue !== null ? "completed" : "pending",
         created_at: "",
         completed_at: null,
         evaluator_version: {
@@ -267,21 +293,6 @@ export function ItemDetailDialog({
           output_type: row.output_type,
         },
       });
-
-      const human_annotations: HumanAnnotation[] = [];
-      for (const [annUuid, ann] of Object.entries(row.annotations ?? {})) {
-        if (!ann || ann.value === null || ann.value === undefined) continue;
-        if (annotatorFilter && !annotatorFilter.has(annUuid)) continue;
-        human_annotations.push({
-          annotation_id: `${row.evaluator_id}:${row.evaluator_version_id ?? ""}:${annUuid}`,
-          annotator_id: annUuid,
-          annotator_name: annotatorNameById.get(annUuid) ?? null,
-          job_id: "",
-          value: { value: ann.value, reasoning: ann.reasoning ?? null },
-          reasoning: ann.reasoning ?? null,
-          updated_at: "",
-        });
-      }
       haEvaluators.push({
         evaluator_id: row.evaluator_id,
         agreement: row.evaluator_agreement,
