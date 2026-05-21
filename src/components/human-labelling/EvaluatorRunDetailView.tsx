@@ -434,6 +434,61 @@ function isAnnotationAligned(
   );
 }
 
+/**
+ * Project a raw verdict source (annotation or evaluator run) onto the
+ * `match` / `score` / `reasoning` props the verdict card expects. Shared
+ * by the per-version card path and the grouped-evaluator card path.
+ */
+type CardDisplay = {
+  match: boolean | null;
+  score: number | null;
+  reasoning: string | null;
+};
+
+function resolveCardDisplay(
+  source: { value: unknown; reasoning: string | null } | null,
+  outputType: "binary" | "rating",
+): CardDisplay {
+  if (!source) return { match: null, score: null, reasoning: null };
+  let match: boolean | null = null;
+  let score: number | null = null;
+  if (outputType === "binary" && typeof source.value === "boolean") {
+    match = source.value;
+  } else if (outputType === "rating" && typeof source.value === "number") {
+    score = source.value;
+  }
+  const trimmed = source.reasoning?.trim();
+  return {
+    match,
+    score,
+    reasoning: trimmed && trimmed.length > 0 ? source.reasoning : null,
+  };
+}
+
+function annotationToSource(a: HumanAnnotation): {
+  value: unknown;
+  reasoning: string | null;
+} {
+  const topLevel = typeof a.reasoning === "string" ? a.reasoning : null;
+  const nested =
+    typeof a.value?.reasoning === "string"
+      ? (a.value.reasoning as string)
+      : null;
+  return { value: a.value?.value, reasoning: topLevel ?? nested };
+}
+
+function runToSource(r: EvaluatorRunRow | null | undefined): {
+  value: unknown;
+  reasoning: string | null;
+} | null {
+  if (!r) return null;
+  const reasoning =
+    typeof r.value?.reasoning === "string"
+      ? (r.value.reasoning as string)
+      : null;
+  return { value: r.value?.value, reasoning };
+}
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
@@ -643,28 +698,15 @@ export function EvaluatorResultsPane({
               x.evaluator_version_id === ev.evaluator_version_id),
         );
         const displayName = evaluatorDisplayName(ev, evaluatorNamesById, r);
-        const reasoning =
-          typeof r?.value?.reasoning === "string"
-            ? (r.value.reasoning as string)
-            : null;
-
-        let match: boolean | null = null;
-        let score: number | null = null;
         // Prefer the evaluator's declared output type so annotations still
         // render with the right pill when the evaluator itself produced no
         // value yet (e.g. items labelled by humans before a run).
         let outputType: "binary" | "rating" =
           r?.evaluator?.output_type === "rating" ? "rating" : "binary";
-
         if (r) {
           const v = r.value?.value;
-          if (typeof v === "boolean") {
-            outputType = "binary";
-            match = v;
-          } else if (typeof v === "number") {
-            outputType = "rating";
-            score = v;
-          }
+          if (typeof v === "boolean") outputType = "binary";
+          else if (typeof v === "number") outputType = "rating";
         }
 
         const stillRunning =
@@ -791,30 +833,16 @@ export function EvaluatorResultsPane({
             ? r.evaluator_version.scale_max
             : undefined;
 
-        let displayMatch: boolean | null = match;
-        let displayScore: number | null = score;
-        let displayReasoning: string | null = reasoning;
-
-        if (showHuman && selectedAnnotation) {
-          const v = selectedAnnotation.value?.value;
-          displayMatch = null;
-          displayScore = null;
-          if (outputType === "binary" && typeof v === "boolean") {
-            displayMatch = v;
-          } else if (outputType === "rating" && typeof v === "number") {
-            displayScore = v;
-          }
-          const topLevelReasoning =
-            typeof selectedAnnotation.reasoning === "string"
-              ? selectedAnnotation.reasoning
-              : null;
-          const nestedReasoning =
-            typeof selectedAnnotation.value?.reasoning === "string"
-              ? (selectedAnnotation.value.reasoning as string)
-              : null;
-          const raw = topLevelReasoning ?? nestedReasoning;
-          displayReasoning = raw && raw.trim().length > 0 ? raw : null;
-        }
+        const {
+          match: displayMatch,
+          score: displayScore,
+          reasoning: displayReasoning,
+        } = resolveCardDisplay(
+          showHuman && selectedAnnotation
+            ? annotationToSource(selectedAnnotation)
+            : runToSource(r),
+          outputType,
+        );
 
         return (
           <div
@@ -1017,33 +1045,16 @@ function GroupedEvaluatorCard({
       ? anchorRun.evaluator_version.scale_max
       : undefined;
 
-  let displayMatch: boolean | null = null;
-  let displayScore: number | null = null;
-  let displayReasoning: string | null = null;
-  if (selectedAnnotation) {
-    const v = selectedAnnotation.value?.value;
-    if (outputType === "binary" && typeof v === "boolean") displayMatch = v;
-    else if (outputType === "rating" && typeof v === "number") displayScore = v;
-    const topLevelReasoning =
-      typeof selectedAnnotation.reasoning === "string"
-        ? selectedAnnotation.reasoning
-        : null;
-    const nestedReasoning =
-      typeof selectedAnnotation.value?.reasoning === "string"
-        ? (selectedAnnotation.value.reasoning as string)
-        : null;
-    const raw = topLevelReasoning ?? nestedReasoning;
-    displayReasoning = raw && raw.trim().length > 0 ? raw : null;
-  } else if (selectedVersion?.r) {
-    const v = selectedVersion.r.value?.value;
-    if (outputType === "binary" && typeof v === "boolean") displayMatch = v;
-    else if (outputType === "rating" && typeof v === "number") displayScore = v;
-    const raw =
-      typeof selectedVersion.r.value?.reasoning === "string"
-        ? (selectedVersion.r.value.reasoning as string)
-        : null;
-    displayReasoning = raw && raw.trim().length > 0 ? raw : null;
-  }
+  const {
+    match: displayMatch,
+    score: displayScore,
+    reasoning: displayReasoning,
+  } = resolveCardDisplay(
+    selectedAnnotation
+      ? annotationToSource(selectedAnnotation)
+      : runToSource(selectedVersion?.r ?? null),
+    outputType,
+  );
 
   return (
     <div className="space-y-2">
