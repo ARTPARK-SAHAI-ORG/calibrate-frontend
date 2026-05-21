@@ -168,6 +168,13 @@ export function ItemDetailDialog({
     return selectedAnnotators.filter((a) => valid.has(a.uuid));
   }, [availableAnnotators, selectedAnnotators]);
 
+  // Only show the live-versions toggle when at least one evaluator has
+  // produced a result on this item — otherwise there's nothing to filter.
+  const hasAnyEvaluatorResult = useMemo(() => {
+    if (!summary) return false;
+    return summary.rows.some((r) => r.evaluator_value !== null);
+  }, [summary]);
+
   const annotatorFilter = useMemo<Set<string> | null>(() => {
     if (effectiveSelectedAnnotators.length === 0) return null;
     return new Set(effectiveSelectedAnnotators.map((a) => a.uuid));
@@ -369,6 +376,7 @@ export function ItemDetailDialog({
                 />
               </div>
             )}
+            {hasAnyEvaluatorResult && (
             <Tooltip
               position="bottom"
               content="Show results for only the live versions of each evaluator. Toggle to see the results for all versions."
@@ -406,6 +414,7 @@ export function ItemDetailDialog({
                 Live versions only
               </button>
             </Tooltip>
+            )}
           <button
             onClick={onClose}
             aria-label="Close"
