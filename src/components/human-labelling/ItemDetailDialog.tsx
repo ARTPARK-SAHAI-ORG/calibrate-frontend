@@ -28,6 +28,10 @@ type SummaryRow = {
   evaluator_version_number?: number | null;
   evaluator_value: boolean | number | null;
   evaluator_reasoning?: string | null;
+  // Total runs for this (item, evaluator) across every version. Unaffected
+  // by the `live_only` query param, so we can trust it even when the
+  // visible rows only cover the live version.
+  evaluator_run_count?: number;
   human_agreement: number | null;
   evaluator_agreement: number | null;
   annotations: Record<string, SummaryAnnotation | null>;
@@ -168,15 +172,13 @@ export function ItemDetailDialog({
     return selectedAnnotators.filter((a) => valid.has(a.uuid));
   }, [availableAnnotators, selectedAnnotators]);
 
-  // Drives toggle visibility together with the toggle's own state — see
-  // the render site for the full condition. We hide the toggle only when
-  // it is OFF and there are no results, because when it is ON the loaded
-  // summary reflects only live-version data and may be empty even though
-  // the item has results on non-live versions; hiding it in that case
-  // would strand the user with no way to flip it off.
-  const hasAnyEvaluatorResult = useMemo(() => {
+  // Hide the live-versions toggle when no evaluator has ever been run
+  // against this item — across every version, not just the live one.
+  // Backend's `evaluator_run_count` is unaffected by the `live_only`
+  // query param, so this works even while the toggle is on.
+  const hasAnyEvaluatorRun = useMemo(() => {
     if (!summary) return false;
-    return summary.rows.some((r) => r.evaluator_value !== null);
+    return summary.rows.some((r) => (r.evaluator_run_count ?? 0) > 0);
   }, [summary]);
 
   const annotatorFilter = useMemo<Set<string> | null>(() => {
@@ -391,7 +393,7 @@ export function ItemDetailDialog({
                 />
               </div>
             )}
-            {(liveOnly || hasAnyEvaluatorResult) && (
+            {hasAnyEvaluatorRun && (
             <Tooltip
               position="bottom"
               content="Show results for only the live versions of each evaluator. Toggle to see the results for all versions."
