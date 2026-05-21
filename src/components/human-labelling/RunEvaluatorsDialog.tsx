@@ -174,6 +174,16 @@ export function RunEvaluatorsDialog({
     setPicked((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const allPicked =
+    evaluators.length > 0 && evaluators.every((e) => picked[e.uuid]);
+  const somePicked = pickedCount > 0 && !allPicked;
+  const toggleSelectAll = () => {
+    const next: Record<string, boolean> = {};
+    const target = !allPicked;
+    for (const e of evaluators) next[e.uuid] = target;
+    setPicked(next);
+  };
+
   const handleConfirm = async () => {
     if (pickedCount === 0 || submitting) return;
     const selections: RunEvaluatorsSelection[] = [];
@@ -261,7 +271,25 @@ export function RunEvaluatorsDialog({
               No evaluators are linked to this task.
             </p>
           ) : (
-            evaluators.map((ev) => {
+            <>
+              {evaluators.length > 1 && (
+                <label className="flex items-center gap-3 px-3 py-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={allPicked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePicked;
+                    }}
+                    onChange={toggleSelectAll}
+                    aria-label={allPicked ? "Unselect all evaluators" : "Select all evaluators"}
+                    className="w-4 h-4 cursor-pointer accent-foreground"
+                  />
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {allPicked ? "Unselect all" : "Select all"}
+                  </span>
+                </label>
+              )}
+              {evaluators.map((ev) => {
               const evInfo = info[ev.uuid];
               const versions = evInfo?.versions ?? [];
               const liveVersionId = evInfo?.liveVersionId ?? null;
@@ -362,7 +390,8 @@ export function RunEvaluatorsDialog({
                   )}
                 </div>
               );
-            })
+            })}
+            </>
           )}
           {submitError && <p className="text-sm text-red-500">{submitError}</p>}
         </div>

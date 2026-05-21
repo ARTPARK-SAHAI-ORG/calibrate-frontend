@@ -86,6 +86,16 @@ export function AssignAnnotatorsDialog({
     });
   };
 
+  const allPicked = annotators.length > 0 && picked.size === annotators.length;
+  const somePicked = picked.size > 0 && !allPicked;
+  const toggleSelectAll = () => {
+    if (allPicked) {
+      setPicked(new Set());
+    } else {
+      setPicked(new Set(annotators.map((a) => a.uuid)));
+    }
+  };
+
   const handleConfirm = async () => {
     if (picked.size === 0 || submitting) return;
     setSubmitting(true);
@@ -194,22 +204,41 @@ export function AssignAnnotatorsDialog({
               }
             />
           ) : (
-            annotators.map((a) => (
-              <label
-                key={a.uuid}
-                className="flex items-center gap-3 px-3 py-2 rounded-md border border-border hover:bg-muted/30 transition-colors cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={picked.has(a.uuid)}
-                  onChange={() => toggle(a.uuid)}
-                  className="w-4 h-4 cursor-pointer accent-foreground"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{a.name}</div>
-                </div>
-              </label>
-            ))
+            <>
+              {annotators.length > 1 && (
+                <label className="flex items-center gap-3 px-3 py-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={allPicked}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePicked;
+                    }}
+                    onChange={toggleSelectAll}
+                    aria-label={allPicked ? "Unselect all annotators" : "Select all annotators"}
+                    className="w-4 h-4 cursor-pointer accent-foreground"
+                  />
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {allPicked ? "Unselect all" : "Select all"}
+                  </span>
+                </label>
+              )}
+              {annotators.map((a) => (
+                <label
+                  key={a.uuid}
+                  className="flex items-center gap-3 px-3 py-2 rounded-md border border-border hover:bg-muted/30 transition-colors cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={picked.has(a.uuid)}
+                    onChange={() => toggle(a.uuid)}
+                    className="w-4 h-4 cursor-pointer accent-foreground"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{a.name}</div>
+                  </div>
+                </label>
+              ))}
+            </>
           )}
           {submitError && <p className="text-sm text-red-500">{submitError}</p>}
         </div>
