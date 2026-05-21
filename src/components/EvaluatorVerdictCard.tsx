@@ -116,36 +116,21 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
     typeof props.variableValues === "object" &&
     Object.keys(props.variableValues).length > 0;
 
-  // Read mode collapses both variables and reasoning behind one toggle
-  // (matches the LLM test output cards). Write mode shows everything
-  // inline so annotators can see variables and write reasoning in one
-  // pass — no toggle.
+  // Read mode now exposes variables and reasoning behind separate
+  // toggles so each surface can be expanded independently. Write mode
+  // still shows everything inline so annotators can see variables and
+  // write reasoning in one pass — no toggle.
   const hasReasoning = props.mode === "read" && !!props.reasoning?.trim();
-  const hasCollapsibleBody =
-    props.mode === "read" && (hasVariables || hasReasoning);
+  const showVariablesToggle = props.mode === "read" && hasVariables;
+  const showReasoningToggle = props.mode === "read" && hasReasoning;
 
-  const [open, setOpen] = useState(false);
-
-  const onSurfaceClick = (e: React.MouseEvent) => {
-    if (props.mode !== "read" || !hasCollapsibleBody) return;
-    const el = e.target as HTMLElement;
-    if (el.closest("button") || el.closest("a[href]")) return;
-    if (el.closest("[data-reasoning-body]")) return;
-    if (el.closest("[data-evaluator-verdict-chips]")) return;
-    setOpen((o) => !o);
-  };
+  const [variablesOpen, setVariablesOpen] = useState(false);
+  const [reasoningOpen, setReasoningOpen] = useState(false);
 
   const surface = evaluatorCardSurfaceClass(tone);
-  const isReadCollapsibleClickable =
-    props.mode === "read" && hasCollapsibleBody;
 
   return (
-    <div
-      onClick={isReadCollapsibleClickable ? onSurfaceClick : undefined}
-      className={`${surface} p-3 space-y-3${
-        isReadCollapsibleClickable ? " cursor-pointer" : ""
-      }`}
-    >
+    <div className={`${surface} p-3 space-y-3`}>
       {/* Header: name + verdict pill + toggle on one row; description
           on its own row below so it can use the full card width. */}
       <div className="space-y-1">
@@ -175,10 +160,17 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
                 scaleMax={props.scaleMax}
               />
             )}
-            {hasCollapsibleBody && (
+            {showVariablesToggle && (
               <ReasoningToggleButton
-                open={open}
-                onToggle={() => setOpen((o) => !o)}
+                kind="variables"
+                open={variablesOpen}
+                onToggle={() => setVariablesOpen((o) => !o)}
+              />
+            )}
+            {showReasoningToggle && (
+              <ReasoningToggleButton
+                open={reasoningOpen}
+                onToggle={() => setReasoningOpen((o) => !o)}
               />
             )}
           </div>
@@ -211,23 +203,30 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
         </>
       )}
 
-      {props.mode === "read" && open && hasCollapsibleBody && (
+      {props.mode === "read" && variablesOpen && hasVariables && (
         <div
           data-reasoning-body
           className="pt-2 border-t border-border/60 space-y-3"
         >
-          {hasVariables && (
-            <VariableValuesBlock values={props.variableValues!} />
-          )}
-          {props.reasoning?.trim() && (
+          <VariableValuesBlock values={props.variableValues!} />
+        </div>
+      )}
+
+      {props.mode === "read" &&
+        reasoningOpen &&
+        showReasoningToggle &&
+        props.reasoning?.trim() && (
+          <div
+            data-reasoning-body
+            className="pt-2 border-t border-border/60 space-y-3"
+          >
             <ReasoningExpandedContent
               text={props.reasoning}
               showReasoningLabel
               mutedBody={false}
             />
-          )}
-        </div>
-      )}
+          </div>
+        )}
     </div>
   );
 }
@@ -456,11 +455,27 @@ function WriteReasoning({
 export function ReasoningToggleButton({
   open,
   onToggle,
+  kind = "reasoning",
 }: {
   open: boolean;
   onToggle: () => void;
+  kind?: "reasoning" | "variables";
 }) {
-  const label = open ? "Hide reasoning" : "See reasoning";
+  const labels =
+    kind === "variables"
+      ? { open: "Hide variables", closed: "See variables" }
+      : { open: "Hide reasoning", closed: "See reasoning" };
+  const label = open ? labels.open : labels.closed;
+  // Variables toggle uses a violet palette so it reads as a distinct
+  // surface from the reasoning toggle when both appear on the same card.
+  const toneClass =
+    kind === "variables"
+      ? open
+        ? "border-violet-500/50 bg-violet-500/16 text-violet-950 dark:border-violet-500/45 dark:bg-violet-500/18 dark:text-violet-100 hover:bg-violet-500/26 dark:hover:bg-violet-500/28"
+        : "border-indigo-500/50 bg-indigo-500/14 text-indigo-950 dark:border-indigo-500/45 dark:bg-indigo-500/16 dark:text-indigo-100 hover:bg-indigo-500/24 dark:hover:bg-indigo-500/22"
+      : open
+        ? "border-fuchsia-500/50 bg-fuchsia-500/16 text-fuchsia-950 dark:border-fuchsia-500/45 dark:bg-fuchsia-500/18 dark:text-fuchsia-100 hover:bg-fuchsia-500/26 dark:hover:bg-fuchsia-500/28"
+        : "border-cyan-500/50 bg-cyan-500/14 text-cyan-950 dark:border-cyan-500/45 dark:bg-cyan-500/16 dark:text-cyan-100 hover:bg-cyan-500/24 dark:hover:bg-cyan-500/22";
   return (
     <button
       type="button"
@@ -469,11 +484,7 @@ export function ReasoningToggleButton({
         onToggle();
       }}
       aria-expanded={open}
-      className={`inline-flex items-center gap-1.5 max-w-[min(100%,14rem)] rounded-md border px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer shrink-0 ${
-        open
-          ? "border-fuchsia-500/50 bg-fuchsia-500/16 text-fuchsia-950 dark:border-fuchsia-500/45 dark:bg-fuchsia-500/18 dark:text-fuchsia-100 hover:bg-fuchsia-500/26 dark:hover:bg-fuchsia-500/28"
-          : "border-cyan-500/50 bg-cyan-500/14 text-cyan-950 dark:border-cyan-500/45 dark:bg-cyan-500/16 dark:text-cyan-100 hover:bg-cyan-500/24 dark:hover:bg-cyan-500/22"
-      }`}
+      className={`inline-flex items-center gap-1.5 max-w-[min(100%,14rem)] rounded-md border px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer shrink-0 ${toneClass}`}
     >
       <span className="truncate">{label}</span>
       <ChevronDownIcon
@@ -484,6 +495,7 @@ export function ReasoningToggleButton({
     </button>
   );
 }
+
 
 /** Read-only reasoning body — shared with the tool-call collapsible
  * strip in shared.tsx so all reasoning content uses the same typography. */
