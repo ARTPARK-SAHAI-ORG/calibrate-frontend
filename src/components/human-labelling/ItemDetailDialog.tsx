@@ -372,10 +372,15 @@ export function ItemDetailDialog({
         onClick={(e) => e.stopPropagation()}
         className="bg-background rounded-none md:rounded-xl w-full max-w-[92rem] h-full md:h-[92vh] flex flex-col shadow-2xl overflow-hidden"
       >
-        <div className="flex items-center justify-between gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-border">
+        <div className="relative flex items-center justify-between gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-border">
           <div className="min-w-0 flex items-center gap-2 flex-wrap">
-            {(onPrev || onNext) && (
-              <div className="flex items-center gap-1 mr-1">
+            <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
+              {itemTitle(item)}
+            </h2>
+          </div>
+          {(onPrev || onNext) && (
+            <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-2 pointer-events-none">
+              <div className="pointer-events-auto">
                 <Tooltip position="bottom" content="Previous item">
                   <button
                     type="button"
@@ -399,6 +404,15 @@ export function ItemDetailDialog({
                     </svg>
                   </button>
                 </Tooltip>
+              </div>
+              {position && position.total > 0 ? (
+                <span className="text-xs text-muted-foreground tabular-nums min-w-[4rem] text-center">
+                  {position.index + 1} of {position.total}
+                </span>
+              ) : (
+                <span className="min-w-[4rem]" />
+              )}
+              <div className="pointer-events-auto">
                 <Tooltip position="bottom" content="Next item">
                   <button
                     type="button"
@@ -423,16 +437,8 @@ export function ItemDetailDialog({
                   </button>
                 </Tooltip>
               </div>
-            )}
-            <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
-              {itemTitle(item)}
-            </h2>
-            {position && position.total > 0 && (
-              <span className="text-xs text-muted-foreground shrink-0">
-                {position.index + 1} of {position.total}
-              </span>
-            )}
-          </div>
+            </div>
+          )}
           <div className="flex items-center gap-2 shrink-0">
             {loading && summary && (
               <svg
