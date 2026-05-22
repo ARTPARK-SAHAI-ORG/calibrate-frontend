@@ -376,7 +376,7 @@ export function ItemDetailDialog({
           <div className="min-w-0 flex items-center gap-2 flex-wrap">
             {(onPrev || onNext) && (
               <div className="flex items-center gap-1 mr-1">
-                <Tooltip position="bottom" content="Previous item (←)">
+                <Tooltip position="bottom" content="Previous item">
                   <button
                     type="button"
                     onClick={onPrev}
@@ -399,7 +399,7 @@ export function ItemDetailDialog({
                     </svg>
                   </button>
                 </Tooltip>
-                <Tooltip position="bottom" content="Next item (→)">
+                <Tooltip position="bottom" content="Next item">
                   <button
                     type="button"
                     onClick={onNext}
