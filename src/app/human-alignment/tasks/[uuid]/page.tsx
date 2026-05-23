@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -582,24 +583,66 @@ function LabelledByCell({
         </span>
       ))}
       {remainingNames.length > 0 && (
-        <span
-          className="relative group inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-muted-foreground cursor-default"
-          onClick={(e) => e.stopPropagation()}
-        >
-          +{remainingNames.length} more
-          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 hidden group-hover:flex flex-wrap gap-1 px-2 py-1.5 rounded-lg bg-white shadow-lg border border-border max-w-64 w-max">
-            {remainingNames.map((n, i) => (
-              <span
-                key={i}
-                className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground"
-              >
-                {n}
-              </span>
-            ))}
-          </span>
-        </span>
+        <MoreLabellersChip names={remainingNames} />
       )}
     </div>
+  );
+}
+
+function MoreLabellersChip({ names }: { names: string[] }) {
+  const triggerRef = useRef<HTMLSpanElement>(null);
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const update = () => {
+      if (!triggerRef.current) return;
+      const r = triggerRef.current.getBoundingClientRect();
+      setPos({ top: r.top, left: r.left + r.width / 2 });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <span
+        ref={triggerRef}
+        className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-muted-foreground cursor-default"
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onClick={(e) => e.stopPropagation()}
+      >
+        +{names.length} more
+      </span>
+      {open &&
+        pos &&
+        typeof window !== "undefined" &&
+        createPortal(
+          <div
+            className="fixed z-[9999] -translate-x-1/2 -translate-y-full pointer-events-none"
+            style={{ top: pos.top - 6, left: pos.left }}
+          >
+            <div className="flex flex-wrap gap-1 px-2 py-1.5 rounded-lg bg-white shadow-lg border border-border max-w-64 w-max">
+              {names.map((n, i) => (
+                <span
+                  key={i}
+                  className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground"
+                >
+                  {n}
+                </span>
+              ))}
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 
