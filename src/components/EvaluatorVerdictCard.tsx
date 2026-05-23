@@ -54,6 +54,12 @@ type CommonProps = {
   /** Custom labels for binary verdicts. Defaults to Correct / Wrong. */
   trueLabel?: string | null;
   falseLabel?: string | null;
+  /** Rating-scale entries with per-level display names. When present we
+   * also show the label next to each rating button and beside the
+   * score / max pill so annotators see what each number means. */
+  ratingScale?:
+    | { value: number; name?: string | null }[]
+    | null;
 };
 
 type ReadProps = CommonProps & {
@@ -174,6 +180,7 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
                 scaleMax={props.scaleMax}
                 trueLabel={props.trueLabel}
                 falseLabel={props.falseLabel}
+                ratingScale={props.ratingScale}
               />
             )}
             {toggleKind && (
@@ -203,6 +210,7 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
             disabled={props.disabled}
             trueLabel={props.trueLabel}
             falseLabel={props.falseLabel}
+            ratingScale={props.ratingScale}
           />
           {hasVariables && (
             <VariableValuesBlock values={props.variableValues!} />
@@ -268,6 +276,7 @@ function ReadVerdictPill({
   scaleMax,
   trueLabel,
   falseLabel,
+  ratingScale,
 }: {
   outputType: EvaluatorOutputType;
   match?: boolean | null;
@@ -276,6 +285,7 @@ function ReadVerdictPill({
   scaleMax?: number;
   trueLabel?: string | null;
   falseLabel?: string | null;
+  ratingScale?: { value: number; name?: string | null }[] | null;
 }) {
   if (outputType === "binary") {
     if (match === null || match === undefined) return null;
@@ -312,12 +322,23 @@ function ReadVerdictPill({
       : tone === "red"
         ? "bg-red-500/15 text-red-600 dark:text-red-400"
         : "bg-amber-500/15 text-amber-600 dark:text-amber-400";
+  const ratingLabel =
+    ratingScale?.find((e) => e.value === score)?.name?.trim() || null;
   return (
-    <span
-      className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium ${toneClass}`}
-    >
-      {scaleMax !== undefined ? `${score} / ${scaleMax}` : `Score: ${score}`}
-    </span>
+    <>
+      <span
+        className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium ${toneClass}`}
+      >
+        {scaleMax !== undefined ? `${score} / ${scaleMax}` : `Score: ${score}`}
+      </span>
+      {ratingLabel && (
+        <span
+          className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium ${toneClass}`}
+        >
+          {ratingLabel}
+        </span>
+      )}
+    </>
   );
 }
 
@@ -330,6 +351,7 @@ function WriteControls({
   disabled,
   trueLabel,
   falseLabel,
+  ratingScale,
 }: {
   outputType: EvaluatorOutputType;
   scaleMin?: number;
@@ -339,6 +361,7 @@ function WriteControls({
   disabled?: boolean;
   trueLabel?: string | null;
   falseLabel?: string | null;
+  ratingScale?: { value: number; name?: string | null }[] | null;
 }) {
   if (outputType === "binary") {
     const baseBtn =
@@ -396,23 +419,39 @@ function WriteControls({
     { length: scaleMax - scaleMin + 1 },
     (_, i) => scaleMin + i,
   );
+  const hasLabels = !!ratingScale?.some((e) => e.name?.trim());
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
+    <div className="flex items-stretch gap-1.5 flex-wrap">
       {options.map((n) => {
         const active = value === n;
+        const label =
+          ratingScale?.find((e) => e.value === n)?.name?.trim() || null;
         return (
           <button
             key={n}
             type="button"
             disabled={disabled}
             onClick={() => onChange(n)}
-            className={`w-9 h-9 rounded-md border text-sm font-medium transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
+            className={`${
+              hasLabels
+                ? "min-w-[3.25rem] px-2.5 h-auto py-1.5 flex flex-col items-center gap-0.5"
+                : "w-9 h-9"
+            } rounded-md border text-sm font-medium transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
               active
                 ? "border-foreground bg-foreground text-background"
                 : "border-border bg-background hover:bg-muted/50"
             }`}
           >
-            {n}
+            <span>{n}</span>
+            {hasLabels && (
+              <span
+                className={`text-[10px] font-normal leading-tight ${
+                  active ? "text-background/80" : "text-muted-foreground"
+                }`}
+              >
+                {label ?? ""}
+              </span>
+            )}
           </button>
         );
       })}

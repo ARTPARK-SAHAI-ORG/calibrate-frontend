@@ -946,7 +946,7 @@ function EvaluatorDetailPageInner() {
       {newVersionOpen && evaluator && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div
-            className="bg-background border border-border rounded-xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[90vh]"
+            className="bg-background border border-border rounded-xl w-full max-w-[96rem] shadow-2xl flex flex-col max-h-[90vh]"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-5 md:px-6 py-4 border-b border-border">
@@ -978,7 +978,7 @@ function EvaluatorDetailPageInner() {
 
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-5 md:px-6 py-4 md:py-5 space-y-4 md:space-y-5">
-              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] gap-4 md:gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)_minmax(300px,0.9fr)] gap-4 md:gap-6">
                 {/* Left column — Prompt */}
                 <div>
                   <label className="block text-xs md:text-sm font-medium mb-2">
@@ -1000,6 +1000,26 @@ function EvaluatorDetailPageInner() {
                         : "border-border"
                     }`}
                   />
+                </div>
+
+                {/* Middle column — Labels (rating scale / binary labels) */}
+                <div className="space-y-4 md:space-y-5">
+                  {evaluator.output_type === "rating" && (
+                    <RatingScaleEditor
+                      rows={newVersionScale}
+                      onChange={setNewVersionScale}
+                      validationAttempted={newVersionValidated}
+                      description="At least two rows. Description is optional rubric text sent to the judge."
+                      descriptionPlaceholder="Description (optional) - criteria for this level, shown to the judge"
+                    />
+                  )}
+
+                  {evaluator.output_type === "binary" && (
+                    <BinaryScaleEditor
+                      rows={newVersionBinaryScale}
+                      onChange={setNewVersionBinaryScale}
+                    />
+                  )}
                 </div>
 
                 {/* Right column — Version settings */}
@@ -1077,23 +1097,6 @@ function EvaluatorDetailPageInner() {
                       </svg>
                     </button>
                   </div>
-
-                  {evaluator.output_type === "rating" && (
-                    <RatingScaleEditor
-                      rows={newVersionScale}
-                      onChange={setNewVersionScale}
-                      validationAttempted={newVersionValidated}
-                      description="At least two rows. Description is optional rubric text sent to the judge."
-                      descriptionPlaceholder="Description (optional) - criteria for this level, shown to the judge"
-                    />
-                  )}
-
-                  {evaluator.output_type === "binary" && (
-                    <BinaryScaleEditor
-                      rows={newVersionBinaryScale}
-                      onChange={setNewVersionBinaryScale}
-                    />
-                  )}
 
                   {(() => {
                     const existingVariables =

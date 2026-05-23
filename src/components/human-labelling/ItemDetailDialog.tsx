@@ -27,10 +27,22 @@ type SummaryRow = {
   evaluator_version_id?: string | null;
   evaluator_version_number?: number | null;
   evaluator_value: boolean | number | null;
+  evaluator_value_name?: string | null;
   evaluator_reasoning?: string | null;
   human_agreement: number | null;
   evaluator_agreement: number | null;
   annotations: Record<string, SummaryAnnotation | null>;
+  // Per-version output_config — different versions of the same evaluator
+  // can carry different labels/rubrics on their scale entries. Falls back
+  // to the task-level evaluator snapshot when the row doesn't carry it.
+  evaluator_version_output_config?: {
+    scale?: {
+      value: boolean | number | string;
+      name?: string | null;
+      description?: string | null;
+      color?: string | null;
+    }[];
+  } | null;
 };
 type SummaryEvaluator = {
   evaluator_id: string;
@@ -51,6 +63,14 @@ type TaskEvaluatorDef = {
   description?: string | null;
   scale_min?: number | boolean | null;
   scale_max?: number | boolean | null;
+  output_config?: {
+    scale?: {
+      value: boolean | number | string;
+      name?: string | null;
+      description?: string | null;
+      color?: string | null;
+    }[];
+  } | null;
 };
 
 function itemTitle(item: Item | null): string {
@@ -328,6 +348,27 @@ export function ItemDetailDialog({
           version_number: row.evaluator_version_number ?? undefined,
           scale_min: scaleMin,
           scale_max: scaleMax,
+          // Prefer the per-row resolved label. The backend now sends
+          // `evaluator_value_name` per row, which is the label for THIS
+          // version's score — different versions of the same evaluator
+          // can have different labels. Synthesize a one-entry scale so
+          // the verdict pill / rating label uses it. Fall back to the
+          // task-level snapshot when the row doesn't carry a name.
+          output_config:
+            row.evaluator_value !== null &&
+            typeof row.evaluator_value_name === "string" &&
+            row.evaluator_value_name.length > 0
+              ? {
+                  scale: [
+                    {
+                      value: row.evaluator_value,
+                      name: row.evaluator_value_name,
+                    },
+                  ],
+                }
+              : row.evaluator_version_output_config ??
+                taskEv?.output_config ??
+                null,
         },
         evaluator: {
           uuid: row.evaluator_id,

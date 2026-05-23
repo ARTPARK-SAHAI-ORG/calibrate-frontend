@@ -11,6 +11,7 @@
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
+import { getBinaryLabel } from "@/lib/binaryLabels";
 import {
   AgreementStatCard,
   agreementColor,
@@ -36,8 +37,14 @@ export type EvaluatorRunRow = {
     version_number?: number;
     scale_min?: number | null;
     scale_max?: number | null;
-    true_label?: string | null;
-    false_label?: string | null;
+    output_config?: {
+      scale?: {
+        value: boolean | number | string;
+        name?: string | null;
+        description?: string | null;
+        color?: string | null;
+      }[];
+    } | null;
   } | null;
   evaluator?: {
     uuid?: string;
@@ -905,8 +912,22 @@ export function EvaluatorResultsPane({
               score={displayScore}
               scaleMin={scaleMin}
               scaleMax={scaleMax}
-              trueLabel={r.evaluator_version?.true_label ?? null}
-              falseLabel={r.evaluator_version?.false_label ?? null}
+              trueLabel={getBinaryLabel(
+                r.evaluator_version?.output_config?.scale ?? null,
+                true,
+              )}
+              falseLabel={getBinaryLabel(
+                r.evaluator_version?.output_config?.scale ?? null,
+                false,
+              )}
+              ratingScale={
+                (r.evaluator_version?.output_config?.scale ?? null)
+                  ?.filter((e) => typeof e.value === "number")
+                  .map((e) => ({
+                    value: e.value as number,
+                    name: e.name ?? null,
+                  })) ?? null
+              }
               reasoning={displayReasoning}
             />
           </div>
@@ -1144,8 +1165,22 @@ function GroupedEvaluatorCard({
         score={displayScore}
         scaleMin={scaleMin}
         scaleMax={scaleMax}
-        trueLabel={anchorRun?.evaluator_version?.true_label ?? null}
-        falseLabel={anchorRun?.evaluator_version?.false_label ?? null}
+        trueLabel={getBinaryLabel(
+          anchorRun?.evaluator_version?.output_config?.scale ?? null,
+          true,
+        )}
+        falseLabel={getBinaryLabel(
+          anchorRun?.evaluator_version?.output_config?.scale ?? null,
+          false,
+        )}
+        ratingScale={
+          (anchorRun?.evaluator_version?.output_config?.scale ?? null)
+            ?.filter((e) => typeof e.value === "number")
+            .map((e) => ({
+              value: e.value as number,
+              name: e.name ?? null,
+            })) ?? null
+        }
         reasoning={displayReasoning}
       />
     </div>

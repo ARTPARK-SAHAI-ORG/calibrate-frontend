@@ -185,6 +185,14 @@ type LabellingTask = {
     output_type?: "binary" | "rating" | null;
     scale_min?: number | boolean | null;
     scale_max?: number | boolean | null;
+    output_config?: {
+      scale?: {
+        value: boolean | number | string;
+        name?: string | null;
+        description?: string | null;
+        color?: string | null;
+      }[];
+    } | null;
     variables?: EvaluatorVariableDef[] | null;
   }[];
   items?: LabellingItem[];

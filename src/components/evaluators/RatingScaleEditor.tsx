@@ -114,8 +114,8 @@ export function RatingScaleEditor<T extends RatingScaleRow>({
                   updateRow(idx, { description: e.target.value } as Partial<T>)
                 }
                 placeholder={descriptionPlaceholder}
-                rows={2}
-                className="mt-2 w-full px-3 py-2 rounded-md text-sm border border-border bg-background dark:bg-accent text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none"
+                rows={3}
+                className="mt-2 w-full px-3 py-2 rounded-md text-sm border border-border bg-background dark:bg-accent text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-y min-h-[5rem]"
               />
             </div>
           );
