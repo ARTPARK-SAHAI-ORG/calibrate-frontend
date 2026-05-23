@@ -566,17 +566,21 @@ function LabelledByCell({
     );
   }
   const ids = Array.from(labellers);
-  const firstId = ids[0];
-  const firstName =
-    annotatorNameById.get(firstId) ?? firstId.slice(0, 8);
-  const remainingNames = ids
-    .slice(1)
-    .map((id) => annotatorNameById.get(id) ?? id.slice(0, 8));
+  const nameFor = (id: string) =>
+    annotatorNameById.get(id) ?? id.slice(0, 8);
+  const visibleIds = ids.length <= 2 ? ids : ids.slice(0, 1);
+  const remainingNames =
+    ids.length <= 2 ? [] : ids.slice(1).map(nameFor);
   return (
     <div className="flex flex-wrap gap-1 min-w-0">
-      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground">
-        {firstName}
-      </span>
+      {visibleIds.map((id) => (
+        <span
+          key={id}
+          className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground"
+        >
+          {nameFor(id)}
+        </span>
+      ))}
       {remainingNames.length > 0 && (
         <span
           className="relative group inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-muted-foreground cursor-default"
