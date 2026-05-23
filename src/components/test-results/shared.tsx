@@ -138,6 +138,11 @@ export type JudgeResult = {
   variable_values?: Record<string, string> | null;
   scale_min?: number | null;
   scale_max?: number | null;
+  // Custom labels for binary verdicts, surfaced from
+  // `output_config.scale`. Optional/null for legacy rows or evaluators
+  // that haven't overridden the default Correct / Wrong labels.
+  true_label?: string | null;
+  false_label?: string | null;
 };
 
 function buildLegacyNextReplyJudgeResults({
@@ -408,6 +413,8 @@ function JudgeResultCard({
       match={result.match}
       score={result.score}
       reasoning={result.reasoning}
+      trueLabel={result.true_label}
+      falseLabel={result.false_label}
     />
   );
 }
@@ -799,6 +806,8 @@ function EvaluatorPanelCard({
       match={result.match}
       score={result.score}
       reasoning={result.reasoning}
+      trueLabel={result.true_label}
+      falseLabel={result.false_label}
     />
   );
 }

@@ -36,6 +36,8 @@ export type EvaluatorRunRow = {
     version_number?: number;
     scale_min?: number | null;
     scale_max?: number | null;
+    true_label?: string | null;
+    false_label?: string | null;
   } | null;
   evaluator?: {
     uuid?: string;
@@ -903,6 +905,8 @@ export function EvaluatorResultsPane({
               score={displayScore}
               scaleMin={scaleMin}
               scaleMax={scaleMax}
+              trueLabel={r.evaluator_version?.true_label ?? null}
+              falseLabel={r.evaluator_version?.false_label ?? null}
               reasoning={displayReasoning}
             />
           </div>
@@ -1140,6 +1144,8 @@ function GroupedEvaluatorCard({
         score={displayScore}
         scaleMin={scaleMin}
         scaleMax={scaleMax}
+        trueLabel={anchorRun?.evaluator_version?.true_label ?? null}
+        falseLabel={anchorRun?.evaluator_version?.false_label ?? null}
         reasoning={displayReasoning}
       />
     </div>

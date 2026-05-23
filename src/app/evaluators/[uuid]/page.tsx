@@ -24,6 +24,11 @@ import {
 import { LLMSelectorModal } from "@/components/agent-tabs/LLMSelectorModal";
 import type { LLMModel } from "@/components/agent-tabs/constants/providers";
 import { RatingScaleEditor } from "@/components/evaluators/RatingScaleEditor";
+import {
+  BinaryScaleEditor,
+  defaultBinaryScale,
+  type BinaryScaleRow,
+} from "@/components/evaluators/BinaryScaleEditor";
 import { VersionCard } from "@/components/evaluators/VersionCard";
 import { extractVariableNames } from "@/lib/evaluatorVariables";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
@@ -191,6 +196,9 @@ function EvaluatorDetailPageInner() {
   const [newVersionScale, setNewVersionScale] = useState<
     { value: number | string; name: string; description: string }[]
   >([]);
+  const [newVersionBinaryScale, setNewVersionBinaryScale] = useState<
+    BinaryScaleRow[]
+  >(defaultBinaryScale());
   const [newVersionLlmModalOpen, setNewVersionLlmModalOpen] = useState(false);
   const [newVersionSaving, setNewVersionSaving] = useState(false);
   const [newVersionError, setNewVersionError] = useState<string | null>(null);
@@ -403,6 +411,23 @@ function EvaluatorDetailPageInner() {
     } else {
       setNewVersionScale([]);
     }
+    if (evaluator.output_type === "binary") {
+      const scale = live?.output_config?.scale ?? [];
+      const trueEntry = scale.find((e) => e.value === true);
+      const falseEntry = scale.find((e) => e.value === false);
+      setNewVersionBinaryScale([
+        {
+          value: true,
+          name: trueEntry?.name ?? "",
+          description: trueEntry?.description ?? "",
+        },
+        {
+          value: false,
+          name: falseEntry?.name ?? "",
+          description: falseEntry?.description ?? "",
+        },
+      ]);
+    }
     setNewVersionError(null);
     setNewVersionValidated(false);
     setNewVersionChangelog("");
@@ -464,6 +489,21 @@ function EvaluatorDetailPageInner() {
               : {}),
           })),
         };
+      } else if (evaluator.output_type === "binary") {
+        const hasAnyOverride = newVersionBinaryScale.some(
+          (r) => r.name.trim().length > 0 || r.description.trim().length > 0,
+        );
+        if (hasAnyOverride) {
+          body.output_config = {
+            scale: newVersionBinaryScale.map((r) => ({
+              value: r.value,
+              name: r.name.trim() || (r.value ? "Correct" : "Wrong"),
+              ...(r.description.trim()
+                ? { description: r.description.trim() }
+                : {}),
+            })),
+          };
+        }
       }
       // Variable name set is pinned to the live version (we don't allow add /
       // rename / remove on a new version — see the amber callout in the UI).
@@ -1045,6 +1085,13 @@ function EvaluatorDetailPageInner() {
                       validationAttempted={newVersionValidated}
                       description="At least two rows. Description is optional rubric text sent to the judge."
                       descriptionPlaceholder="Description (optional) - criteria for this level, shown to the judge"
+                    />
+                  )}
+
+                  {evaluator.output_type === "binary" && (
+                    <BinaryScaleEditor
+                      rows={newVersionBinaryScale}
+                      onChange={setNewVersionBinaryScale}
                     />
                   )}
 

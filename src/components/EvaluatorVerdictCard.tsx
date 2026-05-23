@@ -22,6 +22,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import {
+  DEFAULT_BINARY_FALSE_LABEL,
+  DEFAULT_BINARY_TRUE_LABEL,
+} from "@/lib/binaryLabels";
 
 export type EvaluatorOutputType = "binary" | "rating";
 
@@ -47,6 +51,9 @@ type CommonProps = {
   scaleMin?: number;
   /** Upper bound of a rating scale; rating buttons render 1..scaleMax. */
   scaleMax?: number;
+  /** Custom labels for binary verdicts. Defaults to Correct / Wrong. */
+  trueLabel?: string | null;
+  falseLabel?: string | null;
 };
 
 type ReadProps = CommonProps & {
@@ -165,6 +172,8 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
                 score={props.score}
                 scaleMin={props.scaleMin}
                 scaleMax={props.scaleMax}
+                trueLabel={props.trueLabel}
+                falseLabel={props.falseLabel}
               />
             )}
             {toggleKind && (
@@ -192,6 +201,8 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
             value={props.value}
             onChange={(v) => props.onValueChange?.(v)}
             disabled={props.disabled}
+            trueLabel={props.trueLabel}
+            falseLabel={props.falseLabel}
           />
           {hasVariables && (
             <VariableValuesBlock values={props.variableValues!} />
@@ -255,15 +266,22 @@ function ReadVerdictPill({
   score,
   scaleMin,
   scaleMax,
+  trueLabel,
+  falseLabel,
 }: {
   outputType: EvaluatorOutputType;
   match?: boolean | null;
   score?: number | null;
   scaleMin?: number;
   scaleMax?: number;
+  trueLabel?: string | null;
+  falseLabel?: string | null;
 }) {
   if (outputType === "binary") {
     if (match === null || match === undefined) return null;
+    const label = match
+      ? (trueLabel?.trim() || DEFAULT_BINARY_TRUE_LABEL)
+      : (falseLabel?.trim() || DEFAULT_BINARY_FALSE_LABEL);
     return (
       <span
         className={`flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium ${
@@ -277,7 +295,7 @@ function ReadVerdictPill({
         ) : (
           <XIcon className="w-3 h-3" />
         )}
-        {match ? "Correct" : "Wrong"}
+        {label}
       </span>
     );
   }
@@ -310,6 +328,8 @@ function WriteControls({
   value,
   onChange,
   disabled,
+  trueLabel,
+  falseLabel,
 }: {
   outputType: EvaluatorOutputType;
   scaleMin?: number;
@@ -317,6 +337,8 @@ function WriteControls({
   value?: boolean | number;
   onChange: (v: boolean | number) => void;
   disabled?: boolean;
+  trueLabel?: string | null;
+  falseLabel?: string | null;
 }) {
   if (outputType === "binary") {
     const baseBtn =
@@ -333,7 +355,7 @@ function WriteControls({
               : "border-border bg-background hover:bg-muted/50"
           }`}
         >
-          Correct
+          {trueLabel?.trim() || DEFAULT_BINARY_TRUE_LABEL}
         </button>
         <button
           type="button"
@@ -345,7 +367,7 @@ function WriteControls({
               : "border-border bg-background hover:bg-muted/50"
           }`}
         >
-          Wrong
+          {falseLabel?.trim() || DEFAULT_BINARY_FALSE_LABEL}
         </button>
       </div>
     );

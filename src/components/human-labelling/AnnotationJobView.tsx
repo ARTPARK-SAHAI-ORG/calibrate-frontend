@@ -56,6 +56,10 @@ type Evaluator = {
   // buttons render `scale_min..scale_max` instead of the default 1..5.
   scale_min?: number | null;
   scale_max?: number | null;
+  // Custom labels for binary verdicts, surfaced from
+  // `output_config.scale`. Optional — fall back to Correct / Wrong.
+  true_label?: string | null;
+  false_label?: string | null;
 };
 
 export type Item = {
@@ -923,6 +927,8 @@ function EvaluatorsPane({
                   : null
               }
               reasoning={typeof f?.comment === "string" ? f.comment : null}
+              trueLabel={ev.true_label}
+              falseLabel={ev.false_label}
             />
           );
         }
@@ -941,6 +947,8 @@ function EvaluatorsPane({
             comment={typeof f?.comment === "string" ? f.comment : ""}
             onValueChange={(v) => setField(k, { value: v })}
             onCommentChange={(s) => setField(k, { comment: s })}
+            trueLabel={ev.true_label}
+            falseLabel={ev.false_label}
           />
         );
       })}

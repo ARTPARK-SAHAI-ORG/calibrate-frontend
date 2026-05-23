@@ -11,6 +11,10 @@ import {
   RatingScaleEditor,
   type RatingScaleRow,
 } from "@/components/evaluators/RatingScaleEditor";
+import {
+  BinaryScaleEditor,
+  type BinaryScaleRow,
+} from "@/components/evaluators/BinaryScaleEditor";
 
 type CreateRatingScaleRow = RatingScaleRow & {
   value: number;
@@ -23,6 +27,7 @@ type CreateEvaluatorSidebarProps = {
   evaluatorType: EvaluatorType | null;
   evaluatorOutputType: "binary" | "rating";
   evaluatorScale: CreateRatingScaleRow[];
+  evaluatorBinaryScale: BinaryScaleRow[];
   judgeModel: LLMModel | null;
   systemPrompt: string;
   detectedPromptVariables: string[];
@@ -41,6 +46,7 @@ type CreateEvaluatorSidebarProps = {
   setEvaluatorDescription: (value: string) => void;
   setEvaluatorOutputType: (value: "binary" | "rating") => void;
   setEvaluatorScale: (value: CreateRatingScaleRow[]) => void;
+  setEvaluatorBinaryScale: (value: BinaryScaleRow[]) => void;
   setSystemPrompt: (value: string) => void;
   setVariableDescriptions: Dispatch<SetStateAction<Record<string, string>>>;
   setCreateNameError: (value: string | null) => void;
@@ -53,6 +59,7 @@ export function CreateEvaluatorSidebar({
   evaluatorType,
   evaluatorOutputType,
   evaluatorScale,
+  evaluatorBinaryScale,
   judgeModel,
   systemPrompt,
   detectedPromptVariables,
@@ -71,6 +78,7 @@ export function CreateEvaluatorSidebar({
   setEvaluatorDescription,
   setEvaluatorOutputType,
   setEvaluatorScale,
+  setEvaluatorBinaryScale,
   setSystemPrompt,
   setVariableDescriptions,
   setCreateNameError,
@@ -212,6 +220,13 @@ export function CreateEvaluatorSidebar({
                 : "Returns a score on a custom rating scale you define below."}
             </p>
           </div>
+
+          {evaluatorOutputType === "binary" && (
+            <BinaryScaleEditor
+              rows={evaluatorBinaryScale}
+              onChange={setEvaluatorBinaryScale}
+            />
+          )}
 
           {evaluatorOutputType === "rating" && (
             <RatingScaleEditor

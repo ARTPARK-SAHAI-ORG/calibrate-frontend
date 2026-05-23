@@ -20,6 +20,10 @@ import {
 import { LLMSelectorModal } from "@/components/agent-tabs/LLMSelectorModal";
 import type { LLMModel } from "@/components/agent-tabs/constants/providers";
 import { CreateEvaluatorSidebar } from "@/components/evaluators/CreateEvaluatorSidebar";
+import {
+  defaultBinaryScale,
+  type BinaryScaleRow,
+} from "@/components/evaluators/BinaryScaleEditor";
 import { UseCasePickerDialog } from "@/components/evaluators/UseCasePickerDialog";
 import { extractVariableNames } from "@/lib/evaluatorVariables";
 import { useSidebarState } from "@/lib/sidebar";
@@ -38,6 +42,35 @@ type EvaluatorData = {
 };
 
 type EvaluatorTab = "default" | "mine";
+
+// Build the output_config payload for a binary evaluator. We only send a
+// `scale` when the user has actually overridden at least one label or
+// description — otherwise the backend defaults (Pass/Fail-shaped) stay in
+// effect. Returns either {} or { output_config: { scale: [...] } } so it
+// can be spread inline.
+function buildBinaryOutputConfig(rows: BinaryScaleRow[]): {
+  output_config?: {
+    scale: { value: boolean; name: string; description?: string }[];
+  };
+} {
+  const hasAnyOverride = rows.some(
+    (r) => r.name.trim().length > 0 || r.description.trim().length > 0,
+  );
+  if (!hasAnyOverride) return {};
+  return {
+    output_config: {
+      scale: rows.map((r) => ({
+        value: r.value,
+        name:
+          r.name.trim() ||
+          (r.value ? "Correct" : "Wrong"),
+        ...(r.description.trim()
+          ? { description: r.description.trim() }
+          : {}),
+      })),
+    },
+  };
+}
 
 const EVALUATOR_TYPE_TO_DATA_TYPE: Record<EvaluatorType, "text" | "audio"> = {
   tts: "audio",
@@ -198,6 +231,9 @@ function MetricsPageInner() {
     { value: 2, name: "", description: "" },
     { value: 3, name: "", description: "" },
   ]);
+  const [newEvaluatorBinaryScale, setNewEvaluatorBinaryScale] = useState<
+    BinaryScaleRow[]
+  >(defaultBinaryScale());
 
   // Delete confirmation state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -357,6 +393,34 @@ function MetricsPageInner() {
           })),
         );
       }
+
+      // Seed the binary label editor when the use case's default ships a
+      // binary scale with custom labels. Otherwise leave the blank rows in
+      // place so placeholders fall back to Correct / Wrong.
+      if (
+        data.output_type === "binary" &&
+        data.output_config?.scale &&
+        data.output_config.scale.length >= 2
+      ) {
+        const trueEntry = data.output_config.scale.find(
+          (r) => r.value === true,
+        );
+        const falseEntry = data.output_config.scale.find(
+          (r) => r.value === false,
+        );
+        setNewEvaluatorBinaryScale([
+          {
+            value: true,
+            name: trueEntry?.name ?? "",
+            description: trueEntry?.description ?? "",
+          },
+          {
+            value: false,
+            name: falseEntry?.name ?? "",
+            description: falseEntry?.description ?? "",
+          },
+        ]);
+      }
     } catch (err) {
       console.error("Error prefilling default prompt:", err);
     }
@@ -483,6 +547,7 @@ function MetricsPageInner() {
       { value: 2, name: "", description: "" },
       { value: 3, name: "", description: "" },
     ]);
+    setNewEvaluatorBinaryScale(defaultBinaryScale());
   };
 
   // Check if the name already exists in the visible evaluator namespace.
@@ -570,7 +635,7 @@ function MetricsPageInner() {
                     })),
                   },
                 }
-              : {}),
+              : buildBinaryOutputConfig(newEvaluatorBinaryScale)),
           },
         }),
       });
@@ -984,6 +1049,7 @@ function MetricsPageInner() {
         evaluatorType={newEvaluatorType}
         evaluatorOutputType={newEvaluatorOutputType}
         evaluatorScale={newEvaluatorScale}
+        evaluatorBinaryScale={newEvaluatorBinaryScale}
         judgeModel={newEvaluatorJudgeModel}
         systemPrompt={newEvaluatorSystemPrompt}
         detectedPromptVariables={detectedPromptVariables}
@@ -1008,6 +1074,7 @@ function MetricsPageInner() {
         setEvaluatorDescription={setEvaluatorDescription}
         setEvaluatorOutputType={setNewEvaluatorOutputType}
         setEvaluatorScale={setNewEvaluatorScale}
+        setEvaluatorBinaryScale={setNewEvaluatorBinaryScale}
         setSystemPrompt={setNewEvaluatorSystemPrompt}
         setVariableDescriptions={setNewEvaluatorVariableDescriptions}
         setCreateNameError={setCreateNameError}
