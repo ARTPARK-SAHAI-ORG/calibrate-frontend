@@ -506,16 +506,6 @@ function ItemRowActions({
           Label
         </button>
       )}
-      {onEdit && (
-        <button
-          type="button"
-          onClick={() => onEdit(itemUuid)}
-          aria-label="Edit"
-          className="h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-        >
-          Edit
-        </button>
-      )}
       {onEvaluate && (
         <button
           type="button"
@@ -524,6 +514,16 @@ function ItemRowActions({
           className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer"
         >
           Evaluate
+        </button>
+      )}
+      {onEdit && (
+        <button
+          type="button"
+          onClick={() => onEdit(itemUuid)}
+          aria-label="Edit"
+          className="h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+        >
+          Edit
         </button>
       )}
       {/* Delete Button */}
