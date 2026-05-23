@@ -569,18 +569,30 @@ function LabelledByCell({
   const firstId = ids[0];
   const firstName =
     annotatorNameById.get(firstId) ?? firstId.slice(0, 8);
-  const remaining = ids.length - 1;
-  const allNames = ids
-    .map((id) => annotatorNameById.get(id) ?? id.slice(0, 8))
-    .join(", ");
+  const remainingNames = ids
+    .slice(1)
+    .map((id) => annotatorNameById.get(id) ?? id.slice(0, 8));
   return (
-    <div className="flex flex-wrap gap-1 min-w-0" title={allNames}>
+    <div className="flex flex-wrap gap-1 min-w-0">
       <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground">
         {firstName}
       </span>
-      {remaining > 0 && (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-muted-foreground">
-          +{remaining} more
+      {remainingNames.length > 0 && (
+        <span
+          className="relative group inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-muted-foreground cursor-default"
+          onClick={(e) => e.stopPropagation()}
+        >
+          +{remainingNames.length} more
+          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 hidden group-hover:flex flex-wrap gap-1 px-2 py-1.5 rounded-lg bg-white shadow-lg border border-border max-w-64 w-max">
+            {remainingNames.map((n, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground"
+              >
+                {n}
+              </span>
+            ))}
+          </span>
         </span>
       )}
     </div>
