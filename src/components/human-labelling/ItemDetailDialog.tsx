@@ -373,7 +373,10 @@ export function ItemDetailDialog({
         className="bg-background rounded-none md:rounded-xl w-full max-w-[92rem] h-full md:h-[92vh] flex flex-col shadow-2xl overflow-hidden"
       >
         <div className="relative flex items-center justify-between gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-border">
-          <div className="flex-1 min-w-0 flex items-center gap-2">
+          <div
+            className="flex-1 min-w-0 flex items-center gap-2 md:max-w-[calc(50%-6rem)]"
+            title={itemTitle(item)}
+          >
             <h2 className="text-base md:text-lg font-semibold text-foreground truncate min-w-0">
               {itemTitle(item)}
             </h2>

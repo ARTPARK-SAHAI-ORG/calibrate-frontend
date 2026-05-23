@@ -565,16 +565,24 @@ function LabelledByCell({
       </div>
     );
   }
+  const ids = Array.from(labellers);
+  const firstId = ids[0];
+  const firstName =
+    annotatorNameById.get(firstId) ?? firstId.slice(0, 8);
+  const remaining = ids.length - 1;
+  const allNames = ids
+    .map((id) => annotatorNameById.get(id) ?? id.slice(0, 8))
+    .join(", ");
   return (
-    <div className="flex flex-wrap gap-1 min-w-0">
-      {Array.from(labellers).map((annId) => (
-        <span
-          key={annId}
-          className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground"
-        >
-          {annotatorNameById.get(annId) ?? annId.slice(0, 8)}
+    <div className="flex flex-wrap gap-1 min-w-0" title={allNames}>
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground">
+        {firstName}
+      </span>
+      {remaining > 0 && (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-muted-foreground">
+          +{remaining} more
         </span>
-      ))}
+      )}
     </div>
   );
 }
