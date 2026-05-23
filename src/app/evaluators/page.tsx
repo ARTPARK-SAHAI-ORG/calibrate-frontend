@@ -394,33 +394,10 @@ function MetricsPageInner() {
         );
       }
 
-      // Seed the binary label editor when the use case's default ships a
-      // binary scale with custom labels. Otherwise leave the blank rows in
-      // place so placeholders fall back to Correct / Wrong.
-      if (
-        data.output_type === "binary" &&
-        data.output_config?.scale &&
-        data.output_config.scale.length >= 2
-      ) {
-        const trueEntry = data.output_config.scale.find(
-          (r) => r.value === true,
-        );
-        const falseEntry = data.output_config.scale.find(
-          (r) => r.value === false,
-        );
-        setNewEvaluatorBinaryScale([
-          {
-            value: true,
-            name: trueEntry?.name ?? "",
-            description: trueEntry?.description ?? "",
-          },
-          {
-            value: false,
-            name: falseEntry?.name ?? "",
-            description: falseEntry?.description ?? "",
-          },
-        ]);
-      }
+      // Intentionally do NOT seed the binary scale from the use case
+      // default. Correct / Wrong are the defaults — placeholders surface
+      // them so the user can override either and we only send a
+      // scale payload when they do.
     } catch (err) {
       console.error("Error prefilling default prompt:", err);
     }
