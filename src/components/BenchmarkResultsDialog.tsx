@@ -144,6 +144,7 @@ export function BenchmarkResultsDialog({
       setTaskStatus("queued");
       setModelResults([]);
       setLeaderboardSummary(undefined);
+      setRunEvaluators([]);
       setError(null);
       setExpandedProviders(new Set(models.length > 0 ? [models[0]] : []));
       setSelectedTest(null);
@@ -260,9 +261,12 @@ export function BenchmarkResultsDialog({
       if (result.name) setRunName(result.name);
       if (result.is_public !== undefined) setIsPublic(result.is_public);
       if (result.share_token !== undefined) setShareToken(result.share_token ?? null);
-      if (Array.isArray(result.evaluators)) {
-        setRunEvaluators(result.evaluators);
-      }
+      // Always sync (including the empty case) so the previous
+      // benchmark's evaluator metadata can't leak into a new task in
+      // the same dialog lifecycle.
+      setRunEvaluators(
+        Array.isArray(result.evaluators) ? result.evaluators : [],
+      );
 
       // Update model results (intermediate or final)
       if (result.model_results) {

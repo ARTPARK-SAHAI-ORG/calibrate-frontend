@@ -226,6 +226,7 @@ export function TestRunnerDialog({
     setSelectedTestUuid(null);
     hasAutoSelectedRef.current = false;
     setCurrentTaskId(taskId);
+    setRunEvaluators([]);
 
     const isInProgress =
       initialRunStatus === "pending" ||
@@ -271,6 +272,7 @@ export function TestRunnerDialog({
     setSelectedTestUuid(null);
     hasAutoSelectedRef.current = false;
     setCurrentTaskId(null);
+    setRunEvaluators([]);
     const initialResults: TestResult[] = tests.map((test) => ({
       test,
       status: "pending",
@@ -323,9 +325,12 @@ export function TestRunnerDialog({
       if (result.name) setRunName(result.name);
       if (result.is_public !== undefined) setIsPublic(result.is_public);
       if (result.share_token !== undefined) setShareToken(result.share_token ?? null);
-      if (Array.isArray(result.evaluators)) {
-        setRunEvaluators(result.evaluators);
-      }
+      // Always sync to the latest payload (including the empty case) so
+      // the prior run's evaluator metadata can't leak into a fresh run
+      // / past-run-view that omits the field.
+      setRunEvaluators(
+        Array.isArray(result.evaluators) ? result.evaluators : [],
+      );
 
       // Update test results based on polling response
       setTestResults((prev) => {

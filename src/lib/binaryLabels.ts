@@ -16,13 +16,33 @@ export type BinaryScaleEntryLike = {
   name?: string | null;
 };
 
+// Coerce a scale entry's `value` to a boolean for matching. Backend
+// types allow boolean | number | string, so older / alternate snapshots
+// may encode binary verdicts as 1/0 or "true"/"false" (or "yes"/"no").
+// Normalise so the lookup catches them all.
+function coerceBinaryValue(v: unknown): boolean | null {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") {
+    if (v === 1) return true;
+    if (v === 0) return false;
+    return null;
+  }
+  if (typeof v === "string") {
+    const t = v.trim().toLowerCase();
+    if (t === "true" || t === "yes" || t === "1") return true;
+    if (t === "false" || t === "no" || t === "0") return false;
+    return null;
+  }
+  return null;
+}
+
 // Pull the custom label for a true/false verdict out of a scale array.
 // Falls back to the default when the entry is missing or the name is blank.
 export function getBinaryLabel(
   scale: readonly BinaryScaleEntryLike[] | null | undefined,
   value: boolean,
 ): string {
-  const entry = scale?.find((e) => e.value === value);
+  const entry = scale?.find((e) => coerceBinaryValue(e.value) === value);
   const name = entry?.name?.trim();
   if (name) return name;
   return value ? DEFAULT_BINARY_TRUE_LABEL : DEFAULT_BINARY_FALSE_LABEL;
