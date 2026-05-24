@@ -287,9 +287,21 @@ function buildItemsCsv(
   const evaluators = taskSummary?.evaluators ?? [];
   const annotators = taskSummary?.annotators ?? [];
 
-  const rowByItemEval = new Map<string, SummaryRow>();
+  // Each (item, evaluator, version) tuple gets its own row in the
+  // summary response — keying without version_id would let later
+  // versions silently overwrite earlier ones in the export.
+  const rowByItemEvalVersion = new Map<string, SummaryRow>();
+  const versionsByEval = new Map<string, Set<string | null>>();
   for (const row of taskSummary?.rows ?? []) {
-    rowByItemEval.set(`${row.item_id}::${row.evaluator_id}`, row);
+    const vid = row.evaluator_version_id ?? null;
+    rowByItemEvalVersion.set(
+      `${row.item_id}::${row.evaluator_id}::${vid ?? "live"}`,
+      row,
+    );
+    if (!versionsByEval.has(row.evaluator_id)) {
+      versionsByEval.set(row.evaluator_id, new Set());
+    }
+    versionsByEval.get(row.evaluator_id)!.add(vid);
   }
 
   const versionNumberById = new Map<string, number>();
@@ -298,6 +310,20 @@ function buildItemsCsv(
       versionNumberById.set(v.uuid, v.version_number);
     }
   }
+
+  // For each evaluator, the list of version_ids (sorted by version_number
+  // ascending) that actually appear in the summary rows. Evaluators with
+  // no run data still get one entry (null → "live") so annotator columns
+  // are emitted even when the evaluator hasn't run yet.
+  const versionsForEvaluator = (ev: SummaryEvaluator): (string | null)[] => {
+    const set = versionsByEval.get(ev.uuid);
+    if (!set || set.size === 0) return [null];
+    return [...set].sort((a, b) => {
+      const an: number = (a ? versionNumberById.get(a) : undefined) ?? -Infinity;
+      const bn: number = (b ? versionNumberById.get(b) : undefined) ?? -Infinity;
+      return an - bn;
+    });
+  };
 
   const columns: ExportColumn[] = [{ key: "name", header: "name" }];
   if (taskType !== "stt") {
@@ -327,6 +353,9 @@ function buildItemsCsv(
 
   for (const ev of evaluators) {
     const evName = sanitizeCsvName(ev.name);
+    // Annotator columns are emitted once per (annotator × evaluator) —
+    // a human's label of an item against an evaluator doesn't depend on
+    // which version of the evaluator ran.
     for (const ann of annotators) {
       const annName = sanitizeCsvName(ann.name);
       const base = `${annName}_${evName}`;
@@ -339,20 +368,18 @@ function buildItemsCsv(
         header: `${base}/reasoning`,
       });
     }
-    const liveVid =
-      ev.live_version_id ?? ev.versions?.find((v) => v.is_live)?.uuid ?? null;
-    const versionNumber =
-      (liveVid ? versionNumberById.get(liveVid) : undefined) ??
-      ev.versions?.[0]?.version_number;
-    const verStr = versionNumber != null ? `v${versionNumber}` : "live";
-    columns.push({
-      key: `ev_${ev.uuid}_value`,
-      header: `evaluator_${evName}_${verStr}/value`,
-    });
-    columns.push({
-      key: `ev_${ev.uuid}_reasoning`,
-      header: `evaluator_${evName}_${verStr}/reasoning`,
-    });
+    for (const vid of versionsForEvaluator(ev)) {
+      const versionNumber = vid ? versionNumberById.get(vid) : undefined;
+      const verStr = versionNumber != null ? `v${versionNumber}` : "live";
+      columns.push({
+        key: `ev_${ev.uuid}_${vid ?? "live"}_value`,
+        header: `evaluator_${evName}_${verStr}/value`,
+      });
+      columns.push({
+        key: `ev_${ev.uuid}_${vid ?? "live"}_reasoning`,
+        header: `evaluator_${evName}_${verStr}/reasoning`,
+      });
+    }
   }
 
   const rows = items.map((item) => {
@@ -385,19 +412,41 @@ function buildItemsCsv(
     }
 
     for (const ev of evaluators) {
-      const row = rowByItemEval.get(`${item.uuid}::${ev.uuid}`);
+      const versionIds = versionsForEvaluator(ev);
+      // Annotations don't vary by version; take whichever version's row
+      // we find first that has a non-null annotation for each annotator.
+      const annotationSourceByAnn = new Map<string, SummaryAnnotation>();
+      for (const vid of versionIds) {
+        const row = rowByItemEvalVersion.get(
+          `${item.uuid}::${ev.uuid}::${vid ?? "live"}`,
+        );
+        if (!row) continue;
+        for (const ann of annotators) {
+          if (annotationSourceByAnn.has(ann.uuid)) continue;
+          const a = row.annotations?.[ann.uuid];
+          if (a && a.value !== null && a.value !== undefined) {
+            annotationSourceByAnn.set(ann.uuid, a);
+          }
+        }
+      }
       for (const ann of annotators) {
-        const a = row?.annotations?.[ann.uuid] ?? null;
+        const a = annotationSourceByAnn.get(ann.uuid) ?? null;
         out[`ann_${ann.uuid}_${ev.uuid}_value`] =
           a && a.value !== null && a.value !== undefined ? a.value : "";
         out[`ann_${ann.uuid}_${ev.uuid}_reasoning`] = a?.reasoning ?? "";
       }
-      out[`ev_${ev.uuid}_value`] =
-        row?.evaluator_value_name ??
-        (row?.evaluator_value !== null && row?.evaluator_value !== undefined
-          ? row.evaluator_value
-          : "");
-      out[`ev_${ev.uuid}_reasoning`] = row?.evaluator_reasoning ?? "";
+      for (const vid of versionIds) {
+        const row = rowByItemEvalVersion.get(
+          `${item.uuid}::${ev.uuid}::${vid ?? "live"}`,
+        );
+        out[`ev_${ev.uuid}_${vid ?? "live"}_value`] =
+          row?.evaluator_value_name ??
+          (row?.evaluator_value !== null && row?.evaluator_value !== undefined
+            ? row.evaluator_value
+            : "");
+        out[`ev_${ev.uuid}_${vid ?? "live"}_reasoning`] =
+          row?.evaluator_reasoning ?? "";
+      }
     }
     return out;
   });
