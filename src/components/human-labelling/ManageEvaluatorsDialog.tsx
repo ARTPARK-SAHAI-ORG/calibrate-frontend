@@ -262,7 +262,7 @@ export function ManageEvaluatorsDialog({
       }}
     >
       <div
-        className="bg-background border border-border rounded-xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh]"
+        className="bg-background border border-border rounded-xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 px-5 md:px-6 py-4 border-b border-border">
@@ -327,7 +327,7 @@ export function ManageEvaluatorsDialog({
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10">
             {/* Left column: catalogue with checkboxes */}
             <div className="flex flex-col gap-2 min-w-0">
               <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
