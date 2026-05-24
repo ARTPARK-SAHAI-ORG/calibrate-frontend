@@ -192,6 +192,7 @@ type LabellingItem = {
   task_id: string;
   payload: unknown;
   created_at: string;
+  updated_at?: string;
   deleted_at: string | null;
   agreement?: ItemAgreement;
 };
@@ -537,6 +538,42 @@ function EvaluatorRunsList({
       })}
     </div>
   );
+}
+
+function SortIndicator({
+  direction,
+}: {
+  direction: "asc" | "desc" | null;
+}) {
+  return (
+    <svg
+      className={`w-3 h-3 transition-transform ${
+        direction === "asc" ? "rotate-180" : ""
+      } ${direction ? "text-foreground" : "text-muted-foreground/40"}`}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M19 9l-7 7-7-7"
+      />
+    </svg>
+  );
+}
+
+function formatItemUpdatedAt(item: {
+  updated_at?: string;
+  created_at?: string;
+}): string {
+  const raw = item.updated_at ?? item.created_at;
+  if (!raw) return "—";
+  const d = new Date(raw.replace(" ", "T") + "Z");
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleString();
 }
 
 function ItemRowActions({
@@ -984,6 +1021,30 @@ function LabellingTaskPageInner() {
   const [savingLlmItem, setSavingLlmItem] = useState(false);
   const [editLlmError, setEditLlmError] = useState<string | null>(null);
 
+  // Sort direction for the items table's Updated at column. Persisted in
+  // localStorage so the user's choice carries across visits. `null` means
+  // no explicit sort — fall back to the API's default order.
+  const [itemsSort, setItemsSort] = useState<"asc" | "desc" | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(
+      "calibrate:items-sort-updated-at",
+    );
+    if (stored === "asc" || stored === "desc") setItemsSort(stored);
+  }, []);
+  const toggleItemsSort = () => {
+    setItemsSort((prev) => {
+      const next = prev === "desc" ? "asc" : "desc";
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          "calibrate:items-sort-updated-at",
+          next,
+        );
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
     if (task?.name) document.title = `${task.name} | Calibrate`;
   }, [task?.name]);
@@ -1151,7 +1212,21 @@ function LabellingTaskPageInner() {
   }, [fetchRuns]);
   void activeTab;
 
-  const items = task?.items ?? [];
+  const rawItems = task?.items ?? [];
+  const items = itemsSort
+    ? [...rawItems].sort((a, b) => {
+        const av = a.updated_at ?? a.created_at ?? "";
+        const bv = b.updated_at ?? b.created_at ?? "";
+        if (av === bv) return 0;
+        return itemsSort === "asc"
+          ? av < bv
+            ? -1
+            : 1
+          : av < bv
+            ? 1
+            : -1;
+      })
+    : rawItems;
   const jobs = task?.jobs ?? [];
   const itemsLoading = loading || !taskFetchCompleted;
   const itemsError = error;
@@ -2116,7 +2191,7 @@ function LabellingTaskPageInner() {
 
               {taskType === "stt" ? (
                 <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_180px_360px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
+                  <div className="grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_180px_140px_360px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
                     <input
                       type="checkbox"
                       checked={allSelected}
@@ -2139,6 +2214,15 @@ function LabellingTaskPageInner() {
                     <div className="text-sm font-medium text-muted-foreground">
                       Labelled by
                     </div>
+                    <button
+                      type="button"
+                      onClick={toggleItemsSort}
+                      className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-left"
+                      aria-label="Sort by updated at"
+                    >
+                      <span>Updated at</span>
+                      <SortIndicator direction={itemsSort} />
+                    </button>
                     <div className="text-sm font-medium text-muted-foreground text-center">
                       Actions
                     </div>
@@ -2160,7 +2244,7 @@ function LabellingTaskPageInner() {
                       <Fragment key={item.uuid}>
                         <div
                           onClick={() => openItemDetail(item.uuid)}
-                          className={`grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_180px_360px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
+                          className={`grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_180px_140px_360px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
                             isSelected ? "bg-muted/30" : "hover:bg-muted/20"
                           }`}
                         >
@@ -2185,6 +2269,9 @@ function LabellingTaskPageInner() {
                             labellers={labellerIds}
                             annotatorNameById={annotatorNameById}
                           />
+                          <div className="text-sm text-muted-foreground">
+                            {formatItemUpdatedAt(item)}
+                          </div>
                           <ItemRowActions
                             itemUuid={item.uuid}
                             onDelete={requestDeleteOneItem}
@@ -2227,7 +2314,7 @@ function LabellingTaskPageInner() {
                 </div>
               ) : (
                 <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_180px_360px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
+                  <div className="grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_180px_140px_360px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
                     <input
                       type="checkbox"
                       checked={allSelected}
@@ -2247,6 +2334,15 @@ function LabellingTaskPageInner() {
                     <div className="text-sm font-medium text-muted-foreground">
                       Labelled by
                     </div>
+                    <button
+                      type="button"
+                      onClick={toggleItemsSort}
+                      className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-left"
+                      aria-label="Sort by updated at"
+                    >
+                      <span>Updated at</span>
+                      <SortIndicator direction={itemsSort} />
+                    </button>
                     <div className="text-sm font-medium text-muted-foreground text-center">
                       Actions
                     </div>
@@ -2267,7 +2363,7 @@ function LabellingTaskPageInner() {
                       <Fragment key={item.uuid}>
                         <div
                           onClick={() => openItemDetail(item.uuid)}
-                          className={`grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_180px_360px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
+                          className={`grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_180px_140px_360px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
                             isSelected ? "bg-muted/30" : "hover:bg-muted/20"
                           }`}
                         >
@@ -2296,6 +2392,9 @@ function LabellingTaskPageInner() {
                             labellers={labellerIds}
                             annotatorNameById={annotatorNameById}
                           />
+                          <div className="text-sm text-muted-foreground">
+                            {formatItemUpdatedAt(item)}
+                          </div>
                           <ItemRowActions
                             itemUuid={item.uuid}
                             onDelete={requestDeleteOneItem}
