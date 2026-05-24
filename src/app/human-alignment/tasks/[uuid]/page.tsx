@@ -2216,7 +2216,6 @@ function LabellingTaskPageInner() {
                     </p>
                   </div>
                   <RefreshButton
-                    title="Refresh agreement"
                     loading={agreementLoading}
                     onClick={() => fetchAgreement()}
                   />
@@ -2307,8 +2306,6 @@ function LabellingTaskPageInner() {
             <div ref={itemsSectionTopRef} className="space-y-3 scroll-mt-4">
               <div className="flex items-center justify-end gap-2">
                 <RefreshButton
-                  label="Refresh"
-                  title="Refresh items"
                   loading={loading || summaryLoading}
                   onClick={() => {
                     fetchTask();
