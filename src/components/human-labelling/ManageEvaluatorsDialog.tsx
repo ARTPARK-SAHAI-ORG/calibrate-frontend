@@ -425,13 +425,9 @@ export function ManageEvaluatorsDialog({
             <div className="flex flex-col gap-2 min-w-0">
               <p className="text-xs text-muted-foreground">
                 Drag the cards to set the order evaluators appear in across the
-                task. Saved only when you click{" "}
-                <span className="font-medium text-foreground">
-                  Save changes
-                </span>
-                .
+                task
               </p>
-              <div className="border border-border rounded-md max-h-80 overflow-y-auto p-2 space-y-2 bg-muted/10">
+              <div className="max-h-80 overflow-y-auto space-y-2">
                 {orderedSelected.length === 0 ? (
                   <div className="p-4 text-sm text-muted-foreground text-center">
                     Pick an evaluator on the left to add it here.
