@@ -1774,7 +1774,7 @@ function LabellingTaskPageInner() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-2xl font-semibold flex items-center gap-2">
-                {loading && !task ? (
+                {!taskFetchCompleted || !task ? (
                   <svg
                     className="w-5 h-5 animate-spin text-muted-foreground"
                     fill="none"
