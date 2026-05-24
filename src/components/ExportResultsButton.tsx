@@ -17,6 +17,15 @@ type ExportResultsButtonProps = {
   disabled?: boolean;
   label?: string;
   className?: string;
+  /** Color palette. "teal" is the default; "neutral" is a quiet outline
+   * for pages where teal already means something else. */
+  variant?: "teal" | "neutral";
+};
+
+const VARIANT_CLASSES: Record<"teal" | "neutral", string> = {
+  teal: "bg-teal-500/12 border-teal-500/45 text-teal-950 dark:text-teal-100 hover:bg-teal-500/22 dark:hover:bg-teal-500/18",
+  neutral:
+    "bg-slate-500/10 border-slate-500/30 text-slate-700 dark:text-slate-200 hover:bg-slate-500/20 dark:hover:bg-slate-500/25",
 };
 
 function escapeCell(value: unknown): string {
@@ -43,6 +52,7 @@ export function ExportResultsButton({
   disabled,
   label = "Export results",
   className,
+  variant = "teal",
 }: ExportResultsButtonProps) {
   const handleClick = () => {
     const { columns, rows } = getRows();
@@ -54,16 +64,18 @@ export function ExportResultsButton({
     ];
     const csv = csvLines.join("\n");
 
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
+    // data: URI instead of a blob URL — Chrome silently blocks repeated
+    // blob-URL programmatic downloads as "multiple file downloads" once
+    // the per-site prompt is dismissed. data: URIs aren't subject to it.
+    const url = `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`;
     const link = document.createElement("a");
     link.href = url;
     link.download = `${filename}.csv`;
+    link.rel = "noopener";
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -72,7 +84,7 @@ export function ExportResultsButton({
       onClick={handleClick}
       disabled={disabled}
       title="Export results as CSV"
-      className={`flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-teal-500/12 border-teal-500/45 text-teal-950 dark:text-teal-100 hover:bg-teal-500/22 dark:hover:bg-teal-500/18 ${className ?? ""}`}
+      className={`flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${VARIANT_CLASSES[variant]} ${className ?? ""}`}
     >
       <svg
         className="w-4 h-4"

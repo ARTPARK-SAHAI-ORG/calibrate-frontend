@@ -22,6 +22,10 @@ import {
 } from "@/components/AddTestDialog";
 import { AppLayout } from "@/components/AppLayout";
 import { EvaluatorTypePill } from "@/components/EvaluatorPills";
+import {
+  ExportResultsButton,
+  type ExportColumn,
+} from "@/components/ExportResultsButton";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { AddSttItemsDialog } from "@/components/human-labelling/AddSttItemsDialog";
@@ -268,6 +272,136 @@ function previewItemPayload(payload: unknown, kind: TaskKind): string {
   } catch {
     return "—";
   }
+}
+
+function sanitizeCsvName(s: string): string {
+  return s.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "unnamed";
+}
+
+function buildItemsCsv(
+  items: LabellingItem[],
+  taskSummary: TaskSummaryResponse | null,
+  taskType: TaskKind,
+): { columns: ExportColumn[]; rows: Record<string, unknown>[] } {
+  const evaluators = taskSummary?.evaluators ?? [];
+  const annotators = taskSummary?.annotators ?? [];
+
+  const rowByItemEval = new Map<string, SummaryRow>();
+  for (const row of taskSummary?.rows ?? []) {
+    rowByItemEval.set(`${row.item_id}::${row.evaluator_id}`, row);
+  }
+
+  const versionNumberById = new Map<string, number>();
+  for (const ev of evaluators) {
+    for (const v of ev.versions ?? []) {
+      versionNumberById.set(v.uuid, v.version_number);
+    }
+  }
+
+  const columns: ExportColumn[] = [{ key: "name", header: "name" }];
+  if (taskType !== "stt") {
+    columns.push({ key: "description", header: "description" });
+  }
+  if (taskType === "simulation") {
+    columns.push({
+      key: "conversation_history",
+      header: "conversation_history",
+    });
+  } else if (taskType === "stt") {
+    columns.push({
+      key: "reference_transcript",
+      header: "reference_transcript",
+    });
+    columns.push({
+      key: "predicted_transcript",
+      header: "predicted_transcript",
+    });
+  } else if (taskType === "llm") {
+    columns.push({
+      key: "conversation_history",
+      header: "conversation_history",
+    });
+    columns.push({ key: "agent_response", header: "agent_response" });
+  }
+
+  for (const ev of evaluators) {
+    const evName = sanitizeCsvName(ev.name);
+    for (const ann of annotators) {
+      const annName = sanitizeCsvName(ann.name);
+      const base = `${annName}_${evName}`;
+      columns.push({
+        key: `ann_${ann.uuid}_${ev.uuid}_value`,
+        header: `${base}/value`,
+      });
+      columns.push({
+        key: `ann_${ann.uuid}_${ev.uuid}_reasoning`,
+        header: `${base}/reasoning`,
+      });
+    }
+    const liveVid =
+      ev.live_version_id ?? ev.versions?.find((v) => v.is_live)?.uuid ?? null;
+    const versionNumber =
+      (liveVid ? versionNumberById.get(liveVid) : undefined) ??
+      ev.versions?.[0]?.version_number;
+    const verStr = versionNumber != null ? `v${versionNumber}` : "live";
+    columns.push({
+      key: `ev_${ev.uuid}_value`,
+      header: `evaluator_${evName}_${verStr}/value`,
+    });
+    columns.push({
+      key: `ev_${ev.uuid}_reasoning`,
+      header: `evaluator_${evName}_${verStr}/reasoning`,
+    });
+  }
+
+  const rows = items.map((item) => {
+    const p = (item.payload ?? {}) as Record<string, unknown>;
+    const out: Record<string, unknown> = {
+      name: typeof p.name === "string" ? p.name : "",
+    };
+    if (taskType !== "stt") {
+      out.description = typeof p.description === "string" ? p.description : "";
+    }
+    if (taskType === "simulation") {
+      out.conversation_history = Array.isArray(p.transcript)
+        ? JSON.stringify(p.transcript)
+        : "";
+    } else if (taskType === "stt") {
+      out.reference_transcript =
+        typeof p.reference_transcript === "string"
+          ? p.reference_transcript
+          : "";
+      out.predicted_transcript =
+        typeof p.predicted_transcript === "string"
+          ? p.predicted_transcript
+          : "";
+    } else if (taskType === "llm") {
+      out.conversation_history = Array.isArray(p.chat_history)
+        ? JSON.stringify(p.chat_history)
+        : "";
+      out.agent_response =
+        typeof p.agent_response === "string" ? p.agent_response : "";
+    }
+
+    for (const ev of evaluators) {
+      const row = rowByItemEval.get(`${item.uuid}::${ev.uuid}`);
+      for (const ann of annotators) {
+        const a = row?.annotations?.[ann.uuid] ?? null;
+        out[`ann_${ann.uuid}_${ev.uuid}_value`] =
+          a && a.value !== null && a.value !== undefined ? a.value : "";
+        out[`ann_${ann.uuid}_${ev.uuid}_reasoning`] = a?.reasoning ?? "";
+      }
+      out[`ev_${ev.uuid}_value`] =
+        row?.evaluator_value_name ??
+        (row?.evaluator_value !== null && row?.evaluator_value !== undefined
+          ? row.evaluator_value
+          : "");
+      out[`ev_${ev.uuid}_reasoning`] = row?.evaluator_reasoning ?? "";
+    }
+    return out;
+  });
+
+  return { columns, rows };
 }
 
 function parseApiError(err: unknown, fallback: string): string {
@@ -2163,6 +2297,14 @@ function LabellingTaskPageInner() {
             />
           ) : (
             <div ref={itemsSectionTopRef} className="space-y-3 scroll-mt-4">
+              <div className="flex items-center justify-end">
+                <ExportResultsButton
+                  filename={`${sanitizeCsvName(task?.name ?? "labelling-task")}-items`}
+                  label="Export CSV"
+                  variant="neutral"
+                  getRows={() => buildItemsCsv(items, taskSummary, taskType)}
+                />
+              </div>
               {/* Bulk-action toolbar (shown when at least one row is selected) */}
               {selectedItemIds.size > 0 && (
                 <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
