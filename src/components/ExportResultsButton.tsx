@@ -64,10 +64,11 @@ export function ExportResultsButton({
     ];
     const csv = csvLines.join("\n");
 
-    // data: URI instead of a blob URL — Chrome silently blocks repeated
-    // blob-URL programmatic downloads as "multiple file downloads" once
-    // the per-site prompt is dismissed. data: URIs aren't subject to it.
-    const url = `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`;
+    // Blob URL (not data: URI) so large CSVs aren't capped by the
+    // browser URL-length limit. Revoke is deferred to give the browser
+    // time to consume the URL before we free it.
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.download = `${filename}.csv`;
@@ -76,6 +77,7 @@ export function ExportResultsButton({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   return (
