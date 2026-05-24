@@ -464,6 +464,7 @@ function JudgeResultCard({
           : getBinaryLabel(scale, false)
       }
       ratingScale={toRatingScale(scale)}
+      ratingLabel={valueName}
     />
   );
 }
@@ -886,6 +887,7 @@ function EvaluatorPanelCard({
           : getBinaryLabel(scale, false)
       }
       ratingScale={toRatingScale(scale)}
+      ratingLabel={valueName}
     />
   );
 }

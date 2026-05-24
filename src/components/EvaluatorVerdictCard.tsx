@@ -60,6 +60,11 @@ type CommonProps = {
   ratingScale?:
     | { value: number; name?: string | null }[]
     | null;
+  /** Pre-resolved label for the rating verdict pill. Wins over the
+   * `ratingScale` lookup so callers can surface a backend-resolved
+   * value (e.g. judge_results[].value_name) even if it disagrees with
+   * the current evaluator's scale. */
+  ratingLabel?: string | null;
 };
 
 type ReadProps = CommonProps & {
@@ -181,6 +186,7 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
                 trueLabel={props.trueLabel}
                 falseLabel={props.falseLabel}
                 ratingScale={props.ratingScale}
+                ratingLabel={props.ratingLabel}
               />
             )}
             {toggleKind && (
@@ -277,6 +283,7 @@ function ReadVerdictPill({
   trueLabel,
   falseLabel,
   ratingScale,
+  ratingLabel,
 }: {
   outputType: EvaluatorOutputType;
   match?: boolean | null;
@@ -286,6 +293,7 @@ function ReadVerdictPill({
   trueLabel?: string | null;
   falseLabel?: string | null;
   ratingScale?: { value: number; name?: string | null }[] | null;
+  ratingLabel?: string | null;
 }) {
   if (outputType === "binary") {
     if (match === null || match === undefined) return null;
@@ -322,8 +330,13 @@ function ReadVerdictPill({
       : tone === "red"
         ? "bg-red-500/15 text-red-600 dark:text-red-400"
         : "bg-amber-500/15 text-amber-600 dark:text-amber-400";
-  const ratingLabel =
-    ratingScale?.find((e) => e.value === score)?.name?.trim() || null;
+  // Prefer the caller-provided pre-resolved label (e.g. backend's
+  // value_name) over the scale lookup so a stale local scale can't
+  // override the actually-recorded label.
+  const resolvedRatingLabel =
+    ratingLabel?.trim() ||
+    ratingScale?.find((e) => e.value === score)?.name?.trim() ||
+    null;
   return (
     <>
       <span
@@ -331,11 +344,11 @@ function ReadVerdictPill({
       >
         {scaleMax !== undefined ? `${score} / ${scaleMax}` : `Score: ${score}`}
       </span>
-      {ratingLabel && (
+      {resolvedRatingLabel && (
         <span
           className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium ${toneClass}`}
         >
-          {ratingLabel}
+          {resolvedRatingLabel}
         </span>
       )}
     </>

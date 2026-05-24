@@ -20,7 +20,7 @@ export type BinaryScaleEntryLike = {
 // types allow boolean | number | string, so older / alternate snapshots
 // may encode binary verdicts as 1/0 or "true"/"false" (or "yes"/"no").
 // Normalise so the lookup catches them all.
-function coerceBinaryValue(v: unknown): boolean | null {
+export function coerceBinaryValue(v: unknown): boolean | null {
   if (typeof v === "boolean") return v;
   if (typeof v === "number") {
     if (v === 1) return true;

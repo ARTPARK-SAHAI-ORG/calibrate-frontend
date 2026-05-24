@@ -29,7 +29,10 @@ import {
   defaultBinaryScale,
   type BinaryScaleRow,
 } from "@/components/evaluators/BinaryScaleEditor";
-import { defaultBinaryLabel } from "@/lib/binaryLabels";
+import {
+  coerceBinaryValue,
+  defaultBinaryLabel,
+} from "@/lib/binaryLabels";
 import { liveVersionOf } from "@/lib/evaluatorVersions";
 import { VersionCard } from "@/components/evaluators/VersionCard";
 import { extractVariableNames } from "@/lib/evaluatorVariables";
@@ -418,9 +421,14 @@ function EvaluatorDetailPageInner() {
       setNewVersionScale([]);
     }
     if (evaluator.output_type === "binary") {
+      // Coerce so legacy/alternate encodings (1/0, "true"/"false") still
+      // match — otherwise the form would render blank and silently drop
+      // the existing labels on save.
       const scale = live?.output_config?.scale ?? [];
-      const trueEntry = scale.find((e) => e.value === true);
-      const falseEntry = scale.find((e) => e.value === false);
+      const trueEntry = scale.find((e) => coerceBinaryValue(e.value) === true);
+      const falseEntry = scale.find(
+        (e) => coerceBinaryValue(e.value) === false,
+      );
       setNewVersionBinaryScale([
         {
           value: true,
