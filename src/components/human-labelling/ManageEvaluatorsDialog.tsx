@@ -271,12 +271,12 @@ export function ManageEvaluatorsDialog({
             <div className="text-xs md:text-sm text-muted-foreground mt-1">
               {taskType ? (
                 <div className="inline-flex flex-wrap items-center gap-1.5">
-                  Choose which
+                  Choose
                   <EvaluatorTypePill evaluatorType={taskType} />
-                  evaluators need to be aligned with humans
+                  evaluators to align with humans
                 </div>
               ) : (
-                "Choose which evaluators need to be aligned with humans"
+                "Choose evaluators to align with humans"
               )}
             </div>
           </div>
@@ -305,26 +305,16 @@ export function ManageEvaluatorsDialog({
           <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span>{orderedSelected.length} selected</span>
             {toAdd.length > 0 && (
-              <span className="text-emerald-600">
-                +{toAdd.length} to add
-              </span>
+              <span className="text-emerald-600">+{toAdd.length} to add</span>
             )}
             {toRemove.length > 0 && (
-              <span className="text-red-500">
-                −{toRemove.length} to remove
-              </span>
-            )}
-            {orderChanged && (
-              <span className="text-amber-600">order changed</span>
+              <span className="text-red-500">−{toRemove.length} to remove</span>
             )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10">
             {/* Left column: catalogue with checkboxes */}
             <div className="flex flex-col gap-2 min-w-0">
-              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Available evaluators
-              </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                   <svg
@@ -417,6 +407,13 @@ export function ManageEvaluatorsDialog({
 
             {/* Right column: ordered selected list (drag to reorder) */}
             <div className="flex flex-col gap-2 min-w-0">
+              <div className="flex items-center justify-end min-h-[1.5rem]">
+                {orderChanged && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold border border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300 uppercase tracking-wide">
+                    Order Changed
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Drag the cards to set the order evaluators appear in across the
                 task
