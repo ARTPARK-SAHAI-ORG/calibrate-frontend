@@ -302,13 +302,22 @@ export function ManageEvaluatorsDialog({
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3">
-          <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <span>{orderedSelected.length} selected</span>
-            {toAdd.length > 0 && (
-              <span className="text-emerald-600">+{toAdd.length} to add</span>
-            )}
-            {toRemove.length > 0 && (
-              <span className="text-red-500">−{toRemove.length} to remove</span>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <span>{orderedSelected.length} selected</span>
+              {toAdd.length > 0 && (
+                <span className="text-emerald-600">+{toAdd.length} to add</span>
+              )}
+              {toRemove.length > 0 && (
+                <span className="text-red-500">
+                  −{toRemove.length} to remove
+                </span>
+              )}
+            </div>
+            {orderChanged && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold border border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300 uppercase tracking-wide flex-shrink-0">
+                Order Changed
+              </span>
             )}
           </div>
 
@@ -407,14 +416,9 @@ export function ManageEvaluatorsDialog({
 
             {/* Right column: ordered selected list (drag to reorder) */}
             <div className="flex flex-col gap-2 min-w-0">
-              <div className="flex items-center justify-end min-h-[1.5rem]">
-                {orderChanged && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold border border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300 uppercase tracking-wide">
-                    Order Changed
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
+              {/* Match the h-9 search input height on the left so the
+                  cards below line up with the catalogue list. */}
+              <p className="h-9 flex items-center text-xs text-muted-foreground">
                 Drag the cards to set the order evaluators appear in across the
                 task
               </p>
