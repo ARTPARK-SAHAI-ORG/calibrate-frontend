@@ -302,26 +302,20 @@ export function ManageEvaluatorsDialog({
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>{orderedSelected.length} selected</span>
-            </div>
-            {hasChanges && (
-              <span className="text-xs flex items-center gap-2">
-                {toAdd.length > 0 && (
-                  <span className="text-emerald-600">
-                    +{toAdd.length} to add
-                  </span>
-                )}
-                {toRemove.length > 0 && (
-                  <span className="text-red-500">
-                    −{toRemove.length} to remove
-                  </span>
-                )}
-                {orderChanged && (
-                  <span className="text-amber-600">order changed</span>
-                )}
+          <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span>{orderedSelected.length} selected</span>
+            {toAdd.length > 0 && (
+              <span className="text-emerald-600">
+                +{toAdd.length} to add
               </span>
+            )}
+            {toRemove.length > 0 && (
+              <span className="text-red-500">
+                −{toRemove.length} to remove
+              </span>
+            )}
+            {orderChanged && (
+              <span className="text-amber-600">order changed</span>
             )}
           </div>
 
