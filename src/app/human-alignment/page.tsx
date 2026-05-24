@@ -753,9 +753,6 @@ function HumanLabellingPageInner() {
             </form>
 
             {addError && <p className="text-sm text-red-500">{addError}</p>}
-            {annotatorEditError && (
-              <p className="text-sm text-red-500">{annotatorEditError}</p>
-            )}
 
             {/* Annotator list */}
             {annotatorsLoading || !annotatorsFetchCompleted ? (
@@ -842,7 +839,7 @@ function HumanLabellingPageInner() {
                         {isEditing ? (
                           <div
                             onClick={(e) => e.stopPropagation()}
-                            className="flex items-center gap-2 min-w-0"
+                            className="flex flex-col gap-1 min-w-0"
                           >
                             <input
                               type="text"
@@ -857,8 +854,17 @@ function HumanLabellingPageInner() {
                               }}
                               disabled={savingAnnotatorEdit}
                               autoFocus
-                              className="flex-1 min-w-0 text-sm font-medium bg-background border border-border rounded-md px-2 py-1 outline-none focus:border-foreground disabled:opacity-50"
+                              className={`min-w-0 text-sm font-medium bg-background border rounded-md px-2 py-1 outline-none focus:border-foreground disabled:opacity-50 ${
+                                annotatorEditError
+                                  ? "border-red-500"
+                                  : "border-border"
+                              }`}
                             />
+                            {annotatorEditError && (
+                              <p className="text-xs text-red-500">
+                                {annotatorEditError}
+                              </p>
+                            )}
                           </div>
                         ) : (
                           <p className="text-sm font-medium text-foreground truncate">
@@ -1005,22 +1011,33 @@ function HumanLabellingPageInner() {
                       >
                         <div className="flex-1 min-w-0">
                           {isEditing ? (
-                            <input
-                              type="text"
-                              value={editingAnnotatorName}
-                              onChange={(e) =>
-                                setEditingAnnotatorName(e.target.value)
-                              }
-                              onClick={(e) => e.stopPropagation()}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") saveEditAnnotator();
-                                else if (e.key === "Escape")
-                                  cancelEditAnnotator();
-                              }}
-                              disabled={savingAnnotatorEdit}
-                              autoFocus
-                              className="w-full text-sm font-medium bg-background border border-border rounded-md px-2 py-1 mb-1 outline-none focus:border-foreground disabled:opacity-50"
-                            />
+                            <>
+                              <input
+                                type="text"
+                                value={editingAnnotatorName}
+                                onChange={(e) =>
+                                  setEditingAnnotatorName(e.target.value)
+                                }
+                                onClick={(e) => e.stopPropagation()}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") saveEditAnnotator();
+                                  else if (e.key === "Escape")
+                                    cancelEditAnnotator();
+                                }}
+                                disabled={savingAnnotatorEdit}
+                                autoFocus
+                                className={`w-full text-sm font-medium bg-background border rounded-md px-2 py-1 mb-1 outline-none focus:border-foreground disabled:opacity-50 ${
+                                  annotatorEditError
+                                    ? "border-red-500"
+                                    : "border-border"
+                                }`}
+                              />
+                              {annotatorEditError && (
+                                <p className="text-xs text-red-500 mb-1">
+                                  {annotatorEditError}
+                                </p>
+                              )}
+                            </>
                           ) : (
                             <p className="text-sm font-medium text-foreground truncate mb-1">
                               {annotator.name}
