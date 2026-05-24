@@ -304,146 +304,42 @@ export default function STTEvaluationDetailPage() {
     fetchEvaluators();
   }, [backendAccessToken]);
 
-  // Resolve the evaluators rendered in the About tab. Three sources, in
-  // priority order:
-  //   1) `evaluator_runs` from any provider in the response (new format) —
-  //      this carries the live `name`, stable `evaluator_uuid`, and an
-  //      `aggregate` block with `type` plus `scale_min` / `scale_max` for
-  //      rating evaluators. We can build the About rows directly from this
-  //      without hitting `/evaluators/{uuid}`.
-  //   2) Legacy `_info`-format payloads or `evaluator_uuids` lists. We take
-  //      the union of `evaluator_uuids` and any UUIDs resolved by name from
-  //      `${prefix}_info` keys in the first provider's `metrics`, then issue
-  //      one `GET /evaluators/{uuid}` per target so we can render the
-  //      "min - max" range for rating evaluators. The list endpoint isn't
-  //      guaranteed to ship the scale.
-  //   3) Truly legacy jobs (no runs, no `evaluator_uuids`, no `*_info`
-  //      keys): fall back to the default STT evaluators so the tab still
-  //      shows at least one row.
+  // Resolve the evaluators rendered in the About tab from the new-format
+  // payload — each provider result carries `evaluator_runs[]` with the
+  // live `name`, stable `evaluator_uuid`, and an `aggregate` block
+  // containing `type` plus `scale_min` / `scale_max` for rating
+  // evaluators. Legacy `*_info`-style payloads are no longer supported.
   useEffect(() => {
-    const fetchAboutEvaluators = async () => {
-      if (!evaluationResult) return;
+    if (!evaluationResult) return;
 
-      // (1) New format — derive directly from `evaluator_runs`.
-      const firstRuns = (evaluationResult.provider_results ?? [])
-        .map((pr) => pr.evaluator_runs)
-        .find((er): er is EvaluatorRun[] => Array.isArray(er) && er.length > 0);
+    const firstRuns = (evaluationResult.provider_results ?? [])
+      .map((pr) => pr.evaluator_runs)
+      .find((er): er is EvaluatorRun[] => Array.isArray(er) && er.length > 0);
 
-      if (firstRuns) {
-        const byUuid = new Map<string, EvaluatorAbout>();
-        for (const run of firstRuns) {
-          if (byUuid.has(run.evaluator_uuid)) continue;
-          const a = run.aggregate ?? {};
-          const scaleValues: number[] = [];
-          if (typeof a.scale_min === "number") scaleValues.push(a.scale_min);
-          if (typeof a.scale_max === "number" && a.scale_max !== a.scale_min) {
-            scaleValues.push(a.scale_max);
-          }
-          byUuid.set(run.evaluator_uuid, {
-            uuid: run.evaluator_uuid,
-            name: run.name ?? run.metric_key,
-            description: run.description ?? "",
-            outputType: a.type === "rating" ? "rating" : "binary",
-            scaleValues,
-          });
-        }
-        setAboutEvaluators(Array.from(byUuid.values()));
-        return;
+    if (!firstRuns) {
+      setAboutEvaluators([]);
+      return;
+    }
+
+    const byUuid = new Map<string, EvaluatorAbout>();
+    for (const run of firstRuns) {
+      if (byUuid.has(run.evaluator_uuid)) continue;
+      const a = run.aggregate ?? {};
+      const scaleValues: number[] = [];
+      if (typeof a.scale_min === "number") scaleValues.push(a.scale_min);
+      if (typeof a.scale_max === "number" && a.scale_max !== a.scale_min) {
+        scaleValues.push(a.scale_max);
       }
-
-      // (2) + (3) Legacy paths. Need the auth list first to validate UUIDs.
-      if (!backendAccessToken || sttEvaluators.length === 0) return;
-
-      const knownByUuid = new Set(sttEvaluators.map((e) => e.uuid));
-      const knownByName = new Map(sttEvaluators.map((e) => [e.name, e.uuid]));
-
-      const uuidSet = new Set<string>();
-      for (const u of evaluationResult.evaluator_uuids ?? []) {
-        if (knownByUuid.has(u)) uuidSet.add(u);
-      }
-
-      const firstMetrics = (evaluationResult.provider_results ?? [])
-        .map((pr) => pr.metrics)
-        .find((m): m is ProviderMetrics => !!m);
-      if (firstMetrics) {
-        for (const k of Object.keys(firstMetrics)) {
-          if (
-            k === "wer" ||
-            k === "string_similarity" ||
-            k === "llm_judge_score"
-          ) {
-            continue;
-          }
-          if (k.endsWith("_info")) {
-            const prefix = k.slice(0, -"_info".length);
-            const uuid = knownByName.get(prefix);
-            if (uuid) uuidSet.add(uuid);
-          }
-        }
-      }
-
-      let targetUuids: string[] = Array.from(uuidSet);
-      if (targetUuids.length === 0) {
-        targetUuids = sttEvaluators
-          .filter((e) => e.isDefault)
-          .map((e) => e.uuid);
-      }
-
-      if (targetUuids.length === 0) {
-        setAboutEvaluators([]);
-        return;
-      }
-
-      try {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-        if (!backendUrl) return;
-
-        const results = await Promise.all(
-          targetUuids.map(async (uuid) => {
-            const response = await fetch(`${backendUrl}/evaluators/${uuid}`, {
-              method: "GET",
-              headers: {
-                accept: "application/json",
-                Authorization: `Bearer ${backendAccessToken}`,
-              },
-            });
-            if (!response.ok) return null;
-            const data: {
-              uuid: string;
-              name: string;
-              description?: string | null;
-              output_type: "binary" | "rating";
-              live_version?: {
-                output_config?: {
-                  scale?: { value: number | boolean | string }[];
-                } | null;
-              } | null;
-            } = await response.json();
-
-            const scaleValues = (data.live_version?.output_config?.scale ?? [])
-              .map((s) => Number(s.value))
-              .filter((v) => !Number.isNaN(v));
-
-            return {
-              uuid: data.uuid,
-              name: data.name,
-              description: data.description ?? "",
-              outputType: data.output_type,
-              scaleValues,
-            } satisfies EvaluatorAbout;
-          }),
-        );
-
-        setAboutEvaluators(
-          results.filter((e): e is EvaluatorAbout => e !== null),
-        );
-      } catch (err) {
-        console.error("Error fetching evaluator details:", err);
-      }
-    };
-
-    fetchAboutEvaluators();
-  }, [backendAccessToken, evaluationResult, sttEvaluators]);
+      byUuid.set(run.evaluator_uuid, {
+        uuid: run.evaluator_uuid,
+        name: run.name ?? run.metric_key,
+        description: run.description ?? "",
+        outputType: a.type === "rating" ? "rating" : "binary",
+        scaleValues,
+      });
+    }
+    setAboutEvaluators(Array.from(byUuid.values()));
+  }, [evaluationResult]);
 
   // Fetch evaluation result
   useEffect(() => {

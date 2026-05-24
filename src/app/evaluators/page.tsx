@@ -24,6 +24,7 @@ import {
   defaultBinaryScale,
   type BinaryScaleRow,
 } from "@/components/evaluators/BinaryScaleEditor";
+import { defaultBinaryLabel } from "@/lib/binaryLabels";
 import { UseCasePickerDialog } from "@/components/evaluators/UseCasePickerDialog";
 import { extractVariableNames } from "@/lib/evaluatorVariables";
 import { useSidebarState } from "@/lib/sidebar";
@@ -61,9 +62,7 @@ function buildBinaryOutputConfig(rows: BinaryScaleRow[]): {
     output_config: {
       scale: rows.map((r) => ({
         value: r.value,
-        name:
-          r.name.trim() ||
-          (r.value ? "Correct" : "Wrong"),
+        name: r.name.trim() || defaultBinaryLabel(r.value),
         ...(r.description.trim()
           ? { description: r.description.trim() }
           : {}),

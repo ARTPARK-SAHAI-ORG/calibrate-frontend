@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import { getBackendUrl } from "@/lib/api";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
-import { getBinaryLabel } from "@/lib/binaryLabels";
+import { getBinaryLabel, toRatingScale } from "@/lib/binaryLabels";
 import { LlmItemPane } from "./item-panes/LlmItemPane";
 import { Section } from "./item-panes/shared";
 import { SimulationItemPane } from "./item-panes/SimulationItemPane";
@@ -917,14 +917,7 @@ function EvaluatorsPane({
         const falseLabel =
           outputType === "binary" ? getBinaryLabel(scale, false) : null;
         const ratingScale =
-          outputType === "rating" && scale
-            ? scale
-                .filter((e) => typeof e.value === "number")
-                .map((e) => ({
-                  value: e.value as number,
-                  name: e.name ?? null,
-                }))
-            : null;
+          outputType === "rating" ? toRatingScale(scale) : null;
 
         if (readOnly) {
           // Admin / "view submitted" surface — show the verdict the

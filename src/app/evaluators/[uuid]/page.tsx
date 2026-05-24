@@ -29,6 +29,8 @@ import {
   defaultBinaryScale,
   type BinaryScaleRow,
 } from "@/components/evaluators/BinaryScaleEditor";
+import { defaultBinaryLabel } from "@/lib/binaryLabels";
+import { liveVersionOf } from "@/lib/evaluatorVersions";
 import { VersionCard } from "@/components/evaluators/VersionCard";
 import { extractVariableNames } from "@/lib/evaluatorVariables";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
@@ -99,7 +101,10 @@ type EvaluatorDetail = {
   owner_user_id: string | null;
   slug: string | null;
   live_version_id: string | null;
-  live_version: EvaluatorVersion | null;
+  // Index into `versions[]` for the live version. Replaces the
+  // previously flattened `live_version` blob to keep the response
+  // smaller / DRY.
+  live_version_index: number | null;
   versions?: EvaluatorVersion[];
   evaluator_type?: EvaluatorType;
 };
@@ -270,9 +275,10 @@ function EvaluatorDetailPageInner() {
     if (!evaluator) return [] as EvaluatorVersion[];
     const all = evaluator.versions?.length
       ? [...evaluator.versions]
-      : evaluator.live_version
-        ? [evaluator.live_version]
-        : [];
+      : (() => {
+          const live = liveVersionOf(evaluator);
+          return live ? [live] : [];
+        })();
     const sorted = all.sort((a, b) => b.version_number - a.version_number);
     // Default evaluators always show only the most recent version of the prompt.
     if (!evaluator.owner_user_id) {
@@ -388,7 +394,7 @@ function EvaluatorDetailPageInner() {
 
   const openNewVersionDialog = () => {
     if (!evaluator) return;
-    const live = evaluator.live_version;
+    const live = liveVersionOf(evaluator);
     setNewVersionJudgeModel(
       live?.judge_model
         ? { id: live.judge_model, name: live.judge_model }
@@ -449,7 +455,7 @@ function EvaluatorDetailPageInner() {
       evaluator.output_type === "binary" ||
       (newVersionScale.length >= 2 &&
         newVersionScale.every((r) => r.name.trim().length > 0));
-    const existingVariables = evaluator.live_version?.variables ?? [];
+    const existingVariables = liveVersionOf(evaluator)?.variables ?? [];
     const variableDescriptionsValid =
       evaluator.evaluator_type !== "llm" ||
       existingVariables.every(
@@ -497,7 +503,7 @@ function EvaluatorDetailPageInner() {
           body.output_config = {
             scale: newVersionBinaryScale.map((r) => ({
               value: r.value,
-              name: r.name.trim() || (r.value ? "Correct" : "Wrong"),
+              name: r.name.trim() || defaultBinaryLabel(r.value),
               ...(r.description.trim()
                 ? { description: r.description.trim() }
                 : {}),
@@ -511,7 +517,7 @@ function EvaluatorDetailPageInner() {
       // descriptions and preserve `default`. Only LLM evaluators can carry
       // variables; for other types we omit the field entirely.
       if (evaluator.evaluator_type === "llm") {
-        const existing = evaluator.live_version?.variables ?? [];
+        const existing = liveVersionOf(evaluator)?.variables ?? [];
         if (existing.length > 0) {
           body.variables = existing.map((v) => {
             const description = (
@@ -1100,7 +1106,7 @@ function EvaluatorDetailPageInner() {
 
                   {(() => {
                     const existingVariables =
-                      evaluator.live_version?.variables ?? [];
+                      liveVersionOf(evaluator)?.variables ?? [];
                     const detected = extractVariableNames(
                       newVersionSystemPrompt,
                     );

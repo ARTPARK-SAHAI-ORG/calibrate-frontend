@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 import { apiClient } from "@/lib/api";
+import { liveVersionOf } from "@/lib/evaluatorVersions";
 
 type LinkedEvaluator = { uuid: string; name: string };
 
@@ -15,7 +16,9 @@ type EvaluatorVersion = {
 type EvaluatorDetail = {
   uuid: string;
   live_version_id: string | null;
-  live_version: EvaluatorVersion | null;
+  // Index into `versions[]` for the live version. Replaces the
+  // previously flattened `live_version` blob.
+  live_version_index: number | null;
   versions?: EvaluatorVersion[];
 };
 
@@ -47,6 +50,10 @@ type EvaluatorVersionInfo = {
 type RunEvaluatorsDialogProps = {
   isOpen: boolean;
   accessToken: string;
+  /** Task uuid — used to fetch every linked evaluator (with versions and
+   * live_version) in one request via
+   * `GET /annotation-tasks/{taskUuid}/evaluators`. */
+  taskUuid: string;
   evaluators: LinkedEvaluator[];
   submitting: boolean;
   submitError: string | null;
@@ -77,6 +84,7 @@ function VersionLabel({
 export function RunEvaluatorsDialog({
   isOpen,
   accessToken,
+  taskUuid,
   evaluators,
   submitting,
   submitError,
@@ -113,36 +121,33 @@ export function RunEvaluatorsDialog({
     setLoadError(null);
     setPicked(Object.fromEntries(evaluators.map((e) => [e.uuid, true])));
     setChosenVersion({});
+    if (!taskUuid) return;
     let cancelled = false;
     const run = async () => {
-      if (evaluators.length === 0) return;
       setLoading(true);
       try {
-        const results = await Promise.all(
-          evaluators.map(async (e) => {
-            const data = await apiClient<EvaluatorDetail>(
-              `/evaluators/${e.uuid}`,
-              accessToken,
-            );
-            const all =
-              data.versions && data.versions.length > 0
-                ? [...data.versions]
-                : data.live_version
-                  ? [data.live_version]
-                  : [];
-            all.sort((a, b) => b.version_number - a.version_number);
-            const liveVersionId =
-              data.live_version_id ?? data.live_version?.uuid ?? null;
-            return [e.uuid, { versions: all, liveVersionId }] as const;
-          }),
+        // Single task-level call returns every linked evaluator as a full
+        // EvaluatorDetailResponse (versions[] + live_version[_id]). Replaces
+        // the previous N-parallel `/evaluators/{uuid}` fan-out.
+        const all = await apiClient<EvaluatorDetail[]>(
+          `/annotation-tasks/${taskUuid}/evaluators`,
+          accessToken,
         );
         if (cancelled) return;
         const next: Record<string, EvaluatorVersionInfo> = {};
         const initialChosen: Record<string, string> = {};
-        for (const [evUuid, val] of results) {
-          next[evUuid] = val;
-          const fallback = val.liveVersionId ?? val.versions[0]?.uuid ?? null;
-          if (fallback) initialChosen[evUuid] = fallback;
+        for (const data of all) {
+          // Resolve the live version BEFORE sorting so we hit the
+          // backend's `live_version_index` (an offset into the
+          // unsorted `versions[]`).
+          const liveVersion = liveVersionOf(data);
+          const versions = data.versions ? [...data.versions] : [];
+          versions.sort((a, b) => b.version_number - a.version_number);
+          const liveVersionId =
+            data.live_version_id ?? liveVersion?.uuid ?? null;
+          next[data.uuid] = { versions, liveVersionId };
+          const fallback = liveVersionId ?? versions[0]?.uuid ?? null;
+          if (fallback) initialChosen[data.uuid] = fallback;
         }
         setInfo(next);
         setChosenVersion(initialChosen);
@@ -161,7 +166,7 @@ export function RunEvaluatorsDialog({
     // `evaluatorIdsKey` instead. Including the array reference would
     // re-fire the effect on every parent render and wipe state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, accessToken, evaluatorIdsKey]);
+  }, [isOpen, accessToken, taskUuid, evaluatorIdsKey]);
 
   const pickedCount = useMemo(
     () => Object.values(picked).filter(Boolean).length,

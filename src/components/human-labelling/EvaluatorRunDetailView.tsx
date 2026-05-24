@@ -11,7 +11,7 @@
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
-import { getBinaryLabel } from "@/lib/binaryLabels";
+import { getBinaryLabel, toRatingScale } from "@/lib/binaryLabels";
 import {
   AgreementStatCard,
   agreementColor,
@@ -32,26 +32,39 @@ export type EvaluatorRunRow = {
   status: string;
   created_at: string;
   completed_at: string | null;
-  evaluator_version?: {
-    uuid?: string;
-    version_number?: number;
-    scale_min?: number | null;
-    scale_max?: number | null;
-    output_config?: {
-      scale?: {
-        value: boolean | number | string;
-        name?: string | null;
-        description?: string | null;
-        color?: string | null;
-      }[];
-    } | null;
+};
+
+/**
+ * One entry in the run-job's top-level `evaluators[]`. Pinned to the
+ * version the job actually ran against. Mirrors the labelling-job
+ * viewer's shape so the same renderer code can consume both. The page
+ * builds a `Record<evaluator_id, JobEvaluator>` lookup once and reads
+ * scale / labels / name / description / variables from there instead of
+ * the (now removed) per-run `evaluator` and `evaluator_version` blobs.
+ */
+export type JobEvaluator = {
+  uuid: string;
+  name: string;
+  description?: string | null;
+  evaluator_type?: string;
+  output_type?: "binary" | "rating" | string;
+  evaluator_version_id?: string;
+  version_number?: number;
+  scale_min?: number | null;
+  scale_max?: number | null;
+  output_config?: {
+    scale?: {
+      value: boolean | number | string;
+      name?: string | null;
+      description?: string | null;
+      color?: string | null;
+    }[];
   } | null;
-  evaluator?: {
-    uuid?: string;
-    name?: string;
+  variables?: {
+    name: string;
     description?: string | null;
-    output_type?: string;
-  } | null;
+    default?: string | null;
+  }[] | null;
 };
 
 export type EvaluatorRunItemSnapshot = {
@@ -107,11 +120,6 @@ export type EvaluatorRunJob = {
   task_id: string;
   status: "queued" | "in_progress" | "completed" | "failed";
   details: {
-    evaluators?: {
-      evaluator_id: string;
-      evaluator_version_id?: string;
-      name?: string;
-    }[];
     item_count?: number;
     s3_prefix?: string;
     item_ids?: string[];
@@ -120,6 +128,10 @@ export type EvaluatorRunJob = {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  /** Per-evaluator pinned-version metadata (output_config, scale_min,
+   * scale_max, variables, version_number). Promoted from
+   * `details.evaluators` to the top level. */
+  evaluators?: JobEvaluator[];
   runs: EvaluatorRunRow[];
   items?: EvaluatorRunItemSnapshot[];
   human_agreement?: HumanAgreement;
@@ -143,13 +155,8 @@ export type LabellingTaskFull = {
 export function evaluatorDisplayName(
   ev: { evaluator_id: string; name?: string },
   nameByEvaluatorId: Record<string, string>,
-  runRow?: EvaluatorRunRow | null,
 ): string {
-  for (const candidate of [
-    ev.name,
-    runRow?.evaluator?.name,
-    nameByEvaluatorId[ev.evaluator_id],
-  ]) {
+  for (const candidate of [ev.name, nameByEvaluatorId[ev.evaluator_id]]) {
     if (typeof candidate === "string" && candidate.trim().length > 0) {
       return candidate.trim();
     }
@@ -245,11 +252,12 @@ export function formatAgreement(value: number | null | undefined): string {
 
 export function runOutputType(
   run: EvaluatorRunRow | undefined,
+  evaluator?: JobEvaluator | null,
 ): "binary" | "rating" {
   const v = run?.value?.value;
   if (typeof v === "boolean") return "binary";
   if (typeof v === "number") return "rating";
-  if (run?.evaluator?.output_type === "rating") return "rating";
+  if (evaluator?.output_type === "rating") return "rating";
   return "binary";
 }
 
@@ -611,6 +619,7 @@ function SourcePill({
 export function EvaluatorResultsPane({
   evaluators,
   evaluatorNamesById,
+  getJobEvaluator,
   runs,
   versionLabels,
   jobStatus,
@@ -631,6 +640,18 @@ export function EvaluatorResultsPane({
     name?: string;
   }[];
   evaluatorNamesById: Record<string, string>;
+  /** Lookup helper: given a run row or evaluator descriptor, return the
+   * matching `JobEvaluator` entry (the pinned-version metadata block).
+   * Different versions of the same evaluator can carry different
+   * labels / rubrics, so this is keyed by (evaluator_id, version_id),
+   * not just evaluator_id. Source of truth for description /
+   * output_type / scale_min / scale_max / output_config / variables
+   * now that per-run `evaluator` and `evaluator_version` blobs are
+   * gone from the API. */
+  getJobEvaluator: (key: {
+    evaluator_id: string;
+    evaluator_version_id?: string;
+  }) => JobEvaluator | null;
   runs: EvaluatorRunRow[];
   versionLabels: Record<string, string>;
   jobStatus: EvaluatorRunJob["status"];
@@ -710,12 +731,13 @@ export function EvaluatorResultsPane({
             (!ev.evaluator_version_id ||
               x.evaluator_version_id === ev.evaluator_version_id),
         );
-        const displayName = evaluatorDisplayName(ev, evaluatorNamesById, r);
+        const jobEvaluator = getJobEvaluator(ev);
+        const displayName = evaluatorDisplayName(ev, evaluatorNamesById);
         // Prefer the evaluator's declared output type so annotations still
         // render with the right pill when the evaluator itself produced no
         // value yet (e.g. items labelled by humans before a run).
         let outputType: "binary" | "rating" =
-          r?.evaluator?.output_type === "rating" ? "rating" : "binary";
+          jobEvaluator?.output_type === "rating" ? "rating" : "binary";
         if (r) {
           const v = r.value?.value;
           if (typeof v === "boolean") outputType = "binary";
@@ -838,12 +860,12 @@ export function EvaluatorResultsPane({
           }));
 
         const scaleMin =
-          typeof r.evaluator_version?.scale_min === "number"
-            ? r.evaluator_version.scale_min
+          typeof jobEvaluator?.scale_min === "number"
+            ? jobEvaluator.scale_min
             : undefined;
         const scaleMax =
-          typeof r.evaluator_version?.scale_max === "number"
-            ? r.evaluator_version.scale_max
+          typeof jobEvaluator?.scale_max === "number"
+            ? jobEvaluator.scale_max
             : undefined;
 
         const {
@@ -900,7 +922,7 @@ export function EvaluatorResultsPane({
             <EvaluatorVerdictCard
               mode="read"
               name={evaluatorName}
-              description={r.evaluator?.description ?? null}
+              description={jobEvaluator?.description ?? null}
               versionLabel={showVersionInSourcePill ? null : versionLabel}
               outputType={outputType}
               evaluatorUuid={ev.evaluator_id}
@@ -913,21 +935,16 @@ export function EvaluatorResultsPane({
               scaleMin={scaleMin}
               scaleMax={scaleMax}
               trueLabel={getBinaryLabel(
-                r.evaluator_version?.output_config?.scale ?? null,
+                jobEvaluator?.output_config?.scale ?? null,
                 true,
               )}
               falseLabel={getBinaryLabel(
-                r.evaluator_version?.output_config?.scale ?? null,
+                jobEvaluator?.output_config?.scale ?? null,
                 false,
               )}
-              ratingScale={
-                (r.evaluator_version?.output_config?.scale ?? null)
-                  ?.filter((e) => typeof e.value === "number")
-                  .map((e) => ({
-                    value: e.value as number,
-                    name: e.name ?? null,
-                  })) ?? null
-              }
+              ratingScale={toRatingScale(
+                jobEvaluator?.output_config?.scale,
+              )}
               reasoning={displayReasoning}
             />
           </div>
@@ -955,6 +972,7 @@ export function EvaluatorResultsPane({
             runs={runs}
             versionLabels={versionLabels}
             evaluatorNamesById={evaluatorNamesById}
+            getJobEvaluator={getJobEvaluator}
             humanAgreementForItem={humanAgreementForItem}
             evaluatorVariablesByEvaluatorId={evaluatorVariablesByEvaluatorId}
             jobStatus={jobStatus}
@@ -986,6 +1004,7 @@ function GroupedEvaluatorCard({
   runs,
   versionLabels,
   evaluatorNamesById,
+  getJobEvaluator,
   humanAgreementForItem,
   evaluatorVariablesByEvaluatorId,
   jobStatus,
@@ -1000,6 +1019,10 @@ function GroupedEvaluatorCard({
   runs: EvaluatorRunRow[];
   versionLabels: Record<string, string>;
   evaluatorNamesById: Record<string, string>;
+  getJobEvaluator: (key: {
+    evaluator_id: string;
+    evaluator_version_id?: string;
+  }) => JobEvaluator | null;
   humanAgreementForItem: HumanAgreementItem | null;
   evaluatorVariablesByEvaluatorId: Record<string, Record<string, string>>;
   jobStatus: EvaluatorRunJob["status"];
@@ -1037,8 +1060,11 @@ function GroupedEvaluatorCard({
       ? (humansForEvaluator?.human_annotations ?? [])
       : [];
 
+  // Use the first evaluator entry (typically all share the same evaluator
+  // anyway, since this is grouped by evaluator_id) to resolve the
+  // declared output type.
   const outputType: "binary" | "rating" =
-    versions.find((x) => x.r?.evaluator?.output_type === "rating")
+    getJobEvaluator(evaluators[0])?.output_type === "rating"
       ? "rating"
       : "binary";
 
@@ -1081,22 +1107,28 @@ function GroupedEvaluatorCard({
     ? annotations.find((a) => `a:${a.annotator_id}` === selection) ?? null
     : null;
 
-  // The card's "anchor" run (for description, scale, output_type lookup) is
-  // either the selected version or the first version that has run data.
+  // The card's "anchor" run (for output value / reasoning) is either the
+  // selected version or the first version that has run data. Metadata
+  // (description / scale_min / scale_max / output_config) comes from the
+  // top-level jobEvaluatorById lookup, not the run row.
   const anchorRun =
     selectedVersion?.r ?? versions.find((x) => x.r)?.r ?? null;
+  // Resolve the JobEvaluator for the version actually being shown so
+  // labels / scale come from THIS version, not a sibling.
+  const anchorEv =
+    selectedVersion?.ev ?? versions.find((x) => x.r)?.ev ?? evaluators[0];
+  const jobEvaluator = getJobEvaluator(anchorEv);
   const evaluatorName = evaluatorDisplayName(
     evaluators[0],
     evaluatorNamesById,
-    anchorRun,
   );
   const scaleMin =
-    typeof anchorRun?.evaluator_version?.scale_min === "number"
-      ? anchorRun.evaluator_version.scale_min
+    typeof jobEvaluator?.scale_min === "number"
+      ? jobEvaluator.scale_min
       : undefined;
   const scaleMax =
-    typeof anchorRun?.evaluator_version?.scale_max === "number"
-      ? anchorRun.evaluator_version.scale_max
+    typeof jobEvaluator?.scale_max === "number"
+      ? jobEvaluator.scale_max
       : undefined;
 
   const {
@@ -1154,7 +1186,7 @@ function GroupedEvaluatorCard({
       <EvaluatorVerdictCard
         mode="read"
         name={evaluatorName}
-        description={anchorRun?.evaluator?.description ?? null}
+        description={jobEvaluator?.description ?? null}
         outputType={outputType}
         evaluatorUuid={evaluatorId}
         enableLink={linkEvaluators}
@@ -1166,21 +1198,14 @@ function GroupedEvaluatorCard({
         scaleMin={scaleMin}
         scaleMax={scaleMax}
         trueLabel={getBinaryLabel(
-          anchorRun?.evaluator_version?.output_config?.scale ?? null,
+          jobEvaluator?.output_config?.scale ?? null,
           true,
         )}
         falseLabel={getBinaryLabel(
-          anchorRun?.evaluator_version?.output_config?.scale ?? null,
+          jobEvaluator?.output_config?.scale ?? null,
           false,
         )}
-        ratingScale={
-          (anchorRun?.evaluator_version?.output_config?.scale ?? null)
-            ?.filter((e) => typeof e.value === "number")
-            .map((e) => ({
-              value: e.value as number,
-              name: e.name ?? null,
-            })) ?? null
-        }
+        ratingScale={toRatingScale(jobEvaluator?.output_config?.scale)}
         reasoning={displayReasoning}
       />
     </div>
@@ -1199,6 +1224,7 @@ export function ItemDetailPane({
   taskType,
   evaluators,
   evaluatorNamesById,
+  getJobEvaluator,
   runs,
   versionLabels,
   jobStatus,
@@ -1220,6 +1246,10 @@ export function ItemDetailPane({
     name?: string;
   }[];
   evaluatorNamesById: Record<string, string>;
+  getJobEvaluator: (key: {
+    evaluator_id: string;
+    evaluator_version_id?: string;
+  }) => JobEvaluator | null;
   runs: EvaluatorRunRow[];
   versionLabels: Record<string, string>;
   jobStatus: EvaluatorRunJob["status"];
@@ -1251,6 +1281,7 @@ export function ItemDetailPane({
         <EvaluatorResultsPane
           evaluators={evaluators}
           evaluatorNamesById={evaluatorNamesById}
+          getJobEvaluator={getJobEvaluator}
           runs={runs}
           versionLabels={versionLabels}
           jobStatus={jobStatus}
@@ -1432,6 +1463,51 @@ export function EvaluatorRunDetailView({
     return m;
   }, [task?.evaluators]);
 
+  // Top-level evaluators block (with pinned version + output_config +
+  // scale_min/max + variables). Source of truth for per-evaluator
+  // metadata now that per-run `evaluator` / `evaluator_version` blobs
+  // are gone from the API.
+  //
+  // Keyed by `${evaluator_id}:${evaluator_version_id}` so different
+  // versions of the same evaluator carry their own labels / rubrics.
+  // Falls back to a no-version key (`${evaluator_id}:`) so callers
+  // without a pinned version still resolve to *some* entry.
+  const getJobEvaluator = useMemo(() => {
+    const byCompositeKey = new Map<string, JobEvaluator>();
+    const byEvaluatorId = new Map<string, JobEvaluator>();
+    for (const e of job?.evaluators ?? []) {
+      if (e.evaluator_version_id) {
+        byCompositeKey.set(`${e.uuid}:${e.evaluator_version_id}`, e);
+      }
+      if (!byEvaluatorId.has(e.uuid)) byEvaluatorId.set(e.uuid, e);
+    }
+    return (key: {
+      evaluator_id: string;
+      evaluator_version_id?: string;
+    }): JobEvaluator | null => {
+      if (key.evaluator_version_id) {
+        const hit = byCompositeKey.get(
+          `${key.evaluator_id}:${key.evaluator_version_id}`,
+        );
+        if (hit) return hit;
+      }
+      return byEvaluatorId.get(key.evaluator_id) ?? null;
+    };
+  }, [job?.evaluators]);
+
+  // Shim that matches the legacy `details.evaluators` shape the rest of
+  // this file consumes — `{ evaluator_id, evaluator_version_id?, name? }`.
+  // Built from the new top-level `job.evaluators[]` payload.
+  const detailsEvaluators = useMemo(
+    () =>
+      (job?.evaluators ?? []).map((e) => ({
+        evaluator_id: e.uuid,
+        evaluator_version_id: e.evaluator_version_id,
+        name: e.name,
+      })),
+    [job?.evaluators],
+  );
+
   const itemsForRun = useMemo<Item[]>(() => {
     if (!job) return [];
     const taskId = task?.uuid ?? job.task_id;
@@ -1514,9 +1590,8 @@ export function EvaluatorRunDetailView({
   const itemDone = (itemId: string): boolean => {
     if (!job || job.status !== "completed") return false;
     const rs = runsByItem[itemId] ?? [];
-    const evaluators = job.details?.evaluators ?? [];
-    if (rs.length === 0 || evaluators.length === 0) return false;
-    return evaluators.every((e) =>
+    if (rs.length === 0 || detailsEvaluators.length === 0) return false;
+    return detailsEvaluators.every((e) =>
       rs.some(
         (r) =>
           r.evaluator_id === e.evaluator_id &&
@@ -1570,10 +1645,10 @@ export function EvaluatorRunDetailView({
         if (cardsWillRender) return null;
         return (
           <div className="flex items-center gap-2 flex-wrap min-w-0">
-            {(job.details?.evaluators ?? []).length === 0 ? (
+            {detailsEvaluators.length === 0 ? (
               <span className="text-sm text-muted-foreground">—</span>
             ) : (
-              (job.details?.evaluators ?? []).map((e) => {
+              detailsEvaluators.map((e) => {
                 const name = evaluatorDisplayName(e, evaluatorNamesById);
                 const label = e.evaluator_version_id
                   ? versionLabels[e.evaluator_version_id]
@@ -1621,7 +1696,7 @@ export function EvaluatorRunDetailView({
       <HumanAgreementSummary
         jobStatus={job.status}
         agreement={job.human_agreement}
-        evaluators={job.details?.evaluators ?? []}
+        evaluators={detailsEvaluators}
         evaluatorNamesById={evaluatorNamesById}
         versionLabels={versionLabels}
         linkEvaluators={linkEvaluators}
@@ -1745,8 +1820,9 @@ export function EvaluatorRunDetailView({
                 <ItemDetailPane
                   item={currentItem}
                   taskType={task.type}
-                  evaluators={job.details?.evaluators ?? []}
+                  evaluators={detailsEvaluators}
                   evaluatorNamesById={evaluatorNamesById}
+                  getJobEvaluator={getJobEvaluator}
                   runs={runsByItem[currentItem.uuid] ?? []}
                   versionLabels={versionLabels}
                   jobStatus={job.status}

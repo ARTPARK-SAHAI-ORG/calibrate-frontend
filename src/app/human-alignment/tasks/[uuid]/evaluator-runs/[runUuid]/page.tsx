@@ -70,9 +70,23 @@ export default function EvaluatorRunDetailPage() {
 
   const [job, setJob] = useState<EvaluatorRunJob | null>(null);
   const [task, setTask] = useState<LabellingTaskFull | null>(null);
-  const [versionLabels, setVersionLabels] = useState<Record<string, string>>(
-    {},
-  );
+  // Version labels (`{ versionUuid: "v3" }`) are derived from the top-
+  // level `job.evaluators[]` block — each entry pins the version the
+  // job ran with and carries its `version_number`. The Re-run dialog
+  // lazy-loads the full version list itself when it opens (with its
+  // own spinner), so versions that didn't run on this job still get
+  // labelled there without pre-fetching here.
+  const versionLabels = useMemo<Record<string, string>>(() => {
+    const m: Record<string, string> = {};
+    for (const e of job?.evaluators ?? []) {
+      const id = e.evaluator_version_id;
+      const n = e.version_number;
+      if (id && typeof n === "number") {
+        m[id] = `v${n}`;
+      }
+    }
+    return m;
+  }, [job]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -167,41 +181,6 @@ export default function EvaluatorRunDetailPage() {
   }, [fetchJob]);
 
   // Lazily fetch version labels for evaluators referenced by the run.
-  // Keyed on the sorted list of evaluator IDs so the effect doesn't
-  // re-fire when the run polls.
-  const evaluatorIdsKey = (job?.details?.evaluators ?? [])
-    .map((e) => e.evaluator_id)
-    .filter(Boolean)
-    .slice()
-    .sort()
-    .join(",");
-  useEffect(() => {
-    if (!accessToken || !evaluatorIdsKey) return;
-    const evIds = evaluatorIdsKey.split(",");
-    let cancelled = false;
-    (async () => {
-      const merged: Record<string, string> = {};
-      await Promise.all(
-        evIds.map(async (evaluatorId) => {
-          try {
-            const versions = await apiClient<
-              Array<{ uuid: string; version_number: number }>
-            >(`/evaluators/${evaluatorId}/versions`, accessToken);
-            for (const v of versions) {
-              merged[v.uuid] = `v${v.version_number}`;
-            }
-          } catch {
-            // ignore
-          }
-        }),
-      );
-      if (!cancelled) setVersionLabels((prev) => ({ ...prev, ...merged }));
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, evaluatorIdsKey]);
-
   // Items in this run, derived the same way as the body view (used by export).
   const itemsForRun = useMemo<Item[]>(() => {
     if (!job) return [];
@@ -282,9 +261,17 @@ export default function EvaluatorRunDetailPage() {
     try {
       const ExcelJS = (await import("exceljs")).default;
       const wb = new ExcelJS.Workbook();
-      const evaluators = job.details?.evaluators ?? [];
+      const evaluators = (job.evaluators ?? []).map((e) => ({
+        evaluator_id: e.uuid,
+        evaluator_version_id: e.evaluator_version_id,
+        name: e.name,
+        output_type: e.output_type,
+      }));
 
       for (const ev of evaluators) {
+        const jobEvaluator = (job.evaluators ?? []).find(
+          (e) => e.uuid === ev.evaluator_id,
+        );
         const evName = evaluatorDisplayName(ev, evaluatorNamesById);
         const versionLabel = ev.evaluator_version_id
           ? (versionLabels[ev.evaluator_version_id] ?? null)
@@ -375,7 +362,7 @@ export default function EvaluatorRunDetailPage() {
             evReasoning = typeof reas === "string" ? reas : "";
           }
 
-          const outputType = runOutputType(run);
+          const outputType = runOutputType(run, jobEvaluator);
           const humanAgCell = agreementExportCell(
             evHumanData?.human_agreement,
             computeInterAnnotatorAgreement(
@@ -632,6 +619,7 @@ export default function EvaluatorRunDetailPage() {
         <RunEvaluatorsDialog
           isOpen={rerunOpen}
           accessToken={accessToken}
+          taskUuid={taskUuid}
           evaluators={(task.evaluators ?? []).map((e) => ({
             uuid: e.uuid,
             name: e.name,

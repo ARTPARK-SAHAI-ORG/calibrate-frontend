@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { getBinaryLabel } from "@/lib/binaryLabels";
+
+// Pixel height used as the collapsed cap for prompt bodies. Matches the
+// max-h-[7.5rem] applied to the <pre> below (7.5rem at 16px root).
+const COLLAPSED_PROMPT_HEIGHT_PX = 120;
 
 type ScaleEntry = {
   value: boolean | number | string;
@@ -47,12 +51,27 @@ export function VersionCard({
   const [promptVisible, setPromptVisible] = useState(isLive || isDefault);
   const [copied, setCopied] = useState(false);
   const [promptExpanded, setPromptExpanded] = useState(false);
-  // Roughly 4 lines at the current leading. Used as the collapsed height
-  // and to decide whether the View more / View less toggle is needed.
-  const COLLAPSED_LINE_COUNT = 4;
-  const promptLineCount =
-    (version.system_prompt.match(/\n/g)?.length ?? 0) + 1;
-  const isPromptOverflowing = promptLineCount > COLLAPSED_LINE_COUNT;
+  // Whether the rendered prompt actually overflows the collapsed height.
+  // Measured (not derived from \n count) so prompts with long wrapping
+  // lines and no line breaks still get the toggle.
+  const [isPromptOverflowing, setIsPromptOverflowing] = useState(false);
+  const promptRef = useRef<HTMLPreElement>(null);
+
+  useLayoutEffect(() => {
+    if (!promptVisible) return;
+    const el = promptRef.current;
+    if (!el) return;
+    const measure = () => {
+      // Compare the natural scroll height (clamp ignored) against the
+      // collapsed cap. ResizeObserver re-fires on any layout change so
+      // we stay correct after font load, window resize, etc.
+      setIsPromptOverflowing(el.scrollHeight > COLLAPSED_PROMPT_HEIGHT_PX + 1);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [promptVisible, version.system_prompt]);
 
   useEffect(() => {
     setPromptVisible(isLive || isDefault);
@@ -155,6 +174,7 @@ export function VersionCard({
         </div>
         <div className="relative">
           <pre
+            ref={promptRef}
             className={`border border-border rounded-md p-3 md:p-4 bg-muted/10 text-sm text-foreground whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto ${
               isPromptOverflowing && !promptExpanded
                 ? "max-h-[7.5rem] overflow-hidden"

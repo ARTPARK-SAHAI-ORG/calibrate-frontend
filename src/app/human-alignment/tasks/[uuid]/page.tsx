@@ -118,15 +118,19 @@ type EvaluatorRunJob = {
   task_id: string;
   status: "queued" | "in_progress" | "completed" | "failed";
   details: {
-    evaluators?: {
-      evaluator_id: string;
-      evaluator_version_id?: string;
-      name?: string;
-    }[];
     item_count?: number;
     s3_prefix?: string;
     metrics?: Record<string, EvaluatorRunMetricEntry>;
   } | null;
+  // Top-level evaluators block. Each entry pins the version this run
+  // executed against and carries its `version_number` (used for the
+  // "v3" pills in the run list). Promoted from `details.evaluators`.
+  evaluators?: {
+    uuid: string;
+    name: string;
+    evaluator_version_id?: string;
+    version_number?: number;
+  }[];
   error: string | null;
   created_at: string;
   updated_at: string;
@@ -303,14 +307,12 @@ function EvaluatorRunsList({
   runs,
   loading,
   error,
-  versionLabels,
   onRequestDelete,
   onOpen,
 }: {
   runs: EvaluatorRunJob[];
   loading: boolean;
   error: string | null;
-  versionLabels: Record<string, Record<string, string>>;
   onRequestDelete: (runUuid: string) => void;
   onOpen: (runUuid: string) => void;
 }) {
@@ -383,22 +385,22 @@ function EvaluatorRunsList({
       {runs.map((run) => {
         const itemCount = run.details?.item_count ?? 0;
         const lastUpdated = run.updated_at || run.created_at;
-        const evaluators = run.details?.evaluators ?? [];
-        const versionLabelFor = (
-          evaluatorId: string,
-          versionId: string | undefined,
-        ): string | null => {
-          if (!versionId) return null;
-          return versionLabels[evaluatorId]?.[versionId] ?? null;
-        };
+        // Per-run pinned evaluators live at the top level now (used to be
+        // `run.details.evaluators`). Each entry already carries the
+        // pinned version id + number — no version-labels lookup needed.
+        const evaluators = (run.evaluators ?? []).map((e) => ({
+          evaluator_id: e.uuid,
+          evaluator_version_id: e.evaluator_version_id,
+          name: e.name,
+          version_label:
+            typeof e.version_number === "number"
+              ? `v${e.version_number}`
+              : null,
+        }));
         const evaluatorTitle = evaluators
           .map((e) => {
             const name = e.name || e.evaluator_id.slice(0, 8);
-            const label = versionLabelFor(
-              e.evaluator_id,
-              e.evaluator_version_id,
-            );
-            return label ? `${name} (${label})` : name;
+            return e.version_label ? `${name} (${e.version_label})` : name;
           })
           .join(", ");
         return (
@@ -416,19 +418,15 @@ function EvaluatorRunsList({
               ) : (
                 evaluators.map((e) => {
                   const name = e.name || e.evaluator_id.slice(0, 8);
-                  const label = versionLabelFor(
-                    e.evaluator_id,
-                    e.evaluator_version_id,
-                  );
                   return (
                     <span
                       key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
                       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-background text-foreground"
                     >
                       <span>{name}</span>
-                      {label && (
+                      {e.version_label && (
                         <span className="font-mono text-[10px] text-muted-foreground">
-                          {label}
+                          {e.version_label}
                         </span>
                       )}
                     </span>
@@ -1065,12 +1063,6 @@ function LabellingTaskPageInner() {
     for (const a of taskSummary?.annotators ?? []) map.set(a.uuid, a.name);
     return map;
   }, [taskSummary]);
-  // Map evaluator_id -> { version_id: "v1" }, populated on demand from
-  // /evaluators/{uuid}/versions so we can label runs by version number.
-  const [versionLabels, setVersionLabels] = useState<
-    Record<string, Record<string, string>>
-  >({});
-
   const fetchRuns = useCallback(async () => {
     if (!accessToken || !uuid) return;
     setRunsLoading(true);
@@ -1093,47 +1085,6 @@ function LabellingTaskPageInner() {
     fetchRuns();
   }, [fetchRuns]);
   void activeTab;
-
-  // Fetch evaluator versions for any evaluator referenced by a run that we
-  // haven't already loaded.
-  useEffect(() => {
-    if (!accessToken) return;
-    const needed = new Set<string>();
-    for (const r of runs) {
-      for (const ev of r.details?.evaluators ?? []) {
-        if (ev.evaluator_id && !versionLabels[ev.evaluator_id]) {
-          needed.add(ev.evaluator_id);
-        }
-      }
-    }
-    if (needed.size === 0) return;
-    let cancelled = false;
-    (async () => {
-      const updates: Record<string, Record<string, string>> = {};
-      await Promise.all(
-        Array.from(needed).map(async (evaluatorId) => {
-          try {
-            const versions = await apiClient<
-              Array<{ uuid: string; version_number: number }>
-            >(`/evaluators/${evaluatorId}/versions`, accessToken);
-            const map: Record<string, string> = {};
-            for (const v of versions) {
-              map[v.uuid] = `v${v.version_number}`;
-            }
-            updates[evaluatorId] = map;
-          } catch {
-            updates[evaluatorId] = {};
-          }
-        }),
-      );
-      if (!cancelled) {
-        setVersionLabels((prev) => ({ ...prev, ...updates }));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [runs, accessToken, versionLabels]);
 
   const items = task?.items ?? [];
   const jobs = task?.jobs ?? [];
@@ -2406,7 +2357,6 @@ function LabellingTaskPageInner() {
             runs={runs}
             loading={runsLoading || !runsFetchCompleted}
             error={runsError}
-            versionLabels={versionLabels}
             onRequestDelete={(runUuid) => setDeletingRunUuid(runUuid)}
             onOpen={(runUuid) =>
               router.push(
@@ -2421,6 +2371,7 @@ function LabellingTaskPageInner() {
         <RunEvaluatorsDialog
           isOpen={runDialogOpen}
           accessToken={accessToken}
+          taskUuid={uuid}
           evaluators={(task?.evaluators ?? []).map((e) => ({
             uuid: e.uuid,
             name: e.name,
