@@ -57,9 +57,9 @@ export function ManageEvaluatorsDialog({
   // current server-side order so opening the dialog mirrors what's on
   // the task header. Stays in sync with `selectedIds` as the user
   // toggles checkboxes (additions append; removals splice out).
-  const [orderedSelected, setOrderedSelected] = useState<string[]>(
-    () => [...currentEvaluatorIds],
-  );
+  const [orderedSelected, setOrderedSelected] = useState<string[]>(() => [
+    ...currentEvaluatorIds,
+  ]);
   const [search, setSearch] = useState("");
   const [dragSourceIdx, setDragSourceIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
@@ -142,9 +142,7 @@ export function ManageEvaluatorsDialog({
       ...toAdd,
     ];
     if (serverOrderAfterLinkOps.length !== orderedSelected.length) return false;
-    return serverOrderAfterLinkOps.some(
-      (id, i) => id !== orderedSelected[i],
-    );
+    return serverOrderAfterLinkOps.some((id, i) => id !== orderedSelected[i]);
   }, [currentEvaluatorIds, toAdd, toRemove, orderedSelected]);
 
   const hasChanges = toAdd.length > 0 || toRemove.length > 0 || orderChanged;
@@ -425,12 +423,13 @@ export function ManageEvaluatorsDialog({
 
             {/* Right column: ordered selected list (drag to reorder) */}
             <div className="flex flex-col gap-2 min-w-0">
-              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Display order
-              </div>
               <p className="text-xs text-muted-foreground">
                 Drag the cards to set the order evaluators appear in across the
-                task. Saved only when you click <span className="font-medium text-foreground">Save changes</span>.
+                task. Saved only when you click{" "}
+                <span className="font-medium text-foreground">
+                  Save changes
+                </span>
+                .
               </p>
               <div className="border border-border rounded-md max-h-80 overflow-y-auto p-2 space-y-2 bg-muted/10">
                 {orderedSelected.length === 0 ? (
@@ -461,7 +460,9 @@ export function ManageEvaluatorsDialog({
                             ? "border-foreground/60 ring-2 ring-foreground/20"
                             : "border-border"
                         } ${isDragging ? "opacity-50" : ""} ${
-                          saving ? "cursor-not-allowed" : "cursor-grab active:cursor-grabbing"
+                          saving
+                            ? "cursor-not-allowed"
+                            : "cursor-grab active:cursor-grabbing"
                         }`}
                       >
                         <svg
@@ -485,11 +486,6 @@ export function ManageEvaluatorsDialog({
                           <div className="text-sm font-medium truncate">
                             {ev?.name ?? uuid.slice(0, 8)}
                           </div>
-                          {ev?.description && (
-                            <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                              {ev.description}
-                            </div>
-                          )}
                         </div>
                         <button
                           type="button"
