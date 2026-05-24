@@ -2175,7 +2175,7 @@ function LabellingTaskPageInner() {
 
               {taskType === "stt" ? (
                 <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_180px_180px_360px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
+                  <div className="grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_240px_180px_300px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
                     <input
                       type="checkbox"
                       checked={allSelected}
@@ -2228,7 +2228,7 @@ function LabellingTaskPageInner() {
                       <Fragment key={item.uuid}>
                         <div
                           onClick={() => openItemDetail(item.uuid)}
-                          className={`grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_180px_180px_360px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
+                          className={`grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_240px_180px_300px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
                             isSelected ? "bg-muted/30" : "hover:bg-muted/20"
                           }`}
                         >
@@ -2298,7 +2298,7 @@ function LabellingTaskPageInner() {
                 </div>
               ) : (
                 <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_180px_180px_360px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
+                  <div className="grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_240px_180px_300px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
                     <input
                       type="checkbox"
                       checked={allSelected}
@@ -2347,7 +2347,7 @@ function LabellingTaskPageInner() {
                       <Fragment key={item.uuid}>
                         <div
                           onClick={() => openItemDetail(item.uuid)}
-                          className={`grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_180px_180px_360px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
+                          className={`grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_240px_180px_300px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
                             isSelected ? "bg-muted/30" : "hover:bg-muted/20"
                           }`}
                         >
