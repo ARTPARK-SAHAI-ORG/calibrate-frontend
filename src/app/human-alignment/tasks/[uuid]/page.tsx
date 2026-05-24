@@ -1242,6 +1242,15 @@ function LabellingTaskPageInner() {
     if (task?.name) document.title = `${task.name} | Calibrate`;
   }, [task?.name]);
 
+  // Drag-and-drop reorder state for the linked-evaluator pills on the
+  // task header. `dragSourceIdx` is the index of the pill currently
+  // being dragged; `dragOverIdx` is the index it's hovering over (for
+  // the highlight ring). On drop we PUT /evaluators/order with the
+  // full ordered uuid list and update local state from the response.
+  const [evDragSourceIdx, setEvDragSourceIdx] = useState<number | null>(null);
+  const [evDragOverIdx, setEvDragOverIdx] = useState<number | null>(null);
+  const [evReordering, setEvReordering] = useState(false);
+
   const fetchTask = useCallback(async () => {
     if (!accessToken || !uuid) return;
     setLoading(true);
@@ -1261,6 +1270,50 @@ function LabellingTaskPageInner() {
       setTaskFetchCompleted(true);
     }
   }, [accessToken, uuid]);
+
+  // Reorder linked evaluators. `targetOrder` is the new desired ordered
+  // list of uuids — must be the exact same set currently linked to the
+  // task. Optimistically updates local state, PUTs the order, then
+  // overwrites with the server-fresh list from the 200 response. On
+  // failure we toast the server detail and refetch so the user's UI
+  // matches the server's link set.
+  const reorderEvaluators = useCallback(
+    async (targetOrder: string[]) => {
+      if (!accessToken || !uuid) return;
+      setEvReordering(true);
+      // Optimistic reorder.
+      const previousEvaluators = task?.evaluators ?? [];
+      const byUuid = new Map(previousEvaluators.map((e) => [e.uuid, e]));
+      const optimistic = targetOrder
+        .map((id) => byUuid.get(id))
+        .filter((e): e is NonNullable<typeof e> => !!e);
+      setTask((prev) =>
+        prev ? { ...prev, evaluators: optimistic } : prev,
+      );
+      try {
+        const result = await apiClient<{
+          message: string;
+          evaluators: LabellingTask["evaluators"];
+        }>(`/annotation-tasks/${uuid}/evaluators/order`, accessToken, {
+          method: "PUT",
+          body: { evaluator_ids: targetOrder },
+        });
+        if (result?.evaluators) {
+          setTask((prev) =>
+            prev ? { ...prev, evaluators: result.evaluators } : prev,
+          );
+        }
+      } catch (err) {
+        toast.error(parseApiError(err, "Failed to reorder evaluators"));
+        // Server might have a different link set than ours — refetch
+        // to reconcile rather than blindly restoring the previous order.
+        fetchTask();
+      } finally {
+        setEvReordering(false);
+      }
+    },
+    [accessToken, uuid, task?.evaluators, fetchTask],
+  );
 
   useEffect(() => {
     setAgreementFetchCompleted(false);
@@ -2041,16 +2094,69 @@ function LabellingTaskPageInner() {
                     </svg>
                   </button>
                 </Tooltip>
-                {(task.evaluators ?? []).map((ev) => (
-                  <Link
-                    key={ev.uuid}
-                    href={`/evaluators/${ev.uuid}`}
-                    className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer"
-                    title={`Open ${ev.name}`}
-                  >
-                    {ev.name}
-                  </Link>
-                ))}
+                {(task.evaluators ?? []).map((ev, idx) => {
+                  const evaluatorsList = task.evaluators ?? [];
+                  const isDragging = evDragSourceIdx === idx;
+                  const isDropTarget =
+                    evDragOverIdx === idx &&
+                    evDragSourceIdx !== null &&
+                    evDragSourceIdx !== idx;
+                  return (
+                    <Link
+                      key={ev.uuid}
+                      href={`/evaluators/${ev.uuid}`}
+                      draggable={!evReordering && evaluatorsList.length > 1}
+                      onDragStart={(e) => {
+                        if (evReordering || evaluatorsList.length <= 1) {
+                          e.preventDefault();
+                          return;
+                        }
+                        setEvDragSourceIdx(idx);
+                        e.dataTransfer.effectAllowed = "move";
+                        // Firefox requires data to be set or drag is
+                        // cancelled.
+                        e.dataTransfer.setData("text/plain", ev.uuid);
+                      }}
+                      onDragOver={(e) => {
+                        if (evDragSourceIdx === null) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        if (evDragOverIdx !== idx) setEvDragOverIdx(idx);
+                      }}
+                      onDragLeave={() => {
+                        if (evDragOverIdx === idx) setEvDragOverIdx(null);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const source = evDragSourceIdx;
+                        setEvDragSourceIdx(null);
+                        setEvDragOverIdx(null);
+                        if (source === null || source === idx) return;
+                        const next = evaluatorsList.map((x) => x.uuid);
+                        const [moved] = next.splice(source, 1);
+                        next.splice(idx, 0, moved);
+                        void reorderEvaluators(next);
+                      }}
+                      onDragEnd={() => {
+                        setEvDragSourceIdx(null);
+                        setEvDragOverIdx(null);
+                      }}
+                      className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer select-none ${
+                        isDropTarget
+                          ? "border-foreground/60 ring-2 ring-foreground/20"
+                          : "border-border"
+                      } ${isDragging ? "opacity-50" : ""}`}
+                      title={
+                        evaluatorsList.length > 1
+                          ? `Open ${ev.name} · drag to reorder`
+                          : `Open ${ev.name}`
+                      }
+                    >
+                      {ev.name}
+                    </Link>
+                  );
+                })}
               </div>
             )}
           </div>
