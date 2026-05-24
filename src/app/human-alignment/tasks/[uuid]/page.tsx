@@ -26,6 +26,7 @@ import {
   ExportResultsButton,
   type ExportColumn,
 } from "@/components/ExportResultsButton";
+import { RefreshButton } from "@/components/RefreshButton";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { AddSttItemsDialog } from "@/components/human-labelling/AddSttItemsDialog";
@@ -2206,12 +2207,19 @@ function LabellingTaskPageInner() {
               />
             ) : (
               <div className="space-y-2">
-                <div>
-                  <h2 className="text-sm font-semibold">Agreement summary</h2>
-                  <p className="text-xs text-muted-foreground max-w-2xl mt-1">
-                    These cards show agreement between annotators and how
-                    closely each evaluator aligns with humans
-                  </p>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-sm font-semibold">Agreement summary</h2>
+                    <p className="text-xs text-muted-foreground max-w-2xl mt-1">
+                      These cards show agreement between annotators and how
+                      closely each evaluator aligns with humans
+                    </p>
+                  </div>
+                  <RefreshButton
+                    title="Refresh agreement"
+                    loading={agreementLoading}
+                    onClick={() => fetchAgreement()}
+                  />
                 </div>
                 <div className="flex flex-wrap items-stretch gap-3">
                   <AgreementStatCard
@@ -2297,7 +2305,16 @@ function LabellingTaskPageInner() {
             />
           ) : (
             <div ref={itemsSectionTopRef} className="space-y-3 scroll-mt-4">
-              <div className="flex items-center justify-end">
+              <div className="flex items-center justify-end gap-2">
+                <RefreshButton
+                  label="Refresh"
+                  title="Refresh items"
+                  loading={loading || summaryLoading}
+                  onClick={() => {
+                    fetchTask();
+                    fetchTaskSummary();
+                  }}
+                />
                 <ExportResultsButton
                   filename={`${sanitizeCsvName(task?.name ?? "labelling-task")}-items`}
                   label="Export CSV"
