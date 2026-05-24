@@ -2365,6 +2365,7 @@ function LabellingTaskPageInner() {
                   filename={`${sanitizeCsvName(task?.name ?? "labelling-task")}-items`}
                   label="Export CSV"
                   variant="neutral"
+                  disabled={summaryLoading || !taskSummary}
                   getRows={() => buildItemsCsv(items, taskSummary, taskType)}
                 />
               </div>
