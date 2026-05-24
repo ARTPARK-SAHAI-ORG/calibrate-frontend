@@ -154,24 +154,30 @@ export function ManageEvaluatorsDialog({
     setSaving(true);
     setSaveError(null);
     try {
-      // Removes first so the order PUT only has to deal with the final
-      // set. Adds + removes can run in parallel — the backend treats
-      // them as independent link mutations.
-      const removes = toRemove.map((evaluatorUuid) =>
-        apiClient<{ message: string }>(
-          `/annotation-tasks/${taskUuid}/evaluators/${evaluatorUuid}`,
-          accessToken,
-          { method: "DELETE" },
+      // Adds before removes: the backend enforces a
+      // minimum-one-evaluator rule on a task, so a "replace one
+      // evaluator with another" save (1 in, 1 out, final count = 1)
+      // would fail if the DELETE arrived at the backend before the
+      // POST. Awaiting the adds first guarantees the link count never
+      // drops below the final count mid-save.
+      await Promise.all(
+        toAdd.map((evaluator_id) =>
+          apiClient<{ message: string }>(
+            `/annotation-tasks/${taskUuid}/evaluators`,
+            accessToken,
+            { method: "POST", body: { evaluator_id } },
+          ),
         ),
       );
-      const adds = toAdd.map((evaluator_id) =>
-        apiClient<{ message: string }>(
-          `/annotation-tasks/${taskUuid}/evaluators`,
-          accessToken,
-          { method: "POST", body: { evaluator_id } },
+      await Promise.all(
+        toRemove.map((evaluatorUuid) =>
+          apiClient<{ message: string }>(
+            `/annotation-tasks/${taskUuid}/evaluators/${evaluatorUuid}`,
+            accessToken,
+            { method: "DELETE" },
+          ),
         ),
       );
-      await Promise.all([...removes, ...adds]);
 
       // After link mutations, the server's order is
       // (kept-from-original) followed by (new adds, in append order).
