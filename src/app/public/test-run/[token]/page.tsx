@@ -2,7 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { TestCaseOutput, TestCaseData, JudgeResult } from "@/components/test-results/shared";
+import {
+  TestCaseOutput,
+  TestCaseData,
+  JudgeResult,
+  TestRunEvaluator,
+} from "@/components/test-results/shared";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
 import { TestRunOutputsPanel } from "@/components/eval-details";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
@@ -30,6 +35,8 @@ type TestRunStatusResponse = {
   passed?: number;
   failed?: number;
   results?: TestCaseResult[];
+  /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
+  evaluators?: TestRunEvaluator[];
   error?: string;
 };
 
@@ -112,6 +119,9 @@ export default function PublicTestRunPage() {
                     reasoning: r.reasoning,
                     judgeResults: r.judge_results,
                   })),
+                  Object.fromEntries(
+                    (data.evaluators ?? []).map((e) => [e.uuid, e]),
+                  ),
                 )
               }
             />
@@ -135,6 +145,9 @@ export default function PublicTestRunPage() {
               selectedId={selectedId}
               onSelect={setSelectedId}
               onClearSelection={() => setSelectedId(null)}
+              evaluatorsByUuid={Object.fromEntries(
+                (data.evaluators ?? []).map((e) => [e.uuid, e]),
+              )}
               enableEvaluatorLinks={false}
             />
           </div>

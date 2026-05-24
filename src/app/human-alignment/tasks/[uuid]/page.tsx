@@ -63,11 +63,38 @@ type TaskAgreementResponse = {
 // order (union of every annotator with ≥1 annotation on the task);
 // each `rows[i].annotations[annotator_uuid]` is that annotator's
 // latest annotation for the slot, or null when they didn't label it.
+//
+// Per-row evaluator metadata (name, output_type, scale_min/max,
+// version_number, is_live_version) was moved to the top-level
+// `evaluators[]` block. The page looks each row's evaluator up by
+// `evaluator_id` (and `evaluator_version_id` for version-specific
+// fields).
 type SummaryAnnotator = { uuid: string; name: string };
 type SummaryEvaluator = {
-  evaluator_id: string;
+  uuid: string;
   name: string;
+  description?: string | null;
   output_type: "binary" | "rating";
+  evaluator_type?: string;
+  data_type?: string;
+  live_version_id?: string | null;
+  live_version_index?: number | null;
+  versions?: {
+    uuid: string;
+    version_number: number;
+    output_config?: {
+      scale?: {
+        value: boolean | number | string;
+        name?: string | null;
+        description?: string | null;
+        color?: string | null;
+      }[];
+    } | null;
+    scale_min?: number | null;
+    scale_max?: number | null;
+    is_live?: boolean;
+  }[];
+  run_count?: number;
 };
 type SummaryAnnotation = {
   value: boolean | number | null;
@@ -77,10 +104,9 @@ type SummaryRow = {
   item_id: string;
   payload: Record<string, unknown> | null;
   evaluator_id: string;
-  evaluator_name: string;
   evaluator_version_id?: string | null;
-  evaluator_version_number?: number | null;
   evaluator_value: boolean | number | null;
+  evaluator_value_name?: string | null;
   evaluator_reasoning?: string | null;
   // Aggregate agreement scores in [0, 1] for this (item, evaluator) slot.
   // human_agreement: null when <2 annotators labelled the slot.

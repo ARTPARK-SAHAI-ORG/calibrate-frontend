@@ -3,6 +3,7 @@ import {
   TestCaseOutput,
   TestCaseData,
   JudgeResult,
+  TestRunEvaluator,
   StatusIcon,
   TestDetailView,
   EmptyStateView,
@@ -51,9 +52,10 @@ type BenchmarkOutputsPanelProps = {
   /** Show spinner for running tests */
   showRunningSpinner?: boolean;
   height?: string;
-  /** Optional rating-evaluator scale lookup (uuid → scale_max). Fallback
-   * only — newer judge_results entries carry `scale_max` inline. */
-  scaleByEvaluatorUuid?: Record<string, number | undefined>;
+  /** Top-level evaluators[] keyed by uuid. Threaded down into the
+   * per-evaluator cards as the source of truth for name, description,
+   * scale, and output_config. */
+  evaluatorsByUuid?: Record<string, TestRunEvaluator>;
   /** Disable evaluator detail links for public share pages. */
   enableEvaluatorLinks?: boolean;
   /** Default correctness evaluator used for legacy next-reply criteria. */
@@ -73,7 +75,7 @@ export function BenchmarkOutputsPanel({
   showControls = true,
   showRunningSpinner = false,
   height,
-  scaleByEvaluatorUuid,
+  evaluatorsByUuid,
   enableEvaluatorLinks = true,
   legacyDefaultEvaluator,
 }: BenchmarkOutputsPanelProps) {
@@ -207,7 +209,7 @@ export function BenchmarkOutputsPanel({
                 reasoning={selectedTestResult.reasoning}
                 evaluation={selectedTestResult.test_case?.evaluation}
                 judgeResults={selectedTestResult.judge_results}
-                scaleByEvaluatorUuid={scaleByEvaluatorUuid}
+                evaluatorsByUuid={evaluatorsByUuid}
                 enableEvaluatorLinks={enableEvaluatorLinks}
                 legacyDefaultEvaluator={legacyDefaultEvaluator}
               />
@@ -229,7 +231,7 @@ export function BenchmarkOutputsPanel({
               passed={selectedTestResult.passed}
               judgeResults={selectedTestResult.judge_results}
               reasoning={selectedTestResult.reasoning}
-              scaleByEvaluatorUuid={scaleByEvaluatorUuid}
+              evaluatorsByUuid={evaluatorsByUuid}
               enableEvaluatorLinks={enableEvaluatorLinks}
               legacyDefaultEvaluator={legacyDefaultEvaluator}
             />

@@ -17,6 +17,7 @@ import {
   ChevronDownIcon,
 } from "@/components/icons";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
+import { getBinaryLabel, toRatingScale } from "@/lib/binaryLabels";
 
 // Renders the evaluator name. Authenticated result pages can link to the
 // evaluator detail page; public share pages must render plain text because
@@ -113,36 +114,53 @@ export type TestCaseData = {
 // Per-evaluator verdict for response (next-reply) tests. Tool-call tests
 // always have `judge_results: null`. Mutually-exclusive `match` (binary)
 // and `score` (rating) — exactly one is set on a completed entry.
-// `evaluator_uuid` may be `null` for legacy runs that pre-date snapshot
-// capture; treat as "no canonical link, just display the name".
-// `name` is the CURRENT DB display name (refreshed on every read).
-// `description` is the snapshotted one-line evaluator description used by
-// the job; it may be null/absent for older snapshots.
 //
-// `variable_values`, `scale_min`, `scale_max` were added by the backend
-// after the initial judge_results rollout. They are surfaced inline on
-// every entry so the UI doesn't need a separate evaluator fetch to render
-// `score / scale_max` chips or the per-test variable substitutions:
-//  - `variable_values`: the `{{var}}` substitutions used for this evaluator
-//    on this specific test case (frozen at submission time). Empty maps are
-//    normalised to `null` server-side. Missing on legacy snapshots.
-//  - `scale_min` / `scale_max`: present only for rating evaluators (e.g.
-//    `1.0` / `5.0`); always `null` for binary evaluators or legacy rows.
+// As of the API change that moved per-evaluator metadata to a top-level
+// `evaluators[]` block, each judge_result row carries only the bits that
+// genuinely vary per test case:
+//  - `evaluator_uuid`: keys back into the top-level evaluators[] block
+//    (backend guarantees an entry, synthesising a stub for legacy rows).
+//  - `match` / `score`: the verdict.
+//  - `value_name`: backend-resolved display label for the row's value
+//    (e.g. "Pass" for `match: true` against a custom-labelled binary
+//    evaluator). Optional for the same reason — backend may omit when
+//    null. Empty string is treated like missing.
+//  - `reasoning`: judge's free-text explanation.
+//  - `variable_values`: the `{{var}}` substitutions used on this test
+//    case (frozen at submission time).
+//
+// Fields that used to be inlined here — `name`, `description`,
+// `scale_min`, `scale_max`, `true_label`, `false_label` — are now read
+// from the top-level evaluator entry indexed by `evaluator_uuid`.
 export type JudgeResult = {
   evaluator_uuid?: string | null;
-  name: string;
-  description?: string | null;
   reasoning?: string;
   match?: boolean | null;
   score?: number | null;
+  value_name?: string | null;
   variable_values?: Record<string, string> | null;
+};
+
+// Per-evaluator block returned at the top level of test-run / benchmark
+// responses. Each entry pins the version the run executed against;
+// per-evaluator metadata (name, description, output config, scale
+// bounds) lives here and is looked up by `evaluator_uuid` from each
+// `judge_results[]` row.
+export type TestRunEvaluator = {
+  uuid: string;
+  name: string;
+  description?: string | null;
+  output_type: "binary" | "rating";
+  output_config?: {
+    scale?: {
+      value: boolean | number | string;
+      name?: string | null;
+      description?: string | null;
+      color?: string | null;
+    }[];
+  } | null;
   scale_min?: number | null;
   scale_max?: number | null;
-  // Custom labels for binary verdicts, surfaced from
-  // `output_config.scale`. Optional/null for legacy rows or evaluators
-  // that haven't overridden the default Correct / Wrong labels.
-  true_label?: string | null;
-  false_label?: string | null;
 };
 
 function buildLegacyNextReplyJudgeResults({
@@ -156,16 +174,29 @@ function buildLegacyNextReplyJudgeResults({
 }): JudgeResult[] | null {
   const criteria = evaluation?.criteria;
   if (evaluation?.type === "tool_call" || !criteria) return null;
-
   return [
     {
       evaluator_uuid: defaultEvaluator?.uuid ?? null,
-      name: defaultEvaluator?.name ?? "Correctness",
-      description: defaultEvaluator?.description ?? null,
       reasoning,
       variable_values: { criteria },
     },
   ];
+}
+
+// Synthesise a top-level evaluators[] entry to pair with the legacy
+// next-reply judge_result above. The default-evaluator metadata is what
+// callers used to inline on the row; we now hand it back via the same
+// uuid-keyed lookup the rest of the code uses.
+function legacyEvaluatorEntry(
+  defaultEvaluator?: DefaultEvaluatorSummary | null,
+): TestRunEvaluator | null {
+  if (!defaultEvaluator?.uuid) return null;
+  return {
+    uuid: defaultEvaluator.uuid,
+    name: defaultEvaluator.name ?? "Correctness",
+    description: defaultEvaluator.description ?? null,
+    output_type: "binary",
+  };
 }
 
 // Shared Status Icon Component
@@ -388,33 +419,51 @@ function CollapsibleReasoningStrip({
 // older snapshots that don't carry it inline.
 function JudgeResultCard({
   result,
-  scaleMax,
+  evaluator,
   enableEvaluatorLinks,
 }: {
   result: JudgeResult;
-  scaleMax?: number;
+  /** Top-level evaluator entry resolved by `result.evaluator_uuid`. */
+  evaluator: TestRunEvaluator | null;
   enableEvaluatorLinks: boolean;
 }) {
   const isRating = result.score !== null && result.score !== undefined;
-  const effectiveScaleMax =
-    typeof result.scale_max === "number" ? result.scale_max : scaleMax;
-  const effectiveScaleMin =
-    typeof result.scale_min === "number" ? result.scale_min : undefined;
+  const scale = evaluator?.output_config?.scale ?? null;
+  const valueName = result.value_name?.trim() || null;
   return (
     <EvaluatorVerdictCard
       mode="read"
-      name={result.name}
-      description={result.description ?? null}
+      name={evaluator?.name ?? "Evaluator"}
+      description={evaluator?.description ?? null}
       outputType={isRating ? "rating" : "binary"}
       evaluatorUuid={result.evaluator_uuid ?? undefined}
       enableLink={enableEvaluatorLinks}
-      scaleMin={effectiveScaleMin}
-      scaleMax={effectiveScaleMax}
+      scaleMin={
+        typeof evaluator?.scale_min === "number"
+          ? evaluator.scale_min
+          : undefined
+      }
+      scaleMax={
+        typeof evaluator?.scale_max === "number"
+          ? evaluator.scale_max
+          : undefined
+      }
       match={result.match}
       score={result.score}
       reasoning={result.reasoning}
-      trueLabel={result.true_label}
-      falseLabel={result.false_label}
+      // Prefer the row-resolved `value_name` for the side that matches
+      // this verdict; fall back to the scale lookup for the other side.
+      trueLabel={
+        result.match === true && valueName
+          ? valueName
+          : getBinaryLabel(scale, true)
+      }
+      falseLabel={
+        result.match === false && valueName
+          ? valueName
+          : getBinaryLabel(scale, false)
+      }
+      ratingScale={toRatingScale(scale)}
     />
   );
 }
@@ -424,11 +473,15 @@ function JudgeResultCard({
 // should fall back to the legacy single-reasoning display.
 export function JudgeResultsList({
   results,
-  scaleByEvaluatorUuid,
+  evaluatorsByUuid,
   enableEvaluatorLinks = true,
 }: {
   results?: JudgeResult[] | null;
-  scaleByEvaluatorUuid?: Record<string, number | undefined>;
+  /** Top-level evaluators[] keyed by uuid. Source of truth for name,
+   * description, scale, and output_config. Backend guarantees an entry
+   * for every uuid in `results[].evaluator_uuid` (synthesises a stub
+   * for legacy rows). */
+  evaluatorsByUuid?: Record<string, TestRunEvaluator>;
   enableEvaluatorLinks?: boolean;
 }) {
   if (!results || results.length === 0) return null;
@@ -438,18 +491,19 @@ export function JudgeResultsList({
         Evaluators
       </div>
       <div className="space-y-2">
-        {results.map((r, i) => (
-          <JudgeResultCard
-            key={r.evaluator_uuid ?? `${r.name}-${i}`}
-            result={r}
-            scaleMax={
-              r.evaluator_uuid
-                ? scaleByEvaluatorUuid?.[r.evaluator_uuid]
-                : undefined
-            }
-            enableEvaluatorLinks={enableEvaluatorLinks}
-          />
-        ))}
+        {results.map((r, i) => {
+          const ev = r.evaluator_uuid
+            ? evaluatorsByUuid?.[r.evaluator_uuid] ?? null
+            : null;
+          return (
+            <JudgeResultCard
+              key={r.evaluator_uuid ?? `${i}`}
+              result={r}
+              evaluator={ev}
+              enableEvaluatorLinks={enableEvaluatorLinks}
+            />
+          );
+        })}
       </div>
     </div>
   );
@@ -477,7 +531,7 @@ export function TestDetailView({
   reasoning,
   evaluation,
   judgeResults,
-  scaleByEvaluatorUuid,
+  evaluatorsByUuid,
   legacyDefaultEvaluator,
   enableEvaluatorLinks = true,
   highlightEvalTarget = false,
@@ -491,9 +545,9 @@ export function TestDetailView({
    * for tool-call tests and for legacy response tests that pre-date
    * judge_results — those fall back to the legacy single-reasoning UI. */
   judgeResults?: JudgeResult[] | null;
-  /** Optional rating-evaluator scale lookup (uuid → scale_max). When
-   * provided, rating cards render `score / max` instead of just `score`. */
-  scaleByEvaluatorUuid?: Record<string, number | undefined>;
+  /** Top-level evaluators[] keyed by uuid. Source of truth for name,
+   * description, scale, and output_config. */
+  evaluatorsByUuid?: Record<string, TestRunEvaluator>;
   /** Default correctness evaluator used to render legacy response criteria
    * as evaluator variable values when `judgeResults` is absent. */
   legacyDefaultEvaluator?: DefaultEvaluatorSummary | null;
@@ -726,7 +780,15 @@ export function TestDetailView({
         <div className="md:hidden w-full">
           <JudgeResultsList
             results={effectiveJudgeResults}
-            scaleByEvaluatorUuid={scaleByEvaluatorUuid}
+            evaluatorsByUuid={
+              // For the legacy free-text fallback the JudgeResultsList
+              // also needs the synthetic top-level evaluator entry.
+              evaluatorsByUuid ??
+              (() => {
+                const legacy = legacyEvaluatorEntry(legacyDefaultEvaluator);
+                return legacy ? { [legacy.uuid]: legacy } : undefined;
+              })()
+            }
             enableEvaluatorLinks={enableEvaluatorLinks}
           />
         </div>
@@ -774,40 +836,56 @@ export function EmptyStateView({ message }: { message: string }) {
 //      scale_max map respectively).
 function EvaluatorPanelCard({
   result,
+  evaluator,
   variableValues,
-  scaleMax,
   enableEvaluatorLinks,
 }: {
   result: JudgeResult;
+  /** Top-level evaluator entry resolved by `result.evaluator_uuid`. */
+  evaluator: TestRunEvaluator | null;
   variableValues?: Record<string, string> | null;
-  scaleMax?: number;
   enableEvaluatorLinks: boolean;
 }) {
   const isRating = result.score !== null && result.score !== undefined;
-  const effectiveScaleMax =
-    typeof result.scale_max === "number" ? result.scale_max : scaleMax;
-  const effectiveScaleMin =
-    typeof result.scale_min === "number" ? result.scale_min : undefined;
   const effectiveVariables =
     result.variable_values && typeof result.variable_values === "object"
       ? result.variable_values
       : variableValues ?? null;
+  const scale = evaluator?.output_config?.scale ?? null;
+  const valueName = result.value_name?.trim() || null;
   return (
     <EvaluatorVerdictCard
       mode="read"
-      name={result.name}
-      description={result.description ?? null}
+      name={evaluator?.name ?? "Evaluator"}
+      description={evaluator?.description ?? null}
       outputType={isRating ? "rating" : "binary"}
       evaluatorUuid={result.evaluator_uuid ?? undefined}
       enableLink={enableEvaluatorLinks}
       variableValues={effectiveVariables}
-      scaleMin={effectiveScaleMin}
-      scaleMax={effectiveScaleMax}
+      scaleMin={
+        typeof evaluator?.scale_min === "number"
+          ? evaluator.scale_min
+          : undefined
+      }
+      scaleMax={
+        typeof evaluator?.scale_max === "number"
+          ? evaluator.scale_max
+          : undefined
+      }
       match={result.match}
       score={result.score}
       reasoning={result.reasoning}
-      trueLabel={result.true_label}
-      falseLabel={result.false_label}
+      trueLabel={
+        result.match === true && valueName
+          ? valueName
+          : getBinaryLabel(scale, true)
+      }
+      falseLabel={
+        result.match === false && valueName
+          ? valueName
+          : getBinaryLabel(scale, false)
+      }
+      ratingScale={toRatingScale(scale)}
     />
   );
 }
@@ -839,7 +917,7 @@ export function EvaluationCriteriaPanel({
   judgeResults,
   reasoning,
   testCaseEvaluators,
-  scaleByEvaluatorUuid,
+  evaluatorsByUuid,
   legacyDefaultEvaluator,
   enableEvaluatorLinks = true,
 }: {
@@ -860,10 +938,9 @@ export function EvaluationCriteriaPanel({
    * Used as a fallback for variable values when the judge_results entries
    * don't carry them inline (older snapshots). Optional. */
   testCaseEvaluators?: TestCaseEvaluatorRef[];
-  /** uuid → scale_max for rating evaluators. Fallback only — when an
-   * entry has `scale_max` inline on the `JudgeResult` (newer payloads)
-   * that takes priority. Optional. */
-  scaleByEvaluatorUuid?: Record<string, number | undefined>;
+  /** Top-level evaluators[] keyed by uuid. Source of truth for name,
+   * description, scale, and output_config. */
+  evaluatorsByUuid?: Record<string, TestRunEvaluator>;
   /** Default correctness evaluator used to render legacy response criteria
    * as evaluator variable values when `judgeResults` is absent. */
   legacyDefaultEvaluator?: DefaultEvaluatorSummary | null;
@@ -957,23 +1034,24 @@ export function EvaluationCriteriaPanel({
       {/* Response test, new format: per-evaluator cards. */}
       {!isToolCall && hasJudgeResults && (
         <div className="space-y-3">
-          {judgeResults!.map((jr, i) => (
-            <EvaluatorPanelCard
-              key={jr.evaluator_uuid ?? `${jr.name}-${i}`}
-              result={jr}
-              variableValues={
-                jr.evaluator_uuid
-                  ? variablesByUuid[jr.evaluator_uuid]
-                  : undefined
-              }
-              scaleMax={
-                jr.evaluator_uuid
-                  ? scaleByEvaluatorUuid?.[jr.evaluator_uuid]
-                  : undefined
-              }
-              enableEvaluatorLinks={enableEvaluatorLinks}
-            />
-          ))}
+          {judgeResults!.map((jr, i) => {
+            const ev = jr.evaluator_uuid
+              ? evaluatorsByUuid?.[jr.evaluator_uuid] ?? null
+              : null;
+            return (
+              <EvaluatorPanelCard
+                key={jr.evaluator_uuid ?? `${i}`}
+                result={jr}
+                evaluator={ev}
+                variableValues={
+                  jr.evaluator_uuid
+                    ? variablesByUuid[jr.evaluator_uuid]
+                    : undefined
+                }
+                enableEvaluatorLinks={enableEvaluatorLinks}
+              />
+            );
+          })}
         </div>
       )}
 
@@ -984,8 +1062,9 @@ export function EvaluationCriteriaPanel({
         <div className="space-y-3">
           {legacyJudgeResults!.map((jr, i) => (
             <EvaluatorPanelCard
-              key={jr.evaluator_uuid ?? `${jr.name}-${i}`}
+              key={jr.evaluator_uuid ?? `${i}`}
               result={jr}
+              evaluator={legacyEvaluatorEntry(legacyDefaultEvaluator)}
               enableEvaluatorLinks={enableEvaluatorLinks}
             />
           ))}

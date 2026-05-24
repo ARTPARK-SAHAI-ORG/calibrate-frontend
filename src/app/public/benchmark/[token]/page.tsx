@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
 import { BenchmarkCombinedLeaderboard, BenchmarkOutputsPanel } from "@/components/eval-details";
 import type { BenchmarkModelResult } from "@/components/eval-details";
+import type { TestRunEvaluator } from "@/components/test-results/shared";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
 
@@ -20,6 +21,8 @@ type BenchmarkStatusResponse = {
   status: string;
   model_results?: BenchmarkModelResult[];
   leaderboard_summary?: LeaderboardSummary[];
+  /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
+  evaluators?: TestRunEvaluator[];
   error?: string;
 };
 
@@ -112,6 +115,9 @@ export default function PublicBenchmarkPage() {
                         judgeResults: tr.judge_results,
                       })),
                     ),
+                    Object.fromEntries(
+                      (data.evaluators ?? []).map((e) => [e.uuid, e]),
+                    ),
                   )
                 }
               />
@@ -141,6 +147,9 @@ export default function PublicBenchmarkPage() {
               onSelectTest={(model, testIndex) => setSelectedTest({ model, testIndex })}
               onClearSelection={() => setSelectedTest(null)}
               showControls={true}
+              evaluatorsByUuid={Object.fromEntries(
+                (data.evaluators ?? []).map((e) => [e.uuid, e]),
+              )}
               enableEvaluatorLinks={false}
             />
           </div>

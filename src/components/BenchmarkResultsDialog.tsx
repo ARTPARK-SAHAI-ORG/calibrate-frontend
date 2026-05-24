@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   CloseIcon,
   SpinnerIcon,
+  type TestRunEvaluator,
 } from "./test-results/shared";
 import {
   BenchmarkOutputsPanel,
@@ -35,6 +36,8 @@ type BenchmarkStatusResponse = {
   status: string;
   model_results?: BenchmarkModelResult[];
   leaderboard_summary?: LeaderboardSummary[];
+  /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
+  evaluators?: TestRunEvaluator[];
   results_s3_prefix?: string;
   error?: string;
   is_public?: boolean;
@@ -96,6 +99,9 @@ export function BenchmarkResultsDialog({
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [defaultNextReplyEvaluator, setDefaultNextReplyEvaluator] =
     useState<DefaultEvaluatorSummary | null>(null);
+  // Top-level evaluators block from the benchmark response. See the
+  // matching state in TestRunnerDialog for the same plumbing.
+  const [runEvaluators, setRunEvaluators] = useState<TestRunEvaluator[]>([]);
   const backendAccessToken = useAccessToken();
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   /** Once per dialog open: select first test of `models[0]` when its row exists. */
@@ -254,6 +260,9 @@ export function BenchmarkResultsDialog({
       if (result.name) setRunName(result.name);
       if (result.is_public !== undefined) setIsPublic(result.is_public);
       if (result.share_token !== undefined) setShareToken(result.share_token ?? null);
+      if (Array.isArray(result.evaluators)) {
+        setRunEvaluators(result.evaluators);
+      }
 
       // Update model results (intermediate or final)
       if (result.model_results) {
@@ -466,6 +475,9 @@ export function BenchmarkResultsDialog({
                           judgeResults: tr.judge_results,
                         })),
                       ),
+                      Object.fromEntries(
+                        runEvaluators.map((e) => [e.uuid, e]),
+                      ),
                     )
                   }
                 />
@@ -632,6 +644,9 @@ export function BenchmarkResultsDialog({
                 formatModelName={(n) => n.replace("__", "/")}
                 showControls={isDone}
                 showRunningSpinner={true}
+                evaluatorsByUuid={Object.fromEntries(
+                  runEvaluators.map((e) => [e.uuid, e]),
+                )}
                 legacyDefaultEvaluator={defaultNextReplyEvaluator}
               />
             )}

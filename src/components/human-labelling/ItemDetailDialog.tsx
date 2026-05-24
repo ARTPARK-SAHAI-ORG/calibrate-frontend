@@ -23,20 +23,23 @@ type SummaryRow = {
   item_id: string;
   payload: Record<string, unknown> | null;
   evaluator_id: string;
-  evaluator_name: string;
-  output_type: "binary" | "rating";
   evaluator_version_id?: string | null;
-  evaluator_version_number?: number | null;
   evaluator_value: boolean | number | null;
+  // Backend-resolved label for the row's score (e.g. "Helpful" for a
+  // rating of 4 against a custom-labelled rating evaluator).
   evaluator_value_name?: string | null;
   evaluator_reasoning?: string | null;
   human_agreement: number | null;
   evaluator_agreement: number | null;
   annotations: Record<string, SummaryAnnotation | null>;
-  // Per-version output_config — different versions of the same evaluator
-  // can carry different labels/rubrics on their scale entries. Falls back
-  // to the task-level evaluator snapshot when the row doesn't carry it.
-  evaluator_version_output_config?: {
+};
+// Top-level evaluator entry — carries name / description / output_type
+// and the full version history. Per-version scale + output_config live
+// inside `versions[]`; the row's `evaluator_version_id` keys back in.
+type SummaryEvaluatorVersion = {
+  uuid: string;
+  version_number: number;
+  output_config?: {
     scale?: {
       value: boolean | number | string;
       name?: string | null;
@@ -44,11 +47,20 @@ type SummaryRow = {
       color?: string | null;
     }[];
   } | null;
+  scale_min?: number | null;
+  scale_max?: number | null;
+  is_live?: boolean;
 };
 type SummaryEvaluator = {
-  evaluator_id: string;
-  name?: string;
-  output_type?: "binary" | "rating";
+  uuid: string;
+  name: string;
+  description?: string | null;
+  output_type: "binary" | "rating";
+  evaluator_type?: string;
+  data_type?: string;
+  live_version_id?: string | null;
+  live_version_index?: number | null;
+  versions?: SummaryEvaluatorVersion[];
   // Total runs for this evaluator across every version, restricted to the
   // items in scope. Unaffected by `live_only`.
   run_count?: number;
@@ -62,6 +74,7 @@ type TaskSummaryResponse = {
 type TaskEvaluatorDef = {
   uuid: string;
   description?: string | null;
+  output_type?: "binary" | "rating" | null;
   scale_min?: number | boolean | null;
   scale_max?: number | boolean | null;
   output_config?: {
@@ -260,6 +273,13 @@ export function ItemDetailDialog({
     const taskEvaluatorByUuid = new Map(
       (task.evaluators ?? []).map((e) => [e.uuid, e]),
     );
+    // Top-level evaluators block from the new summary response. Each
+    // entry carries the full version history; per-row evaluator metadata
+    // (name, output_type, version_number, scale) is resolved by uuid
+    // (and evaluator_version_id for version-level fields).
+    const summaryEvaluatorByUuid = new Map(
+      (summary.evaluators ?? []).map((e) => [e.uuid, e]),
+    );
     const annotatorNameById = new Map(
       (summary.annotators ?? []).map((a) => [a.uuid, a.name]),
     );
@@ -300,31 +320,59 @@ export function ItemDetailDialog({
       // drop rows that have no matching annotations.
       if (annotatorFilter && human_annotations.length === 0) continue;
 
+      // Resolve per-evaluator metadata from the top-level evaluators[]
+      // block. Falls back to the task-level evaluator def for description
+      // / scale (which the summary used to inline).
+      const summaryEv = summaryEvaluatorByUuid.get(row.evaluator_id);
+      const taskEv = taskEvaluatorByUuid.get(row.evaluator_id);
+      const evName =
+        summaryEv?.name ?? taskEv?.uuid ? (summaryEv?.name ?? "") : "";
+      const evDescription =
+        summaryEv?.description ?? taskEv?.description ?? null;
+      const evOutputType =
+        summaryEv?.output_type ?? (taskEv?.output_type as
+          | "binary"
+          | "rating"
+          | undefined);
+      const evVersion = row.evaluator_version_id
+        ? summaryEv?.versions?.find(
+            (v) => v.uuid === row.evaluator_version_id,
+          )
+        : undefined;
+
       const evKey = `${row.evaluator_id}-${row.evaluator_version_id ?? ""}`;
       if (!seenEvKey.has(evKey)) {
         seenEvKey.add(evKey);
         evaluators.push({
           evaluator_id: row.evaluator_id,
           evaluator_version_id: row.evaluator_version_id ?? undefined,
-          name: row.evaluator_name,
+          name: evName,
         });
       }
       if (
         row.evaluator_version_id &&
-        typeof row.evaluator_version_number === "number"
+        typeof evVersion?.version_number === "number"
       ) {
         versionLabels[row.evaluator_version_id] =
-          `v${row.evaluator_version_number}`;
+          `v${evVersion.version_number}`;
       }
-      if (!evaluatorNamesById[row.evaluator_id]) {
-        evaluatorNamesById[row.evaluator_id] = row.evaluator_name;
+      if (evName && !evaluatorNamesById[row.evaluator_id]) {
+        evaluatorNamesById[row.evaluator_id] = evName;
       }
 
-      const taskEv = taskEvaluatorByUuid.get(row.evaluator_id);
+      // Prefer the per-version scale; fall back to the task-level snapshot.
       const scaleMin =
-        typeof taskEv?.scale_min === "number" ? taskEv.scale_min : null;
+        typeof evVersion?.scale_min === "number"
+          ? evVersion.scale_min
+          : typeof taskEv?.scale_min === "number"
+            ? taskEv.scale_min
+            : null;
       const scaleMax =
-        typeof taskEv?.scale_max === "number" ? taskEv.scale_max : null;
+        typeof evVersion?.scale_max === "number"
+          ? evVersion.scale_max
+          : typeof taskEv?.scale_max === "number"
+            ? taskEv.scale_max
+            : null;
 
       const suppressEvaluator = annotatorFilter !== null;
       const effectiveValue = suppressEvaluator ? null : row.evaluator_value;
@@ -357,11 +405,11 @@ export function ItemDetailDialog({
       // output_config or the task-level snapshot.
       jobEvaluators.push({
         uuid: row.evaluator_id,
-        name: row.evaluator_name,
-        description: taskEv?.description ?? null,
-        output_type: row.output_type,
+        name: evName,
+        description: evDescription,
+        output_type: evOutputType,
         evaluator_version_id: row.evaluator_version_id ?? undefined,
-        version_number: row.evaluator_version_number ?? undefined,
+        version_number: evVersion?.version_number,
         scale_min: scaleMin,
         scale_max: scaleMax,
         output_config:
@@ -376,7 +424,7 @@ export function ItemDetailDialog({
                   },
                 ],
               }
-            : row.evaluator_version_output_config ??
+            : evVersion?.output_config ??
               taskEv?.output_config ??
               null,
       });

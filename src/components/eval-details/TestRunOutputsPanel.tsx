@@ -3,6 +3,7 @@ import {
   TestCaseOutput,
   TestCaseData,
   JudgeResult,
+  TestRunEvaluator,
   StatusIcon,
   TestDetailView as SharedTestDetailView,
   EmptyStateView,
@@ -31,9 +32,10 @@ type TestRunOutputsPanelProps = {
   onSelect: (id: string) => void;
   onClearSelection?: () => void;
   height?: string;
-  /** Optional rating-evaluator scale lookup (uuid → scale_max). Fallback
-   * only — newer judge_results entries carry `scale_max` inline. */
-  scaleByEvaluatorUuid?: Record<string, number | undefined>;
+  /** Top-level evaluators[] keyed by uuid. Threaded down into the
+   * per-evaluator cards as the source of truth for name, description,
+   * scale, and output_config. */
+  evaluatorsByUuid?: Record<string, TestRunEvaluator>;
   /** Disable evaluator detail links for public share pages. */
   enableEvaluatorLinks?: boolean;
   /** Default correctness evaluator used for legacy next-reply criteria. */
@@ -53,7 +55,7 @@ export function TestRunOutputsPanel({
   onSelect,
   onClearSelection,
   height,
-  scaleByEvaluatorUuid,
+  evaluatorsByUuid,
   enableEvaluatorLinks = true,
   legacyDefaultEvaluator,
 }: TestRunOutputsPanelProps) {
@@ -147,7 +149,7 @@ export function TestRunOutputsPanel({
             <div className="flex-1 overflow-y-auto">
               <TestResultDetail
                 result={selectedResult}
-                scaleByEvaluatorUuid={scaleByEvaluatorUuid}
+                evaluatorsByUuid={evaluatorsByUuid}
                 enableEvaluatorLinks={enableEvaluatorLinks}
                 legacyDefaultEvaluator={legacyDefaultEvaluator}
               />
@@ -175,7 +177,7 @@ export function TestRunOutputsPanel({
               }
               judgeResults={selectedResult.judgeResults}
               reasoning={selectedResult.reasoning}
-              scaleByEvaluatorUuid={scaleByEvaluatorUuid}
+              evaluatorsByUuid={evaluatorsByUuid}
               enableEvaluatorLinks={enableEvaluatorLinks}
               legacyDefaultEvaluator={legacyDefaultEvaluator}
             />
@@ -188,12 +190,12 @@ export function TestRunOutputsPanel({
 
 function TestResultDetail({
   result,
-  scaleByEvaluatorUuid,
+  evaluatorsByUuid,
   enableEvaluatorLinks,
   legacyDefaultEvaluator,
 }: {
   result: TestRunResult;
-  scaleByEvaluatorUuid?: Record<string, number | undefined>;
+  evaluatorsByUuid?: Record<string, TestRunEvaluator>;
   enableEvaluatorLinks: boolean;
   legacyDefaultEvaluator?: DefaultEvaluatorSummary | null;
 }) {
@@ -253,7 +255,7 @@ function TestResultDetail({
       reasoning={result.reasoning}
       evaluation={result.testCase?.evaluation}
       judgeResults={result.judgeResults}
-      scaleByEvaluatorUuid={scaleByEvaluatorUuid}
+      evaluatorsByUuid={evaluatorsByUuid}
       enableEvaluatorLinks={enableEvaluatorLinks}
       legacyDefaultEvaluator={legacyDefaultEvaluator}
     />
