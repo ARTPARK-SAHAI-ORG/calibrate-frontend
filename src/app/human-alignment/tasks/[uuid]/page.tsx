@@ -141,26 +141,36 @@ type EvaluatorRunMetricEntry = number | { type?: string; mean?: number | null };
 
 type EvaluatorRunJob = {
   uuid: string;
-  task_id: string;
   status: "queued" | "in_progress" | "completed" | "failed";
-  details: {
-    item_count?: number;
-    s3_prefix?: string;
-    metrics?: Record<string, EvaluatorRunMetricEntry>;
-  } | null;
-  // Top-level evaluators block. Each entry pins the version this run
-  // executed against and carries its `version_number` (used for the
-  // "v3" pills in the run list). Promoted from `details.evaluators`.
+  // Item count was promoted to the top level alongside the new
+  // evaluators block.
+  item_count?: number;
+  // Per-run evaluator refs — keys back into the response's top-level
+  // `evaluators[]` block via `(evaluator_id, evaluator_version_id)`.
+  // No name / version_number embedded here.
   evaluators?: {
-    uuid: string;
-    name: string;
-    evaluator_version_id?: string;
-    version_number?: number;
+    evaluator_id: string;
+    evaluator_version_id: string;
   }[];
-  error: string | null;
-  created_at: string;
   updated_at: string;
-  completed_at: string | null;
+};
+
+// Top-level evaluators[] entry on the runs-list response. One per
+// (evaluator, pinned version) tuple referenced across all runs. The
+// page builds a `(id, version_id) -> entry` lookup to resolve
+// per-run names / version numbers for the pills.
+type RunsListEvaluator = {
+  uuid: string;
+  name: string;
+  evaluator_version_id?: string;
+  version_number?: number;
+  output_type?: "binary" | "rating";
+  deleted?: boolean;
+};
+
+type EvaluatorRunsListResponse = {
+  evaluators?: RunsListEvaluator[];
+  runs: EvaluatorRunJob[];
 };
 
 function isTab(value: string | null): value is Tab {
@@ -331,17 +341,31 @@ function runStatusLabel(status: EvaluatorRunJob["status"]): string {
 
 function EvaluatorRunsList({
   runs,
+  evaluators,
   loading,
   error,
   onRequestDelete,
   onOpen,
 }: {
   runs: EvaluatorRunJob[];
+  /** Top-level evaluators[] block from the runs-list response. Keyed
+   * by `(uuid, evaluator_version_id)` for per-run pill rendering. */
+  evaluators: RunsListEvaluator[];
   loading: boolean;
   error: string | null;
   onRequestDelete: (runUuid: string) => void;
   onOpen: (runUuid: string) => void;
 }) {
+  // (evaluator_id, evaluator_version_id) -> top-level entry. Same
+  // evaluator can appear under multiple versions, so we key on both.
+  const evaluatorByKey = useMemo(() => {
+    const m = new Map<string, RunsListEvaluator>();
+    for (const e of evaluators) {
+      const vid = e.evaluator_version_id ?? "";
+      m.set(`${e.uuid}:${vid}`, e);
+    }
+    return m;
+  }, [evaluators]);
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
@@ -409,21 +433,26 @@ function EvaluatorRunsList({
         <div />
       </div>
       {runs.map((run) => {
-        const itemCount = run.details?.item_count ?? 0;
-        const lastUpdated = run.updated_at || run.created_at;
-        // Per-run pinned evaluators live at the top level now (used to be
-        // `run.details.evaluators`). Each entry already carries the
-        // pinned version id + number — no version-labels lookup needed.
-        const evaluators = (run.evaluators ?? []).map((e) => ({
-          evaluator_id: e.uuid,
-          evaluator_version_id: e.evaluator_version_id,
-          name: e.name,
-          version_label:
-            typeof e.version_number === "number"
-              ? `v${e.version_number}`
-              : null,
-        }));
-        const evaluatorTitle = evaluators
+        const itemCount = run.item_count ?? 0;
+        const lastUpdated = run.updated_at;
+        // Per-run evaluator refs ([{evaluator_id, evaluator_version_id}])
+        // are resolved against the top-level evaluators[] block to get
+        // names and version numbers for the pills.
+        const runEvaluators = (run.evaluators ?? []).map((ref) => {
+          const ev = evaluatorByKey.get(
+            `${ref.evaluator_id}:${ref.evaluator_version_id ?? ""}`,
+          );
+          return {
+            evaluator_id: ref.evaluator_id,
+            evaluator_version_id: ref.evaluator_version_id,
+            name: ev?.name ?? "",
+            version_label:
+              typeof ev?.version_number === "number"
+                ? `v${ev.version_number}`
+                : null,
+          };
+        });
+        const evaluatorTitle = runEvaluators
           .map((e) => {
             const name = e.name || e.evaluator_id.slice(0, 8);
             return e.version_label ? `${name} (${e.version_label})` : name;
@@ -439,10 +468,10 @@ function EvaluatorRunsList({
               className="flex flex-wrap gap-1.5 min-w-0"
               title={evaluatorTitle}
             >
-              {evaluators.length === 0 ? (
+              {runEvaluators.length === 0 ? (
                 <span className="text-sm text-muted-foreground">—</span>
               ) : (
-                evaluators.map((e) => {
+                runEvaluators.map((e) => {
                   const name = e.name || e.evaluator_id.slice(0, 8);
                   return (
                     <span
@@ -912,6 +941,12 @@ function LabellingTaskPageInner() {
 
   // evaluators / agreement (declared before route-level effects that reset on uuid)
   const [runs, setRuns] = useState<EvaluatorRunJob[]>([]);
+  // Top-level evaluators[] block from the runs-list response. Used to
+  // resolve each run's evaluator refs (id, version_id) into display
+  // pills (name + version_number).
+  const [runsListEvaluators, setRunsListEvaluators] = useState<
+    RunsListEvaluator[]
+  >([]);
   const [runsLoading, setRunsLoading] = useState(false);
   const [runsError, setRunsError] = useState<string | null>(null);
   /** False until the first evaluator-runs list fetch finishes (avoids empty placeholder flash). */
@@ -978,6 +1013,7 @@ function LabellingTaskPageInner() {
     setTask(null);
     setError(null);
     setRuns([]);
+    setRunsListEvaluators([]);
     setRunsFetchCompleted(false);
     autoTabSwitchedRef.current = false;
   }, [uuid]);
@@ -1094,11 +1130,14 @@ function LabellingTaskPageInner() {
     setRunsLoading(true);
     setRunsError(null);
     try {
-      const data = await apiClient<EvaluatorRunJob[]>(
+      const data = await apiClient<EvaluatorRunsListResponse>(
         `/annotation-tasks/${uuid}/evaluator-runs`,
         accessToken,
       );
-      setRuns(Array.isArray(data) ? data : []);
+      setRuns(Array.isArray(data?.runs) ? data.runs : []);
+      setRunsListEvaluators(
+        Array.isArray(data?.evaluators) ? data.evaluators : [],
+      );
     } catch (err) {
       setRunsError(parseApiError(err, "Failed to load evaluator runs"));
     } finally {
@@ -2381,6 +2420,7 @@ function LabellingTaskPageInner() {
         {activeTab === "runs" && (
           <EvaluatorRunsList
             runs={runs}
+            evaluators={runsListEvaluators}
             loading={runsLoading || !runsFetchCompleted}
             error={runsError}
             onRequestDelete={(runUuid) => setDeletingRunUuid(runUuid)}

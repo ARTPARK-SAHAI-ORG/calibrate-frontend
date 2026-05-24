@@ -402,6 +402,34 @@ export function ItemDetailDialog({
       // card surfaces THIS version's label for THIS row's score; rows
       // without a resolved name fall back to the version-level
       // output_config or the task-level snapshot.
+      // Build the synthetic scale: start from the version's full scale
+      // (so labels for OTHER values are available when the user
+      // switches between human annotators that picked a different
+      // value) and, when present, override the matching entry's name
+      // with the per-row backend-resolved label. Adds a fresh entry if
+      // the row's value isn't represented in the scale.
+      const baseScale =
+        evVersion?.output_config?.scale ?? taskEv?.output_config?.scale ?? [];
+      const rowValue = row.evaluator_value;
+      const rowValueName = row.evaluator_value_name?.trim() || null;
+      const hasRowOverride = rowValue !== null && !!rowValueName;
+      const mergedScale = hasRowOverride
+        ? (() => {
+            let matched = false;
+            const next = baseScale.map((e) => {
+              if (e.value === rowValue) {
+                matched = true;
+                return { ...e, name: rowValueName };
+              }
+              return e;
+            });
+            if (!matched) {
+              next.push({ value: rowValue, name: rowValueName });
+            }
+            return next;
+          })()
+        : baseScale;
+
       jobEvaluators.push({
         uuid: row.evaluator_id,
         name: evName,
@@ -411,21 +439,7 @@ export function ItemDetailDialog({
         version_number: evVersion?.version_number,
         scale_min: scaleMin,
         scale_max: scaleMax,
-        output_config:
-          row.evaluator_value !== null &&
-          typeof row.evaluator_value_name === "string" &&
-          row.evaluator_value_name.length > 0
-            ? {
-                scale: [
-                  {
-                    value: row.evaluator_value,
-                    name: row.evaluator_value_name,
-                  },
-                ],
-              }
-            : evVersion?.output_config ??
-              taskEv?.output_config ??
-              null,
+        output_config: mergedScale.length > 0 ? { scale: mergedScale } : null,
       });
       haEvaluators.push({
         evaluator_id: row.evaluator_id,
