@@ -927,15 +927,16 @@ function EvaluatorsPane({
   const trimmedComment = itemComment.trim();
   const showCommentBlock = readOnly ? trimmedComment.length > 0 : true;
   const commentBlock = showCommentBlock ? (
-    <div className="border border-border rounded-xl p-4 space-y-2">
-      <h3 className="text-sm font-semibold">
-        Comments {readOnly ? "" : "(optional)"}
-      </h3>
-      {readOnly ? (
+    readOnly ? (
+      <div className="space-y-1.5">
+        <h3 className="text-sm font-semibold">Comments</h3>
         <p className="text-sm text-foreground whitespace-pre-wrap break-words">
           {trimmedComment}
         </p>
-      ) : (
+      </div>
+    ) : (
+      <div className="border border-border rounded-xl p-4 space-y-2">
+        <h3 className="text-sm font-semibold">Comments (optional)</h3>
         <textarea
           value={itemComment}
           onChange={(e) => onItemCommentChange(e.target.value)}
@@ -943,8 +944,8 @@ function EvaluatorsPane({
           rows={2}
           className="w-full text-sm rounded-md border border-border bg-background px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-foreground/20"
         />
-      )}
-    </div>
+      </div>
+    )
   ) : null;
 
   if (evaluators.length === 0) {
