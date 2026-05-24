@@ -325,8 +325,7 @@ export function ItemDetailDialog({
       // / scale (which the summary used to inline).
       const summaryEv = summaryEvaluatorByUuid.get(row.evaluator_id);
       const taskEv = taskEvaluatorByUuid.get(row.evaluator_id);
-      const evName =
-        summaryEv?.name ?? taskEv?.uuid ? (summaryEv?.name ?? "") : "";
+      const evName = summaryEv?.name ?? "";
       const evDescription =
         summaryEv?.description ?? taskEv?.description ?? null;
       const evOutputType =
