@@ -1048,7 +1048,9 @@ function LabellingTaskPageInner() {
       );
       setTask(data);
     } catch (err) {
-      setError(parseApiError(err, "Failed to load task"));
+      const msg = parseApiError(err, "Failed to load task");
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
       setTaskFetchCompleted(true);
@@ -1064,6 +1066,8 @@ function LabellingTaskPageInner() {
     setRuns([]);
     setRunsListEvaluators([]);
     setRunsFetchCompleted(false);
+    setTaskSummary(null);
+    setSummaryFetchCompleted(false);
     autoTabSwitchedRef.current = false;
   }, [uuid]);
 
@@ -1097,10 +1101,15 @@ function LabellingTaskPageInner() {
     null,
   );
   const [, setTaskSummaryError] = useState<string | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  /** False until the first summary fetch for this task completes (so the
+   * Items tab's "Labelled by" column doesn't flash "—" before populating). */
+  const [summaryFetchCompleted, setSummaryFetchCompleted] = useState(false);
 
   const fetchTaskSummary = useCallback(async () => {
     if (!accessToken || !uuid) return;
     setTaskSummaryError(null);
+    setSummaryLoading(true);
     try {
       const data = await apiClient<TaskSummaryResponse>(
         `/annotation-tasks/${uuid}/summary`,
@@ -1109,6 +1118,9 @@ function LabellingTaskPageInner() {
       setTaskSummary(data);
     } catch (err) {
       setTaskSummaryError(parseApiError(err, "Failed to load task summary"));
+    } finally {
+      setSummaryLoading(false);
+      setSummaryFetchCompleted(true);
     }
   }, [accessToken, uuid]);
 
@@ -1130,11 +1142,17 @@ function LabellingTaskPageInner() {
     }
     // Items exist — overview only renders the agreement panel, so if
     // there's no agreement data the overview is just an empty state.
-    // Skip straight to the items tab in that case. Wait for the
-    // agreement fetch to complete first. If the fetch errored, stay on
-    // overview so the user sees the error rather than getting silently
-    // bounced off the tab.
-    if (!agreementFetchCompleted) return;
+    // Skip straight to the items tab in that case. Wait for every
+    // overview-tab fetch to complete first so the user doesn't see a
+    // spinner→bounce flicker on slow connections. If the agreement
+    // fetch errored, stay on overview so the user sees the error rather
+    // than getting silently bounced off the tab.
+    if (
+      !agreementFetchCompleted ||
+      !summaryFetchCompleted ||
+      !runsFetchCompleted
+    )
+      return;
     if (agreementError) {
       autoTabSwitchedRef.current = true;
       return;
@@ -1154,6 +1172,8 @@ function LabellingTaskPageInner() {
     agreement,
     agreementError,
     agreementFetchCompleted,
+    summaryFetchCompleted,
+    runsFetchCompleted,
   ]);
 
   // Map item_id -> annotator uuids who have at least one labelled annotation
@@ -1219,7 +1239,8 @@ function LabellingTaskPageInner() {
       })
     : rawItems;
   const jobs = task?.jobs ?? [];
-  const itemsLoading = loading || !taskFetchCompleted;
+  const itemsLoading =
+    loading || !taskFetchCompleted || summaryLoading || !summaryFetchCompleted;
   const itemsError = error;
   const itemsCount = items.length || task?.item_count || 0;
   const jobsCount = jobs.length;
@@ -1754,8 +1775,31 @@ function LabellingTaskPageInner() {
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl font-semibold">
-                {loading && !task ? "Loading..." : (task?.name ?? "—")}
+              <h1 className="text-2xl font-semibold flex items-center gap-2">
+                {!taskFetchCompleted ? (
+                  <svg
+                    className="w-5 h-5 animate-spin text-muted-foreground"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    aria-label="Loading task"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                ) : (
+                  (task?.name ?? "—")
+                )}
               </h1>
               {taskType && <EvaluatorTypePill evaluatorType={taskType} />}
             </div>
@@ -1965,7 +2009,14 @@ function LabellingTaskPageInner() {
               </div>
             )}
 
-            {agreementLoading || !agreementFetchCompleted ? (
+            {loading ||
+            !taskFetchCompleted ||
+            agreementLoading ||
+            !agreementFetchCompleted ||
+            summaryLoading ||
+            !summaryFetchCompleted ||
+            runsLoading ||
+            !runsFetchCompleted ? (
               <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
                 <svg
                   className="w-4 h-4 animate-spin"
@@ -1986,7 +2037,7 @@ function LabellingTaskPageInner() {
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   />
                 </svg>
-                Loading agreement
+                Loading
               </div>
             ) : !agreement ||
               ((agreement.human_human?.pair_count ?? 0) === 0 &&
