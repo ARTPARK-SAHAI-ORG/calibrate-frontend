@@ -1131,12 +1131,18 @@ function LabellingTaskPageInner() {
     // Items exist — overview only renders the agreement panel, so if
     // there's no agreement data the overview is just an empty state.
     // Skip straight to the items tab in that case. Wait for the
-    // agreement fetch to complete first.
+    // agreement fetch to complete first. If the fetch errored, stay on
+    // overview so the user sees the error rather than getting silently
+    // bounced off the tab.
     if (!agreementFetchCompleted) return;
+    if (agreementError) {
+      autoTabSwitchedRef.current = true;
+      return;
+    }
+    if (!agreement) return;
     const agreementEmpty =
-      !agreement ||
-      ((agreement.human_human?.pair_count ?? 0) === 0 &&
-        (agreement.evaluators ?? []).every((e) => (e.pair_count ?? 0) === 0));
+      (agreement.human_human?.pair_count ?? 0) === 0 &&
+      (agreement.evaluators ?? []).every((e) => (e.pair_count ?? 0) === 0);
     autoTabSwitchedRef.current = true;
     if (agreementEmpty) {
       handleTabChange("items");
@@ -1146,6 +1152,7 @@ function LabellingTaskPageInner() {
     initialTab,
     handleTabChange,
     agreement,
+    agreementError,
     agreementFetchCompleted,
   ]);
 
