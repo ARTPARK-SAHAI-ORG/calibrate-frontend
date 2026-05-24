@@ -22,6 +22,11 @@ import {
 } from "@/components/AddTestDialog";
 import { AppLayout } from "@/components/AppLayout";
 import { EvaluatorTypePill } from "@/components/EvaluatorPills";
+import {
+  ExportResultsButton,
+  type ExportColumn,
+} from "@/components/ExportResultsButton";
+import { RefreshButton } from "@/components/RefreshButton";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { AddSttItemsDialog } from "@/components/human-labelling/AddSttItemsDialog";
@@ -268,6 +273,185 @@ function previewItemPayload(payload: unknown, kind: TaskKind): string {
   } catch {
     return "—";
   }
+}
+
+function sanitizeCsvName(s: string): string {
+  return s.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "unnamed";
+}
+
+function buildItemsCsv(
+  items: LabellingItem[],
+  taskSummary: TaskSummaryResponse | null,
+  taskType: TaskKind,
+): { columns: ExportColumn[]; rows: Record<string, unknown>[] } {
+  const evaluators = taskSummary?.evaluators ?? [];
+  const annotators = taskSummary?.annotators ?? [];
+
+  // Each (item, evaluator, version) tuple gets its own row in the
+  // summary response — keying without version_id would let later
+  // versions silently overwrite earlier ones in the export.
+  const rowByItemEvalVersion = new Map<string, SummaryRow>();
+  const versionsByEval = new Map<string, Set<string | null>>();
+  for (const row of taskSummary?.rows ?? []) {
+    const vid = row.evaluator_version_id ?? null;
+    rowByItemEvalVersion.set(
+      `${row.item_id}::${row.evaluator_id}::${vid ?? "live"}`,
+      row,
+    );
+    if (!versionsByEval.has(row.evaluator_id)) {
+      versionsByEval.set(row.evaluator_id, new Set());
+    }
+    versionsByEval.get(row.evaluator_id)!.add(vid);
+  }
+
+  const versionNumberById = new Map<string, number>();
+  for (const ev of evaluators) {
+    for (const v of ev.versions ?? []) {
+      versionNumberById.set(v.uuid, v.version_number);
+    }
+  }
+
+  // For each evaluator, the list of version_ids (sorted by version_number
+  // ascending) that actually appear in the summary rows. Evaluators with
+  // no run data still get one entry (null → "live") so annotator columns
+  // are emitted even when the evaluator hasn't run yet.
+  const versionsForEvaluator = (ev: SummaryEvaluator): (string | null)[] => {
+    const set = versionsByEval.get(ev.uuid);
+    if (!set || set.size === 0) return [null];
+    return [...set].sort((a, b) => {
+      const an: number = (a ? versionNumberById.get(a) : undefined) ?? -Infinity;
+      const bn: number = (b ? versionNumberById.get(b) : undefined) ?? -Infinity;
+      return an - bn;
+    });
+  };
+
+  const columns: ExportColumn[] = [{ key: "name", header: "name" }];
+  if (taskType !== "stt") {
+    columns.push({ key: "description", header: "description" });
+  }
+  if (taskType === "simulation") {
+    columns.push({
+      key: "conversation_history",
+      header: "conversation_history",
+    });
+  } else if (taskType === "stt") {
+    columns.push({
+      key: "reference_transcript",
+      header: "reference_transcript",
+    });
+    columns.push({
+      key: "predicted_transcript",
+      header: "predicted_transcript",
+    });
+  } else if (taskType === "llm") {
+    columns.push({
+      key: "conversation_history",
+      header: "conversation_history",
+    });
+    columns.push({ key: "agent_response", header: "agent_response" });
+  }
+
+  for (const ev of evaluators) {
+    const evName = sanitizeCsvName(ev.name);
+    // Annotator columns are emitted once per (annotator × evaluator) —
+    // a human's label of an item against an evaluator doesn't depend on
+    // which version of the evaluator ran.
+    for (const ann of annotators) {
+      const annName = sanitizeCsvName(ann.name);
+      const base = `${annName}_${evName}`;
+      columns.push({
+        key: `ann_${ann.uuid}_${ev.uuid}_value`,
+        header: `${base}/value`,
+      });
+      columns.push({
+        key: `ann_${ann.uuid}_${ev.uuid}_reasoning`,
+        header: `${base}/reasoning`,
+      });
+    }
+    for (const vid of versionsForEvaluator(ev)) {
+      const versionNumber = vid ? versionNumberById.get(vid) : undefined;
+      const verStr = versionNumber != null ? `v${versionNumber}` : "live";
+      columns.push({
+        key: `ev_${ev.uuid}_${vid ?? "live"}_value`,
+        header: `evaluator_${evName}_${verStr}/value`,
+      });
+      columns.push({
+        key: `ev_${ev.uuid}_${vid ?? "live"}_reasoning`,
+        header: `evaluator_${evName}_${verStr}/reasoning`,
+      });
+    }
+  }
+
+  const rows = items.map((item) => {
+    const p = (item.payload ?? {}) as Record<string, unknown>;
+    const out: Record<string, unknown> = {
+      name: typeof p.name === "string" ? p.name : "",
+    };
+    if (taskType !== "stt") {
+      out.description = typeof p.description === "string" ? p.description : "";
+    }
+    if (taskType === "simulation") {
+      out.conversation_history = Array.isArray(p.transcript)
+        ? JSON.stringify(p.transcript)
+        : "";
+    } else if (taskType === "stt") {
+      out.reference_transcript =
+        typeof p.reference_transcript === "string"
+          ? p.reference_transcript
+          : "";
+      out.predicted_transcript =
+        typeof p.predicted_transcript === "string"
+          ? p.predicted_transcript
+          : "";
+    } else if (taskType === "llm") {
+      out.conversation_history = Array.isArray(p.chat_history)
+        ? JSON.stringify(p.chat_history)
+        : "";
+      out.agent_response =
+        typeof p.agent_response === "string" ? p.agent_response : "";
+    }
+
+    for (const ev of evaluators) {
+      const versionIds = versionsForEvaluator(ev);
+      // Annotations don't vary by version; take whichever version's row
+      // we find first that has a non-null annotation for each annotator.
+      const annotationSourceByAnn = new Map<string, SummaryAnnotation>();
+      for (const vid of versionIds) {
+        const row = rowByItemEvalVersion.get(
+          `${item.uuid}::${ev.uuid}::${vid ?? "live"}`,
+        );
+        if (!row) continue;
+        for (const ann of annotators) {
+          if (annotationSourceByAnn.has(ann.uuid)) continue;
+          const a = row.annotations?.[ann.uuid];
+          if (a && a.value !== null && a.value !== undefined) {
+            annotationSourceByAnn.set(ann.uuid, a);
+          }
+        }
+      }
+      for (const ann of annotators) {
+        const a = annotationSourceByAnn.get(ann.uuid) ?? null;
+        out[`ann_${ann.uuid}_${ev.uuid}_value`] =
+          a && a.value !== null && a.value !== undefined ? a.value : "";
+        out[`ann_${ann.uuid}_${ev.uuid}_reasoning`] = a?.reasoning ?? "";
+      }
+      for (const vid of versionIds) {
+        const row = rowByItemEvalVersion.get(
+          `${item.uuid}::${ev.uuid}::${vid ?? "live"}`,
+        );
+        out[`ev_${ev.uuid}_${vid ?? "live"}_value`] =
+          row?.evaluator_value_name ??
+          (row?.evaluator_value !== null && row?.evaluator_value !== undefined
+            ? row.evaluator_value
+            : "");
+        out[`ev_${ev.uuid}_${vid ?? "live"}_reasoning`] =
+          row?.evaluator_reasoning ?? "";
+      }
+    }
+    return out;
+  });
+
+  return { columns, rows };
 }
 
 function parseApiError(err: unknown, fallback: string): string {
@@ -1094,8 +1278,8 @@ function LabellingTaskPageInner() {
   }, [accessToken, uuid]);
 
   useEffect(() => {
-    if (activeTab === "overview") fetchAgreement();
-  }, [activeTab, fetchAgreement]);
+    fetchAgreement();
+  }, [fetchAgreement]);
 
   const [taskSummary, setTaskSummary] = useState<TaskSummaryResponse | null>(
     null,
@@ -1125,8 +1309,8 @@ function LabellingTaskPageInner() {
   }, [accessToken, uuid]);
 
   useEffect(() => {
-    if (activeTab === "overview" || activeTab === "items") fetchTaskSummary();
-  }, [activeTab, fetchTaskSummary]);
+    fetchTaskSummary();
+  }, [fetchTaskSummary]);
 
   useEffect(() => {
     if (autoTabSwitchedRef.current) return;
@@ -2073,7 +2257,13 @@ function LabellingTaskPageInner() {
             ) : (
               <div className="space-y-2">
                 <div>
-                  <h2 className="text-sm font-semibold">Agreement summary</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-semibold">Agreement summary</h2>
+                    <RefreshButton
+                      loading={agreementLoading}
+                      onClick={() => fetchAgreement()}
+                    />
+                  </div>
                   <p className="text-xs text-muted-foreground max-w-2xl mt-1">
                     These cards show agreement between annotators and how
                     closely each evaluator aligns with humans
@@ -2163,6 +2353,22 @@ function LabellingTaskPageInner() {
             />
           ) : (
             <div ref={itemsSectionTopRef} className="space-y-3 scroll-mt-4">
+              <div className="flex items-center justify-end gap-2">
+                <RefreshButton
+                  loading={loading || summaryLoading}
+                  onClick={() => {
+                    fetchTask();
+                    fetchTaskSummary();
+                  }}
+                />
+                <ExportResultsButton
+                  filename={`${sanitizeCsvName(task?.name ?? "labelling-task")}-items`}
+                  label="Export CSV"
+                  variant="neutral"
+                  disabled={summaryLoading || !taskSummary}
+                  getRows={() => buildItemsCsv(items, taskSummary, taskType)}
+                />
+              </div>
               {/* Bulk-action toolbar (shown when at least one row is selected) */}
               {selectedItemIds.size > 0 && (
                 <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
