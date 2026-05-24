@@ -126,6 +126,10 @@ type TaskSummaryResponse = {
   evaluators: SummaryEvaluator[];
   annotators: SummaryAnnotator[];
   rows: SummaryRow[];
+  /** Sparse per-(item, annotator) free-text comments — the
+   * `evaluator_id IS NULL` annotation slot. Items / annotators
+   * without a non-empty comment don't appear. */
+  item_comments?: { [item_id: string]: { [annotator_uuid: string]: string } };
 };
 
 const TABS: Tab[] = ["overview", "items", "jobs", "runs"];
@@ -382,6 +386,19 @@ function buildItemsCsv(
     }
   }
 
+  // Item-level free-text comments — one column per annotator, not tied
+  // to any evaluator (`evaluator_id IS NULL` slot). Placed after all
+  // evaluator/annotator columns so the per-evaluator block stays
+  // contiguous and downstream consumers don't have to special-case
+  // mid-stream comment columns.
+  for (const ann of annotators) {
+    const annName = sanitizeCsvName(ann.name);
+    columns.push({
+      key: `ann_${ann.uuid}_comment`,
+      header: `${annName}/comment`,
+    });
+  }
+
   const rows = items.map((item) => {
     const p = (item.payload ?? {}) as Record<string, unknown>;
     const out: Record<string, unknown> = {
@@ -447,6 +464,10 @@ function buildItemsCsv(
         out[`ev_${ev.uuid}_${vid ?? "live"}_reasoning`] =
           row?.evaluator_reasoning ?? "";
       }
+    }
+    const commentsForItem = taskSummary?.item_comments?.[item.uuid];
+    for (const ann of annotators) {
+      out[`ann_${ann.uuid}_comment`] = commentsForItem?.[ann.uuid] ?? "";
     }
     return out;
   });
