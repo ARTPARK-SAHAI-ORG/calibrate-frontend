@@ -2207,18 +2207,18 @@ function LabellingTaskPageInner() {
               />
             ) : (
               <div className="space-y-2">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
+                <div>
+                  <div className="flex items-center gap-2">
                     <h2 className="text-sm font-semibold">Agreement summary</h2>
-                    <p className="text-xs text-muted-foreground max-w-2xl mt-1">
-                      These cards show agreement between annotators and how
-                      closely each evaluator aligns with humans
-                    </p>
+                    <RefreshButton
+                      loading={agreementLoading}
+                      onClick={() => fetchAgreement()}
+                    />
                   </div>
-                  <RefreshButton
-                    loading={agreementLoading}
-                    onClick={() => fetchAgreement()}
-                  />
+                  <p className="text-xs text-muted-foreground max-w-2xl mt-1">
+                    These cards show agreement between annotators and how
+                    closely each evaluator aligns with humans
+                  </p>
                 </div>
                 <div className="flex flex-wrap items-stretch gap-3">
                   <AgreementStatCard
