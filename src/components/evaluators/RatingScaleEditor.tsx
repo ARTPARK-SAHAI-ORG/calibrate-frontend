@@ -47,14 +47,11 @@ export function RatingScaleEditor<T extends RatingScaleRow>({
       <p className="text-xs md:text-sm text-muted-foreground mb-2">
         {description}
       </p>
-      <div className="space-y-2">
+      <div className="space-y-4">
         {rows.map((row, idx) => {
           const missingLabel = validationAttempted && !row.name.trim();
           return (
-            <div
-              key={idx}
-              className="border border-border rounded-md p-2 md:p-3 bg-muted/10 dark:bg-muted"
-            >
+            <div key={idx}>
               <div className="flex items-center gap-2">
                 <input
                   type="number"

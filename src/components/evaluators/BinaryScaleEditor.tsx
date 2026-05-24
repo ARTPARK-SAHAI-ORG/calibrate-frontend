@@ -38,16 +38,13 @@ export function BinaryScaleEditor({ rows, onChange }: Props) {
         the defaults ({DEFAULT_BINARY_TRUE_LABEL} / {DEFAULT_BINARY_FALSE_LABEL}
         ). The optional description is rubric text sent to the judge.
       </p>
-      <div className="space-y-2">
+      <div className="space-y-4">
         {rows.map((row, idx) => {
           const placeholder = row.value
             ? DEFAULT_BINARY_TRUE_LABEL
             : DEFAULT_BINARY_FALSE_LABEL;
           return (
-            <div
-              key={String(row.value)}
-              className="border border-border rounded-md p-2 md:p-3 bg-muted/10 dark:bg-muted"
-            >
+            <div key={String(row.value)}>
               <div className="flex items-center gap-2">
                 <span
                   className={`w-20 h-9 md:h-10 inline-flex items-center justify-center rounded-md text-sm md:text-base font-medium border ${
