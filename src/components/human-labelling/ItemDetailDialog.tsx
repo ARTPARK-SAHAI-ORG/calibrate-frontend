@@ -227,8 +227,10 @@ export function ItemDetailDialog({
     [item],
   );
 
-  // Annotators who actually labelled this item across any evaluator/version.
-  // We only surface the filter when this list is non-empty.
+  // Annotators who left any signal on this item — either an evaluator
+  // annotation in any row, OR a comment in `item_comments`. Comment-only
+  // annotators (no evaluator labels) need to be filterable too, otherwise
+  // the picker can't isolate their Comments block entry.
   const availableAnnotators = useMemo<PickerItem[]>(() => {
     if (!summary) return [];
     const seen = new Set<string>();
@@ -239,10 +241,16 @@ export function ItemDetailDialog({
         }
       }
     }
+    if (item) {
+      const byAnn = summary.item_comments?.[item.uuid] ?? {};
+      for (const [annUuid, c] of Object.entries(byAnn)) {
+        if (typeof c === "string" && c.trim()) seen.add(annUuid);
+      }
+    }
     return (summary.annotators ?? [])
       .filter((a) => seen.has(a.uuid))
       .map((a) => ({ uuid: a.uuid, name: a.name }));
-  }, [summary]);
+  }, [summary, item]);
 
   // Drop selections that no longer correspond to an annotator with data
   // (e.g. after the modal re-fetches with different filters) at render
