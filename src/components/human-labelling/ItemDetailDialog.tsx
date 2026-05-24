@@ -773,6 +773,7 @@ export function ItemDetailDialog({
               showVersionInSourcePill
               groupVersionsByEvaluator
               annotatorFilterActive={annotatorFilter !== null}
+              singleAnnotatorFiltered={effectiveSelectedAnnotators.length === 1}
               itemComments={itemCommentEntries}
             />
           )}

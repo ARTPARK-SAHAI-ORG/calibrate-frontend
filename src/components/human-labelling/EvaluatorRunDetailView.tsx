@@ -633,6 +633,7 @@ export function EvaluatorResultsPane({
   showVersionInSourcePill = false,
   groupVersionsByEvaluator = false,
   annotatorFilterActive = false,
+  singleAnnotatorFiltered = false,
   itemComments = [],
 }: {
   evaluators: {
@@ -673,6 +674,11 @@ export function EvaluatorResultsPane({
   /** Parent has narrowed annotations to a subset — lets grouped cards
    *  hide a solitary annotator pill when only one annotation remains. */
   annotatorFilterActive?: boolean;
+  /** True when the annotator filter is narrowed to exactly one
+   * annotator. Drives the comments-block pill hide rule (we drop the
+   * solitary pill regardless of how many annotators actually have
+   * comments for the item). */
+  singleAnnotatorFiltered?: boolean;
   /** Per-annotator item-level free-text comments (the
    * `evaluator_id IS NULL` slot). Already filtered by the parent's
    * annotator picker; ordered by the summary's annotator list. */
@@ -696,7 +702,7 @@ export function EvaluatorResultsPane({
     itemComments.length > 0 ? (
       <CommentsBlock
         comments={itemComments}
-        annotatorFilterActive={annotatorFilterActive}
+        singleAnnotatorFiltered={singleAnnotatorFiltered}
       />
     ) : null;
 
@@ -1017,20 +1023,23 @@ export function EvaluatorResultsPane({
  * Item-level "Comments" block — heading + per-annotator pills that
  * switch the displayed comment. Matches the source-pill UX on the
  * evaluator cards: clicking a pill highlights it and swaps the body
- * text. When the parent has filtered to a single annotator we drop
- * the solitary pill (same rule as the annotator pill on each
- * evaluator card) and just show the body.
+ * text. We hide the pill row only when the parent's filter has
+ * narrowed selection to exactly one annotator — i.e. the user has
+ * already committed to a specific annotator at the dialog level.
+ * If the filter has multiple annotators selected but only one of
+ * them actually commented, the pill still shows so the reader
+ * knows whose comment they're looking at.
  */
 function CommentsBlock({
   comments,
-  annotatorFilterActive,
+  singleAnnotatorFiltered,
 }: {
   comments: {
     annotator_id: string;
     annotator_name: string;
     comment: string;
   }[];
-  annotatorFilterActive: boolean;
+  singleAnnotatorFiltered: boolean;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -1044,7 +1053,7 @@ function CommentsBlock({
   const active = comments.find((c) => c.annotator_id === activeId) ?? null;
   if (!active) return null;
 
-  const showPills = !(annotatorFilterActive && comments.length === 1);
+  const showPills = !singleAnnotatorFiltered;
 
   return (
     <div className="space-y-1.5">
@@ -1313,6 +1322,7 @@ export function ItemDetailPane({
   showVersionInSourcePill = false,
   groupVersionsByEvaluator = false,
   annotatorFilterActive = false,
+  singleAnnotatorFiltered = false,
   itemComments = [],
 }: {
   item: Item;
@@ -1339,6 +1349,12 @@ export function ItemDetailPane({
   showVersionInSourcePill?: boolean;
   groupVersionsByEvaluator?: boolean;
   annotatorFilterActive?: boolean;
+  /** True when the annotator filter has narrowed selection to exactly
+   * one annotator. Used to hide the solitary pill row on the comments
+   * block — the user has already committed to that annotator at the
+   * dialog level. Distinct from `annotatorFilterActive` (any subset
+   * selected). */
+  singleAnnotatorFiltered?: boolean;
   /** Per-annotator item-level free-text comments to surface in the
    * results pane. Empty = no comments for this item. */
   itemComments?: {
@@ -1379,6 +1395,7 @@ export function ItemDetailPane({
           showVersionInSourcePill={showVersionInSourcePill}
           groupVersionsByEvaluator={groupVersionsByEvaluator}
           annotatorFilterActive={annotatorFilterActive}
+          singleAnnotatorFiltered={singleAnnotatorFiltered}
           itemComments={itemComments}
         />
       </div>
