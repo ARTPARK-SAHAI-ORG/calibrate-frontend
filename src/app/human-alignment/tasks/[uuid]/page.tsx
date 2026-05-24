@@ -123,18 +123,6 @@ type TaskSummaryResponse = {
   rows: SummaryRow[];
 };
 
-// A summary row is "empty" when no value column has anything to show:
-// no evaluator value, no agreement scores, and no annotator label.
-function summaryRowHasAnyValue(r: SummaryRow): boolean {
-  if (r.evaluator_value !== null) return true;
-  if (r.human_agreement !== null) return true;
-  if (r.evaluator_agreement !== null) return true;
-  for (const v of Object.values(r.annotations ?? {})) {
-    if (v && v.value !== null && v.value !== undefined) return true;
-  }
-  return false;
-}
-
 const TABS: Tab[] = ["overview", "items", "jobs", "runs"];
 
 type EvaluatorRunMetricEntry = number | { type?: string; mean?: number | null };
@@ -1140,20 +1128,17 @@ function LabellingTaskPageInner() {
       handleTabChange("items");
       return;
     }
-    // Items exist — peek at overview's data sources to decide if the
-    // overview would just be empty states. If both the agreement panel
-    // and the per-item summary table have nothing to show, jump straight
-    // to the items tab. Wait for both fetches to complete first.
+    // Items exist — overview only renders the agreement panel, so if
+    // there's no agreement data the overview is just an empty state.
+    // Skip straight to the items tab in that case. Wait for the
+    // agreement fetch to complete first.
     if (!agreementFetchCompleted) return;
-    if (taskSummary === null) return;
     const agreementEmpty =
       !agreement ||
       ((agreement.human_human?.pair_count ?? 0) === 0 &&
         (agreement.evaluators ?? []).every((e) => (e.pair_count ?? 0) === 0));
-    const summaryEmpty =
-      (taskSummary.rows ?? []).filter(summaryRowHasAnyValue).length === 0;
     autoTabSwitchedRef.current = true;
-    if (agreementEmpty && summaryEmpty) {
+    if (agreementEmpty) {
       handleTabChange("items");
     }
   }, [
@@ -1162,7 +1147,6 @@ function LabellingTaskPageInner() {
     handleTabChange,
     agreement,
     agreementFetchCompleted,
-    taskSummary,
   ]);
 
   // Map item_id -> annotator uuids who have at least one labelled annotation
