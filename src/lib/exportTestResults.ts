@@ -83,12 +83,14 @@ function evaluatorVerdict(
   return "";
 }
 
-// Stable key for an evaluator. Always uses the uuid now that the backend
-// guarantees one on every judge_results row (synthesising stub entries
-// for legacy snapshots). Falls back to a positional placeholder only if
-// the uuid is missing entirely.
-function evaluatorKey(jr: JudgeResult): string {
-  return jr.evaluator_uuid ? `uuid:${jr.evaluator_uuid}` : `unknown`;
+// Stable key for an evaluator. Prefers the uuid (canonical across
+// runs); for legacy snapshots that omit `evaluator_uuid` falls back to
+// the evaluator's position within the row's judge_results array — this
+// keeps multi-evaluator legacy rows from collapsing into one CSV
+// column. Position is stable across rows because the backend emits
+// judge_results in the same evaluator order on every row.
+function evaluatorKey(jr: JudgeResult, indexInRow: number): string {
+  return jr.evaluator_uuid ? `uuid:${jr.evaluator_uuid}` : `pos:${indexInRow}`;
 }
 
 // Walk every row's `judgeResults` and build the union of evaluators present
@@ -116,8 +118,9 @@ function collectEvaluatorColumns(
   for (const row of rows) {
     const jrs = row.judgeResults;
     if (!Array.isArray(jrs)) continue;
-    for (const jr of jrs) {
-      const key = evaluatorKey(jr);
+    for (let i = 0; i < jrs.length; i++) {
+      const jr = jrs[i];
+      const key = evaluatorKey(jr, i);
       if (!seen.has(key)) {
         // Disambiguate when two distinct evaluators share a display name.
         const evName = jr.evaluator_uuid
@@ -177,7 +180,9 @@ function evaluatorCellsForRow(
 ): Record<string, string> {
   const byKey = new Map<string, JudgeResult>();
   if (Array.isArray(judgeResults)) {
-    for (const jr of judgeResults) byKey.set(evaluatorKey(jr), jr);
+    for (let i = 0; i < judgeResults.length; i++) {
+      byKey.set(evaluatorKey(judgeResults[i], i), judgeResults[i]);
+    }
   }
   const out: Record<string, string> = {};
   for (const c of cols) {
