@@ -221,6 +221,14 @@ export function AnnotationJobView({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [fields, setFields] = useState<Record<FieldKey, FieldValue>>({});
   const [savedKeys, setSavedKeys] = useState<Set<FieldKey>>(new Set());
+  // Per-item free-text comments, stored against the `evaluator_id IS NULL`
+  // slot for each (job, item). `itemComments` holds the current editor
+  // value; `savedComments` snapshots what the server has so we only POST
+  // when it actually changed.
+  const [itemComments, setItemComments] = useState<Record<string, string>>({});
+  const [savedComments, setSavedComments] = useState<Record<string, string>>(
+    {},
+  );
   const [submitting, setSubmitting] = useState(false);
   const [topError, setTopError] = useState<string | null>(null);
 
@@ -230,8 +238,13 @@ export function AnnotationJobView({
     (data: JobResponse) => {
       const next: Record<FieldKey, FieldValue> = {};
       const saved = new Set<FieldKey>();
+      const comments: Record<string, string> = {};
       for (const a of data.annotations) {
-        if (!a.evaluator_id) continue;
+        if (!a.evaluator_id) {
+          const c = readSavedComment(a.value);
+          if (c) comments[a.item_id] = c;
+          continue;
+        }
         const k = fieldKey(a.item_id, a.evaluator_id);
         next[k] = {
           value: readSavedValue(a.value),
@@ -241,6 +254,8 @@ export function AnnotationJobView({
       }
       setFields(next);
       setSavedKeys(saved);
+      setItemComments(comments);
+      setSavedComments(comments);
 
       // Read-only views (admin, public-readonly) always start on the first
       // item — they're reviewing what's been labelled, not picking up where
@@ -391,6 +406,10 @@ export function AnnotationJobView({
       setFields={setFields}
       savedKeys={savedKeys}
       setSavedKeys={setSavedKeys}
+      itemComments={itemComments}
+      setItemComments={setItemComments}
+      savedComments={savedComments}
+      setSavedComments={setSavedComments}
       submitting={submitting}
       setSubmitting={setSubmitting}
       topError={topError}
@@ -414,6 +433,12 @@ type ViewProps = {
   setFields: React.Dispatch<React.SetStateAction<Record<FieldKey, FieldValue>>>;
   savedKeys: Set<FieldKey>;
   setSavedKeys: React.Dispatch<React.SetStateAction<Set<FieldKey>>>;
+  itemComments: Record<string, string>;
+  setItemComments: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  savedComments: Record<string, string>;
+  setSavedComments: React.Dispatch<
+    React.SetStateAction<Record<string, string>>
+  >;
   submitting: boolean;
   setSubmitting: (b: boolean) => void;
   topError: string | null;
@@ -434,6 +459,10 @@ function AnnotateView({
   setFields,
   savedKeys,
   setSavedKeys,
+  itemComments,
+  setItemComments,
+  savedComments,
+  setSavedComments,
   submitting,
   setSubmitting,
   topError,
@@ -480,7 +509,7 @@ function AnnotateView({
     setTopError(null);
 
     const annotationsBody: {
-      evaluator_id: string;
+      evaluator_id: string | null;
       value: Record<string, unknown>;
     }[] = [];
     for (const ev of evaluators) {
@@ -495,6 +524,21 @@ function AnnotateView({
           value: f.value,
           ...(f.comment ? { reasoning: f.comment } : {}),
         },
+      });
+    }
+
+    // Item-level free-text comment lives on the `evaluator_id IS NULL`
+    // slot. Only send when it actually changed since the last save — the
+    // backend overwrites whatever's there, so an unchanged value is wasted
+    // work, and we'd erase a saved comment if we sent an empty string for
+    // an item that never had one edited.
+    const currentComment = (itemComments[currentItem.uuid] ?? "").trim();
+    const savedComment = (savedComments[currentItem.uuid] ?? "").trim();
+    const commentChanged = currentComment !== savedComment;
+    if (commentChanged) {
+      annotationsBody.push({
+        evaluator_id: null,
+        value: { comment: currentComment },
       });
     }
 
@@ -529,6 +573,12 @@ function AnnotateView({
         justSaved.forEach((k) => next.add(k));
         return next;
       });
+      if (commentChanged) {
+        setSavedComments((prev) => ({
+          ...prev,
+          [currentItem.uuid]: currentComment,
+        }));
+      }
 
       if (result.data.status === "completed") {
         onJobUpdate({
@@ -766,6 +816,13 @@ function AnnotateView({
                 fields={fields}
                 setField={setField}
                 readOnly={isAdmin}
+                itemComment={itemComments[currentItem.uuid] ?? ""}
+                onItemCommentChange={(s) =>
+                  setItemComments((prev) => ({
+                    ...prev,
+                    [currentItem.uuid]: s,
+                  }))
+                }
               />
             </div>
           ) : (
@@ -792,6 +849,13 @@ function AnnotateView({
                   fields={fields}
                   setField={setField}
                   readOnly={isAdmin}
+                  itemComment={itemComments[currentItem.uuid] ?? ""}
+                  onItemCommentChange={(s) =>
+                    setItemComments((prev) => ({
+                      ...prev,
+                      [currentItem.uuid]: s,
+                    }))
+                  }
                 />
               </div>
             </>
@@ -832,12 +896,18 @@ function EvaluatorsPane({
   fields,
   setField,
   readOnly,
+  itemComment,
+  onItemCommentChange,
 }: {
   evaluators: Evaluator[];
   item: Item;
   fields: Record<FieldKey, FieldValue>;
   setField: (key: FieldKey, partial: Partial<FieldValue>) => void;
   readOnly: boolean;
+  /** Current free-text comment for this item — backed by the
+   * `evaluator_id IS NULL` annotation slot. */
+  itemComment: string;
+  onItemCommentChange: (s: string) => void;
 }) {
   // Per-item, per-evaluator variable values live on
   // `payload.evaluator_variables[<evaluator_uuid>]`. Surface them on
@@ -854,10 +924,34 @@ function EvaluatorsPane({
     </p>
   ) : null;
 
+  const trimmedComment = itemComment.trim();
+  const showCommentBlock = readOnly ? trimmedComment.length > 0 : true;
+  const commentBlock = showCommentBlock ? (
+    <div className="border border-border rounded-xl p-4 space-y-2">
+      <h3 className="text-sm font-semibold">
+        Comments {readOnly ? "" : "(optional)"}
+      </h3>
+      {readOnly ? (
+        <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+          {trimmedComment}
+        </p>
+      ) : (
+        <textarea
+          value={itemComment}
+          onChange={(e) => onItemCommentChange(e.target.value)}
+          placeholder="Add any notes about this item"
+          rows={2}
+          className="w-full text-sm rounded-md border border-border bg-background px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-foreground/20"
+        />
+      )}
+    </div>
+  ) : null;
+
   if (evaluators.length === 0) {
     return (
       <div className="space-y-3">
         {descriptionBlock}
+        {commentBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
           No evaluators are attached to this task.
         </div>
@@ -885,6 +979,7 @@ function EvaluatorsPane({
   return (
     <div className="space-y-3 pb-4 md:pb-6">
       {descriptionBlock}
+      {commentBlock}
       {evaluators.map((ev) => {
         const k = fieldKey(item.uuid, ev.uuid);
         const f = fields[k];
