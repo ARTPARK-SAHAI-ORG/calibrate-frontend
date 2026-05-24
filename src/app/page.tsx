@@ -326,6 +326,66 @@ const tabs: LandingTab[] = [
     ],
   },
   {
+    id: "human-alignment",
+    label: "Human alignment",
+    navDescription:
+      "Collect human labels and measure how closely your evaluators agree with real human judgment",
+    sections: [
+      {
+        headingBold: "Align your LLM judges",
+        headingLight: "with human judgment",
+        description:
+          "Evaluators are only as reliable as their agreement with humans. Collect labels from real annotators, measure consistency between them, and track how closely your evaluators match human ratings over time.",
+        images: [
+          "/human-task.png",
+          "/human-annotators.png",
+          "/human-agreement.png",
+          "/human-evaluator-runs.png",
+          "/human-trend.png",
+        ],
+        quickStart: {
+          steps: [
+            {
+              key: "human-task",
+              headingBold: "Create a labelling task",
+              headingLight:
+                "and add the items you want labelled — conversations, transcriptions, or simulation runs",
+              image: "/human-task.png",
+            },
+            {
+              key: "human-annotators",
+              headingBold: "Assign annotators to items",
+              headingLight:
+                "and share a private link with each one to label blindly, without seeing labels from other annotators",
+              image: "/human-annotators.png",
+            },
+            {
+              key: "human-agreement",
+              headingBold: "Collect labels on a single dashboard",
+              headingLight:
+                "and measure inter-annotator agreement whenever multiple annotators rate the same item",
+              image: "/human-agreement.png",
+            },
+            {
+              key: "human-evaluator-runs",
+              headingBold: "Run your evaluators on the same items",
+              headingLight:
+                "to see how well they agree with humans, and inspect every disagreement row by row",
+              image: "/human-evaluator-runs.png",
+            },
+            {
+              key: "human-trend",
+              headingBold: "Iterate on evaluator prompts",
+              headingLight:
+                "and track agreement across versions over time to know your evaluators are getting closer to human judgment",
+              image: "/human-trend.png",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
     id: "simulations",
     label: "Simulations",
     navDescription:
