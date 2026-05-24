@@ -38,7 +38,12 @@ export function RefreshButton({
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M4 4v6h6M20 20v-6h-6M20 9A8 8 0 006.34 6.34M4 15a8 8 0 0013.66 2.66"
+            d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M21 3v5h-5"
           />
         </svg>
       </button>
