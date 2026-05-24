@@ -1094,8 +1094,8 @@ function LabellingTaskPageInner() {
   }, [accessToken, uuid]);
 
   useEffect(() => {
-    if (activeTab === "overview") fetchAgreement();
-  }, [activeTab, fetchAgreement]);
+    fetchAgreement();
+  }, [fetchAgreement]);
 
   const [taskSummary, setTaskSummary] = useState<TaskSummaryResponse | null>(
     null,
@@ -1125,8 +1125,8 @@ function LabellingTaskPageInner() {
   }, [accessToken, uuid]);
 
   useEffect(() => {
-    if (activeTab === "overview" || activeTab === "items") fetchTaskSummary();
-  }, [activeTab, fetchTaskSummary]);
+    fetchTaskSummary();
+  }, [fetchTaskSummary]);
 
   useEffect(() => {
     if (autoTabSwitchedRef.current) return;
