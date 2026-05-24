@@ -633,6 +633,7 @@ export function EvaluatorResultsPane({
   showVersionInSourcePill = false,
   groupVersionsByEvaluator = false,
   annotatorFilterActive = false,
+  itemComments = [],
 }: {
   evaluators: {
     evaluator_id: string;
@@ -672,6 +673,14 @@ export function EvaluatorResultsPane({
   /** Parent has narrowed annotations to a subset — lets grouped cards
    *  hide a solitary annotator pill when only one annotation remains. */
   annotatorFilterActive?: boolean;
+  /** Per-annotator item-level free-text comments (the
+   * `evaluator_id IS NULL` slot). Already filtered by the parent's
+   * annotator picker; ordered by the summary's annotator list. */
+  itemComments?: {
+    annotator_id: string;
+    annotator_name: string;
+    comment: string;
+  }[];
 }) {
   const [selectionByEvaluator, setSelectionByEvaluator] = useState<
     Record<string, string>
@@ -683,10 +692,19 @@ export function EvaluatorResultsPane({
     </p>
   ) : null;
 
+  const commentsBlock =
+    itemComments.length > 0 ? (
+      <CommentsBlock
+        comments={itemComments}
+        annotatorFilterActive={annotatorFilterActive}
+      />
+    ) : null;
+
   if (evaluators.length === 0) {
     return (
       <div className="space-y-3">
         {descriptionBlock}
+        {commentsBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
           No evaluators in this run.
         </div>
@@ -712,6 +730,7 @@ export function EvaluatorResultsPane({
     return (
       <div className="space-y-3">
         {descriptionBlock}
+        {commentsBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
           All evaluators agree with human annotations on this item.
         </div>
@@ -965,6 +984,7 @@ export function EvaluatorResultsPane({
     return (
       <div className="space-y-4">
         {descriptionBlock}
+        {commentsBlock}
         {order.map((id) => (
           <GroupedEvaluatorCard
             key={id}
@@ -987,7 +1007,63 @@ export function EvaluatorResultsPane({
   return (
     <div className="space-y-4">
       {descriptionBlock}
+      {commentsBlock}
       {visibleEvaluators.map((ev) => renderEvaluatorCard(ev))}
+    </div>
+  );
+}
+
+/**
+ * Item-level "Comments" block — heading + per-annotator pills that
+ * switch the displayed comment. Matches the source-pill UX on the
+ * evaluator cards: clicking a pill highlights it and swaps the body
+ * text. When the parent has filtered to a single annotator we drop
+ * the solitary pill (same rule as the annotator pill on each
+ * evaluator card) and just show the body.
+ */
+function CommentsBlock({
+  comments,
+  annotatorFilterActive,
+}: {
+  comments: {
+    annotator_id: string;
+    annotator_name: string;
+    comment: string;
+  }[];
+  annotatorFilterActive: boolean;
+}) {
+  const [selected, setSelected] = useState<string | null>(null);
+
+  // Clamp the selection whenever the list of comments changes (e.g.
+  // the annotator filter narrows). Falls back to the first available
+  // annotator so the body text is never empty.
+  const activeId =
+    selected && comments.some((c) => c.annotator_id === selected)
+      ? selected
+      : (comments[0]?.annotator_id ?? null);
+  const active = comments.find((c) => c.annotator_id === activeId) ?? null;
+  if (!active) return null;
+
+  const showPills = !(annotatorFilterActive && comments.length === 1);
+
+  return (
+    <div className="space-y-1.5">
+      <h3 className="text-sm font-semibold">Comments</h3>
+      {showPills && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {comments.map((c) => (
+            <SourcePill
+              key={c.annotator_id}
+              primaryLabel={c.annotator_name || "Annotator"}
+              selected={c.annotator_id === active.annotator_id}
+              onClick={() => setSelected(c.annotator_id)}
+            />
+          ))}
+        </div>
+      )}
+      <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+        {active.comment}
+      </p>
     </div>
   );
 }
@@ -1237,6 +1313,7 @@ export function ItemDetailPane({
   showVersionInSourcePill = false,
   groupVersionsByEvaluator = false,
   annotatorFilterActive = false,
+  itemComments = [],
 }: {
   item: Item;
   taskType: LabellingTaskFull["type"];
@@ -1262,6 +1339,13 @@ export function ItemDetailPane({
   showVersionInSourcePill?: boolean;
   groupVersionsByEvaluator?: boolean;
   annotatorFilterActive?: boolean;
+  /** Per-annotator item-level free-text comments to surface in the
+   * results pane. Empty = no comments for this item. */
+  itemComments?: {
+    annotator_id: string;
+    annotator_name: string;
+    comment: string;
+  }[];
 }) {
   const itemPayload =
     item.payload && typeof item.payload === "object"
@@ -1295,6 +1379,7 @@ export function ItemDetailPane({
           showVersionInSourcePill={showVersionInSourcePill}
           groupVersionsByEvaluator={groupVersionsByEvaluator}
           annotatorFilterActive={annotatorFilterActive}
+          itemComments={itemComments}
         />
       </div>
     </div>
