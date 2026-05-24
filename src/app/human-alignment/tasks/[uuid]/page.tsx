@@ -1140,11 +1140,17 @@ function LabellingTaskPageInner() {
     }
     // Items exist — overview only renders the agreement panel, so if
     // there's no agreement data the overview is just an empty state.
-    // Skip straight to the items tab in that case. Wait for the
-    // agreement fetch to complete first. If the fetch errored, stay on
-    // overview so the user sees the error rather than getting silently
-    // bounced off the tab.
-    if (!agreementFetchCompleted) return;
+    // Skip straight to the items tab in that case. Wait for every
+    // overview-tab fetch to complete first so the user doesn't see a
+    // spinner→bounce flicker on slow connections. If the agreement
+    // fetch errored, stay on overview so the user sees the error rather
+    // than getting silently bounced off the tab.
+    if (
+      !agreementFetchCompleted ||
+      !summaryFetchCompleted ||
+      !runsFetchCompleted
+    )
+      return;
     if (agreementError) {
       autoTabSwitchedRef.current = true;
       return;
@@ -1164,6 +1170,8 @@ function LabellingTaskPageInner() {
     agreement,
     agreementError,
     agreementFetchCompleted,
+    summaryFetchCompleted,
+    runsFetchCompleted,
   ]);
 
   // Map item_id -> annotator uuids who have at least one labelled annotation
