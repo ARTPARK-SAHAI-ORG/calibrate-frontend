@@ -919,9 +919,12 @@ function EvaluatorsPane({
       ? (itemPayload.description as string).trim()
       : "";
   const descriptionBlock = itemDescription ? (
-    <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-      {itemDescription}
-    </p>
+    <div className="space-y-1.5">
+      <h3 className="text-sm font-semibold">Description</h3>
+      <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+        {itemDescription}
+      </p>
+    </div>
   ) : null;
 
   const trimmedComment = itemComment.trim();
