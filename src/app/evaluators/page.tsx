@@ -104,7 +104,7 @@ const EVALUATOR_TYPE_OPTIONS: {
     value: "simulation",
     title: "Simulation",
     description:
-      "Evaluate the agent's performance in an entire conversation history",
+      "Evaluate the agent's performance during a complete conversation",
   },
 ];
 
