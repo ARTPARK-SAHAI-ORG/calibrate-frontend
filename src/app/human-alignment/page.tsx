@@ -435,6 +435,45 @@ function HumanLabellingPageInner() {
   const tasksCount = tasks.length;
   const annotatorsCount = annotators.length;
 
+  /**
+   * Mirrors the `hasNoAgreementData` check inside <AgreementOverview/>: true
+   * when there are no human-human pairs and no evaluator pairs to show.
+   * Lifted here so we can auto-switch off the Overview tab when it would
+   * render an empty state.
+   */
+  const overviewIsEmpty =
+    !agreement ||
+    ((agreement.human_human?.current ?? null) == null &&
+      (agreement.human_human?.pair_count ?? 0) === 0 &&
+      (agreement.evaluators ?? []).every(
+        (e) => (e.current ?? null) == null && (e.pair_count ?? 0) === 0,
+      ));
+
+  /**
+   * On a fresh visit to `/human-alignment` (no explicit `?tab=...`), skip
+   * past an empty Overview and land on Tasks — that's where the user can
+   * actually act. Only fires once we know the overview is empty (post-fetch)
+   * and only when the user didn't deep-link into Overview.
+   */
+  const [autoSwitchedAway, setAutoSwitchedAway] = useState(false);
+  useEffect(() => {
+    if (autoSwitchedAway) return;
+    if (activeTab !== "overview") return;
+    if (!agreementFetchCompleted || agreementLoading) return;
+    if (isTab(initialTab)) return; // respect explicit ?tab= choice
+    if (!overviewIsEmpty) return;
+    setAutoSwitchedAway(true);
+    handleTabChange("tasks");
+  }, [
+    autoSwitchedAway,
+    activeTab,
+    agreementFetchCompleted,
+    agreementLoading,
+    initialTab,
+    overviewIsEmpty,
+    handleTabChange,
+  ]);
+
   return (
     <AppLayout
       activeItem="human-alignment"

@@ -96,13 +96,13 @@ const EVALUATOR_TYPE_OPTIONS: {
   },
   {
     value: "llm",
-    title: "LLM response",
+    title: "Single LLM response",
     description:
       "Given a conversation history, evaluate the agent's next response",
   },
   {
     value: "simulation",
-    title: "Simulation",
+    title: "Full conversation",
     description:
       "Evaluate the agent's performance during a complete conversation",
   },

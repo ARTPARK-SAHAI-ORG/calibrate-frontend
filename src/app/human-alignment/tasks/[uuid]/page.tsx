@@ -1611,6 +1611,23 @@ function LabellingTaskPageInner() {
   const canAddItem =
     taskType === "llm" || taskType === "simulation" || taskType === "stt";
 
+  /**
+   * Anchor for shift+click range selection — the uuid of the most
+   * recently clicked row/checkbox. Cleared if it drops out of `items`.
+   */
+  const [lastSelectedItemUuid, setLastSelectedItemUuid] = useState<
+    string | null
+  >(null);
+
+  /**
+   * `onChange` on a checkbox doesn't carry `shiftKey`, and calling
+   * `e.preventDefault()` on the checkbox's `onClick` desyncs React's
+   * controlled `checked` prop from the DOM (state updates but the visual
+   * tick doesn't appear). So we capture shift state on `mousedown` into a
+   * ref and read it inside `onChange`, leaving the native toggle alone.
+   */
+  const pendingShiftRef = useRef(false);
+
   const toggleItem = (uuid: string) => {
     setSelectedItemIds((prev) => {
       const next = new Set(prev);
@@ -1618,6 +1635,36 @@ function LabellingTaskPageInner() {
       else next.add(uuid);
       return next;
     });
+    setLastSelectedItemUuid(uuid);
+  };
+
+  /**
+   * Shift+click range selection: adds every item between the anchor
+   * (`lastSelectedItemUuid`) and `targetUuid` — inclusive, in the current
+   * sorted order — to the selection. Falls back to a plain toggle if
+   * the anchor is missing.
+   */
+  const selectRangeTo = (targetUuid: string) => {
+    if (!lastSelectedItemUuid || lastSelectedItemUuid === targetUuid) {
+      toggleItem(targetUuid);
+      return;
+    }
+    const anchorIdx = items.findIndex((i) => i.uuid === lastSelectedItemUuid);
+    const targetIdx = items.findIndex((i) => i.uuid === targetUuid);
+    if (anchorIdx === -1 || targetIdx === -1) {
+      toggleItem(targetUuid);
+      return;
+    }
+    const [start, end] =
+      anchorIdx <= targetIdx
+        ? [anchorIdx, targetIdx]
+        : [targetIdx, anchorIdx];
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      for (let i = start; i <= end; i++) next.add(items[i].uuid);
+      return next;
+    });
+    setLastSelectedItemUuid(targetUuid);
   };
 
   /**
@@ -1662,15 +1709,18 @@ function LabellingTaskPageInner() {
 
   // Drop selections that no longer exist in the items list (after delete or refetch).
   useEffect(() => {
+    const ids = new Set(items.map((i) => i.uuid));
     setSelectedItemIds((prev) => {
       if (prev.size === 0) return prev;
-      const ids = new Set(items.map((i) => i.uuid));
       const next = new Set<string>();
       prev.forEach((id) => {
         if (ids.has(id)) next.add(id);
       });
       return next.size === prev.size ? prev : next;
     });
+    setLastSelectedItemUuid((prev) =>
+      prev && !ids.has(prev) ? null : prev,
+    );
   }, [items]);
 
   const toggleJob = (jobUuid: string) => {
@@ -2858,7 +2908,7 @@ function LabellingTaskPageInner() {
                       }}
                       onChange={toggleSelectAll}
                       aria-label="Select all"
-                      className="w-4 h-4 cursor-pointer accent-foreground"
+                      className="w-5 h-5 cursor-pointer accent-foreground"
                     />
                     <div className="text-sm font-medium text-muted-foreground">
                       Name
@@ -2901,7 +2951,19 @@ function LabellingTaskPageInner() {
                     return (
                       <Fragment key={item.uuid}>
                         <div
-                          onClick={() => openItemDetail(item.uuid)}
+                          onMouseDown={(e) => {
+                            // Shift+click on text triggers a browser text-selection
+                            // range; suppress it so range-selecting rows stays clean.
+                            if (e.shiftKey) e.preventDefault();
+                          }}
+                          onClick={(e) => {
+                            if (e.shiftKey) {
+                              e.preventDefault();
+                              selectRangeTo(item.uuid);
+                              return;
+                            }
+                            openItemDetail(item.uuid);
+                          }}
                           className={`grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
                             isSelected ? "bg-muted/30" : "hover:bg-muted/20"
                           }`}
@@ -2909,10 +2971,20 @@ function LabellingTaskPageInner() {
                           <input
                             type="checkbox"
                             checked={isSelected}
-                            onChange={() => toggleItem(item.uuid)}
+                            onMouseDown={(e) => {
+                              pendingShiftRef.current = e.shiftKey;
+                            }}
+                            onChange={() => {
+                              if (pendingShiftRef.current) {
+                                selectRangeTo(item.uuid);
+                              } else {
+                                toggleItem(item.uuid);
+                              }
+                              pendingShiftRef.current = false;
+                            }}
                             onClick={(e) => e.stopPropagation()}
                             aria-label={`Select item ${item.id}`}
-                            className="w-4 h-4 cursor-pointer accent-foreground"
+                            className="w-5 h-5 cursor-pointer accent-foreground"
                           />
                           <p className="text-sm text-foreground line-clamp-2">
                             {name || "—"}
@@ -2981,7 +3053,7 @@ function LabellingTaskPageInner() {
                       }}
                       onChange={toggleSelectAll}
                       aria-label="Select all"
-                      className="w-4 h-4 cursor-pointer accent-foreground"
+                      className="w-5 h-5 cursor-pointer accent-foreground"
                     />
                     <div className="text-sm font-medium text-muted-foreground">
                       Name
@@ -3020,7 +3092,19 @@ function LabellingTaskPageInner() {
                     return (
                       <Fragment key={item.uuid}>
                         <div
-                          onClick={() => openItemDetail(item.uuid)}
+                          onMouseDown={(e) => {
+                            // Shift+click on text triggers a browser text-selection
+                            // range; suppress it so range-selecting rows stays clean.
+                            if (e.shiftKey) e.preventDefault();
+                          }}
+                          onClick={(e) => {
+                            if (e.shiftKey) {
+                              e.preventDefault();
+                              selectRangeTo(item.uuid);
+                              return;
+                            }
+                            openItemDetail(item.uuid);
+                          }}
                           className={`grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_200px_180px_300px] gap-6 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
                             isSelected ? "bg-muted/30" : "hover:bg-muted/20"
                           }`}
@@ -3028,10 +3112,20 @@ function LabellingTaskPageInner() {
                           <input
                             type="checkbox"
                             checked={isSelected}
-                            onChange={() => toggleItem(item.uuid)}
+                            onMouseDown={(e) => {
+                              pendingShiftRef.current = e.shiftKey;
+                            }}
+                            onChange={() => {
+                              if (pendingShiftRef.current) {
+                                selectRangeTo(item.uuid);
+                              } else {
+                                toggleItem(item.uuid);
+                              }
+                              pendingShiftRef.current = false;
+                            }}
                             onClick={(e) => e.stopPropagation()}
                             aria-label={`Select item ${item.id}`}
-                            className="w-4 h-4 cursor-pointer accent-foreground"
+                            className="w-5 h-5 cursor-pointer accent-foreground"
                           />
                           <p className="text-sm text-foreground line-clamp-1">
                             {previewItemPayload(item.payload, taskType)}
