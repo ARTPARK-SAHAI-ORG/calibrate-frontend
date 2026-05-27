@@ -2970,27 +2970,43 @@ function LabellingTaskPageInner() {
                 <div className="flex items-center gap-3">
                   <label className="flex items-center gap-2">
                     <span>Per page</span>
-                    <select
-                      value={itemsLimit}
-                      onChange={(e) => {
-                        const next = Number(e.target.value);
-                        if (typeof window !== "undefined") {
-                          window.localStorage.setItem(
-                            ITEMS_PAGE_SIZE_KEY,
-                            String(next),
-                          );
-                        }
-                        setItemsLimit(next);
-                        setItemsOffset(0);
-                      }}
-                      className="h-8 pl-2 pr-7 rounded-md border border-border bg-background text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
-                    >
-                      {ITEMS_PAGE_SIZE_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <select
+                        value={itemsLimit}
+                        onChange={(e) => {
+                          const next = Number(e.target.value);
+                          if (typeof window !== "undefined") {
+                            window.localStorage.setItem(
+                              ITEMS_PAGE_SIZE_KEY,
+                              String(next),
+                            );
+                          }
+                          setItemsLimit(next);
+                          setItemsOffset(0);
+                        }}
+                        className="h-8 pl-3 pr-8 appearance-none rounded-md border border-border bg-background text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        {ITEMS_PAGE_SIZE_OPTIONS.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                      <svg
+                        className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </div>
                   </label>
                   <div className="flex items-center gap-1">
                     <button
