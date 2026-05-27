@@ -2618,10 +2618,12 @@ function LabellingTaskPageInner() {
                     getRows={async () => {
                       // Pagination is in effect on the items tab, so
                       // `items` / `taskSummary.rows` are page-sized.
-                      // Pull every item in the task (ignoring the active
-                      // search) before building the CSV: first ask the
-                      // backend for the total, then re-fetch with
-                      // limit=total so every item lands in one response.
+                      // Re-fetch with limit=<full task total> (already
+                      // in hand from task.item_count / the displayed
+                      // "N–M of T" readout) so every item in the task
+                      // lands in one response. We deliberately ignore
+                      // the active search so the CSV always reflects
+                      // the whole task.
                       // NB: the backend's /summary endpoint currently
                       // caps `limit` at 200 (see PR #60); tasks larger
                       // than that will need that cap raised before this
@@ -2629,17 +2631,10 @@ function LabellingTaskPageInner() {
                       if (!accessToken || !uuid) {
                         return { columns: [], rows: [] };
                       }
-                      const peekParams = new URLSearchParams({
-                        limit: "1",
-                        offset: "0",
-                        sort_by: "updated_at",
-                        order: itemsSort,
-                      });
-                      const peek = await apiClient<TaskSummaryResponse>(
-                        `/annotation-tasks/${uuid}/summary?${peekParams.toString()}`,
-                        accessToken,
-                      );
-                      const total = peek.pagination?.total ?? items.length;
+                      const total =
+                        task?.item_count ??
+                        taskSummary?.pagination?.total ??
+                        items.length;
                       if (total === 0) return { columns: [], rows: [] };
                       const fullParams = new URLSearchParams({
                         limit: String(total),
