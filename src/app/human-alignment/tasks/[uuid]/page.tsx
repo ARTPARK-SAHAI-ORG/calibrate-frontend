@@ -3528,11 +3528,10 @@ function LabellingTaskPageInner() {
             scale_max: typeof e.scale_max === "number" ? e.scale_max : null,
           }))}
           onClose={() => setBulkUploadSimulationOpen(false)}
-          onSuccess={async (count, withAnnotations) => {
+          onSuccess={async (count) => {
             setBulkUploadSimulationOpen(false);
             handleTabChange("items");
             await Promise.all([fetchTask(), fetchTaskSummary()]);
-            void withAnnotations;
             toast.success(`Added ${count} ${count === 1 ? "item" : "items"}`);
           }}
         />
@@ -3553,11 +3552,10 @@ function LabellingTaskPageInner() {
             scale_max: typeof e.scale_max === "number" ? e.scale_max : null,
           }))}
           onClose={() => setBulkUploadLlmOpen(false)}
-          onSuccess={async (count, withAnnotations) => {
+          onSuccess={async (count) => {
             setBulkUploadLlmOpen(false);
             handleTabChange("items");
             await Promise.all([fetchTask(), fetchTaskSummary()]);
-            void withAnnotations;
             toast.success(`Added ${count} ${count === 1 ? "item" : "items"}`);
           }}
         />
