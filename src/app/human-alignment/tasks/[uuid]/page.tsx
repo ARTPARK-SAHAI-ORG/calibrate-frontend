@@ -1364,6 +1364,7 @@ function LabellingTaskPageInner() {
     setRunsListEvaluators([]);
     setRunsFetchCompleted(false);
     setTaskSummary(null);
+    setTaskSummaryError(null);
     setSummaryFetchCompleted(false);
     setItemsOffset(0);
     setItemsSearch("");
@@ -1400,7 +1401,9 @@ function LabellingTaskPageInner() {
   const [taskSummary, setTaskSummary] = useState<TaskSummaryResponse | null>(
     null,
   );
-  const [, setTaskSummaryError] = useState<string | null>(null);
+  const [taskSummaryError, setTaskSummaryError] = useState<string | null>(
+    null,
+  );
   const [summaryLoading, setSummaryLoading] = useState(false);
   /** False until the first summary fetch for this task completes (so the
    * Items tab's "Labelled by" column doesn't flash "—" before populating). */
@@ -2559,6 +2562,58 @@ function LabellingTaskPageInner() {
           ) : itemsError ? (
             <div className="rounded-md border border-border bg-muted/20 p-4 text-sm text-red-500">
               {itemsError}
+            </div>
+          ) : taskSummaryError ? (
+            // The task fetch succeeded but the summary fetch (which
+            // drives the items list) failed — surface the error and a
+            // retry button instead of silently rendering an empty page.
+            <div className="rounded-md border border-border bg-muted/20 p-4 text-sm flex flex-wrap items-center justify-between gap-3">
+              <span className="text-red-500">{taskSummaryError}</span>
+              <button
+                type="button"
+                onClick={() => fetchTaskSummary()}
+                disabled={summaryLoading}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {summaryLoading ? (
+                  <svg
+                    className="w-3.5 h-3.5 animate-spin"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    className="w-3.5 h-3.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M4 4v6h6M20 20v-6h-6M5.5 9A7 7 0 0119 13M18.5 15A7 7 0 015 11"
+                    />
+                  </svg>
+                )}
+                Retry
+              </button>
             </div>
           ) : !hasAnyItems ? (
             <EmptyState
