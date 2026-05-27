@@ -2614,8 +2614,82 @@ function LabellingTaskPageInner() {
                     filename={`${sanitizeCsvName(task?.name ?? "labelling-task")}-items`}
                     label="Export CSV"
                     variant="neutral"
-                    disabled={summaryLoading || !taskSummary}
-                    getRows={() => buildItemsCsv(items, taskSummary, taskType)}
+                    disabled={!taskSummary || !accessToken}
+                    getRows={async () => {
+                      // Pagination is in effect on the items tab, so
+                      // `items` / `taskSummary.rows` are page-sized.
+                      // Pull every item in the task (ignoring the active
+                      // search) before building the CSV, batching at the
+                      // backend's max page size (200) so tasks with more
+                      // items still export in full.
+                      if (!accessToken || !uuid) {
+                        return { columns: [], rows: [] };
+                      }
+                      const BATCH = 200;
+                      const seen = new Set<string>();
+                      const allItems: LabellingItem[] = [];
+                      const allRows: SummaryRow[] = [];
+                      let lastSummary: TaskSummaryResponse | null = null;
+                      let offset = 0;
+                      // Hard cap on batches to avoid an infinite loop if
+                      // pagination metadata goes missing — 200 batches *
+                      // 200 items = 40k items, well past the suggested
+                      // pagination scale.
+                      for (let i = 0; i < 200; i++) {
+                        const params = new URLSearchParams({
+                          limit: String(BATCH),
+                          offset: String(offset),
+                          sort_by: "updated_at",
+                          order: itemsSort,
+                        });
+                        const batch = await apiClient<TaskSummaryResponse>(
+                          `/annotation-tasks/${uuid}/summary?${params.toString()}`,
+                          accessToken,
+                        );
+                        lastSummary = batch;
+                        for (const row of batch.rows ?? []) {
+                          allRows.push(row);
+                          if (seen.has(row.item_id)) continue;
+                          seen.add(row.item_id);
+                          const meta = itemMetaByUuid.get(row.item_id);
+                          allItems.push(
+                            meta
+                              ? { ...meta, payload: row.payload ?? meta.payload }
+                              : {
+                                  id: 0,
+                                  uuid: row.item_id,
+                                  task_id: batch.task_id,
+                                  payload: row.payload,
+                                  created_at: "",
+                                  updated_at: undefined,
+                                  deleted_at: null,
+                                },
+                          );
+                        }
+                        const total = batch.pagination?.total;
+                        // Stop when we've covered the reported total, or
+                        // when the API returned fewer rows than asked
+                        // for (older / unpaginated responses).
+                        if (total != null) {
+                          if (seen.size >= total) break;
+                        } else if ((batch.rows?.length ?? 0) < BATCH) {
+                          break;
+                        }
+                        offset += BATCH;
+                      }
+                      if (!lastSummary) {
+                        return { columns: [], rows: [] };
+                      }
+                      // buildItemsCsv reads taskSummary.rows /
+                      // .evaluators / .annotators — splice in the
+                      // unioned rows so per-item annotations on every
+                      // batch reach the CSV.
+                      const fullSummary: TaskSummaryResponse = {
+                        ...lastSummary,
+                        rows: allRows,
+                      };
+                      return buildItemsCsv(allItems, fullSummary, taskType);
+                    }}
                   />
                 </div>
               </div>
