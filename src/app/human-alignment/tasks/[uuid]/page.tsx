@@ -142,6 +142,11 @@ type TaskSummaryResponse = {
 const ITEMS_PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 const ITEMS_PAGE_SIZE_KEY = "calibrate:items-page-size";
 const ITEMS_SORT_KEY = "calibrate:items-sort-updated-at";
+/** Per-batch page size used by "Export CSV" to pull the full task
+ * scope. Matches the backend `/summary` endpoint's current `limit`
+ * cap; if a task ever exceeds this, the export loops to drain the
+ * remaining batches. */
+const ITEMS_EXPORT_BATCH_SIZE = 1_000_000;
 
 const TABS: Tab[] = ["overview", "items", "jobs", "runs"];
 
@@ -2618,16 +2623,15 @@ function LabellingTaskPageInner() {
                     getRows={async () => {
                       // Pagination is in effect on the items tab, so
                       // `items` / `taskSummary.rows` are page-sized.
-                      // Re-fetch with limit=<full task total> (already
-                      // in hand from task.item_count / the displayed
-                      // "N–M of T" readout) so every item in the task
-                      // lands in one response. We deliberately ignore
-                      // the active search so the CSV always reflects
-                      // the whole task.
-                      // NB: the backend's /summary endpoint currently
-                      // caps `limit` at 200 (see PR #60); tasks larger
-                      // than that will need that cap raised before this
-                      // export covers the full set in one shot.
+                      // Pull every item in the task (ignoring the
+                      // active search) before building the CSV.
+                      //
+                      // The backend's /summary `limit` is already very
+                      // generous (1M) so almost every task drains in a
+                      // single request — but we still loop with a
+                      // configurable batch size so a hypothetical task
+                      // past that ceiling can still be exported in
+                      // full.
                       if (!accessToken || !uuid) {
                         return { columns: [], rows: [] };
                       }
@@ -2636,40 +2640,74 @@ function LabellingTaskPageInner() {
                         taskSummary?.pagination?.total ??
                         items.length;
                       if (total === 0) return { columns: [], rows: [] };
-                      const fullParams = new URLSearchParams({
-                        limit: String(total),
-                        offset: "0",
-                        sort_by: "updated_at",
-                        order: itemsSort,
-                      });
-                      const fullSummary = await apiClient<TaskSummaryResponse>(
-                        `/annotation-tasks/${uuid}/summary?${fullParams.toString()}`,
-                        accessToken,
-                      );
-                      // Mirror the visible-items derivation: unique
-                      // summary rows by item_id (preserving order) and
-                      // hydrate from task.items where available so
-                      // created_at / updated_at land in the CSV too.
                       const seen = new Set<string>();
                       const allItems: LabellingItem[] = [];
-                      for (const row of fullSummary.rows ?? []) {
-                        if (seen.has(row.item_id)) continue;
-                        seen.add(row.item_id);
-                        const meta = itemMetaByUuid.get(row.item_id);
-                        allItems.push(
-                          meta
-                            ? { ...meta, payload: row.payload ?? meta.payload }
-                            : {
-                                id: 0,
-                                uuid: row.item_id,
-                                task_id: fullSummary.task_id,
-                                payload: row.payload,
-                                created_at: "",
-                                updated_at: undefined,
-                                deleted_at: null,
-                              },
+                      const allRows: SummaryRow[] = [];
+                      let lastSummary: TaskSummaryResponse | null = null;
+                      let offset = 0;
+                      // Cap iterations defensively in case
+                      // pagination.total ever disagrees with how many
+                      // items the API actually returns.
+                      const maxIterations = Math.max(
+                        1,
+                        Math.ceil(total / ITEMS_EXPORT_BATCH_SIZE) + 1,
+                      );
+                      for (let i = 0; i < maxIterations; i++) {
+                        const params = new URLSearchParams({
+                          limit: String(ITEMS_EXPORT_BATCH_SIZE),
+                          offset: String(offset),
+                          sort_by: "updated_at",
+                          order: itemsSort,
+                        });
+                        const batch = await apiClient<TaskSummaryResponse>(
+                          `/annotation-tasks/${uuid}/summary?${params.toString()}`,
+                          accessToken,
                         );
+                        lastSummary = batch;
+                        for (const row of batch.rows ?? []) {
+                          allRows.push(row);
+                          if (seen.has(row.item_id)) continue;
+                          seen.add(row.item_id);
+                          const meta = itemMetaByUuid.get(row.item_id);
+                          allItems.push(
+                            meta
+                              ? { ...meta, payload: row.payload ?? meta.payload }
+                              : {
+                                  id: 0,
+                                  uuid: row.item_id,
+                                  task_id: batch.task_id,
+                                  payload: row.payload,
+                                  created_at: "",
+                                  updated_at: undefined,
+                                  deleted_at: null,
+                                },
+                          );
+                        }
+                        const batchTotal = batch.pagination?.total;
+                        // Stop when we've covered the backend-reported
+                        // total, or when the response held fewer rows
+                        // than the requested batch (e.g. older /
+                        // unpaginated server, or task shrank mid-loop).
+                        if (batchTotal != null) {
+                          if (seen.size >= batchTotal) break;
+                        } else if (
+                          (batch.rows?.length ?? 0) < ITEMS_EXPORT_BATCH_SIZE
+                        ) {
+                          break;
+                        }
+                        offset += ITEMS_EXPORT_BATCH_SIZE;
                       }
+                      if (!lastSummary) {
+                        return { columns: [], rows: [] };
+                      }
+                      // buildItemsCsv reads from taskSummary.rows /
+                      // .evaluators / .annotators — splice the unioned
+                      // rows back in so per-item annotations from every
+                      // batch reach the CSV.
+                      const fullSummary: TaskSummaryResponse = {
+                        ...lastSummary,
+                        rows: allRows,
+                      };
                       return buildItemsCsv(allItems, fullSummary, taskType);
                     }}
                   />
