@@ -2942,7 +2942,10 @@ function LabellingTaskPageInner() {
                   })}
                 </div>
               )}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-sm text-muted-foreground">
+              {/* Bottom padding clears the fixed Talk-to-us FAB
+                  (bottom-6 right-6) so the prev/next controls stay
+                  visible when the user scrolls to the bottom. */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1 pb-20 text-sm text-muted-foreground">
                 <div>
                   {itemsTotal === 0 ? (
                     "0 items"
