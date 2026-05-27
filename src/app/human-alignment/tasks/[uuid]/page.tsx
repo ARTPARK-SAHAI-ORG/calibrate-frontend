@@ -2983,7 +2983,7 @@ function LabellingTaskPageInner() {
                         setItemsLimit(next);
                         setItemsOffset(0);
                       }}
-                      className="h-8 px-2 rounded-md border border-border bg-background text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
+                      className="h-8 pl-2 pr-7 rounded-md border border-border bg-background text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
                     >
                       {ITEMS_PAGE_SIZE_OPTIONS.map((opt) => (
                         <option key={opt} value={opt}>
