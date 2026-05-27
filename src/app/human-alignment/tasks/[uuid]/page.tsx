@@ -130,7 +130,23 @@ type TaskSummaryResponse = {
    * `evaluator_id IS NULL` annotation slot. Items / annotators
    * without a non-empty comment don't appear. */
   item_comments?: { [item_id: string]: { [annotator_uuid: string]: string } };
+  /** Item-level pagination metadata. `total` counts items in scope
+   * (narrowed by `q` / `item_id`), not row count. */
+  pagination?: {
+    total: number;
+    limit: number;
+    offset: number;
+  };
 };
+
+const ITEMS_PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
+const ITEMS_PAGE_SIZE_KEY = "calibrate:items-page-size";
+const ITEMS_SORT_KEY = "calibrate:items-sort-updated-at";
+/** Per-batch page size used by "Export CSV" to pull the full task
+ * scope. Matches the backend `/summary` endpoint's current `limit`
+ * cap; if a task ever exceeds this, the export loops to drain the
+ * remaining batches. */
+const ITEMS_EXPORT_BATCH_SIZE = 1_000_000;
 
 const TABS: Tab[] = ["overview", "items", "jobs", "runs"];
 
@@ -1214,29 +1230,52 @@ function LabellingTaskPageInner() {
   const [savingLlmItem, setSavingLlmItem] = useState(false);
   const [editLlmError, setEditLlmError] = useState<string | null>(null);
 
-  // Sort direction for the items table's Updated at column. Persisted in
-  // localStorage so the user's choice carries across visits. `null` means
-  // no explicit sort — fall back to the API's default order.
-  const [itemsSort, setItemsSort] = useState<"asc" | "desc" | null>(null);
+  // Sort direction for the items table's Updated at column. Always
+  // applied to `updated_at` on the backend; defaults to desc (newest
+  // first). Persisted so the user's choice carries across visits.
+  const [itemsSort, setItemsSort] = useState<"asc" | "desc">("desc");
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(
-      "calibrate:items-sort-updated-at",
-    );
+    const stored = window.localStorage.getItem(ITEMS_SORT_KEY);
     if (stored === "asc" || stored === "desc") setItemsSort(stored);
   }, []);
   const toggleItemsSort = () => {
     setItemsSort((prev) => {
       const next = prev === "desc" ? "asc" : "desc";
       if (typeof window !== "undefined") {
-        window.localStorage.setItem(
-          "calibrate:items-sort-updated-at",
-          next,
-        );
+        window.localStorage.setItem(ITEMS_SORT_KEY, next);
       }
       return next;
     });
   };
+
+  // Server-side pagination / search for the items tab — driven by the
+  // /summary endpoint's new params (PR #60). Limit is persisted so the
+  // user's preferred page size sticks across visits; offset and search
+  // are session-scoped.
+  const [itemsLimit, setItemsLimit] = useState<number>(50);
+  const [itemsOffset, setItemsOffset] = useState<number>(0);
+  const [itemsSearchInput, setItemsSearchInput] = useState<string>("");
+  const [itemsSearch, setItemsSearch] = useState<string>("");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(ITEMS_PAGE_SIZE_KEY);
+    const parsed = stored ? Number(stored) : NaN;
+    if (
+      Number.isFinite(parsed) &&
+      (ITEMS_PAGE_SIZE_OPTIONS as readonly number[]).includes(parsed)
+    ) {
+      setItemsLimit(parsed);
+    }
+  }, []);
+  // Debounce the search input so we don't hammer the API on every keystroke.
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setItemsSearch(itemsSearchInput);
+      setItemsOffset(0);
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [itemsSearchInput]);
 
   useEffect(() => {
     if (task?.name) document.title = `${task.name} | Calibrate`;
@@ -1325,7 +1364,11 @@ function LabellingTaskPageInner() {
     setRunsListEvaluators([]);
     setRunsFetchCompleted(false);
     setTaskSummary(null);
+    setTaskSummaryError(null);
     setSummaryFetchCompleted(false);
+    setItemsOffset(0);
+    setItemsSearch("");
+    setItemsSearchInput("");
     autoTabSwitchedRef.current = false;
   }, [uuid]);
 
@@ -1358,7 +1401,9 @@ function LabellingTaskPageInner() {
   const [taskSummary, setTaskSummary] = useState<TaskSummaryResponse | null>(
     null,
   );
-  const [, setTaskSummaryError] = useState<string | null>(null);
+  const [taskSummaryError, setTaskSummaryError] = useState<string | null>(
+    null,
+  );
   const [summaryLoading, setSummaryLoading] = useState(false);
   /** False until the first summary fetch for this task completes (so the
    * Items tab's "Labelled by" column doesn't flash "—" before populating). */
@@ -1368,9 +1413,16 @@ function LabellingTaskPageInner() {
     if (!accessToken || !uuid) return;
     setTaskSummaryError(null);
     setSummaryLoading(true);
+    const params = new URLSearchParams({
+      limit: String(itemsLimit),
+      offset: String(itemsOffset),
+      sort_by: "updated_at",
+      order: itemsSort,
+    });
+    if (itemsSearch) params.set("q", itemsSearch);
     try {
       const data = await apiClient<TaskSummaryResponse>(
-        `/annotation-tasks/${uuid}/summary`,
+        `/annotation-tasks/${uuid}/summary?${params.toString()}`,
         accessToken,
       );
       setTaskSummary(data);
@@ -1380,11 +1432,26 @@ function LabellingTaskPageInner() {
       setSummaryLoading(false);
       setSummaryFetchCompleted(true);
     }
-  }, [accessToken, uuid]);
+  }, [accessToken, uuid, itemsLimit, itemsOffset, itemsSort, itemsSearch]);
 
   useEffect(() => {
     fetchTaskSummary();
   }, [fetchTaskSummary]);
+
+  // Snap offset back into range after the summary returns — covers
+  // deletes that shrink the result set below the current offset, or a
+  // search that narrows total below offset.
+  useEffect(() => {
+    const total = taskSummary?.pagination?.total;
+    if (total == null) return;
+    if (itemsOffset > 0 && itemsOffset >= total) {
+      const lastPageOffset = Math.max(
+        0,
+        (Math.ceil(total / itemsLimit) - 1) * itemsLimit,
+      );
+      setItemsOffset(lastPageOffset);
+    }
+  }, [taskSummary, itemsOffset, itemsLimit]);
 
   useEffect(() => {
     if (autoTabSwitchedRef.current) return;
@@ -1393,7 +1460,8 @@ function LabellingTaskPageInner() {
       autoTabSwitchedRef.current = true;
       return; // user pinned a tab via URL
     }
-    if ((task.items?.length ?? 0) === 0) {
+    const taskItemCount = task.item_count ?? task.items?.length ?? 0;
+    if (taskItemCount === 0) {
       autoTabSwitchedRef.current = true;
       handleTabChange("items");
       return;
@@ -1481,26 +1549,63 @@ function LabellingTaskPageInner() {
   }, [fetchRuns]);
   void activeTab;
 
-  const rawItems = task?.items ?? [];
-  const items = itemsSort
-    ? [...rawItems].sort((a, b) => {
-        const av = a.updated_at ?? a.created_at ?? "";
-        const bv = b.updated_at ?? b.created_at ?? "";
-        if (av === bv) return 0;
-        return itemsSort === "asc"
-          ? av < bv
-            ? -1
-            : 1
-          : av < bv
-            ? 1
-            : -1;
-      })
-    : rawItems;
+  // Items shown on the current page are driven by the (paginated /
+  // sorted / searched) summary endpoint. We unique summary rows by
+  // item_id (each item explodes into one row per evaluator × version
+  // slot) preserving the API-returned order, then hydrate per-item
+  // metadata (id, created_at, updated_at) from the full task.items
+  // lookup. Items that are in the summary but missing from task.items
+  // still render — payload + uuid come from the summary row.
+  const itemMetaByUuid = useMemo(() => {
+    const map = new Map<string, LabellingItem>();
+    for (const it of task?.items ?? []) map.set(it.uuid, it);
+    return map;
+  }, [task?.items]);
+  const items = useMemo<LabellingItem[]>(() => {
+    if (!taskSummary) return [];
+    const seen = new Set<string>();
+    const out: LabellingItem[] = [];
+    for (const row of taskSummary.rows ?? []) {
+      if (seen.has(row.item_id)) continue;
+      seen.add(row.item_id);
+      const meta = itemMetaByUuid.get(row.item_id);
+      out.push(
+        meta
+          ? { ...meta, payload: row.payload ?? meta.payload }
+          : {
+              id: 0,
+              uuid: row.item_id,
+              task_id: taskSummary.task_id,
+              payload: row.payload,
+              created_at: "",
+              updated_at: undefined,
+              deleted_at: null,
+            },
+      );
+    }
+    return out;
+  }, [taskSummary, itemMetaByUuid]);
   const jobs = task?.jobs ?? [];
-  const itemsLoading =
-    loading || !taskFetchCompleted || summaryLoading || !summaryFetchCompleted;
+  // First-load spinner only — paginated refetches keep the table
+  // visible and surface their loading state via the refresh button.
+  const itemsLoading = !taskFetchCompleted || !summaryFetchCompleted;
   const itemsError = error;
-  const itemsCount = items.length || task?.item_count || 0;
+  const itemsTotal =
+    taskSummary?.pagination?.total ?? task?.item_count ?? items.length;
+  const itemsCount = itemsTotal;
+  const itemsPageCount =
+    itemsLimit > 0 ? Math.max(1, Math.ceil(itemsTotal / itemsLimit)) : 1;
+  const itemsCurrentPage =
+    itemsLimit > 0 ? Math.floor(itemsOffset / itemsLimit) + 1 : 1;
+  const itemsRangeStart = itemsTotal === 0 ? 0 : itemsOffset + 1;
+  const itemsRangeEnd = Math.min(itemsOffset + items.length, itemsTotal);
+  /** True when the task itself has any items (regardless of the
+   * current search). Used to distinguish the "no items yet" empty state
+   * from the "no search matches" state. */
+  const hasAnyItems =
+    (task?.item_count ?? 0) > 0 ||
+    (taskSummary?.pagination?.total ?? 0) > 0 ||
+    (itemsSearch ? false : items.length > 0);
   const jobsCount = jobs.length;
   const taskType = task?.type ?? task?.evaluators?.[0]?.evaluator_type;
   const canAddItem =
@@ -1708,7 +1813,7 @@ function LabellingTaskPageInner() {
         return next;
       });
       setDeletingOneUuid(null);
-      await fetchTask();
+      await Promise.all([fetchTask(), fetchTaskSummary()]);
     } catch (err) {
       setError(parseApiError(err, "Failed to delete item"));
     } finally {
@@ -1776,7 +1881,7 @@ function LabellingTaskPageInner() {
       );
       setDeleteSelectedOpen(false);
       setSelectedItemIds(new Set());
-      await fetchTask();
+      await Promise.all([fetchTask(), fetchTaskSummary()]);
     } catch (err) {
       setError(parseApiError(err, "Failed to delete items"));
     } finally {
@@ -2458,7 +2563,59 @@ function LabellingTaskPageInner() {
             <div className="rounded-md border border-border bg-muted/20 p-4 text-sm text-red-500">
               {itemsError}
             </div>
-          ) : items.length === 0 ? (
+          ) : taskSummaryError ? (
+            // The task fetch succeeded but the summary fetch (which
+            // drives the items list) failed — surface the error and a
+            // retry button instead of silently rendering an empty page.
+            <div className="rounded-md border border-border bg-muted/20 p-4 text-sm flex flex-wrap items-center justify-between gap-3">
+              <span className="text-red-500">{taskSummaryError}</span>
+              <button
+                type="button"
+                onClick={() => fetchTaskSummary()}
+                disabled={summaryLoading}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {summaryLoading ? (
+                  <svg
+                    className="w-3.5 h-3.5 animate-spin"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    className="w-3.5 h-3.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M4 4v6h6M20 20v-6h-6M5.5 9A7 7 0 0119 13M18.5 15A7 7 0 015 11"
+                    />
+                  </svg>
+                )}
+                Retry
+              </button>
+            </div>
+          ) : !hasAnyItems ? (
             <EmptyState
               icon={
                 <svg
@@ -2480,21 +2637,136 @@ function LabellingTaskPageInner() {
             />
           ) : (
             <div ref={itemsSectionTopRef} className="space-y-3 scroll-mt-4">
-              <div className="flex items-center justify-end gap-2">
-                <RefreshButton
-                  loading={loading || summaryLoading}
-                  onClick={() => {
-                    fetchTask();
-                    fetchTaskSummary();
-                  }}
-                />
-                <ExportResultsButton
-                  filename={`${sanitizeCsvName(task?.name ?? "labelling-task")}-items`}
-                  label="Export CSV"
-                  variant="neutral"
-                  disabled={summaryLoading || !taskSummary}
-                  getRows={() => buildItemsCsv(items, taskSummary, taskType)}
-                />
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="relative flex-1 min-w-[200px] max-w-sm">
+                  <svg
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z"
+                    />
+                  </svg>
+                  <input
+                    type="search"
+                    value={itemsSearchInput}
+                    onChange={(e) => setItemsSearchInput(e.target.value)}
+                    placeholder="Search by name"
+                    aria-label="Search items by name"
+                    className="h-9 w-full pl-8 pr-3 rounded-md border border-border bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <RefreshButton
+                    loading={loading || summaryLoading}
+                    onClick={() => {
+                      fetchTask();
+                      fetchTaskSummary();
+                    }}
+                  />
+                  <ExportResultsButton
+                    filename={`${sanitizeCsvName(task?.name ?? "labelling-task")}-items`}
+                    label="Export CSV"
+                    variant="neutral"
+                    disabled={!taskSummary || !accessToken}
+                    getRows={async () => {
+                      // Pagination is in effect on the items tab, so
+                      // `items` / `taskSummary.rows` are page-sized.
+                      // Pull every item in the task (ignoring the
+                      // active search) before building the CSV.
+                      //
+                      // The backend's /summary `limit` is already very
+                      // generous (1M) so almost every task drains in a
+                      // single request — but we still loop with a
+                      // configurable batch size so a hypothetical task
+                      // past that ceiling can still be exported in
+                      // full.
+                      if (!accessToken || !uuid) {
+                        return { columns: [], rows: [] };
+                      }
+                      const total =
+                        task?.item_count ??
+                        taskSummary?.pagination?.total ??
+                        items.length;
+                      if (total === 0) return { columns: [], rows: [] };
+                      const seen = new Set<string>();
+                      const allItems: LabellingItem[] = [];
+                      const allRows: SummaryRow[] = [];
+                      let lastSummary: TaskSummaryResponse | null = null;
+                      let offset = 0;
+                      // Cap iterations defensively in case
+                      // pagination.total ever disagrees with how many
+                      // items the API actually returns.
+                      const maxIterations = Math.max(
+                        1,
+                        Math.ceil(total / ITEMS_EXPORT_BATCH_SIZE) + 1,
+                      );
+                      for (let i = 0; i < maxIterations; i++) {
+                        const params = new URLSearchParams({
+                          limit: String(ITEMS_EXPORT_BATCH_SIZE),
+                          offset: String(offset),
+                          sort_by: "updated_at",
+                          order: itemsSort,
+                        });
+                        const batch = await apiClient<TaskSummaryResponse>(
+                          `/annotation-tasks/${uuid}/summary?${params.toString()}`,
+                          accessToken,
+                        );
+                        lastSummary = batch;
+                        for (const row of batch.rows ?? []) {
+                          allRows.push(row);
+                          if (seen.has(row.item_id)) continue;
+                          seen.add(row.item_id);
+                          const meta = itemMetaByUuid.get(row.item_id);
+                          allItems.push(
+                            meta
+                              ? { ...meta, payload: row.payload ?? meta.payload }
+                              : {
+                                  id: 0,
+                                  uuid: row.item_id,
+                                  task_id: batch.task_id,
+                                  payload: row.payload,
+                                  created_at: "",
+                                  updated_at: undefined,
+                                  deleted_at: null,
+                                },
+                          );
+                        }
+                        const batchTotal = batch.pagination?.total;
+                        // Stop when we've covered the backend-reported
+                        // total, or when the response held fewer rows
+                        // than the requested batch (e.g. older /
+                        // unpaginated server, or task shrank mid-loop).
+                        if (batchTotal != null) {
+                          if (seen.size >= batchTotal) break;
+                        } else if (
+                          (batch.rows?.length ?? 0) < ITEMS_EXPORT_BATCH_SIZE
+                        ) {
+                          break;
+                        }
+                        offset += ITEMS_EXPORT_BATCH_SIZE;
+                      }
+                      if (!lastSummary) {
+                        return { columns: [], rows: [] };
+                      }
+                      // buildItemsCsv reads from taskSummary.rows /
+                      // .evaluators / .annotators — splice the unioned
+                      // rows back in so per-item annotations from every
+                      // batch reach the CSV.
+                      const fullSummary: TaskSummaryResponse = {
+                        ...lastSummary,
+                        rows: allRows,
+                      };
+                      return buildItemsCsv(allItems, fullSummary, taskType);
+                    }}
+                  />
+                </div>
               </div>
               {/* Bulk-action toolbar (shown when at least one row is selected) */}
               {selectedItemIds.size > 0 && (
@@ -2518,11 +2790,16 @@ function LabellingTaskPageInner() {
                     </button>
                     <button
                       onClick={() => {
-                        const totalItems = items.length;
                         const selected = Array.from(selectedItemIds);
-                        // Omit item_ids when every item is selected; otherwise
-                        // send the explicit subset.
-                        if (totalItems > 0 && selected.length === totalItems) {
+                        // Omit item_ids when every item in the entire
+                        // task is selected (selection is page-scoped, so
+                        // we only hit this when the task has ≤ one
+                        // page and every row on it is selected).
+                        if (
+                          itemsTotal > 0 &&
+                          selected.length === itemsTotal &&
+                          selected.length === items.length
+                        ) {
                           handleRunEvaluators();
                         } else {
                           handleRunEvaluators(selected);
@@ -2564,9 +2841,15 @@ function LabellingTaskPageInner() {
                 </div>
               )}
 
-              {taskType === "stt" ? (
+              {items.length === 0 ? (
+                <div className="rounded-md border border-dashed border-border bg-muted/10 px-4 py-8 text-center text-sm text-muted-foreground">
+                  {itemsSearch
+                    ? `No items match "${itemsSearch}".`
+                    : "No items on this page."}
+                </div>
+              ) : taskType === "stt" ? (
                 <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_240px_180px_300px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
+                  <div className="grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-2 border-b border-border bg-muted/30 items-center">
                     <input
                       type="checkbox"
                       checked={allSelected}
@@ -2619,7 +2902,7 @@ function LabellingTaskPageInner() {
                       <Fragment key={item.uuid}>
                         <div
                           onClick={() => openItemDetail(item.uuid)}
-                          className={`grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_240px_180px_300px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
+                          className={`grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
                             isSelected ? "bg-muted/30" : "hover:bg-muted/20"
                           }`}
                         >
@@ -2689,7 +2972,7 @@ function LabellingTaskPageInner() {
                 </div>
               ) : (
                 <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_240px_180px_300px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
+                  <div className="grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_200px_180px_300px] gap-6 px-4 py-2 border-b border-border bg-muted/30 items-center">
                     <input
                       type="checkbox"
                       checked={allSelected}
@@ -2738,7 +3021,7 @@ function LabellingTaskPageInner() {
                       <Fragment key={item.uuid}>
                         <div
                           onClick={() => openItemDetail(item.uuid)}
-                          className={`grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_240px_180px_300px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
+                          className={`grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1.2fr)_200px_180px_300px] gap-6 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
                             isSelected ? "bg-muted/30" : "hover:bg-muted/20"
                           }`}
                         >
@@ -2808,6 +3091,137 @@ function LabellingTaskPageInner() {
                   })}
                 </div>
               )}
+              {/* Bottom padding clears the fixed Talk-to-us FAB
+                  (bottom-6 right-6) so the prev/next controls stay
+                  visible when the user scrolls to the bottom. */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1 pb-20 text-sm text-muted-foreground">
+                <div>
+                  {itemsTotal === 0 ? (
+                    "0 items"
+                  ) : (
+                    <>
+                      Showing{" "}
+                      <span className="text-foreground font-medium">
+                        {itemsRangeStart}
+                      </span>
+                      –
+                      <span className="text-foreground font-medium">
+                        {itemsRangeEnd}
+                      </span>{" "}
+                      of{" "}
+                      <span className="text-foreground font-medium">
+                        {itemsTotal}
+                      </span>{" "}
+                      item{itemsTotal === 1 ? "" : "s"}
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2">
+                    <span>Per page</span>
+                    <div className="relative">
+                      <select
+                        value={itemsLimit}
+                        onChange={(e) => {
+                          const next = Number(e.target.value);
+                          if (typeof window !== "undefined") {
+                            window.localStorage.setItem(
+                              ITEMS_PAGE_SIZE_KEY,
+                              String(next),
+                            );
+                          }
+                          setItemsLimit(next);
+                          setItemsOffset(0);
+                        }}
+                        className="h-8 pl-3 pr-8 appearance-none rounded-md border border-border bg-background text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        {ITEMS_PAGE_SIZE_OPTIONS.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                      <svg
+                        className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </div>
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setItemsOffset((prev) =>
+                          Math.max(0, prev - itemsLimit),
+                        )
+                      }
+                      disabled={itemsOffset === 0 || summaryLoading}
+                      aria-label="Previous page"
+                      className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border bg-background hover:bg-muted transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M15 19l-7-7 7-7"
+                        />
+                      </svg>
+                    </button>
+                    <span className="px-2 text-sm">
+                      Page{" "}
+                      <span className="text-foreground font-medium">
+                        {itemsCurrentPage}
+                      </span>{" "}
+                      of{" "}
+                      <span className="text-foreground font-medium">
+                        {itemsPageCount}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setItemsOffset((prev) => prev + itemsLimit)
+                      }
+                      disabled={
+                        itemsOffset + itemsLimit >= itemsTotal ||
+                        summaryLoading
+                      }
+                      aria-label="Next page"
+                      className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border bg-background hover:bg-muted transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           ))}
 
@@ -3037,7 +3451,7 @@ function LabellingTaskPageInner() {
               });
               setAddItemOpen(false);
               handleTabChange("items");
-              await fetchTask();
+              await Promise.all([fetchTask(), fetchTaskSummary()]);
             } catch (err) {
               setCreateItemError(parseApiError(err, "Failed to create item"));
             } finally {
@@ -3147,7 +3561,7 @@ function LabellingTaskPageInner() {
                 },
               );
               setEditLlmItemUuid(null);
-              await fetchTask();
+              await Promise.all([fetchTask(), fetchTaskSummary()]);
             } catch (err) {
               setEditLlmError(parseApiError(err, "Failed to save item"));
             } finally {
@@ -3185,11 +3599,10 @@ function LabellingTaskPageInner() {
             scale_max: typeof e.scale_max === "number" ? e.scale_max : null,
           }))}
           onClose={() => setBulkUploadSttOpen(false)}
-          onSuccess={async (count, withAnnotations) => {
+          onSuccess={async (count) => {
             setBulkUploadSttOpen(false);
             handleTabChange("items");
-            await fetchTask();
-            if (withAnnotations) await fetchTaskSummary();
+            await Promise.all([fetchTask(), fetchTaskSummary()]);
             toast.success(`Added ${count} ${count === 1 ? "item" : "items"}`);
           }}
         />
@@ -3208,11 +3621,10 @@ function LabellingTaskPageInner() {
             scale_max: typeof e.scale_max === "number" ? e.scale_max : null,
           }))}
           onClose={() => setBulkUploadSimulationOpen(false)}
-          onSuccess={async (count, withAnnotations) => {
+          onSuccess={async (count) => {
             setBulkUploadSimulationOpen(false);
             handleTabChange("items");
-            await fetchTask();
-            if (withAnnotations) await fetchTaskSummary();
+            await Promise.all([fetchTask(), fetchTaskSummary()]);
             toast.success(`Added ${count} ${count === 1 ? "item" : "items"}`);
           }}
         />
@@ -3233,11 +3645,10 @@ function LabellingTaskPageInner() {
             scale_max: typeof e.scale_max === "number" ? e.scale_max : null,
           }))}
           onClose={() => setBulkUploadLlmOpen(false)}
-          onSuccess={async (count, withAnnotations) => {
+          onSuccess={async (count) => {
             setBulkUploadLlmOpen(false);
             handleTabChange("items");
-            await fetchTask();
-            if (withAnnotations) await fetchTaskSummary();
+            await Promise.all([fetchTask(), fetchTaskSummary()]);
             toast.success(`Added ${count} ${count === 1 ? "item" : "items"}`);
           }}
         />
@@ -3261,7 +3672,7 @@ function LabellingTaskPageInner() {
             },
           });
           handleTabChange("items");
-          await fetchTask();
+          await Promise.all([fetchTask(), fetchTaskSummary()]);
           setAddSttItemsOpen(false);
         }}
       />
@@ -3315,7 +3726,7 @@ function LabellingTaskPageInner() {
               },
             },
           );
-          await fetchTask();
+          await Promise.all([fetchTask(), fetchTaskSummary()]);
           setEditSttItemsOpen(false);
           setEditSttSingleItemUuid(null);
           setSelectedItemIds(new Set());
