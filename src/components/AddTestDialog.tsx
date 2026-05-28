@@ -1,6 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+} from "react";
+import { createPortal } from "react-dom";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
@@ -635,6 +642,40 @@ export function AddTestDialog({
   const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // The tool-call dropdown is anchored to the "Add message" button but its
+  // panel is rendered in a portal with fixed positioning so it escapes the
+  // scrollable chat container's clipping (otherwise it hides beneath the
+  // dialog's sticky header). Track the trigger's viewport rect to place it.
+  const toolCallAnchorRef = useRef<HTMLDivElement>(null);
+  const [toolCallAnchorRect, setToolCallAnchorRect] = useState<{
+    left: number;
+    right: number;
+    top: number;
+    bottom: number;
+  } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!toolCallDropdownOpen) return;
+    const update = () => {
+      const el = toolCallAnchorRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setToolCallAnchorRect({
+        left: r.left,
+        right: r.right,
+        top: r.top,
+        bottom: r.bottom,
+      });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [toolCallDropdownOpen]);
 
   // Scroll to bottom when new messages are added
   useEffect(() => {
@@ -2908,7 +2949,7 @@ export function AddTestDialog({
                                   ? 1
                                   : 0) && (
                               <>
-                                <div className="relative">
+                                <div className="relative" ref={toolCallAnchorRef}>
                                   <button
                                     onClick={() =>
                                       setAddMessageDropdownOpen(
@@ -3034,8 +3075,12 @@ export function AddTestDialog({
                                     </>
                                   )}
 
-                                  {/* Tool Call Selection Dropdown */}
-                                  {toolCallDropdownOpen && (
+                                  {/* Tool Call Selection Dropdown — rendered in a portal with
+                                      fixed positioning so it escapes the scrollable chat container
+                                      instead of being clipped beneath the sticky header. */}
+                                  {toolCallDropdownOpen &&
+                                    typeof window !== "undefined" &&
+                                    createPortal(
                                     <>
                                       <div
                                         className="fixed inset-0 z-[150]"
@@ -3045,15 +3090,24 @@ export function AddTestDialog({
                                         }}
                                       />
                                       <div
-                                        className={`absolute bg-background border border-border rounded-xl shadow-xl z-[200] overflow-hidden min-w-[320px] ${
-                                          message.role === "user"
-                                            ? chatMessages.length <= 2
-                                              ? "right-0 top-10"
-                                              : "right-0 bottom-full mb-2"
-                                            : chatMessages.length <= 2
-                                              ? "left-0 top-10"
-                                              : "left-0 bottom-full mb-2"
-                                        }`}
+                                        style={(() => {
+                                          const r = toolCallAnchorRect;
+                                          if (!r) return { left: -9999, top: 0 };
+                                          const margin = 8;
+                                          const estHeight = 360;
+                                          const spaceBelow = window.innerHeight - r.bottom - margin;
+                                          const openAbove = spaceBelow < estHeight && r.top > spaceBelow;
+                                          const alignRight = message.role === "user";
+                                          return {
+                                            ...(openAbove
+                                              ? { bottom: window.innerHeight - r.top + margin }
+                                              : { top: r.bottom + margin }),
+                                            ...(alignRight
+                                              ? { right: window.innerWidth - r.right }
+                                              : { left: r.left }),
+                                          };
+                                        })()}
+                                      className="fixed bg-background border border-border rounded-xl shadow-xl z-[200] overflow-hidden min-w-[320px]"
                                       >
                                         {!pendingToolCall ? (
                                           <ToolPicker
@@ -3236,7 +3290,8 @@ export function AddTestDialog({
                                           </div>
                                         )}
                                       </div>
-                                    </>
+                                    </>,
+                                    document.body,
                                   )}
                                 </div>
                               </>
