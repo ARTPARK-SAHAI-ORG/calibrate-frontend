@@ -70,21 +70,20 @@ const TEST_TYPE_OPTIONS: Array<{
     tab: "next-reply",
     label: "Next reply",
     title: "Next reply test",
-    description: "Evaluate the agent's response given a conversation history.",
+    description: "Evaluate the agent's response given a conversation history",
   },
   {
     tab: "tool-invocation",
     label: "Tool call",
     title: "Tool call test",
     description:
-      "Check whether the agent invokes the correct tool with the right arguments.",
+      "Check whether the agent invokes the correct tool with the right arguments",
   },
   {
     tab: "conversation",
     label: "Conversation",
     title: "Conversation test",
-    description:
-      "Generate the agent's reply, then grade the full conversation as a whole.",
+    description: "Generate the agent's reply, then grade the full conversation",
   },
 ];
 
@@ -224,7 +223,8 @@ export function AddTestDialog({
   // renders; `editorEntered` drives the entrance transition once chosen.
   const showTypeIntroFlow = !isLabelItem && !isEditing;
   const [typeChosen, setTypeChosen] = useState<boolean>(!showTypeIntroFlow);
-  const [editorEntered, setEditorEntered] = useState<boolean>(!showTypeIntroFlow);
+  const [editorEntered, setEditorEntered] =
+    useState<boolean>(!showTypeIntroFlow);
 
   // Reset the phase whenever the dialog (re)opens so a fresh create always
   // starts on the picker and an edit always lands straight in the editor.
@@ -1517,196 +1517,134 @@ export function AddTestDialog({
 
       {/* Dialog */}
       {typeChosen && (
-      <div
-        className={`relative w-full max-w-7xl h-[95vh] md:h-[85vh] mx-2 md:mx-4 bg-background rounded-xl md:rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden border border-border transition-all duration-300 ease-out ${
-          editorEntered ? "opacity-100 scale-100" : "opacity-0 scale-95"
-        }`}
-      >
-        {/* Left Column - Form */}
-        <div className="w-full md:w-2/5 flex flex-col border-b md:border-b-0 md:border-r border-border">
-          {/* Tabs — hidden in labelItem mode (always next-reply). When
+        <div
+          className={`relative w-full max-w-7xl h-[95vh] md:h-[85vh] mx-2 md:mx-4 bg-background rounded-xl md:rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden border border-border transition-all duration-300 ease-out ${
+            editorEntered ? "opacity-100 scale-100" : "opacity-0 scale-95"
+          }`}
+        >
+          {/* Left Column - Form */}
+          <div className="w-full md:w-2/5 flex flex-col border-b md:border-b-0 md:border-r border-border">
+            {/* Tabs — hidden in labelItem mode (always next-reply). When
               editing an existing test the type is fixed (the backend no
               longer allows changing a test's type), so we show only the
               matching view's label as a static, non-switchable header. */}
-          {!isLabelItem &&
-            (isEditing ? (
-              <div className="flex border-b border-border">
-                <div className="flex-1 py-3 md:py-4 text-sm md:text-base font-medium text-foreground border-b-2 border-foreground text-center">
-                  {activeTab === "tool-invocation"
-                    ? "Tool call test"
-                    : activeTab === "conversation"
-                      ? "Conversation test"
-                      : "Next reply test"}
+            {!isLabelItem &&
+              (isEditing ? (
+                <div className="flex border-b border-border">
+                  <div className="flex-1 py-3 md:py-4 text-sm md:text-base font-medium text-foreground border-b-2 border-foreground text-center">
+                    {activeTab === "tool-invocation"
+                      ? "Tool call test"
+                      : activeTab === "conversation"
+                        ? "Conversation test"
+                        : "Next reply test"}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              // Create phase: the same three boxes from the intro picker,
-              // rendered compactly in the top-left so the type can still be
-              // switched mid-create.
-              <div className="flex gap-2 p-3 border-b border-border">
-                {TEST_TYPE_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.tab}
-                    onClick={() => setActiveTab(opt.tab)}
-                    title={opt.title}
-                    className={`flex-1 min-w-0 px-2 py-2 rounded-lg border text-xs md:text-sm font-medium transition-colors cursor-pointer truncate ${
-                      activeTab === opt.tab
-                        ? "bg-foreground text-background border-foreground"
-                        : "bg-background border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                    }`}
+              ) : (
+                // Create phase: the same three boxes from the intro picker,
+                // rendered compactly in the top-left so the type can still be
+                // switched mid-create.
+                <div className="flex gap-2 p-3 border-b border-border">
+                  {TEST_TYPE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.tab}
+                      onClick={() => setActiveTab(opt.tab)}
+                      title={opt.title}
+                      className={`flex-1 min-w-0 px-2 py-2 rounded-lg border text-xs md:text-sm font-medium transition-colors cursor-pointer truncate ${
+                        activeTab === opt.tab
+                          ? "bg-foreground text-background border-foreground"
+                          : "bg-background border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              ))}
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto overflow-x-visible p-4 md:p-6">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <svg
+                    className="w-6 h-6 animate-spin text-foreground"
+                    fill="none"
+                    viewBox="0 0 24 24"
                   >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            ))}
-
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto overflow-x-visible p-4 md:p-6">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <svg
-                  className="w-6 h-6 animate-spin text-foreground"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-              </div>
-            ) : isEvaluatorTab ? (
-              <div className="space-y-6">
-                {/* Name */}
-                <div>
-                  <label className="block text-base font-medium text-foreground mb-2">
-                    {ItemNoun} name
-                  </label>
-                  <input
-                    type="text"
-                    value={testName}
-                    onChange={(e) => setTestName(e.target.value)}
-                    placeholder={`Your ${itemNoun} name`}
-                    className={`w-full h-11 px-4 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
-                      nameError ||
-                      (localValidationAttempted &&
-                        isEvaluatorTab &&
-                        !testName.trim())
-                        ? "border-red-500"
-                        : "border-border"
-                    }`}
-                  />
-                  {nameError ? (
-                    <p className="text-xs text-red-500 mt-1">{nameError}</p>
-                  ) : (
-                    localValidationAttempted &&
-                    isEvaluatorTab &&
-                    !testName.trim() && (
-                      <p className="text-xs text-red-500 mt-1">
-                        {ItemNoun} name cannot be empty
-                      </p>
-                    )
-                  )}
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
                 </div>
-
-                {/* Description (labelling items only) */}
-                {isLabelItem && setItemDescription && (
+              ) : isEvaluatorTab ? (
+                <div className="space-y-6">
+                  {/* Name */}
                   <div>
                     <label className="block text-base font-medium text-foreground mb-2">
-                      Description
+                      {ItemNoun} name
                     </label>
-                    <textarea
-                      value={itemDescription ?? ""}
-                      onChange={(e) => setItemDescription(e.target.value)}
-                      placeholder="Optional — what is this item about? Shown to annotators alongside the evaluators."
-                      rows={3}
-                      className="w-full px-4 py-2.5 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-y"
+                    <input
+                      type="text"
+                      value={testName}
+                      onChange={(e) => setTestName(e.target.value)}
+                      placeholder={`Your ${itemNoun} name`}
+                      className={`w-full h-11 px-4 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                        nameError ||
+                        (localValidationAttempted &&
+                          isEvaluatorTab &&
+                          !testName.trim())
+                          ? "border-red-500"
+                          : "border-border"
+                      }`}
                     />
-                  </div>
-                )}
-
-                {/* Evaluators (next-reply tab only) */}
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-base font-medium text-foreground">
-                      Evaluators
-                    </label>
-                    {!isLabelItem &&
-                      (() => {
-                        const remainingOptions = availableLLMEvaluators.filter(
-                          (o) =>
-                            !attachedEvaluators.some(
-                              (a) => a.evaluator_uuid === o.uuid,
-                            ) &&
-                            (activeTab === "conversation"
-                              ? o.evaluator_type ===
-                                CONVERSATION_EVALUATOR_TYPE
-                              : o.evaluator_type === "llm"),
-                        );
-                        const noOptionsLeft = remainingOptions.length === 0;
-                        return (
-                          <button
-                            onClick={() => {
-                              if (evaluatorPickerOpen) {
-                                closeEvaluatorPicker();
-                              } else {
-                                setEvaluatorPickerOpen(true);
-                              }
-                            }}
-                            disabled={
-                              evaluatorsLoading || isLoading || noOptionsLeft
-                            }
-                            // Tinted violet so the action stands out from
-                            // the neutral form chrome around it. Validation
-                            // error state overrides border/text to red.
-                            className={`px-3 py-1.5 text-sm font-medium rounded-lg border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-500/12 border-violet-500/45 text-violet-950 dark:text-violet-100 hover:bg-violet-500/22 dark:hover:bg-violet-500/18 ${
-                              localValidationAttempted &&
-                              isEvaluatorTab &&
-                              attachedEvaluators.length === 0
-                                ? "!border-red-500 !text-red-500 !bg-red-500/10"
-                                : ""
-                            }`}
-                          >
-                            Add evaluator
-                          </button>
-                        );
-                      })()}
+                    {nameError ? (
+                      <p className="text-xs text-red-500 mt-1">{nameError}</p>
+                    ) : (
+                      localValidationAttempted &&
+                      isEvaluatorTab &&
+                      !testName.trim() && (
+                        <p className="text-xs text-red-500 mt-1">
+                          {ItemNoun} name cannot be empty
+                        </p>
+                      )
+                    )}
                   </div>
 
-                  {/* Evaluator picker dropdown */}
-                  {evaluatorPickerOpen && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-[99]"
-                        onClick={closeEvaluatorPicker}
+                  {/* Description (labelling items only) */}
+                  {isLabelItem && setItemDescription && (
+                    <div>
+                      <label className="block text-base font-medium text-foreground mb-2">
+                        Description
+                      </label>
+                      <textarea
+                        value={itemDescription ?? ""}
+                        onChange={(e) => setItemDescription(e.target.value)}
+                        placeholder="Optional — what is this item about? Shown to annotators alongside the evaluators."
+                        rows={3}
+                        className="w-full px-4 py-2.5 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-y"
                       />
-                      <div className="absolute right-0 top-9 mt-1 w-80 max-h-80 flex flex-col bg-background border border-border rounded-xl shadow-2xl z-[100] overflow-hidden">
-                        {/* Sticky search bar */}
-                        <div className="p-2 border-b border-border bg-background">
-                          <input
-                            type="text"
-                            value={evaluatorPickerSearch}
-                            onChange={(e) =>
-                              setEvaluatorPickerSearch(e.target.value)
-                            }
-                            placeholder="Search evaluators"
-                            autoFocus
-                            className="w-full h-9 px-3 rounded-md text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-1 focus:ring-accent"
-                          />
-                        </div>
-                        <div className="flex-1 overflow-y-auto">
-                          {(() => {
-                            const remaining = availableLLMEvaluators.filter(
+                    </div>
+                  )}
+
+                  {/* Evaluators (next-reply tab only) */}
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-base font-medium text-foreground">
+                        Evaluators
+                      </label>
+                      {!isLabelItem &&
+                        (() => {
+                          const remainingOptions =
+                            availableLLMEvaluators.filter(
                               (o) =>
                                 !attachedEvaluators.some(
                                   (a) => a.evaluator_uuid === o.uuid,
@@ -1716,336 +1654,400 @@ export function AddTestDialog({
                                     CONVERSATION_EVALUATOR_TYPE
                                   : o.evaluator_type === "llm"),
                             );
-                            if (remaining.length === 0) {
-                              return (
-                                <div className="px-4 py-6 text-sm text-muted-foreground text-center">
-                                  No more LLM evaluators to add.
-                                </div>
-                              );
-                            }
-                            // Case-insensitive substring match against both
-                            // name and description so users can search by
-                            // either label or rubric snippet.
-                            const query = evaluatorPickerSearch
-                              .trim()
-                              .toLowerCase();
-                            const matches = query
-                              ? remaining.filter((o) => {
-                                  const name = o.name.toLowerCase();
-                                  const desc = (
-                                    o.description ?? ""
-                                  ).toLowerCase();
-                                  return (
-                                    name.includes(query) || desc.includes(query)
-                                  );
-                                })
-                              : remaining;
-                            if (matches.length === 0) {
-                              return (
-                                <div className="px-4 py-6 text-sm text-muted-foreground text-center">
-                                  No evaluators match &ldquo;
-                                  {evaluatorPickerSearch}&rdquo;.
-                                </div>
-                              );
-                            }
-                            const defaults = matches.filter(
-                              (o) => o.owner_user_id === null,
-                            );
-                            const mine = matches.filter(
-                              (o) => o.owner_user_id !== null,
-                            );
-                            const renderRow = (o: LLMEvaluatorOption) => (
-                              <button
-                                key={o.uuid}
-                                onClick={() => attachEvaluatorFromOption(o)}
-                                className="w-full text-left px-4 py-2.5 hover:bg-muted transition-colors cursor-pointer"
-                              >
-                                <div className="text-sm font-medium text-foreground">
-                                  {o.name}
-                                </div>
-                                {o.description && (
-                                  <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                                    {o.description}
-                                  </div>
-                                )}
-                              </button>
-                            );
-                            return (
-                              <>
-                                {defaults.length > 0 && (
-                                  <div>
-                                    <div className="px-4 pt-3 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                                      Default
-                                    </div>
-                                    {defaults.map(renderRow)}
-                                  </div>
-                                )}
-                                {mine.length > 0 && (
-                                  <div>
-                                    <div className="px-4 pt-3 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                                      My evaluators
-                                    </div>
-                                    {mine.map(renderRow)}
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Empty / loading state */}
-                  {evaluatorsLoading && attachedEvaluators.length === 0 && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-                      <svg
-                        className="w-4 h-4 animate-spin"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
-                      Loading evaluators
-                    </div>
-                  )}
-                  {!evaluatorsLoading && attachedEvaluators.length === 0 && (
-                    <div
-                      className={`text-sm py-4 ${
-                        localValidationAttempted && isEvaluatorTab
-                          ? "text-red-500"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {activeTab === "conversation"
-                        ? "Add at least one evaluator to grade the full conversation."
-                        : "Add at least one evaluator to grade the agent's next reply."}
-                    </div>
-                  )}
-
-                  {/* Attached evaluator cards */}
-                  <div className="space-y-4">
-                    {attachedEvaluators.map((ev) => (
-                      <div
-                        key={ev.evaluator_uuid}
-                        className="border border-border rounded-lg p-4 bg-background"
-                      >
-                        <div className="flex items-start justify-between gap-2 mb-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="text-sm font-semibold text-foreground">
-                              {ev.name}
-                            </div>
-                            {ev.description && (
-                              <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                                {ev.description}
-                              </div>
-                            )}
-                          </div>
-                          {!isLabelItem && (
+                          const noOptionsLeft = remainingOptions.length === 0;
+                          return (
                             <button
-                              onClick={() =>
-                                removeAttachedEvaluator(ev.evaluator_uuid)
+                              onClick={() => {
+                                if (evaluatorPickerOpen) {
+                                  closeEvaluatorPicker();
+                                } else {
+                                  setEvaluatorPickerOpen(true);
+                                }
+                              }}
+                              disabled={
+                                evaluatorsLoading || isLoading || noOptionsLeft
                               }
-                              className="text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
-                              aria-label={`Remove ${ev.name}`}
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M6 18L18 6M6 6l12 12"
-                                />
-                              </svg>
-                            </button>
-                          )}
-                        </div>
-
-                        {ev.variables.length > 0 && (
-                          <div className="space-y-3">
-                            {ev.variables.map((v) => {
-                              // Uniform rendering for every evaluator variable:
-                              // a small `{{name}}` monospace hint + textarea
-                              // whose placeholder is the variable's
-                              // `description` (falling back to `default`, then
-                              // a generic prompt). No special-case label —
-                              // the description carries the user-facing copy.
-                              const placeholder =
-                                v.description && v.description.length > 0
-                                  ? v.description
-                                  : v.default && v.default.length > 0
-                                    ? v.default
-                                    : `Enter value for {{${v.name}}}`;
-                              const value = ev.variable_values[v.name] ?? "";
-                              const isMissing =
+                              // Tinted violet so the action stands out from
+                              // the neutral form chrome around it. Validation
+                              // error state overrides border/text to red.
+                              className={`px-3 py-1.5 text-sm font-medium rounded-lg border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-500/12 border-violet-500/45 text-violet-950 dark:text-violet-100 hover:bg-violet-500/22 dark:hover:bg-violet-500/18 ${
                                 localValidationAttempted &&
                                 isEvaluatorTab &&
-                                value.trim().length === 0;
-                              return (
-                                <div key={v.name}>
-                                  <div className="text-xs text-muted-foreground mb-1.5">
-                                    <code className="font-mono">{`{{${v.name}}}`}</code>
-                                  </div>
-                                  <textarea
-                                    value={value}
-                                    onChange={(e) =>
-                                      updateEvaluatorVariableValue(
-                                        ev.evaluator_uuid,
-                                        v.name,
-                                        e.target.value,
-                                      )
-                                    }
-                                    placeholder={placeholder}
-                                    rows={4}
-                                    className={`w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent resize-none ${
-                                      isMissing
-                                        ? "border-red-500"
-                                        : "border-border"
-                                    }`}
-                                  />
-                                  {isMissing && (
-                                    <p className="text-xs text-red-500 mt-1">
-                                      Value cannot be empty
-                                    </p>
-                                  )}
-                                </div>
-                              );
-                            })}
+                                attachedEvaluators.length === 0
+                                  ? "!border-red-500 !text-red-500 !bg-red-500/10"
+                                  : ""
+                              }`}
+                            >
+                              Add evaluator
+                            </button>
+                          );
+                        })()}
+                    </div>
+
+                    {/* Evaluator picker dropdown */}
+                    {evaluatorPickerOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-[99]"
+                          onClick={closeEvaluatorPicker}
+                        />
+                        <div className="absolute right-0 top-9 mt-1 w-80 max-h-80 flex flex-col bg-background border border-border rounded-xl shadow-2xl z-[100] overflow-hidden">
+                          {/* Sticky search bar */}
+                          <div className="p-2 border-b border-border bg-background">
+                            <input
+                              type="text"
+                              value={evaluatorPickerSearch}
+                              onChange={(e) =>
+                                setEvaluatorPickerSearch(e.target.value)
+                              }
+                              placeholder="Search evaluators"
+                              autoFocus
+                              className="w-full h-9 px-3 rounded-md text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-1 focus:ring-accent"
+                            />
                           </div>
-                        )}
+                          <div className="flex-1 overflow-y-auto">
+                            {(() => {
+                              const remaining = availableLLMEvaluators.filter(
+                                (o) =>
+                                  !attachedEvaluators.some(
+                                    (a) => a.evaluator_uuid === o.uuid,
+                                  ) &&
+                                  (activeTab === "conversation"
+                                    ? o.evaluator_type ===
+                                      CONVERSATION_EVALUATOR_TYPE
+                                    : o.evaluator_type === "llm"),
+                              );
+                              if (remaining.length === 0) {
+                                return (
+                                  <div className="px-4 py-6 text-sm text-muted-foreground text-center">
+                                    No more LLM evaluators to add.
+                                  </div>
+                                );
+                              }
+                              // Case-insensitive substring match against both
+                              // name and description so users can search by
+                              // either label or rubric snippet.
+                              const query = evaluatorPickerSearch
+                                .trim()
+                                .toLowerCase();
+                              const matches = query
+                                ? remaining.filter((o) => {
+                                    const name = o.name.toLowerCase();
+                                    const desc = (
+                                      o.description ?? ""
+                                    ).toLowerCase();
+                                    return (
+                                      name.includes(query) ||
+                                      desc.includes(query)
+                                    );
+                                  })
+                                : remaining;
+                              if (matches.length === 0) {
+                                return (
+                                  <div className="px-4 py-6 text-sm text-muted-foreground text-center">
+                                    No evaluators match &ldquo;
+                                    {evaluatorPickerSearch}&rdquo;.
+                                  </div>
+                                );
+                              }
+                              const defaults = matches.filter(
+                                (o) => o.owner_user_id === null,
+                              );
+                              const mine = matches.filter(
+                                (o) => o.owner_user_id !== null,
+                              );
+                              const renderRow = (o: LLMEvaluatorOption) => (
+                                <button
+                                  key={o.uuid}
+                                  onClick={() => attachEvaluatorFromOption(o)}
+                                  className="w-full text-left px-4 py-2.5 hover:bg-muted transition-colors cursor-pointer"
+                                >
+                                  <div className="text-sm font-medium text-foreground">
+                                    {o.name}
+                                  </div>
+                                  {o.description && (
+                                    <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                                      {o.description}
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                              return (
+                                <>
+                                  {defaults.length > 0 && (
+                                    <div>
+                                      <div className="px-4 pt-3 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                                        Default
+                                      </div>
+                                      {defaults.map(renderRow)}
+                                    </div>
+                                  )}
+                                  {mine.length > 0 && (
+                                    <div>
+                                      <div className="px-4 pt-3 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                                        My evaluators
+                                      </div>
+                                      {mine.map(renderRow)}
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Empty / loading state */}
+                    {evaluatorsLoading && attachedEvaluators.length === 0 && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                        <svg
+                          className="w-4 h-4 animate-spin"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                        Loading evaluators
                       </div>
-                    ))}
+                    )}
+                    {!evaluatorsLoading && attachedEvaluators.length === 0 && (
+                      <div
+                        className={`text-sm py-4 ${
+                          localValidationAttempted && isEvaluatorTab
+                            ? "text-red-500"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {activeTab === "conversation"
+                          ? "Add at least one evaluator to grade the full conversation"
+                          : "Add at least one evaluator to grade the agent's next reply"}
+                      </div>
+                    )}
+
+                    {/* Attached evaluator cards */}
+                    <div className="space-y-4">
+                      {attachedEvaluators.map((ev) => (
+                        <div
+                          key={ev.evaluator_uuid}
+                          className="border border-border rounded-lg p-4 bg-background"
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-semibold text-foreground">
+                                {ev.name}
+                              </div>
+                              {ev.description && (
+                                <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                                  {ev.description}
+                                </div>
+                              )}
+                            </div>
+                            {!isLabelItem && (
+                              <button
+                                onClick={() =>
+                                  removeAttachedEvaluator(ev.evaluator_uuid)
+                                }
+                                className="text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
+                                aria-label={`Remove ${ev.name}`}
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M6 18L18 6M6 6l12 12"
+                                  />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+
+                          {ev.variables.length > 0 && (
+                            <div className="space-y-3">
+                              {ev.variables.map((v) => {
+                                // Uniform rendering for every evaluator variable:
+                                // a small `{{name}}` monospace hint + textarea
+                                // whose placeholder is the variable's
+                                // `description` (falling back to `default`, then
+                                // a generic prompt). No special-case label —
+                                // the description carries the user-facing copy.
+                                const placeholder =
+                                  v.description && v.description.length > 0
+                                    ? v.description
+                                    : v.default && v.default.length > 0
+                                      ? v.default
+                                      : `Enter value for {{${v.name}}}`;
+                                const value = ev.variable_values[v.name] ?? "";
+                                const isMissing =
+                                  localValidationAttempted &&
+                                  isEvaluatorTab &&
+                                  value.trim().length === 0;
+                                return (
+                                  <div key={v.name}>
+                                    <div className="text-xs text-muted-foreground mb-1.5">
+                                      <code className="font-mono">{`{{${v.name}}}`}</code>
+                                    </div>
+                                    <textarea
+                                      value={value}
+                                      onChange={(e) =>
+                                        updateEvaluatorVariableValue(
+                                          ev.evaluator_uuid,
+                                          v.name,
+                                          e.target.value,
+                                        )
+                                      }
+                                      placeholder={placeholder}
+                                      rows={4}
+                                      className={`w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent resize-none ${
+                                        isMissing
+                                          ? "border-red-500"
+                                          : "border-border"
+                                      }`}
+                                    />
+                                    {isMissing && (
+                                      <p className="text-xs text-red-500 mt-1">
+                                        Value cannot be empty
+                                      </p>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Test Name */}
-                <div>
-                  <label className="block text-base font-medium text-foreground mb-2">
-                    Test name
-                  </label>
-                  <input
-                    type="text"
-                    value={testName}
-                    onChange={(e) => setTestName(e.target.value)}
-                    placeholder="Your test name"
-                    className={`w-full h-11 px-4 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
-                      nameError ||
-                      (localValidationAttempted &&
-                        activeTab === "tool-invocation" &&
-                        !testName.trim())
-                        ? "border-red-500"
-                        : "border-border"
-                    }`}
-                  />
-                  {nameError && (
-                    <p className="text-xs text-red-500 mt-1">{nameError}</p>
-                  )}
-                </div>
-
-                {/* Tools to test */}
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-base font-medium text-foreground">
-                      Tools to test
+              ) : (
+                <div className="space-y-6">
+                  {/* Test Name */}
+                  <div>
+                    <label className="block text-base font-medium text-foreground mb-2">
+                      Test name
                     </label>
-                    <button
-                      onClick={() => setToolDropdownOpen(!toolDropdownOpen)}
-                      className={`px-3 py-1.5 text-sm font-medium bg-background text-foreground rounded-lg hover:bg-muted transition-colors cursor-pointer border ${
-                        localValidationAttempted &&
-                        activeTab === "tool-invocation" &&
-                        selectedTools.length === 0
-                          ? "border-red-500 text-red-400"
+                    <input
+                      type="text"
+                      value={testName}
+                      onChange={(e) => setTestName(e.target.value)}
+                      placeholder="Your test name"
+                      className={`w-full h-11 px-4 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                        nameError ||
+                        (localValidationAttempted &&
+                          activeTab === "tool-invocation" &&
+                          !testName.trim())
+                          ? "border-red-500"
                           : "border-border"
                       }`}
-                    >
-                      Add tool
-                    </button>
+                    />
+                    {nameError && (
+                      <p className="text-xs text-red-500 mt-1">{nameError}</p>
+                    )}
                   </div>
 
-                  {/* Tool Dropdown */}
-                  {toolDropdownOpen && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-[99]"
-                        onClick={() => {
-                          setToolDropdownOpen(false);
-                        }}
-                      />
-                      <div className="absolute right-0 top-8 mt-2 w-72 bg-background border border-border rounded-xl shadow-2xl z-[100] overflow-hidden">
-                        <ToolPicker
-                          availableTools={availableTools}
-                          isLoading={availableToolsLoading}
-                          onSelectInbuiltTool={(toolId, toolName) => {
-                            selectInbuiltTool(toolId, toolName);
-                          }}
-                          onSelectCustomTool={(tool) => {
-                            addToolFromSelection(tool);
-                          }}
-                          selectedToolIds={selectedTools.map((t) => t.id)}
-                        />
-                      </div>
-                    </>
-                  )}
-
-                  {selectedTools.length === 0 ? (
-                    <div className="bg-muted rounded-lg p-8 text-center ">
-                      <p className="text-muted-foreground text-sm">
-                        If you leave this empty, the test will check that no
-                        tool has been called.
-                      </p>
+                  {/* Tools to test */}
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-base font-medium text-foreground">
+                        Tools to test
+                      </label>
+                      <button
+                        onClick={() => setToolDropdownOpen(!toolDropdownOpen)}
+                        className={`px-3 py-1.5 text-sm font-medium bg-background text-foreground rounded-lg hover:bg-muted transition-colors cursor-pointer border ${
+                          localValidationAttempted &&
+                          activeTab === "tool-invocation" &&
+                          selectedTools.length === 0
+                            ? "border-red-500 text-red-400"
+                            : "border-border"
+                        }`}
+                      >
+                        Add tool
+                      </button>
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {selectedTools.map((tool) => (
-                        <div
-                          key={tool.id}
-                          className="bg-muted rounded-lg p-4 border border-border"
-                        >
-                          {/* Tool header with name and delete button */}
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="flex-1 h-10 px-4 rounded-lg text-base bg-background text-foreground border border-border flex items-center">
-                              {tool.name}
-                            </div>
-                            <button
-                              onClick={() => removeTool(tool.id)}
-                              className="w-10 h-10 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
-                            >
-                              <svg
-                                className="w-5 h-5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                                />
-                              </svg>
-                            </button>
-                          </div>
 
-                          {/* Expectation indicator. The "should not have been
+                    {/* Tool Dropdown */}
+                    {toolDropdownOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-[99]"
+                          onClick={() => {
+                            setToolDropdownOpen(false);
+                          }}
+                        />
+                        <div className="absolute right-0 top-8 mt-2 w-72 bg-background border border-border rounded-xl shadow-2xl z-[100] overflow-hidden">
+                          <ToolPicker
+                            availableTools={availableTools}
+                            isLoading={availableToolsLoading}
+                            onSelectInbuiltTool={(toolId, toolName) => {
+                              selectInbuiltTool(toolId, toolName);
+                            }}
+                            onSelectCustomTool={(tool) => {
+                              addToolFromSelection(tool);
+                            }}
+                            selectedToolIds={selectedTools.map((t) => t.id)}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {selectedTools.length === 0 ? (
+                      <div className="bg-muted rounded-lg p-8 text-center ">
+                        <p className="text-muted-foreground text-sm">
+                          If you leave this empty, the test will check that no
+                          tool has been called.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {selectedTools.map((tool) => (
+                          <div
+                            key={tool.id}
+                            className="bg-muted rounded-lg p-4 border border-border"
+                          >
+                            {/* Tool header with name and delete button */}
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="flex-1 h-10 px-4 rounded-lg text-base bg-background text-foreground border border-border flex items-center">
+                                {tool.name}
+                              </div>
+                              <button
+                                onClick={() => removeTool(tool.id)}
+                                className="w-10 h-10 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
+                              >
+                                <svg
+                                  className="w-5 h-5"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                                  />
+                                </svg>
+                              </button>
+                            </div>
+
+                            {/* Expectation indicator. The "should not have been
                               called" option is intentionally hidden for now
                               and the dialog assumes "should have been called"
                               on every save (see the tool_calls payload
@@ -2053,519 +2055,732 @@ export function AddTestDialog({
                               selected-state pill for visual consistency with
                               the rest of the dialog rather than a real
                               segmented control. */}
-                          <div
-                            className="w-full py-2.5 rounded-lg border border-border bg-foreground text-background text-sm font-medium text-center"
-                            aria-label="Expected behaviour"
-                          >
-                            Should have been called
+                            <div
+                              className="w-full py-2.5 rounded-lg border border-border bg-foreground text-background text-sm font-medium text-center"
+                              aria-label="Expected behaviour"
+                            >
+                              Should have been called
+                            </div>
+
+                            {/* Accept any parameter values checkbox - show when "should call" is selected and tool has parameters */}
+                            {tool.expectation === "should-call" &&
+                              toolHasParams(tool.id, tool.name) && (
+                                <div className="mt-4 flex items-center gap-3">
+                                  <button
+                                    onClick={() =>
+                                      updateToolConfig(tool.id, {
+                                        acceptAnyParameterValues:
+                                          !tool.acceptAnyParameterValues,
+                                      })
+                                    }
+                                    className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
+                                      tool.acceptAnyParameterValues
+                                        ? "bg-foreground border-foreground"
+                                        : "bg-background border-muted-foreground hover:border-foreground"
+                                    }`}
+                                  >
+                                    {tool.acceptAnyParameterValues && (
+                                      <svg
+                                        className="w-3 h-3 text-background"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={3}
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          d="M4.5 12.75l6 6 9-13.5"
+                                        />
+                                      </svg>
+                                    )}
+                                  </button>
+                                  <span className="text-sm font-medium text-foreground">
+                                    Accept any values for the parameters
+                                  </span>
+                                </div>
+                              )}
+
+                            {/* Expected parameters section - only show when "should call" is selected and toggle is off */}
+                            {tool.expectation === "should-call" &&
+                              tool.expectedParameters.length > 0 &&
+                              !tool.acceptAnyParameterValues && (
+                                <div className="mt-4">
+                                  <div className="mb-3">
+                                    <h4 className="text-sm font-medium text-foreground">
+                                      Expected extracted parameters
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      Configure how each parameter should be
+                                      evaluated when the agent calls this tool
+                                    </p>
+                                  </div>
+
+                                  <div className="space-y-3">
+                                    {tool.expectedParameters.map((param) => (
+                                      <div key={param.id}>
+                                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+                                          {param.name}
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={param.value}
+                                          onChange={(e) =>
+                                            updateToolParameterValue(
+                                              tool.id,
+                                              param.id,
+                                              e.target.value,
+                                            )
+                                          }
+                                          placeholder="Expected value"
+                                          className={`w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                                            localValidationAttempted &&
+                                            activeTab === "tool-invocation" &&
+                                            !param.value.trim()
+                                              ? "border-red-500"
+                                              : "border-border"
+                                          }`}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                           </div>
-
-                          {/* Accept any parameter values checkbox - show when "should call" is selected and tool has parameters */}
-                          {tool.expectation === "should-call" &&
-                            toolHasParams(tool.id, tool.name) && (
-                              <div className="mt-4 flex items-center gap-3">
-                                <button
-                                  onClick={() =>
-                                    updateToolConfig(tool.id, {
-                                      acceptAnyParameterValues:
-                                        !tool.acceptAnyParameterValues,
-                                    })
-                                  }
-                                  className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
-                                    tool.acceptAnyParameterValues
-                                      ? "bg-foreground border-foreground"
-                                      : "bg-background border-muted-foreground hover:border-foreground"
-                                  }`}
-                                >
-                                  {tool.acceptAnyParameterValues && (
-                                    <svg
-                                      className="w-3 h-3 text-background"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      stroke="currentColor"
-                                      strokeWidth={3}
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M4.5 12.75l6 6 9-13.5"
-                                      />
-                                    </svg>
-                                  )}
-                                </button>
-                                <span className="text-sm font-medium text-foreground">
-                                  Accept any values for the parameters
-                                </span>
-                              </div>
-                            )}
-
-                          {/* Expected parameters section - only show when "should call" is selected and toggle is off */}
-                          {tool.expectation === "should-call" &&
-                            tool.expectedParameters.length > 0 &&
-                            !tool.acceptAnyParameterValues && (
-                              <div className="mt-4">
-                                <div className="mb-3">
-                                  <h4 className="text-sm font-medium text-foreground">
-                                    Expected extracted parameters
-                                  </h4>
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    Configure how each parameter should be
-                                    evaluated when the agent calls this tool
-                                  </p>
-                                </div>
-
-                                <div className="space-y-3">
-                                  {tool.expectedParameters.map((param) => (
-                                    <div key={param.id}>
-                                      <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-                                        {param.name}
-                                      </label>
-                                      <input
-                                        type="text"
-                                        value={param.value}
-                                        onChange={(e) =>
-                                          updateToolParameterValue(
-                                            tool.id,
-                                            param.id,
-                                            e.target.value,
-                                          )
-                                        }
-                                        placeholder="Expected value"
-                                        className={`w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
-                                          localValidationAttempted &&
-                                          activeTab === "tool-invocation" &&
-                                          !param.value.trim()
-                                            ? "border-red-500"
-                                            : "border-border"
-                                        }`}
-                                      />
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="px-4 md:px-6 py-3 md:py-4 bg-background">
-            {createError && (
-              <p className="text-sm text-red-500 mb-3">{createError}</p>
-            )}
-            <div className="flex items-center justify-between gap-2">
-              <button
-                onClick={onClose}
-                disabled={isCreating || isLoading}
-                className="h-9 md:h-10 px-4 md:px-5 rounded-lg text-sm md:text-base font-medium bg-background text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border border-border"
-              >
-                Back
-              </button>
-              {(() => {
-                const lastMessage = chatMessages[chatMessages.length - 1];
-                const isEmpty = chatMessages.length === 0;
-                let isLastMessageInvalid: boolean;
-                if (requireAssistantLastMessage) {
-                  isLastMessageInvalid =
-                    isEmpty || lastMessage?.role !== "agent";
-                } else if (allowAgentLastMessage) {
-                  isLastMessageInvalid = isEmpty;
-                } else {
-                  // Next-reply AND conversation tests run the agent against
-                  // the trailing user turn, so the history must end on a
-                  // user message, not an agent one.
-                  isLastMessageInvalid =
-                    isEmpty || lastMessage?.role === "agent";
-                }
-                const isLastMessageAgent = isLastMessageInvalid;
-                const tooltipMessage = requireAssistantLastMessage
-                  ? `The conversation history should end with an agent message, not a user message`
-                  : `The conversation history should end with a user message, not an agent message`;
-                const isButtonDisabled =
-                  isCreating || isLoading || isLastMessageInvalid;
-
-                return (
-                  <div className="relative group">
-                    <button
-                      onClick={handleSubmit}
-                      disabled={isButtonDisabled}
-                      className="h-9 md:h-10 px-4 md:px-5 rounded-lg text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                      {isCreating ? (
-                        <>
-                          <svg
-                            className="w-4 h-4 animate-spin"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            ></circle>
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                            ></path>
-                          </svg>
-                          {isEditing ? "Saving..." : "Creating..."}
-                        </>
-                      ) : isEditing ? (
-                        "Save"
-                      ) : (
-                        "Create"
-                      )}
-                    </button>
-                    {/* Tooltip for disabled state */}
-                    {isLastMessageAgent && !isCreating && !isLoading && (
-                      <div className="absolute bottom-full mb-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                        <div className="px-3 py-2 text-sm bg-background text-foreground border border-border rounded-lg shadow-lg w-72">
-                          {tooltipMessage}
-                        </div>
-                        {/* Arrow */}
-                        <div className="absolute top-full right-4 -mt-1 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-border"></div>
+                        ))}
                       </div>
                     )}
                   </div>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column - Chat Messages */}
-        <div className="w-full md:w-3/5 flex flex-col bg-muted/30 overflow-visible">
-          {/* Info banner */}
-          <div className="px-4 md:px-6 py-3 md:py-4 border-b border-border bg-blue-500/5">
-            <div className="flex items-start gap-3">
-              <svg
-                className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-                />
-              </svg>
-              <p className="text-sm text-foreground leading-relaxed">
-                {requireAssistantLastMessage
-                  ? "Your evaluators read this whole conversation and evaluate the last agent message (the one highlighted) against the evaluators. Only that final reply is scored."
-                  : activeTab === "conversation"
-                    ? "The agent generates its reply to the last user message; the full conversation (history plus that generated reply) is then graded against the evaluators added to the test."
-                    : "The agent's response to the last user message, given the conversation history, will be evaluated against the evaluators added to the test"}
-              </p>
-            </div>
-          </div>
-          {/* Chat Messages Area */}
-          <div className="flex-1 overflow-y-auto overflow-x-visible p-4 md:p-6">
-            {chatMessages.length === 0 ? (
-              /* Empty State Placeholder */
-              <div className="h-full flex flex-col items-center justify-center text-center px-8">
-                {/* Globe with chat icon */}
-                <div className="mb-6">
-                  <svg
-                    className="w-24 h-24 text-muted-foreground"
-                    viewBox="0 0 100 100"
-                    fill="none"
-                  >
-                    {/* Globe */}
-                    <circle
-                      cx="45"
-                      cy="50"
-                      r="30"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      fill="none"
-                    />
-                    <ellipse
-                      cx="45"
-                      cy="50"
-                      rx="12"
-                      ry="30"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      fill="none"
-                    />
-                    <path
-                      d="M15 50 Q45 35 75 50"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      fill="none"
-                    />
-                    <path
-                      d="M15 50 Q45 65 75 50"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      fill="none"
-                    />
-                    {/* Chat bubbles */}
-                    <circle
-                      cx="70"
-                      cy="30"
-                      r="12"
-                      className="fill-muted"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    />
-                    <circle cx="66" cy="30" r="1.5" fill="currentColor" />
-                    <circle cx="70" cy="30" r="1.5" fill="currentColor" />
-                    <circle cx="74" cy="30" r="1.5" fill="currentColor" />
-                    {/* Shadow */}
-                    <ellipse
-                      cx="45"
-                      cy="88"
-                      rx="18"
-                      ry="4"
-                      fill="currentColor"
-                      opacity="0.2"
-                    />
-                  </svg>
                 </div>
+              )}
+            </div>
 
-                <h3 className="text-xl font-semibold text-foreground mb-3">
-                  No conversation context
-                </h3>
+            {/* Footer */}
+            <div className="px-4 md:px-6 py-3 md:py-4 bg-background">
+              {createError && (
+                <p className="text-sm text-red-500 mb-3">{createError}</p>
+              )}
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  onClick={onClose}
+                  disabled={isCreating || isLoading}
+                  className="h-9 md:h-10 px-4 md:px-5 rounded-lg text-sm md:text-base font-medium bg-background text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border border-border"
+                >
+                  Back
+                </button>
+                {(() => {
+                  const lastMessage = chatMessages[chatMessages.length - 1];
+                  const isEmpty = chatMessages.length === 0;
+                  let isLastMessageInvalid: boolean;
+                  if (requireAssistantLastMessage) {
+                    isLastMessageInvalid =
+                      isEmpty || lastMessage?.role !== "agent";
+                  } else if (allowAgentLastMessage) {
+                    isLastMessageInvalid = isEmpty;
+                  } else {
+                    // Next-reply AND conversation tests run the agent against
+                    // the trailing user turn, so the history must end on a
+                    // user message, not an agent one.
+                    isLastMessageInvalid =
+                      isEmpty || lastMessage?.role === "agent";
+                  }
+                  const isLastMessageAgent = isLastMessageInvalid;
+                  const tooltipMessage = requireAssistantLastMessage
+                    ? `The conversation history should end with an agent message, not a user message`
+                    : `The conversation history should end with a user message, not an agent message`;
+                  const isButtonDisabled =
+                    isCreating || isLoading || isLastMessageInvalid;
 
-                <p className="text-muted-foreground text-sm mb-6 max-w-md leading-relaxed">
-                  The agent&apos;s response to the last user message will be
-                  evaluated against the success criteria using examples
-                  provided. Previous messages will be passed as context.
-                </p>
-
-                <p className="text-muted-foreground text-sm mb-4">
-                  Create conversation context starting with
-                </p>
-
-                {/* Conversation starter buttons. Semantic tint per role so
-                    they match the per-row +-menu items below — agent = sky,
-                    user = amber. */}
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => addChatMessage("agent")}
-                    className="px-4 py-2.5 rounded-xl border cursor-pointer transition-colors flex items-center gap-2 bg-sky-500/12 border-sky-500/45 text-sky-950 dark:text-sky-100 hover:bg-sky-500/22 dark:hover:bg-sky-500/18"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={1.5}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z"
-                      />
-                    </svg>
-                    <span className="text-sm font-medium">Agent message</span>
-                  </button>
-                  <button
-                    onClick={() => addChatMessage("user")}
-                    className="px-4 py-2.5 rounded-xl border cursor-pointer transition-colors flex items-center gap-2 bg-amber-500/12 border-amber-500/45 text-amber-950 dark:text-amber-100 hover:bg-amber-500/22 dark:hover:bg-amber-500/18"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={1.5}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
-                      />
-                    </svg>
-                    <span className="text-sm font-medium">User message</span>
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {chatMessages.map((message, index) => {
-                  const evalTargetIndex =
-                    requireAssistantLastMessage &&
-                    chatMessages.length > 0 &&
-                    chatMessages[chatMessages.length - 1].role === "agent"
-                      ? chatMessages.length - 1
-                      : -1;
-                  const isEvalTarget = index === evalTargetIndex;
-                  const lastNonToolResponseIndex =
-                    chatMessages.length -
-                    1 -
-                    (chatMessages[chatMessages.length - 1]?.role ===
-                    "tool_response"
-                      ? 1
-                      : 0);
-                  const isLastNonToolResponse =
-                    index === lastNonToolResponseIndex;
-                  const showInlineDelete =
-                    message.role !== "tool_response" && !isLastNonToolResponse;
-                  const turnTimestamp = formatTurnTimestamp(message.createdAt);
                   return (
-                    <div
-                      key={message.id}
-                      className={`space-y-2 ${
-                        message.role === "user" ? "flex flex-col items-end" : ""
-                      } ${
-                        isEvalTarget
-                          ? "border-l-2 border-blue-500 pl-4 -ml-4"
-                          : ""
-                      }`}
-                    >
-                      {/* Message Header - show for agent messages and tool calls */}
-                      {(message.role === "agent" ||
-                        message.role === "tool_call") && (
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-medium text-foreground">
-                            {message.role === "tool_call"
-                              ? "Agent Tool Call"
-                              : "Agent"}
-                          </span>
-                          {isEvalTarget && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                              Evaluation target
-                            </span>
-                          )}
+                    <div className="relative group">
+                      <button
+                        onClick={handleSubmit}
+                        disabled={isButtonDisabled}
+                        className="h-9 md:h-10 px-4 md:px-5 rounded-lg text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        {isCreating ? (
+                          <>
+                            <svg
+                              className="w-4 h-4 animate-spin"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              ></circle>
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              ></path>
+                            </svg>
+                            {isEditing ? "Saving..." : "Creating..."}
+                          </>
+                        ) : isEditing ? (
+                          "Save"
+                        ) : (
+                          "Create"
+                        )}
+                      </button>
+                      {/* Tooltip for disabled state */}
+                      {isLastMessageAgent && !isCreating && !isLoading && (
+                        <div className="absolute bottom-full mb-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                          <div className="px-3 py-2 text-sm bg-background text-foreground border border-border rounded-lg shadow-lg w-72">
+                            {tooltipMessage}
+                          </div>
+                          {/* Arrow */}
+                          <div className="absolute top-full right-4 -mt-1 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-border"></div>
                         </div>
                       )}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
 
-                      {/* Message Bubble - for agent and user messages */}
-                      {(message.role === "agent" || message.role === "user") &&
-                        (() => {
-                          const isEmpty =
-                            localValidationAttempted && !message.content.trim();
-                          const inlineDeleteBtn = showInlineDelete ? (
-                            <button
-                              onClick={() => removeChatMessage(message.id)}
-                              className="w-8 h-8 flex-shrink-0 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60"
-                              title="Remove message"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
+          {/* Right Column - Chat Messages */}
+          <div className="w-full md:w-3/5 flex flex-col bg-muted/30 overflow-visible">
+            {/* Info banner */}
+            <div className="px-4 md:px-6 py-3 md:py-4 border-b border-border bg-blue-500/5">
+              <div className="flex items-start gap-3">
+                <svg
+                  className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                  />
+                </svg>
+                <p className="text-sm text-foreground leading-relaxed">
+                  {requireAssistantLastMessage
+                    ? "Your evaluators read this whole conversation and evaluate the last agent message (the one highlighted) against the evaluators. Only that final reply is scored."
+                    : activeTab === "conversation"
+                      ? "The agent generates its reply given the conversation and the entire conversation is then graded against the evaluators"
+                      : activeTab === "tool-invocation"
+                        ? "The tool call the agent makes in response to the last user message, given the conversation history, will be checked against the expected tool calls configured for this test"
+                        : "The agent's response to the last user message, given the conversation history, will be evaluated against the evaluators added to the test"}
+                </p>
+              </div>
+            </div>
+            {/* Chat Messages Area */}
+            <div className="flex-1 overflow-y-auto overflow-x-visible p-4 md:p-6">
+              {chatMessages.length === 0 ? (
+                /* Empty State Placeholder */
+                <div className="h-full flex flex-col items-center justify-center text-center px-8">
+                  {/* Globe with chat icon */}
+                  <div className="mb-6">
+                    <svg
+                      className="w-24 h-24 text-muted-foreground"
+                      viewBox="0 0 100 100"
+                      fill="none"
+                    >
+                      {/* Globe */}
+                      <circle
+                        cx="45"
+                        cy="50"
+                        r="30"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        fill="none"
+                      />
+                      <ellipse
+                        cx="45"
+                        cy="50"
+                        rx="12"
+                        ry="30"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        fill="none"
+                      />
+                      <path
+                        d="M15 50 Q45 35 75 50"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        fill="none"
+                      />
+                      <path
+                        d="M15 50 Q45 65 75 50"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        fill="none"
+                      />
+                      {/* Chat bubbles */}
+                      <circle
+                        cx="70"
+                        cy="30"
+                        r="12"
+                        className="fill-muted"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      />
+                      <circle cx="66" cy="30" r="1.5" fill="currentColor" />
+                      <circle cx="70" cy="30" r="1.5" fill="currentColor" />
+                      <circle cx="74" cy="30" r="1.5" fill="currentColor" />
+                      {/* Shadow */}
+                      <ellipse
+                        cx="45"
+                        cy="88"
+                        rx="18"
+                        ry="4"
+                        fill="currentColor"
+                        opacity="0.2"
+                      />
+                    </svg>
+                  </div>
+
+                  <h3 className="text-xl font-semibold text-foreground mb-3">
+                    No conversation context
+                  </h3>
+
+                  <p className="text-muted-foreground text-sm mb-6 max-w-md leading-relaxed">
+                    The agent&apos;s response to the last user message will be
+                    evaluated against the success criteria using examples
+                    provided. Previous messages will be passed as context.
+                  </p>
+
+                  <p className="text-muted-foreground text-sm mb-4">
+                    Create conversation context starting with
+                  </p>
+
+                  {/* Conversation starter buttons. Semantic tint per role so
+                    they match the per-row +-menu items below — agent = sky,
+                    user = amber. */}
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => addChatMessage("agent")}
+                      className="px-4 py-2.5 rounded-xl border cursor-pointer transition-colors flex items-center gap-2 bg-sky-500/12 border-sky-500/45 text-sky-950 dark:text-sky-100 hover:bg-sky-500/22 dark:hover:bg-sky-500/18"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={1.5}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z"
+                        />
+                      </svg>
+                      <span className="text-sm font-medium">Agent message</span>
+                    </button>
+                    <button
+                      onClick={() => addChatMessage("user")}
+                      className="px-4 py-2.5 rounded-xl border cursor-pointer transition-colors flex items-center gap-2 bg-amber-500/12 border-amber-500/45 text-amber-950 dark:text-amber-100 hover:bg-amber-500/22 dark:hover:bg-amber-500/18"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={1.5}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
+                        />
+                      </svg>
+                      <span className="text-sm font-medium">User message</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {chatMessages.map((message, index) => {
+                    const evalTargetIndex =
+                      requireAssistantLastMessage &&
+                      chatMessages.length > 0 &&
+                      chatMessages[chatMessages.length - 1].role === "agent"
+                        ? chatMessages.length - 1
+                        : -1;
+                    const isEvalTarget = index === evalTargetIndex;
+                    const lastNonToolResponseIndex =
+                      chatMessages.length -
+                      1 -
+                      (chatMessages[chatMessages.length - 1]?.role ===
+                      "tool_response"
+                        ? 1
+                        : 0);
+                    const isLastNonToolResponse =
+                      index === lastNonToolResponseIndex;
+                    const showInlineDelete =
+                      message.role !== "tool_response" &&
+                      !isLastNonToolResponse;
+                    const turnTimestamp = formatTurnTimestamp(
+                      message.createdAt,
+                    );
+                    return (
+                      <div
+                        key={message.id}
+                        className={`space-y-2 ${
+                          message.role === "user"
+                            ? "flex flex-col items-end"
+                            : ""
+                        } ${
+                          isEvalTarget
+                            ? "border-l-2 border-blue-500 pl-4 -ml-4"
+                            : ""
+                        }`}
+                      >
+                        {/* Message Header - show for agent messages and tool calls */}
+                        {(message.role === "agent" ||
+                          message.role === "tool_call") && (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-foreground">
+                              {message.role === "tool_call"
+                                ? "Agent Tool Call"
+                                : "Agent"}
+                            </span>
+                            {isEvalTarget && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                                Evaluation target
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Message Bubble - for agent and user messages */}
+                        {(message.role === "agent" ||
+                          message.role === "user") &&
+                          (() => {
+                            const isEmpty =
+                              localValidationAttempted &&
+                              !message.content.trim();
+                            const inlineDeleteBtn = showInlineDelete ? (
+                              <button
+                                onClick={() => removeChatMessage(message.id)}
+                                className="w-8 h-8 flex-shrink-0 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60"
+                                title="Remove message"
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                                />
-                              </svg>
-                            </button>
-                          ) : null;
-                          return (
-                            <div
-                              className={`flex w-full items-start gap-2 ${
-                                message.role === "user"
-                                  ? "flex-row-reverse"
-                                  : ""
-                              }`}
-                            >
-                              {inlineDeleteBtn}
-                              <div className="w-fit max-w-[50%] min-w-[180px] flex flex-col">
-                                <textarea
-                                  value={message.content}
-                                  placeholder={
-                                    message.role === "agent"
-                                      ? "Enter agent message"
-                                      : "Enter user message"
-                                  }
-                                  onChange={(e) => {
-                                    updateChatMessage(
-                                      message.id,
-                                      e.target.value,
-                                    );
-                                    // Auto-resize textarea
-                                    e.target.style.height = "auto";
-                                    e.target.style.height = `${e.target.scrollHeight}px`;
-                                  }}
-                                  onInput={(e) => {
-                                    // Auto-resize on initial render and paste
-                                    const target =
-                                      e.target as HTMLTextAreaElement;
-                                    target.style.height = "auto";
-                                    target.style.height = `${target.scrollHeight}px`;
-                                  }}
-                                  ref={autoSizeOnMount}
-                                  data-msg-id={message.id}
-                                  rows={1}
-                                  className={`[field-sizing:content] min-w-[180px] max-w-full px-4 py-2 rounded-xl text-sm text-foreground border focus:outline-none focus:ring-1 resize-none overflow-hidden placeholder:text-muted-foreground ${
-                                    isEmpty
-                                      ? "border-red-500 focus:ring-red-500"
-                                      : "focus:ring-accent " +
-                                        (message.role === "agent"
-                                          ? "bg-background border-border"
-                                          : "bg-accent border-border")
-                                  }`}
-                                />
-                                {isEmpty && (
-                                  <p className="text-xs text-red-500 mt-1">
-                                    Message cannot be empty
-                                  </p>
-                                )}
-                                {turnTimestamp && (
-                                  <span
-                                    className={`text-[11px] text-muted-foreground tabular-nums mt-1 ${
-                                      message.role === "user"
-                                        ? "self-start"
-                                        : "self-end"
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                                  />
+                                </svg>
+                              </button>
+                            ) : null;
+                            return (
+                              <div
+                                className={`flex w-full items-start gap-2 ${
+                                  message.role === "user"
+                                    ? "flex-row-reverse"
+                                    : ""
+                                }`}
+                              >
+                                {inlineDeleteBtn}
+                                <div className="w-fit max-w-[50%] min-w-[180px] flex flex-col">
+                                  <textarea
+                                    value={message.content}
+                                    placeholder={
+                                      message.role === "agent"
+                                        ? "Enter agent message"
+                                        : "Enter user message"
+                                    }
+                                    onChange={(e) => {
+                                      updateChatMessage(
+                                        message.id,
+                                        e.target.value,
+                                      );
+                                      // Auto-resize textarea
+                                      e.target.style.height = "auto";
+                                      e.target.style.height = `${e.target.scrollHeight}px`;
+                                    }}
+                                    onInput={(e) => {
+                                      // Auto-resize on initial render and paste
+                                      const target =
+                                        e.target as HTMLTextAreaElement;
+                                      target.style.height = "auto";
+                                      target.style.height = `${target.scrollHeight}px`;
+                                    }}
+                                    ref={autoSizeOnMount}
+                                    data-msg-id={message.id}
+                                    rows={1}
+                                    className={`[field-sizing:content] min-w-[180px] max-w-full px-4 py-2 rounded-xl text-sm text-foreground border focus:outline-none focus:ring-1 resize-none overflow-hidden placeholder:text-muted-foreground ${
+                                      isEmpty
+                                        ? "border-red-500 focus:ring-red-500"
+                                        : "focus:ring-accent " +
+                                          (message.role === "agent"
+                                            ? "bg-background border-border"
+                                            : "bg-accent border-border")
                                     }`}
-                                  >
-                                    {turnTimestamp}
-                                  </span>
-                                )}
+                                  />
+                                  {isEmpty && (
+                                    <p className="text-xs text-red-500 mt-1">
+                                      Message cannot be empty
+                                    </p>
+                                  )}
+                                  {turnTimestamp && (
+                                    <span
+                                      className={`text-[11px] text-muted-foreground tabular-nums mt-1 ${
+                                        message.role === "user"
+                                          ? "self-start"
+                                          : "self-end"
+                                      }`}
+                                    >
+                                      {turnTimestamp}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })()}
+                            );
+                          })()}
 
-                      {/* Tool Call Display */}
-                      {message.role === "tool_call" && (
-                        <div className="flex w-full items-start gap-2">
-                          {/* Delete button on the LEFT of the tool-call card
+                        {/* Tool Call Display */}
+                        {message.role === "tool_call" && (
+                          <div className="flex w-full items-start gap-2">
+                            {/* Delete button on the LEFT of the tool-call card
                               so it aligns with how previous agent message
                               rows place it (tool calls are always an agent
                               action, never a user one). Rendered first in
                               source order so flexbox lays it out at the
                               start of the row. */}
-                          {showInlineDelete && (
-                            <button
-                              onClick={() => removeChatMessage(message.id)}
-                              className="w-8 h-8 flex-shrink-0 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60"
-                              title="Remove message"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
+                            {showInlineDelete && (
+                              <button
+                                onClick={() => removeChatMessage(message.id)}
+                                className="w-8 h-8 flex-shrink-0 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60"
+                                title="Remove message"
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                                />
-                              </svg>
-                            </button>
-                          )}
-                          <div className="w-1/2 flex flex-col">
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                                  />
+                                </svg>
+                              </button>
+                            )}
+                            <div className="w-1/2 flex flex-col">
+                              <div className="bg-muted border border-border rounded-2xl p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <svg
+                                    className="w-4 h-4 text-muted-foreground"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={1.5}
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
+                                    />
+                                  </svg>
+                                  <span className="text-sm font-medium text-foreground">
+                                    {message.toolName}
+                                  </span>
+                                  {message.isWebhook && (
+                                    <span className="text-xs text-muted-foreground bg-background px-2 py-0.5 rounded">
+                                      Webhook
+                                    </span>
+                                  )}
+                                </div>
+                                {message.toolParams &&
+                                  message.toolParams.length > 0 && (
+                                    <div className="space-y-3 mt-3">
+                                      {/* Group parameters by type for webhook tools */}
+                                      {message.isWebhook ? (
+                                        <>
+                                          {/* Query Parameters */}
+                                          {message.toolParams.filter(
+                                            (p) => p.group === "query",
+                                          ).length > 0 && (
+                                            <div className="bg-background border border-border rounded-xl p-3">
+                                              <h5 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">
+                                                Query
+                                              </h5>
+                                              <div className="space-y-3">
+                                                {message.toolParams
+                                                  .filter(
+                                                    (p) => p.group === "query",
+                                                  )
+                                                  .map((param, idx) => {
+                                                    const isEmpty =
+                                                      !param.value.trim();
+                                                    const showError =
+                                                      localValidationAttempted &&
+                                                      isEmpty;
+                                                    return (
+                                                      <div key={idx}>
+                                                        <label className="block text-sm font-medium text-foreground mb-1.5">
+                                                          {param.name}
+                                                        </label>
+                                                        <input
+                                                          type="text"
+                                                          value={param.value}
+                                                          onChange={(e) =>
+                                                            updateToolCallParam(
+                                                              message.id,
+                                                              param.name,
+                                                              e.target.value,
+                                                              param.group,
+                                                            )
+                                                          }
+                                                          placeholder={`Enter ${param.name}`}
+                                                          data-tool-call-id={
+                                                            message.id
+                                                          }
+                                                          className={`w-full h-10 px-3 rounded-lg text-sm bg-muted text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                                                            showError
+                                                              ? "border-red-500"
+                                                              : "border-border"
+                                                          }`}
+                                                        />
+                                                        {showError && (
+                                                          <p className="text-xs text-red-500 mt-1">
+                                                            This field cannot be
+                                                            empty
+                                                          </p>
+                                                        )}
+                                                      </div>
+                                                    );
+                                                  })}
+                                              </div>
+                                            </div>
+                                          )}
+                                          {/* Body Parameters */}
+                                          {message.toolParams.filter(
+                                            (p) => p.group === "body",
+                                          ).length > 0 && (
+                                            <div className="bg-background border border-border rounded-xl p-3">
+                                              <h5 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">
+                                                Body
+                                              </h5>
+                                              <div className="space-y-3">
+                                                {message.toolParams
+                                                  .filter(
+                                                    (p) => p.group === "body",
+                                                  )
+                                                  .map((param, idx) => {
+                                                    const isEmpty =
+                                                      !param.value.trim();
+                                                    const showError =
+                                                      localValidationAttempted &&
+                                                      isEmpty;
+                                                    return (
+                                                      <div key={idx}>
+                                                        <label className="block text-sm font-medium text-foreground mb-1.5">
+                                                          {param.name}
+                                                        </label>
+                                                        <input
+                                                          type="text"
+                                                          value={param.value}
+                                                          onChange={(e) =>
+                                                            updateToolCallParam(
+                                                              message.id,
+                                                              param.name,
+                                                              e.target.value,
+                                                              param.group,
+                                                            )
+                                                          }
+                                                          placeholder={`Enter ${param.name}`}
+                                                          data-tool-call-id={
+                                                            message.id
+                                                          }
+                                                          className={`w-full h-10 px-3 rounded-lg text-sm bg-muted text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                                                            showError
+                                                              ? "border-red-500"
+                                                              : "border-border"
+                                                          }`}
+                                                        />
+                                                        {showError && (
+                                                          <p className="text-xs text-red-500 mt-1">
+                                                            This field cannot be
+                                                            empty
+                                                          </p>
+                                                        )}
+                                                      </div>
+                                                    );
+                                                  })}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </>
+                                      ) : (
+                                        /* Regular tool parameters */
+                                        <div className="space-y-3">
+                                          {message.toolParams.map(
+                                            (param, idx) => {
+                                              const isEmpty =
+                                                !param.value.trim();
+                                              const showError =
+                                                localValidationAttempted &&
+                                                isEmpty;
+                                              return (
+                                                <div key={idx}>
+                                                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                                                    {param.name}
+                                                  </label>
+                                                  <input
+                                                    type="text"
+                                                    value={param.value}
+                                                    onChange={(e) =>
+                                                      updateToolCallParam(
+                                                        message.id,
+                                                        param.name,
+                                                        e.target.value,
+                                                        param.group,
+                                                      )
+                                                    }
+                                                    placeholder={`Enter ${param.name}`}
+                                                    className={`w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                                                      showError
+                                                        ? "border-red-500"
+                                                        : "border-border"
+                                                    }`}
+                                                  />
+                                                  {showError && (
+                                                    <p className="text-xs text-red-500 mt-1">
+                                                      This field cannot be empty
+                                                    </p>
+                                                  )}
+                                                </div>
+                                              );
+                                            },
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                              </div>
+                              {turnTimestamp && (
+                                <span className="self-end text-[11px] text-muted-foreground tabular-nums mt-1">
+                                  {turnTimestamp}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Tool Response Display (for webhook tools) */}
+                        {message.role === "tool_response" && (
+                          <div className="w-1/2">
                             <div className="bg-muted border border-border rounded-2xl p-4">
                               <div className="flex items-center gap-2 mb-2">
                                 <svg
@@ -2578,339 +2793,139 @@ export function AddTestDialog({
                                   <path
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
-                                    d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
+                                    d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                                   />
                                 </svg>
                                 <span className="text-sm font-medium text-foreground">
-                                  {message.toolName}
+                                  Tool Response
                                 </span>
-                                {message.isWebhook && (
-                                  <span className="text-xs text-muted-foreground bg-background px-2 py-0.5 rounded">
-                                    Webhook
-                                  </span>
-                                )}
+                                <span className="text-xs text-muted-foreground">
+                                  ({message.toolName})
+                                </span>
                               </div>
-                              {message.toolParams &&
-                                message.toolParams.length > 0 && (
-                                  <div className="space-y-3 mt-3">
-                                    {/* Group parameters by type for webhook tools */}
-                                    {message.isWebhook ? (
-                                      <>
-                                        {/* Query Parameters */}
-                                        {message.toolParams.filter(
-                                          (p) => p.group === "query",
-                                        ).length > 0 && (
-                                          <div className="bg-background border border-border rounded-xl p-3">
-                                            <h5 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">
-                                              Query
-                                            </h5>
-                                            <div className="space-y-3">
-                                              {message.toolParams
-                                                .filter(
-                                                  (p) => p.group === "query",
-                                                )
-                                                .map((param, idx) => {
-                                                  const isEmpty =
-                                                    !param.value.trim();
-                                                  const showError =
-                                                    localValidationAttempted &&
-                                                    isEmpty;
-                                                  return (
-                                                    <div key={idx}>
-                                                      <label className="block text-sm font-medium text-foreground mb-1.5">
-                                                        {param.name}
-                                                      </label>
-                                                      <input
-                                                        type="text"
-                                                        value={param.value}
-                                                        onChange={(e) =>
-                                                          updateToolCallParam(
-                                                            message.id,
-                                                            param.name,
-                                                            e.target.value,
-                                                            param.group,
-                                                          )
-                                                        }
-                                                        placeholder={`Enter ${param.name}`}
-                                                        data-tool-call-id={
-                                                          message.id
-                                                        }
-                                                        className={`w-full h-10 px-3 rounded-lg text-sm bg-muted text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
-                                                          showError
-                                                            ? "border-red-500"
-                                                            : "border-border"
-                                                        }`}
-                                                      />
-                                                      {showError && (
-                                                        <p className="text-xs text-red-500 mt-1">
-                                                          This field cannot be
-                                                          empty
-                                                        </p>
-                                                      )}
-                                                    </div>
-                                                  );
-                                                })}
-                                            </div>
-                                          </div>
-                                        )}
-                                        {/* Body Parameters */}
-                                        {message.toolParams.filter(
-                                          (p) => p.group === "body",
-                                        ).length > 0 && (
-                                          <div className="bg-background border border-border rounded-xl p-3">
-                                            <h5 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">
-                                              Body
-                                            </h5>
-                                            <div className="space-y-3">
-                                              {message.toolParams
-                                                .filter(
-                                                  (p) => p.group === "body",
-                                                )
-                                                .map((param, idx) => {
-                                                  const isEmpty =
-                                                    !param.value.trim();
-                                                  const showError =
-                                                    localValidationAttempted &&
-                                                    isEmpty;
-                                                  return (
-                                                    <div key={idx}>
-                                                      <label className="block text-sm font-medium text-foreground mb-1.5">
-                                                        {param.name}
-                                                      </label>
-                                                      <input
-                                                        type="text"
-                                                        value={param.value}
-                                                        onChange={(e) =>
-                                                          updateToolCallParam(
-                                                            message.id,
-                                                            param.name,
-                                                            e.target.value,
-                                                            param.group,
-                                                          )
-                                                        }
-                                                        placeholder={`Enter ${param.name}`}
-                                                        data-tool-call-id={
-                                                          message.id
-                                                        }
-                                                        className={`w-full h-10 px-3 rounded-lg text-sm bg-muted text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
-                                                          showError
-                                                            ? "border-red-500"
-                                                            : "border-border"
-                                                        }`}
-                                                      />
-                                                      {showError && (
-                                                        <p className="text-xs text-red-500 mt-1">
-                                                          This field cannot be
-                                                          empty
-                                                        </p>
-                                                      )}
-                                                    </div>
-                                                  );
-                                                })}
-                                            </div>
-                                          </div>
-                                        )}
-                                      </>
-                                    ) : (
-                                      /* Regular tool parameters */
-                                      <div className="space-y-3">
-                                        {message.toolParams.map(
-                                          (param, idx) => {
-                                            const isEmpty = !param.value.trim();
-                                            const showError =
-                                              localValidationAttempted &&
-                                              isEmpty;
-                                            return (
-                                              <div key={idx}>
-                                                <label className="block text-sm font-medium text-foreground mb-1.5">
-                                                  {param.name}
-                                                </label>
-                                                <input
-                                                  type="text"
-                                                  value={param.value}
-                                                  onChange={(e) =>
-                                                    updateToolCallParam(
-                                                      message.id,
-                                                      param.name,
-                                                      e.target.value,
-                                                      param.group,
-                                                    )
-                                                  }
-                                                  placeholder={`Enter ${param.name}`}
-                                                  className={`w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
-                                                    showError
-                                                      ? "border-red-500"
-                                                      : "border-border"
-                                                  }`}
-                                                />
-                                                {showError && (
-                                                  <p className="text-xs text-red-500 mt-1">
-                                                    This field cannot be empty
-                                                  </p>
-                                                )}
-                                              </div>
-                                            );
-                                          },
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                            </div>
-                            {turnTimestamp && (
-                              <span className="self-end text-[11px] text-muted-foreground tabular-nums mt-1">
-                                {turnTimestamp}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Tool Response Display (for webhook tools) */}
-                      {message.role === "tool_response" && (
-                        <div className="w-1/2">
-                          <div className="bg-muted border border-border rounded-2xl p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                              <svg
-                                className="w-4 h-4 text-muted-foreground"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={1.5}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                />
-                              </svg>
-                              <span className="text-sm font-medium text-foreground">
-                                Tool Response
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                ({message.toolName})
-                              </span>
-                            </div>
-                            <div className="mt-2">
-                              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-                                JSON Response{" "}
-                                <span className="text-red-500">*</span>
-                              </label>
-                              <textarea
-                                value={message.content}
-                                onChange={(e) =>
-                                  updateChatMessage(message.id, e.target.value)
-                                }
-                                placeholder='{"status": "success", "response": {}}'
-                                rows={5}
-                                className={`w-full px-3 py-2 rounded-lg text-sm font-mono bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${(() => {
-                                  try {
-                                    JSON.parse(message.content);
-                                    return "border-border";
-                                  } catch {
-                                    return message.content.trim()
-                                      ? "border-red-500"
-                                      : "border-border";
-                                  }
-                                })()}`}
-                              />
-                              {(() => {
-                                try {
-                                  JSON.parse(message.content);
-                                  return null;
-                                } catch {
-                                  return message.content.trim() ? (
-                                    <p className="text-xs text-red-500 mt-1">
-                                      Invalid JSON format
-                                    </p>
-                                  ) : null;
-                                }
-                              })()}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Message Actions — Delete + Add on the last non-tool-response message only.
-                           Earlier messages get an inline delete button beside the bubble. */}
-                      <div className="flex items-center gap-2 relative">
-                        {message.role !== "tool_response" &&
-                          isLastNonToolResponse && (
-                            <button
-                              onClick={() => removeChatMessage(message.id)}
-                              className="w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60"
-                              title="Remove message"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                                />
-                              </svg>
-                            </button>
-                          )}
-                        {message.role !== "tool_response" &&
-                          index ===
-                            chatMessages.length -
-                              1 -
-                              (chatMessages[chatMessages.length - 1]?.role ===
-                              "tool_response"
-                                ? 1
-                                : 0) && (
-                            <>
-                              <div className="relative">
-                                <button
-                                  onClick={() =>
-                                    setAddMessageDropdownOpen(
-                                      !addMessageDropdownOpen,
+                              <div className="mt-2">
+                                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                                  JSON Response{" "}
+                                  <span className="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                  value={message.content}
+                                  onChange={(e) =>
+                                    updateChatMessage(
+                                      message.id,
+                                      e.target.value,
                                     )
                                   }
-                                  className="w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
-                                  title="Add message"
-                                >
-                                  <svg
-                                    className="w-4 h-4"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    strokeWidth={2}
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      d="M12 4.5v15m7.5-7.5h-15"
-                                    />
-                                  </svg>
-                                </button>
+                                  placeholder='{"status": "success", "response": {}}'
+                                  rows={5}
+                                  className={`w-full px-3 py-2 rounded-lg text-sm font-mono bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${(() => {
+                                    try {
+                                      JSON.parse(message.content);
+                                      return "border-border";
+                                    } catch {
+                                      return message.content.trim()
+                                        ? "border-red-500"
+                                        : "border-border";
+                                    }
+                                  })()}`}
+                                />
+                                {(() => {
+                                  try {
+                                    JSON.parse(message.content);
+                                    return null;
+                                  } catch {
+                                    return message.content.trim() ? (
+                                      <p className="text-xs text-red-500 mt-1">
+                                        Invalid JSON format
+                                      </p>
+                                    ) : null;
+                                  }
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
-                                {/* Dropdown Menu */}
-                                {addMessageDropdownOpen && (
-                                  <>
-                                    <div
-                                      className="fixed inset-0 z-[150]"
-                                      onClick={() =>
-                                        setAddMessageDropdownOpen(false)
-                                      }
-                                    />
-                                    <div
-                                      className={`absolute bg-background border border-border rounded-lg shadow-xl z-[200] overflow-hidden whitespace-nowrap ${
-                                        message.role === "user"
-                                          ? chatMessages.length <= 2
-                                            ? "right-0 top-10"
-                                            : "right-0 bottom-full mb-2"
-                                          : chatMessages.length <= 2
-                                            ? "left-0 top-10"
-                                            : "left-0 bottom-full mb-2"
-                                      }`}
+                        {/* Message Actions — Delete + Add on the last non-tool-response message only.
+                           Earlier messages get an inline delete button beside the bubble. */}
+                        <div className="flex items-center gap-2 relative">
+                          {message.role !== "tool_response" &&
+                            isLastNonToolResponse && (
+                              <button
+                                onClick={() => removeChatMessage(message.id)}
+                                className="w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60"
+                                title="Remove message"
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                                  />
+                                </svg>
+                              </button>
+                            )}
+                          {message.role !== "tool_response" &&
+                            index ===
+                              chatMessages.length -
+                                1 -
+                                (chatMessages[chatMessages.length - 1]?.role ===
+                                "tool_response"
+                                  ? 1
+                                  : 0) && (
+                              <>
+                                <div className="relative">
+                                  <button
+                                    onClick={() =>
+                                      setAddMessageDropdownOpen(
+                                        !addMessageDropdownOpen,
+                                      )
+                                    }
+                                    className="w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
+                                    title="Add message"
+                                  >
+                                    <svg
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      strokeWidth={2}
                                     >
-                                      {/* Three clearly separated hues so
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M12 4.5v15m7.5-7.5h-15"
+                                      />
+                                    </svg>
+                                  </button>
+
+                                  {/* Dropdown Menu */}
+                                  {addMessageDropdownOpen && (
+                                    <>
+                                      <div
+                                        className="fixed inset-0 z-[150]"
+                                        onClick={() =>
+                                          setAddMessageDropdownOpen(false)
+                                        }
+                                      />
+                                      <div
+                                        className={`absolute bg-background border border-border rounded-lg shadow-xl z-[200] overflow-hidden whitespace-nowrap ${
+                                          message.role === "user"
+                                            ? chatMessages.length <= 2
+                                              ? "right-0 top-10"
+                                              : "right-0 bottom-full mb-2"
+                                            : chatMessages.length <= 2
+                                              ? "left-0 top-10"
+                                              : "left-0 bottom-full mb-2"
+                                        }`}
+                                      >
+                                        {/* Three clearly separated hues so
                                           adjacent rows don't read as the
                                           same family: amber (warm yellow)
                                           for User, sky (cool blue) for
@@ -2918,297 +2933,299 @@ export function AddTestDialog({
                                           for Agent tool call — also
                                           distinct from the violet
                                           "Add evaluator" button above. */}
-                                      <button
-                                        onClick={() => {
-                                          addChatMessage("user");
-                                          setAddMessageDropdownOpen(false);
-                                        }}
-                                        className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-amber-500/15 text-amber-900 dark:bg-amber-500/20 dark:text-amber-100 hover:bg-amber-500/25 dark:hover:bg-amber-500/30"
-                                      >
-                                        <svg
-                                          className="w-4 h-4"
-                                          fill="none"
-                                          viewBox="0 0 24 24"
-                                          stroke="currentColor"
-                                          strokeWidth={1.5}
+                                        <button
+                                          onClick={() => {
+                                            addChatMessage("user");
+                                            setAddMessageDropdownOpen(false);
+                                          }}
+                                          className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-amber-500/15 text-amber-900 dark:bg-amber-500/20 dark:text-amber-100 hover:bg-amber-500/25 dark:hover:bg-amber-500/30"
                                         >
-                                          <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
-                                          />
-                                        </svg>
-                                        <span className="text-sm">
-                                          User message
-                                        </span>
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          addChatMessage("agent");
-                                          setAddMessageDropdownOpen(false);
-                                        }}
-                                        className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-sky-500/15 text-sky-900 dark:bg-sky-500/20 dark:text-sky-100 hover:bg-sky-500/25 dark:hover:bg-sky-500/30"
-                                      >
-                                        <svg
-                                          className="w-4 h-4"
-                                          fill="none"
-                                          viewBox="0 0 24 24"
-                                          stroke="currentColor"
-                                          strokeWidth={1.5}
+                                          <svg
+                                            className="w-4 h-4"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                            strokeWidth={1.5}
+                                          >
+                                            <path
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
+                                            />
+                                          </svg>
+                                          <span className="text-sm">
+                                            User message
+                                          </span>
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            addChatMessage("agent");
+                                            setAddMessageDropdownOpen(false);
+                                          }}
+                                          className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-sky-500/15 text-sky-900 dark:bg-sky-500/20 dark:text-sky-100 hover:bg-sky-500/25 dark:hover:bg-sky-500/30"
                                         >
-                                          <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z"
-                                          />
-                                        </svg>
-                                        <span className="text-sm">
-                                          Agent message
-                                        </span>
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          setAddMessageDropdownOpen(false);
-                                          setToolCallDropdownOpen(true);
-                                        }}
-                                        className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-fuchsia-500/15 text-fuchsia-900 dark:bg-fuchsia-500/20 dark:text-fuchsia-100 hover:bg-fuchsia-500/25 dark:hover:bg-fuchsia-500/30"
-                                      >
-                                        <svg
-                                          className="w-4 h-4"
-                                          fill="none"
-                                          viewBox="0 0 24 24"
-                                          stroke="currentColor"
-                                          strokeWidth={1.5}
+                                          <svg
+                                            className="w-4 h-4"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                            strokeWidth={1.5}
+                                          >
+                                            <path
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z"
+                                            />
+                                          </svg>
+                                          <span className="text-sm">
+                                            Agent message
+                                          </span>
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setAddMessageDropdownOpen(false);
+                                            setToolCallDropdownOpen(true);
+                                          }}
+                                          className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-fuchsia-500/15 text-fuchsia-900 dark:bg-fuchsia-500/20 dark:text-fuchsia-100 hover:bg-fuchsia-500/25 dark:hover:bg-fuchsia-500/30"
                                         >
-                                          <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
-                                          />
-                                        </svg>
-                                        <span className="text-sm">
-                                          Agent tool call
-                                        </span>
-                                      </button>
-                                    </div>
-                                  </>
-                                )}
+                                          <svg
+                                            className="w-4 h-4"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                            strokeWidth={1.5}
+                                          >
+                                            <path
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
+                                            />
+                                          </svg>
+                                          <span className="text-sm">
+                                            Agent tool call
+                                          </span>
+                                        </button>
+                                      </div>
+                                    </>
+                                  )}
 
-                                {/* Tool Call Selection Dropdown */}
-                                {toolCallDropdownOpen && (
-                                  <>
-                                    <div
-                                      className="fixed inset-0 z-[150]"
-                                      onClick={() => {
-                                        setToolCallDropdownOpen(false);
-                                        setPendingToolCall(null);
-                                      }}
-                                    />
-                                    <div
-                                      className={`absolute bg-background border border-border rounded-xl shadow-xl z-[200] overflow-hidden min-w-[320px] ${
-                                        message.role === "user"
-                                          ? chatMessages.length <= 2
-                                            ? "right-0 top-10"
-                                            : "right-0 bottom-full mb-2"
-                                          : chatMessages.length <= 2
-                                            ? "left-0 top-10"
-                                            : "left-0 bottom-full mb-2"
-                                      }`}
-                                    >
-                                      {!pendingToolCall ? (
-                                        <ToolPicker
-                                          availableTools={availableTools}
-                                          isLoading={availableToolsLoading}
-                                          onSelectInbuiltTool={(
-                                            toolId,
-                                            toolName,
-                                          ) => {
-                                            addToolCallMessage(
+                                  {/* Tool Call Selection Dropdown */}
+                                  {toolCallDropdownOpen && (
+                                    <>
+                                      <div
+                                        className="fixed inset-0 z-[150]"
+                                        onClick={() => {
+                                          setToolCallDropdownOpen(false);
+                                          setPendingToolCall(null);
+                                        }}
+                                      />
+                                      <div
+                                        className={`absolute bg-background border border-border rounded-xl shadow-xl z-[200] overflow-hidden min-w-[320px] ${
+                                          message.role === "user"
+                                            ? chatMessages.length <= 2
+                                              ? "right-0 top-10"
+                                              : "right-0 bottom-full mb-2"
+                                            : chatMessages.length <= 2
+                                              ? "left-0 top-10"
+                                              : "left-0 bottom-full mb-2"
+                                        }`}
+                                      >
+                                        {!pendingToolCall ? (
+                                          <ToolPicker
+                                            availableTools={availableTools}
+                                            isLoading={availableToolsLoading}
+                                            onSelectInbuiltTool={(
                                               toolId,
                                               toolName,
-                                              [],
-                                            );
-                                          }}
-                                          onSelectCustomTool={(tool) => {
-                                            const isWebhook =
-                                              tool.config?.type === "webhook";
-                                            let allParams: Array<{
-                                              name: string;
-                                              value: string;
-                                              group?: string;
-                                            }> = [];
+                                            ) => {
+                                              addToolCallMessage(
+                                                toolId,
+                                                toolName,
+                                                [],
+                                              );
+                                            }}
+                                            onSelectCustomTool={(tool) => {
+                                              const isWebhook =
+                                                tool.config?.type === "webhook";
+                                              let allParams: Array<{
+                                                name: string;
+                                                value: string;
+                                                group?: string;
+                                              }> = [];
 
-                                            if (
-                                              isWebhook &&
-                                              tool.config?.webhook
-                                            ) {
-                                              // Extract webhook-specific parameters
-                                              const webhook =
-                                                tool.config.webhook;
-
-                                              // Query parameters (for GET requests)
                                               if (
-                                                webhook.queryParameters &&
-                                                Array.isArray(
-                                                  webhook.queryParameters,
-                                                )
+                                                isWebhook &&
+                                                tool.config?.webhook
                                               ) {
-                                                webhook.queryParameters.forEach(
-                                                  (p: any) => {
-                                                    allParams.push({
-                                                      name:
-                                                        p.id || p.name || "",
-                                                      value: "",
-                                                      group: "query",
-                                                    });
-                                                  },
-                                                );
-                                              }
+                                                // Extract webhook-specific parameters
+                                                const webhook =
+                                                  tool.config.webhook;
 
-                                              // Body parameters (for POST requests)
-                                              if (
-                                                webhook.body?.parameters &&
-                                                Array.isArray(
-                                                  webhook.body.parameters,
-                                                )
-                                              ) {
-                                                webhook.body.parameters.forEach(
-                                                  (p: any) => {
-                                                    allParams.push({
-                                                      name:
-                                                        p.id || p.name || "",
-                                                      value: "",
-                                                      group: "body",
-                                                    });
-                                                  },
-                                                );
-                                              }
-                                              // Note: Headers are not shown in conversation history UI
-                                            } else {
-                                              // Structured output tool - use regular parameters
-                                              const params =
-                                                tool.config?.parameters;
-                                              if (Array.isArray(params)) {
-                                                allParams = params.map(
-                                                  (p: any) => ({
-                                                    name: p.id || p.name || "",
-                                                    value: "",
-                                                  }),
-                                                );
+                                                // Query parameters (for GET requests)
+                                                if (
+                                                  webhook.queryParameters &&
+                                                  Array.isArray(
+                                                    webhook.queryParameters,
+                                                  )
+                                                ) {
+                                                  webhook.queryParameters.forEach(
+                                                    (p: any) => {
+                                                      allParams.push({
+                                                        name:
+                                                          p.id || p.name || "",
+                                                        value: "",
+                                                        group: "query",
+                                                      });
+                                                    },
+                                                  );
+                                                }
+
+                                                // Body parameters (for POST requests)
+                                                if (
+                                                  webhook.body?.parameters &&
+                                                  Array.isArray(
+                                                    webhook.body.parameters,
+                                                  )
+                                                ) {
+                                                  webhook.body.parameters.forEach(
+                                                    (p: any) => {
+                                                      allParams.push({
+                                                        name:
+                                                          p.id || p.name || "",
+                                                        value: "",
+                                                        group: "body",
+                                                      });
+                                                    },
+                                                  );
+                                                }
+                                                // Note: Headers are not shown in conversation history UI
                                               } else {
-                                                const propsObj =
-                                                  tool.config?.parameters
-                                                    ?.properties ||
-                                                  tool.config?.function
-                                                    ?.parameters?.properties ||
-                                                  tool.config?.properties ||
-                                                  tool.config?.parameters ||
-                                                  {};
-                                                allParams = Object.keys(
-                                                  propsObj,
-                                                ).map((name) => ({
-                                                  name,
-                                                  value: "",
-                                                }));
+                                                // Structured output tool - use regular parameters
+                                                const params =
+                                                  tool.config?.parameters;
+                                                if (Array.isArray(params)) {
+                                                  allParams = params.map(
+                                                    (p: any) => ({
+                                                      name:
+                                                        p.id || p.name || "",
+                                                      value: "",
+                                                    }),
+                                                  );
+                                                } else {
+                                                  const propsObj =
+                                                    tool.config?.parameters
+                                                      ?.properties ||
+                                                    tool.config?.function
+                                                      ?.parameters
+                                                      ?.properties ||
+                                                    tool.config?.properties ||
+                                                    tool.config?.parameters ||
+                                                    {};
+                                                  allParams = Object.keys(
+                                                    propsObj,
+                                                  ).map((name) => ({
+                                                    name,
+                                                    value: "",
+                                                  }));
+                                                }
                                               }
-                                            }
 
-                                            addToolCallMessage(
-                                              tool.uuid,
-                                              tool.name,
-                                              allParams,
-                                              isWebhook,
-                                            );
-                                          }}
-                                        />
-                                      ) : (
-                                        <div className="p-4">
-                                          <div className="flex items-center gap-2 mb-4">
+                                              addToolCallMessage(
+                                                tool.uuid,
+                                                tool.name,
+                                                allParams,
+                                                isWebhook,
+                                              );
+                                            }}
+                                          />
+                                        ) : (
+                                          <div className="p-4">
+                                            <div className="flex items-center gap-2 mb-4">
+                                              <button
+                                                onClick={() =>
+                                                  setPendingToolCall(null)
+                                                }
+                                                className="text-muted-foreground hover:text-foreground transition-colors"
+                                              >
+                                                <svg
+                                                  className="w-4 h-4"
+                                                  fill="none"
+                                                  viewBox="0 0 24 24"
+                                                  stroke="currentColor"
+                                                  strokeWidth={2}
+                                                >
+                                                  <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    d="M15.75 19.5L8.25 12l7.5-7.5"
+                                                  />
+                                                </svg>
+                                              </button>
+                                              <h4 className="text-sm font-medium text-foreground">
+                                                {pendingToolCall.toolName}
+                                              </h4>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground mb-3">
+                                              Enter values for parameters:
+                                            </p>
+                                            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                                              {pendingToolCall.params.map(
+                                                (param, idx) => (
+                                                  <div key={idx}>
+                                                    <label className="block text-xs text-muted-foreground mb-1">
+                                                      {param.name}
+                                                    </label>
+                                                    <input
+                                                      type="text"
+                                                      value={param.value}
+                                                      onChange={(e) => {
+                                                        const newParams = [
+                                                          ...pendingToolCall.params,
+                                                        ];
+                                                        newParams[idx].value =
+                                                          e.target.value;
+                                                        setPendingToolCall({
+                                                          ...pendingToolCall,
+                                                          params: newParams,
+                                                        });
+                                                      }}
+                                                      placeholder={`Enter ${param.name}`}
+                                                      className="w-full h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-1 focus:ring-accent"
+                                                    />
+                                                  </div>
+                                                ),
+                                              )}
+                                            </div>
                                             <button
                                               onClick={() =>
-                                                setPendingToolCall(null)
+                                                addToolCallMessage(
+                                                  pendingToolCall.toolId,
+                                                  pendingToolCall.toolName,
+                                                  pendingToolCall.params,
+                                                )
                                               }
-                                              className="text-muted-foreground hover:text-foreground transition-colors"
+                                              className="w-full mt-4 h-9 px-4 rounded-lg text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
                                             >
-                                              <svg
-                                                className="w-4 h-4"
-                                                fill="none"
-                                                viewBox="0 0 24 24"
-                                                stroke="currentColor"
-                                                strokeWidth={2}
-                                              >
-                                                <path
-                                                  strokeLinecap="round"
-                                                  strokeLinejoin="round"
-                                                  d="M15.75 19.5L8.25 12l7.5-7.5"
-                                                />
-                                              </svg>
+                                              Add tool call
                                             </button>
-                                            <h4 className="text-sm font-medium text-foreground">
-                                              {pendingToolCall.toolName}
-                                            </h4>
                                           </div>
-                                          <p className="text-xs text-muted-foreground mb-3">
-                                            Enter values for parameters:
-                                          </p>
-                                          <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                                            {pendingToolCall.params.map(
-                                              (param, idx) => (
-                                                <div key={idx}>
-                                                  <label className="block text-xs text-muted-foreground mb-1">
-                                                    {param.name}
-                                                  </label>
-                                                  <input
-                                                    type="text"
-                                                    value={param.value}
-                                                    onChange={(e) => {
-                                                      const newParams = [
-                                                        ...pendingToolCall.params,
-                                                      ];
-                                                      newParams[idx].value =
-                                                        e.target.value;
-                                                      setPendingToolCall({
-                                                        ...pendingToolCall,
-                                                        params: newParams,
-                                                      });
-                                                    }}
-                                                    placeholder={`Enter ${param.name}`}
-                                                    className="w-full h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-1 focus:ring-accent"
-                                                  />
-                                                </div>
-                                              ),
-                                            )}
-                                          </div>
-                                          <button
-                                            onClick={() =>
-                                              addToolCallMessage(
-                                                pendingToolCall.toolId,
-                                                pendingToolCall.toolName,
-                                                pendingToolCall.params,
-                                              )
-                                            }
-                                            className="w-full mt-4 h-9 px-4 rounded-lg text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
-                                          >
-                                            Add tool call
-                                          </button>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            </>
-                          )}
+                                        )}
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-                <div ref={chatEndRef} />
-              </div>
-            )}
+                    );
+                  })}
+                  <div ref={chatEndRef} />
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
       )}
     </div>
   );
