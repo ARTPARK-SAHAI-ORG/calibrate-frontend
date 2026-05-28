@@ -169,6 +169,9 @@ function LLMPageInner() {
   );
   const [editingTestUuid, setEditingTestUuid] = useState<string | null>(null);
   const [isLoadingTest, setIsLoadingTest] = useState(false);
+  // UUID of the test whose details are being fetched for duplication. Drives
+  // the per-row spinner; the dialog only opens once the fetch resolves.
+  const [duplicatingUuid, setDuplicatingUuid] = useState<string | null>(null);
   const [validationAttempted, setValidationAttempted] = useState(false);
   const [initialTab, setInitialTab] = useState<
     "next-reply" | "tool-invocation" | undefined
@@ -761,17 +764,15 @@ function LLMPageInner() {
     }
   };
 
-  // Open the create dialog pre-filled from an existing test. editingTestUuid
-  // stays null so submitting creates a brand-new test — nothing is persisted
-  // until the user submits.
+  // Duplicate a test: fetch its details first (showing a spinner on the row's
+  // duplicate button), then open the create dialog pre-filled. The dialog is
+  // mounted only after the fresh data is in state, so it can't briefly show a
+  // previous duplicate's leftover config/evaluators. editingTestUuid stays
+  // null so submitting creates a brand-new test — nothing is persisted until
+  // the user submits.
   const openDuplicateTest = async (test: TestData) => {
     try {
-      setIsLoadingTest(true);
-      setEditingTestUuid(null);
-      setAddTestSidebarOpen(true);
-      setCreateError(null);
-      setNameConflictError(null);
-      setValidationAttempted(false);
+      setDuplicatingUuid(test.uuid);
 
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
@@ -797,6 +798,11 @@ function LLMPageInner() {
 
       const testData: TestData = await response.json();
 
+      // Populate all dialog inputs before opening it.
+      setEditingTestUuid(null);
+      setCreateError(null);
+      setNameConflictError(null);
+      setValidationAttempted(false);
       setNewTestName(`Copy of ${testData.name || test.name}`);
       setNewTestDescription(
         testData.config?.description || testData.description || ""
@@ -804,9 +810,7 @@ function LLMPageInner() {
       setInitialTab(
         testData.type === "tool_call" ? "tool-invocation" : "next-reply"
       );
-      if (testData.config) {
-        setInitialConfig(testData.config as TestConfig);
-      }
+      setInitialConfig(testData.config ? (testData.config as TestConfig) : undefined);
       if (Array.isArray(testData.evaluators)) {
         setInitialEvaluators(
           testData.evaluators.map((e) => ({
@@ -821,13 +825,16 @@ function LLMPageInner() {
       } else {
         setInitialEvaluators([]);
       }
+
+      // Open the dialog only now that the fresh data is in state.
+      setAddTestSidebarOpen(true);
     } catch (err) {
       console.error("Error duplicating test:", err);
       setCreateError(
         err instanceof Error ? err.message : "Failed to load test"
       );
     } finally {
-      setIsLoadingTest(false);
+      setDuplicatingUuid(null);
     }
   };
 
@@ -1259,6 +1266,7 @@ function LLMPageInner() {
                     <DuplicateIconButton
                       onClick={() => openDuplicateTest(test)}
                       tooltip="Duplicate test"
+                      loading={duplicatingUuid === test.uuid}
                     />
                     {/* Delete Button */}
                     <DeleteIconButton
