@@ -1371,31 +1371,43 @@ export function AddTestDialog({
       <div className="relative w-full max-w-7xl h-[95vh] md:h-[85vh] mx-2 md:mx-4 bg-background rounded-xl md:rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden border border-border">
         {/* Left Column - Form */}
         <div className="w-full md:w-2/5 flex flex-col border-b md:border-b-0 md:border-r border-border">
-          {/* Tabs — hidden in labelItem mode (always next-reply) */}
-          {!isLabelItem && (
-            <div className="flex border-b border-border">
-              <button
-                onClick={() => setActiveTab("next-reply")}
-                className={`flex-1 py-3 md:py-4 text-sm md:text-base font-medium transition-colors cursor-pointer ${
-                  activeTab === "next-reply"
-                    ? "text-foreground border-b-2 border-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Next reply test
-              </button>
-              <button
-                onClick={() => setActiveTab("tool-invocation")}
-                className={`flex-1 py-3 md:py-4 text-sm md:text-base font-medium transition-colors cursor-pointer ${
-                  activeTab === "tool-invocation"
-                    ? "text-foreground border-b-2 border-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Tool invocation test
-              </button>
-            </div>
-          )}
+          {/* Tabs — hidden in labelItem mode (always next-reply). When
+              editing an existing test the type is fixed (the backend no
+              longer allows changing a test's type), so we show only the
+              matching view's label as a static, non-switchable header. */}
+          {!isLabelItem &&
+            (isEditing ? (
+              <div className="flex border-b border-border">
+                <div className="flex-1 py-3 md:py-4 text-sm md:text-base font-medium text-foreground border-b-2 border-foreground text-center">
+                  {activeTab === "tool-invocation"
+                    ? "Tool invocation test"
+                    : "Next reply test"}
+                </div>
+              </div>
+            ) : (
+              <div className="flex border-b border-border">
+                <button
+                  onClick={() => setActiveTab("next-reply")}
+                  className={`flex-1 py-3 md:py-4 text-sm md:text-base font-medium transition-colors cursor-pointer ${
+                    activeTab === "next-reply"
+                      ? "text-foreground border-b-2 border-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Next reply test
+                </button>
+                <button
+                  onClick={() => setActiveTab("tool-invocation")}
+                  className={`flex-1 py-3 md:py-4 text-sm md:text-base font-medium transition-colors cursor-pointer ${
+                    activeTab === "tool-invocation"
+                      ? "text-foreground border-b-2 border-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Tool invocation test
+                </button>
+              </div>
+            ))}
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto overflow-x-visible p-4 md:p-6">
