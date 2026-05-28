@@ -54,6 +54,40 @@ export type TestConfig = {
 // Evaluator type for the conversation tab — picker is filtered to this.
 const CONVERSATION_EVALUATOR_TYPE = "simulation";
 
+type TestTab = "next-reply" | "tool-invocation" | "conversation";
+
+// The three selectable test types, shared by the create-phase intro picker
+// (large cards) and the compact in-dialog type switcher (top-left boxes) so
+// both surfaces stay in sync. `label` is the short box label; `title` is the
+// full heading; `description` is the one-liner shown on the intro cards.
+const TEST_TYPE_OPTIONS: Array<{
+  tab: TestTab;
+  label: string;
+  title: string;
+  description: string;
+}> = [
+  {
+    tab: "next-reply",
+    label: "Next reply",
+    title: "Next reply test",
+    description: "Evaluate the agent's response given a conversation history.",
+  },
+  {
+    tab: "tool-invocation",
+    label: "Tool call",
+    title: "Tool call test",
+    description:
+      "Check whether the agent invokes the correct tool with the right arguments.",
+  },
+  {
+    tab: "conversation",
+    label: "Conversation",
+    title: "Conversation test",
+    description:
+      "Generate the agent's reply, then grade the full conversation as a whole.",
+  },
+];
+
 export type EvaluatorVariableDef = {
   name: string;
   description?: string;
@@ -174,14 +208,50 @@ export function AddTestDialog({
   const ItemNoun = isLabelItem ? "Item" : "Test";
 
   const backendAccessToken = useAccessToken();
-  const [activeTab, setActiveTab] = useState<
-    "next-reply" | "tool-invocation" | "conversation"
-  >(isLabelItem ? "next-reply" : initialTab || "next-reply");
+  const [activeTab, setActiveTab] = useState<TestTab>(
+    isLabelItem ? "next-reply" : initialTab || "next-reply",
+  );
   // Tabs that pair the conversation history with attached evaluators (vs. the
   // tool-invocation tab, which uses a tool picker instead). Used to gate the
   // shared evaluator-related UI and validation paths below.
   const isEvaluatorTab =
     activeTab === "next-reply" || activeTab === "conversation";
+
+  // Two-phase create flow: when creating a brand-new test we first show a
+  // centred type picker (the same three boxes as the bulk-upload modal),
+  // then animate into the full editor. Editing (type is immutable) and
+  // labelItem mode skip the intro entirely. `typeChosen` gates which phase
+  // renders; `editorEntered` drives the entrance transition once chosen.
+  const showTypeIntroFlow = !isLabelItem && !isEditing;
+  const [typeChosen, setTypeChosen] = useState<boolean>(!showTypeIntroFlow);
+  const [editorEntered, setEditorEntered] = useState<boolean>(!showTypeIntroFlow);
+
+  // Reset the phase whenever the dialog (re)opens so a fresh create always
+  // starts on the picker and an edit always lands straight in the editor.
+  useEffect(() => {
+    if (!isOpen) return;
+    const skipIntro = isLabelItem || isEditing;
+    setTypeChosen(skipIntro);
+    setEditorEntered(skipIntro);
+  }, [isOpen, isLabelItem, isEditing]);
+
+  // Drive the editor's scale/opacity entrance on the frame after the type is
+  // chosen, so the swap from the intro picker reads as an animation.
+  useEffect(() => {
+    if (!typeChosen) {
+      setEditorEntered(false);
+      return;
+    }
+    if (editorEntered) return;
+    const raf = requestAnimationFrame(() => setEditorEntered(true));
+    return () => cancelAnimationFrame(raf);
+  }, [typeChosen, editorEntered]);
+
+  // Pick a type from the intro picker and slide into the full editor.
+  const chooseTestType = (tab: TestTab) => {
+    setActiveTab(tab);
+    setTypeChosen(true);
+  };
 
   // Available tools state - declared early so it's available for initialConfig parsing
   const [availableTools, setAvailableTools] = useState<AvailableTool[]>([]);
@@ -1345,13 +1415,72 @@ export function AddTestDialog({
 
   if (!isOpen) return null;
 
+  // During the intro picker nothing has been entered yet, so a backdrop
+  // click can close immediately without the "discard changes?" guard.
+  const handleBackdropDismiss = typeChosen ? handleBackdropClick : onClose;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={handleBackdropClick}
+        onClick={handleBackdropDismiss}
       />
+
+      {/* Create-phase intro: centred type picker (the same three boxes the
+          bulk-upload modal uses). Selecting a box animates into the full
+          editor, where a compact version of the same boxes stays in the
+          top-left so the type can still be switched while creating. */}
+      {!typeChosen && (
+        <div className="relative w-full max-w-2xl mx-4 bg-background rounded-2xl shadow-2xl border border-border flex flex-col overflow-hidden animate-in-scale">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+            <h2 className="text-lg font-semibold text-foreground">
+              Create a test
+            </h2>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+              aria-label="Close"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+          <div className="px-6 py-5">
+            <label className="block text-sm font-medium text-foreground mb-3">
+              Select the type of test
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {TEST_TYPE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.tab}
+                  type="button"
+                  onClick={() => chooseTestType(opt.tab)}
+                  className="text-left px-4 py-3 rounded-lg border border-border bg-background hover:bg-muted/50 hover:border-foreground/40 transition-colors cursor-pointer"
+                >
+                  <div className="text-sm font-medium mb-0.5 text-foreground">
+                    {opt.title}
+                  </div>
+                  <div className="text-xs leading-snug text-muted-foreground">
+                    {opt.description}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Close Confirmation Dialog */}
       {showCloseConfirmation && (
@@ -1387,7 +1516,12 @@ export function AddTestDialog({
       )}
 
       {/* Dialog */}
-      <div className="relative w-full max-w-7xl h-[95vh] md:h-[85vh] mx-2 md:mx-4 bg-background rounded-xl md:rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden border border-border">
+      {typeChosen && (
+      <div
+        className={`relative w-full max-w-7xl h-[95vh] md:h-[85vh] mx-2 md:mx-4 bg-background rounded-xl md:rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden border border-border transition-all duration-300 ease-out ${
+          editorEntered ? "opacity-100 scale-100" : "opacity-0 scale-95"
+        }`}
+      >
         {/* Left Column - Form */}
         <div className="w-full md:w-2/5 flex flex-col border-b md:border-b-0 md:border-r border-border">
           {/* Tabs — hidden in labelItem mode (always next-reply). When
@@ -1399,44 +1533,31 @@ export function AddTestDialog({
               <div className="flex border-b border-border">
                 <div className="flex-1 py-3 md:py-4 text-sm md:text-base font-medium text-foreground border-b-2 border-foreground text-center">
                   {activeTab === "tool-invocation"
-                    ? "Tool invocation test"
+                    ? "Tool call test"
                     : activeTab === "conversation"
                       ? "Conversation test"
                       : "Next reply test"}
                 </div>
               </div>
             ) : (
-              <div className="flex border-b border-border">
-                <button
-                  onClick={() => setActiveTab("next-reply")}
-                  className={`flex-1 py-3 md:py-4 text-sm md:text-base font-medium transition-colors cursor-pointer ${
-                    activeTab === "next-reply"
-                      ? "text-foreground border-b-2 border-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Next reply test
-                </button>
-                <button
-                  onClick={() => setActiveTab("tool-invocation")}
-                  className={`flex-1 py-3 md:py-4 text-sm md:text-base font-medium transition-colors cursor-pointer ${
-                    activeTab === "tool-invocation"
-                      ? "text-foreground border-b-2 border-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Tool invocation test
-                </button>
-                <button
-                  onClick={() => setActiveTab("conversation")}
-                  className={`flex-1 py-3 md:py-4 text-sm md:text-base font-medium transition-colors cursor-pointer ${
-                    activeTab === "conversation"
-                      ? "text-foreground border-b-2 border-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Conversation test
-                </button>
+              // Create phase: the same three boxes from the intro picker,
+              // rendered compactly in the top-left so the type can still be
+              // switched mid-create.
+              <div className="flex gap-2 p-3 border-b border-border">
+                {TEST_TYPE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.tab}
+                    onClick={() => setActiveTab(opt.tab)}
+                    title={opt.title}
+                    className={`flex-1 min-w-0 px-2 py-2 rounded-lg border text-xs md:text-sm font-medium transition-colors cursor-pointer truncate ${
+                      activeTab === opt.tab
+                        ? "bg-foreground text-background border-foreground"
+                        : "bg-background border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
             ))}
 
@@ -3088,6 +3209,7 @@ export function AddTestDialog({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
