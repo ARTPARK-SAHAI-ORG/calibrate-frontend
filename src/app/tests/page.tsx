@@ -1282,7 +1282,7 @@ function LLMPageInner() {
                         e.stopPropagation();
                         openDeleteDialog(test);
                       }}
-                      className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                      className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                     >
                       <svg
                         className="w-4 h-4"
