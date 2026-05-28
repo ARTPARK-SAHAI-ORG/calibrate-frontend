@@ -457,7 +457,7 @@ export function BulkUploadTestsModal({
         {
           name: "conversation_history",
           description: isConversationType
-            ? `${CONVERSATION_HISTORY_DESC}\n\nThe full conversation is graded as a whole — it may end on either an assistant or a user turn.`
+            ? `${CONVERSATION_HISTORY_DESC}\n\nThe conversation should end with a user message. On run, the agent generates its reply to that message and the full conversation (history plus the generated reply) is graded as a whole.`
             : CONVERSATION_HISTORY_DESC,
           example: `[
   {"role": "user", "content": "What is your return policy?"},
@@ -1199,7 +1199,7 @@ export function BulkUploadTestsModal({
                     value: "conversation" as const,
                     label: "Conversation",
                     description:
-                      "Evaluate an entire conversation history as a whole",
+                      "Generate the agent's reply, then grade the full conversation as a whole",
                   },
                 ]
               ).map((opt) => {

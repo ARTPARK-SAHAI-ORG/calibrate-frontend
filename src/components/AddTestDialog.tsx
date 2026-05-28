@@ -455,13 +455,15 @@ export function AddTestDialog({
       // since that's the message being graded.
       return [u("1"), a("2")];
     }
-    if (allowAgentLastMessage || activeTab === "conversation") {
-      // Simulation add-item / conversation test: a short but complete
-      // conversation transcript (any role can be last).
+    if (allowAgentLastMessage) {
+      // Simulation add-item: a short but complete conversation transcript
+      // (any role can be last).
       return [u("1"), a("2"), u("3"), a("4"), u("5"), a("6")];
     }
-    // Default test: user → agent → user (final user turn is what the agent
-    // will reply to when the test runs).
+    // Default test (next-reply AND conversation): user → agent → user. The
+    // final user turn is what the agent will reply to when the test runs —
+    // conversation tests also generate the agent's next reply live, then
+    // judge the full conversation, so they must end on a user turn too.
     return [u("1"), a("2"), u("3")];
   });
 
@@ -2050,12 +2052,12 @@ export function AddTestDialog({
                 if (requireAssistantLastMessage) {
                   isLastMessageInvalid =
                     isEmpty || lastMessage?.role !== "agent";
-                } else if (
-                  allowAgentLastMessage ||
-                  activeTab === "conversation"
-                ) {
+                } else if (allowAgentLastMessage) {
                   isLastMessageInvalid = isEmpty;
                 } else {
+                  // Next-reply AND conversation tests run the agent against
+                  // the trailing user turn, so the history must end on a
+                  // user message, not an agent one.
                   isLastMessageInvalid =
                     isEmpty || lastMessage?.role === "agent";
                 }
@@ -2141,7 +2143,7 @@ export function AddTestDialog({
                 {requireAssistantLastMessage
                   ? "Your evaluators read this whole conversation and evaluate the last agent message (the one highlighted) against the evaluators. Only that final reply is scored."
                   : activeTab === "conversation"
-                    ? "Your evaluators read the entire conversation history and grade it as a whole against the evaluators added to the test."
+                    ? "The agent generates its reply to the last user message; the full conversation (history plus that generated reply) is then graded against the evaluators added to the test."
                     : "The agent's response to the last user message, given the conversation history, will be evaluated against the evaluators added to the test"}
               </p>
             </div>
