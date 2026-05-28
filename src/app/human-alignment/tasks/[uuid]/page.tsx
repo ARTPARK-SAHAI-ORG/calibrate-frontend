@@ -1641,6 +1641,18 @@ function LabellingTaskPageInner() {
   const [selectAllTotal, setSelectAllTotal] = useState(false);
 
   const toggleItem = (uuid: string) => {
+    if (selectAllTotal) {
+      // Leaving "select all across pages": the backend can't express
+      // "all except this one", so collapse to an explicit selection of
+      // the current page (every visible row was shown ticked) and drop
+      // the row the user just unticked.
+      const next = new Set(items.map((i) => i.uuid));
+      next.delete(uuid);
+      setSelectedItemIds(next);
+      setSelectAllTotal(false);
+      setLastSelectedItemUuid(uuid);
+      return;
+    }
     setSelectedItemIds((prev) => {
       const next = new Set(prev);
       if (next.has(uuid)) next.delete(uuid);
@@ -1648,8 +1660,6 @@ function LabellingTaskPageInner() {
       return next;
     });
     setLastSelectedItemUuid(uuid);
-    // Per-row interaction exits "select all across pages" mode.
-    setSelectAllTotal(false);
   };
 
   /**
@@ -1659,6 +1669,13 @@ function LabellingTaskPageInner() {
    * the anchor is missing.
    */
   const selectRangeTo = (targetUuid: string) => {
+    // In "select all across pages" mode every row is already ticked, so a
+    // shift+click degrades to a single toggle (which materialises the page
+    // selection and drops select-all).
+    if (selectAllTotal) {
+      toggleItem(targetUuid);
+      return;
+    }
     if (!lastSelectedItemUuid || lastSelectedItemUuid === targetUuid) {
       toggleItem(targetUuid);
       return;
@@ -1713,17 +1730,19 @@ function LabellingTaskPageInner() {
     });
   };
 
-  const allSelected = items.length > 0 && selectedItemIds.size === items.length;
-  const someSelected = selectedItemIds.size > 0 && !allSelected;
+  const allSelected =
+    selectAllTotal ||
+    (items.length > 0 && selectedItemIds.size === items.length);
+  const someSelected =
+    !selectAllTotal && selectedItemIds.size > 0 && !allSelected;
   const toggleSelectAll = () => {
-    setSelectedItemIds((prev) =>
-      prev.size === items.length
-        ? new Set()
-        : new Set(items.map((i) => i.uuid)),
-    );
-    // Header-checkbox toggle only acts on the current page; if the user
-    // was in "select all across pages" mode, drop back to page scope.
-    setSelectAllTotal(false);
+    if (allSelected) {
+      // Everything (current page, or all-across-pages) is selected → clear.
+      setSelectedItemIds(new Set());
+      setSelectAllTotal(false);
+    } else {
+      setSelectedItemIds(new Set(items.map((i) => i.uuid)));
+    }
   };
 
   /**
@@ -3050,7 +3069,8 @@ function LabellingTaskPageInner() {
                       typeof p.predicted_transcript === "string"
                         ? p.predicted_transcript
                         : "";
-                    const isSelected = selectedItemIds.has(item.uuid);
+                    const isSelected =
+                      selectAllTotal || selectedItemIds.has(item.uuid);
                     const labellerIds = labellersByItem.get(item.uuid);
                     return (
                       <Fragment key={item.uuid}>
@@ -3182,7 +3202,8 @@ function LabellingTaskPageInner() {
                     </div>
                   </div>
                   {items.map((item) => {
-                    const isSelected = selectedItemIds.has(item.uuid);
+                    const isSelected =
+                      selectAllTotal || selectedItemIds.has(item.uuid);
                     const labellerIds = labellersByItem.get(item.uuid);
                     const itemPayloadObj =
                       item.payload && typeof item.payload === "object"
