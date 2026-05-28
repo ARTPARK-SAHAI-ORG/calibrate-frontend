@@ -2266,10 +2266,10 @@ export function AddTestDialog({
                   {requireAssistantLastMessage
                     ? "Your evaluators read this whole conversation and evaluate the last agent message (the one highlighted) against the evaluators. Only that final reply is scored."
                     : activeTab === "conversation"
-                      ? "The agent generates its reply given the conversation and the entire conversation is then graded against the evaluators"
+                      ? "Given the conversation history, the agent generates a response and the full updated conversation is graded using the evaluators added to the test"
                       : activeTab === "tool-invocation"
-                        ? "The tool call the agent makes in response to the last user message, given the conversation history, will be checked against the expected tool calls configured for this test"
-                        : "The agent's response to the last user message, given the conversation history, will be evaluated against the evaluators added to the test"}
+                        ? "Given the conversation history, the agent makes a tool call which is checked against the expected tool calls configured for this test"
+                        : "Given the conversation history, the agent generates a response which is graded using the evaluators added to the test"}
                 </p>
               </div>
             </div>
@@ -2938,7 +2938,7 @@ export function AddTestDialog({
                                             addChatMessage("user");
                                             setAddMessageDropdownOpen(false);
                                           }}
-                                          className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-amber-500/15 text-amber-900 dark:bg-amber-500/20 dark:text-amber-100 hover:bg-amber-500/25 dark:hover:bg-amber-500/30"
+                                          className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-amber-500/10 text-amber-700 dark:bg-amber-500/12 dark:text-amber-200 hover:bg-amber-500/18 dark:hover:bg-amber-500/20"
                                         >
                                           <svg
                                             className="w-4 h-4"
@@ -2962,7 +2962,7 @@ export function AddTestDialog({
                                             addChatMessage("agent");
                                             setAddMessageDropdownOpen(false);
                                           }}
-                                          className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-sky-500/15 text-sky-900 dark:bg-sky-500/20 dark:text-sky-100 hover:bg-sky-500/25 dark:hover:bg-sky-500/30"
+                                          className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-sky-500/10 text-sky-700 dark:bg-sky-500/12 dark:text-sky-200 hover:bg-sky-500/18 dark:hover:bg-sky-500/20"
                                         >
                                           <svg
                                             className="w-4 h-4"
@@ -2986,7 +2986,7 @@ export function AddTestDialog({
                                             setAddMessageDropdownOpen(false);
                                             setToolCallDropdownOpen(true);
                                           }}
-                                          className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-fuchsia-500/15 text-fuchsia-900 dark:bg-fuchsia-500/20 dark:text-fuchsia-100 hover:bg-fuchsia-500/25 dark:hover:bg-fuchsia-500/30"
+                                          className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-fuchsia-500/10 text-fuchsia-700 dark:bg-fuchsia-500/12 dark:text-fuchsia-200 hover:bg-fuchsia-500/18 dark:hover:bg-fuchsia-500/20"
                                         >
                                           <svg
                                             className="w-4 h-4"
