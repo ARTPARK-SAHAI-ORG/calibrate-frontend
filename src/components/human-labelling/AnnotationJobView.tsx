@@ -42,7 +42,7 @@ type Annotator = { uuid: string; name: string };
 export type Task = {
   uuid: string;
   name: string;
-  type: "llm" | "stt" | "tts" | "simulation";
+  type: "llm" | "stt" | "tts" | "conversation";
   description: string | null;
 };
 
@@ -877,7 +877,7 @@ export function ItemPane({
   const payload = (item.payload ?? {}) as Record<string, unknown>;
   if (taskType === "stt") return <SttItemPane payload={payload} />;
   if (taskType === "llm") return <LlmItemPane payload={payload} />;
-  if (taskType === "simulation")
+  if (taskType === "conversation")
     return <SimulationItemPane payload={payload} />;
   return (
     <div className="space-y-2">

@@ -111,7 +111,7 @@ function itemTitle(item: Item | null): string {
 export type ItemDetailDialogTask = {
   uuid: string;
   name: string;
-  type: "llm" | "stt" | "simulation";
+  type: "llm" | "stt" | "conversation";
   evaluators?: TaskEvaluatorDef[];
 };
 

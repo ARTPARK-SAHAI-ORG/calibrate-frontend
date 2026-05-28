@@ -124,7 +124,7 @@ type SummaryRow = {
 };
 type TaskSummaryResponse = {
   task_id: string;
-  task_type: "stt" | "llm" | "simulation";
+  task_type: "stt" | "llm" | "conversation";
   evaluators: SummaryEvaluator[];
   annotators: SummaryAnnotator[];
   rows: SummaryRow[];
@@ -228,7 +228,7 @@ type LabellingJob = {
 type LabellingTask = {
   uuid: string;
   name: string;
-  type?: "llm" | "stt" | "tts" | "simulation";
+  type?: "llm" | "stt" | "tts" | "conversation";
   description?: string;
   created_at?: string;
   updated_at?: string;
@@ -259,6 +259,15 @@ type LabellingTask = {
 };
 
 type TaskKind = "llm" | "stt" | "tts" | "simulation" | undefined;
+
+// Backend annotation tasks carry type "conversation" where evaluators
+// carry "simulation". Normalize to the evaluator-side value so all
+// downstream branching and the shared EvaluatorTypePill keep working.
+function normalizeTaskType(
+  t: "llm" | "stt" | "tts" | "conversation" | undefined,
+): TaskKind {
+  return t === "conversation" ? "simulation" : t;
+}
 
 function previewItemPayload(payload: unknown, kind: TaskKind): string {
   if (payload == null || typeof payload !== "object") {
@@ -1611,7 +1620,8 @@ function LabellingTaskPageInner() {
     (taskSummary?.pagination?.total ?? 0) > 0 ||
     (itemsSearch ? false : items.length > 0);
   const jobsCount = jobs.length;
-  const taskType = task?.type ?? task?.evaluators?.[0]?.evaluator_type;
+  const taskType =
+    normalizeTaskType(task?.type) ?? task?.evaluators?.[0]?.evaluator_type;
   const canAddItem =
     taskType === "llm" || taskType === "simulation" || taskType === "stt";
 
@@ -4121,7 +4131,9 @@ function LabellingTaskPageInner() {
         <ManageEvaluatorsDialog
           accessToken={accessToken}
           taskUuid={task.uuid}
-          taskType={task.type ?? task.evaluators?.[0]?.evaluator_type}
+          taskType={
+            normalizeTaskType(task.type) ?? task.evaluators?.[0]?.evaluator_type
+          }
           currentEvaluatorIds={(task.evaluators ?? []).map((e) => e.uuid)}
           onClose={() => setManageOpen(false)}
           onSaved={() => {
@@ -4135,7 +4147,10 @@ function LabellingTaskPageInner() {
         isOpen={!!itemDetailUuid}
         onClose={() => setItemDetailUuid(null)}
         task={
-          task && (task.type === "llm" || task.type === "stt" || task.type === "simulation")
+          task &&
+          (task.type === "llm" ||
+            task.type === "stt" ||
+            task.type === "conversation")
             ? {
                 uuid: task.uuid,
                 name: task.name,

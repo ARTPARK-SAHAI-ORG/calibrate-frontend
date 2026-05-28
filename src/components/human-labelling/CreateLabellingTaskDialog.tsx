@@ -10,8 +10,19 @@ import {
 import { apiClient } from "@/lib/api";
 import { readNameConflictFromError } from "@/lib/parseBackendError";
 
-// Only these three task types are allowed for labelling tasks
-type TaskType = Extract<EvaluatorType, "llm" | "stt" | "simulation">;
+// Only these three task types are allowed for labelling tasks.
+// Note: the "conversation" task type maps to the "simulation" evaluator
+// type — annotation tasks use "conversation" but evaluators are still
+// typed "simulation" (see TASK_TO_EVALUATOR_TYPE).
+type TaskType = "llm" | "stt" | "conversation";
+
+// A labelling task's type and its evaluators' type diverge for full
+// conversations: the task is "conversation", the evaluators are "simulation".
+const TASK_TO_EVALUATOR_TYPE: Record<TaskType, EvaluatorType> = {
+  llm: "llm",
+  stt: "stt",
+  conversation: "simulation",
+};
 
 const TASK_TYPE_OPTIONS: {
   value: TaskType;
@@ -30,7 +41,7 @@ const TASK_TYPE_OPTIONS: {
       "Given a conversation history, evaluate the agent's next response.",
   },
   {
-    value: "simulation",
+    value: "conversation",
     title: "Full conversation",
     description:
       "Evaluate the agent's performance during a complete conversation.",
@@ -45,20 +56,20 @@ const TASK_TYPE_OPTIONS: {
 const TASK_TYPE_INACTIVE_CLASSES: Record<TaskType, string> = {
   llm: "border-orange-500/20 bg-orange-500/[0.04] hover:bg-orange-500/10 hover:border-orange-500/40",
   stt: "border-blue-500/20 bg-blue-500/[0.04] hover:bg-blue-500/10 hover:border-blue-500/40",
-  simulation:
+  conversation:
     "border-pink-500/20 bg-pink-500/[0.04] hover:bg-pink-500/10 hover:border-pink-500/40",
 };
 
 const TASK_TYPE_ACTIVE_CLASSES: Record<TaskType, string> = {
   llm: "border-orange-500/60 bg-orange-500/15 ring-1 ring-orange-500/40",
   stt: "border-blue-500/60 bg-blue-500/15 ring-1 ring-blue-500/40",
-  simulation: "border-pink-500/60 bg-pink-500/15 ring-1 ring-pink-500/40",
+  conversation: "border-pink-500/60 bg-pink-500/15 ring-1 ring-pink-500/40",
 };
 
 const TASK_TYPE_TITLE_CLASSES: Record<TaskType, string> = {
   llm: "text-orange-700 dark:text-orange-300",
   stt: "text-blue-700 dark:text-blue-300",
-  simulation: "text-pink-700 dark:text-pink-300",
+  conversation: "text-pink-700 dark:text-pink-300",
 };
 
 type EvaluatorListItem = {
@@ -144,10 +155,11 @@ export function CreateLabellingTaskDialog({
   // When the type changes, drop selections that don't belong to the new type.
   useEffect(() => {
     if (!taskType) return;
+    const evaluatorType = TASK_TO_EVALUATOR_TYPE[taskType];
     setSelectedEvaluatorIds((prev) => {
       const next = new Set<string>();
       for (const ev of evaluators) {
-        if (ev.evaluator_type === taskType && prev.has(ev.uuid)) {
+        if (ev.evaluator_type === evaluatorType && prev.has(ev.uuid)) {
           next.add(ev.uuid);
         }
       }
@@ -157,9 +169,10 @@ export function CreateLabellingTaskDialog({
 
   const filteredEvaluators = useMemo(() => {
     if (!taskType) return [];
+    const evaluatorType = TASK_TO_EVALUATOR_TYPE[taskType];
     const q = evaluatorSearch.trim().toLowerCase();
     return evaluators
-      .filter((ev) => ev.evaluator_type === taskType)
+      .filter((ev) => ev.evaluator_type === evaluatorType)
       .filter((ev) => (q ? ev.name.toLowerCase().includes(q) : true));
   }, [evaluators, taskType, evaluatorSearch]);
 
@@ -427,7 +440,7 @@ export function CreateLabellingTaskDialog({
                   <div className="p-4 text-sm text-muted-foreground">
                     {evaluatorSearch.trim()
                       ? "No matching evaluators."
-                      : `No ${EVALUATOR_TYPE_LABELS[taskType]} evaluators yet.`}
+                      : `No ${EVALUATOR_TYPE_LABELS[TASK_TO_EVALUATOR_TYPE[taskType]]} evaluators yet.`}
                   </div>
                 ) : (
                   filteredEvaluators.map((ev) => {

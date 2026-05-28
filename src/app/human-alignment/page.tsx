@@ -66,13 +66,21 @@ type LabellingTaskEvaluator = {
 type LabellingTask = {
   uuid: string;
   name: string;
-  type?: "llm" | "stt" | "tts" | "simulation";
+  type?: "llm" | "stt" | "tts" | "conversation";
   description?: string;
   created_at?: string;
   updated_at?: string;
   item_count?: number;
   evaluators?: LabellingTaskEvaluator[];
 };
+
+// Annotation tasks carry type "conversation"; the matching evaluator type
+// is "simulation". Map task type → evaluator type for display/grouping.
+function taskTypeToEvaluatorType(
+  t: "llm" | "stt" | "tts" | "conversation" | undefined,
+): "llm" | "stt" | "tts" | "simulation" | undefined {
+  return t === "conversation" ? "simulation" : t;
+}
 
 type SortDirection = "asc" | "desc";
 
@@ -619,7 +627,8 @@ function HumanLabellingPageInner() {
                 {sortedTasks.map((task) => {
                   const evaluators = task.evaluators ?? [];
                   const evaluatorType =
-                    task.type ?? evaluators[0]?.evaluator_type;
+                    taskTypeToEvaluatorType(task.type) ??
+                    evaluators[0]?.evaluator_type;
                   return (
                     <div
                       key={task.uuid}
@@ -695,7 +704,8 @@ function HumanLabellingPageInner() {
                 {sortedTasks.map((task) => {
                   const evaluators = task.evaluators ?? [];
                   const evaluatorType =
-                    task.type ?? evaluators[0]?.evaluator_type;
+                    taskTypeToEvaluatorType(task.type) ??
+                    evaluators[0]?.evaluator_type;
                   return (
                     <div
                       key={task.uuid}
@@ -1295,7 +1305,7 @@ function AgreementOverview({
     const m = new Map<string, "llm" | "stt" | "tts" | "simulation">();
     for (const t of tasks) {
       for (const ev of t.evaluators ?? []) {
-        const type = ev.evaluator_type ?? t.type;
+        const type = ev.evaluator_type ?? taskTypeToEvaluatorType(t.type);
         if (type && !m.has(ev.uuid)) m.set(ev.uuid, type);
       }
     }
