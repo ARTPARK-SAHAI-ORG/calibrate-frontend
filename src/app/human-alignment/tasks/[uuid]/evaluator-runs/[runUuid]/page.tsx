@@ -230,7 +230,15 @@ export default function EvaluatorRunDetailPage() {
       setRerunError(null);
       try {
         const body: Record<string, unknown> = { evaluators: selections };
-        if (rerunItemIds.length > 0) body.item_ids = rerunItemIds;
+        // Target the same items the original job covered. If we couldn't
+        // resolve them, fall back to select_all — the backend no longer
+        // treats an omitted item_ids as "all" (it 400s), so the intent
+        // must be explicit.
+        if (rerunItemIds.length > 0) {
+          body.item_ids = rerunItemIds;
+        } else {
+          body.select_all = true;
+        }
         const result = await apiClient<{
           job_uuid: string;
           status: string;
