@@ -759,6 +759,76 @@ function LLMPageInner() {
     }
   };
 
+  // Open the create dialog pre-filled from an existing test. editingTestUuid
+  // stays null so submitting creates a brand-new test — nothing is persisted
+  // until the user submits.
+  const openDuplicateTest = async (test: TestData) => {
+    try {
+      setIsLoadingTest(true);
+      setEditingTestUuid(null);
+      setAddTestSidebarOpen(true);
+      setCreateError(null);
+      setNameConflictError(null);
+      setValidationAttempted(false);
+
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) {
+        throw new Error("BACKEND_URL environment variable is not set");
+      }
+
+      const response = await fetch(`${backendUrl}/tests/${test.uuid}`, {
+        method: "GET",
+        headers: {
+          accept: "application/json",
+          Authorization: `Bearer ${backendAccessToken}`,
+        },
+      });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch test details");
+      }
+
+      const testData: TestData = await response.json();
+
+      setNewTestName(`Copy of ${testData.name || test.name}`);
+      setNewTestDescription(
+        testData.config?.description || testData.description || ""
+      );
+      setInitialTab(
+        testData.type === "tool_call" ? "tool-invocation" : "next-reply"
+      );
+      if (testData.config) {
+        setInitialConfig(testData.config as TestConfig);
+      }
+      if (Array.isArray(testData.evaluators)) {
+        setInitialEvaluators(
+          testData.evaluators.map((e) => ({
+            evaluator_uuid: e.uuid,
+            name: e.name,
+            description: e.description ?? null,
+            slug: e.slug,
+            variables: Array.isArray(e.variables) ? e.variables : [],
+            variable_values: e.variable_values ?? null,
+          }))
+        );
+      } else {
+        setInitialEvaluators([]);
+      }
+    } catch (err) {
+      console.error("Error duplicating test:", err);
+      setCreateError(
+        err instanceof Error ? err.message : "Failed to load test"
+      );
+    } finally {
+      setIsLoadingTest(false);
+    }
+  };
+
   // Update existing test via PUT API
   const updateTest = async (
     config: TestConfig,
@@ -1182,6 +1252,30 @@ function LLMPageInner() {
                         <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white"></div>
                       </div>
                     </button>
+                    {/* Duplicate Button — opens the create dialog pre-filled
+                        from this test; nothing is saved until submit. */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openDuplicateTest(test);
+                      }}
+                      className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                      title="Duplicate test"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={1.5}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75"
+                        />
+                      </svg>
+                    </button>
                     {/* Delete Button */}
                     <button
                       onClick={(e) => {
@@ -1280,6 +1374,28 @@ function LLMPageInner() {
                         <path d="M8 5v14l11-7z" />
                       </svg>
                       Run test
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openDuplicateTest(test);
+                      }}
+                      className="flex-1 h-8 flex items-center justify-center gap-2 rounded-md text-xs font-medium text-foreground bg-muted hover:bg-muted/70 transition-colors"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={1.5}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75"
+                        />
+                      </svg>
+                      Duplicate
                     </button>
                     <button
                       onClick={(e) => {

@@ -859,6 +859,73 @@ export function TestsTabContent({
     }
   };
 
+  // Open the create dialog pre-filled from an existing test. Editing is left
+  // off (editingTestUuid stays null) so submitting creates a brand-new test
+  // via POST /tests/bulk — nothing is persisted until the user submits.
+  const openDuplicateTest = async (test: TestData) => {
+    try {
+      setIsLoadingTest(true);
+      setEditingTestUuid(null);
+      setCreateDialogOpen(true);
+      setCreateError(null);
+      setNameConflictError(null);
+      setValidationAttempted(false);
+
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) {
+        throw new Error("BACKEND_URL environment variable is not set");
+      }
+
+      const response = await fetch(`${backendUrl}/tests/${test.uuid}`, {
+        method: "GET",
+        headers: {
+          accept: "application/json",
+          Authorization: `Bearer ${backendAccessToken}`,
+        },
+      });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch test details");
+      }
+
+      const testData: TestDetail = await response.json();
+
+      setNewTestName(`Copy of ${testData.name || test.name}`);
+      setInitialTab(
+        testData.type === "tool_call" ? "tool-invocation" : "next-reply",
+      );
+      if (testData.config) {
+        setInitialConfig(testData.config as TestConfig);
+      }
+      if (Array.isArray(testData.evaluators)) {
+        setInitialEvaluators(
+          testData.evaluators.map((e) => ({
+            evaluator_uuid: e.uuid,
+            name: e.name,
+            description: e.description ?? null,
+            slug: e.slug,
+            variables: Array.isArray(e.variables) ? e.variables : [],
+            variable_values: e.variable_values ?? null,
+          })),
+        );
+      } else {
+        setInitialEvaluators([]);
+      }
+    } catch (err) {
+      console.error("Error duplicating test:", err);
+      setCreateError(
+        err instanceof Error ? err.message : "Failed to load test",
+      );
+    } finally {
+      setIsLoadingTest(false);
+    }
+  };
+
   // Update an existing test via PUT /tests/{uuid}. The test's agent links
   // are not touched here — this only edits the test itself.
   const updateTest = async (
@@ -1936,7 +2003,7 @@ export function TestsTabContent({
                 {/* Desktop Table */}
                 <div className="hidden md:block border border-border rounded-xl overflow-hidden">
                   {/* Table Header */}
-                  <div className="grid grid-cols-[40px_minmax(0,1fr)_120px_auto_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+                  <div className="grid grid-cols-[40px_minmax(0,1fr)_120px_auto_auto_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
                     <div className="flex items-center">
                       <button
                         type="button"
@@ -1976,13 +2043,14 @@ export function TestsTabContent({
                     </div>
                     <div className="w-8"></div>
                     <div className="w-8"></div>
+                    <div className="w-8"></div>
                   </div>
                   {/* Table Body */}
                   {filteredAgentTests.map((test) => (
                     <div
                       key={test.uuid}
                       onClick={() => openEditTest(test.uuid)}
-                      className="grid grid-cols-[40px_minmax(0,1fr)_120px_auto_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                      className="grid grid-cols-[40px_minmax(0,1fr)_120px_auto_auto_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                     >
                       {/* Checkbox */}
                       <div className="flex items-center">
@@ -2082,6 +2150,32 @@ export function TestsTabContent({
                               strokeLinecap="round"
                               strokeLinejoin="round"
                               d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                      {/* Duplicate Button — opens the create dialog pre-filled
+                          from this test; nothing is saved until submit. */}
+                      <div className="flex items-center">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDuplicateTest(test);
+                          }}
+                          className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
+                          title="Duplicate test"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={1.5}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75"
                             />
                           </svg>
                         </button>
@@ -2187,6 +2281,28 @@ export function TestsTabContent({
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                                 d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openDuplicateTest(test);
+                            }}
+                            className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
+                            title="Duplicate test"
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={1.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75"
                               />
                             </svg>
                           </button>

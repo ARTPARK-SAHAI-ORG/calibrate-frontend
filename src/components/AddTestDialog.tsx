@@ -765,9 +765,10 @@ export function AddTestDialog({
       (e) => e.slug === DEFAULT_NEXT_REPLY_EVALUATOR_SLUG,
     );
 
-    // Legacy edit: pre-fill criteria from the old free-text field.
+    // Legacy edit/duplicate: pre-fill criteria from the old free-text field.
+    // Guarded by the presence of criteria text, so it only fires for tests
+    // that actually carry it (never for a from-scratch create).
     if (
-      isEditing &&
       initialConfig?.evaluation?.type === "response" &&
       typeof initialConfig.evaluation.criteria === "string" &&
       initialConfig.evaluation.criteria.length > 0 &&
