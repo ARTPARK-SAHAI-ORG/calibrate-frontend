@@ -1,0 +1,21 @@
+.git
+.gitignore
+.next
+node_modules
+npm-debug.log*
+
+# env files — never bake secrets into the image
+.env
+.env.*
+!.env.example
+
+# dev/tooling
+.cursor
+.husky
+*.md
+!SELF_HOSTING.md
+coverage
+.nyc_output
+
+# Vercel
+.vercel
