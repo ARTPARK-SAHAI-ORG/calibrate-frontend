@@ -12,3 +12,4 @@ export { BackHeader } from "./BackHeader";
 export { StatusBadge } from "./StatusBadge";
 export { NestedContainer } from "./NestedContainer";
 export { RetryIcon } from "./RetryIcon";
+export { DeleteIconButton } from "./DeleteIconButton";
