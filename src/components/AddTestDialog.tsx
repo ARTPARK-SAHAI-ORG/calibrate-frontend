@@ -2952,23 +2952,20 @@ export function AddTestDialog({
                                               : "left-0 bottom-full mb-2"
                                         }`}
                                       >
-                                        {/* Three clearly separated hues so
-                                          adjacent rows don't read as the
-                                          same family: amber (warm yellow)
-                                          for User, sky (cool blue) for
-                                          Agent, fuchsia (pink-magenta)
-                                          for Agent tool call — also
-                                          distinct from the violet
-                                          "Add evaluator" button above. */}
+                                        {/* Neutral rows (no bright fills) —
+                                          the three options stay visually
+                                          distinct via their icons (person /
+                                          chip / crossed tools) and labels
+                                          rather than colour. */}
                                         <button
                                           onClick={() => {
                                             addChatMessage("user");
                                             setAddMessageDropdownOpen(false);
                                           }}
-                                          className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-amber-500/10 text-amber-700 dark:bg-amber-500/12 dark:text-amber-200 hover:bg-amber-500/18 dark:hover:bg-amber-500/20"
+                                          className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer text-foreground hover:bg-muted"
                                         >
                                           <svg
-                                            className="w-4 h-4"
+                                            className="w-4 h-4 text-muted-foreground"
                                             fill="none"
                                             viewBox="0 0 24 24"
                                             stroke="currentColor"
@@ -2989,10 +2986,10 @@ export function AddTestDialog({
                                             addChatMessage("agent");
                                             setAddMessageDropdownOpen(false);
                                           }}
-                                          className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-sky-500/10 text-sky-700 dark:bg-sky-500/12 dark:text-sky-200 hover:bg-sky-500/18 dark:hover:bg-sky-500/20"
+                                          className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer text-foreground hover:bg-muted"
                                         >
                                           <svg
-                                            className="w-4 h-4"
+                                            className="w-4 h-4 text-muted-foreground"
                                             fill="none"
                                             viewBox="0 0 24 24"
                                             stroke="currentColor"
@@ -3013,10 +3010,10 @@ export function AddTestDialog({
                                             setAddMessageDropdownOpen(false);
                                             setToolCallDropdownOpen(true);
                                           }}
-                                          className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer bg-fuchsia-500/10 text-fuchsia-700 dark:bg-fuchsia-500/12 dark:text-fuchsia-200 hover:bg-fuchsia-500/18 dark:hover:bg-fuchsia-500/20"
+                                          className="w-full px-3 py-1.5 flex items-center gap-2 transition-colors cursor-pointer text-foreground hover:bg-muted"
                                         >
                                           <svg
-                                            className="w-4 h-4"
+                                            className="w-4 h-4 text-muted-foreground"
                                             fill="none"
                                             viewBox="0 0 24 24"
                                             stroke="currentColor"
