@@ -1358,7 +1358,10 @@ export function TestsTabContent({
               className="flex flex-col sm:grid sm:grid-cols-[minmax(0,1fr)_5.75rem_5rem_9.25rem] sm:items-start sm:justify-items-stretch gap-2 sm:gap-2 xl:grid-cols-[minmax(0,1fr)_6.25rem_5.75rem_11.5rem] xl:gap-3 px-3 md:px-4 py-2 md:py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer"
             >
               <div className="flex items-start justify-between gap-2 sm:block min-w-0">
-                <span className="text-xs md:text-sm font-medium text-foreground block min-w-0 break-words">
+                <span
+                  className="text-xs md:text-sm font-medium text-foreground block min-w-0 truncate"
+                  title={getTestRunDisplayName(run)}
+                >
                   {getTestRunDisplayName(run)}
                 </span>
                 <span className="sm:hidden text-xs text-muted-foreground">
