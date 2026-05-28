@@ -908,6 +908,33 @@ export function AddTestDialog({
     activeTab,
   ]);
 
+  // Create-mode only: when the user switches between the evaluator-based
+  // tabs (next-reply ↔ conversation), drop every attached evaluator that
+  // doesn't belong to the newly selected type. This removes the auto-seeded
+  // next-reply "Correctness" evaluator (an `llm` evaluator) when moving to
+  // the conversation tab — conversation tests only accept `simulation`
+  // evaluators, and the backend rejects a mismatch — and symmetrically
+  // clears any simulation evaluators when moving back. Editing is left
+  // untouched (the type is immutable there). Only fires on an actual tab
+  // change, so the next-reply default seeded on first load survives.
+  const prevTabRef = useRef(activeTab);
+  useEffect(() => {
+    const prev = prevTabRef.current;
+    prevTabRef.current = activeTab;
+    if (prev === activeTab) return;
+    if (isEditing) return;
+    if (!isEvaluatorTab) return;
+    const wantedType =
+      activeTab === "conversation" ? CONVERSATION_EVALUATOR_TYPE : "llm";
+    setAttachedEvaluators((prevAttached) =>
+      prevAttached.filter(
+        (e) =>
+          availableLLMEvaluators.find((o) => o.uuid === e.evaluator_uuid)
+            ?.evaluator_type === wantedType,
+      ),
+    );
+  }, [activeTab, isEditing, isEvaluatorTab, availableLLMEvaluators]);
+
   const updateEvaluatorVariableValue = (
     evaluatorUuid: string,
     variableName: string,
