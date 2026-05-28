@@ -18,6 +18,7 @@ import {
 import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { showLimitToast } from "@/constants/limits";
+import { testTypeLabel } from "@/lib/testTypes";
 import {
   readBulkNameConflictMessage,
   readNameConflictMessage,
@@ -1298,11 +1299,7 @@ export function TestsTabContent({
                     </p>
                   )}
                   <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">
-                    {test.type === "tool_call"
-                      ? "Tool Call"
-                      : test.type === "conversation"
-                        ? "Conversation"
-                        : "Next Reply"}
+                    {testTypeLabel(test.type)}
                   </span>
                 </button>
               ))
@@ -1631,11 +1628,7 @@ export function TestsTabContent({
                             </p>
                           )}
                           <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">
-                            {test.type === "tool_call"
-                              ? "Tool Call"
-                              : test.type === "conversation"
-                                ? "Conversation"
-                                : "Next Reply"}
+                            {testTypeLabel(test.type)}
                           </span>
                         </button>
                       ))
@@ -2073,11 +2066,7 @@ export function TestsTabContent({
                           </svg>
                         )}
                         <span className="text-sm text-muted-foreground">
-                          {test.type === "tool_call"
-                            ? "Tool Call"
-                            : test.type === "conversation"
-                              ? "Conversation"
-                              : "Next Reply"}
+                          {testTypeLabel(test.type)}
                         </span>
                       </div>
                       {/* Run Button */}
@@ -2180,11 +2169,7 @@ export function TestsTabContent({
                               {test.name}
                             </h4>
                             <p className="text-xs text-muted-foreground mt-1">
-                              {test.type === "tool_call"
-                                ? "Tool Call"
-                                : test.type === "conversation"
-                                  ? "Conversation"
-                                  : "Next Reply"}
+                              {testTypeLabel(test.type)}
                             </p>
                           </div>
                         </div>

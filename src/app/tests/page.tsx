@@ -23,6 +23,7 @@ import {
 } from "@/components/AddTestDialog";
 import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
 import { useSidebarState } from "@/lib/sidebar";
+import { testTypeLabel } from "@/lib/testTypes";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import {
   readBulkNameConflictMessage,
@@ -1161,13 +1162,7 @@ function LLMPageInner() {
                     </p>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {test.type === "response"
-                      ? "Next Reply"
-                      : test.type === "tool_call"
-                      ? "Tool Call"
-                      : test.type === "conversation"
-                      ? "Conversation"
-                      : "—"}
+                    {testTypeLabel(test.type, "—")}
                   </p>
                   <div className="flex items-center gap-1">
                     {/* Play Button */}
@@ -1267,11 +1262,7 @@ function LLMPageInner() {
                           {test.name}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {test.type === "response"
-                            ? "Next Reply"
-                            : test.type === "tool_call"
-                            ? "Tool Call"
-                            : "—"}
+                          {testTypeLabel(test.type, "—")}
                         </div>
                       </div>
                     </div>
