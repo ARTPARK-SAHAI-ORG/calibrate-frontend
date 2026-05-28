@@ -19,15 +19,15 @@ const TASK_TYPE_OPTIONS: {
   description: string;
 }[] = [
   {
+    value: "stt",
+    title: "Speech to Text",
+    description: "Evaluate the transcription quality against a reference text.",
+  },
+  {
     value: "llm",
     title: "Single LLM response",
     description:
       "Given a conversation history, evaluate the agent's next response.",
-  },
-  {
-    value: "stt",
-    title: "Speech to Text",
-    description: "Evaluate the transcription quality against a reference text.",
   },
   {
     value: "simulation",
