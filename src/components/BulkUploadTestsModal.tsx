@@ -27,7 +27,10 @@ import { parseJsonLenient } from "@/lib/jsonSanitize";
 const HELPER_LINK_CLASS =
   "text-foreground underline decoration-foreground/30 underline-offset-2 hover:decoration-foreground/60 transition-colors";
 
-type TestType = "response" | "tool_call";
+type TestType = "response" | "tool_call" | "conversation";
+
+// evaluator_type filter the Conversation test type uses for its picker.
+const CONVERSATION_EVALUATOR_TYPE = "simulation";
 
 type ParsedTest = {
   name: string;
@@ -167,6 +170,10 @@ export function BulkUploadTestsModal({
 
   const [testType, setTestType] = useState<TestType | null>(null);
   const isResponseType = testType === "response";
+  const isConversationType = testType === "conversation";
+  // Both "Next Reply" (response) and "Conversation" use attached evaluators
+  // rather than tool_calls — they share most of the response code path.
+  const usesEvaluators = isResponseType || isConversationType;
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [parsedTests, setParsedTests] = useState<ParsedTest[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -244,13 +251,13 @@ export function BulkUploadTestsModal({
     }
   }, [isOpen]);
 
-  // Fetch the LLM evaluators list as soon as the user picks "Next Reply" so
-  // we can validate the CSV against it. We only need it for response-type
-  // uploads, so don't preload it on modal open — keeps the round-trip off
-  // the path for users who only ever do tool-call uploads.
+  // Fetch the evaluators list as soon as the user picks "Next Reply" or
+  // "Conversation" so we can validate the CSV against it. We only need it
+  // for evaluator-based uploads, so don't preload it on modal open — keeps
+  // the round-trip off the path for users who only ever do tool-call uploads.
   useEffect(() => {
     if (!isOpen || !backendAccessToken) return;
-    if (testType !== "response") return;
+    if (!usesEvaluators) return;
     if (evaluatorsFetched || evaluatorsLoading) return;
 
     const fetchEvaluators = async () => {
@@ -290,8 +297,12 @@ export function BulkUploadTestsModal({
           live_version?: { variables?: EvaluatorVariableDef[] | null } | null;
         }> = await response.json();
 
+        const wanted =
+          testType === "conversation"
+            ? CONVERSATION_EVALUATOR_TYPE
+            : "llm";
         const llm: LLMEvaluatorOption[] = raw
-          .filter((e) => e.evaluator_type === "llm")
+          .filter((e) => e.evaluator_type === wanted)
           .map((e) => ({
             uuid: e.uuid,
             name: e.name,
@@ -382,7 +393,7 @@ export function BulkUploadTestsModal({
   // user having to re-upload anything.
   useEffect(() => {
     if (!pendingFile) return;
-    if (isResponseType) {
+    if (usesEvaluators) {
       if (!evaluatorsFetched) return;
     } else {
       if (!toolsFetched) return;
@@ -393,7 +404,7 @@ export function BulkUploadTestsModal({
     // handleFileChange is stable for our purposes — re-running on its
     // identity would just thrash; we only care about the gating signals.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingFile, evaluatorsFetched, toolsFetched, isResponseType]);
+  }, [pendingFile, evaluatorsFetched, toolsFetched, usesEvaluators]);
 
   // Lookup set of every tool name the platform recognises for this tenant:
   // the names of all custom tools (from `GET /tools`) plus the ids of every
@@ -440,12 +451,14 @@ export function BulkUploadTestsModal({
   };
 
   const buildGuidelines = (): GuidelineDoc => {
-    if (isResponseType) {
+    if (usesEvaluators) {
       const columns: GuidelineColumn[] = [
         { name: "name", description: "A unique test name." },
         {
           name: "conversation_history",
-          description: CONVERSATION_HISTORY_DESC,
+          description: isConversationType
+            ? `${CONVERSATION_HISTORY_DESC}\n\nThe full conversation is graded as a whole — it may end on either an assistant or a user turn.`
+            : CONVERSATION_HISTORY_DESC,
           example: `[
   {"role": "user", "content": "What is your return policy?"},
   {"role": "assistant", "content": "You can return any item within 30 days."}
@@ -462,7 +475,9 @@ export function BulkUploadTestsModal({
         }
       }
       return {
-        title: "Bulk upload — Next reply tests",
+        title: isConversationType
+          ? "Bulk upload — Conversation tests"
+          : "Bulk upload — Next reply tests",
         intro:
           "Upload a CSV with the following columns. Each row creates one test.",
         columns,
@@ -512,9 +527,11 @@ export function BulkUploadTestsModal({
   const downloadGuidelines = () => {
     if (!testType) return;
     const blob = generateGuidelinesPdf(buildGuidelines());
-    const filename = isResponseType
-      ? "next_reply_tests_csv_guidelines.pdf"
-      : "tool_call_tests_csv_guidelines.pdf";
+    const filename = isConversationType
+      ? "conversation_tests_csv_guidelines.pdf"
+      : isResponseType
+        ? "next_reply_tests_csv_guidelines.pdf"
+        : "tool_call_tests_csv_guidelines.pdf";
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -528,14 +545,16 @@ export function BulkUploadTestsModal({
   const downloadSampleCsv = () => {
     if (!testType) return;
 
-    if (isResponseType) {
+    if (usesEvaluators) {
       // Single-CSV download tailored to the user's selected evaluators.
       const csv = buildResponseSampleCsv(committedEvaluators);
       const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = "sample_next_reply_tests.csv";
+      link.download = isConversationType
+        ? "sample_conversation_tests.csv"
+        : "sample_next_reply_tests.csv";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -568,23 +587,23 @@ export function BulkUploadTestsModal({
     // failure straight away, but if the fetch is still in flight just
     // stash the file and let the deferred-parse effect pick it up once
     // the data lands — no user-facing wait state.
-    if (isResponseType && evaluatorsFetchError) {
+    if (usesEvaluators && evaluatorsFetchError) {
       setParseError(
         `Failed to load evaluators: ${evaluatorsFetchError}. Refresh and try again.`,
       );
       return;
     }
-    if (isResponseType && !evaluatorsFetched) {
+    if (usesEvaluators && !evaluatorsFetched) {
       setPendingFile(file);
       return;
     }
-    if (!isResponseType && toolsFetchError) {
+    if (!usesEvaluators && toolsFetchError) {
       setParseError(
         `Failed to load tools: ${toolsFetchError}. Refresh and try again.`,
       );
       return;
     }
-    if (!isResponseType && !toolsFetched) {
+    if (!usesEvaluators && !toolsFetched) {
       setPendingFile(file);
       return;
     }
@@ -608,7 +627,7 @@ export function BulkUploadTestsModal({
         }
 
         const headers = Object.keys(data[0]);
-        const baseColumns = isResponseType
+        const baseColumns = usesEvaluators
           ? ["name", "conversation_history"]
           : ["name", "conversation_history", "tool_calls"];
         const variableColumns: {
@@ -616,7 +635,7 @@ export function BulkUploadTestsModal({
           varName: string;
           header: string;
         }[] = [];
-        if (isResponseType) {
+        if (usesEvaluators) {
           for (const e of committedEvaluators) {
             for (const v of e.variables) {
               variableColumns.push({
@@ -692,7 +711,7 @@ export function BulkUploadTestsModal({
             return;
           }
 
-          if (isResponseType) {
+          if (usesEvaluators) {
             // Build the EvaluatorRefPayload[] from the user's selected
             // evaluators. Variable values come from the per-variable
             // columns; evaluators with no variables get attached without
@@ -843,7 +862,7 @@ export function BulkUploadTestsModal({
       const tests = parsedTests.map((test) => {
         const conversation_history = parseJsonLenient(test.conversation_history);
 
-        if (isResponseType) {
+        if (usesEvaluators) {
           // Send the resolved EvaluatorRefPayload[] (same shape as the
           // single-test POST /tests `evaluators` field). The legacy
           // `criteria` field is no longer sent — its value lives inside
@@ -1161,69 +1180,73 @@ export function BulkUploadTestsModal({
             <label className="block text-sm font-medium text-foreground mb-3">
               Select the type of test
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl">
-              <button
-                type="button"
-                onClick={() => {
-                  setTestType("response");
-                  setCsvFile(null);
-                  setParsedTests([]);
-                  setParseError(null);
-                  setUploadError(null);
-                  setPendingFile(null);
-                  setSelectedEvaluators([]);
-                  setCommittedEvaluators([]);
-                  if (fileInputRef.current) fileInputRef.current.value = "";
-                }}
-                className={`text-left px-4 py-3 rounded-lg border transition-colors cursor-pointer ${
-                  isResponseType
-                    ? "bg-foreground text-background border-foreground"
-                    : "bg-background border-border hover:bg-muted/50"
-                }`}
-              >
-                <div className="text-sm font-medium mb-0.5">Next Reply</div>
-                <div
-                  className={`text-xs leading-snug ${
-                    isResponseType
-                      ? "text-background/80"
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  Evaluate the agent&apos;s response given a conversation
-                  history
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setTestType("tool_call");
-                  setCsvFile(null);
-                  setParsedTests([]);
-                  setParseError(null);
-                  setUploadError(null);
-                  setPendingFile(null);
-                  setSelectedEvaluators([]);
-                  setCommittedEvaluators([]);
-                  if (fileInputRef.current) fileInputRef.current.value = "";
-                }}
-                className={`text-left px-4 py-3 rounded-lg border transition-colors cursor-pointer ${
-                  testType === "tool_call"
-                    ? "bg-foreground text-background border-foreground"
-                    : "bg-background border-border hover:bg-muted/50"
-                }`}
-              >
-                <div className="text-sm font-medium mb-0.5">Tool Call</div>
-                <div
-                  className={`text-xs leading-snug ${
-                    testType === "tool_call"
-                      ? "text-background/80"
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  Check whether the agent invokes the correct tool with the
-                  correct arguments
-                </div>
-              </button>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-3xl">
+              {(
+                [
+                  {
+                    value: "response" as const,
+                    label: "Next Reply",
+                    description:
+                      "Evaluate the agent's response given a conversation history",
+                  },
+                  {
+                    value: "tool_call" as const,
+                    label: "Tool Call",
+                    description:
+                      "Check whether the agent invokes the correct tool with the correct arguments",
+                  },
+                  {
+                    value: "conversation" as const,
+                    label: "Conversation",
+                    description:
+                      "Evaluate an entire conversation history as a whole",
+                  },
+                ]
+              ).map((opt) => {
+                const isSelected = testType === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      setTestType(opt.value);
+                      setCsvFile(null);
+                      setParsedTests([]);
+                      setParseError(null);
+                      setUploadError(null);
+                      setPendingFile(null);
+                      setSelectedEvaluators([]);
+                      setCommittedEvaluators([]);
+                      // Reset cached evaluator list so the next-reply ↔
+                      // conversation switch re-fetches with the right
+                      // evaluator_type filter.
+                      setAvailableLLMEvaluators([]);
+                      setEvaluatorsFetched(false);
+                      setEvaluatorsFetchError(null);
+                      if (fileInputRef.current)
+                        fileInputRef.current.value = "";
+                    }}
+                    className={`text-left px-4 py-3 rounded-lg border transition-colors cursor-pointer ${
+                      isSelected
+                        ? "bg-foreground text-background border-foreground"
+                        : "bg-background border-border hover:bg-muted/50"
+                    }`}
+                  >
+                    <div className="text-sm font-medium mb-0.5">
+                      {opt.label}
+                    </div>
+                    <div
+                      className={`text-xs leading-snug ${
+                        isSelected
+                          ? "text-background/80"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {opt.description}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -1232,7 +1255,7 @@ export function BulkUploadTestsModal({
               their variables) the user wants to attach, so we ask for
               that up-front and don't show the upload section until at
               least one evaluator is picked. */}
-          {isResponseType && (
+          {usesEvaluators && (
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
                 Select evaluators to attach
@@ -1290,7 +1313,7 @@ export function BulkUploadTestsModal({
 
           {/* Step 2: CSV Upload (only after type + (for response) at least
               one evaluator are picked) */}
-          {testType && (!isResponseType || committedEvaluators.length > 0) && (
+          {testType && (!usesEvaluators || committedEvaluators.length > 0) && (
             <div>
               {parsedTests.length === 0 && (
                 <div className="mb-3 flex flex-wrap gap-2">
@@ -1321,13 +1344,13 @@ export function BulkUploadTestsModal({
                   surfacing — loading happens silently in the background,
                   and a CSV dropped while in flight is auto-parsed once
                   the fetch lands (see deferred-parse effect). */}
-              {isResponseType && evaluatorsFetchError && (
+              {usesEvaluators && evaluatorsFetchError && (
                 <p className="text-xs text-red-500 mb-3">
                   Failed to load evaluators: {evaluatorsFetchError}. Refresh and
                   try again.
                 </p>
               )}
-              {!isResponseType && toolsFetchError && (
+              {!usesEvaluators && toolsFetchError && (
                 <p className="text-xs text-red-500 mb-3">
                   Failed to load tools: {toolsFetchError}. Refresh and try
                   again.
@@ -1465,7 +1488,7 @@ export function BulkUploadTestsModal({
 
               {/* Parsed Preview */}
               {parsedTests.length > 0 &&
-                isResponseType &&
+                usesEvaluators &&
                 (() => {
                   const variableColumns = committedEvaluators.flatMap((e) =>
                     e.variables.map((v) => ({
@@ -1584,7 +1607,7 @@ export function BulkUploadTestsModal({
 
               {/* Tool-call preview keeps the existing table layout — its
                   per-row `tool_calls` column has its own custom rendering. */}
-              {parsedTests.length > 0 && !isResponseType && (
+              {parsedTests.length > 0 && !usesEvaluators && (
                 <div className="mt-3 rounded-lg bg-muted/50 border border-border overflow-hidden">
                   <div className="px-3 py-2.5 flex items-center gap-2 border-b border-border">
                     <svg

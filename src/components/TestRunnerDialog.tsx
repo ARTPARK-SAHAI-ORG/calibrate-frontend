@@ -26,7 +26,7 @@ type TestData = {
   uuid: string;
   name: string;
   description: string;
-  type: "response" | "tool_call";
+  type: "response" | "tool_call" | "conversation";
   config: Record<string, any>;
   created_at: string;
   updated_at: string;

@@ -40,7 +40,7 @@ export type TestConfig = {
     created_at?: string;
   }>;
   evaluation: {
-    type: "tool_call" | "response";
+    type: "tool_call" | "response" | "conversation";
     tool_calls?: Array<{
       tool: string;
       arguments: Record<string, any>;
@@ -50,6 +50,9 @@ export type TestConfig = {
     criteria?: string;
   };
 };
+
+// Evaluator type for the conversation tab — picker is filtered to this.
+const CONVERSATION_EVALUATOR_TYPE = "simulation";
 
 export type EvaluatorVariableDef = {
   name: string;
@@ -93,6 +96,8 @@ type LLMEvaluatorOption = {
   slug: string | null;
   owner_user_id: string | null;
   variables: EvaluatorVariableDef[];
+  /** "llm" for next-reply tab, "simulation" for conversation tab. */
+  evaluator_type?: string;
 };
 
 type AddTestDialogProps = {
@@ -114,7 +119,7 @@ type AddTestDialogProps = {
   setItemDescription?: (description: string) => void;
   validationAttempted: boolean;
   onSubmit: (config: TestConfig, evaluators: EvaluatorRefPayload[]) => void;
-  initialTab?: "next-reply" | "tool-invocation";
+  initialTab?: "next-reply" | "tool-invocation" | "conversation";
   initialConfig?: TestConfig;
   initialEvaluators?: AttachedEvaluatorInit[];
   /**
@@ -169,9 +174,14 @@ export function AddTestDialog({
   const ItemNoun = isLabelItem ? "Item" : "Test";
 
   const backendAccessToken = useAccessToken();
-  const [activeTab, setActiveTab] = useState<"next-reply" | "tool-invocation">(
-    isLabelItem ? "next-reply" : initialTab || "next-reply",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "next-reply" | "tool-invocation" | "conversation"
+  >(isLabelItem ? "next-reply" : initialTab || "next-reply");
+  // Tabs that pair the conversation history with attached evaluators (vs. the
+  // tool-invocation tab, which uses a tool picker instead). Used to gate the
+  // shared evaluator-related UI and validation paths below.
+  const isEvaluatorTab =
+    activeTab === "next-reply" || activeTab === "conversation";
 
   // Available tools state - declared early so it's available for initialConfig parsing
   const [availableTools, setAvailableTools] = useState<AvailableTool[]>([]);
@@ -445,8 +455,9 @@ export function AddTestDialog({
       // since that's the message being graded.
       return [u("1"), a("2")];
     }
-    if (allowAgentLastMessage) {
-      // Simulation add-item: a short but complete conversation transcript.
+    if (allowAgentLastMessage || activeTab === "conversation") {
+      // Simulation add-item / conversation test: a short but complete
+      // conversation transcript (any role can be last).
       return [u("1"), a("2"), u("3"), a("4"), u("5"), a("6")];
     }
     // Default test: user → agent → user (final user turn is what the agent
@@ -686,13 +697,18 @@ export function AddTestDialog({
         }> = await response.json();
 
         const llm: LLMEvaluatorOption[] = raw
-          .filter((e) => e.evaluator_type === "llm")
+          .filter(
+            (e) =>
+              e.evaluator_type === "llm" ||
+              e.evaluator_type === CONVERSATION_EVALUATOR_TYPE,
+          )
           .map((e) => ({
             uuid: e.uuid,
             name: e.name,
             description: e.description,
             slug: e.slug,
             owner_user_id: e.owner_user_id,
+            evaluator_type: e.evaluator_type,
             variables: Array.isArray(e.live_version?.variables)
               ? (e.live_version!.variables as EvaluatorVariableDef[])
               : [],
@@ -1174,12 +1190,12 @@ export function AddTestDialog({
         };
       }
     } else {
-      // next-reply test. The legacy free-text `criteria` field is no longer
-      // sent — the user-supplied criteria now lives on the attached
-      // correctness evaluator's `variable_values.criteria` (sent separately
-      // on the POST/PUT body's `evaluators` array).
+      // Evaluator-based tests (next-reply or conversation). The legacy
+      // free-text `criteria` field is no longer sent — the user-supplied
+      // criteria now lives on the attached evaluator's `variable_values`
+      // (sent separately on the POST/PUT body's `evaluators` array).
       evaluation = {
-        type: "response",
+        type: activeTab === "conversation" ? "conversation" : "response",
       };
     }
 
@@ -1187,10 +1203,11 @@ export function AddTestDialog({
   };
 
   // Build the EvaluatorRef[] payload sent alongside `config` on POST/PUT
-  // /tests. Only relevant for next-reply tests. We omit `variable_values`
-  // entirely when the evaluator has no variables to keep the payload lean.
+  // /tests. Relevant for both next-reply and conversation tests. We omit
+  // `variable_values` entirely when the evaluator has no variables to keep
+  // the payload lean.
   const buildEvaluatorsPayload = (): EvaluatorRefPayload[] => {
-    if (activeTab !== "next-reply") return [];
+    if (!isEvaluatorTab) return [];
     return attachedEvaluators.map((e) => {
       const ref: EvaluatorRefPayload = { evaluator_uuid: e.evaluator_uuid };
       if (e.variables.length > 0) {
@@ -1203,7 +1220,7 @@ export function AddTestDialog({
   // Returns true if any attached evaluator has at least one variable whose
   // value is empty (after trim). Used to gate the Save button.
   const hasUnfilledEvaluatorVariables = () => {
-    if (activeTab !== "next-reply") return false;
+    if (!isEvaluatorTab) return false;
     for (const e of attachedEvaluators) {
       for (const v of e.variables) {
         const value = e.variable_values[v.name];
@@ -1250,7 +1267,7 @@ export function AddTestDialog({
     }
 
     // Validate required fields based on test type
-    if (activeTab === "next-reply") {
+    if (isEvaluatorTab) {
       if (!testName.trim()) {
         return; // Don't submit if validation fails
       }
@@ -1381,7 +1398,9 @@ export function AddTestDialog({
                 <div className="flex-1 py-3 md:py-4 text-sm md:text-base font-medium text-foreground border-b-2 border-foreground text-center">
                   {activeTab === "tool-invocation"
                     ? "Tool invocation test"
-                    : "Next reply test"}
+                    : activeTab === "conversation"
+                      ? "Conversation test"
+                      : "Next reply test"}
                 </div>
               </div>
             ) : (
@@ -1405,6 +1424,16 @@ export function AddTestDialog({
                   }`}
                 >
                   Tool invocation test
+                </button>
+                <button
+                  onClick={() => setActiveTab("conversation")}
+                  className={`flex-1 py-3 md:py-4 text-sm md:text-base font-medium transition-colors cursor-pointer ${
+                    activeTab === "conversation"
+                      ? "text-foreground border-b-2 border-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Conversation test
                 </button>
               </div>
             ))}
@@ -1433,7 +1462,7 @@ export function AddTestDialog({
                   ></path>
                 </svg>
               </div>
-            ) : activeTab === "next-reply" ? (
+            ) : isEvaluatorTab ? (
               <div className="space-y-6">
                 {/* Name */}
                 <div>
@@ -1448,7 +1477,7 @@ export function AddTestDialog({
                     className={`w-full h-11 px-4 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
                       nameError ||
                       (localValidationAttempted &&
-                        activeTab === "next-reply" &&
+                        isEvaluatorTab &&
                         !testName.trim())
                         ? "border-red-500"
                         : "border-border"
@@ -1458,7 +1487,7 @@ export function AddTestDialog({
                     <p className="text-xs text-red-500 mt-1">{nameError}</p>
                   ) : (
                     localValidationAttempted &&
-                    activeTab === "next-reply" &&
+                    isEvaluatorTab &&
                     !testName.trim() && (
                       <p className="text-xs text-red-500 mt-1">
                         {ItemNoun} name cannot be empty
@@ -1495,7 +1524,11 @@ export function AddTestDialog({
                           (o) =>
                             !attachedEvaluators.some(
                               (a) => a.evaluator_uuid === o.uuid,
-                            ),
+                            ) &&
+                            (activeTab === "conversation"
+                              ? o.evaluator_type ===
+                                CONVERSATION_EVALUATOR_TYPE
+                              : o.evaluator_type === "llm"),
                         );
                         const noOptionsLeft = remainingOptions.length === 0;
                         return (
@@ -1515,7 +1548,7 @@ export function AddTestDialog({
                             // error state overrides border/text to red.
                             className={`px-3 py-1.5 text-sm font-medium rounded-lg border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-500/12 border-violet-500/45 text-violet-950 dark:text-violet-100 hover:bg-violet-500/22 dark:hover:bg-violet-500/18 ${
                               localValidationAttempted &&
-                              activeTab === "next-reply" &&
+                              isEvaluatorTab &&
                               attachedEvaluators.length === 0
                                 ? "!border-red-500 !text-red-500 !bg-red-500/10"
                                 : ""
@@ -1554,7 +1587,11 @@ export function AddTestDialog({
                               (o) =>
                                 !attachedEvaluators.some(
                                   (a) => a.evaluator_uuid === o.uuid,
-                                ),
+                                ) &&
+                                (activeTab === "conversation"
+                                  ? o.evaluator_type ===
+                                    CONVERSATION_EVALUATOR_TYPE
+                                  : o.evaluator_type === "llm"),
                             );
                             if (remaining.length === 0) {
                               return (
@@ -1664,13 +1701,14 @@ export function AddTestDialog({
                   {!evaluatorsLoading && attachedEvaluators.length === 0 && (
                     <div
                       className={`text-sm py-4 ${
-                        localValidationAttempted && activeTab === "next-reply"
+                        localValidationAttempted && isEvaluatorTab
                           ? "text-red-500"
                           : "text-muted-foreground"
                       }`}
                     >
-                      Add at least one evaluator to grade the agent&apos;s next
-                      reply.
+                      {activeTab === "conversation"
+                        ? "Add at least one evaluator to grade the full conversation."
+                        : "Add at least one evaluator to grade the agent's next reply."}
                     </div>
                   )}
 
@@ -1735,7 +1773,7 @@ export function AddTestDialog({
                               const value = ev.variable_values[v.name] ?? "";
                               const isMissing =
                                 localValidationAttempted &&
-                                activeTab === "next-reply" &&
+                                isEvaluatorTab &&
                                 value.trim().length === 0;
                               return (
                                 <div key={v.name}>
@@ -2012,7 +2050,10 @@ export function AddTestDialog({
                 if (requireAssistantLastMessage) {
                   isLastMessageInvalid =
                     isEmpty || lastMessage?.role !== "agent";
-                } else if (allowAgentLastMessage) {
+                } else if (
+                  allowAgentLastMessage ||
+                  activeTab === "conversation"
+                ) {
                   isLastMessageInvalid = isEmpty;
                 } else {
                   isLastMessageInvalid =
@@ -2099,7 +2140,9 @@ export function AddTestDialog({
               <p className="text-sm text-foreground leading-relaxed">
                 {requireAssistantLastMessage
                   ? "Your evaluators read this whole conversation and evaluate the last agent message (the one highlighted) against the evaluators. Only that final reply is scored."
-                  : "The agent's response to the last user message, given the conversation history, will be evaluated against the evaluators added to the test"}
+                  : activeTab === "conversation"
+                    ? "Your evaluators read the entire conversation history and grade it as a whole against the evaluators added to the test."
+                    : "The agent's response to the last user message, given the conversation history, will be evaluated against the evaluators added to the test"}
               </p>
             </div>
           </div>

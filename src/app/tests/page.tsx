@@ -44,7 +44,7 @@ type TestData = {
   uuid: string;
   name: string;
   description: string;
-  type: "response" | "tool_call";
+  type: "response" | "tool_call" | "conversation";
   config: Record<string, any>;
   evaluators?: TestEvaluatorRow[] | null;
   created_at: string;
@@ -169,7 +169,7 @@ function LLMPageInner() {
   const [isLoadingTest, setIsLoadingTest] = useState(false);
   const [validationAttempted, setValidationAttempted] = useState(false);
   const [initialTab, setInitialTab] = useState<
-    "next-reply" | "tool-invocation" | undefined
+    "next-reply" | "tool-invocation" | "conversation" | undefined
   >(undefined);
   const [initialConfig, setInitialConfig] = useState<TestConfig | undefined>(
     undefined
@@ -608,7 +608,9 @@ function LLMPageInner() {
         throw new Error("BACKEND_URL environment variable is not set");
       }
 
-      const isResponse = config.evaluation.type === "response";
+      const evalType = config.evaluation.type;
+      const usesEvaluators =
+        evalType === "response" || evalType === "conversation";
       const testItem: {
         name: string;
         conversation_history: TestConfig["history"];
@@ -618,7 +620,7 @@ function LLMPageInner() {
         name: newTestName.trim(),
         conversation_history: config.history,
       };
-      if (isResponse) {
+      if (usesEvaluators) {
         testItem.evaluators = evaluators;
       } else {
         testItem.tool_calls = config.evaluation.tool_calls ?? [];
@@ -726,7 +728,11 @@ function LLMPageInner() {
       );
       // Set initial tab based on test type
       setInitialTab(
-        testData.type === "tool_call" ? "tool-invocation" : "next-reply"
+        testData.type === "tool_call"
+          ? "tool-invocation"
+          : testData.type === "conversation"
+          ? "conversation"
+          : "next-reply"
       );
       // Set initial config to populate dialog fields
       if (testData.config) {
@@ -776,12 +782,13 @@ function LLMPageInner() {
         throw new Error("BACKEND_URL environment variable is not set");
       }
 
-      // For next-reply tests we send `evaluators` so the backend replaces the
-      // whole pivot set. For tool-invocation tests we omit `evaluators`
-      // entirely so existing links (if any) are left untouched.
+      // For next-reply / conversation tests we send `evaluators` so the
+      // backend replaces the whole pivot set. For tool-invocation tests we
+      // omit `evaluators` entirely so existing links (if any) are left
+      // untouched.
       const body: {
         name: string;
-        type: "response" | "tool_call";
+        type: "response" | "tool_call" | "conversation";
         config: TestConfig;
         evaluators?: EvaluatorRefPayload[];
       } = {
@@ -789,7 +796,10 @@ function LLMPageInner() {
         type: config.evaluation.type,
         config: config,
       };
-      if (config.evaluation.type === "response") {
+      if (
+        config.evaluation.type === "response" ||
+        config.evaluation.type === "conversation"
+      ) {
         body.evaluators = evaluators;
       }
 
@@ -1155,6 +1165,8 @@ function LLMPageInner() {
                       ? "Next Reply"
                       : test.type === "tool_call"
                       ? "Tool Call"
+                      : test.type === "conversation"
+                      ? "Conversation"
                       : "—"}
                   </p>
                   <div className="flex items-center gap-1">
