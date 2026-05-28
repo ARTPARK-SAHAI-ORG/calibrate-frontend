@@ -2887,40 +2887,51 @@ function LabellingTaskPageInner() {
               {/* Bulk-action toolbar (shown when at least one row is selected,
                   or when "select all across pages" is active). */}
               {(selectedItemIds.size > 0 || selectAllTotal) && (
-                <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
-                  <span className="text-sm">
-                    <span className="font-medium">
-                      {selectAllTotal ? itemsTotal : selectedItemIds.size}
-                    </span>{" "}
-                    item
-                    {(selectAllTotal ? itemsTotal : selectedItemIds.size) === 1
-                      ? ""
-                      : "s"}{" "}
-                    selected
-                    {selectAllTotal && itemsSearch ? (
-                      <span className="text-muted-foreground">
-                        {" "}
-                        matching &ldquo;{itemsSearch}&rdquo;
-                      </span>
-                    ) : null}
+                <div
+                  className={`flex items-center justify-between gap-3 rounded-md border px-3 py-2 transition-colors ${
+                    selectAllTotal
+                      ? "border-amber-500/50 bg-amber-500/10"
+                      : "border-border bg-muted/30"
+                  }`}
+                >
+                  <div
+                    className={`flex items-center gap-2 text-sm ${
+                      selectAllTotal
+                        ? "text-amber-700 dark:text-amber-300"
+                        : ""
+                    }`}
+                  >
+                    <span>
+                      <span className="font-medium">
+                        {selectAllTotal ? itemsTotal : selectedItemIds.size}
+                      </span>{" "}
+                      item
+                      {(selectAllTotal
+                        ? itemsTotal
+                        : selectedItemIds.size) === 1
+                        ? ""
+                        : "s"}{" "}
+                      selected
+                      {selectAllTotal && itemsSearch ? (
+                        <span className="opacity-80">
+                          {" "}
+                          matching &ldquo;{itemsSearch}&rdquo;
+                        </span>
+                      ) : null}
+                    </span>
                     {!selectAllTotal &&
                       allSelected &&
                       itemsTotal > items.length && (
-                        <>
-                          .{" "}
-                          <button
-                            onClick={() => setSelectAllTotal(true)}
-                            className="font-medium text-foreground underline underline-offset-2 hover:opacity-80 cursor-pointer"
-                          >
-                            Select all {itemsTotal} item
-                            {itemsTotal === 1 ? "" : "s"}
-                            {itemsSearch
-                              ? ` matching "${itemsSearch}"`
-                              : ""}
-                          </button>
-                        </>
+                        <button
+                          onClick={() => setSelectAllTotal(true)}
+                          className="inline-flex items-center h-7 px-2.5 rounded-md text-xs font-medium border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 hover:border-amber-500/60 transition-colors cursor-pointer whitespace-nowrap"
+                        >
+                          Select all {itemsTotal} item
+                          {itemsTotal === 1 ? "" : "s"}
+                          {itemsSearch ? ` matching "${itemsSearch}"` : ""}
+                        </button>
                       )}
-                  </span>
+                  </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => {
