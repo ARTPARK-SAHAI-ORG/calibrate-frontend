@@ -26,6 +26,7 @@ import {
 } from "@/components/evaluators/BinaryScaleEditor";
 import { defaultBinaryLabel } from "@/lib/binaryLabels";
 import { UseCasePickerDialog } from "@/components/evaluators/UseCasePickerDialog";
+import { Select } from "@/components/ui/Select";
 import { extractVariableNames } from "@/lib/evaluatorVariables";
 import { useSidebarState } from "@/lib/sidebar";
 
@@ -781,65 +782,35 @@ function MetricsPageInner() {
             />
           </div>
           <div className="flex items-center gap-2 md:gap-3">
-            <div className="relative">
-              <select
-                value={purposeFilter}
-                onChange={(e) =>
-                  setPurposeFilter(e.target.value as EvaluatorType | "all")
-                }
-                className="appearance-none h-9 md:h-10 pl-3 pr-9 rounded-md text-sm md:text-base border border-border bg-background dark:bg-muted text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer"
-                aria-label="Filter by purpose"
-              >
-                <option value="all">All purposes</option>
-                {EVALUATOR_TYPE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {EVALUATOR_TYPE_LABELS[opt.value]}
-                  </option>
-                ))}
-              </select>
-              <svg
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                />
-              </svg>
-            </div>
-            <div className="relative">
-              <select
-                value={outputTypeFilter}
-                onChange={(e) =>
-                  setOutputTypeFilter(
-                    e.target.value as "binary" | "rating" | "all",
-                  )
-                }
-                className="appearance-none h-9 md:h-10 pl-3 pr-9 rounded-md text-sm md:text-base border border-border bg-background dark:bg-muted text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer"
-                aria-label="Filter by output type"
-              >
-                <option value="all">All outputs</option>
-                <option value="binary">Binary</option>
-                <option value="rating">Rating</option>
-              </select>
-              <svg
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                />
-              </svg>
-            </div>
+            <Select
+              value={purposeFilter}
+              onChange={(e) =>
+                setPurposeFilter(e.target.value as EvaluatorType | "all")
+              }
+              className="h-9 md:h-10 text-sm md:text-base dark:bg-muted cursor-pointer"
+              aria-label="Filter by purpose"
+            >
+              <option value="all">All purposes</option>
+              {EVALUATOR_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {EVALUATOR_TYPE_LABELS[opt.value]}
+                </option>
+              ))}
+            </Select>
+            <Select
+              value={outputTypeFilter}
+              onChange={(e) =>
+                setOutputTypeFilter(
+                  e.target.value as "binary" | "rating" | "all",
+                )
+              }
+              className="h-9 md:h-10 text-sm md:text-base dark:bg-muted cursor-pointer"
+              aria-label="Filter by output type"
+            >
+              <option value="all">All outputs</option>
+              <option value="binary">Binary</option>
+              <option value="rating">Rating</option>
+            </Select>
           </div>
         </div>
 
