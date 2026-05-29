@@ -1603,6 +1603,11 @@ function LabellingTaskPageInner() {
     itemsLimit > 0 ? Math.floor(itemsOffset / itemsLimit) + 1 : 1;
   const itemsRangeStart = itemsTotal === 0 ? 0 : itemsOffset + 1;
   const itemsRangeEnd = Math.min(itemsOffset + items.length, itemsTotal);
+  // Hide the whole pagination footer when pagination can never apply — i.e.
+  // even the smallest page size fits every item on one page. Above that
+  // threshold we keep the footer (so the Per-page selector stays reachable)
+  // but hide the prev/next page nav whenever there's only a single page.
+  const showItemsPagination = itemsTotal > ITEMS_PAGE_SIZE_OPTIONS[0];
   /** True when the task itself has any items (regardless of the
    * current search). Used to distinguish the "no items yet" empty state
    * from the "no search matches" state. */
@@ -3379,6 +3384,8 @@ function LabellingTaskPageInner() {
                   (bottom-6 right-6) so the prev/next controls stay
                   visible when the user scrolls to the bottom. */}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-1 pb-20 text-sm text-muted-foreground">
+                {showItemsPagination && (
+                  <>
                 <div>
                   {itemsTotal === 0 ? (
                     "0 items"
@@ -3441,6 +3448,7 @@ function LabellingTaskPageInner() {
                       </svg>
                     </div>
                   </label>
+                  {itemsPageCount > 1 && (
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
@@ -3504,7 +3512,10 @@ function LabellingTaskPageInner() {
                       </svg>
                     </button>
                   </div>
+                  )}
                 </div>
+                  </>
+                )}
               </div>
             </div>
           ))}
