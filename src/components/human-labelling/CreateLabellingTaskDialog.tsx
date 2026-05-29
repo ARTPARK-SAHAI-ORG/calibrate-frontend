@@ -49,7 +49,7 @@ const TASK_TYPE_OPTIONS: {
 ];
 
 // Per-type tints, mirroring EvaluatorTypePill's palette
-// (llm=orange, stt=blue, simulation=pink) so the picker reads as the
+// (llm=orange, stt=blue, conversation=pink) so the picker reads as the
 // same "type" affordance the user sees on evaluator cards. We use a
 // subtle tint by default (so the cards announce their type at rest)
 // and a stronger tint + bordered ring when active.

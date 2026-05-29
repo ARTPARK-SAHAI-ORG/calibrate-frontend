@@ -21,7 +21,10 @@ import {
   type TestConfig,
 } from "@/components/AddTestDialog";
 import { AppLayout } from "@/components/AppLayout";
-import { EvaluatorTypePill } from "@/components/EvaluatorPills";
+import {
+  EvaluatorTypePill,
+  type EvaluatorType,
+} from "@/components/EvaluatorPills";
 import {
   ExportResultsButton,
   type ExportColumn,
@@ -31,7 +34,7 @@ import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { AddSttItemsDialog } from "@/components/human-labelling/AddSttItemsDialog";
 import { BulkUploadSttItemsDialog } from "@/components/human-labelling/BulkUploadSttItemsDialog";
-import { BulkUploadSimulationItemsDialog } from "@/components/human-labelling/BulkUploadSimulationItemsDialog";
+import { BulkUploadConversationItemsDialog } from "@/components/human-labelling/BulkUploadConversationItemsDialog";
 import { BulkUploadLlmItemsDialog } from "@/components/human-labelling/BulkUploadLlmItemsDialog";
 import { AssignAnnotatorsDialog } from "@/components/human-labelling/AssignAnnotatorsDialog";
 import { EditTaskDialog } from "@/components/human-labelling/EditTaskDialog";
@@ -258,14 +261,17 @@ type LabellingTask = {
   item_count?: number;
 };
 
-type TaskKind = "llm" | "stt" | "tts" | "simulation" | undefined;
+type TaskKind = "llm" | "stt" | "tts" | "conversation" | undefined;
 
-// Backend annotation tasks carry type "conversation" where evaluators
-// carry "simulation". Normalize to the evaluator-side value so all
-// downstream branching and the shared EvaluatorTypePill keep working.
-function normalizeTaskType(
-  t: "llm" | "stt" | "tts" | "conversation" | undefined,
-): TaskKind {
+// Annotation tasks use "conversation"; evaluators use "simulation". These
+// two helpers bridge the divergence so task-level code stays in the
+// "conversation" vocabulary and only converts at the evaluator boundary
+// (EvaluatorTypePill, evaluator filtering).
+function evaluatorTypeToTaskKind(t: EvaluatorType | undefined): TaskKind {
+  return t === "simulation" ? "conversation" : t;
+}
+
+function taskKindToEvaluatorType(t: TaskKind): EvaluatorType | undefined {
   return t === "conversation" ? "simulation" : t;
 }
 
@@ -293,7 +299,7 @@ function previewItemPayload(payload: unknown, kind: TaskKind): string {
       if (typeof last?.content === "string") return last.content;
     }
   }
-  if (kind === "simulation") {
+  if (kind === "conversation") {
     if (Array.isArray(p.transcript) && p.transcript.length > 0) {
       const first = p.transcript[0] as { content?: unknown };
       if (typeof first?.content === "string") return first.content;
@@ -360,7 +366,7 @@ function buildItemsCsv(
   if (taskType !== "stt") {
     columns.push({ key: "description", header: "description" });
   }
-  if (taskType === "simulation") {
+  if (taskType === "conversation") {
     columns.push({
       key: "conversation_history",
       header: "conversation_history",
@@ -434,7 +440,7 @@ function buildItemsCsv(
     if (taskType !== "stt") {
       out.description = typeof p.description === "string" ? p.description : "";
     }
-    if (taskType === "simulation") {
+    if (taskType === "conversation") {
       out.conversation_history = Array.isArray(p.transcript)
         ? JSON.stringify(p.transcript)
         : "";
@@ -1621,9 +1627,10 @@ function LabellingTaskPageInner() {
     (itemsSearch ? false : items.length > 0);
   const jobsCount = jobs.length;
   const taskType =
-    normalizeTaskType(task?.type) ?? task?.evaluators?.[0]?.evaluator_type;
+    task?.type ??
+    evaluatorTypeToTaskKind(task?.evaluators?.[0]?.evaluator_type);
   const canAddItem =
-    taskType === "llm" || taskType === "simulation" || taskType === "stt";
+    taskType === "llm" || taskType === "conversation" || taskType === "stt";
 
   /**
    * Anchor for shift+click range selection — the uuid of the most
@@ -2143,7 +2150,7 @@ function LabellingTaskPageInner() {
     };
 
     let history: HistoryItem[];
-    if (taskType === "simulation") {
+    if (taskType === "conversation") {
       history = parseHistory(payload.transcript);
     } else {
       // LLM: chat_history (may include tool calls + tool responses) +
@@ -2223,7 +2230,7 @@ function LabellingTaskPageInner() {
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [addSttItemsOpen, setAddSttItemsOpen] = useState(false);
   const [bulkUploadSttOpen, setBulkUploadSttOpen] = useState(false);
-  const [bulkUploadSimulationOpen, setBulkUploadSimulationOpen] =
+  const [bulkUploadConversationOpen, setBulkUploadConversationOpen] =
     useState(false);
   const [bulkUploadLlmOpen, setBulkUploadLlmOpen] = useState(false);
   const [newItemName, setNewItemName] = useState("");
@@ -2322,7 +2329,11 @@ function LabellingTaskPageInner() {
                   (task?.name ?? "—")
                 )}
               </h1>
-              {taskType && <EvaluatorTypePill evaluatorType={taskType} />}
+              {taskType && (
+                <EvaluatorTypePill
+                  evaluatorType={taskKindToEvaluatorType(taskType)!}
+                />
+              )}
             </div>
             {task?.description && (
               <p className="text-muted-foreground text-sm md:text-base leading-relaxed mt-1 max-w-3xl">
@@ -2448,7 +2459,7 @@ function LabellingTaskPageInner() {
               </button>
               <button
                 onClick={() => {
-                  if (taskType === "llm" || taskType === "simulation") {
+                  if (taskType === "llm" || taskType === "conversation") {
                     setNewItemName("");
                     setNewItemDescription("");
                     setCreateItemError(null);
@@ -2495,8 +2506,8 @@ function LabellingTaskPageInner() {
                       if (llmNoEvaluators) return;
                       if (taskType === "stt") {
                         setBulkUploadSttOpen(true);
-                      } else if (taskType === "simulation") {
-                        setBulkUploadSimulationOpen(true);
+                      } else if (taskType === "conversation") {
+                        setBulkUploadConversationOpen(true);
                       } else if (taskType === "llm") {
                         setBulkUploadLlmOpen(true);
                       } else {
@@ -3654,7 +3665,7 @@ function LabellingTaskPageInner() {
           setItemDescription={setNewItemDescription}
           validationAttempted={validationAttempted}
           mode="labelItem"
-          allowAgentLastMessage={taskType === "simulation"}
+          allowAgentLastMessage={taskType === "conversation"}
           requireAssistantLastMessage={taskType === "llm"}
           initialConfig={addItemInitialConfig}
           initialEvaluators={newItemInitialEvaluators}
@@ -3705,7 +3716,7 @@ function LabellingTaskPageInner() {
               : {};
 
             let payload: Record<string, unknown>;
-            if (taskType === "simulation") {
+            if (taskType === "conversation") {
               payload = {
                 name: newItemName.trim(),
                 ...descriptionField,
@@ -3776,7 +3787,7 @@ function LabellingTaskPageInner() {
           setItemDescription={setEditLlmItemDescription}
           validationAttempted={false}
           mode="labelItem"
-          allowAgentLastMessage={taskType === "simulation"}
+          allowAgentLastMessage={taskType === "conversation"}
           requireAssistantLastMessage={taskType === "llm"}
           initialConfig={editingInitialConfig}
           initialEvaluators={editingInitialEvaluators}
@@ -3815,7 +3826,7 @@ function LabellingTaskPageInner() {
             const descriptionField = { description: trimmedDescription };
 
             let payload: Record<string, unknown>;
-            if (taskType === "simulation") {
+            if (taskType === "conversation") {
               payload = {
                 name: editLlmItemName.trim(),
                 ...descriptionField,
@@ -3907,8 +3918,8 @@ function LabellingTaskPageInner() {
       )}
 
       {accessToken && (
-        <BulkUploadSimulationItemsDialog
-          isOpen={bulkUploadSimulationOpen}
+        <BulkUploadConversationItemsDialog
+          isOpen={bulkUploadConversationOpen}
           accessToken={accessToken}
           taskUuid={uuid}
           linkedEvaluators={(task?.evaluators ?? []).map((e) => ({
@@ -3918,9 +3929,9 @@ function LabellingTaskPageInner() {
             scale_min: typeof e.scale_min === "number" ? e.scale_min : null,
             scale_max: typeof e.scale_max === "number" ? e.scale_max : null,
           }))}
-          onClose={() => setBulkUploadSimulationOpen(false)}
+          onClose={() => setBulkUploadConversationOpen(false)}
           onSuccess={async (count) => {
-            setBulkUploadSimulationOpen(false);
+            setBulkUploadConversationOpen(false);
             handleTabChange("items");
             await Promise.all([fetchTask(), fetchTaskSummary()]);
             toast.success(`Added ${count} ${count === 1 ? "item" : "items"}`);
@@ -4132,7 +4143,8 @@ function LabellingTaskPageInner() {
           accessToken={accessToken}
           taskUuid={task.uuid}
           taskType={
-            normalizeTaskType(task.type) ?? task.evaluators?.[0]?.evaluator_type
+            taskKindToEvaluatorType(task.type) ??
+            task.evaluators?.[0]?.evaluator_type
           }
           currentEvaluatorIds={(task.evaluators ?? []).map((e) => e.uuid)}
           onClose={() => setManageOpen(false)}
