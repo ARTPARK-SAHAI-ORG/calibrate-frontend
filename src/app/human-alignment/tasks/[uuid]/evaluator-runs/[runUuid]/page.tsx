@@ -527,7 +527,7 @@ export default function EvaluatorRunDetailPage() {
         task &&
         (task.type === "stt" ||
           task.type === "llm" ||
-          task.type === "simulation") ? (
+          task.type === "conversation") ? (
           <EvaluatorRunDetailView
             job={job}
             task={task}

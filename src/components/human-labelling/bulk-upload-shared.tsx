@@ -152,7 +152,7 @@ export function parseAnnotationCell(
   return { error: `unsupported evaluator type for "${e.name}"` };
 }
 
-// ─── Parsed-items preview + annotated-check (LLM / STT / Simulation) ───────
+// ─── Parsed-items preview + annotated-check (LLM / STT / Conversation) ─────
 
 /** POST `annotated-check` when bulk-uploading with pre-filled annotations. */
 export function useAnnotatedItemsCheck(args: {
@@ -991,7 +991,7 @@ function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
-// Shared shell for the three bulk-upload dialogs (LLM / STT / Simulation).
+// Shared shell for the three bulk-upload dialogs (LLM / STT / Conversation).
 // Owns the modal chrome, header, footer, dropzone, format-help toggle, tip
 // callout, and sample-CSV download wiring. Each dialog supplies its own
 // help body, parsing/upload logic, and items preview.

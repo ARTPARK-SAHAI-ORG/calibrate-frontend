@@ -142,7 +142,7 @@ export type EvaluatorRunJob = {
 export type LabellingTaskFull = {
   uuid: string;
   name: string;
-  type: "llm" | "stt" | "tts" | "simulation";
+  type: "llm" | "stt" | "tts" | "conversation";
   description?: string | null;
   evaluators?: { uuid: string; name: string }[];
   items?: Item[];
@@ -1705,7 +1705,7 @@ export function EvaluatorRunDetailView({
   };
 
   if (
-    !(task.type === "stt" || task.type === "llm" || task.type === "simulation")
+    !(task.type === "stt" || task.type === "llm" || task.type === "conversation")
   ) {
     return null;
   }

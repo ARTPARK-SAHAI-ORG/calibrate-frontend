@@ -7,7 +7,7 @@ import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { getBinaryLabel, toRatingScale } from "@/lib/binaryLabels";
 import { LlmItemPane } from "./item-panes/LlmItemPane";
 import { Section } from "./item-panes/shared";
-import { SimulationItemPane } from "./item-panes/SimulationItemPane";
+import { ConversationItemPane } from "./item-panes/ConversationItemPane";
 import { SttItemPane } from "./item-panes/SttItemPane";
 
 function fireConfetti() {
@@ -42,7 +42,7 @@ type Annotator = { uuid: string; name: string };
 export type Task = {
   uuid: string;
   name: string;
-  type: "llm" | "stt" | "tts" | "simulation";
+  type: "llm" | "stt" | "tts" | "conversation";
   description: string | null;
 };
 
@@ -826,7 +826,7 @@ function AnnotateView({
               />
             </div>
           ) : (
-            // LLM / simulation: long conversation on the left, evaluators
+            // LLM / conversation: long conversation on the left, evaluators
             // on the right. Each panel scrolls independently so the
             // evaluator controls stay visible while the annotator scrolls
             // through history.
@@ -877,8 +877,8 @@ export function ItemPane({
   const payload = (item.payload ?? {}) as Record<string, unknown>;
   if (taskType === "stt") return <SttItemPane payload={payload} />;
   if (taskType === "llm") return <LlmItemPane payload={payload} />;
-  if (taskType === "simulation")
-    return <SimulationItemPane payload={payload} />;
+  if (taskType === "conversation")
+    return <ConversationItemPane payload={payload} />;
   return (
     <div className="space-y-2">
       <Section title="Item payload">

@@ -26,6 +26,7 @@ import {
 } from "@/components/evaluators/BinaryScaleEditor";
 import { defaultBinaryLabel } from "@/lib/binaryLabels";
 import { UseCasePickerDialog } from "@/components/evaluators/UseCasePickerDialog";
+import { Select } from "@/components/ui/Select";
 import { extractVariableNames } from "@/lib/evaluatorVariables";
 import { useSidebarState } from "@/lib/sidebar";
 
@@ -75,7 +76,7 @@ const EVALUATOR_TYPE_TO_DATA_TYPE: Record<EvaluatorType, "text" | "audio"> = {
   tts: "audio",
   stt: "audio",
   llm: "text",
-  simulation: "text",
+  conversation: "text",
 };
 
 const EVALUATOR_TYPE_OPTIONS: {
@@ -101,7 +102,7 @@ const EVALUATOR_TYPE_OPTIONS: {
       "Given a conversation history, evaluate the agent's next response",
   },
   {
-    value: "simulation",
+    value: "conversation",
     title: "Full conversation",
     description:
       "Evaluate the agent's performance during a complete conversation",
@@ -168,13 +169,13 @@ function MetricsPageInner() {
   // page reloads and is restored when the user clicks back from a detail page.
   const [activeTab, setActiveTab] = useState<EvaluatorTab>(() => {
     const t = searchParams.get("tab");
-    return t === "mine" ? "mine" : "default";
+    return t === "default" ? "default" : "mine";
   });
 
   // Keep state in sync if the URL changes (e.g. back/forward navigation).
   useEffect(() => {
     const t = searchParams.get("tab");
-    const next: EvaluatorTab = t === "mine" ? "mine" : "default";
+    const next: EvaluatorTab = t === "default" ? "default" : "mine";
     setActiveTab((prev) => (prev === next ? prev : next));
   }, [searchParams]);
 
@@ -358,7 +359,7 @@ function MetricsPageInner() {
         } | null;
       } = await response.json();
 
-      // `name` is null for `purpose === "simulation"` (no seeded evaluator
+      // `name` is null for `purpose === "conversation"` (no seeded evaluator
       // name); the user must type their own. For all other purposes the
       // server returns a suggested slug-style name we drop straight in.
       setEvaluatorName(data.name ?? "");
@@ -733,16 +734,6 @@ function MetricsPageInner() {
         {/* Tabs */}
         <div className="flex items-center gap-4 md:gap-6 border-b border-border">
           <button
-            onClick={() => changeActiveTab("default")}
-            className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap border-b-2 -mb-px ${
-              activeTab === "default"
-                ? "border-foreground text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Default ({defaultEvaluators.length})
-          </button>
-          <button
             onClick={() => changeActiveTab("mine")}
             className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap border-b-2 -mb-px ${
               activeTab === "mine"
@@ -751,6 +742,16 @@ function MetricsPageInner() {
             }`}
           >
             My evaluators ({myEvaluators.length})
+          </button>
+          <button
+            onClick={() => changeActiveTab("default")}
+            className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap border-b-2 -mb-px ${
+              activeTab === "default"
+                ? "border-foreground text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Default ({defaultEvaluators.length})
           </button>
         </div>
 
@@ -781,65 +782,35 @@ function MetricsPageInner() {
             />
           </div>
           <div className="flex items-center gap-2 md:gap-3">
-            <div className="relative">
-              <select
-                value={purposeFilter}
-                onChange={(e) =>
-                  setPurposeFilter(e.target.value as EvaluatorType | "all")
-                }
-                className="appearance-none h-9 md:h-10 pl-3 pr-9 rounded-md text-sm md:text-base border border-border bg-background dark:bg-muted text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer"
-                aria-label="Filter by purpose"
-              >
-                <option value="all">All purposes</option>
-                {EVALUATOR_TYPE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {EVALUATOR_TYPE_LABELS[opt.value]}
-                  </option>
-                ))}
-              </select>
-              <svg
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                />
-              </svg>
-            </div>
-            <div className="relative">
-              <select
-                value={outputTypeFilter}
-                onChange={(e) =>
-                  setOutputTypeFilter(
-                    e.target.value as "binary" | "rating" | "all",
-                  )
-                }
-                className="appearance-none h-9 md:h-10 pl-3 pr-9 rounded-md text-sm md:text-base border border-border bg-background dark:bg-muted text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer"
-                aria-label="Filter by output type"
-              >
-                <option value="all">All outputs</option>
-                <option value="binary">Binary</option>
-                <option value="rating">Rating</option>
-              </select>
-              <svg
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                />
-              </svg>
-            </div>
+            <Select
+              value={purposeFilter}
+              onChange={(e) =>
+                setPurposeFilter(e.target.value as EvaluatorType | "all")
+              }
+              className="h-9 md:h-10 text-sm md:text-base dark:bg-muted cursor-pointer"
+              aria-label="Filter by purpose"
+            >
+              <option value="all">All purposes</option>
+              {EVALUATOR_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {EVALUATOR_TYPE_LABELS[opt.value]}
+                </option>
+              ))}
+            </Select>
+            <Select
+              value={outputTypeFilter}
+              onChange={(e) =>
+                setOutputTypeFilter(
+                  e.target.value as "binary" | "rating" | "all",
+                )
+              }
+              className="h-9 md:h-10 text-sm md:text-base dark:bg-muted cursor-pointer"
+              aria-label="Filter by output type"
+            >
+              <option value="all">All outputs</option>
+              <option value="binary">Binary</option>
+              <option value="rating">Rating</option>
+            </Select>
           </div>
         </div>
 

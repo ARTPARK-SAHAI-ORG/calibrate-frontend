@@ -3,7 +3,7 @@ import {
   type TestCaseHistory,
 } from "@/components/test-results/shared";
 
-export function SimulationItemPane({
+export function ConversationItemPane({
   payload,
 }: {
   payload: Record<string, unknown>;

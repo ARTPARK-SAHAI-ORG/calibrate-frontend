@@ -31,7 +31,7 @@ import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { AddSttItemsDialog } from "@/components/human-labelling/AddSttItemsDialog";
 import { BulkUploadSttItemsDialog } from "@/components/human-labelling/BulkUploadSttItemsDialog";
-import { BulkUploadSimulationItemsDialog } from "@/components/human-labelling/BulkUploadSimulationItemsDialog";
+import { BulkUploadConversationItemsDialog } from "@/components/human-labelling/BulkUploadConversationItemsDialog";
 import { BulkUploadLlmItemsDialog } from "@/components/human-labelling/BulkUploadLlmItemsDialog";
 import { AssignAnnotatorsDialog } from "@/components/human-labelling/AssignAnnotatorsDialog";
 import { EditTaskDialog } from "@/components/human-labelling/EditTaskDialog";
@@ -124,7 +124,7 @@ type SummaryRow = {
 };
 type TaskSummaryResponse = {
   task_id: string;
-  task_type: "stt" | "llm" | "simulation";
+  task_type: "stt" | "llm" | "conversation";
   evaluators: SummaryEvaluator[];
   annotators: SummaryAnnotator[];
   rows: SummaryRow[];
@@ -228,7 +228,7 @@ type LabellingJob = {
 type LabellingTask = {
   uuid: string;
   name: string;
-  type?: "llm" | "stt" | "tts" | "simulation";
+  type?: "llm" | "stt" | "tts" | "conversation";
   description?: string;
   created_at?: string;
   updated_at?: string;
@@ -237,7 +237,7 @@ type LabellingTask = {
     name: string;
     description?: string | null;
     slug?: string | null;
-    evaluator_type?: "llm" | "stt" | "tts" | "simulation";
+    evaluator_type?: "llm" | "stt" | "tts" | "conversation";
     output_type?: "binary" | "rating" | null;
     scale_min?: number | boolean | null;
     scale_max?: number | boolean | null;
@@ -258,7 +258,7 @@ type LabellingTask = {
   item_count?: number;
 };
 
-type TaskKind = "llm" | "stt" | "tts" | "simulation" | undefined;
+type TaskKind = "llm" | "stt" | "tts" | "conversation" | undefined;
 
 function previewItemPayload(payload: unknown, kind: TaskKind): string {
   if (payload == null || typeof payload !== "object") {
@@ -284,7 +284,7 @@ function previewItemPayload(payload: unknown, kind: TaskKind): string {
       if (typeof last?.content === "string") return last.content;
     }
   }
-  if (kind === "simulation") {
+  if (kind === "conversation") {
     if (Array.isArray(p.transcript) && p.transcript.length > 0) {
       const first = p.transcript[0] as { content?: unknown };
       if (typeof first?.content === "string") return first.content;
@@ -351,7 +351,7 @@ function buildItemsCsv(
   if (taskType !== "stt") {
     columns.push({ key: "description", header: "description" });
   }
-  if (taskType === "simulation") {
+  if (taskType === "conversation") {
     columns.push({
       key: "conversation_history",
       header: "conversation_history",
@@ -425,7 +425,7 @@ function buildItemsCsv(
     if (taskType !== "stt") {
       out.description = typeof p.description === "string" ? p.description : "";
     }
-    if (taskType === "simulation") {
+    if (taskType === "conversation") {
       out.conversation_history = Array.isArray(p.transcript)
         ? JSON.stringify(p.transcript)
         : "";
@@ -1603,6 +1603,11 @@ function LabellingTaskPageInner() {
     itemsLimit > 0 ? Math.floor(itemsOffset / itemsLimit) + 1 : 1;
   const itemsRangeStart = itemsTotal === 0 ? 0 : itemsOffset + 1;
   const itemsRangeEnd = Math.min(itemsOffset + items.length, itemsTotal);
+  // Hide the whole pagination footer when pagination can never apply — i.e.
+  // even the smallest page size fits every item on one page. Above that
+  // threshold we keep the footer (so the Per-page selector stays reachable)
+  // but hide the prev/next page nav whenever there's only a single page.
+  const showItemsPagination = itemsTotal > ITEMS_PAGE_SIZE_OPTIONS[0];
   /** True when the task itself has any items (regardless of the
    * current search). Used to distinguish the "no items yet" empty state
    * from the "no search matches" state. */
@@ -1611,9 +1616,10 @@ function LabellingTaskPageInner() {
     (taskSummary?.pagination?.total ?? 0) > 0 ||
     (itemsSearch ? false : items.length > 0);
   const jobsCount = jobs.length;
-  const taskType = task?.type ?? task?.evaluators?.[0]?.evaluator_type;
+  const taskType =
+    task?.type ?? task?.evaluators?.[0]?.evaluator_type;
   const canAddItem =
-    taskType === "llm" || taskType === "simulation" || taskType === "stt";
+    taskType === "llm" || taskType === "conversation" || taskType === "stt";
 
   /**
    * Anchor for shift+click range selection — the uuid of the most
@@ -2133,7 +2139,7 @@ function LabellingTaskPageInner() {
     };
 
     let history: HistoryItem[];
-    if (taskType === "simulation") {
+    if (taskType === "conversation") {
       history = parseHistory(payload.transcript);
     } else {
       // LLM: chat_history (may include tool calls + tool responses) +
@@ -2213,7 +2219,7 @@ function LabellingTaskPageInner() {
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [addSttItemsOpen, setAddSttItemsOpen] = useState(false);
   const [bulkUploadSttOpen, setBulkUploadSttOpen] = useState(false);
-  const [bulkUploadSimulationOpen, setBulkUploadSimulationOpen] =
+  const [bulkUploadConversationOpen, setBulkUploadConversationOpen] =
     useState(false);
   const [bulkUploadLlmOpen, setBulkUploadLlmOpen] = useState(false);
   const [newItemName, setNewItemName] = useState("");
@@ -2438,7 +2444,7 @@ function LabellingTaskPageInner() {
               </button>
               <button
                 onClick={() => {
-                  if (taskType === "llm" || taskType === "simulation") {
+                  if (taskType === "llm" || taskType === "conversation") {
                     setNewItemName("");
                     setNewItemDescription("");
                     setCreateItemError(null);
@@ -2485,8 +2491,8 @@ function LabellingTaskPageInner() {
                       if (llmNoEvaluators) return;
                       if (taskType === "stt") {
                         setBulkUploadSttOpen(true);
-                      } else if (taskType === "simulation") {
-                        setBulkUploadSimulationOpen(true);
+                      } else if (taskType === "conversation") {
+                        setBulkUploadConversationOpen(true);
                       } else if (taskType === "llm") {
                         setBulkUploadLlmOpen(true);
                       } else {
@@ -3378,6 +3384,8 @@ function LabellingTaskPageInner() {
                   (bottom-6 right-6) so the prev/next controls stay
                   visible when the user scrolls to the bottom. */}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-1 pb-20 text-sm text-muted-foreground">
+                {showItemsPagination && (
+                  <>
                 <div>
                   {itemsTotal === 0 ? (
                     "0 items"
@@ -3440,6 +3448,7 @@ function LabellingTaskPageInner() {
                       </svg>
                     </div>
                   </label>
+                  {itemsPageCount > 1 && (
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
@@ -3503,7 +3512,10 @@ function LabellingTaskPageInner() {
                       </svg>
                     </button>
                   </div>
+                  )}
                 </div>
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -3644,7 +3656,7 @@ function LabellingTaskPageInner() {
           setItemDescription={setNewItemDescription}
           validationAttempted={validationAttempted}
           mode="labelItem"
-          allowAgentLastMessage={taskType === "simulation"}
+          allowAgentLastMessage={taskType === "conversation"}
           requireAssistantLastMessage={taskType === "llm"}
           initialConfig={addItemInitialConfig}
           initialEvaluators={newItemInitialEvaluators}
@@ -3695,7 +3707,7 @@ function LabellingTaskPageInner() {
               : {};
 
             let payload: Record<string, unknown>;
-            if (taskType === "simulation") {
+            if (taskType === "conversation") {
               payload = {
                 name: newItemName.trim(),
                 ...descriptionField,
@@ -3766,7 +3778,7 @@ function LabellingTaskPageInner() {
           setItemDescription={setEditLlmItemDescription}
           validationAttempted={false}
           mode="labelItem"
-          allowAgentLastMessage={taskType === "simulation"}
+          allowAgentLastMessage={taskType === "conversation"}
           requireAssistantLastMessage={taskType === "llm"}
           initialConfig={editingInitialConfig}
           initialEvaluators={editingInitialEvaluators}
@@ -3805,7 +3817,7 @@ function LabellingTaskPageInner() {
             const descriptionField = { description: trimmedDescription };
 
             let payload: Record<string, unknown>;
-            if (taskType === "simulation") {
+            if (taskType === "conversation") {
               payload = {
                 name: editLlmItemName.trim(),
                 ...descriptionField,
@@ -3897,8 +3909,8 @@ function LabellingTaskPageInner() {
       )}
 
       {accessToken && (
-        <BulkUploadSimulationItemsDialog
-          isOpen={bulkUploadSimulationOpen}
+        <BulkUploadConversationItemsDialog
+          isOpen={bulkUploadConversationOpen}
           accessToken={accessToken}
           taskUuid={uuid}
           linkedEvaluators={(task?.evaluators ?? []).map((e) => ({
@@ -3908,9 +3920,9 @@ function LabellingTaskPageInner() {
             scale_min: typeof e.scale_min === "number" ? e.scale_min : null,
             scale_max: typeof e.scale_max === "number" ? e.scale_max : null,
           }))}
-          onClose={() => setBulkUploadSimulationOpen(false)}
+          onClose={() => setBulkUploadConversationOpen(false)}
           onSuccess={async (count) => {
-            setBulkUploadSimulationOpen(false);
+            setBulkUploadConversationOpen(false);
             handleTabChange("items");
             await Promise.all([fetchTask(), fetchTaskSummary()]);
             toast.success(`Added ${count} ${count === 1 ? "item" : "items"}`);
@@ -4135,7 +4147,10 @@ function LabellingTaskPageInner() {
         isOpen={!!itemDetailUuid}
         onClose={() => setItemDetailUuid(null)}
         task={
-          task && (task.type === "llm" || task.type === "stt" || task.type === "simulation")
+          task &&
+          (task.type === "llm" ||
+            task.type === "stt" ||
+            task.type === "conversation")
             ? {
                 uuid: task.uuid,
                 name: task.name,

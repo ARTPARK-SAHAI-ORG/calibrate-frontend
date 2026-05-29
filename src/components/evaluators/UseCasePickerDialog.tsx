@@ -14,7 +14,7 @@ const TYPE_INACTIVE_CLASSES: Record<EvaluatorType, string> = {
   tts: "border-purple-500/20 bg-purple-500/[0.04] hover:bg-purple-500/10 hover:border-purple-500/40",
   stt: "border-blue-500/20 bg-blue-500/[0.04] hover:bg-blue-500/10 hover:border-blue-500/40",
   llm: "border-orange-500/20 bg-orange-500/[0.04] hover:bg-orange-500/10 hover:border-orange-500/40",
-  simulation:
+  conversation:
     "border-pink-500/20 bg-pink-500/[0.04] hover:bg-pink-500/10 hover:border-pink-500/40",
 };
 
@@ -22,14 +22,14 @@ const TYPE_ACTIVE_CLASSES: Record<EvaluatorType, string> = {
   tts: "border-purple-500/60 bg-purple-500/15 ring-1 ring-purple-500/40",
   stt: "border-blue-500/60 bg-blue-500/15 ring-1 ring-blue-500/40",
   llm: "border-orange-500/60 bg-orange-500/15 ring-1 ring-orange-500/40",
-  simulation: "border-pink-500/60 bg-pink-500/15 ring-1 ring-pink-500/40",
+  conversation: "border-pink-500/60 bg-pink-500/15 ring-1 ring-pink-500/40",
 };
 
 const TYPE_TITLE_CLASSES: Record<EvaluatorType, string> = {
   tts: "text-purple-700 dark:text-purple-300",
   stt: "text-blue-700 dark:text-blue-300",
   llm: "text-orange-700 dark:text-orange-300",
-  simulation: "text-pink-700 dark:text-pink-300",
+  conversation: "text-pink-700 dark:text-pink-300",
 };
 
 type UseCasePickerDialogProps = {
@@ -63,8 +63,8 @@ export function UseCasePickerDialog({
               What is this evaluator for?
             </h2>
             <p className="text-xs md:text-sm text-muted-foreground mt-1">
-              Pick the use case so we can configure the right judge model and
-              inputs.
+              Pick the use case so we can set a good default LLM judge model and
+              prompt for you
             </p>
           </div>
           <button

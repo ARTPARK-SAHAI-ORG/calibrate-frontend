@@ -35,14 +35,14 @@ const TRANSCRIPT_HEADERS = [
   "conversation",
   "conversation_history",
 ];
-const NAME_HEADERS = ["name", "title", "simulation_name"];
+const NAME_HEADERS = ["name", "title", "conversation_name"];
 const DESCRIPTION_HEADERS = ["description", "desc", "notes"];
 
 function csvEscape(s: string): string {
   return `"${s.replace(/"/g, '""')}"`;
 }
 
-const SAMPLE_SIMULATION_BASE_ROWS: Array<{
+const SAMPLE_CONVERSATION_BASE_ROWS: Array<{
   name: string;
   description: string;
   transcript: string;
@@ -78,7 +78,7 @@ const SAMPLE_SIMULATION_BASE_ROWS: Array<{
   },
 ];
 
-function buildSampleSimulationCsv(
+function buildSampleConversationCsv(
   evaluators: EvaluatorMeta[],
   includeAnnotations: boolean,
 ): string {
@@ -93,7 +93,7 @@ function buildSampleSimulationCsv(
         ])
       : []),
   ];
-  const lines = SAMPLE_SIMULATION_BASE_ROWS.map((r) =>
+  const lines = SAMPLE_CONVERSATION_BASE_ROWS.map((r) =>
     [
       csvEscape(r.name),
       csvEscape(r.description),
@@ -116,7 +116,7 @@ type ParsedItem = {
   annotations: ParsedAnnotation[];
 };
 
-export type SimulationLinkedEvaluator = {
+export type ConversationLinkedEvaluator = {
   uuid: string;
   name: string;
   output_type: "binary" | "rating" | null;
@@ -124,11 +124,11 @@ export type SimulationLinkedEvaluator = {
   scale_max: number | null;
 };
 
-type BulkUploadSimulationItemsDialogProps = {
+type BulkUploadConversationItemsDialogProps = {
   isOpen: boolean;
   accessToken: string;
   taskUuid: string;
-  linkedEvaluators?: SimulationLinkedEvaluator[];
+  linkedEvaluators?: ConversationLinkedEvaluator[];
   onClose: () => void;
   onSuccess: (count: number, withAnnotations: boolean) => void;
 };
@@ -160,14 +160,14 @@ function TranscriptPreview({ turns }: { turns: TurnObject[] }) {
   );
 }
 
-export function BulkUploadSimulationItemsDialog({
+export function BulkUploadConversationItemsDialog({
   isOpen,
   accessToken,
   taskUuid,
   linkedEvaluators = [],
   onClose,
   onSuccess,
-}: BulkUploadSimulationItemsDialogProps) {
+}: BulkUploadConversationItemsDialogProps) {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -458,9 +458,9 @@ export function BulkUploadSimulationItemsDialog({
     });
 
     return {
-      title: "Bulk upload — Simulation labelling items",
+      title: "Bulk upload — Conversation labelling items",
       intro:
-        "Upload a CSV with the following columns. Each row creates one simulation annotation item.",
+        "Upload a CSV with the following columns. Each row creates one conversation annotation item.",
       columns,
     };
   };
@@ -628,18 +628,18 @@ export function BulkUploadSimulationItemsDialog({
       isOpen={isOpen}
       title="Bulk upload items"
       buildSampleCsv={() =>
-        buildSampleSimulationCsv(annotationEvaluatorsMeta, uploadAnnotations)
+        buildSampleConversationCsv(annotationEvaluatorsMeta, uploadAnnotations)
       }
       sampleFilename={() =>
         uploadAnnotations
-          ? "sample_simulation_items_with_annotations.csv"
-          : "sample_simulation_items.csv"
+          ? "sample_conversation_items_with_annotations.csv"
+          : "sample_conversation_items.csv"
       }
       buildGuidelines={buildGuidelines}
       guidelinesFilename={() =>
         uploadAnnotations
-          ? "simulation_items_csv_guidelines_with_annotations.pdf"
-          : "simulation_items_csv_guidelines.pdf"
+          ? "conversation_items_csv_guidelines_with_annotations.pdf"
+          : "conversation_items_csv_guidelines.pdf"
       }
       csvFile={csvFile}
       onFile={handleFile}

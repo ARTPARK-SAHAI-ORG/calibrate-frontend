@@ -4,14 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import {
   EVALUATOR_TYPE_LABELS,
-  EvaluatorTypePill,
   type EvaluatorType,
 } from "@/components/EvaluatorPills";
 import { apiClient } from "@/lib/api";
 import { readNameConflictFromError } from "@/lib/parseBackendError";
 
-// Only these three task types are allowed for labelling tasks
-type TaskType = Extract<EvaluatorType, "llm" | "stt" | "simulation">;
+// Only these three task types are allowed for labelling tasks. A task's
+// type matches its evaluators' evaluator_type one-to-one.
+type TaskType = Extract<EvaluatorType, "llm" | "stt" | "conversation">;
 
 const TASK_TYPE_OPTIONS: {
   value: TaskType;
@@ -19,18 +19,18 @@ const TASK_TYPE_OPTIONS: {
   description: string;
 }[] = [
   {
+    value: "stt",
+    title: "Speech to Text",
+    description: "Evaluate the transcription quality against a reference text.",
+  },
+  {
     value: "llm",
     title: "Single LLM response",
     description:
       "Given a conversation history, evaluate the agent's next response.",
   },
   {
-    value: "stt",
-    title: "Speech to Text",
-    description: "Evaluate the transcription quality against a reference text.",
-  },
-  {
-    value: "simulation",
+    value: "conversation",
     title: "Full conversation",
     description:
       "Evaluate the agent's performance during a complete conversation.",
@@ -38,27 +38,27 @@ const TASK_TYPE_OPTIONS: {
 ];
 
 // Per-type tints, mirroring EvaluatorTypePill's palette
-// (llm=orange, stt=blue, simulation=pink) so the picker reads as the
+// (llm=orange, stt=blue, conversation=pink) so the picker reads as the
 // same "type" affordance the user sees on evaluator cards. We use a
 // subtle tint by default (so the cards announce their type at rest)
 // and a stronger tint + bordered ring when active.
 const TASK_TYPE_INACTIVE_CLASSES: Record<TaskType, string> = {
   llm: "border-orange-500/20 bg-orange-500/[0.04] hover:bg-orange-500/10 hover:border-orange-500/40",
   stt: "border-blue-500/20 bg-blue-500/[0.04] hover:bg-blue-500/10 hover:border-blue-500/40",
-  simulation:
+  conversation:
     "border-pink-500/20 bg-pink-500/[0.04] hover:bg-pink-500/10 hover:border-pink-500/40",
 };
 
 const TASK_TYPE_ACTIVE_CLASSES: Record<TaskType, string> = {
   llm: "border-orange-500/60 bg-orange-500/15 ring-1 ring-orange-500/40",
   stt: "border-blue-500/60 bg-blue-500/15 ring-1 ring-blue-500/40",
-  simulation: "border-pink-500/60 bg-pink-500/15 ring-1 ring-pink-500/40",
+  conversation: "border-pink-500/60 bg-pink-500/15 ring-1 ring-pink-500/40",
 };
 
 const TASK_TYPE_TITLE_CLASSES: Record<TaskType, string> = {
   llm: "text-orange-700 dark:text-orange-300",
   stt: "text-blue-700 dark:text-blue-300",
-  simulation: "text-pink-700 dark:text-pink-300",
+  conversation: "text-pink-700 dark:text-pink-300",
 };
 
 type EvaluatorListItem = {
@@ -252,214 +252,195 @@ export function CreateLabellingTaskDialog({
               aligns with the bottom of the type-picker cards (left
               column's last child) — never extending past it. */}
           <div className={taskType ? "md:relative" : ""}>
-          <div
-            className={`min-w-0 space-y-5 ${
-              taskType ? "md:max-w-[42rem]" : ""
-            }`}
-          >
-          {/* Name */}
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              autoFocus
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (nameConflictError) setNameConflictError(null);
-              }}
-              placeholder="e.g., Helpfulness review — Q2 batch"
-              className={`w-full h-10 px-3 rounded-md text-sm border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent ${
-                nameConflictError ? "border-red-500" : "border-border"
+            <div
+              className={`min-w-0 space-y-5 ${
+                taskType ? "md:max-w-[42rem]" : ""
               }`}
-            />
-            {nameConflictError && (
-              <p className="mt-1 text-sm text-red-500">{nameConflictError}</p>
-            )}
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Description
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Short description of the labelling task"
-              rows={3}
-              className="w-full px-3 py-2 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent resize-y"
-            />
-          </div>
-
-          {/* Type picker */}
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Type <span className="text-red-500">*</span>
-            </label>
-            <p className="text-xs text-muted-foreground mb-2">
-              Type can&apos;t be changed after the task is created.
-            </p>
-            <div className="mb-2 flex items-start gap-2.5 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-              <svg
-                className="w-4 h-4 flex-shrink-0 mt-0.5 text-yellow-500"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+            >
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  autoFocus
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (nameConflictError) setNameConflictError(null);
+                  }}
+                  placeholder="e.g., Helpfulness review — Q2 batch"
+                  className={`w-full h-10 px-3 rounded-md text-sm border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent ${
+                    nameConflictError ? "border-red-500" : "border-border"
+                  }`}
                 />
-              </svg>
-              <span className="text-xs md:text-sm text-foreground inline-flex items-center gap-1.5 flex-wrap">
-                Human alignment for
-                <EvaluatorTypePill evaluatorType="tts" />
-                evaluators is not supported yet
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {TASK_TYPE_OPTIONS.map((opt) => {
-                const active = taskType === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setTaskType(opt.value)}
-                    className={`flex flex-col items-start text-left p-3 rounded-md border transition-colors cursor-pointer ${
-                      active
-                        ? TASK_TYPE_ACTIVE_CLASSES[opt.value]
-                        : TASK_TYPE_INACTIVE_CLASSES[opt.value]
-                    }`}
-                  >
-                    <div
-                      className={`text-sm font-medium ${TASK_TYPE_TITLE_CLASSES[opt.value]}`}
-                    >
-                      {opt.title}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                      {opt.description}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          </div>
+                {nameConflictError && (
+                  <p className="mt-1 text-sm text-red-500">
+                    {nameConflictError}
+                  </p>
+                )}
+              </div>
 
-          {/* Evaluator picker — only shown once a type is chosen.
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Short description of the labelling task"
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent resize-y"
+                />
+              </div>
+
+              {/* Type picker */}
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Task type <span className="text-red-500">*</span>
+                </label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  The task type cannot be changed after the task is created
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {TASK_TYPE_OPTIONS.map((opt) => {
+                    const active = taskType === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setTaskType(opt.value)}
+                        className={`flex flex-col items-start text-left p-3 rounded-md border transition-colors cursor-pointer ${
+                          active
+                            ? TASK_TYPE_ACTIVE_CLASSES[opt.value]
+                            : TASK_TYPE_INACTIVE_CLASSES[opt.value]
+                        }`}
+                      >
+                        <div
+                          className={`text-sm font-medium ${TASK_TYPE_TITLE_CLASSES[opt.value]}`}
+                        >
+                          {opt.title}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                          {opt.description}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Evaluator picker — only shown once a type is chosen.
               On md+ this is positioned absolutely so its top/bottom
               align with the left column's content (bottom = bottom of
               the type-picker cards). On mobile it falls back to the
               normal flow underneath. The list inside flexes to fill
               the remaining vertical space. */}
-          {taskType && (
-            <div
-              className="mt-5 md:mt-0 md:absolute md:top-0 md:bottom-0 md:left-[calc(42rem+1.5rem)] md:right-0 flex flex-col md:overflow-hidden"
-            >
-              <label className="block text-sm font-medium mb-2">
-                Evaluators <span className="text-red-500">*</span>
-                <span className="ml-2 text-xs font-normal text-muted-foreground">
-                  ({selectedEvaluatorIds.size} selected)
-                </span>
-              </label>
-              <p className="text-xs text-muted-foreground mb-2">
-                Pick at least one evaluator that annotators will grade against.
-              </p>
+            {taskType && (
+              <div className="mt-5 md:mt-0 md:absolute md:top-0 md:bottom-0 md:left-[calc(42rem+1.5rem)] md:right-0 flex flex-col md:overflow-hidden">
+                <label className="block text-sm font-medium mb-2">
+                  Evaluators <span className="text-red-500">*</span>
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    ({selectedEvaluatorIds.size} selected)
+                  </span>
+                </label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Pick at least one evaluator that annotators will grade
+                  against.
+                </p>
 
-              <div className="relative mb-2">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <svg
-                    className="w-4 h-4 text-muted-foreground"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                    />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  value={evaluatorSearch}
-                  onChange={(e) => setEvaluatorSearch(e.target.value)}
-                  placeholder={`Search evaluators`}
-                  className="w-full h-9 pl-9 pr-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-              </div>
-
-              <div className="border border-border rounded-md min-h-0 overflow-y-auto divide-y divide-border">
-                {evaluatorsLoading ? (
-                  <div className="p-4 flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="relative mb-2">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                     <svg
-                      className="w-4 h-4 animate-spin"
+                      className="w-4 h-4 text-muted-foreground"
                       fill="none"
                       viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
                     >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
                       <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
                       />
                     </svg>
-                    Loading evaluators
                   </div>
-                ) : evaluatorsError ? (
-                  <div className="p-4 text-sm text-red-500">
-                    {evaluatorsError}
-                  </div>
-                ) : filteredEvaluators.length === 0 ? (
-                  <div className="p-4 text-sm text-muted-foreground">
-                    {evaluatorSearch.trim()
-                      ? "No matching evaluators."
-                      : `No ${EVALUATOR_TYPE_LABELS[taskType]} evaluators yet.`}
-                  </div>
-                ) : (
-                  filteredEvaluators.map((ev) => {
-                    const checked = selectedEvaluatorIds.has(ev.uuid);
-                    return (
-                      <label
-                        key={ev.uuid}
-                        className="flex items-start gap-3 px-3 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer"
+                  <input
+                    type="text"
+                    value={evaluatorSearch}
+                    onChange={(e) => setEvaluatorSearch(e.target.value)}
+                    placeholder={`Search evaluators`}
+                    className="w-full h-9 pl-9 pr-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                </div>
+
+                <div className="border border-border rounded-md min-h-0 overflow-y-auto divide-y divide-border">
+                  {evaluatorsLoading ? (
+                    <div className="p-4 flex items-center gap-2 text-sm text-muted-foreground">
+                      <svg
+                        className="w-4 h-4 animate-spin"
+                        fill="none"
+                        viewBox="0 0 24 24"
                       >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleEvaluator(ev.uuid)}
-                          className="mt-0.5 w-4 h-4 cursor-pointer accent-foreground"
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
                         />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium truncate">
-                            {ev.name}
-                          </div>
-                          {ev.description && (
-                            <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                              {ev.description}
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                      Loading evaluators
+                    </div>
+                  ) : evaluatorsError ? (
+                    <div className="p-4 text-sm text-red-500">
+                      {evaluatorsError}
+                    </div>
+                  ) : filteredEvaluators.length === 0 ? (
+                    <div className="p-4 text-sm text-muted-foreground">
+                      {evaluatorSearch.trim()
+                        ? "No matching evaluators."
+                        : `No ${EVALUATOR_TYPE_LABELS[taskType]} evaluators yet.`}
+                    </div>
+                  ) : (
+                    filteredEvaluators.map((ev) => {
+                      const checked = selectedEvaluatorIds.has(ev.uuid);
+                      return (
+                        <label
+                          key={ev.uuid}
+                          className="flex items-start gap-3 px-3 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleEvaluator(ev.uuid)}
+                            className="mt-0.5 w-4 h-4 cursor-pointer accent-foreground"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium truncate">
+                              {ev.name}
                             </div>
-                          )}
-                        </div>
-                      </label>
-                    );
-                  })
-                )}
+                            {ev.description && (
+                              <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                                {ev.description}
+                              </div>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
           </div>
 
           {submitError && (

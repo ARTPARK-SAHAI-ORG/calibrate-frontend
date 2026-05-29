@@ -58,7 +58,7 @@ type LabellingTaskSummary = {
 type LabellingTaskEvaluator = {
   uuid: string;
   name: string;
-  evaluator_type?: "llm" | "stt" | "tts" | "simulation";
+  evaluator_type?: "llm" | "stt" | "tts" | "conversation";
   output_type?: "binary" | "rating";
   owner_user_id?: string | null;
 };
@@ -66,7 +66,7 @@ type LabellingTaskEvaluator = {
 type LabellingTask = {
   uuid: string;
   name: string;
-  type?: "llm" | "stt" | "tts" | "simulation";
+  type?: "llm" | "stt" | "tts" | "conversation";
   description?: string;
   created_at?: string;
   updated_at?: string;
@@ -1255,7 +1255,7 @@ type SeriesRow = {
   current: number | null;
   pairCount: number;
   series: AgreementSeriesPoint[];
-  evaluatorType?: "llm" | "stt" | "tts" | "simulation";
+  evaluatorType?: "llm" | "stt" | "tts" | "conversation";
   emptyTitle: string;
   emptyDescription: string;
 };
@@ -1292,7 +1292,7 @@ function AgreementOverview({
   tasks: LabellingTask[];
 }) {
   const evaluatorTypeMap = (() => {
-    const m = new Map<string, "llm" | "stt" | "tts" | "simulation">();
+    const m = new Map<string, "llm" | "stt" | "tts" | "conversation">();
     for (const t of tasks) {
       for (const ev of t.evaluators ?? []) {
         const type = ev.evaluator_type ?? t.type;

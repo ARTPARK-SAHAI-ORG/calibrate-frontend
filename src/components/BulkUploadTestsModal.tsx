@@ -30,7 +30,7 @@ const HELPER_LINK_CLASS =
 type TestType = "response" | "tool_call" | "conversation";
 
 // evaluator_type filter the Conversation test type uses for its picker.
-const CONVERSATION_EVALUATOR_TYPE = "simulation";
+const CONVERSATION_EVALUATOR_TYPE = "conversation";
 
 type ParsedTest = {
   name: string;
