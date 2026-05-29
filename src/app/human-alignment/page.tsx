@@ -58,7 +58,7 @@ type LabellingTaskSummary = {
 type LabellingTaskEvaluator = {
   uuid: string;
   name: string;
-  evaluator_type?: "llm" | "stt" | "tts" | "simulation";
+  evaluator_type?: "llm" | "stt" | "tts" | "conversation";
   output_type?: "binary" | "rating";
   owner_user_id?: string | null;
 };
@@ -73,14 +73,6 @@ type LabellingTask = {
   item_count?: number;
   evaluators?: LabellingTaskEvaluator[];
 };
-
-// Annotation tasks carry type "conversation"; the matching evaluator type
-// is "simulation". Map task type → evaluator type for display/grouping.
-function taskTypeToEvaluatorType(
-  t: "llm" | "stt" | "tts" | "conversation" | undefined,
-): "llm" | "stt" | "tts" | "simulation" | undefined {
-  return t === "conversation" ? "simulation" : t;
-}
 
 type SortDirection = "asc" | "desc";
 
@@ -627,8 +619,7 @@ function HumanLabellingPageInner() {
                 {sortedTasks.map((task) => {
                   const evaluators = task.evaluators ?? [];
                   const evaluatorType =
-                    taskTypeToEvaluatorType(task.type) ??
-                    evaluators[0]?.evaluator_type;
+                    task.type ?? evaluators[0]?.evaluator_type;
                   return (
                     <div
                       key={task.uuid}
@@ -704,8 +695,7 @@ function HumanLabellingPageInner() {
                 {sortedTasks.map((task) => {
                   const evaluators = task.evaluators ?? [];
                   const evaluatorType =
-                    taskTypeToEvaluatorType(task.type) ??
-                    evaluators[0]?.evaluator_type;
+                    task.type ?? evaluators[0]?.evaluator_type;
                   return (
                     <div
                       key={task.uuid}
@@ -1265,7 +1255,7 @@ type SeriesRow = {
   current: number | null;
   pairCount: number;
   series: AgreementSeriesPoint[];
-  evaluatorType?: "llm" | "stt" | "tts" | "simulation";
+  evaluatorType?: "llm" | "stt" | "tts" | "conversation";
   emptyTitle: string;
   emptyDescription: string;
 };
@@ -1302,10 +1292,10 @@ function AgreementOverview({
   tasks: LabellingTask[];
 }) {
   const evaluatorTypeMap = (() => {
-    const m = new Map<string, "llm" | "stt" | "tts" | "simulation">();
+    const m = new Map<string, "llm" | "stt" | "tts" | "conversation">();
     for (const t of tasks) {
       for (const ev of t.evaluators ?? []) {
-        const type = ev.evaluator_type ?? taskTypeToEvaluatorType(t.type);
+        const type = ev.evaluator_type ?? t.type;
         if (type && !m.has(ev.uuid)) m.set(ev.uuid, type);
       }
     }

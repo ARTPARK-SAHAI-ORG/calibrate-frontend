@@ -59,7 +59,7 @@ export type TestConfig = {
 };
 
 // Evaluator type for the conversation tab — picker is filtered to this.
-const CONVERSATION_EVALUATOR_TYPE = "simulation";
+const CONVERSATION_EVALUATOR_TYPE = "conversation";
 
 type TestTab = "next-reply" | "tool-invocation" | "conversation";
 
@@ -136,7 +136,7 @@ type LLMEvaluatorOption = {
   slug: string | null;
   owner_user_id: string | null;
   variables: EvaluatorVariableDef[];
-  /** "llm" for next-reply tab, "simulation" for conversation tab. */
+  /** "llm" for next-reply tab, "conversation" for conversation tab. */
   evaluator_type?: string;
 };
 

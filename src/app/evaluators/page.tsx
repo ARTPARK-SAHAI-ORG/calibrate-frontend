@@ -75,7 +75,7 @@ const EVALUATOR_TYPE_TO_DATA_TYPE: Record<EvaluatorType, "text" | "audio"> = {
   tts: "audio",
   stt: "audio",
   llm: "text",
-  simulation: "text",
+  conversation: "text",
 };
 
 const EVALUATOR_TYPE_OPTIONS: {
@@ -101,7 +101,7 @@ const EVALUATOR_TYPE_OPTIONS: {
       "Given a conversation history, evaluate the agent's next response",
   },
   {
-    value: "simulation",
+    value: "conversation",
     title: "Full conversation",
     description:
       "Evaluate the agent's performance during a complete conversation",
@@ -358,7 +358,7 @@ function MetricsPageInner() {
         } | null;
       } = await response.json();
 
-      // `name` is null for `purpose === "simulation"` (no seeded evaluator
+      // `name` is null for `purpose === "conversation"` (no seeded evaluator
       // name); the user must type their own. For all other purposes the
       // server returns a suggested slug-style name we drop straight in.
       setEvaluatorName(data.name ?? "");

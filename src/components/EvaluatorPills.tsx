@@ -5,7 +5,7 @@ import { Tooltip } from "@/components/Tooltip";
 
 type Kind = "single" | "side_by_side";
 type OutputType = "binary" | "rating";
-export type EvaluatorType = "tts" | "stt" | "llm" | "simulation";
+export type EvaluatorType = "tts" | "stt" | "llm" | "conversation";
 
 const baseClasses =
   "inline-flex items-center px-2 py-0.5 rounded-md text-[10px] md:text-[11px] font-medium uppercase tracking-wide";
@@ -22,21 +22,21 @@ export const EVALUATOR_TYPE_LABELS: Record<EvaluatorType, string> = {
   tts: "Text to Speech",
   stt: "Speech to Text",
   llm: "Single LLM response",
-  simulation: "Full conversation",
+  conversation: "Full conversation",
 };
 
 export const EVALUATOR_TYPE_TOOLTIPS: Record<EvaluatorType, string> = {
   tts: "Evaluate the quality of generated audio.",
   stt: "Evaluate the output of transcription of an audio.",
   llm: "Given a conversation history, evaluate the agent's next response.",
-  simulation: "Evaluate an entire conversation history from a simulation.",
+  conversation: "Evaluate an entire conversation history.",
 };
 
 const EVALUATOR_TYPE_COLORS: Record<EvaluatorType, string> = {
   tts: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
   stt: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
   llm: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-  simulation: "bg-pink-500/10 text-pink-600 dark:text-pink-400",
+  conversation: "bg-pink-500/10 text-pink-600 dark:text-pink-400",
 };
 
 export function EvaluatorTypePill({

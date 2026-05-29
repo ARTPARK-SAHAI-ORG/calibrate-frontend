@@ -2,7 +2,7 @@ export type PublicDefaultEvaluator = {
   uuid: string;
   name: string;
   description?: string | null;
-  evaluator_type: "stt" | "tts" | "llm" | "simulation" | string;
+  evaluator_type: "stt" | "tts" | "llm" | "conversation" | string;
   output_type: "binary" | "rating";
   live_version?: {
     output_config?: {
@@ -14,7 +14,7 @@ export type PublicDefaultEvaluator = {
 export async function getPublicDefaultEvaluator(
   backendUrl: string,
   shareToken: string,
-  type: "stt" | "tts" | "llm" | "simulation",
+  type: "stt" | "tts" | "llm" | "conversation",
 ): Promise<PublicDefaultEvaluator | null> {
   const response = await fetch(
     `${backendUrl}/public/evaluators/defaults?share_token=${encodeURIComponent(

@@ -21,10 +21,7 @@ import {
   type TestConfig,
 } from "@/components/AddTestDialog";
 import { AppLayout } from "@/components/AppLayout";
-import {
-  EvaluatorTypePill,
-  type EvaluatorType,
-} from "@/components/EvaluatorPills";
+import { EvaluatorTypePill } from "@/components/EvaluatorPills";
 import {
   ExportResultsButton,
   type ExportColumn,
@@ -240,7 +237,7 @@ type LabellingTask = {
     name: string;
     description?: string | null;
     slug?: string | null;
-    evaluator_type?: "llm" | "stt" | "tts" | "simulation";
+    evaluator_type?: "llm" | "stt" | "tts" | "conversation";
     output_type?: "binary" | "rating" | null;
     scale_min?: number | boolean | null;
     scale_max?: number | boolean | null;
@@ -262,18 +259,6 @@ type LabellingTask = {
 };
 
 type TaskKind = "llm" | "stt" | "tts" | "conversation" | undefined;
-
-// Annotation tasks use "conversation"; evaluators use "simulation". These
-// two helpers bridge the divergence so task-level code stays in the
-// "conversation" vocabulary and only converts at the evaluator boundary
-// (EvaluatorTypePill, evaluator filtering).
-function evaluatorTypeToTaskKind(t: EvaluatorType | undefined): TaskKind {
-  return t === "simulation" ? "conversation" : t;
-}
-
-function taskKindToEvaluatorType(t: TaskKind): EvaluatorType | undefined {
-  return t === "conversation" ? "simulation" : t;
-}
 
 function previewItemPayload(payload: unknown, kind: TaskKind): string {
   if (payload == null || typeof payload !== "object") {
@@ -1627,8 +1612,7 @@ function LabellingTaskPageInner() {
     (itemsSearch ? false : items.length > 0);
   const jobsCount = jobs.length;
   const taskType =
-    task?.type ??
-    evaluatorTypeToTaskKind(task?.evaluators?.[0]?.evaluator_type);
+    task?.type ?? task?.evaluators?.[0]?.evaluator_type;
   const canAddItem =
     taskType === "llm" || taskType === "conversation" || taskType === "stt";
 
@@ -2329,11 +2313,7 @@ function LabellingTaskPageInner() {
                   (task?.name ?? "—")
                 )}
               </h1>
-              {taskType && (
-                <EvaluatorTypePill
-                  evaluatorType={taskKindToEvaluatorType(taskType)!}
-                />
-              )}
+              {taskType && <EvaluatorTypePill evaluatorType={taskType} />}
             </div>
             {task?.description && (
               <p className="text-muted-foreground text-sm md:text-base leading-relaxed mt-1 max-w-3xl">
@@ -4142,10 +4122,7 @@ function LabellingTaskPageInner() {
         <ManageEvaluatorsDialog
           accessToken={accessToken}
           taskUuid={task.uuid}
-          taskType={
-            taskKindToEvaluatorType(task.type) ??
-            task.evaluators?.[0]?.evaluator_type
-          }
+          taskType={task.type ?? task.evaluators?.[0]?.evaluator_type}
           currentEvaluatorIds={(task.evaluators ?? []).map((e) => e.uuid)}
           onClose={() => setManageOpen(false)}
           onSaved={() => {

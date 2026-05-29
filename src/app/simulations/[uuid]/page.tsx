@@ -471,7 +471,7 @@ export default function SimulationDetailPage() {
     fetchScenarios();
   }, [backendAccessToken]);
 
-  // Fetch evaluators — only `evaluator_type === "simulation"` is offered as a
+  // Fetch evaluators — only `evaluator_type === "conversation"` is offered as a
   // metric for simulations. Other use cases (LLM, TTS, STT) are filtered out
   // here so the picker doesn't expose evaluators that can't run on a full
   // conversation.
@@ -509,7 +509,7 @@ export default function SimulationDetailPage() {
           ? data
               .filter(
                 (m: { evaluator_type?: string }) =>
-                  m.evaluator_type === "simulation",
+                  m.evaluator_type === "conversation",
               )
               .map(
                 (m: {
