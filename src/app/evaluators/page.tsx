@@ -168,13 +168,13 @@ function MetricsPageInner() {
   // page reloads and is restored when the user clicks back from a detail page.
   const [activeTab, setActiveTab] = useState<EvaluatorTab>(() => {
     const t = searchParams.get("tab");
-    return t === "mine" ? "mine" : "default";
+    return t === "default" ? "default" : "mine";
   });
 
   // Keep state in sync if the URL changes (e.g. back/forward navigation).
   useEffect(() => {
     const t = searchParams.get("tab");
-    const next: EvaluatorTab = t === "mine" ? "mine" : "default";
+    const next: EvaluatorTab = t === "default" ? "default" : "mine";
     setActiveTab((prev) => (prev === next ? prev : next));
   }, [searchParams]);
 
@@ -733,16 +733,6 @@ function MetricsPageInner() {
         {/* Tabs */}
         <div className="flex items-center gap-4 md:gap-6 border-b border-border">
           <button
-            onClick={() => changeActiveTab("default")}
-            className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap border-b-2 -mb-px ${
-              activeTab === "default"
-                ? "border-foreground text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Default ({defaultEvaluators.length})
-          </button>
-          <button
             onClick={() => changeActiveTab("mine")}
             className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap border-b-2 -mb-px ${
               activeTab === "mine"
@@ -751,6 +741,16 @@ function MetricsPageInner() {
             }`}
           >
             My evaluators ({myEvaluators.length})
+          </button>
+          <button
+            onClick={() => changeActiveTab("default")}
+            className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap border-b-2 -mb-px ${
+              activeTab === "default"
+                ? "border-foreground text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Default ({defaultEvaluators.length})
           </button>
         </div>
 
