@@ -63,8 +63,8 @@ export function UseCasePickerDialog({
               What is this evaluator for?
             </h2>
             <p className="text-xs md:text-sm text-muted-foreground mt-1">
-              Pick the use case so we can configure the right judge model and
-              inputs.
+              Pick the use case so we can set a good default LLM judge model and
+              prompt for you
             </p>
           </div>
           <button
