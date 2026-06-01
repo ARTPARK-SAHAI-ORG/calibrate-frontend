@@ -621,8 +621,8 @@ export default function HomePage() {
           </div>
 
           <div className="md:hidden space-y-12">
-            <div className="mx-auto max-w-4xl w-full space-y-5 text-center">
-              <h2 className={`${landingBannerHeadlineClass} mb-1`}>
+            <div className="mx-auto max-w-4xl w-full text-center">
+              <h2 className={`${landingBannerHeadlineClass} mb-3 md:mb-4`}>
                 <span className="font-semibold text-gray-900">
                   {sec.headingBold}
                 </span>
@@ -686,7 +686,7 @@ export default function HomePage() {
         className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-10 md:gap-8 items-start"
       >
         <div className="text-left lg:sticky lg:top-40">
-          <h2 className={`${landingBannerHeadlineClass} mb-4 md:mb-6`}>
+          <h2 className={`${landingBannerHeadlineClass} mb-3 md:mb-4`}>
             <span className="font-semibold text-gray-900">
               {sec.headingBold}
             </span>
