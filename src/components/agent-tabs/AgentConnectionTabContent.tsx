@@ -182,7 +182,11 @@ export function AgentConnectionTabContent({
       }
     }
 
-    const success = await verify.verifyAdHoc(agentUrl, currentHeadersObj, messages);
+    const success = await verify.verifyAdHoc(
+      agentUrl,
+      currentHeadersObj,
+      messages,
+    );
 
     const newStatus: VerificationStatus = success ? "verified" : "failed";
     const now = success ? new Date().toISOString() : null;
@@ -440,9 +444,7 @@ export function AgentConnectionTabContent({
                   onChange={(e) => handleProviderChange(e.target.value)}
                   className="w-full h-9 md:h-10 px-3 md:px-4 pr-10 rounded-md text-sm md:text-base border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer appearance-none"
                 >
-                  <option value="openrouter">
-                    OpenRouter (all providers)
-                  </option>
+                  <option value="openrouter">OpenRouter (all providers)</option>
                   <option value="openai">OpenAI</option>
                   <option value="anthropic">Anthropic</option>
                   <option value="google">Google</option>
@@ -523,9 +525,7 @@ export function AgentConnectionTabContent({
             <button
               type="button"
               onClick={handleVerifyClick}
-              disabled={
-                verify.isVerifying || !agentUrl.trim() || isSaving
-              }
+              disabled={verify.isVerifying || !agentUrl.trim() || isSaving}
               className="h-8 md:h-9 px-3 md:px-4 rounded-md text-xs md:text-sm font-medium bg-yellow-500 text-black hover:bg-yellow-400 transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex-shrink-0 flex items-center gap-1.5"
             >
               {verifyStatus === "verifying" ? (
@@ -541,23 +541,24 @@ export function AgentConnectionTabContent({
             </button>
           </div>
 
-          {verifyStatus === "failed" && (verifyError || verify.verifySampleResponse) && (
-            <div className="space-y-2 rounded-lg border border-red-500/20 bg-red-500/5 p-3">
-              {verifyError && (
-                <p className="text-xs text-red-400">{verifyError}</p>
-              )}
-              {verify.verifySampleResponse && (
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Your agent responded with:
-                  </p>
-                  <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground max-h-48 overflow-y-auto">
-                    {JSON.stringify(verify.verifySampleResponse, null, 2)}
-                  </pre>
-                </div>
-              )}
-            </div>
-          )}
+          {verifyStatus === "failed" &&
+            (verifyError || verify.verifySampleResponse) && (
+              <div className="space-y-2 rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+                {verifyError && (
+                  <p className="text-xs text-red-400">{verifyError}</p>
+                )}
+                {verify.verifySampleResponse && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Your agent responded with:
+                    </p>
+                    <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground max-h-48 overflow-y-auto">
+                      {JSON.stringify(verify.verifySampleResponse, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
         </div>
 
         {/* Expected Format */}
@@ -661,17 +662,41 @@ export function AgentConnectionTabContent({
                 Your agent must respond with:
               </p>
               <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground">
-                {showToolCalls
-                  ? `{
+                {showToolCalls ? (
+                  <>
+                    {`{
   "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye.",
   "tool_calls": [
-    { "tool": "get_schedule", "arguments": { "child_age_weeks": 14 } }
+    {
+      "tool": "get_schedule",
+      "arguments": { "child_age_weeks": 14 },
+      `}
+                    <span className="italic text-muted-foreground">
+                      {`// optional`}
+                    </span>
+                    {`
+      "output": { "next_vaccines": ["OPV", "DPT"], "due_in_weeks": 14 }
+    }
   ]
-}`
-                  : `{
-  "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye."
 }`}
+                  </>
+                ) : (
+                  `{
+  "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye."
+}`
+                )}
               </pre>
+              {showToolCalls && (
+                <p className="text-xs text-muted-foreground">
+                  <code className="text-[11px] bg-muted px-1 py-0.5 rounded">
+                    output
+                  </code>{" "}
+                  is optional. Include the tool&apos;s execution result (any
+                  JSON value) and it will be shown alongside the tool call in
+                  the test results. Omit it if your agent doesn&apos;t run the
+                  tool.
+                </p>
+              )}
             </div>
           </div>
         </div>
