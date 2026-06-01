@@ -338,10 +338,11 @@ const tabs: LandingTab[] = [
           "Evaluators are only as reliable as their agreement with humans. Collect labels from real annotators, measure consistency between them, and track how closely your evaluators match human ratings over time.",
         images: [
           "/human-task.png",
-          "/human-annotators.png",
+          "/human-items.png",
+          "/human-jobs.png",
           "/human-agreement.png",
           "/human-evaluator-runs.png",
-          "/human-trend.png",
+          "/human-unified.png",
         ],
         quickStart: {
           steps: [
@@ -349,36 +350,42 @@ const tabs: LandingTab[] = [
               key: "human-task",
               headingBold: "Create a labelling task",
               headingLight:
-                "and add the items you want labelled — conversations, transcriptions, or simulation runs",
+                "and attach the evaluators you want to align — each one becomes an annotation column for every item",
               image: "/human-task.png",
             },
             {
-              key: "human-annotators",
-              headingBold: "Assign annotators to items",
+              key: "human-items",
+              headingBold: "Add the items to the task",
+              headingLight: "that humans will review and label",
+              image: "/human-items.png",
+            },
+            {
+              key: "human-jobs",
+              headingBold: "Create labelling jobs by assigning items to labellers",
               headingLight:
-                "and share a private link with each one to label blindly, without seeing labels from other annotators",
-              image: "/human-annotators.png",
+                "each job is a unique link so one annotator's labels never influence another's, and the same item can be sent to multiple labellers for cross-checks",
+              image: "/human-jobs.png",
             },
             {
               key: "human-agreement",
-              headingBold: "Collect labels on a single dashboard",
+              headingBold: "Get inter-annotator agreement",
               headingLight:
-                "and measure inter-annotator agreement whenever multiple annotators rate the same item",
+                "for every item that more than one labeller has reviewed, so you know which items humans themselves disagree on",
               image: "/human-agreement.png",
             },
             {
               key: "human-evaluator-runs",
               headingBold: "Run your evaluators on the same items",
               headingLight:
-                "to see how well they agree with humans, and inspect every disagreement row by row",
+                "and get an alignment score against human labels on every item where both are available",
               image: "/human-evaluator-runs.png",
             },
             {
-              key: "human-trend",
-              headingBold: "Iterate on evaluator prompts",
+              key: "human-unified",
+              headingBold: "Compare LLM judge and human labels side by side",
               headingLight:
-                "and track agreement across versions over time to know your evaluators are getting closer to human judgment",
-              image: "/human-trend.png",
+                "in a single unified interface — review disagreements, update your evaluators, and iteratively improve alignment across versions",
+              image: "/human-unified.png",
             },
           ],
         },
