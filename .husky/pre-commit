@@ -1,1 +1,15 @@
+staged=$(git diff --cached --name-only --diff-filter=d)
+
+if [ -z "$staged" ]; then
+  exit 0
+fi
+
+# Skip the build when every staged file is a PNG image.
+non_png=$(printf '%s\n' "$staged" | grep -iv '\.png$')
+
+if [ -z "$non_png" ]; then
+  echo "Only PNG files changed — skipping build."
+  exit 0
+fi
+
 npm run build
