@@ -401,9 +401,10 @@ const tabs: LandingTab[] = [
       "Use personas and scenarios to simulate conversations before deploying to real users",
     sections: [
       {
-        headingBold: "Simulate realistic conversations",
+        headingBold: "Simulate conversations",
         headingLight: "with your agent",
-        description: "Catch bugs before deploying your agent to real users",
+        description:
+          "Catch bugs and regressions in your agent before deploying it to real users",
         images: [
           "/sim-persona.png",
           "/sim-scenario.png",
@@ -836,13 +837,13 @@ export default function HomePage() {
           <div className="flex min-w-0 flex-col gap-24 md:gap-24 lg:gap-28">
             {tabs.map((tab, tabIndex) => (
               <div key={tab.id} className="flex flex-col gap-10 md:gap-0">
-                <div className="md:hidden">
+                <div className="sticky top-0 z-30 -mx-6 bg-white/95 px-6 py-3 backdrop-blur-sm md:hidden">
                   {renderLandingProductNavButton(tab, tabIndex)}
                 </div>
                 <section
                   id={`landing-${tab.id}`}
                   data-landing-tab={tab.id}
-                  className="scroll-mt-8 md:scroll-mt-40"
+                  className="scroll-mt-32 md:scroll-mt-40"
                 >
                   <div className="flex flex-col gap-20 md:gap-16">
                     {tab.sections.map((sec, secIdx) =>
