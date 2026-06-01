@@ -665,13 +665,28 @@ export function AgentConnectionTabContent({
                   ? `{
   "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye.",
   "tool_calls": [
-    { "tool": "get_schedule", "arguments": { "child_age_weeks": 14 } }
+    {
+      "tool": "get_schedule",
+      "arguments": { "child_age_weeks": 14 },
+      "output": { "next_vaccines": ["OPV", "DPT"], "due_in_weeks": 14 }
+    }
   ]
 }`
                   : `{
   "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye."
 }`}
               </pre>
+              {showToolCalls && (
+                <p className="text-xs text-muted-foreground">
+                  <code className="text-[11px] bg-muted px-1 py-0.5 rounded">
+                    output
+                  </code>{" "}
+                  is optional — include the tool&apos;s execution result (any
+                  JSON value) and it will be shown alongside the tool call in
+                  tool-call test results. Omit it if your agent doesn&apos;t run
+                  the tool.
+                </p>
+              )}
             </div>
           </div>
         </div>
