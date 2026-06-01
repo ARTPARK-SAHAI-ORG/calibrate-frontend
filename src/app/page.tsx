@@ -340,7 +340,6 @@ const tabs: LandingTab[] = [
           "/human-alignment-1.png",
           "/human-alignment-2.png",
           "/human-alignment-3.png",
-          "/human-alignment-3b.png",
           "/human-alignment-4.png",
           "/human-alignment-5.png",
           "/human-alignment-6.png",
