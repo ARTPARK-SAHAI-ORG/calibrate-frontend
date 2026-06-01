@@ -1,4 +1,4 @@
-staged=$(git diff --cached --name-only --diff-filter=d)
+staged=$(git diff --cached --name-only)
 
 if [ -z "$staged" ]; then
   exit 0
