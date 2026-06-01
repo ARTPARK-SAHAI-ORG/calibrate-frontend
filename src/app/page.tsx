@@ -329,20 +329,21 @@ const tabs: LandingTab[] = [
     id: "human-alignment",
     label: "Human alignment",
     navDescription:
-      "Collect human labels and measure how closely your evaluators agree with real human judgment",
+      "Collect human labels and iteratively align your LLM judges to automate monitoring reliably",
     sections: [
       {
         headingBold: "Align your LLM judges",
         headingLight: "with human judgment",
         description:
-          "Evaluators are only as reliable as their agreement with humans. Collect labels from real annotators, measure consistency between them, and track how closely your evaluators match human ratings over time.",
+          "LLM evaluators are prone to mistakes as well. The only way to trust them is to compare them with human judgment. Collect human labels, measure alignment with LLM judges and iteratively improve them.",
         images: [
-          "/human-task.png",
-          "/human-items.png",
-          "/human-jobs.png",
-          "/human-agreement.png",
-          "/human-evaluator-runs.png",
-          "/human-unified.png",
+          "/human-alignment-1.png",
+          "/human-alignment-2.png",
+          "/human-alignment-3.png",
+          "/human-alignment-3b.png",
+          "/human-alignment-4.png",
+          "/human-alignment-5.png",
+          "/human-alignment-6.png",
         ],
         quickStart: {
           steps: [
@@ -350,42 +351,51 @@ const tabs: LandingTab[] = [
               key: "human-task",
               headingBold: "Create a labelling task",
               headingLight:
-                "and attach the evaluators you want to align — each one becomes an annotation column for every item",
-              image: "/human-task.png",
+                "and attach the evaluators you want to align. Each evaluator becomes an annotation column for every item",
+              image: "/human-alignment-1.png",
             },
             {
               key: "human-items",
               headingBold: "Add the items to the task",
               headingLight: "that humans will review and label",
-              image: "/human-items.png",
+              image: "/human-alignment-2.png",
             },
             {
               key: "human-jobs",
-              headingBold: "Create labelling jobs by assigning items to labellers",
+              headingBold:
+                "Create labelling jobs by assigning items to labellers",
               headingLight:
-                "each job is a unique link so one annotator's labels never influence another's, and the same item can be sent to multiple labellers for cross-checks",
-              image: "/human-jobs.png",
+                "the same item can be sent to more than one labeller for cross-checks",
+              image: "/human-alignment-3.png",
+            },
+            {
+              key: "human-blind-link",
+              headingBold: "Each labelling job is a unique link",
+              headingLight:
+                "so one annotator's labels never influence another's — every labeller reviews items blindly",
+              image: "/human-alignment-3b.png",
             },
             {
               key: "human-agreement",
               headingBold: "Get inter-annotator agreement",
               headingLight:
                 "for every item that more than one labeller has reviewed, so you know which items humans themselves disagree on",
-              image: "/human-agreement.png",
+              image: "/human-alignment-4.png",
             },
             {
               key: "human-evaluator-runs",
               headingBold: "Run your evaluators on the same items",
               headingLight:
                 "and get an alignment score against human labels on every item where both are available",
-              image: "/human-evaluator-runs.png",
+              image: "/human-alignment-5.png",
             },
             {
               key: "human-unified",
-              headingBold: "Review every disagreement and improve alignment over iterations",
+              headingBold:
+                "Review every disagreement and improve alignment over iterations",
               headingLight:
                 "drill into the rows where the LLM judge and humans disagree, update your evaluator, and watch alignment climb across versions",
-              image: "/human-unified.png",
+              image: "/human-alignment-6.png",
             },
           ],
         },
