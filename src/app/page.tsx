@@ -496,7 +496,7 @@ export default function HomePage() {
 
   /** Section-level split headlines (quick-start intro & closing, Voice/Sim columns, section rail) */
   const landingBannerHeadlineClass =
-    "text-base min-[380px]:text-lg min-[440px]:text-2xl sm:text-4xl md:text-[2.25rem] lg:text-5xl xl:text-[3rem] leading-[1.08] tracking-[-0.035em] w-full";
+    "text-2xl min-[380px]:text-3xl min-[440px]:text-[2rem] sm:text-4xl md:text-[2.25rem] lg:text-5xl xl:text-[3rem] leading-[1.08] tracking-[-0.035em] w-full";
 
   /** Per-step titles — same weight treatment, smaller scale than `landingBannerHeadlineClass` */
   const landingStepHeadlineClass =
