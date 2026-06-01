@@ -382,9 +382,9 @@ const tabs: LandingTab[] = [
             },
             {
               key: "human-unified",
-              headingBold: "Compare LLM judge and human labels side by side",
+              headingBold: "Review every disagreement and improve alignment over iterations",
               headingLight:
-                "in a single unified interface — review disagreements, update your evaluators, and iteratively improve alignment across versions",
+                "drill into the rows where the LLM judge and humans disagree, update your evaluator, and watch alignment climb across versions",
               image: "/human-unified.png",
             },
           ],
