@@ -240,7 +240,7 @@ const tabs: LandingTab[] = [
       "Benchmark speech\u2011to\u2011text and text\u2011to\u2011speech models using metrics suited for agents",
     sections: [
       {
-        headingBold: "Identify the best speech\u2011to\u2011text model",
+        headingBold: "Find the best speech\u2011to\u2011text model",
         headingLight: "for your users",
         description:
           "Calibrate uses evaluators that compare the meaning of the predicted transcriptions with the references beyond simple rule-based metrics to rank different models",

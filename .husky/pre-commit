@@ -4,11 +4,14 @@ if [ -z "$staged" ]; then
   exit 0
 fi
 
-# Skip the build when every staged file is a PNG image.
-non_png=$(printf '%s\n' "$staged" | grep -iv '\.png$')
+# File extensions that can't affect the Next.js production build.
+# If every staged file matches one of these, skip the build.
+skip_pattern='\.(png|jpg|jpeg|gif|webp|ico|bmp|tiff?|mp3|wav|ogg|m4a|aac|flac|mp4|mov|webm|avi|mkv|pdf|md|markdown|mdx|txt|csv|log)$'
 
-if [ -z "$non_png" ]; then
-  echo "Only PNG files changed — skipping build."
+non_skippable=$(printf '%s\n' "$staged" | grep -Eiv "$skip_pattern")
+
+if [ -z "$non_skippable" ]; then
+  echo "Only non-build files changed (images/media/docs) — skipping build."
   exit 0
 fi
 
