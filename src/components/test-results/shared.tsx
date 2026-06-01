@@ -54,6 +54,12 @@ export { CheckIcon, XIcon, SpinnerIcon, ToolIcon, CloseIcon, DocumentIcon };
 export type ToolCallOutput = {
   tool: string;
   arguments: Record<string, any>;
+  /** The tool's execution result, echoed back by the external agent.
+   * Any JSON value. Only populated for agent-connection tests where the
+   * agent actually runs the tool; `null`/absent for managed
+   * calibrate-agent tests (which declare tool calls but never execute
+   * them). Render only when present. */
+  output?: unknown;
 };
 
 export type TestCaseOutput = {
@@ -274,6 +280,7 @@ function formatParamValue(value: any): string {
 export function normalizeToolCall(tc: any): {
   toolName: string;
   args: Record<string, any>;
+  output?: unknown;
 } {
   if (!tc || typeof tc !== "object") {
     return { toolName: "Unknown tool", args: {} };
@@ -321,17 +328,27 @@ export function normalizeToolCall(tc: any): {
     }
   }
 
-  return { toolName, args };
+  const output =
+    tc.output === undefined || tc.output === null ? undefined : tc.output;
+
+  return { toolName, args, output };
 }
 
 // Shared Tool Call Card Component
 export function ToolCallCard({
   toolName,
   args,
+  output,
 }: {
   toolName: string;
   args: Record<string, any>;
+  /** The tool's execution result (agent-connection tests only). Rendered
+   * only when present — `undefined`/`null` hides the result section. */
+  output?: unknown;
 }) {
+  const hasOutput = output !== undefined && output !== null;
+  const outputValue = hasOutput ? formatParamValue(output) : "";
+  const outputIsMultiLine = outputValue.includes("\n");
   return (
     <div className="bg-muted border border-border rounded-2xl p-4">
       <div className="flex items-center gap-2 mb-2">
@@ -360,6 +377,20 @@ export function ToolCallCard({
                 </div>
               );
             })}
+        </div>
+      )}
+      {hasOutput && (
+        <div className="mt-3 pt-3 border-t border-border">
+          <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+            Output
+          </label>
+          <div
+            className={`px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground whitespace-pre-wrap break-all ${
+              outputIsMultiLine ? "font-mono text-xs" : ""
+            }`}
+          >
+            {outputValue}
+          </div>
         </div>
       )}
     </div>
@@ -758,10 +789,18 @@ export function TestDetailView({
               </div>
               <div className="space-y-3">
                 {output.tool_calls.map((toolCall, index) => {
-                  const { toolName, args } = normalizeToolCall(toolCall);
+                  const {
+                    toolName,
+                    args,
+                    output: toolOutput,
+                  } = normalizeToolCall(toolCall);
                   return (
                     <div key={index} className="w-[88%] md:w-3/4">
-                      <ToolCallCard toolName={toolName} args={args} />
+                      <ToolCallCard
+                        toolName={toolName}
+                        args={args}
+                        output={toolOutput}
+                      />
                     </div>
                   );
                 })}
