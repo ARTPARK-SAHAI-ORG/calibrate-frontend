@@ -1,1 +1,21 @@
+# Use --name-status so renames expose BOTH sides (status, old path, new path).
+# A rename like src/page.tsx -> public/page.png would otherwise show only the
+# skippable new name under --name-only and wrongly bypass the build.
+staged=$(git diff --cached --name-status | awk -F'\t' '{ for (i = 2; i <= NF; i++) print $i }')
+
+if [ -z "$staged" ]; then
+  exit 0
+fi
+
+# File extensions that can't affect the Next.js production build.
+# If every staged file matches one of these, skip the build.
+skip_pattern='\.(png|jpg|jpeg|gif|webp|ico|bmp|tiff?|mp3|wav|ogg|m4a|aac|flac|mp4|mov|webm|avi|mkv|pdf|md|markdown|mdx|txt|csv|log)$'
+
+non_skippable=$(printf '%s\n' "$staged" | grep -Eiv "$skip_pattern")
+
+if [ -z "$non_skippable" ]; then
+  echo "Only non-build files changed (images/media/docs) — skipping build."
+  exit 0
+fi
+
 npm run build

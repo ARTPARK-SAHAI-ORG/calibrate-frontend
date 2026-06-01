@@ -240,7 +240,7 @@ const tabs: LandingTab[] = [
       "Benchmark speech\u2011to\u2011text and text\u2011to\u2011speech models using metrics suited for agents",
     sections: [
       {
-        headingBold: "Identify the best speech\u2011to\u2011text model",
+        headingBold: "Find the best speech\u2011to\u2011text model",
         headingLight: "for your users",
         description:
           "Calibrate uses evaluators that compare the meaning of the predicted transcriptions with the references beyond simple rule-based metrics to rank different models",
@@ -326,15 +326,85 @@ const tabs: LandingTab[] = [
     ],
   },
   {
+    id: "human-alignment",
+    label: "Human alignment",
+    navDescription:
+      "Collect human labels and iteratively align your LLM judges to automate monitoring reliably",
+    sections: [
+      {
+        headingBold: "Align your LLM judges",
+        headingLight: "with human judgment",
+        description:
+          "LLM evaluators are prone to mistakes as well. The only way to trust them is to compare them with human judgment. Collect human labels, measure alignment with LLM judges and iteratively improve them.",
+        images: [
+          "/human-alignment-1.png",
+          "/human-alignment-2.png",
+          "/human-alignment-3.png",
+          "/human-alignment-4.png",
+          "/human-alignment-5.png",
+          "/human-alignment-6.png",
+        ],
+        quickStart: {
+          steps: [
+            {
+              key: "human-task",
+              headingBold: "Create a human alignment task",
+              headingLight:
+                "and attach the evaluators you want to align. Each evaluator becomes an annotation column for every item",
+              image: "/human-alignment-1.png",
+            },
+            {
+              key: "human-items",
+              headingBold: "Add the items to the task",
+              headingLight: "that humans will review and label",
+              image: "/human-alignment-2.png",
+            },
+            {
+              key: "human-jobs",
+              headingBold:
+                "Create labelling jobs by assigning items to annotators",
+              headingLight:
+                "and send unique links so that labels from one annotator never influence another's",
+              image: "/human-alignment-3.png",
+            },
+            {
+              key: "human-blind-link",
+              headingBold:
+                "Each annotator labels each item across all evaluators",
+              headingLight:
+                "you want to align. Measure consistency in their labels by sending a few common items to all annotators",
+              image: "/human-alignment-4.png",
+            },
+            {
+              key: "human-evaluator-runs",
+              headingBold: "Run your evaluators on the same items",
+              headingLight:
+                "and review disagreements between LLM judges and human labels",
+              image: "/human-alignment-5.png",
+            },
+            {
+              key: "human-unified",
+              headingBold: "Iteratively improve LLM judge alignment",
+              headingLight:
+                "by experimenting with different evaluator settings. Once aligned, the evaluator can be reliably used to automate monitoring.",
+              image: "/human-alignment-6.png",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
     id: "simulations",
     label: "Simulations",
     navDescription:
       "Use personas and scenarios to simulate conversations before deploying to real users",
     sections: [
       {
-        headingBold: "Simulate realistic conversations",
+        headingBold: "Simulate conversations",
         headingLight: "with your agent",
-        description: "Catch bugs before deploying your agent to real users",
+        description:
+          "Catch bugs and regressions in your agent before deploying it to real users",
         images: [
           "/sim-persona.png",
           "/sim-scenario.png",
@@ -426,7 +496,7 @@ export default function HomePage() {
 
   /** Section-level split headlines (quick-start intro & closing, Voice/Sim columns, section rail) */
   const landingBannerHeadlineClass =
-    "text-base min-[380px]:text-lg min-[440px]:text-2xl sm:text-4xl md:text-[2.25rem] lg:text-5xl xl:text-[3rem] leading-[1.08] tracking-[-0.035em] w-full";
+    "text-2xl min-[380px]:text-3xl min-[440px]:text-[2rem] sm:text-4xl md:text-[2.25rem] lg:text-5xl xl:text-[3rem] leading-[1.08] tracking-[-0.035em] w-full";
 
   /** Per-step titles — same weight treatment, smaller scale than `landingBannerHeadlineClass` */
   const landingStepHeadlineClass =
@@ -552,8 +622,8 @@ export default function HomePage() {
           </div>
 
           <div className="md:hidden space-y-12">
-            <div className="mx-auto max-w-4xl w-full space-y-5 text-center">
-              <h2 className={`${landingBannerHeadlineClass} mb-1`}>
+            <div className="mx-auto max-w-4xl w-full text-center">
+              <h2 className={`${landingBannerHeadlineClass} mb-3 md:mb-4`}>
                 <span className="font-semibold text-gray-900">
                   {sec.headingBold}
                 </span>
@@ -617,7 +687,7 @@ export default function HomePage() {
         className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-10 md:gap-8 items-start"
       >
         <div className="text-left lg:sticky lg:top-40">
-          <h2 className={`${landingBannerHeadlineClass} mb-4 md:mb-6`}>
+          <h2 className={`${landingBannerHeadlineClass} mb-3 md:mb-4`}>
             <span className="font-semibold text-gray-900">
               {sec.headingBold}
             </span>
@@ -767,13 +837,13 @@ export default function HomePage() {
           <div className="flex min-w-0 flex-col gap-24 md:gap-24 lg:gap-28">
             {tabs.map((tab, tabIndex) => (
               <div key={tab.id} className="flex flex-col gap-10 md:gap-0">
-                <div className="md:hidden">
+                <div className="sticky top-0 z-30 -mx-6 bg-white/95 px-6 py-3 backdrop-blur-sm md:hidden">
                   {renderLandingProductNavButton(tab, tabIndex)}
                 </div>
                 <section
                   id={`landing-${tab.id}`}
                   data-landing-tab={tab.id}
-                  className="scroll-mt-8 md:scroll-mt-40"
+                  className="scroll-mt-32 md:scroll-mt-40"
                 >
                   <div className="flex flex-col gap-20 md:gap-16">
                     {tab.sections.map((sec, secIdx) =>
