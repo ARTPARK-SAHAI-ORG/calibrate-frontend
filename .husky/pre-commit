@@ -1,4 +1,7 @@
-staged=$(git diff --cached --name-only)
+# Use --name-status so renames expose BOTH sides (status, old path, new path).
+# A rename like src/page.tsx -> public/page.png would otherwise show only the
+# skippable new name under --name-only and wrongly bypass the build.
+staged=$(git diff --cached --name-status | awk -F'\t' '{ for (i = 2; i <= NF; i++) print $i }')
 
 if [ -z "$staged" ]; then
   exit 0
