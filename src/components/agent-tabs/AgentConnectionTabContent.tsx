@@ -662,21 +662,29 @@ export function AgentConnectionTabContent({
                 Your agent must respond with:
               </p>
               <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-foreground">
-                {showToolCalls
-                  ? `{
+                {showToolCalls ? (
+                  <>
+                    {`{
   "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye.",
   "tool_calls": [
     {
       "tool": "get_schedule",
       "arguments": { "child_age_weeks": 14 },
-      // optional
+      `}
+                    <span className="italic text-muted-foreground">
+                      {`// optional`}
+                    </span>
+                    {`
       "output": { "next_vaccines": ["OPV", "DPT"], "due_in_weeks": 14 }
     }
   ]
-}`
-                  : `{
-  "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye."
 }`}
+                  </>
+                ) : (
+                  `{
+  "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye."
+}`
+                )}
               </pre>
               {showToolCalls && (
                 <p className="text-xs text-muted-foreground">
