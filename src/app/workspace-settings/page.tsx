@@ -510,25 +510,32 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
     }
   };
 
+  // Hide the header (title + description + create button) when there are no
+  // keys — the EmptyState already provides a title, description and a create
+  // action, so the header would be redundant.
+  const hasKeys = apiKeys.length > 0;
+
   return (
     <section className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base md:text-lg font-semibold text-foreground">
-            API keys
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Authenticate Calibrate (e.g. for Github Actions)
-          </p>
+      {hasKeys && (
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base md:text-lg font-semibold text-foreground">
+              API keys
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Authenticate Calibrate (e.g. for Github Actions)
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(true)}
+            className="shrink-0 h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer"
+          >
+            Create key
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => setIsCreateOpen(true)}
-          className="shrink-0 h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer"
-        >
-          Create key
-        </button>
-      </div>
+      )}
 
       {isLoading && apiKeys.length === 0 ? (
         <div className="border border-border rounded-xl px-4 py-10 flex items-center justify-center">
@@ -556,7 +563,7 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
             </svg>
           }
           title="No API keys yet"
-          description="Create an API key to authenticate Calibrate from CI, like GitHub Actions."
+          description="Create an API key to authenticate Calibrate (e.g. for Github Actions)"
           action={{
             label: "Create key",
             onClick: () => setIsCreateOpen(true),
