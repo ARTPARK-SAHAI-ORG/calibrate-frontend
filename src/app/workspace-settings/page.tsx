@@ -45,12 +45,14 @@ export default function WorkspaceSettingsPage() {
     document.title = "Workspace settings | Calibrate";
   }, []);
 
-  // Restore the selected tab from `?tab=` on load (and on back/forward), so a
-  // reload or shared link keeps the user on the same tab. We read the URL
-  // directly instead of `useSearchParams()` to avoid forcing a Suspense
-  // boundary on this otherwise-static page. Init defaults to "admin" so the
-  // first client render matches the prerendered HTML (no hydration mismatch);
-  // this effect then syncs to the URL.
+  // Restore the selected tab from `?tab=` on load, so a reload or shared link
+  // keeps the user on the same tab. We read the URL directly instead of
+  // `useSearchParams()` to avoid forcing a Suspense boundary on this
+  // otherwise-static page. Init defaults to "admin" so the first client render
+  // matches the prerendered HTML (no hydration mismatch); this effect then
+  // syncs to the URL. The popstate listener covers external URL changes (e.g.
+  // editing the address bar); tab clicks use replaceState below, so they don't
+  // add their own back/forward history entries.
   useEffect(() => {
     const syncFromUrl = () => {
       const tab = new URLSearchParams(window.location.search).get("tab");
@@ -65,6 +67,8 @@ export default function WorkspaceSettingsPage() {
 
   const handleTabChange = (tab: SettingsTab) => {
     setActiveTab(tab);
+    // replaceState (not pushState): switching tabs updates the URL for reload /
+    // share, without pushing a history entry per click.
     const params = new URLSearchParams(window.location.search);
     params.set("tab", tab);
     window.history.replaceState(null, "", `?${params.toString()}`);
