@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
+import { getDefaultHeaders } from "@/lib/api";
 import {
   TestCaseOutput,
   TestCaseData,
@@ -289,10 +290,7 @@ export function TestRunnerDialog({
     try {
       const response = await fetch(`${backendUrl}/agent-tests/run/${taskId}`, {
         method: "GET",
-        headers: {
-          accept: "application/json",
-          Authorization: `Bearer ${backendAccessToken}`,
-        },
+        headers: getDefaultHeaders(backendAccessToken),
       });
 
       if (response.status === 401) {
@@ -520,9 +518,8 @@ export function TestRunnerDialog({
         {
           method: "POST",
           headers: {
-            accept: "application/json",
+            ...getDefaultHeaders(backendAccessToken),
             "Content-Type": "application/json",
-            Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify(runAllLinked ? {} : { test_uuids: testUuids }),
         },
@@ -603,9 +600,8 @@ export function TestRunnerDialog({
         {
           method: "POST",
           headers: {
-            accept: "application/json",
+            ...getDefaultHeaders(backendAccessToken),
             "Content-Type": "application/json",
-            Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({
             test_uuids: [testUuid],
@@ -631,10 +627,7 @@ export function TestRunnerDialog({
             `${backendUrl}/agent-tests/run/${result.task_id}`,
             {
               method: "GET",
-              headers: {
-                accept: "application/json",
-                Authorization: `Bearer ${backendAccessToken}`,
-              },
+              headers: getDefaultHeaders(backendAccessToken),
             },
           );
 
@@ -779,9 +772,8 @@ export function TestRunnerDialog({
         {
           method: "POST",
           headers: {
-            accept: "application/json",
+            ...getDefaultHeaders(backendAccessToken),
             "Content-Type": "application/json",
-            Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({
             test_uuids: testUuids,

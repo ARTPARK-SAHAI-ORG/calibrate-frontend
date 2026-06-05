@@ -10,6 +10,7 @@ import React, {
 import { createPortal } from "react-dom";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
+import { getDefaultHeaders } from "@/lib/api";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
 import { useHideFloatingButton } from "@/components/AppLayout";
@@ -737,10 +738,7 @@ export function AddTestDialog({
 
         const response = await fetch(`${backendUrl}/tools`, {
           method: "GET",
-          headers: {
-            accept: "application/json",
-            Authorization: `Bearer ${backendAccessToken}`,
-          },
+          headers: getDefaultHeaders(backendAccessToken),
         });
 
         if (response.status === 401) {
@@ -783,10 +781,7 @@ export function AddTestDialog({
           `${backendUrl}/evaluators?include_defaults=true`,
           {
             method: "GET",
-            headers: {
-              accept: "application/json",
-              Authorization: `Bearer ${backendAccessToken}`,
-            },
+            headers: getDefaultHeaders(backendAccessToken),
           },
         );
 

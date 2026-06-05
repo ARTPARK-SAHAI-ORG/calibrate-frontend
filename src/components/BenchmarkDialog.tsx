@@ -5,6 +5,7 @@ import { signOut } from "next-auth/react";
 import type { LLMModel } from "./agent-tabs/constants/providers";
 import { LLMSelectorModal } from "./agent-tabs/LLMSelectorModal";
 import { useOpenRouterModels, useAccessToken } from "@/hooks";
+import { getDefaultHeaders } from "@/lib/api";
 import { BenchmarkResultsDialog } from "./BenchmarkResultsDialog";
 import {
   CloseIcon,
@@ -132,9 +133,8 @@ export function BenchmarkDialog({
         {
           method: "POST",
           headers: {
-            accept: "application/json",
+            ...getDefaultHeaders(backendAccessToken),
             "Content-Type": "application/json",
-            Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({
             model: modelId,

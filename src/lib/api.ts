@@ -22,7 +22,7 @@ export function getBackendUrl(): string {
 /**
  * Default headers for API requests
  */
-export function getDefaultHeaders(accessToken?: string): Record<string, string> {
+export function getDefaultHeaders(accessToken?: string | null): Record<string, string> {
   const headers: Record<string, string> = {
     accept: "application/json",
   };

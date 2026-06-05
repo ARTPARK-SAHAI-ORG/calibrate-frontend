@@ -12,6 +12,7 @@ import {
   type BenchmarkModelResult,
 } from "./eval-details";
 import { StatusBadge } from "@/components/ui";
+import { getDefaultHeaders } from "@/lib/api";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
@@ -282,10 +283,7 @@ export function BenchmarkResultsDialog({
         `${backendUrl}/agent-tests/benchmark/${taskId}`,
         {
           method: "GET",
-          headers: {
-            accept: "application/json",
-            Authorization: `Bearer ${backendAccessToken}`,
-          },
+          headers: getDefaultHeaders(backendAccessToken),
         },
       );
 
@@ -384,9 +382,8 @@ export function BenchmarkResultsDialog({
         {
           method: "POST",
           headers: {
-            accept: "application/json",
+            ...getDefaultHeaders(backendAccessToken),
             "Content-Type": "application/json",
-            Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({
             models: models,
