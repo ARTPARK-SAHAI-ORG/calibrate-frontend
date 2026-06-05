@@ -15,8 +15,7 @@ import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { CreateApiKeyDialog } from "@/components/CreateApiKeyDialog";
-import { SpinnerIcon } from "@/components/icons";
-import { EmptyState } from "@/components/ui/LoadingState";
+import { EmptyState, LoadingState } from "@/components/ui/LoadingState";
 import { useSidebarState } from "@/lib/sidebar";
 import { apiGet } from "@/lib/api";
 import { parseBackendErrorMessage } from "@/lib/parseBackendError";
@@ -131,10 +130,7 @@ export default function WorkspaceSettingsPage() {
     >
       <div className="py-6 md:py-8">
         {orgsLoading && !activeOrg ? (
-          <div className="flex flex-col items-center justify-center gap-3 min-h-[60vh] text-muted-foreground">
-            <SpinnerIcon className="w-6 h-6 animate-spin" />
-            <p className="text-sm">Loading</p>
-          </div>
+          <LoadingState className="min-h-[60vh]" />
         ) : !activeOrg ? (
           <p className="text-sm text-muted-foreground">
             No active workspace selected.
@@ -379,7 +375,7 @@ function MembersSection({
 
       <div className="border border-border rounded-lg overflow-hidden">
         {isLoading && members.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-muted-foreground">Loading…</p>
+          <LoadingState />
         ) : loadError ? (
           <p className="px-4 py-6 text-[13px] text-red-500">{loadError}</p>
         ) : members.length === 0 ? (
@@ -538,9 +534,7 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
       )}
 
       {isLoading && apiKeys.length === 0 ? (
-        <div className="border border-border rounded-xl px-4 py-10 flex items-center justify-center">
-          <SpinnerIcon className="w-5 h-5 animate-spin text-muted-foreground" />
-        </div>
+        <LoadingState />
       ) : loadError ? (
         <div className="border border-border rounded-xl px-4 py-6 bg-muted/20">
           <p className="text-[13px] text-red-500">{loadError}</p>
