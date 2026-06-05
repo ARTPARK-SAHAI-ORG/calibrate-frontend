@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
+import { getDefaultHeaders } from "@/lib/api";
 import Papa from "papaparse";
 import { MultiAgentPicker } from "@/components/AgentPicker";
 import { MultiSelectPicker } from "@/components/MultiSelectPicker";
@@ -273,10 +274,7 @@ export function BulkUploadTestsModal({
           `${backendUrl}/evaluators?include_defaults=true`,
           {
             method: "GET",
-            headers: {
-              accept: "application/json",
-              Authorization: `Bearer ${backendAccessToken}`,
-            },
+            headers: getDefaultHeaders(backendAccessToken),
           },
         );
 
@@ -352,10 +350,7 @@ export function BulkUploadTestsModal({
 
         const response = await fetch(`${backendUrl}/tools`, {
           method: "GET",
-          headers: {
-            accept: "application/json",
-            Authorization: `Bearer ${backendAccessToken}`,
-          },
+          headers: getDefaultHeaders(backendAccessToken),
         });
 
         if (response.status === 401) {
@@ -897,9 +892,8 @@ export function BulkUploadTestsModal({
       const response = await fetch(`${backendUrl}/tests/bulk`, {
         method: "POST",
         headers: {
-          accept: "application/json",
+          ...getDefaultHeaders(backendAccessToken),
           "Content-Type": "application/json",
-          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify(body),
       });

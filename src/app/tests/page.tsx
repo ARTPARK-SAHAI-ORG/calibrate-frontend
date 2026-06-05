@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
+import { getDefaultHeaders } from "@/lib/api";
 import { AppLayout } from "@/components/AppLayout";
 import {
   ToolPicker,
@@ -220,10 +221,7 @@ function LLMPageInner() {
 
       const response = await fetch(`${backendUrl}/tests`, {
         method: "GET",
-        headers: {
-          accept: "application/json",
-          Authorization: `Bearer ${backendAccessToken}`,
-        },
+        headers: getDefaultHeaders(backendAccessToken),
       });
 
       if (response.status === 401) {
@@ -261,10 +259,7 @@ function LLMPageInner() {
         if (!backendUrl) throw new Error("BACKEND_URL not set");
         const response = await fetch(`${backendUrl}/agent-tests/runs`, {
           method: "GET",
-          headers: {
-            accept: "application/json",
-            Authorization: `Bearer ${backendAccessToken}`,
-          },
+          headers: getDefaultHeaders(backendAccessToken),
         });
         if (response.status === 401) { await signOut({ callbackUrl: "/login" }); return; }
         if (!response.ok) throw new Error("Failed to fetch runs");
@@ -344,10 +339,7 @@ function LLMPageInner() {
 
           const response = await fetch(endpoint, {
             method: "GET",
-            headers: {
-              accept: "application/json",
-              Authorization: `Bearer ${backendAccessToken}`,
-            },
+            headers: getDefaultHeaders(backendAccessToken),
           });
 
           if (response.status === 401) {
@@ -510,10 +502,7 @@ function LLMPageInner() {
       for (const uuid of uuidsToDelete) {
         const response = await fetch(`${backendUrl}/tests/${uuid}`, {
           method: "DELETE",
-          headers: {
-            accept: "application/json",
-            Authorization: `Bearer ${backendAccessToken}`,
-          },
+          headers: getDefaultHeaders(backendAccessToken),
         });
 
         if (response.status === 401) {
@@ -562,9 +551,8 @@ function LLMPageInner() {
         const response = await fetch(`${backendUrl}/agent-tests`, {
           method: "POST",
           headers: {
-            accept: "application/json",
+            ...getDefaultHeaders(backendAccessToken),
             "Content-Type": "application/json",
-            Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({
             agent_uuid: agentUuid,
@@ -635,9 +623,8 @@ function LLMPageInner() {
       const response = await fetch(`${backendUrl}/tests/bulk`, {
         method: "POST",
         headers: {
-          accept: "application/json",
+          ...getDefaultHeaders(backendAccessToken),
           "Content-Type": "application/json",
-          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
           type: config.evaluation.type,
@@ -668,10 +655,7 @@ function LLMPageInner() {
       // Refetch the tests list to get the updated data
       const testsResponse = await fetch(`${backendUrl}/tests`, {
         method: "GET",
-        headers: {
-          accept: "application/json",
-          Authorization: `Bearer ${backendAccessToken}`,
-        },
+        headers: getDefaultHeaders(backendAccessToken),
       });
 
       if (testsResponse.ok) {
@@ -710,10 +694,7 @@ function LLMPageInner() {
 
       const response = await fetch(`${backendUrl}/tests/${uuid}`, {
         method: "GET",
-        headers: {
-          accept: "application/json",
-          Authorization: `Bearer ${backendAccessToken}`,
-        },
+        headers: getDefaultHeaders(backendAccessToken),
       });
 
       if (response.status === 401) {
@@ -788,10 +769,7 @@ function LLMPageInner() {
 
       const response = await fetch(`${backendUrl}/tests/${test.uuid}`, {
         method: "GET",
-        headers: {
-          accept: "application/json",
-          Authorization: `Bearer ${backendAccessToken}`,
-        },
+        headers: getDefaultHeaders(backendAccessToken),
       });
 
       if (response.status === 401) {
@@ -886,9 +864,8 @@ function LLMPageInner() {
       const response = await fetch(`${backendUrl}/tests/${editingTestUuid}`, {
         method: "PUT",
         headers: {
-          accept: "application/json",
+          ...getDefaultHeaders(backendAccessToken),
           "Content-Type": "application/json",
-          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify(body),
       });
@@ -911,10 +888,7 @@ function LLMPageInner() {
       // Refetch the tests list to get the updated data
       const testsResponse = await fetch(`${backendUrl}/tests`, {
         method: "GET",
-        headers: {
-          accept: "application/json",
-          Authorization: `Bearer ${backendAccessToken}`,
-        },
+        headers: getDefaultHeaders(backendAccessToken),
       });
 
       if (testsResponse.ok) {

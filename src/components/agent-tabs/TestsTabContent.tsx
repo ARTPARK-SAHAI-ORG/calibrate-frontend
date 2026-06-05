@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { signOut } from "next-auth/react";
 import { useAccessToken, useMaxRowsPerEval } from "@/hooks";
+import { getDefaultHeaders } from "@/lib/api";
 
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
@@ -315,10 +316,7 @@ export function TestsTabContent({
         `${backendUrl}/agent-tests/agent/${agentUuid}/tests`,
         {
           method: "GET",
-          headers: {
-            accept: "application/json",
-            Authorization: `Bearer ${backendAccessToken}`,
-          },
+          headers: getDefaultHeaders(backendAccessToken),
         },
       );
 
@@ -364,10 +362,7 @@ export function TestsTabContent({
 
       const response = await fetch(`${backendUrl}/tests`, {
         method: "GET",
-        headers: {
-          accept: "application/json",
-          Authorization: `Bearer ${backendAccessToken}`,
-        },
+        headers: getDefaultHeaders(backendAccessToken),
       });
 
       if (response.status === 401) {
@@ -461,10 +456,7 @@ export function TestsTabContent({
           `${backendUrl}/agent-tests/agent/${agentUuid}/runs`,
           {
             method: "GET",
-            headers: {
-              accept: "application/json",
-              Authorization: `Bearer ${backendAccessToken}`,
-            },
+            headers: getDefaultHeaders(backendAccessToken),
           },
         );
 
@@ -543,10 +535,7 @@ export function TestsTabContent({
 
           const response = await fetch(endpoint, {
             method: "GET",
-            headers: {
-              accept: "application/json",
-              Authorization: `Bearer ${backendAccessToken}`,
-            },
+            headers: getDefaultHeaders(backendAccessToken),
           });
 
           if (!response.ok) continue;
@@ -654,9 +643,8 @@ export function TestsTabContent({
       const response = await fetch(`${backendUrl}/agent-tests`, {
         method: "POST",
         headers: {
-          accept: "application/json",
+          ...getDefaultHeaders(backendAccessToken),
           "Content-Type": "application/json",
-          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
           agent_uuid: agentUuid,
@@ -725,9 +713,8 @@ export function TestsTabContent({
       const response = await fetch(`${backendUrl}/tests/bulk`, {
         method: "POST",
         headers: {
-          accept: "application/json",
+          ...getDefaultHeaders(backendAccessToken),
           "Content-Type": "application/json",
-          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify({
           type: config.evaluation.type,
@@ -814,10 +801,7 @@ export function TestsTabContent({
 
       const response = await fetch(`${backendUrl}/tests/${uuid}`, {
         method: "GET",
-        headers: {
-          accept: "application/json",
-          Authorization: `Bearer ${backendAccessToken}`,
-        },
+        headers: getDefaultHeaders(backendAccessToken),
       });
 
       if (response.status === 401) {
@@ -885,10 +869,7 @@ export function TestsTabContent({
 
       const response = await fetch(`${backendUrl}/tests/${test.uuid}`, {
         method: "GET",
-        headers: {
-          accept: "application/json",
-          Authorization: `Bearer ${backendAccessToken}`,
-        },
+        headers: getDefaultHeaders(backendAccessToken),
       });
 
       if (response.status === 401) {
@@ -974,9 +955,8 @@ export function TestsTabContent({
       const response = await fetch(`${backendUrl}/tests/${editingTestUuid}`, {
         method: "PUT",
         headers: {
-          accept: "application/json",
+          ...getDefaultHeaders(backendAccessToken),
           "Content-Type": "application/json",
-          Authorization: `Bearer ${backendAccessToken}`,
         },
         body: JSON.stringify(body),
       });
@@ -1170,9 +1150,8 @@ export function TestsTabContent({
           {
             method: "POST",
             headers: {
-              accept: "application/json",
+              ...getDefaultHeaders(backendAccessToken),
               "Content-Type": "application/json",
-              Authorization: `Bearer ${backendAccessToken}`,
             },
             body: JSON.stringify({
               agent_uuid: agentUuid,
@@ -1200,9 +1179,8 @@ export function TestsTabContent({
           const response = await fetch(`${backendUrl}/agent-tests`, {
             method: "DELETE",
             headers: {
-              accept: "application/json",
+              ...getDefaultHeaders(backendAccessToken),
               "Content-Type": "application/json",
-              Authorization: `Bearer ${backendAccessToken}`,
             },
             body: JSON.stringify({
               agent_uuid: agentUuid,
