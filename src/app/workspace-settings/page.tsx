@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { CreateApiKeyDialog } from "@/components/CreateApiKeyDialog";
+import { SpinnerIcon } from "@/components/icons";
 import { useSidebarState } from "@/lib/sidebar";
 import { apiGet } from "@/lib/api";
 import { parseBackendErrorMessage } from "@/lib/parseBackendError";
@@ -43,31 +44,6 @@ export default function WorkspaceSettingsPage() {
   useEffect(() => {
     document.title = "Workspace settings | Calibrate";
   }, []);
-
-  // Restore the selected tab from `?tab=` on load (and back/forward), so a
-  // reload or shared link keeps the user on the same tab. We read the URL
-  // directly instead of `useSearchParams()` to avoid forcing a Suspense
-  // boundary on this otherwise-static page. Init defaults to "admin" so the
-  // first client render matches the prerendered HTML (no hydration mismatch);
-  // the effect then syncs to the URL.
-  useEffect(() => {
-    const syncFromUrl = () => {
-      const tab = new URLSearchParams(window.location.search).get("tab");
-      if (SETTINGS_TABS.some((t) => t.id === tab)) {
-        setActiveTab(tab as SettingsTab);
-      }
-    };
-    syncFromUrl();
-    window.addEventListener("popstate", syncFromUrl);
-    return () => window.removeEventListener("popstate", syncFromUrl);
-  }, []);
-
-  const handleTabChange = (tab: SettingsTab) => {
-    setActiveTab(tab);
-    const params = new URLSearchParams(window.location.search);
-    params.set("tab", tab);
-    window.history.replaceState(null, "", `?${params.toString()}`);
-  };
 
   const {
     organizations,
@@ -129,7 +105,10 @@ export default function WorkspaceSettingsPage() {
     >
       <div className="py-6 md:py-8">
         {orgsLoading && !activeOrg ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <div className="flex flex-col items-center justify-center gap-3 min-h-[60vh] text-muted-foreground">
+            <SpinnerIcon className="w-6 h-6 animate-spin" />
+            <p className="text-sm">Loading</p>
+          </div>
         ) : !activeOrg ? (
           <p className="text-sm text-muted-foreground">
             No active workspace selected.
@@ -144,7 +123,7 @@ export default function WorkspaceSettingsPage() {
                     <button
                       key={tab.id}
                       type="button"
-                      onClick={() => handleTabChange(tab.id)}
+                      onClick={() => setActiveTab(tab.id)}
                       className={`flex-1 md:flex-none text-left px-4 py-3 text-sm font-medium border-l-2 transition-colors cursor-pointer ${
                         i > 0 ? "md:border-t md:border-t-border" : ""
                       } ${
@@ -518,6 +497,9 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
           <h2 className="text-base md:text-lg font-semibold text-foreground">
             API keys
           </h2>
+          <p className="text-sm text-muted-foreground">
+            Authenticate Calibrate (e.g. for Github Actions)
+          </p>
         </div>
         <button
           type="button"
@@ -535,7 +517,7 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
           <p className="px-4 py-6 text-[13px] text-red-500">{loadError}</p>
         ) : apiKeys.length === 0 ? (
           <p className="px-4 py-6 text-sm text-muted-foreground">
-            No API keys yet
+            No API keys yet.
           </p>
         ) : (
           <ul className="divide-y divide-border">
