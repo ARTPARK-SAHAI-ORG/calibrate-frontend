@@ -5,7 +5,7 @@ import { useHideFloatingButton } from "@/components/AppLayout";
 import { parseBackendErrorMessage } from "@/lib/parseBackendError";
 import type { OrganizationApiKeyWithSecret } from "@/lib/orgs";
 
-type CreateTokenDialogProps = {
+type CreateApiKeyDialogProps = {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (name: string) => Promise<OrganizationApiKeyWithSecret>;
@@ -13,15 +13,14 @@ type CreateTokenDialogProps = {
 
 /**
  * Two-phase dialog: first a name form, then a one-time reveal of the secret.
- * The plaintext token is shown exactly once — once the dialog closes it is
- * gone, matching the "show once on create" backend contract. (The backend
- * endpoint is `/api-keys`; the UI labels these "tokens".)
+ * The plaintext key is shown exactly once — once the dialog closes it is gone,
+ * matching the "show once on create" backend contract.
  */
-export function CreateTokenDialog({
+export function CreateApiKeyDialog({
   isOpen,
   onClose,
   onCreate,
-}: CreateTokenDialogProps) {
+}: CreateApiKeyDialogProps) {
   useHideFloatingButton(isOpen);
 
   const [name, setName] = useState("");
@@ -53,7 +52,7 @@ export function CreateTokenDialog({
       const created = await onCreate(trimmed);
       setCreatedKey(created);
     } catch (err) {
-      setError(parseBackendErrorMessage(err, "Failed to create token"));
+      setError(parseBackendErrorMessage(err, "Failed to create API key"));
     } finally {
       setIsSubmitting(false);
     }
@@ -80,10 +79,10 @@ export function CreateTokenDialog({
       {createdKey ? (
         <div className="bg-background rounded-xl w-full max-w-md p-5 md:p-6 shadow-2xl">
           <h2 className="text-base md:text-lg font-semibold text-foreground mb-2">
-            Token created
+            API key created
           </h2>
           <p className="text-sm text-muted-foreground mb-4">
-            Copy your token now and store it somewhere safe. For security, you
+            Copy your key now and store it somewhere safe. For security, you
             won&apos;t be able to see it again.
           </p>
 
@@ -120,11 +119,11 @@ export function CreateTokenDialog({
           className="bg-background rounded-xl w-full max-w-md p-5 md:p-6 shadow-2xl"
         >
           <h2 className="text-base md:text-lg font-semibold text-foreground mb-2">
-            Create token
+            Create API key
           </h2>
           <p className="text-sm text-muted-foreground mb-4">
-            Use a token to authenticate Calibrate from CI, like GitHub Actions.
-            The token acts on this workspace.
+            Use an API key to authenticate Calibrate from CI, like GitHub
+            Actions. The key acts on this workspace.
           </p>
 
           <label className="block text-sm font-medium text-foreground mb-1.5">
@@ -184,7 +183,7 @@ export function CreateTokenDialog({
                   />
                 </svg>
               )}
-              {isSubmitting ? "Creating..." : "Create token"}
+              {isSubmitting ? "Creating..." : "Create key"}
             </button>
           </div>
         </form>

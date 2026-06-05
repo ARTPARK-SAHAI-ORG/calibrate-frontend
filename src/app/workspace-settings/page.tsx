@@ -14,7 +14,7 @@ import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
-import { CreateTokenDialog } from "@/components/CreateTokenDialog";
+import { CreateApiKeyDialog } from "@/components/CreateApiKeyDialog";
 import { useSidebarState } from "@/lib/sidebar";
 import { apiGet } from "@/lib/api";
 import { parseBackendErrorMessage } from "@/lib/parseBackendError";
@@ -30,7 +30,7 @@ import {
 
 const SETTINGS_TABS = [
   { id: "admin", label: "Admin" },
-  { id: "tokens", label: "Tokens" },
+  { id: "api-keys", label: "API keys" },
 ] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number]["id"];
 
@@ -179,7 +179,7 @@ export default function WorkspaceSettingsPage() {
                   />
                 </div>
               ) : (
-                <TokensSection orgUuid={activeOrg.uuid} />
+                <ApiKeysSection orgUuid={activeOrg.uuid} />
               )}
             </div>
           </div>
@@ -453,7 +453,7 @@ function formatDate(iso: string): string {
   });
 }
 
-function TokensSection({ orgUuid }: { orgUuid: string }) {
+function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
   const accessToken = useAccessToken();
   const {
     apiKeys,
@@ -478,7 +478,7 @@ function TokensSection({ orgUuid }: { orgUuid: string }) {
       setKeyToRevoke(null);
     } catch (err) {
       refetch();
-      toast.error(parseBackendErrorMessage(err, "Failed to revoke token"));
+      toast.error(parseBackendErrorMessage(err, "Failed to revoke API key"));
     } finally {
       setIsRevoking(false);
     }
@@ -489,7 +489,7 @@ function TokensSection({ orgUuid }: { orgUuid: string }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-base md:text-lg font-semibold text-foreground">
-            Tokens
+            API keys
           </h2>
           <p className="text-sm text-muted-foreground">
             Authenticate Calibrate from CI, like GitHub Actions
@@ -500,7 +500,7 @@ function TokensSection({ orgUuid }: { orgUuid: string }) {
           onClick={() => setIsCreateOpen(true)}
           className="shrink-0 h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer"
         >
-          Create token
+          Create key
         </button>
       </div>
 
@@ -511,7 +511,7 @@ function TokensSection({ orgUuid }: { orgUuid: string }) {
           <p className="px-4 py-6 text-[13px] text-red-500">{loadError}</p>
         ) : apiKeys.length === 0 ? (
           <p className="px-4 py-6 text-sm text-muted-foreground">
-            No tokens yet.
+            No API keys yet.
           </p>
         ) : (
           <ul className="divide-y divide-border">
@@ -537,7 +537,7 @@ function TokensSection({ orgUuid }: { orgUuid: string }) {
                 <button
                   type="button"
                   onClick={() => setKeyToRevoke(key)}
-                  title="Revoke this token"
+                  title="Revoke this key"
                   className="h-9 px-3 rounded-md text-xs font-medium text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors cursor-pointer"
                 >
                   Revoke
@@ -548,7 +548,7 @@ function TokensSection({ orgUuid }: { orgUuid: string }) {
         )}
       </div>
 
-      <CreateTokenDialog
+      <CreateApiKeyDialog
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         onCreate={createApiKey}
@@ -560,7 +560,7 @@ function TokensSection({ orgUuid }: { orgUuid: string }) {
           if (!isRevoking) setKeyToRevoke(null);
         }}
         onConfirm={handleRevoke}
-        title="Revoke token"
+        title="Revoke API key"
         message={
           keyToRevoke
             ? `Revoke "${keyToRevoke.name}"? Any CI or scripts using it will stop working immediately. This cannot be undone.`
