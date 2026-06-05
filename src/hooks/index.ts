@@ -9,6 +9,7 @@ export {
   useOrganizations,
   useActiveOrgUuid,
   useOrgMembers,
+  useWorkspaceApiKeys,
   clearOrgsCache,
   seedOrgsCache,
 } from "./useOrganizations";

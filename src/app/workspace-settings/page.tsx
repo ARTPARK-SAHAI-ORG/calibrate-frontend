@@ -7,12 +7,14 @@ import {
   useActiveOrgUuid,
   useOrganizations,
   useOrgMembers,
+  useWorkspaceApiKeys,
   seedOrgsCache,
 } from "@/hooks";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
+import { CreateApiKeyDialog } from "@/components/CreateApiKeyDialog";
 import { useSidebarState } from "@/lib/sidebar";
 import { apiGet } from "@/lib/api";
 import { parseBackendErrorMessage } from "@/lib/parseBackendError";
@@ -22,6 +24,7 @@ import {
   pickDefaultOrg,
   setActiveOrgUuid,
   type Organization,
+  type OrganizationApiKey,
   type OrganizationMember,
 } from "@/lib/orgs";
 
@@ -135,6 +138,8 @@ export default function WorkspaceSettingsPage() {
             </section>
 
             <MembersSection orgUuid={activeOrg.uuid} orgName={activeOrg.name} />
+
+            <ApiKeysSection orgUuid={activeOrg.uuid} />
           </>
         )}
       </div>
@@ -391,6 +396,136 @@ function MembersSection({
         }
         confirmText={isSelfRemoval ? "Leave" : "Remove"}
         isDeleting={isRemoving}
+      />
+    </section>
+  );
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
+  const accessToken = useAccessToken();
+  const {
+    apiKeys,
+    isLoading,
+    error: loadError,
+    refetch,
+    createApiKey,
+    revokeApiKey,
+  } = useWorkspaceApiKeys(accessToken, orgUuid);
+
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [keyToRevoke, setKeyToRevoke] = useState<OrganizationApiKey | null>(
+    null,
+  );
+  const [isRevoking, setIsRevoking] = useState(false);
+
+  const handleRevoke = async () => {
+    if (!keyToRevoke) return;
+    setIsRevoking(true);
+    try {
+      await revokeApiKey(keyToRevoke.uuid);
+      setKeyToRevoke(null);
+    } catch (err) {
+      refetch();
+      toast.error(parseBackendErrorMessage(err, "Failed to revoke API key"));
+    } finally {
+      setIsRevoking(false);
+    }
+  };
+
+  return (
+    <section className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base md:text-lg font-semibold text-foreground">
+            API keys
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Authenticate Calibrate from CI, like GitHub Actions
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsCreateOpen(true)}
+          className="shrink-0 h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer"
+        >
+          Create key
+        </button>
+      </div>
+
+      <div className="border border-border rounded-lg overflow-hidden">
+        {isLoading && apiKeys.length === 0 ? (
+          <p className="px-4 py-6 text-sm text-muted-foreground">Loading…</p>
+        ) : loadError ? (
+          <p className="px-4 py-6 text-[13px] text-red-500">{loadError}</p>
+        ) : apiKeys.length === 0 ? (
+          <p className="px-4 py-6 text-sm text-muted-foreground">
+            No API keys yet.
+          </p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {apiKeys.map((key) => (
+              <li
+                key={key.uuid}
+                className="flex items-center gap-3 px-4 py-3"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {key.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground font-mono truncate">
+                    {key.prefix}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Created {formatDate(key.created_at)}
+                    {key.last_used_at
+                      ? ` · Last used ${formatDate(key.last_used_at)}`
+                      : " · Never used"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setKeyToRevoke(key)}
+                  title="Revoke this key"
+                  className="h-9 px-3 rounded-md text-xs font-medium text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors cursor-pointer"
+                >
+                  Revoke
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <CreateApiKeyDialog
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onCreate={createApiKey}
+      />
+
+      <DeleteConfirmationDialog
+        isOpen={!!keyToRevoke}
+        onClose={() => {
+          if (!isRevoking) setKeyToRevoke(null);
+        }}
+        onConfirm={handleRevoke}
+        title="Revoke API key"
+        message={
+          keyToRevoke
+            ? `Revoke "${keyToRevoke.name}"? Any CI or scripts using it will stop working immediately. This cannot be undone.`
+            : ""
+        }
+        confirmText="Revoke"
+        isDeleting={isRevoking}
       />
     </section>
   );
