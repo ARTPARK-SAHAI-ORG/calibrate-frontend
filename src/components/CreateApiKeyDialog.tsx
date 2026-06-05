@@ -77,7 +77,7 @@ export function CreateApiKeyDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       {createdKey ? (
-        <div className="bg-background rounded-xl w-full max-w-md p-5 md:p-6 shadow-2xl">
+        <div className="bg-background rounded-xl w-full max-w-2xl p-5 md:p-6 shadow-2xl">
           <h2 className="text-base md:text-lg font-semibold text-foreground mb-2">
             API key created
           </h2>
@@ -87,7 +87,7 @@ export function CreateApiKeyDialog({
           </p>
 
           <div className="flex items-stretch gap-2">
-            <code className="flex-1 min-w-0 px-3 py-2 rounded-md border border-border bg-muted/40 text-xs font-mono text-foreground break-all">
+            <code className="flex-1 min-w-0 px-3 py-2 rounded-md border border-border bg-muted/40 text-xs font-mono text-foreground whitespace-nowrap overflow-x-auto">
               {createdKey.key}
             </code>
             <button
