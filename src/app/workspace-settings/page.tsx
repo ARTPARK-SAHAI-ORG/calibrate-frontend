@@ -45,6 +45,31 @@ export default function WorkspaceSettingsPage() {
     document.title = "Workspace settings | Calibrate";
   }, []);
 
+  // Restore the selected tab from `?tab=` on load (and on back/forward), so a
+  // reload or shared link keeps the user on the same tab. We read the URL
+  // directly instead of `useSearchParams()` to avoid forcing a Suspense
+  // boundary on this otherwise-static page. Init defaults to "admin" so the
+  // first client render matches the prerendered HTML (no hydration mismatch);
+  // this effect then syncs to the URL.
+  useEffect(() => {
+    const syncFromUrl = () => {
+      const tab = new URLSearchParams(window.location.search).get("tab");
+      if (SETTINGS_TABS.some((t) => t.id === tab)) {
+        setActiveTab(tab as SettingsTab);
+      }
+    };
+    syncFromUrl();
+    window.addEventListener("popstate", syncFromUrl);
+    return () => window.removeEventListener("popstate", syncFromUrl);
+  }, []);
+
+  const handleTabChange = (tab: SettingsTab) => {
+    setActiveTab(tab);
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", tab);
+    window.history.replaceState(null, "", `?${params.toString()}`);
+  };
+
   const {
     organizations,
     isLoading: orgsLoading,
@@ -123,7 +148,7 @@ export default function WorkspaceSettingsPage() {
                     <button
                       key={tab.id}
                       type="button"
-                      onClick={() => setActiveTab(tab.id)}
+                      onClick={() => handleTabChange(tab.id)}
                       className={`flex-1 md:flex-none text-left px-4 py-3 text-sm font-medium border-l-2 transition-colors cursor-pointer ${
                         i > 0 ? "md:border-t md:border-t-border" : ""
                       } ${
