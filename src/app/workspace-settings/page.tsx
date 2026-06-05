@@ -100,7 +100,7 @@ export default function WorkspaceSettingsPage() {
         </h1>
       }
     >
-      <div className="max-w-4xl mx-auto py-6 md:py-8">
+      <div className="py-6 md:py-8">
         {orgsLoading && !activeOrg ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : !activeOrg ? (
@@ -133,7 +133,7 @@ export default function WorkspaceSettingsPage() {
               </div>
             </nav>
 
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 max-w-2xl">
               {activeTab === "admin" ? (
                 <div className="space-y-8">
                   <section className="space-y-3">
