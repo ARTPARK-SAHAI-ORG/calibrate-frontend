@@ -131,9 +131,13 @@ export function BenchmarkResultsDialog({
     };
   }, [isOpen, backendAccessToken]);
 
-  // Start benchmark when dialog opens
+  // Start benchmark when dialog opens. Gate on `backendAccessToken` too: the
+  // run/poll requests now require a Bearer token, and on a fresh mount the
+  // token resolves a tick after first render (localStorage read for
+  // email/password login). Without this guard the polling closure would
+  // capture a null token and send `Bearer null` on every request.
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && backendAccessToken) {
       // Clear any existing polling interval first
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
@@ -188,7 +192,7 @@ export function BenchmarkResultsDialog({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, taskId]);
+  }, [isOpen, taskId, backendAccessToken]);
 
   // Default selection: first test (index 0) of the first model that has
   // `test_results`. When `models` is populated (new run), prefer that order
@@ -244,6 +248,7 @@ export function BenchmarkResultsDialog({
           method: "GET",
           headers: {
             accept: "application/json",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
         },
       );
@@ -345,6 +350,7 @@ export function BenchmarkResultsDialog({
           headers: {
             accept: "application/json",
             "Content-Type": "application/json",
+            Authorization: `Bearer ${backendAccessToken}`,
           },
           body: JSON.stringify({
             models: models,
