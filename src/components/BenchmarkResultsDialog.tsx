@@ -106,6 +106,14 @@ export function BenchmarkResultsDialog({
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   /** Once per dialog open: select first test of `models[0]` when its row exists. */
   const hasAutoSelectedFirstBenchmarkTestRef = useRef(false);
+  /**
+   * Which "open session" we've already kicked off — keyed by `taskId` (or a
+   * sentinel for a brand-new run). Stays set across auth-token refreshes so a
+   * mid-run token change re-points polling at the SAME run instead of
+   * resetting state or launching a duplicate benchmark. Cleared when the
+   * dialog closes so the next open starts fresh.
+   */
+  const initializedSessionRef = useRef<string | null>(null);
 
   const isDone =
     taskStatus === "completed" ||
@@ -131,58 +139,86 @@ export function BenchmarkResultsDialog({
     };
   }, [isOpen, backendAccessToken]);
 
-  // Start benchmark when dialog opens. Gate on `backendAccessToken` too: the
-  // run/poll requests now require a Bearer token, and on a fresh mount the
-  // token resolves a tick after first render (localStorage read for
-  // email/password login). Without this guard the polling closure would
-  // capture a null token and send `Bearer null` on every request.
+  // Drive the dialog when it opens. This effect also re-fires when
+  // `backendAccessToken` changes, for two reasons:
+  //   1. On a fresh mount the token resolves a tick after first render
+  //      (localStorage read for email/password login); without re-firing we'd
+  //      start polling with a null token and send `Bearer null`.
+  //   2. The auth token can silently refresh while the dialog is open.
+  // `initializedSessionRef` distinguishes the two cases so a token refresh
+  // re-points polling at the in-progress run (with the fresh token) instead of
+  // wiping state or launching a duplicate benchmark.
   useEffect(() => {
-    if (isOpen && backendAccessToken) {
-      // Clear any existing polling interval first
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+    const beginPolling = (id: string) => {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
       }
+      if (!backendUrl) {
+        setIsInitialLoading(false);
+        setError("BACKEND_URL environment variable is not set");
+        return;
+      }
+      pollingIntervalRef.current = setInterval(() => {
+        pollBenchmarkStatus(id, backendUrl);
+      }, POLLING_INTERVAL_MS);
+      pollBenchmarkStatus(id, backendUrl);
+    };
 
-      setIsInitialLoading(true);
-      setTaskStatus("queued");
-      setModelResults([]);
-      setLeaderboardSummary(undefined);
-      setRunEvaluators([]);
-      setError(null);
-      setExpandedProviders(new Set(models.length > 0 ? [models[0]] : []));
-      setSelectedTest(null);
-      hasAutoSelectedFirstBenchmarkTestRef.current = false;
-      setActiveTab("outputs");
-      setIsPublic(false);
-      setShareToken(null);
-      setCurrentTaskId(taskId ?? null);
+    if (isOpen && backendAccessToken) {
+      // A new run has no taskId yet — give it a stable sentinel key so token
+      // refreshes during the initial run still count as the same session.
+      const sessionKey = taskId ?? "__new__";
 
-      if (taskId) {
-        // View existing benchmark - poll the task immediately
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-        if (backendUrl) {
-          pollingIntervalRef.current = setInterval(() => {
-            pollBenchmarkStatus(taskId, backendUrl);
-          }, POLLING_INTERVAL_MS);
-          pollBenchmarkStatus(taskId, backendUrl);
+      if (initializedSessionRef.current === sessionKey) {
+        // Same open session, re-firing because the token refreshed. Re-point
+        // polling at the active run with the new token — no reset, no relaunch.
+        const activeId = taskId ?? currentTaskId;
+        if (activeId) beginPolling(activeId);
+      } else {
+        // First open, or switched to a different run: reset and start fresh.
+        initializedSessionRef.current = sessionKey;
+
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+
+        setIsInitialLoading(true);
+        setTaskStatus("queued");
+        setModelResults([]);
+        setLeaderboardSummary(undefined);
+        setRunEvaluators([]);
+        setError(null);
+        setExpandedProviders(new Set(models.length > 0 ? [models[0]] : []));
+        setSelectedTest(null);
+        hasAutoSelectedFirstBenchmarkTestRef.current = false;
+        setActiveTab("outputs");
+        setIsPublic(false);
+        setShareToken(null);
+        setCurrentTaskId(taskId ?? null);
+
+        if (taskId) {
+          // View existing benchmark - poll the task immediately
+          beginPolling(taskId);
+        } else if (models.length > 0) {
+          // Start a new benchmark
+          runBenchmark();
         } else {
           setIsInitialLoading(false);
-          setError("BACKEND_URL environment variable is not set");
         }
-      } else if (models.length > 0) {
-        // Start a new benchmark
-        runBenchmark();
-      } else {
-        setIsInitialLoading(false);
       }
-    } else {
-      // Dialog closed - clear polling
+    } else if (!isOpen) {
+      // Dialog closed - clear polling and arm for the next open.
+      initializedSessionRef.current = null;
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
       }
     }
+    // else: open but the token hasn't resolved yet — wait for the re-fire.
 
     // Cleanup on unmount or when dependencies change
     return () => {
