@@ -139,80 +139,74 @@ export default function WorkspaceSettingsPage() {
             No active workspace selected.
           </p>
         ) : (
-          <div className="flex flex-col md:flex-row gap-6 md:gap-10">
-            <nav className="md:w-56 md:shrink-0">
-              <div className="flex md:flex-col border border-border rounded-lg overflow-hidden">
-                {SETTINGS_TABS.map((tab, i) => {
-                  const isActive = activeTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => handleTabChange(tab.id)}
-                      className={`flex-1 md:flex-none text-left px-4 py-3 text-sm font-medium border-l-2 transition-colors cursor-pointer ${
-                        i > 0 ? "md:border-t md:border-t-border" : ""
-                      } ${
-                        isActive
-                          ? "border-l-foreground bg-muted/40 text-foreground"
-                          : "border-l-transparent text-muted-foreground hover:bg-muted/20 hover:text-foreground"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </nav>
-
-            <div className="flex-1 min-w-0 max-w-2xl">
-              {activeTab === "admin" ? (
-                <div className="space-y-8">
-                  <section className="space-y-3">
-                    <label className="block text-sm font-medium text-foreground">
-                      Name
-                    </label>
-                    <div>
-                      <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                        <input
-                          type="text"
-                          value={nameInput}
-                          onChange={(e) => {
-                            setNameInput(e.target.value);
-                            setRenameError(null);
-                          }}
-                          disabled={isRenaming}
-                          className={`flex-1 h-10 px-3 rounded-md border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 disabled:opacity-50 ${
-                            renameError
-                              ? "border-red-500/60 focus:ring-red-500/20"
-                              : "border-border focus:ring-foreground/10"
-                          }`}
-                        />
-                        <button
-                          type="button"
-                          onClick={handleRename}
-                          disabled={!isDirty || isRenaming || !nameInput.trim()}
-                          className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isRenaming ? "Saving..." : "Save"}
-                        </button>
-                      </div>
-                      {renameError && (
-                        <p className="mt-1 text-[13px] text-red-500">
-                          {renameError}
-                        </p>
-                      )}
-                    </div>
-                  </section>
-
-                  <MembersSection
-                    orgUuid={activeOrg.uuid}
-                    orgName={activeOrg.name}
-                  />
-                </div>
-              ) : (
-                <ApiKeysSection orgUuid={activeOrg.uuid} />
-              )}
+          <div className="space-y-6 md:space-y-8">
+            <div className="flex items-center gap-4 md:gap-6 border-b border-border overflow-x-auto">
+              {SETTINGS_TABS.map((tab) => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => handleTabChange(tab.id)}
+                    className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                      isActive
+                        ? "text-foreground border-b-2 border-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
+
+            {activeTab === "admin" ? (
+              <div className="max-w-2xl space-y-8">
+                <section className="space-y-3">
+                  <label className="block text-sm font-medium text-foreground">
+                    Name
+                  </label>
+                  <div>
+                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                      <input
+                        type="text"
+                        value={nameInput}
+                        onChange={(e) => {
+                          setNameInput(e.target.value);
+                          setRenameError(null);
+                        }}
+                        disabled={isRenaming}
+                        className={`flex-1 h-10 px-3 rounded-md border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 disabled:opacity-50 ${
+                          renameError
+                            ? "border-red-500/60 focus:ring-red-500/20"
+                            : "border-border focus:ring-foreground/10"
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleRename}
+                        disabled={!isDirty || isRenaming || !nameInput.trim()}
+                        className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isRenaming ? "Saving..." : "Save"}
+                      </button>
+                    </div>
+                    {renameError && (
+                      <p className="mt-1 text-[13px] text-red-500">
+                        {renameError}
+                      </p>
+                    )}
+                  </div>
+                </section>
+
+                <MembersSection
+                  orgUuid={activeOrg.uuid}
+                  orgName={activeOrg.name}
+                />
+              </div>
+            ) : (
+              <ApiKeysSection orgUuid={activeOrg.uuid} />
+            )}
           </div>
         )}
       </div>
@@ -535,46 +529,96 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
         </button>
       </div>
 
-      <div className="border border-border rounded-lg overflow-hidden">
-        {isLoading && apiKeys.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-muted-foreground">Loading…</p>
-        ) : loadError ? (
-          <p className="px-4 py-6 text-[13px] text-red-500">{loadError}</p>
-        ) : apiKeys.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-muted-foreground">
+      {isLoading && apiKeys.length === 0 ? (
+        <div className="border border-border rounded-xl px-4 py-10 flex items-center justify-center">
+          <SpinnerIcon className="w-5 h-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : loadError ? (
+        <div className="border border-border rounded-xl px-4 py-6 bg-muted/20">
+          <p className="text-[13px] text-red-500">{loadError}</p>
+        </div>
+      ) : apiKeys.length === 0 ? (
+        <div className="border border-border rounded-xl px-4 py-10 bg-muted/20">
+          <p className="text-sm text-muted-foreground text-center">
             No API keys yet.
           </p>
-        ) : (
-          <ul className="divide-y divide-border">
+        </div>
+      ) : (
+        <>
+          {/* Desktop table */}
+          <div className="hidden md:block border border-border rounded-xl overflow-hidden">
+            <div className="grid grid-cols-[1fr_1.5fr_160px_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+              <div className="text-sm font-medium text-muted-foreground">
+                Name
+              </div>
+              <div className="text-sm font-medium text-muted-foreground">
+                Value
+              </div>
+              <div className="text-sm font-medium text-muted-foreground">
+                Last used
+              </div>
+              <div className="w-[76px]" />
+            </div>
             {apiKeys.map((key) => (
-              <li key={key.uuid} className="flex items-center gap-3 px-4 py-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {key.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground font-mono truncate">
-                    {key.masked_key}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Created {formatDate(key.created_at)}
-                    {key.last_used_at
-                      ? ` · Last used ${formatDate(key.last_used_at)}`
-                      : " · Never used"}
-                  </p>
-                </div>
+              <div
+                key={key.uuid}
+                className="grid grid-cols-[1fr_1.5fr_160px_auto] gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors items-center"
+              >
+                <p className="text-sm font-medium text-foreground truncate">
+                  {key.name}
+                </p>
+                <p className="text-sm text-muted-foreground font-mono truncate">
+                  {key.masked_key}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {key.last_used_at ? formatDate(key.last_used_at) : "Never"}
+                </p>
                 <button
                   type="button"
                   onClick={() => setKeyToRevoke(key)}
                   title="Revoke this key"
-                  className="h-9 px-3 rounded-md text-xs font-medium text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors cursor-pointer"
+                  className="justify-self-end h-9 px-3 rounded-md text-xs font-medium text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors cursor-pointer"
                 >
                   Revoke
                 </button>
-              </li>
+              </div>
             ))}
-          </ul>
-        )}
-      </div>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-3">
+            {apiKeys.map((key) => (
+              <div
+                key={key.uuid}
+                className="border border-border rounded-lg overflow-hidden bg-background"
+              >
+                <div className="p-4">
+                  <div className="text-sm font-medium text-foreground mb-1 truncate">
+                    {key.name}
+                  </div>
+                  <div className="text-xs text-muted-foreground font-mono mb-1 truncate">
+                    {key.masked_key}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {key.last_used_at
+                      ? `Last used ${formatDate(key.last_used_at)}`
+                      : "Never used"}
+                  </div>
+                </div>
+                <div className="px-4 pb-3 pt-0">
+                  <button
+                    type="button"
+                    onClick={() => setKeyToRevoke(key)}
+                    className="w-full h-8 text-xs font-medium text-red-500 bg-red-500/10 hover:bg-red-500/20 rounded-md transition-colors cursor-pointer"
+                  >
+                    Revoke
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       <CreateApiKeyDialog
         isOpen={isCreateOpen}
@@ -591,7 +635,7 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
         title="Revoke API key"
         message={
           keyToRevoke
-            ? `Revoke "${keyToRevoke.name}"? Any CI or scripts using it will stop working immediately. This cannot be undone.`
+            ? `If you revoke this key, it will stop working immediately. This cannot be undone. Are you sure?`
             : ""
         }
         confirmText="Revoke"
