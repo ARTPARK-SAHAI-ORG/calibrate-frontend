@@ -44,6 +44,31 @@ export default function WorkspaceSettingsPage() {
     document.title = "Workspace settings | Calibrate";
   }, []);
 
+  // Restore the selected tab from `?tab=` on load (and back/forward), so a
+  // reload or shared link keeps the user on the same tab. We read the URL
+  // directly instead of `useSearchParams()` to avoid forcing a Suspense
+  // boundary on this otherwise-static page. Init defaults to "admin" so the
+  // first client render matches the prerendered HTML (no hydration mismatch);
+  // the effect then syncs to the URL.
+  useEffect(() => {
+    const syncFromUrl = () => {
+      const tab = new URLSearchParams(window.location.search).get("tab");
+      if (SETTINGS_TABS.some((t) => t.id === tab)) {
+        setActiveTab(tab as SettingsTab);
+      }
+    };
+    syncFromUrl();
+    window.addEventListener("popstate", syncFromUrl);
+    return () => window.removeEventListener("popstate", syncFromUrl);
+  }, []);
+
+  const handleTabChange = (tab: SettingsTab) => {
+    setActiveTab(tab);
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", tab);
+    window.history.replaceState(null, "", `?${params.toString()}`);
+  };
+
   const {
     organizations,
     isLoading: orgsLoading,
@@ -82,7 +107,9 @@ export default function WorkspaceSettingsPage() {
       await renameOrganization(activeOrg.uuid, trimmed);
       toast.success("Workspace name updated");
     } catch (err) {
-      setRenameError(parseBackendErrorMessage(err, "Failed to rename workspace"));
+      setRenameError(
+        parseBackendErrorMessage(err, "Failed to rename workspace"),
+      );
     } finally {
       setIsRenaming(false);
     }
@@ -117,7 +144,7 @@ export default function WorkspaceSettingsPage() {
                     <button
                       key={tab.id}
                       type="button"
-                      onClick={() => setActiveTab(tab.id)}
+                      onClick={() => handleTabChange(tab.id)}
                       className={`flex-1 md:flex-none text-left px-4 py-3 text-sm font-medium border-l-2 transition-colors cursor-pointer ${
                         i > 0 ? "md:border-t md:border-t-border" : ""
                       } ${
@@ -491,9 +518,6 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
           <h2 className="text-base md:text-lg font-semibold text-foreground">
             API keys
           </h2>
-          <p className="text-sm text-muted-foreground">
-            Authenticate Calibrate from CI, like GitHub Actions
-          </p>
         </div>
         <button
           type="button"
@@ -511,15 +535,12 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
           <p className="px-4 py-6 text-[13px] text-red-500">{loadError}</p>
         ) : apiKeys.length === 0 ? (
           <p className="px-4 py-6 text-sm text-muted-foreground">
-            No API keys yet.
+            No API keys yet
           </p>
         ) : (
           <ul className="divide-y divide-border">
             {apiKeys.map((key) => (
-              <li
-                key={key.uuid}
-                className="flex items-center gap-3 px-4 py-3"
-              >
+              <li key={key.uuid} className="flex items-center gap-3 px-4 py-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">
                     {key.name}

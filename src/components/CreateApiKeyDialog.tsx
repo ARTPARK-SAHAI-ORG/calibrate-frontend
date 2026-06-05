@@ -121,10 +121,6 @@ export function CreateApiKeyDialog({
           <h2 className="text-base md:text-lg font-semibold text-foreground mb-2">
             Create API key
           </h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            Use an API key to authenticate Calibrate from CI, like GitHub
-            Actions. The key acts on this workspace.
-          </p>
 
           <label className="block text-sm font-medium text-foreground mb-1.5">
             Name
