@@ -16,6 +16,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { CreateApiKeyDialog } from "@/components/CreateApiKeyDialog";
 import { SpinnerIcon } from "@/components/icons";
+import { EmptyState } from "@/components/ui/LoadingState";
 import { useSidebarState } from "@/lib/sidebar";
 import { apiGet } from "@/lib/api";
 import { parseBackendErrorMessage } from "@/lib/parseBackendError";
@@ -538,11 +539,29 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
           <p className="text-[13px] text-red-500">{loadError}</p>
         </div>
       ) : apiKeys.length === 0 ? (
-        <div className="border border-border rounded-xl px-4 py-10 bg-muted/20">
-          <p className="text-sm text-muted-foreground text-center">
-            No API keys yet.
-          </p>
-        </div>
+        <EmptyState
+          icon={
+            <svg
+              className="w-7 h-7 text-muted-foreground"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z"
+              />
+            </svg>
+          }
+          title="No API keys yet"
+          description="Create an API key to authenticate Calibrate from CI, like GitHub Actions."
+          action={{
+            label: "Create key",
+            onClick: () => setIsCreateOpen(true),
+          }}
+        />
       ) : (
         <>
           {/* Desktop table */}
