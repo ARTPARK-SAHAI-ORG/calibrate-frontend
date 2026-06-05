@@ -2080,9 +2080,9 @@ export function AddTestDialog({
                     {selectedTools.length === 0 ? (
                       <div className="bg-muted rounded-lg p-8 text-center ">
                         <p className="text-muted-foreground text-sm">
-                          Select which tool should be called and the expected
-                          parameters. If the agent does not call the tool or
-                          calls it with the wrong parameters, the test will
+                          Select which tools should be called and the expected
+                          parameters. If the agent does not call the right tools
+                          or calls them with the wrong parameters, the test will
                           fail.
                         </p>
                       </div>
