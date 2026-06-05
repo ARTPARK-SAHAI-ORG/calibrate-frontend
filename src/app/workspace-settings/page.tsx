@@ -525,7 +525,7 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
                     {key.name}
                   </p>
                   <p className="text-xs text-muted-foreground font-mono truncate">
-                    {key.prefix}
+                    {key.masked_key}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Created {formatDate(key.created_at)}

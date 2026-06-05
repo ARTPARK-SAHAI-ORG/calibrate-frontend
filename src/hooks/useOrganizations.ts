@@ -333,8 +333,14 @@ type UseWorkspaceApiKeysReturn = {
 };
 
 /**
- * List + create + revoke API keys for a single workspace. The backend returns
- * the full secret only in the create response; the list returns masked keys.
+ * List + create + revoke API keys for the active workspace. Keys are scoped by
+ * the `X-Org-UUID` header (attached automatically in api.ts), so the endpoints
+ * are the bare `/api-keys` — NOT under `/organizations/...`, which would strip
+ * that header. The backend returns the full secret only in the create
+ * response; the list returns masked keys (`masked_key` / `last_four`).
+ *
+ * `orgUuid` isn't sent in the URL, but is kept as a gate + refetch dependency
+ * so the list reloads when the user switches workspaces.
  */
 export function useWorkspaceApiKeys(
   accessToken: string | null | undefined,
@@ -354,7 +360,7 @@ export function useWorkspaceApiKeys(
       setIsLoading(true);
       setError(null);
       const data = await apiGet<OrganizationApiKey[]>(
-        `/organizations/${orgUuid}/api-keys`,
+        "/api-keys",
         accessToken,
       );
       setApiKeys(data);
@@ -376,7 +382,7 @@ export function useWorkspaceApiKeys(
         throw new Error("Not signed in");
       }
       const created = await apiPost<OrganizationApiKeyWithSecret>(
-        `/organizations/${orgUuid}/api-keys`,
+        "/api-keys",
         accessToken,
         { name },
       );
@@ -394,10 +400,7 @@ export function useWorkspaceApiKeys(
       if (!accessToken || !orgUuid) {
         throw new Error("Not signed in");
       }
-      await apiDelete(
-        `/organizations/${orgUuid}/api-keys/${keyUuid}`,
-        accessToken,
-      );
+      await apiDelete(`/api-keys/${keyUuid}`, accessToken);
       setApiKeys((prev) => prev.filter((k) => k.uuid !== keyUuid));
     },
     [accessToken, orgUuid],

@@ -54,16 +54,19 @@ export type OrganizationMember = {
 
 /**
  * A workspace-scoped API key, used by CI / GitHub Actions to authenticate as
- * the workspace. The list endpoint only ever returns the masked `prefix` (the
- * first few characters, e.g. `calib_a1b2…`) — the full secret is shown exactly
- * once, in the POST response (`OrganizationApiKeyWithSecret`), and never again.
+ * the active workspace (scoped via the `X-Org-UUID` header, not the URL). The
+ * list endpoint never returns the secret — only `masked_key` (e.g.
+ * `sk_••••a2b3`) and its `last_four`. The full plaintext `key` is returned
+ * exactly once, in the POST response (`OrganizationApiKeyWithSecret`).
  */
 export type OrganizationApiKey = {
   uuid: string;
   name: string;
-  prefix: string;
+  last_four: string;
+  masked_key: string;
   last_used_at: string | null;
   created_at: string;
+  updated_at: string;
 };
 
 /** The create response, which additionally carries the plaintext key once. */
