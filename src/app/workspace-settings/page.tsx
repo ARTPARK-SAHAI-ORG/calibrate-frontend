@@ -14,7 +14,7 @@ import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
-import { CreateApiKeyDialog } from "@/components/CreateApiKeyDialog";
+import { CreateTokenDialog } from "@/components/CreateTokenDialog";
 import { useSidebarState } from "@/lib/sidebar";
 import { apiGet } from "@/lib/api";
 import { parseBackendErrorMessage } from "@/lib/parseBackendError";
@@ -28,10 +28,17 @@ import {
   type OrganizationMember,
 } from "@/lib/orgs";
 
+const SETTINGS_TABS = [
+  { id: "admin", label: "Admin" },
+  { id: "tokens", label: "Tokens" },
+] as const;
+type SettingsTab = (typeof SETTINGS_TABS)[number]["id"];
+
 export default function WorkspaceSettingsPage() {
   const router = useRouter();
   const accessToken = useAccessToken();
   const [sidebarOpen, setSidebarOpen] = useSidebarState();
+  const [activeTab, setActiveTab] = useState<SettingsTab>("admin");
 
   useEffect(() => {
     document.title = "Workspace settings | Calibrate";
@@ -93,7 +100,7 @@ export default function WorkspaceSettingsPage() {
         </h1>
       }
     >
-      <div className="max-w-3xl mx-auto py-6 md:py-8 space-y-8">
+      <div className="max-w-4xl mx-auto py-6 md:py-8">
         {orgsLoading && !activeOrg ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : !activeOrg ? (
@@ -101,46 +108,81 @@ export default function WorkspaceSettingsPage() {
             No active workspace selected.
           </p>
         ) : (
-          <>
-            <section className="space-y-3">
-              <label className="block text-sm font-medium text-foreground">
-                Name
-              </label>
-              <div>
-                <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                  <input
-                    type="text"
-                    value={nameInput}
-                    onChange={(e) => {
-                      setNameInput(e.target.value);
-                      setRenameError(null);
-                    }}
-                    disabled={isRenaming}
-                    className={`flex-1 h-10 px-3 rounded-md border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 disabled:opacity-50 ${
-                      renameError
-                        ? "border-red-500/60 focus:ring-red-500/20"
-                        : "border-border focus:ring-foreground/10"
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleRename}
-                    disabled={!isDirty || isRenaming || !nameInput.trim()}
-                    className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isRenaming ? "Saving..." : "Save"}
-                  </button>
-                </div>
-                {renameError && (
-                  <p className="mt-1 text-[13px] text-red-500">{renameError}</p>
-                )}
+          <div className="flex flex-col md:flex-row gap-6 md:gap-10">
+            <nav className="md:w-56 md:shrink-0">
+              <div className="flex md:flex-col border border-border rounded-lg overflow-hidden">
+                {SETTINGS_TABS.map((tab, i) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex-1 md:flex-none text-left px-4 py-3 text-sm font-medium border-l-2 transition-colors cursor-pointer ${
+                        i > 0 ? "md:border-t md:border-t-border" : ""
+                      } ${
+                        isActive
+                          ? "border-l-foreground bg-muted/40 text-foreground"
+                          : "border-l-transparent text-muted-foreground hover:bg-muted/20 hover:text-foreground"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
               </div>
-            </section>
+            </nav>
 
-            <MembersSection orgUuid={activeOrg.uuid} orgName={activeOrg.name} />
+            <div className="flex-1 min-w-0">
+              {activeTab === "admin" ? (
+                <div className="space-y-8">
+                  <section className="space-y-3">
+                    <label className="block text-sm font-medium text-foreground">
+                      Name
+                    </label>
+                    <div>
+                      <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                        <input
+                          type="text"
+                          value={nameInput}
+                          onChange={(e) => {
+                            setNameInput(e.target.value);
+                            setRenameError(null);
+                          }}
+                          disabled={isRenaming}
+                          className={`flex-1 h-10 px-3 rounded-md border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 disabled:opacity-50 ${
+                            renameError
+                              ? "border-red-500/60 focus:ring-red-500/20"
+                              : "border-border focus:ring-foreground/10"
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleRename}
+                          disabled={!isDirty || isRenaming || !nameInput.trim()}
+                          className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isRenaming ? "Saving..." : "Save"}
+                        </button>
+                      </div>
+                      {renameError && (
+                        <p className="mt-1 text-[13px] text-red-500">
+                          {renameError}
+                        </p>
+                      )}
+                    </div>
+                  </section>
 
-            <ApiKeysSection orgUuid={activeOrg.uuid} />
-          </>
+                  <MembersSection
+                    orgUuid={activeOrg.uuid}
+                    orgName={activeOrg.name}
+                  />
+                </div>
+              ) : (
+                <TokensSection orgUuid={activeOrg.uuid} />
+              )}
+            </div>
+          </div>
         )}
       </div>
     </AppLayout>
@@ -411,7 +453,7 @@ function formatDate(iso: string): string {
   });
 }
 
-function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
+function TokensSection({ orgUuid }: { orgUuid: string }) {
   const accessToken = useAccessToken();
   const {
     apiKeys,
@@ -436,7 +478,7 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
       setKeyToRevoke(null);
     } catch (err) {
       refetch();
-      toast.error(parseBackendErrorMessage(err, "Failed to revoke API key"));
+      toast.error(parseBackendErrorMessage(err, "Failed to revoke token"));
     } finally {
       setIsRevoking(false);
     }
@@ -447,7 +489,7 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-base md:text-lg font-semibold text-foreground">
-            API keys
+            Tokens
           </h2>
           <p className="text-sm text-muted-foreground">
             Authenticate Calibrate from CI, like GitHub Actions
@@ -458,7 +500,7 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
           onClick={() => setIsCreateOpen(true)}
           className="shrink-0 h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer"
         >
-          Create key
+          Create token
         </button>
       </div>
 
@@ -469,7 +511,7 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
           <p className="px-4 py-6 text-[13px] text-red-500">{loadError}</p>
         ) : apiKeys.length === 0 ? (
           <p className="px-4 py-6 text-sm text-muted-foreground">
-            No API keys yet.
+            No tokens yet.
           </p>
         ) : (
           <ul className="divide-y divide-border">
@@ -495,7 +537,7 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
                 <button
                   type="button"
                   onClick={() => setKeyToRevoke(key)}
-                  title="Revoke this key"
+                  title="Revoke this token"
                   className="h-9 px-3 rounded-md text-xs font-medium text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors cursor-pointer"
                 >
                   Revoke
@@ -506,7 +548,7 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
         )}
       </div>
 
-      <CreateApiKeyDialog
+      <CreateTokenDialog
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         onCreate={createApiKey}
@@ -518,7 +560,7 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
           if (!isRevoking) setKeyToRevoke(null);
         }}
         onConfirm={handleRevoke}
-        title="Revoke API key"
+        title="Revoke token"
         message={
           keyToRevoke
             ? `Revoke "${keyToRevoke.name}"? Any CI or scripts using it will stop working immediately. This cannot be undone.`
