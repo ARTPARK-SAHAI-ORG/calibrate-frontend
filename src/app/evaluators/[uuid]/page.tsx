@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useAccessToken } from "@/hooks";
+import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
 import { NotFoundState } from "@/components/ui";
 import { useSidebarState } from "@/lib/sidebar";
@@ -173,7 +173,8 @@ function EvaluatorDetailPageInner() {
   const [evaluator, setEvaluator] = useState<EvaluatorDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [errorCode, setErrorCode] = useState<401 | 403 | 404 | null>(null);
+  const { errorCode, reset: resetErrorCode, captureResponse } =
+    usePageErrorState();
   const [settingLiveUuid, setSettingLiveUuid] = useState<string | null>(null);
   const [activeTab, setActiveTab] =
     useState<EvaluatorPageTab>(resolvedInitialTab);
@@ -241,7 +242,7 @@ function EvaluatorDetailPageInner() {
       try {
         setLoading(true);
         setError(null);
-        setErrorCode(null);
+        resetErrorCode();
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
         if (!backendUrl) throw new Error("BACKEND_URL is not set");
 
@@ -252,18 +253,7 @@ function EvaluatorDetailPageInner() {
           },
         });
 
-        if (res.status === 401) {
-          await signOut({ callbackUrl: "/login" });
-          return;
-        }
-        if (res.status === 404) {
-          setErrorCode(404);
-          return;
-        }
-        if (res.status === 403) {
-          setErrorCode(403);
-          return;
-        }
+        if (captureResponse(res)) return;
         if (!res.ok) throw new Error("Failed to fetch evaluator");
 
         const data: EvaluatorDetail = await res.json();
@@ -279,7 +269,7 @@ function EvaluatorDetailPageInner() {
     };
 
     fetchEvaluator();
-  }, [backendAccessToken, uuid]);
+  }, [backendAccessToken, uuid, resetErrorCode, captureResponse]);
 
   const isDefault = !evaluator?.owner_user_id;
 

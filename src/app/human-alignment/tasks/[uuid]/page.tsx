@@ -49,9 +49,8 @@ import {
 import { EmptyState, NotFoundState } from "@/components/ui/LoadingState";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
-import { useAccessToken } from "@/hooks";
+import { useAccessToken, usePageErrorState } from "@/hooks";
 import { apiClient } from "@/lib/api";
-import { getErrorStatusCode } from "@/lib/parseBackendError";
 import { useSidebarState } from "@/lib/sidebar";
 
 type Tab = "overview" | "items" | "jobs" | "runs";
@@ -1177,7 +1176,8 @@ function LabellingTaskPageInner() {
   const [task, setTask] = useState<LabellingTask | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [errorCode, setErrorCode] = useState<401 | 403 | 404 | null>(null);
+  const { errorCode, reset: resetErrorCode, captureError } =
+    usePageErrorState();
   /** False until the first task GET for this route finishes (avoids empty-state flash on Items/Jobs). */
   const [taskFetchCompleted, setTaskFetchCompleted] = useState(false);
 
@@ -1300,7 +1300,7 @@ function LabellingTaskPageInner() {
     if (!accessToken || !uuid) return;
     setLoading(true);
     setError(null);
-    setErrorCode(null);
+    resetErrorCode();
     try {
       const data = await apiClient<LabellingTask>(
         `/annotation-tasks/${uuid}`,
@@ -1308,11 +1308,7 @@ function LabellingTaskPageInner() {
       );
       setTask(data);
     } catch (err) {
-      const status = getErrorStatusCode(err);
-      if (status === 404 || status === 403) {
-        setErrorCode(status);
-        return;
-      }
+      if (captureError(err)) return;
       const msg = parseApiError(err, "Failed to load task");
       setError(msg);
       toast.error(msg);
@@ -1320,7 +1316,7 @@ function LabellingTaskPageInner() {
       setLoading(false);
       setTaskFetchCompleted(true);
     }
-  }, [accessToken, uuid]);
+  }, [accessToken, uuid, resetErrorCode, captureError]);
 
   // Reorder linked evaluators. `targetOrder` is the new desired ordered
   // list of uuids — must be the exact same set currently linked to the

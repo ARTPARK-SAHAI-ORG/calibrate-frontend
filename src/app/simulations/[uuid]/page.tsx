@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { useAccessToken, useVerifyConnection } from "@/hooks";
+import { useAccessToken, useVerifyConnection, usePageErrorState } from "@/hooks";
 import { toast } from "sonner";
 import { SpinnerIcon, CheckCircleIcon } from "@/components/icons";
 import { VerifyErrorPopover } from "@/components/VerifyErrorPopover";
@@ -86,7 +86,8 @@ export default function SimulationDetailPage() {
   const [simulation, setSimulation] = useState<SimulationData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [errorCode, setErrorCode] = useState<401 | 403 | 404 | null>(null);
+  const { errorCode, reset: resetErrorCode, captureResponse } =
+    usePageErrorState();
 
   // Form state
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
@@ -290,7 +291,7 @@ export default function SimulationDetailPage() {
       try {
         setIsLoading(true);
         setError(null);
-        setErrorCode(null);
+        resetErrorCode();
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
         if (!backendUrl) {
           throw new Error("BACKEND_URL environment variable is not set");
@@ -304,20 +305,7 @@ export default function SimulationDetailPage() {
           },
         });
 
-        if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
-          return;
-        }
-
-        if (response.status === 404) {
-          setErrorCode(404);
-          return;
-        }
-
-        if (response.status === 403) {
-          setErrorCode(403);
-          return;
-        }
+        if (captureResponse(response)) return;
 
         if (!response.ok) {
           throw new Error("Failed to fetch simulation");
@@ -390,7 +378,7 @@ export default function SimulationDetailPage() {
     if (uuid && backendAccessToken) {
       fetchSimulation();
     }
-  }, [uuid, backendAccessToken]);
+  }, [uuid, backendAccessToken, resetErrorCode, captureResponse]);
 
   // Fetch personas
   useEffect(() => {

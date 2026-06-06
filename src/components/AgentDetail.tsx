@@ -22,6 +22,7 @@ import {
   useOpenRouterModels,
   findModelInProviders,
   useVerifyConnection,
+  usePageErrorState,
 } from "@/hooks";
 import { SpinnerIcon, CheckCircleIcon } from "@/components/icons";
 import { NotFoundState } from "@/components/ui";
@@ -122,7 +123,8 @@ export function AgentDetail({
   const [agent, setAgent] = useState<AgentData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [errorCode, setErrorCode] = useState<401 | 403 | 404 | null>(null);
+  const { errorCode, reset: resetErrorCode, captureResponse } =
+    usePageErrorState();
   const [activeTab, setActiveTab] = useState<TabType>(getInitialTab);
 
   // Name editing dialog state
@@ -324,7 +326,7 @@ export function AgentDetail({
       try {
         setIsLoading(true);
         setError(null);
-        setErrorCode(null);
+        resetErrorCode();
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
         if (!backendUrl) {
           throw new Error("BACKEND_URL environment variable is not set");
@@ -338,20 +340,7 @@ export function AgentDetail({
           },
         });
 
-        if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
-          return;
-        }
-
-        if (response.status === 404) {
-          setErrorCode(404);
-          return;
-        }
-
-        if (response.status === 403) {
-          setErrorCode(403);
-          return;
-        }
+        if (captureResponse(response)) return;
 
         if (!response.ok) {
           throw new Error("Failed to fetch agent");
@@ -467,7 +456,7 @@ export function AgentDetail({
     if (agentUuid && backendAccessToken) {
       fetchAgent();
     }
-  }, [agentUuid, backendAccessToken]);
+  }, [agentUuid, backendAccessToken, resetErrorCode, captureResponse]);
 
   // When providers load asynchronously, resolve the display name if it was set to the raw ID
   useEffect(() => {

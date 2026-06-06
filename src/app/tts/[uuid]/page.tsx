@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
-import { useAccessToken } from "@/hooks";
+import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
 import {
   BackHeader,
@@ -179,7 +179,7 @@ export default function TTSEvaluationDetailPage() {
     useState<EvaluationResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [errorCode, setErrorCode] = useState<401 | 403 | 404 | null>(null);
+  const { errorCode, captureResponse } = usePageErrorState();
   // Retry flow for failed runs.
   const [retryConfirmOpen, setRetryConfirmOpen] = useState(false);
   const [retrying, setRetrying] = useState(false);
@@ -362,20 +362,7 @@ export default function TTSEvaluationDetailPage() {
           },
         });
 
-        if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
-          return;
-        }
-
-        if (response.status === 404) {
-          setErrorCode(404);
-          return;
-        }
-
-        if (response.status === 403) {
-          setErrorCode(403);
-          return;
-        }
+        if (captureResponse(response)) return;
 
         if (!response.ok) {
           throw new Error("Failed to fetch evaluation result");
@@ -433,7 +420,7 @@ export default function TTSEvaluationDetailPage() {
     };
 
     fetchResult();
-  }, [taskId, backendAccessToken]);
+  }, [taskId, backendAccessToken, captureResponse]);
 
   const pollTaskStatus = async (taskId: string, backendUrl: string) => {
     try {

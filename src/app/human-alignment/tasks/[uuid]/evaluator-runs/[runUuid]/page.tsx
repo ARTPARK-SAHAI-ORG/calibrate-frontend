@@ -5,9 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
 import { RetryIcon, NotFoundState } from "@/components/ui";
-import { useAccessToken } from "@/hooks";
+import { useAccessToken, usePageErrorState } from "@/hooks";
 import { apiClient } from "@/lib/api";
-import { getErrorStatusCode } from "@/lib/parseBackendError";
 import { useSidebarState } from "@/lib/sidebar";
 import { type Item } from "@/components/human-labelling/AnnotationJobView";
 import {
@@ -90,7 +89,8 @@ export default function EvaluatorRunDetailPage() {
   }, [job]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [errorCode, setErrorCode] = useState<401 | 403 | 404 | null>(null);
+  const { errorCode, reset: resetErrorCode, captureError } =
+    usePageErrorState();
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const startTime = useRef(Date.now());
@@ -123,13 +123,11 @@ export default function EvaluatorRunDetailPage() {
       );
       setJob(data);
       setError(null);
-      setErrorCode(null);
+      resetErrorCode();
       setLoading(false);
       return data;
     } catch (err) {
-      const status = getErrorStatusCode(err);
-      if (status === 404 || status === 403) {
-        setErrorCode(status);
+      if (captureError(err)) {
         setLoading(false);
         return null;
       }
@@ -137,7 +135,7 @@ export default function EvaluatorRunDetailPage() {
       setLoading(false);
       return null;
     }
-  }, [accessToken, taskUuid, runUuid]);
+  }, [accessToken, taskUuid, runUuid, resetErrorCode, captureError]);
 
   // Fetch the task for type (and fallback item list when the job has no `items[]`).
   useEffect(() => {

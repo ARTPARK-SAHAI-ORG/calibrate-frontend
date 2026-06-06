@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { useAccessToken, useMaxRowsPerEval } from "@/hooks";
+import { useAccessToken, useMaxRowsPerEval, usePageErrorState } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
 import { NotFoundState } from "@/components/ui";
-import { getErrorStatusCode } from "@/lib/parseBackendError";
 import { useSidebarState } from "@/lib/sidebar";
 import {
   getDataset,
@@ -35,7 +34,8 @@ export default function DatasetDetailPage() {
   const [dataset, setDataset] = useState<DatasetDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [errorCode, setErrorCode] = useState<401 | 403 | 404 | null>(null);
+  const { errorCode, reset: resetErrorCode, captureError } =
+    usePageErrorState();
   const [isSaving, setIsSaving] = useState(false);
   const [hasPendingChanges, setHasPendingChanges] = useState(false);
 
@@ -54,20 +54,16 @@ export default function DatasetDetailPage() {
     try {
       setIsLoading(true);
       setError(null);
-      setErrorCode(null);
+      resetErrorCode();
       const data = await getDataset(accessToken, datasetId);
       setDataset(data);
     } catch (err) {
-      const status = getErrorStatusCode(err);
-      if (status === 404 || status === 403) {
-        setErrorCode(status);
-        return;
-      }
+      if (captureError(err)) return;
       setError(err instanceof Error ? err.message : "Failed to load dataset");
     } finally {
       setIsLoading(false);
     }
-  }, [accessToken, datasetId]);
+  }, [accessToken, datasetId, resetErrorCode, captureError]);
 
   useEffect(() => {
     fetchDataset();

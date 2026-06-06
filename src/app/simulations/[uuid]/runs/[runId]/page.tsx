@@ -10,7 +10,7 @@ import React, {
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { useAccessToken } from "@/hooks";
+import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout, useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
 import { NotFoundState } from "@/components/ui";
@@ -122,7 +122,7 @@ export default function SimulationRunPage() {
     useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [errorCode, setErrorCode] = useState<401 | 403 | 404 | null>(null);
+  const { errorCode, captureResponse } = usePageErrorState();
   const [isAborting, setIsAborting] = useState(false);
   const [transcriptDialogOpen, setTranscriptDialogOpen] = useState(false);
 
@@ -308,20 +308,7 @@ export default function SimulationRunPage() {
           },
         });
 
-        if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
-          return;
-        }
-
-        if (response.status === 404) {
-          setErrorCode(404);
-          return;
-        }
-
-        if (response.status === 403) {
-          setErrorCode(403);
-          return;
-        }
+        if (captureResponse(response)) return;
 
         if (!response.ok) {
           throw new Error("Failed to fetch run data");
@@ -368,7 +355,7 @@ export default function SimulationRunPage() {
         clearInterval(pollInterval);
       }
     };
-  }, [runId, backendAccessToken]);
+  }, [runId, backendAccessToken, captureResponse]);
 
   const getTypeBadgeClass = (type: string) => {
     switch (type.toLowerCase()) {
