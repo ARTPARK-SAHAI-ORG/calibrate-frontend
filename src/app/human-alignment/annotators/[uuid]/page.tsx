@@ -12,7 +12,8 @@ import {
   YAxis,
 } from "recharts";
 import { AppLayout } from "@/components/AppLayout";
-import { EmptyState, NotFoundState } from "@/components/ui/LoadingState";
+import { NotFoundPage } from "@/components/NotFoundPage";
+import { EmptyState } from "@/components/ui/LoadingState";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
@@ -238,14 +239,12 @@ function AnnotatorDetailPageInner() {
 
   if (errorCode) {
     return (
-      <AppLayout
+      <NotFoundPage
         activeItem="human-alignment"
-        onItemChange={(id) => router.push(`/${id}`)}
+        errorCode={errorCode}
         sidebarOpen={sidebarOpen}
         onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
-      >
-        <NotFoundState errorCode={errorCode} />
-      </AppLayout>
+      />
     );
   }
 

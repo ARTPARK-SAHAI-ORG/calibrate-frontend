@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
-import { RetryIcon, NotFoundState } from "@/components/ui";
+import { RetryIcon } from "@/components/ui";
+import { NotFoundPage } from "@/components/NotFoundPage";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
@@ -466,15 +467,13 @@ export default function EvaluatorRunDetailPage() {
 
   if (errorCode) {
     return (
-      <AppLayout
+      <NotFoundPage
         activeItem="human-alignment"
-        onItemChange={(id) => router.push(`/${id}`)}
+        errorCode={errorCode}
         sidebarOpen={sidebarOpen}
         onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
         customHeader={customHeader}
-      >
-        <NotFoundState errorCode={errorCode} />
-      </AppLayout>
+      />
     );
   }
 

@@ -46,7 +46,8 @@ import {
   AgreementStatCard,
   agreementColor,
 } from "@/components/human-labelling/AgreementStatCard";
-import { EmptyState, NotFoundState } from "@/components/ui/LoadingState";
+import { EmptyState } from "@/components/ui/LoadingState";
+import { NotFoundPage } from "@/components/NotFoundPage";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
 import { useAccessToken, usePageErrorState } from "@/hooks";
@@ -2256,15 +2257,13 @@ function LabellingTaskPageInner() {
 
   if (errorCode) {
     return (
-      <AppLayout
+      <NotFoundPage
         activeItem="human-alignment"
-        onItemChange={(id) => router.push(`/${id}`)}
+        errorCode={errorCode}
         sidebarOpen={sidebarOpen}
         onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
         customHeader={customHeader}
-      >
-        <NotFoundState errorCode={errorCode} />
-      </AppLayout>
+      />
     );
   }
 
