@@ -622,21 +622,17 @@ export default function SimulationDetailPage() {
           />
         </svg>
       </button>
-      <span
-        className={`text-base font-semibold text-foreground ${
-          !isLoading && simulation ? "cursor-pointer hover:opacity-70 transition-opacity" : ""
-        }`}
-        onClick={!isLoading && simulation ? handleOpenEditName : undefined}
-        title={!isLoading && simulation ? "Click to edit name" : undefined}
-      >
-        {errorCode
-          ? errorCode === 404
-            ? "Not Found"
-            : "Access Denied"
-          : isLoading
-            ? "Loading..."
-            : simulation?.name || "Simulation"}
-      </span>
+      {!errorCode && (
+        <span
+          className={`text-base font-semibold text-foreground ${
+            !isLoading && simulation ? "cursor-pointer hover:opacity-70 transition-opacity" : ""
+          }`}
+          onClick={!isLoading && simulation ? handleOpenEditName : undefined}
+          title={!isLoading && simulation ? "Click to edit name" : undefined}
+        >
+          {isLoading ? "Loading..." : simulation?.name || "Simulation"}
+        </span>
+      )}
     </div>
   );
 

@@ -82,7 +82,9 @@ export function NotFoundState({
       <h2 className="text-xl md:text-2xl font-semibold text-foreground mt-4">
         {title}
       </h2>
-      <p className="text-base text-muted-foreground mt-2 max-w-md">{message}</p>
+      <p className="text-base text-muted-foreground mt-2 max-w-md md:max-w-none">
+        {message}
+      </p>
       <button
         onClick={() => router.push("/agents")}
         className="mt-6 h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"

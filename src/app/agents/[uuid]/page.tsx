@@ -66,11 +66,7 @@ export default function AgentDetailPage() {
           />
         </svg>
       </button>
-      {headerState?.hasError ? (
-        <span className="text-sm md:text-base font-semibold text-foreground truncate">
-          {headerState.agentName}
-        </span>
-      ) : (
+      {!headerState?.hasError && (
         <span
           className="text-sm md:text-base font-semibold text-foreground cursor-pointer hover:opacity-70 transition-opacity truncate"
           onClick={() => headerState?.onEditName()}

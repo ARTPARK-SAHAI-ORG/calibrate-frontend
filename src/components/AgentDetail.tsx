@@ -908,11 +908,7 @@ export function AgentDetail({
   useEffect(() => {
     if (onHeaderStateChange) {
       onHeaderStateChange({
-        agentName: errorCode
-          ? errorCode === 404
-            ? "Not Found"
-            : "Access Denied"
-          : agent?.name || "Loading...",
+        agentName: agent?.name || "Loading...",
         activeTab,
         isLoading,
         hasError: errorCode !== null,
