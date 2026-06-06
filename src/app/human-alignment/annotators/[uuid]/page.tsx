@@ -12,9 +12,10 @@ import {
   YAxis,
 } from "recharts";
 import { AppLayout } from "@/components/AppLayout";
-import { EmptyState } from "@/components/ui/LoadingState";
+import { EmptyState, NotFoundState } from "@/components/ui/LoadingState";
 import { useAccessToken } from "@/hooks";
 import { apiClient } from "@/lib/api";
+import { getErrorStatusCode } from "@/lib/parseBackendError";
 import { useSidebarState } from "@/lib/sidebar";
 
 type Tab = "overview" | "jobs";
@@ -134,6 +135,7 @@ function AnnotatorDetailPageInner() {
   const [detail, setDetail] = useState<AnnotatorDetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<401 | 403 | 404 | null>(null);
   /** False until the first detail request for this annotator finishes (avoids agreement empty-state flash). */
   const [detailFetchCompleted, setDetailFetchCompleted] = useState(false);
 
@@ -157,6 +159,7 @@ function AnnotatorDetailPageInner() {
     if (!accessToken || !uuid) return;
     setDetailLoading(true);
     setDetailError(null);
+    setErrorCode(null);
     try {
       const query = `?bucket=${DEFAULT_BUCKET}&days=${DEFAULT_DAYS}`;
       const data = await apiClient<AnnotatorDetailResponse>(
@@ -165,6 +168,11 @@ function AnnotatorDetailPageInner() {
       );
       setDetail(data);
     } catch (err) {
+      const status = getErrorStatusCode(err);
+      if (status === 404 || status === 403) {
+        setErrorCode(status);
+        return;
+      }
       setDetailError(parseApiError(err, "Failed to load annotator"));
     } finally {
       setDetailLoading(false);
@@ -231,6 +239,19 @@ function AnnotatorDetailPageInner() {
   };
 
   const jobsCount = stats?.jobs_count ?? jobs.length;
+
+  if (errorCode) {
+    return (
+      <AppLayout
+        activeItem="human-alignment"
+        onItemChange={(id) => router.push(`/${id}`)}
+        sidebarOpen={sidebarOpen}
+        onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+      >
+        <NotFoundState errorCode={errorCode} />
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout

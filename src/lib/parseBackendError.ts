@@ -157,6 +157,19 @@ export function parseBackendErrorMessage(
   return readDetail(parsed) ?? rawBody;
 }
 
+/**
+ * Extracts the HTTP status code from an Error thrown by `apiClient` (whose
+ * message follows `"Request failed: <status> - <body>"`). Returns null when
+ * the error doesn't carry a parseable status — e.g. a network failure or a
+ * non-apiClient error. Use it to route page-load failures to the shared
+ * `NotFoundState` (404 / 403) vs. a generic retry state.
+ */
+export function getErrorStatusCode(err: unknown): number | null {
+  if (!(err instanceof Error)) return null;
+  const match = err.message.match(/Request failed:\s*(\d+)/);
+  return match ? Number(match[1]) : null;
+}
+
 function readDetail(body: DetailObject): string | undefined {
   const detail = body?.detail;
   if (typeof detail === "string" && detail.trim().length > 0) {

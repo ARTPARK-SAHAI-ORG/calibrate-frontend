@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import { useAccessToken } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
+import { NotFoundState } from "@/components/ui";
 import { useSidebarState } from "@/lib/sidebar";
 import {
   DefaultPill,
@@ -172,6 +173,7 @@ function EvaluatorDetailPageInner() {
   const [evaluator, setEvaluator] = useState<EvaluatorDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<401 | 403 | 404 | null>(null);
   const [settingLiveUuid, setSettingLiveUuid] = useState<string | null>(null);
   const [activeTab, setActiveTab] =
     useState<EvaluatorPageTab>(resolvedInitialTab);
@@ -239,6 +241,7 @@ function EvaluatorDetailPageInner() {
       try {
         setLoading(true);
         setError(null);
+        setErrorCode(null);
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
         if (!backendUrl) throw new Error("BACKEND_URL is not set");
 
@@ -254,7 +257,12 @@ function EvaluatorDetailPageInner() {
           return;
         }
         if (res.status === 404) {
-          throw new Error("Evaluator not found");
+          setErrorCode(404);
+          return;
+        }
+        if (res.status === 403) {
+          setErrorCode(403);
+          return;
         }
         if (!res.ok) throw new Error("Failed to fetch evaluator");
 
@@ -672,7 +680,9 @@ function EvaluatorDetailPageInner() {
           Back to evaluators
         </button>
 
-        {loading ? (
+        {errorCode ? (
+          <NotFoundState errorCode={errorCode} />
+        ) : loading ? (
           <div className="flex items-center justify-center gap-3 py-8">
             <svg
               className="w-5 h-5 animate-spin"

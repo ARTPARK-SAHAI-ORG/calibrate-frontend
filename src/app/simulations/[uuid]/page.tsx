@@ -12,6 +12,7 @@ import {
   type MessageRow,
 } from "@/components/VerifyRequestPreviewDialog";
 import { AppLayout } from "@/components/AppLayout";
+import { NotFoundState } from "@/components/ui";
 import { Agent } from "@/components/AgentPicker";
 import { PickerItem } from "@/components/MultiSelectPicker";
 import {
@@ -85,6 +86,7 @@ export default function SimulationDetailPage() {
   const [simulation, setSimulation] = useState<SimulationData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<401 | 403 | 404 | null>(null);
 
   // Form state
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
@@ -288,6 +290,7 @@ export default function SimulationDetailPage() {
       try {
         setIsLoading(true);
         setError(null);
+        setErrorCode(null);
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
         if (!backendUrl) {
           throw new Error("BACKEND_URL environment variable is not set");
@@ -303,6 +306,16 @@ export default function SimulationDetailPage() {
 
         if (response.status === 401) {
           await signOut({ callbackUrl: "/login" });
+          return;
+        }
+
+        if (response.status === 404) {
+          setErrorCode(404);
+          return;
+        }
+
+        if (response.status === 403) {
+          setErrorCode(403);
           return;
         }
 
@@ -628,7 +641,13 @@ export default function SimulationDetailPage() {
         onClick={!isLoading && simulation ? handleOpenEditName : undefined}
         title={!isLoading && simulation ? "Click to edit name" : undefined}
       >
-        {isLoading ? "Loading..." : simulation?.name || "Simulation"}
+        {errorCode
+          ? errorCode === 404
+            ? "Not Found"
+            : "Access Denied"
+          : isLoading
+            ? "Loading..."
+            : simulation?.name || "Simulation"}
       </span>
     </div>
   );
@@ -790,7 +809,9 @@ export default function SimulationDetailPage() {
     >
       <div className="space-y-4 md:space-y-6 py-4 md:py-6">
         {/* Content */}
-        {isLoading ? (
+        {errorCode ? (
+          <NotFoundState errorCode={errorCode} />
+        ) : isLoading ? (
           <div className="flex items-center justify-center gap-3 py-8">
             <SpinnerIcon className="w-5 h-5 animate-spin" />
           </div>

@@ -66,19 +66,25 @@ export default function AgentDetailPage() {
           />
         </svg>
       </button>
-      <span
-        className="text-sm md:text-base font-semibold text-foreground cursor-pointer hover:opacity-70 transition-opacity truncate"
-        onClick={() => headerState?.onEditName()}
-        title="Click to edit name"
-      >
-        {headerState?.agentName || "Loading..."}
-      </span>
+      {headerState?.hasError ? (
+        <span className="text-sm md:text-base font-semibold text-foreground truncate">
+          {headerState.agentName}
+        </span>
+      ) : (
+        <span
+          className="text-sm md:text-base font-semibold text-foreground cursor-pointer hover:opacity-70 transition-opacity truncate"
+          onClick={() => headerState?.onEditName()}
+          title="Click to edit name"
+        >
+          {headerState?.agentName || "Loading..."}
+        </span>
+      )}
     </div>
   );
 
   // Header actions: Verify button (for unverified connection agents) + Save button
   const headerActions =
-    headerState && !headerState.isLoading ? (
+    headerState && !headerState.isLoading && !headerState.hasError ? (
       <div className="flex items-center gap-2 mr-1 md:mr-2">
         {headerState.isConnectionUnverified && headerState.activeTab !== "connection" && (
           <div className="relative">

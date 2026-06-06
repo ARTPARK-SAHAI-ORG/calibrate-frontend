@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
-import { RetryIcon } from "@/components/ui";
+import { RetryIcon, NotFoundState } from "@/components/ui";
 import { useAccessToken } from "@/hooks";
 import { apiClient } from "@/lib/api";
+import { getErrorStatusCode } from "@/lib/parseBackendError";
 import { useSidebarState } from "@/lib/sidebar";
 import { type Item } from "@/components/human-labelling/AnnotationJobView";
 import {
@@ -89,6 +90,7 @@ export default function EvaluatorRunDetailPage() {
   }, [job]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<401 | 403 | 404 | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const startTime = useRef(Date.now());
@@ -121,9 +123,16 @@ export default function EvaluatorRunDetailPage() {
       );
       setJob(data);
       setError(null);
+      setErrorCode(null);
       setLoading(false);
       return data;
     } catch (err) {
+      const status = getErrorStatusCode(err);
+      if (status === 404 || status === 403) {
+        setErrorCode(status);
+        setLoading(false);
+        return null;
+      }
       setError(parseApiError(err, "Failed to load run"));
       setLoading(false);
       return null;
@@ -456,6 +465,20 @@ export default function EvaluatorRunDetailPage() {
       Back to evaluation runs
     </button>
   );
+
+  if (errorCode) {
+    return (
+      <AppLayout
+        activeItem="human-alignment"
+        onItemChange={(id) => router.push(`/${id}`)}
+        sidebarOpen={sidebarOpen}
+        onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+        customHeader={customHeader}
+      >
+        <NotFoundState errorCode={errorCode} />
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout

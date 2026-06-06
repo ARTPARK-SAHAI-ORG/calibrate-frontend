@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import { SpinnerIcon } from "@/components/icons";
 
 type LoadingStateProps = {
@@ -48,24 +49,45 @@ type NotFoundStateProps = {
   errorCode?: 401 | 403 | 404;
 };
 
-const errorMessages: Record<number, string> = {
-  401: "You do not have the permission to access this page",
-  403: "You do not have the permission to access this page",
-  404: "Not found",
+const errorContent: Record<number, { title: string; message: string }> = {
+  401: {
+    title: "Access Denied",
+    message: "You don't have permission to access this page.",
+  },
+  403: {
+    title: "Access Denied",
+    message: "You don't have permission to access this page.",
+  },
+  404: {
+    title: "Not Found",
+    message: "The page you're looking for doesn't exist or may have been moved.",
+  },
 };
 
 export function NotFoundState({
   className = "",
   errorCode = 404,
 }: NotFoundStateProps) {
-  const message = errorMessages[errorCode] || "Not found";
+  const router = useRouter();
+  const { title, message } = errorContent[errorCode] || errorContent[404];
 
   return (
     <div
-      className={`flex flex-col items-center justify-center py-20 ${className}`}
+      className={`flex flex-col items-center justify-center py-20 text-center px-4 ${className}`}
     >
-      <h1 className="text-8xl font-bold text-muted-foreground">{errorCode}</h1>
-      <p className="text-lg text-muted-foreground mt-2">{message}</p>
+      <h1 className="text-7xl md:text-8xl font-bold text-muted-foreground">
+        {errorCode}
+      </h1>
+      <h2 className="text-xl md:text-2xl font-semibold text-foreground mt-4">
+        {title}
+      </h2>
+      <p className="text-base text-muted-foreground mt-2 max-w-md">{message}</p>
+      <button
+        onClick={() => router.push("/agents")}
+        className="mt-6 h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+      >
+        Go to home
+      </button>
     </div>
   );
 }

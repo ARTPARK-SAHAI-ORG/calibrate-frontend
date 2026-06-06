@@ -24,6 +24,7 @@ import {
   useVerifyConnection,
 } from "@/hooks";
 import { SpinnerIcon, CheckCircleIcon } from "@/components/icons";
+import { NotFoundState } from "@/components/ui";
 import { VerifyErrorPopover } from "@/components/VerifyErrorPopover";
 import {
   VerifyRequestPreviewDialog,
@@ -36,6 +37,7 @@ export type AgentDetailHeaderState = {
   agentName: string;
   activeTab: string;
   isLoading: boolean;
+  hasError: boolean;
   isSaving: boolean;
   onSave: () => void;
   onEditName: () => void;
@@ -120,6 +122,7 @@ export function AgentDetail({
   const [agent, setAgent] = useState<AgentData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<401 | 403 | 404 | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>(getInitialTab);
 
   // Name editing dialog state
@@ -321,6 +324,7 @@ export function AgentDetail({
       try {
         setIsLoading(true);
         setError(null);
+        setErrorCode(null);
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
         if (!backendUrl) {
           throw new Error("BACKEND_URL environment variable is not set");
@@ -336,6 +340,16 @@ export function AgentDetail({
 
         if (response.status === 401) {
           await signOut({ callbackUrl: "/login" });
+          return;
+        }
+
+        if (response.status === 404) {
+          setErrorCode(404);
+          return;
+        }
+
+        if (response.status === 403) {
+          setErrorCode(403);
           return;
         }
 
@@ -905,9 +919,14 @@ export function AgentDetail({
   useEffect(() => {
     if (onHeaderStateChange) {
       onHeaderStateChange({
-        agentName: agent?.name || "Loading...",
+        agentName: errorCode
+          ? errorCode === 404
+            ? "Not Found"
+            : "Access Denied"
+          : agent?.name || "Loading...",
         activeTab,
         isLoading,
+        hasError: errorCode !== null,
         isSaving,
         onSave: () => saveRef.current(),
         onEditName: handleOpenEditNameDialog,
@@ -921,6 +940,7 @@ export function AgentDetail({
     }
   }, [
     agent?.name,
+    errorCode,
     activeTab,
     isLoading,
     isSaving,
@@ -930,6 +950,10 @@ export function AgentDetail({
     verify.verifyError,
     verify.verifySampleResponse,
   ]);
+
+  if (errorCode) {
+    return <NotFoundState errorCode={errorCode} />;
+  }
 
   if (isLoading) {
     return (
