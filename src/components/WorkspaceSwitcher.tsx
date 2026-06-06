@@ -18,6 +18,25 @@ type WorkspaceSwitcherProps = {
   collapsed: boolean;
 };
 
+// Root sidebar routes — mirrors the nav item ids in AppLayout. On a workspace
+// switch we drop any deep/detail route and land on the list page for the
+// section the user was in (e.g. /simulations/<id>/runs/<run> -> /simulations),
+// since the specific resource belongs to the old workspace and won't exist in
+// the new one. Sections without a list page (e.g. /datasets/<id>) fall back to
+// /agents, a known-good page for any workspace.
+const ROOT_SIDEBAR_ROUTES = new Set([
+  "agents",
+  "tools",
+  "evaluators",
+  "human-alignment",
+  "stt",
+  "tests",
+  "tts",
+  "personas",
+  "scenarios",
+  "simulations",
+]);
+
 function workspaceInitial(name: string): string {
   const trimmed = name.trim();
   return trimmed ? trimmed[0].toUpperCase() : "W";
@@ -101,12 +120,17 @@ export function WorkspaceSwitcher({ collapsed }: WorkspaceSwitcherProps) {
   const navigateAfterSwitch = () => {
     // Stay on workspace settings if that's where the user is — switching
     // workspaces from there should just reload settings for the new one.
-    // Everywhere else, land on /agents (a known-good page for any workspace).
-    if (window.location.pathname === "/workspace-settings") {
+    const path = window.location.pathname;
+    if (path === "/workspace-settings") {
       window.location.reload();
-    } else {
-      window.location.assign("/agents");
+      return;
     }
+    // Land on the root sidebar page for the section the user is in, so e.g.
+    // a tools page stays on tools and a simulation run page reopens the
+    // simulations list. Unknown sections fall back to /agents.
+    const section = path.split("/")[1] ?? "";
+    const target = ROOT_SIDEBAR_ROUTES.has(section) ? `/${section}` : "/agents";
+    window.location.assign(target);
   };
 
   const handleSelect = (uuid: string) => {
