@@ -641,18 +641,41 @@ function EvaluatorDetailPageInner() {
     return d.toLocaleString();
   };
 
+  const customHeader = (
+    <button
+      onClick={() => router.back()}
+      className="inline-flex items-center gap-1.5 px-2 h-8 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+    >
+      <svg
+        className="w-4 h-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M15 19l-7-7 7-7"
+        />
+      </svg>
+      Back to evaluators
+    </button>
+  );
+
   return (
     <AppLayout
       activeItem="evaluators"
       onItemChange={(itemId) => router.push(`/${itemId}`)}
       sidebarOpen={sidebarOpen}
       onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+      customHeader={customHeader}
     >
       <div className="space-y-4 md:space-y-6 py-4 md:py-6">
-        {/* Back */}
+        {/* Mobile-only back button — AppLayout hides `customHeader` below md. */}
         <button
           onClick={() => router.back()}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          className="md:hidden inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         >
           <svg
             className="w-4 h-4"
