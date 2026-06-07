@@ -209,6 +209,22 @@ const buildExpectedParamsFromToolConfig = (
   return { params, allowCustom };
 };
 
+// Pick the parameters to pre-select when a tool is first added. Optional params
+// start out unselected (offered as add-back chips); only required ones are
+// shown. If a level has no required params at all, the first one is selected so
+// the form isn't empty. Applied recursively to nested object properties.
+const defaultSelectedParams = (
+  params: ExpectedParam[],
+): ExpectedParam[] => {
+  const required = params.filter((p) => p.required);
+  const chosen = required.length > 0 ? required : params.slice(0, 1);
+  return chosen.map((p) =>
+    p.isObject
+      ? { ...p, properties: defaultSelectedParams(p.properties || []) }
+      : p,
+  );
+};
+
 // Deep-clone an expected-parameter node, assigning fresh ids throughout so the
 // result can be safely re-inserted into the tree (used when re-adding a
 // previously-removed optional schema parameter).
@@ -462,6 +478,80 @@ const hasInvalidExpectedParams = (params: ExpectedParam[]): boolean => {
   }
   return false;
 };
+
+// Add-back chips for removed optional params. Clamped to a single row; when the
+// chips overflow that row a "View more" / "View less" toggle reveals the rest
+// (mirrors the evaluator-page prompt expander). Renders nothing when there's
+// nothing to add back.
+function AddBackChips({
+  missing,
+  onAdd,
+}: {
+  missing: ExpectedParam[];
+  onAdd: (param: ExpectedParam) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [overflowing, setOverflowing] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setOverflowing(el.scrollHeight > el.clientHeight + 1);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [missing.length, expanded]);
+  if (missing.length === 0) return null;
+  return (
+    <div className="w-full space-y-2">
+      <div
+        ref={ref}
+        className={`flex flex-wrap items-center gap-2 ${
+          expanded ? "" : "max-h-8 overflow-hidden"
+        }`}
+      >
+        {missing.map((s) => (
+          <button
+            key={s.name}
+            type="button"
+            onClick={() => onAdd(s)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border border-dashed border-border bg-background text-muted-foreground hover:text-foreground hover:border-foreground transition-colors cursor-pointer"
+          >
+            <span className="text-sm leading-none">+</span>
+            {s.name}
+          </button>
+        ))}
+      </div>
+      {(overflowing || expanded) && (
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-border bg-background text-foreground hover:bg-muted transition-colors cursor-pointer"
+        >
+          {expanded ? "View less" : "View more"}
+          <svg
+            className="w-3.5 h-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d={
+                expanded
+                  ? "M4.5 15.75l7.5-7.5 7.5 7.5"
+                  : "M19.5 8.25l-7.5 7.5-7.5-7.5"
+              }
+            />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
 
 export type TestConfig = {
   history: Array<{
@@ -959,6 +1049,16 @@ export function AddTestDialog({
     null,
   );
   const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
+  // Per-tool "edit parameters as raw JSON" mode. Keyed by tool id. While in
+  // JSON mode we keep an editable text buffer and a parse-error message; valid
+  // JSON flows live into `expectedParameters` (the single source of truth).
+  const [jsonModeToolIds, setJsonModeToolIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [toolJsonText, setToolJsonText] = useState<Record<string, string>>({});
+  const [toolJsonError, setToolJsonError] = useState<
+    Record<string, string | null>
+  >({});
   // Collapsed object-parameter rows (keyed by the param's unique id). Objects
   // default to expanded; the user can fold them to tame deeply nested schemas.
   const [collapsedParamIds, setCollapsedParamIds] = useState<Set<string>>(
@@ -1498,7 +1598,7 @@ export function AddTestDialog({
       acceptAnyParameterValues: isWebhook,
       isInbuilt: false,
       allowCustomParameters: allowCustom,
-      expectedParameters: params,
+      expectedParameters: defaultSelectedParams(params),
     };
 
     setSelectedTools([...selectedTools, newTool]);
@@ -1521,6 +1621,60 @@ export function AddTestDialog({
 
   const removeTool = (toolId: string) => {
     setSelectedTools(selectedTools.filter((t) => t.id !== toolId));
+  };
+
+  // ---- Per-tool JSON editing of expected parameters ----
+  // Switch a tool's parameter editor into raw-JSON mode, seeding the buffer
+  // from the current expected `arguments`.
+  const enterToolJsonMode = (tool: SelectedToolConfig) => {
+    const args = buildArgsFromExpectedParams(tool.expectedParameters);
+    setToolJsonText((prev) => ({
+      ...prev,
+      [tool.id]: JSON.stringify(args, null, 2),
+    }));
+    setToolJsonError((prev) => ({ ...prev, [tool.id]: null }));
+    setJsonModeToolIds((prev) => new Set(prev).add(tool.id));
+  };
+
+  const exitToolJsonMode = (toolId: string) => {
+    setJsonModeToolIds((prev) => {
+      const next = new Set(prev);
+      next.delete(toolId);
+      return next;
+    });
+    setToolJsonError((prev) => ({ ...prev, [toolId]: null }));
+  };
+
+  // Live-sync raw JSON into the expected-parameter tree. Valid JSON (an object
+  // of param → value / spec) is overlaid onto the tool's schema; invalid JSON
+  // surfaces an error and leaves the last good parameters untouched.
+  const handleToolJsonChange = (tool: SelectedToolConfig, text: string) => {
+    setToolJsonText((prev) => ({ ...prev, [tool.id]: text }));
+    let parsed: any;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      setToolJsonError((prev) => ({
+        ...prev,
+        [tool.id]: `Invalid JSON: ${(e as Error).message}`,
+      }));
+      return;
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      setToolJsonError((prev) => ({
+        ...prev,
+        [tool.id]: "The top-level value must be a JSON object of parameters.",
+      }));
+      return;
+    }
+    setToolJsonError((prev) => ({ ...prev, [tool.id]: null }));
+    const schemaParams = getExpectedParamsForTool(tool.id, tool.name).params;
+    const rebuilt = overlayArgsOntoParams(schemaParams, parsed);
+    setSelectedTools((prev) =>
+      prev.map((t) =>
+        t.id === tool.id ? { ...t, expectedParameters: rebuilt } : t,
+      ),
+    );
   };
 
   // Rebuild the expected-parameter tree for a selected tool from its schema.
@@ -1547,10 +1701,9 @@ export function AddTestDialog({
           updates.acceptAnyParameterValues === false &&
           tool.acceptAnyParameterValues === true
         ) {
-          updatedTool.expectedParameters = getExpectedParamsForTool(
-            tool.id,
-            tool.name,
-          ).params;
+          updatedTool.expectedParameters = defaultSelectedParams(
+            getExpectedParamsForTool(tool.id, tool.name).params,
+          );
         }
 
         // If changing to should-call and params are empty and acceptAny is off
@@ -1560,10 +1713,9 @@ export function AddTestDialog({
           !updatedTool.acceptAnyParameterValues &&
           updatedTool.expectedParameters.length === 0
         ) {
-          updatedTool.expectedParameters = getExpectedParamsForTool(
-            tool.id,
-            tool.name,
-          ).params;
+          updatedTool.expectedParameters = defaultSelectedParams(
+            getExpectedParamsForTool(tool.id, tool.name).params,
+          );
         }
 
         return updatedTool;
@@ -1842,25 +1994,15 @@ export function AddTestDialog({
   ): React.ReactNode => {
     const currentNames = new Set(currentParams.map((p) => p.name));
     const missing = schemaLevelParams.filter((s) => !currentNames.has(s.name));
-    if (missing.length === 0) return null;
     return (
-      <div className="flex flex-wrap items-center gap-2">
-        {missing.map((s) => (
-          <button
-            key={s.name}
-            type="button"
-            onClick={() =>
-              mutateToolParams(toolId, (params) =>
-                addExpParamAtPath(params, parentPath, cloneExpParamFresh(s)),
-              )
-            }
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border border-dashed border-border bg-background text-muted-foreground hover:text-foreground hover:border-foreground transition-colors cursor-pointer"
-          >
-            <span className="text-sm leading-none">+</span>
-            {s.name}
-          </button>
-        ))}
-      </div>
+      <AddBackChips
+        missing={missing}
+        onAdd={(s) =>
+          mutateToolParams(toolId, (params) =>
+            addExpParamAtPath(params, parentPath, cloneExpParamFresh(s)),
+          )
+        }
+      />
     );
   };
 
@@ -3155,44 +3297,107 @@ export function AddTestDialog({
                                   tool.allowCustomParameters ||
                                   toolSchemaParams.length > 0) && (
                                   <div className="mt-4">
-                                    <div className="mb-3">
+                                    <div className="mb-3 flex items-start justify-between gap-2">
                                       <p className="text-xs text-muted-foreground mt-1">
                                         {tool.allowCustomParameters &&
                                         tool.expectedParameters.length === 0
                                           ? "Add the parameter names you expect the agent to extract and their expected values"
                                           : "Configure how each parameter for the tool call should be evaluated"}
                                       </p>
-                                    </div>
-
-                                    {tool.expectedParameters.length > 0 && (
-                                      <div className="space-y-3">
-                                        {renderExpectedParams(
-                                          tool.id,
-                                          tool.expectedParameters,
-                                          [],
-                                          toolSchemaParams,
-                                        )}
-                                      </div>
-                                    )}
-
-                                    <div className="mt-3 flex flex-wrap items-center gap-3">
-                                      {tool.allowCustomParameters && (
+                                      {/* Form ⇆ JSON toggle for this tool's
+                                          expected parameters. */}
+                                      <div className="inline-flex flex-shrink-0 items-center gap-0.5 rounded-lg bg-background border border-border p-0.5">
                                         <button
+                                          type="button"
                                           onClick={() =>
-                                            addCustomExpectedParam(tool.id, [])
+                                            exitToolJsonMode(tool.id)
                                           }
-                                          className="h-9 px-4 rounded-lg text-sm font-medium bg-background text-foreground border border-border hover:bg-muted transition-colors cursor-pointer"
+                                          className={`h-7 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                                            jsonModeToolIds.has(tool.id)
+                                              ? "text-muted-foreground hover:text-foreground"
+                                              : "bg-foreground text-background"
+                                          }`}
                                         >
-                                          + Add parameter
+                                          Form
                                         </button>
-                                      )}
-                                      {renderAddBackChips(
-                                        tool.id,
-                                        [],
-                                        toolSchemaParams,
-                                        tool.expectedParameters,
-                                      )}
+                                        <button
+                                          type="button"
+                                          onClick={() => enterToolJsonMode(tool)}
+                                          className={`h-7 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                                            jsonModeToolIds.has(tool.id)
+                                              ? "bg-foreground text-background"
+                                              : "text-muted-foreground hover:text-foreground"
+                                          }`}
+                                        >
+                                          JSON
+                                        </button>
+                                      </div>
                                     </div>
+
+                                    {jsonModeToolIds.has(tool.id) ? (
+                                      <div className="space-y-2">
+                                        {toolJsonError[tool.id] && (
+                                          <div className="rounded-md border border-red-500 bg-red-500/10 px-4 py-3">
+                                            <p className="text-sm text-red-500 whitespace-pre-line">
+                                              {toolJsonError[tool.id]}
+                                            </p>
+                                          </div>
+                                        )}
+                                        <textarea
+                                          value={toolJsonText[tool.id] ?? ""}
+                                          onChange={(e) =>
+                                            handleToolJsonChange(
+                                              tool,
+                                              e.target.value,
+                                            )
+                                          }
+                                          spellCheck={false}
+                                          placeholder={
+                                            '{\n  "param": { "match_type": "exact", "value": "..." }\n}'
+                                          }
+                                          className={`w-full min-h-[240px] px-4 py-3 rounded-lg text-sm font-mono bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent resize-y ${
+                                            toolJsonError[tool.id]
+                                              ? "border-red-500"
+                                              : "border-border"
+                                          }`}
+                                        />
+                                      </div>
+                                    ) : (
+                                      <>
+                                        {tool.expectedParameters.length > 0 && (
+                                          <div className="space-y-3">
+                                            {renderExpectedParams(
+                                              tool.id,
+                                              tool.expectedParameters,
+                                              [],
+                                              toolSchemaParams,
+                                            )}
+                                          </div>
+                                        )}
+
+                                        <div className="mt-3 flex flex-wrap items-center gap-3">
+                                          {tool.allowCustomParameters && (
+                                            <button
+                                              onClick={() =>
+                                                addCustomExpectedParam(
+                                                  tool.id,
+                                                  [],
+                                                )
+                                              }
+                                              className="h-9 px-4 rounded-lg text-sm font-medium bg-background text-foreground border border-border hover:bg-muted transition-colors cursor-pointer"
+                                            >
+                                              + Add parameter
+                                            </button>
+                                          )}
+                                          {renderAddBackChips(
+                                            tool.id,
+                                            [],
+                                            toolSchemaParams,
+                                            tool.expectedParameters,
+                                          )}
+                                        </div>
+                                      </>
+                                    )}
                                   </div>
                                 )}
                             </div>
