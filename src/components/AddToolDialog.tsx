@@ -610,29 +610,38 @@ export function AddToolDialog({
     return new Set(names).size !== names.length;
   };
 
-  const hasInvalidParameters = (params: Parameter[]): boolean => {
+  const hasInvalidParameters = (
+    params: Parameter[],
+    requireDescription = true,
+  ): boolean => {
     if (hasDuplicateNames(params)) return true;
     for (const p of params) {
-      if (!p.name.trim() || !p.description.trim()) return true;
+      if (!p.name.trim()) return true;
+      if (requireDescription && !p.description.trim()) return true;
       if (p.dataType === "object") {
         if (!p.properties || p.properties.length === 0) return true;
-        if (hasInvalidParameters(p.properties)) return true;
+        if (hasInvalidParameters(p.properties, requireDescription)) return true;
       }
       if (p.dataType === "array" && p.items) {
-        if (hasInvalidSingleParameter(p.items)) return true;
+        if (hasInvalidSingleParameter(p.items, requireDescription)) return true;
       }
     }
     return false;
   };
 
-  const hasInvalidSingleParameter = (param: Parameter): boolean => {
-    if (!param.description.trim()) return true;
+  const hasInvalidSingleParameter = (
+    param: Parameter,
+    requireDescription = true,
+  ): boolean => {
+    if (requireDescription && !param.description.trim()) return true;
     if (param.dataType === "object") {
       if (!param.properties || param.properties.length === 0) return true;
-      if (hasInvalidParameters(param.properties)) return true;
+      if (hasInvalidParameters(param.properties, requireDescription))
+        return true;
     }
     if (param.dataType === "array" && param.items) {
-      if (hasInvalidSingleParameter(param.items)) return true;
+      if (hasInvalidSingleParameter(param.items, requireDescription))
+        return true;
     }
     return false;
   };
@@ -984,20 +993,26 @@ export function AddToolDialog({
   // Build a specific, field-by-field list of what is missing. Mirrors the rules in
   // hasInvalidParameters / hasInvalidSingleParameter exactly, but reports each
   // offending field by name/path instead of a single boolean.
-  const collectItemIssues = (item: Parameter, label: string): string[] => {
+  const collectItemIssues = (
+    item: Parameter,
+    label: string,
+    requireDescription: boolean,
+  ): string[] => {
     const issues: string[] = [];
-    if (!item.description.trim()) {
-      issues.push(`${label}: item description is required`);
+    if (requireDescription && !item.description.trim()) {
+      issues.push(`${label}: item description cannot be empty`);
     }
     if (item.dataType === "object") {
       if (!item.properties || item.properties.length === 0) {
         issues.push(`${label}: object items need at least one property`);
       } else {
-        issues.push(...collectParamIssues(item.properties, `${label} › `));
+        issues.push(
+          ...collectParamIssues(item.properties, `${label} › `, requireDescription),
+        );
       }
     }
     if (item.dataType === "array" && item.items) {
-      issues.push(...collectItemIssues(item.items, `${label}[]`));
+      issues.push(...collectItemIssues(item.items, `${label}[]`, requireDescription));
     }
     return issues;
   };
@@ -1005,6 +1020,7 @@ export function AddToolDialog({
   const collectParamIssues = (
     params: Parameter[],
     prefix: string,
+    requireDescription: boolean,
   ): string[] => {
     const issues: string[] = [];
     const counts = new Map<string, number>();
@@ -1016,8 +1032,10 @@ export function AddToolDialog({
     params.forEach((p) => {
       const name = p.name.trim();
       const label = `${prefix}${name || "(unnamed)"}`;
-      if (!name) issues.push(`${label}: name is required`);
-      if (!p.description.trim()) issues.push(`${label}: description is required`);
+      if (!name) issues.push(`${label}: name cannot be empty`);
+      if (requireDescription && !p.description.trim()) {
+        issues.push(`${label}: description cannot be empty`);
+      }
       const dupKey = name.toLowerCase();
       if (name && (counts.get(dupKey) || 0) > 1 && !reportedDup.has(dupKey)) {
         reportedDup.add(dupKey);
@@ -1027,33 +1045,36 @@ export function AddToolDialog({
         if (!p.properties || p.properties.length === 0) {
           issues.push(`${label}: object needs at least one property`);
         } else {
-          issues.push(...collectParamIssues(p.properties, `${label} › `));
+          issues.push(
+            ...collectParamIssues(p.properties, `${label} › `, requireDescription),
+          );
         }
       }
       if (p.dataType === "array" && p.items) {
-        issues.push(...collectItemIssues(p.items, `${label}[]`));
+        issues.push(...collectItemIssues(p.items, `${label}[]`, requireDescription));
       }
     });
     return issues;
   };
 
   // Returns a multi-line message naming every incomplete field, or null if valid.
+  // Tool/param descriptions are optional for structured-output tools.
   const collectIncompleteFields = (): string | null => {
     const issues: string[] = [];
-    if (!toolName.trim()) issues.push("Name is required");
-    if (!toolDescription.trim()) issues.push("Description is required");
+    if (!toolName.trim()) issues.push("Name cannot be empty");
     if (toolType === "webhook") {
+      if (!toolDescription.trim()) issues.push("Description cannot be empty");
       if (!isValidUrl(webhookUrl)) issues.push("A valid webhook URL is required");
       if (webhookHeaders.length > 0 && hasInvalidHeaders(webhookHeaders)) {
         issues.push("Each header needs both a name and a value");
       }
-      issues.push(...collectParamIssues(queryParameters, "Query param "));
+      issues.push(...collectParamIssues(queryParameters, "Query param ", true));
       if (["POST", "PUT", "PATCH"].includes(webhookMethod)) {
-        if (!bodyDescription.trim()) issues.push("Body description is required");
-        issues.push(...collectParamIssues(bodyParameters, "Body param "));
+        if (!bodyDescription.trim()) issues.push("Body description cannot be empty");
+        issues.push(...collectParamIssues(bodyParameters, "Body param ", true));
       }
     } else {
-      issues.push(...collectParamIssues(parameters, "Parameter "));
+      issues.push(...collectParamIssues(parameters, "Parameter ", false));
     }
     if (issues.length === 0) return null;
     return `Please fix:\n${issues.map((i) => `• ${i}`).join("\n")}`;
@@ -1212,9 +1233,11 @@ export function AddToolDialog({
   // Create tool
   const createTool = async () => {
     setValidationAttempted(true);
-    if (!toolName.trim() || !toolDescription.trim()) return;
+    if (!toolName.trim()) return;
 
     if (toolType === "webhook") {
+      // Description is required for webhook tools (optional for structured output)
+      if (!toolDescription.trim()) return;
       // Validate webhook URL
       if (!isValidUrl(webhookUrl)) return;
       // Validate headers - if any header exists, both name and value are required
@@ -1230,8 +1253,8 @@ export function AddToolDialog({
           return;
       }
     } else {
-      // Validate structured output parameters
-      if (hasInvalidParameters(parameters)) return;
+      // Validate structured output parameters (descriptions optional)
+      if (hasInvalidParameters(parameters, false)) return;
     }
 
     try {
@@ -1317,9 +1340,11 @@ export function AddToolDialog({
   // Update tool
   const updateTool = async () => {
     setValidationAttempted(true);
-    if (!toolName.trim() || !toolDescription.trim() || !editingToolUuid) return;
+    if (!toolName.trim() || !editingToolUuid) return;
 
     if (toolType === "webhook") {
+      // Description is required for webhook tools (optional for structured output)
+      if (!toolDescription.trim()) return;
       // Validate webhook URL
       if (!isValidUrl(webhookUrl)) return;
       // Validate headers - if any header exists, both name and value are required
@@ -1335,8 +1360,8 @@ export function AddToolDialog({
           return;
       }
     } else {
-      // Validate structured output parameters
-      if (hasInvalidParameters(parameters)) return;
+      // Validate structured output parameters (descriptions optional)
+      if (hasInvalidParameters(parameters, false)) return;
     }
 
     try {
@@ -1605,12 +1630,22 @@ export function AddToolDialog({
                           {nameConflictError}
                         </p>
                       )}
+                      {!nameConflictError &&
+                        validationAttempted &&
+                        !toolName.trim() && (
+                          <p className="mt-1 text-sm text-red-500">
+                            Name cannot be empty
+                          </p>
+                        )}
                     </div>
 
-                    {/* Description */}
+                    {/* Description (required only for webhook tools) */}
                     <div>
                       <label className="block text-sm font-medium mb-2">
-                        Description <span className="text-red-500">*</span>
+                        Description{" "}
+                        {toolType === "webhook" && (
+                          <span className="text-red-500">*</span>
+                        )}
                       </label>
                       <textarea
                         value={toolDescription}
@@ -1618,11 +1653,20 @@ export function AddToolDialog({
                         placeholder="Describe to the LLM how and when to use the tool along with what should be passed to the tool"
                         rows={3}
                         className={`w-full px-4 py-3 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none ${
-                          validationAttempted && !toolDescription.trim()
+                          validationAttempted &&
+                          toolType === "webhook" &&
+                          !toolDescription.trim()
                             ? "border-red-500"
                             : "border-border"
                         }`}
                       />
+                      {validationAttempted &&
+                        toolType === "webhook" &&
+                        !toolDescription.trim() && (
+                          <p className="mt-1 text-sm text-red-500">
+                            Description cannot be empty
+                          </p>
+                        )}
                     </div>
 
                     {/* Webhook-specific fields */}
@@ -1823,6 +1867,11 @@ export function AddToolDialog({
                                   : "border-border"
                               }`}
                             />
+                            {validationAttempted && !header.name.trim() && (
+                              <p className="mt-1 text-sm text-red-500">
+                                Name cannot be empty
+                              </p>
+                            )}
                           </div>
 
                           {/* Value */}
@@ -1849,6 +1898,11 @@ export function AddToolDialog({
                                   : "border-border"
                               }`}
                             />
+                            {validationAttempted && !header.value.trim() && (
+                              <p className="mt-1 text-sm text-red-500">
+                                Value cannot be empty
+                              </p>
+                            )}
                           </div>
 
                           {/* Delete button */}
@@ -1903,6 +1957,7 @@ export function AddToolDialog({
                           onAddProperty={handleAddPropertyAtPath}
                           onSetItems={handleSetItemsAtPath}
                           validationAttempted={validationAttempted}
+                          requireDescription={false}
                           siblingNames={parameters
                             .filter((p) => p.id !== param.id)
                             .map((p) => p.name)}
@@ -1996,6 +2051,11 @@ export function AddToolDialog({
                                   : "border-border"
                               }`}
                             />
+                            {validationAttempted && !bodyDescription.trim() && (
+                              <p className="mt-1 text-sm text-red-500">
+                                Description cannot be empty
+                              </p>
+                            )}
                           </div>
 
                           {/* Properties - same UI as object type properties */}
