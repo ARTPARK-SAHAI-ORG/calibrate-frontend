@@ -1493,14 +1493,17 @@ export function AddTestDialog({
       updateExpParamAtPath(params, path, (p) => {
         const isObject = dataType === "object";
         // Booleans can only be true/false — default to "true" so there's always
-        // a valid selection. Objects clear their (now meaningless) value.
+        // a valid selection. Objects clear their (now meaningless) value, and
+        // leaving boolean for another type clears the leftover true/false.
         const value = isObject
           ? ""
           : dataType === "boolean"
             ? p.value === "true" || p.value === "false"
               ? p.value
               : "true"
-            : p.value;
+            : p.dataType === "boolean"
+              ? ""
+              : p.value;
         return {
           ...p,
           dataType,
