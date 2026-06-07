@@ -24,17 +24,71 @@ import { formatTurnTimestamp } from "@/components/test-results/shared";
 // rows are user-added (free-form name + value) — they appear for
 // structured-output tools with no declared parameters and for `object` params
 // that declare no properties of their own.
+// Data types a custom (user-added) expected parameter can take — mirrors the
+// set offered in the add-tool dialog's ParameterCard.
+const EXPECTED_PARAM_TYPES = [
+  "boolean",
+  "integer",
+  "number",
+  "string",
+  "object",
+  "array",
+] as const;
+
 type ExpectedParam = {
   id: string;
   name: string;
   value: string;
   required: boolean;
+  // JSON-schema data type ("string", "integer", "object", "array", …). Drives
+  // the type picker for custom rows and how the value is coerced on save.
+  dataType: string;
   isObject: boolean;
   custom: boolean;
   // True for `object` params that declare no properties — the user may add
   // arbitrary key/value rows under them.
   allowCustomKeys: boolean;
   properties?: ExpectedParam[];
+};
+
+// Best-effort JSON data type for a saved argument value (edit mode).
+const inferExpectedDataType = (v: any): string => {
+  if (Array.isArray(v)) return "array";
+  if (v !== null && typeof v === "object") return "object";
+  if (typeof v === "boolean") return "boolean";
+  if (typeof v === "number") return Number.isInteger(v) ? "integer" : "number";
+  return "string";
+};
+
+// Coerce a custom/leaf row's string value into the JSON type the user picked.
+const coerceExpectedValue = (value: string, dataType: string): any => {
+  const trimmed = value.trim();
+  switch (dataType) {
+    case "integer":
+    case "number": {
+      const n = Number(trimmed);
+      return trimmed !== "" && !Number.isNaN(n) ? n : value;
+    }
+    case "boolean":
+      if (trimmed === "true") return true;
+      if (trimmed === "false") return false;
+      return value;
+    case "array":
+    case "object":
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        return value;
+      }
+    case "string":
+      return value;
+    default:
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        return value;
+      }
+  }
 };
 
 type SelectedToolConfig = {
@@ -72,6 +126,7 @@ const schemaNodeToExpectedParam = (
     name,
     value: "",
     required,
+    dataType,
     isObject,
     custom: false,
     allowCustomKeys: false,
@@ -146,34 +201,42 @@ const cloneExpParamFresh = (param: ExpectedParam): ExpectedParam => ({
     : param.properties,
 });
 
-// A blank user-added parameter row.
-const makeCustomParam = (isObject: boolean): ExpectedParam => ({
-  id: newExpParamId(),
-  name: "",
-  value: "",
-  required: false,
-  isObject,
-  custom: true,
-  allowCustomKeys: isObject,
-  properties: isObject ? [] : undefined,
-});
+// A blank user-added parameter row of the given data type.
+const makeCustomParam = (dataType: string = "string"): ExpectedParam => {
+  const isObject = dataType === "object";
+  return {
+    id: newExpParamId(),
+    name: "",
+    value: "",
+    required: false,
+    dataType,
+    isObject,
+    custom: true,
+    allowCustomKeys: isObject,
+    properties: isObject ? [] : undefined,
+  };
+};
+
+// Build a custom param row from a saved argument value, inferring its type.
+const customParamFromArg = (name: string, v: any): ExpectedParam => {
+  const isObj = v !== null && typeof v === "object" && !Array.isArray(v);
+  return {
+    id: newExpParamId(),
+    name,
+    value: isObj ? "" : expectedValueToString(v),
+    required: false,
+    dataType: inferExpectedDataType(v),
+    isObject: isObj,
+    custom: true,
+    allowCustomKeys: isObj,
+    properties: isObj ? argsToCustomParams(v) : undefined,
+  };
+};
 
 // Build a pure-custom tree from a saved arguments object when no schema is
 // available (e.g. the tool was deleted, or it declares no parameters).
 const argsToCustomParams = (args: Record<string, any>): ExpectedParam[] =>
-  Object.entries(args).map(([name, v]) => {
-    const isObj = v !== null && typeof v === "object" && !Array.isArray(v);
-    return {
-      id: newExpParamId(),
-      name,
-      value: isObj ? "" : expectedValueToString(v),
-      required: false,
-      isObject: isObj,
-      custom: true,
-      allowCustomKeys: isObj,
-      properties: isObj ? argsToCustomParams(v) : undefined,
-    };
-  });
+  Object.entries(args).map(([name, v]) => customParamFromArg(name, v));
 
 // Overlay saved tool-call argument values onto a schema-derived param tree
 // (edit mode). Required params are always kept; optional ones the saved test
@@ -207,17 +270,7 @@ const overlayArgsOntoParams = (
 
   for (const [name, v] of Object.entries(args)) {
     if (schemaNames.has(name)) continue;
-    const isObj = v !== null && typeof v === "object" && !Array.isArray(v);
-    merged.push({
-      id: newExpParamId(),
-      name,
-      value: isObj ? "" : expectedValueToString(v),
-      required: false,
-      isObject: isObj,
-      custom: true,
-      allowCustomKeys: isObj,
-      properties: isObj ? argsToCustomParams(v) : undefined,
-    });
+    merged.push(customParamFromArg(name, v));
   }
 
   return merged;
@@ -286,11 +339,7 @@ const buildArgsFromExpectedParams = (
       obj[name] = buildArgsFromExpectedParams(p.properties || []);
     } else {
       if (!p.value.trim() && !p.required) continue;
-      try {
-        obj[name] = JSON.parse(p.value);
-      } catch {
-        obj[name] = p.value;
-      }
+      obj[name] = coerceExpectedValue(p.value, p.dataType);
     }
   }
   return obj;
@@ -1453,6 +1502,27 @@ export function AddTestDialog({
       updateExpParamAtPath(params, path, (p) => ({ ...p, name })),
     );
 
+  // Update a custom expected parameter's data type, re-deriving the object/
+  // nested-keys flags so switching to/from `object` behaves correctly.
+  const updateExpectedParamType = (
+    toolId: string,
+    path: string[],
+    dataType: string,
+  ) =>
+    mutateToolParams(toolId, (params) =>
+      updateExpParamAtPath(params, path, (p) => {
+        const isObject = dataType === "object";
+        return {
+          ...p,
+          dataType,
+          isObject,
+          allowCustomKeys: isObject,
+          properties: isObject ? p.properties || [] : undefined,
+          value: isObject ? "" : p.value,
+        };
+      }),
+    );
+
   // Remove an optional / custom expected parameter.
   const removeExpectedParam = (toolId: string, path: string[]) =>
     mutateToolParams(toolId, (params) => removeExpParamAtPath(params, path));
@@ -1460,7 +1530,7 @@ export function AddTestDialog({
   // Add a blank custom expected parameter under the given parent (root = []).
   const addCustomExpectedParam = (toolId: string, parentPath: string[]) =>
     mutateToolParams(toolId, (params) =>
-      addExpParamAtPath(params, parentPath, makeCustomParam(false)),
+      addExpParamAtPath(params, parentPath, makeCustomParam("string")),
     );
 
   // Check if a tool has parameters in its original config
@@ -1498,6 +1568,44 @@ export function AddTestDialog({
     >
       {required ? "Required" : "Optional"}
     </span>
+  );
+
+  // Data-type picker for custom (user-added) parameter rows. Mirrors the type
+  // options offered in the add-tool dialog.
+  const renderParamTypeSelect = (
+    toolId: string,
+    path: string[],
+    dataType: string,
+  ) => (
+    <div className="relative flex-shrink-0">
+      <select
+        value={dataType}
+        onChange={(e) => updateExpectedParamType(toolId, path, e.target.value)}
+        aria-label="Parameter type"
+        className="h-9 pl-3 pr-8 rounded-lg text-sm bg-background text-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer appearance-none capitalize"
+      >
+        {EXPECTED_PARAM_TYPES.map((t) => (
+          <option key={t} value={t} className="capitalize">
+            {t}
+          </option>
+        ))}
+      </select>
+      <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+        <svg
+          className="w-4 h-4 text-muted-foreground"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+          />
+        </svg>
+      </div>
+    </div>
   );
 
   // Small trash button for removing optional / custom parameter rows.
@@ -1539,7 +1647,6 @@ export function AddTestDialog({
     if (missing.length === 0) return null;
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground">Add removed:</span>
         {missing.map((s) => (
           <button
             key={s.name}
@@ -1585,17 +1692,20 @@ export function AddTestDialog({
       const header = (
         <div className="flex items-center gap-2">
           {param.custom ? (
-            <input
-              type="text"
-              value={param.name}
-              onChange={(e) =>
-                updateExpectedParamName(toolId, paramPath, e.target.value)
-              }
-              placeholder="Parameter name"
-              className={`flex-1 h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
-                nameError ? "border-red-500" : "border-border"
-              }`}
-            />
+            <>
+              {renderParamTypeSelect(toolId, paramPath, param.dataType)}
+              <input
+                type="text"
+                value={param.name}
+                onChange={(e) =>
+                  updateExpectedParamName(toolId, paramPath, e.target.value)
+                }
+                placeholder="Parameter name"
+                className={`flex-1 min-w-0 h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                  nameError ? "border-red-500" : "border-border"
+                }`}
+              />
+            </>
           ) : (
             <span className="flex-1 text-sm font-medium text-foreground">
               {param.name}
@@ -1656,15 +1766,18 @@ export function AddTestDialog({
           >
             <div className="flex items-center gap-2">
               {param.custom ? (
-                <input
-                  type="text"
-                  value={param.name}
-                  onChange={(e) =>
-                    updateExpectedParamName(toolId, paramPath, e.target.value)
-                  }
-                  placeholder="Parameter name"
-                  className="flex-1 h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent"
-                />
+                <>
+                  {renderParamTypeSelect(toolId, paramPath, param.dataType)}
+                  <input
+                    type="text"
+                    value={param.name}
+                    onChange={(e) =>
+                      updateExpectedParamName(toolId, paramPath, e.target.value)
+                    }
+                    placeholder="Parameter name"
+                    className="flex-1 min-w-0 h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                </>
               ) : (
                 <span className="flex-1 text-sm font-medium text-foreground">
                   {param.name}
@@ -1733,7 +1846,15 @@ export function AddTestDialog({
             onChange={(e) =>
               updateExpectedParamValue(toolId, paramPath, e.target.value)
             }
-            placeholder="Expected value"
+            placeholder={
+              param.dataType === "boolean"
+                ? "true or false"
+                : param.dataType === "array"
+                  ? 'Expected value, e.g. ["a", "b"]'
+                  : param.dataType === "integer" || param.dataType === "number"
+                    ? "Expected number"
+                    : "Expected value"
+            }
             className={`w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
               valueError ? "border-red-500" : "border-border"
             }`}
@@ -2630,36 +2751,36 @@ export function AddTestDialog({
                             tool.name,
                           ).params;
                           return (
-                          <div
-                            key={tool.id}
-                            className="bg-muted rounded-lg p-4 border border-border"
-                          >
-                            {/* Tool header with name and delete button */}
-                            <div className="flex items-center gap-2 mb-3">
-                              <div className="flex-1 h-10 px-4 rounded-lg text-base bg-background text-foreground border border-border flex items-center">
-                                {tool.name}
-                              </div>
-                              <button
-                                onClick={() => removeTool(tool.id)}
-                                className="w-10 h-10 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
-                              >
-                                <svg
-                                  className="w-5 h-5"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={2}
+                            <div
+                              key={tool.id}
+                              className="bg-muted rounded-lg p-4 border border-border"
+                            >
+                              {/* Tool header with name and delete button */}
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className="flex-1 h-10 px-4 rounded-lg text-base bg-background text-foreground border border-border flex items-center">
+                                  {tool.name}
+                                </div>
+                                <button
+                                  onClick={() => removeTool(tool.id)}
+                                  className="w-10 h-10 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
                                 >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                                  />
-                                </svg>
-                              </button>
-                            </div>
+                                  <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                                    />
+                                  </svg>
+                                </button>
+                              </div>
 
-                            {/* Expectation indicator. The "should not have been
+                              {/* Expectation indicator. The "should not have been
                               called" option is intentionally hidden for now
                               and the dialog assumes "should have been called"
                               on every save (see the tool_calls payload
@@ -2667,103 +2788,103 @@ export function AddTestDialog({
                               selected-state pill for visual consistency with
                               the rest of the dialog rather than a real
                               segmented control. */}
-                            <div
-                              className="w-full py-2.5 rounded-lg border border-border bg-foreground text-background text-sm font-medium text-center"
-                              aria-label="Expected behaviour"
-                            >
-                              Should have been called
-                            </div>
+                              <div
+                                className="w-full py-2.5 rounded-lg border border-border bg-foreground text-background text-sm font-medium text-center"
+                                aria-label="Expected behaviour"
+                              >
+                                Should have been called
+                              </div>
 
-                            {/* Accept any parameter values checkbox - show when "should call" is selected and tool has parameters */}
-                            {tool.expectation === "should-call" &&
-                              toolHasParams(tool.id, tool.name) && (
-                                <div className="mt-4 flex items-center gap-3">
-                                  <button
-                                    onClick={() =>
-                                      updateToolConfig(tool.id, {
-                                        acceptAnyParameterValues:
-                                          !tool.acceptAnyParameterValues,
-                                      })
-                                    }
-                                    className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
-                                      tool.acceptAnyParameterValues
-                                        ? "bg-foreground border-foreground"
-                                        : "bg-background border-muted-foreground hover:border-foreground"
-                                    }`}
-                                  >
-                                    {tool.acceptAnyParameterValues && (
-                                      <svg
-                                        className="w-3 h-3 text-background"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                        strokeWidth={3}
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          d="M4.5 12.75l6 6 9-13.5"
-                                        />
-                                      </svg>
-                                    )}
-                                  </button>
-                                  <span className="text-sm font-medium text-foreground">
-                                    Accept any values for the parameters
-                                  </span>
-                                </div>
-                              )}
+                              {/* Accept any parameter values checkbox - show when "should call" is selected and tool has parameters */}
+                              {tool.expectation === "should-call" &&
+                                toolHasParams(tool.id, tool.name) && (
+                                  <div className="mt-4 flex items-center gap-3">
+                                    <button
+                                      onClick={() =>
+                                        updateToolConfig(tool.id, {
+                                          acceptAnyParameterValues:
+                                            !tool.acceptAnyParameterValues,
+                                        })
+                                      }
+                                      className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
+                                        tool.acceptAnyParameterValues
+                                          ? "bg-foreground border-foreground"
+                                          : "bg-background border-muted-foreground hover:border-foreground"
+                                      }`}
+                                    >
+                                      {tool.acceptAnyParameterValues && (
+                                        <svg
+                                          className="w-3 h-3 text-background"
+                                          fill="none"
+                                          viewBox="0 0 24 24"
+                                          stroke="currentColor"
+                                          strokeWidth={3}
+                                        >
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M4.5 12.75l6 6 9-13.5"
+                                          />
+                                        </svg>
+                                      )}
+                                    </button>
+                                    <span className="text-sm font-medium text-foreground">
+                                      Accept any values for the parameters
+                                    </span>
+                                  </div>
+                                )}
 
-                            {/* Expected parameters section - only show when
+                              {/* Expected parameters section - only show when
                               "should call" is selected and accept-any is off.
                               Renders for tools with declared parameters and for
                               structured-output tools that allow custom ones. */}
-                            {tool.expectation === "should-call" &&
-                              !tool.acceptAnyParameterValues &&
-                              (tool.expectedParameters.length > 0 ||
-                                tool.allowCustomParameters ||
-                                toolSchemaParams.length > 0) && (
-                                <div className="mt-4">
-                                  <div className="mb-3">
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                      {tool.allowCustomParameters &&
-                                      tool.expectedParameters.length === 0
-                                        ? "This tool declares no parameters. Add the parameter names you expect the agent to extract and their expected values."
-                                        : "Configure how each parameter for the tool call should be evaluated"}
-                                    </p>
-                                  </div>
+                              {tool.expectation === "should-call" &&
+                                !tool.acceptAnyParameterValues &&
+                                (tool.expectedParameters.length > 0 ||
+                                  tool.allowCustomParameters ||
+                                  toolSchemaParams.length > 0) && (
+                                  <div className="mt-4">
+                                    <div className="mb-3">
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        {tool.allowCustomParameters &&
+                                        tool.expectedParameters.length === 0
+                                          ? "Add the parameter names you expect the agent to extract and their expected values"
+                                          : "Configure how each parameter for the tool call should be evaluated"}
+                                      </p>
+                                    </div>
 
-                                  {tool.expectedParameters.length > 0 && (
-                                    <div className="space-y-3">
-                                      {renderExpectedParams(
+                                    {tool.expectedParameters.length > 0 && (
+                                      <div className="space-y-3">
+                                        {renderExpectedParams(
+                                          tool.id,
+                                          tool.expectedParameters,
+                                          [],
+                                          toolSchemaParams,
+                                        )}
+                                      </div>
+                                    )}
+
+                                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                                      {tool.allowCustomParameters && (
+                                        <button
+                                          onClick={() =>
+                                            addCustomExpectedParam(tool.id, [])
+                                          }
+                                          className="h-9 px-4 rounded-lg text-sm font-medium bg-background text-foreground border border-border hover:bg-muted transition-colors cursor-pointer"
+                                        >
+                                          + Add parameter
+                                        </button>
+                                      )}
+                                      {renderAddBackChips(
                                         tool.id,
-                                        tool.expectedParameters,
                                         [],
                                         toolSchemaParams,
+                                        tool.expectedParameters,
                                       )}
                                     </div>
-                                  )}
-
-                                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                                    {tool.allowCustomParameters && (
-                                      <button
-                                        onClick={() =>
-                                          addCustomExpectedParam(tool.id, [])
-                                        }
-                                        className="h-9 px-4 rounded-lg text-sm font-medium bg-background text-foreground border border-border hover:bg-muted transition-colors cursor-pointer"
-                                      >
-                                        + Add parameter
-                                      </button>
-                                    )}
-                                    {renderAddBackChips(
-                                      tool.id,
-                                      [],
-                                      toolSchemaParams,
-                                      tool.expectedParameters,
-                                    )}
                                   </div>
-                                </div>
-                              )}
-                          </div>
+                                )}
+                            </div>
                           );
                         })}
                       </div>
