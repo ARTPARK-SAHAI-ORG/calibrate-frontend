@@ -271,6 +271,81 @@ function formatParamValue(value: any): string {
   return String(value);
 }
 
+// True when a value is an expected-argument match spec — a dict carrying a
+// `match_type` key (`exact` or `llm_judge`).
+function isMatchSpec(
+  v: any,
+): v is { match_type: string; value?: any; criteria?: string } {
+  return (
+    v !== null &&
+    typeof v === "object" &&
+    !Array.isArray(v) &&
+    "match_type" in v
+  );
+}
+
+// Read-only render of an expected argument value, mirroring the add-test
+// dialog's per-parameter controls: a match-mode pill ("Is exactly" / "satisfies
+// the criteria" / "Is null") beside the value or criteria. Object-typed params
+// recurse so each nested field shows its own mode; bare literals (legacy
+// expected values) fall back to a plain value box.
+function ExpectedArgValue({ value }: { value: any }) {
+  if (isMatchSpec(value)) {
+    const isLlm = value.match_type === "llm_judge";
+    const isNull = !isLlm && value.value === null;
+    const label = isLlm
+      ? "satisfies the criteria"
+      : isNull
+        ? "Is null"
+        : "Is exactly";
+    const text = isLlm
+      ? typeof value.criteria === "string"
+        ? value.criteria
+        : ""
+      : formatParamValue(value.value);
+    const multiLine = text.includes("\n");
+    return (
+      <div className="flex items-stretch gap-2">
+        <span className="flex-shrink-0 inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-foreground text-background">
+          {label}
+        </span>
+        <div
+          className={`flex-1 min-w-0 px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground whitespace-pre-wrap break-all ${
+            multiLine ? "font-mono text-xs" : ""
+          }`}
+        >
+          {text}
+        </div>
+      </div>
+    );
+  }
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    return (
+      <div className="space-y-2 pl-3 border-l-2 border-border">
+        {Object.entries(value).map(([k, v]) => (
+          <div key={k}>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">
+              {k}
+            </label>
+            <ExpectedArgValue value={v} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  const text = formatParamValue(value);
+  const multiLine = text.includes("\n");
+  return (
+    <div
+      className={`px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground whitespace-pre-wrap break-all ${
+        multiLine ? "font-mono text-xs" : ""
+      }`}
+    >
+      {text}
+    </div>
+  );
+}
+
 // Normalize any tool-call-shaped value into `{ toolName, args }`. The
 // backend has shipped tool_calls in a few different shapes over time
 // (`{tool, arguments}`, OpenAI's `{name, arguments}`, and nested
@@ -339,12 +414,17 @@ export function ToolCallCard({
   toolName,
   args,
   output,
+  expected = false,
 }: {
   toolName: string;
   args: Record<string, any>;
   /** The tool's execution result (agent-connection tests only). Rendered
    * only when present — `undefined`/`null` hides the result section. */
   output?: unknown;
+  /** When true, render each argument as an expected match spec (mode pill +
+   * value / criteria) instead of a plain value. Used for "Expected Tool
+   * Calls"; actual agent tool calls leave this false. */
+  expected?: boolean;
 }) {
   const hasOutput = output !== undefined && output !== null;
   const outputValue = hasOutput ? formatParamValue(output) : "";
@@ -367,13 +447,17 @@ export function ToolCallCard({
                   <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                     {paramName}
                   </label>
-                  <div
-                    className={`px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground whitespace-pre-wrap break-all ${
-                      isMultiLine ? "font-mono text-xs" : ""
-                    }`}
-                  >
-                    {displayValue}
-                  </div>
+                  {expected ? (
+                    <ExpectedArgValue value={paramValue} />
+                  ) : (
+                    <div
+                      className={`px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground whitespace-pre-wrap break-all ${
+                        isMultiLine ? "font-mono text-xs" : ""
+                      }`}
+                    >
+                      {displayValue}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -1044,7 +1128,12 @@ export function EvaluationCriteriaPanel({
               {evaluation!.tool_calls!.map((tc, i) => {
                 const { toolName, args } = normalizeToolCall(tc);
                 return (
-                  <ToolCallCard key={i} toolName={toolName} args={args} />
+                  <ToolCallCard
+                    key={i}
+                    toolName={toolName}
+                    args={args}
+                    expected
+                  />
                 );
               })}
             </div>
