@@ -1710,8 +1710,10 @@ export function AddTestDialog({
     </div>
   );
 
-  // Match-strategy picker shown beside each non-boolean leaf parameter: "Exact"
-  // compares the literal value, "LLM" judges the actual value against criteria.
+  // Match-strategy picker shown beside each non-boolean leaf parameter's value:
+  // "Exact" compares the literal value, "LLM" judges the actual value against
+  // criteria. Styled in the inverted (foreground) palette to set it apart from
+  // the value/criteria field beside it.
   const renderMatchTypeSelect = (
     toolId: string,
     path: string[],
@@ -1724,14 +1726,14 @@ export function AddTestDialog({
           updateExpectedParamMatchType(toolId, path, e.target.value as MatchType)
         }
         aria-label="Match type"
-        className="h-9 pl-3 pr-8 rounded-lg text-sm bg-background text-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer appearance-none"
+        className="h-10 pl-3 pr-8 rounded-lg text-sm font-medium bg-foreground text-background border border-transparent hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer appearance-none transition-opacity"
       >
         <option value="exact">Exact</option>
         <option value="llm_judge">LLM</option>
       </select>
       <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
         <svg
-          className="w-4 h-4 text-muted-foreground"
+          className="w-4 h-4 text-background"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -1828,8 +1830,8 @@ export function AddTestDialog({
           ? !!param.criteria.trim()
           : !!param.value.trim();
 
-      // Header: name (label, or editable input for custom rows) + match-type
-      // picker (non-boolean leaves) + badge + remove button.
+      // Header: name (label, or editable input for custom rows) + badge +
+      // remove button. The match-type picker lives on the value row below.
       const nameError =
         showErrors && param.custom && leafFilled && !param.name.trim();
       const header = (
@@ -1854,10 +1856,6 @@ export function AddTestDialog({
               {param.name}
             </span>
           )}
-          {/* Booleans are always exact (yes/no) — no match-type picker. */}
-          {!param.isObject &&
-            param.dataType !== "boolean" &&
-            renderMatchTypeSelect(toolId, paramPath, param.matchType)}
           {renderRequiredBadge(param.required)}
           {!param.required && renderRemoveParamButton(toolId, paramPath)}
         </div>
@@ -2036,33 +2034,44 @@ export function AddTestDialog({
                 </svg>
               </div>
             </div>
-          ) : isLlm ? (
-            // LLM judge — describe what a correct value looks like.
-            <textarea
-              value={param.criteria}
-              onChange={(e) =>
-                updateExpectedParamCriteria(toolId, paramPath, e.target.value)
-              }
-              rows={2}
-              placeholder="Describe what a correct value looks like, e.g. A friendly reminder that includes the date"
-              className={criteriaClass}
-            />
           ) : (
-            <input
-              type="text"
-              value={param.value}
-              onChange={(e) =>
-                updateExpectedParamValue(toolId, paramPath, e.target.value)
-              }
-              placeholder={
-                param.dataType === "array"
-                  ? 'Expected value, e.g. ["a", "b"]'
-                  : param.dataType === "integer" || param.dataType === "number"
-                    ? "Expected number"
-                    : "Expected value"
-              }
-              className={fieldClass}
-            />
+            // Match-type picker sits inline with the expected value / criteria.
+            <div className="flex items-start gap-2">
+              {renderMatchTypeSelect(toolId, paramPath, param.matchType)}
+              {isLlm ? (
+                // LLM judge — describe what a correct value looks like.
+                <textarea
+                  value={param.criteria}
+                  onChange={(e) =>
+                    updateExpectedParamCriteria(
+                      toolId,
+                      paramPath,
+                      e.target.value,
+                    )
+                  }
+                  rows={2}
+                  placeholder="Describe what a correct value looks like, e.g. A friendly reminder that includes the date"
+                  className={`${criteriaClass} flex-1 min-w-0`}
+                />
+              ) : (
+                <input
+                  type="text"
+                  value={param.value}
+                  onChange={(e) =>
+                    updateExpectedParamValue(toolId, paramPath, e.target.value)
+                  }
+                  placeholder={
+                    param.dataType === "array"
+                      ? 'Expected value, e.g. ["a", "b"]'
+                      : param.dataType === "integer" ||
+                          param.dataType === "number"
+                        ? "Expected number"
+                        : "Expected value"
+                  }
+                  className={`${fieldClass} flex-1 min-w-0`}
+                />
+              )}
+            </div>
           )}
           {showErrors && isLlm && missingValue && (
             <p className="text-xs text-red-500">Enter judging criteria.</p>
