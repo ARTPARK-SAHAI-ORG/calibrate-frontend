@@ -1810,6 +1810,25 @@ export function AddTestDialog({
     </button>
   );
 
+  // Full-width name input for a custom (user-added) parameter row. `hasError`
+  // applies the red outline when the row is named-but-incomplete.
+  const renderParamNameInput = (
+    toolId: string,
+    path: string[],
+    name: string,
+    hasError: boolean,
+  ) => (
+    <input
+      type="text"
+      value={name}
+      onChange={(e) => updateExpectedParamName(toolId, path, e.target.value)}
+      placeholder="Parameter name"
+      className={`w-full h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+        hasError ? "border-red-500" : "border-border"
+      }`}
+    />
+  );
+
   // Render "+ name" chips for schema-declared optional parameters that the user
   // removed at this level, letting them add the parameter (and its subtree)
   // back. `schemaLevelParams` is the full set declared at this level; anything
@@ -1874,18 +1893,11 @@ export function AddTestDialog({
       // below. The match-type picker lives on the value row.
       const nameError =
         showErrors && param.custom && leafFilled && !param.name.trim();
-      const nameInput = (
-        <input
-          type="text"
-          value={param.name}
-          onChange={(e) =>
-            updateExpectedParamName(toolId, paramPath, e.target.value)
-          }
-          placeholder="Parameter name"
-          className={`w-full h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
-            nameError ? "border-red-500" : "border-border"
-          }`}
-        />
+      const nameInput = renderParamNameInput(
+        toolId,
+        paramPath,
+        param.name,
+        nameError,
       );
       const header = param.custom ? (
         <div className="space-y-2">
@@ -1965,15 +1977,7 @@ export function AddTestDialog({
                   {renderRequiredBadge(param.required)}
                   {!param.required && renderRemoveParamButton(toolId, paramPath)}
                 </div>
-                <input
-                  type="text"
-                  value={param.name}
-                  onChange={(e) =>
-                    updateExpectedParamName(toolId, paramPath, e.target.value)
-                  }
-                  placeholder="Parameter name"
-                  className="w-full h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent"
-                />
+                {renderParamNameInput(toolId, paramPath, param.name, nameError)}
               </>
             ) : (
               <div className="flex items-center gap-2">
