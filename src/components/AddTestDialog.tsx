@@ -3297,8 +3297,8 @@ export function AddTestDialog({
                                   tool.allowCustomParameters ||
                                   toolSchemaParams.length > 0) && (
                                   <div className="mt-4">
-                                    <div className="mb-3 flex items-start justify-between gap-2">
-                                      <p className="text-xs text-muted-foreground mt-1">
+                                    <div className="mb-3 flex items-end justify-between gap-2">
+                                      <p className="text-xs text-muted-foreground">
                                         {tool.allowCustomParameters &&
                                         tool.expectedParameters.length === 0
                                           ? "Add the parameter names you expect the agent to extract and their expected values"
