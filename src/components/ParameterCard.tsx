@@ -1,4 +1,5 @@
 import { NestedContainer } from "@/components/ui/NestedContainer";
+import { FieldError } from "@/components/ui/FieldError";
 
 export type Parameter = {
   id: string;
@@ -113,16 +114,18 @@ export const ParameterCard = ({
                   : "border-border"
               }`}
             />
-            {validationAttempted && !param.name.trim() && (
-              <p className="text-sm text-red-500 mt-1">Name cannot be empty</p>
-            )}
-            {validationAttempted &&
-              param.name.trim() !== "" &&
-              isDuplicateName && (
-                <p className="text-sm text-red-500 mt-1">
-                  A parameter with this name already exists
-                </p>
-              )}
+            <FieldError show={validationAttempted && !param.name.trim()}>
+              Name cannot be empty
+            </FieldError>
+            <FieldError
+              show={
+                validationAttempted &&
+                param.name.trim() !== "" &&
+                isDuplicateName
+              }
+            >
+              A parameter with this name already exists
+            </FieldError>
           </div>
         )}
       </div>
@@ -181,11 +184,13 @@ export const ParameterCard = ({
               : "border-border"
           }`}
         />
-        {validationAttempted && requireDescription && !param.description.trim() && (
-          <p className="text-sm text-red-500 mt-1">
-            Description cannot be empty
-          </p>
-        )}
+        <FieldError
+          show={
+            validationAttempted && requireDescription && !param.description.trim()
+          }
+        >
+          Description cannot be empty
+        </FieldError>
       </div>
 
       {/* Properties section for object type */}
@@ -229,12 +234,14 @@ export const ParameterCard = ({
               </div>
             )}
           </NestedContainer>
-          {validationAttempted &&
-            (!param.properties || param.properties.length === 0) && (
-              <p className="text-sm text-red-500 mt-1">
-                Add at least one property
-              </p>
-            )}
+          <FieldError
+            show={
+              validationAttempted &&
+              (!param.properties || param.properties.length === 0)
+            }
+          >
+            Add at least one property
+          </FieldError>
         </div>
       )}
 

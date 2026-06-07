@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { signOut } from "next-auth/react";
 import { ParameterCard, Parameter } from "@/components/ParameterCard";
 import { NestedContainer } from "@/components/ui/NestedContainer";
+import { FieldError } from "@/components/ui/FieldError";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { readNameConflictMessage } from "@/lib/parseBackendError";
 
@@ -603,48 +604,12 @@ export function AddToolDialog({
     }
   };
 
-  const hasDuplicateNames = (params: Parameter[]): boolean => {
-    const names = params
-      .map((p) => p.name.trim().toLowerCase())
-      .filter(Boolean);
-    return new Set(names).size !== names.length;
-  };
-
+  // Single source of truth for parameter validity is collectParamIssues (below);
+  // this boolean gate just asks whether it found anything to fix.
   const hasInvalidParameters = (
     params: Parameter[],
     requireDescription = true,
-  ): boolean => {
-    if (hasDuplicateNames(params)) return true;
-    for (const p of params) {
-      if (!p.name.trim()) return true;
-      if (requireDescription && !p.description.trim()) return true;
-      if (p.dataType === "object") {
-        if (!p.properties || p.properties.length === 0) return true;
-        if (hasInvalidParameters(p.properties, requireDescription)) return true;
-      }
-      if (p.dataType === "array" && p.items) {
-        if (hasInvalidSingleParameter(p.items, requireDescription)) return true;
-      }
-    }
-    return false;
-  };
-
-  const hasInvalidSingleParameter = (
-    param: Parameter,
-    requireDescription = true,
-  ): boolean => {
-    if (requireDescription && !param.description.trim()) return true;
-    if (param.dataType === "object") {
-      if (!param.properties || param.properties.length === 0) return true;
-      if (hasInvalidParameters(param.properties, requireDescription))
-        return true;
-    }
-    if (param.dataType === "array" && param.items) {
-      if (hasInvalidSingleParameter(param.items, requireDescription))
-        return true;
-    }
-    return false;
-  };
+  ): boolean => collectParamIssues(params, "", requireDescription).length > 0;
 
   const hasInvalidHeaders = (headers: WebhookHeader[]): boolean => {
     for (const header of headers) {
@@ -990,9 +955,9 @@ export function AddToolDialog({
     setViewMode("ui");
   };
 
-  // Build a specific, field-by-field list of what is missing. Mirrors the rules in
-  // hasInvalidParameters / hasInvalidSingleParameter exactly, but reports each
-  // offending field by name/path instead of a single boolean.
+  // Single source of truth for parameter validation: returns a field-by-field
+  // list of what is missing (name/description/properties/duplicates), keyed by
+  // path. hasInvalidParameters above is the boolean view of the same rules.
   const collectItemIssues = (
     item: Parameter,
     label: string,
@@ -1625,18 +1590,18 @@ export function AddToolDialog({
                             : "border-border"
                         }`}
                       />
-                      {nameConflictError && (
-                        <p className="mt-1 text-sm text-red-500">
-                          {nameConflictError}
-                        </p>
-                      )}
-                      {!nameConflictError &&
-                        validationAttempted &&
-                        !toolName.trim() && (
-                          <p className="mt-1 text-sm text-red-500">
-                            Name cannot be empty
-                          </p>
-                        )}
+                      <FieldError show={!!nameConflictError}>
+                        {nameConflictError}
+                      </FieldError>
+                      <FieldError
+                        show={
+                          !nameConflictError &&
+                          validationAttempted &&
+                          !toolName.trim()
+                        }
+                      >
+                        Name cannot be empty
+                      </FieldError>
                     </div>
 
                     {/* Description (required only for webhook tools) */}
@@ -1660,13 +1625,15 @@ export function AddToolDialog({
                             : "border-border"
                         }`}
                       />
-                      {validationAttempted &&
-                        toolType === "webhook" &&
-                        !toolDescription.trim() && (
-                          <p className="mt-1 text-sm text-red-500">
-                            Description cannot be empty
-                          </p>
-                        )}
+                      <FieldError
+                        show={
+                          validationAttempted &&
+                          toolType === "webhook" &&
+                          !toolDescription.trim()
+                        }
+                      >
+                        Description cannot be empty
+                      </FieldError>
                     </div>
 
                     {/* Webhook-specific fields */}
@@ -1867,11 +1834,11 @@ export function AddToolDialog({
                                   : "border-border"
                               }`}
                             />
-                            {validationAttempted && !header.name.trim() && (
-                              <p className="mt-1 text-sm text-red-500">
-                                Name cannot be empty
-                              </p>
-                            )}
+                            <FieldError
+                              show={validationAttempted && !header.name.trim()}
+                            >
+                              Name cannot be empty
+                            </FieldError>
                           </div>
 
                           {/* Value */}
@@ -1898,11 +1865,11 @@ export function AddToolDialog({
                                   : "border-border"
                               }`}
                             />
-                            {validationAttempted && !header.value.trim() && (
-                              <p className="mt-1 text-sm text-red-500">
-                                Value cannot be empty
-                              </p>
-                            )}
+                            <FieldError
+                              show={validationAttempted && !header.value.trim()}
+                            >
+                              Value cannot be empty
+                            </FieldError>
                           </div>
 
                           {/* Delete button */}
@@ -2051,11 +2018,13 @@ export function AddToolDialog({
                                   : "border-border"
                               }`}
                             />
-                            {validationAttempted && !bodyDescription.trim() && (
-                              <p className="mt-1 text-sm text-red-500">
-                                Description cannot be empty
-                              </p>
-                            )}
+                            <FieldError
+                              show={
+                                validationAttempted && !bodyDescription.trim()
+                              }
+                            >
+                              Description cannot be empty
+                            </FieldError>
                           </div>
 
                           {/* Properties - same UI as object type properties */}
