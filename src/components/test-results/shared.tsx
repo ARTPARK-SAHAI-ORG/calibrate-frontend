@@ -305,12 +305,12 @@ function ExpectedArgValue({ value }: { value: any }) {
       : formatParamValue(value.value);
     const multiLine = text.includes("\n");
     return (
-      <div className="flex items-stretch gap-2">
-        <span className="flex-shrink-0 inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-foreground text-background">
+      <div className="space-y-1">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-foreground text-background">
           {label}
         </span>
         <div
-          className={`flex-1 min-w-0 px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground whitespace-pre-wrap break-all ${
+          className={`px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground whitespace-pre-wrap break-words ${
             multiLine ? "font-mono text-xs" : ""
           }`}
         >
@@ -337,7 +337,7 @@ function ExpectedArgValue({ value }: { value: any }) {
   const multiLine = text.includes("\n");
   return (
     <div
-      className={`px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground whitespace-pre-wrap break-all ${
+      className={`px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground whitespace-pre-wrap break-words ${
         multiLine ? "font-mono text-xs" : ""
       }`}
     >
