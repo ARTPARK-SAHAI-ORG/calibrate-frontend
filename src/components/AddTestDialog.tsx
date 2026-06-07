@@ -134,6 +134,18 @@ const buildExpectedParamsFromToolConfig = (
   return { params: list, allowCustom };
 };
 
+// Deep-clone an expected-parameter node, assigning fresh ids throughout so the
+// result can be safely re-inserted into the tree (used when re-adding a
+// previously-removed optional schema parameter).
+const cloneExpParamFresh = (param: ExpectedParam): ExpectedParam => ({
+  ...param,
+  id: newExpParamId(),
+  value: "",
+  properties: param.properties
+    ? param.properties.map(cloneExpParamFresh)
+    : param.properties,
+});
+
 // A blank user-added parameter row.
 const makeCustomParam = (isObject: boolean): ExpectedParam => ({
   id: newExpParamId(),
@@ -1511,13 +1523,52 @@ export function AddTestDialog({
     </button>
   );
 
+  // Render "+ name" chips for schema-declared optional parameters that the user
+  // removed at this level, letting them add the parameter (and its subtree)
+  // back. `schemaLevelParams` is the full set declared at this level; anything
+  // not currently present must be a removed optional (required ones can't be
+  // removed).
+  const renderAddBackChips = (
+    toolId: string,
+    parentPath: string[],
+    schemaLevelParams: ExpectedParam[],
+    currentParams: ExpectedParam[],
+  ): React.ReactNode => {
+    const currentNames = new Set(currentParams.map((p) => p.name));
+    const missing = schemaLevelParams.filter((s) => !currentNames.has(s.name));
+    if (missing.length === 0) return null;
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground">Add removed:</span>
+        {missing.map((s) => (
+          <button
+            key={s.name}
+            type="button"
+            onClick={() =>
+              mutateToolParams(toolId, (params) =>
+                addExpParamAtPath(params, parentPath, cloneExpParamFresh(s)),
+              )
+            }
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border border-dashed border-border bg-background text-muted-foreground hover:text-foreground hover:border-foreground transition-colors cursor-pointer"
+          >
+            <span className="text-sm leading-none">+</span>
+            {s.name}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
   // Recursively render a tool's expected-parameter rows. `object` params render
   // a nested section (with an "Add parameter" affordance when they accept
   // arbitrary keys); leaf params render a name + expected-value input.
+  // `schemaLevelParams` carries the tool's declared parameters for the current
+  // level so removed optional ones can be offered for re-adding.
   const renderExpectedParams = (
     toolId: string,
     params: ExpectedParam[],
     path: string[],
+    schemaLevelParams: ExpectedParam[],
   ): React.ReactNode =>
     params.map((param) => {
       const paramPath = [...path, param.id];
@@ -1559,6 +1610,12 @@ export function AddTestDialog({
         const children = param.properties || [];
         const collapsed = collapsedParamIds.has(param.id);
         const childCount = children.length;
+        // Schema-declared properties for this object (empty for custom objects),
+        // used to offer removed optional sub-params for re-adding.
+        const schemaNode = schemaLevelParams.find(
+          (s) => !s.custom && s.name === param.name,
+        );
+        const childSchemaParams = schemaNode?.properties || [];
         const collapseToggle = (
           <button
             type="button"
@@ -1631,17 +1688,29 @@ export function AddTestDialog({
                 addButtonText="Add parameter"
                 onAddProperty={() => addCustomExpectedParam(toolId, paramPath)}
               >
-                {children.length > 0 ? (
+                {children.length > 0 && (
                   <div className="space-y-3">
-                    {renderExpectedParams(toolId, children, paramPath)}
+                    {renderExpectedParams(
+                      toolId,
+                      children,
+                      paramPath,
+                      childSchemaParams,
+                    )}
                   </div>
-                ) : (
-                  !param.allowCustomKeys && (
+                )}
+                {renderAddBackChips(
+                  toolId,
+                  paramPath,
+                  childSchemaParams,
+                  children,
+                )}
+                {children.length === 0 &&
+                  !param.allowCustomKeys &&
+                  childSchemaParams.length === children.length && (
                     <p className="text-xs text-muted-foreground text-center">
                       This object has no parameters.
                     </p>
-                  )
-                )}
+                  )}
               </NestedContainer>
             )}
           </div>
@@ -2553,7 +2622,14 @@ export function AddTestDialog({
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {selectedTools.map((tool) => (
+                        {selectedTools.map((tool) => {
+                          // Tool's full declared parameters, used to offer
+                          // removed optional ones for re-adding.
+                          const toolSchemaParams = getExpectedParamsForTool(
+                            tool.id,
+                            tool.name,
+                          ).params;
+                          return (
                           <div
                             key={tool.id}
                             className="bg-muted rounded-lg p-4 border border-border"
@@ -2644,7 +2720,8 @@ export function AddTestDialog({
                             {tool.expectation === "should-call" &&
                               !tool.acceptAnyParameterValues &&
                               (tool.expectedParameters.length > 0 ||
-                                tool.allowCustomParameters) && (
+                                tool.allowCustomParameters ||
+                                toolSchemaParams.length > 0) && (
                                 <div className="mt-4">
                                   <div className="mb-3">
                                     <p className="text-xs text-muted-foreground mt-1">
@@ -2661,24 +2738,34 @@ export function AddTestDialog({
                                         tool.id,
                                         tool.expectedParameters,
                                         [],
+                                        toolSchemaParams,
                                       )}
                                     </div>
                                   )}
 
-                                  {tool.allowCustomParameters && (
-                                    <button
-                                      onClick={() =>
-                                        addCustomExpectedParam(tool.id, [])
-                                      }
-                                      className="mt-3 h-9 px-4 rounded-lg text-sm font-medium bg-background text-foreground border border-border hover:bg-muted transition-colors cursor-pointer"
-                                    >
-                                      + Add parameter
-                                    </button>
-                                  )}
+                                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                                    {tool.allowCustomParameters && (
+                                      <button
+                                        onClick={() =>
+                                          addCustomExpectedParam(tool.id, [])
+                                        }
+                                        className="h-9 px-4 rounded-lg text-sm font-medium bg-background text-foreground border border-border hover:bg-muted transition-colors cursor-pointer"
+                                      >
+                                        + Add parameter
+                                      </button>
+                                    )}
+                                    {renderAddBackChips(
+                                      tool.id,
+                                      [],
+                                      toolSchemaParams,
+                                      tool.expectedParameters,
+                                    )}
+                                  </div>
                                 </div>
                               )}
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
