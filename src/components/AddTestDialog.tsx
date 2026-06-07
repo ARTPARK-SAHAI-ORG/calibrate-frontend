@@ -2121,12 +2121,12 @@ export function AddTestDialog({
       {/* Dialog */}
       {typeChosen && (
         <div
-          className={`relative w-full max-w-7xl h-[95vh] md:h-[85vh] mx-2 md:mx-4 bg-background rounded-xl md:rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden border border-border transition-all duration-300 ease-out ${
+          className={`relative w-full max-w-[90rem] h-[95vh] md:h-[85vh] mx-2 md:mx-4 bg-background rounded-xl md:rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden border border-border transition-all duration-300 ease-out ${
             editorEntered ? "opacity-100 scale-100" : "opacity-0 scale-95"
           }`}
         >
           {/* Left Column - Form */}
-          <div className="w-full md:w-2/5 flex flex-col border-b md:border-b-0 md:border-r border-border">
+          <div className="w-full md:w-1/2 flex flex-col border-b md:border-b-0 md:border-r border-border">
             {/* Tabs — hidden in labelItem mode (always next-reply). When
               editing an existing test the type is fixed (the backend no
               longer allows changing a test's type), so we show only the
@@ -2863,7 +2863,7 @@ export function AddTestDialog({
           </div>
 
           {/* Right Column - Chat Messages */}
-          <div className="w-full md:w-3/5 flex flex-col bg-muted/30 overflow-visible">
+          <div className="w-full md:w-1/2 flex flex-col bg-muted/30 overflow-visible">
             {/* Info banner */}
             <div className="px-4 md:px-6 py-3 md:py-4 border-b border-border bg-blue-500/5">
               <div className="flex items-start gap-3">
