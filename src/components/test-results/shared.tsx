@@ -284,12 +284,17 @@ function isMatchSpec(
   );
 }
 
-// Read-only render of an expected argument value, mirroring the add-test
-// dialog's per-parameter controls: a match-mode pill ("Is exactly" / "satisfies
-// the criteria" / "Is null") beside the value or criteria. Object-typed params
-// recurse so each nested field shows its own mode; bare literals (legacy
-// expected values) fall back to a plain value box.
-function ExpectedArgValue({ value }: { value: any }) {
+// Read-only render of an expected argument (name + value), mirroring the
+// add-test dialog's per-parameter controls: the parameter name sits on one line
+// with a match-mode chip ("Is exactly" / "satisfies the criteria" / "Is null"),
+// and the value or criteria below. Object-typed params recurse inside a boxed
+// group so each nested field shows its own mode; bare literals (legacy expected
+// values) fall back to a plain value box.
+function ExpectedArgValue({ name, value }: { name: string; value: any }) {
+  const nameLabel = (
+    <label className="text-sm font-medium text-foreground">{name}</label>
+  );
+
   if (isMatchSpec(value)) {
     const isLlm = value.match_type === "llm_judge";
     const isNull = !isLlm && value.value === null;
@@ -306,9 +311,12 @@ function ExpectedArgValue({ value }: { value: any }) {
     const multiLine = text.includes("\n");
     return (
       <div className="space-y-1">
-        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-foreground text-background">
-          {label}
-        </span>
+        <div className="flex items-center gap-2 flex-wrap">
+          {nameLabel}
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-foreground text-background">
+            {label}
+          </span>
+        </div>
         <div
           className={`px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground whitespace-pre-wrap break-words ${
             multiLine ? "font-mono text-xs" : ""
@@ -321,27 +329,28 @@ function ExpectedArgValue({ value }: { value: any }) {
   }
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
     return (
-      <div className="space-y-3 rounded-xl border border-border bg-background/50 p-3">
-        {Object.entries(value).map(([k, v]) => (
-          <div key={k}>
-            <label className="block text-xs font-medium text-foreground mb-1">
-              {k}
-            </label>
-            <ExpectedArgValue value={v} />
-          </div>
-        ))}
+      <div className="space-y-1">
+        {nameLabel}
+        <div className="space-y-3 rounded-xl border border-border bg-background/50 p-3">
+          {Object.entries(value).map(([k, v]) => (
+            <ExpectedArgValue key={k} name={k} value={v} />
+          ))}
+        </div>
       </div>
     );
   }
   const text = formatParamValue(value);
   const multiLine = text.includes("\n");
   return (
-    <div
-      className={`px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground whitespace-pre-wrap break-words ${
-        multiLine ? "font-mono text-xs" : ""
-      }`}
-    >
-      {text}
+    <div className="space-y-1">
+      {nameLabel}
+      <div
+        className={`px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground whitespace-pre-wrap break-words ${
+          multiLine ? "font-mono text-xs" : ""
+        }`}
+      >
+        {text}
+      </div>
     </div>
   );
 }
@@ -476,29 +485,33 @@ export function ToolCallCard({
       )}
       {showParams && (
         <div className="space-y-3 mt-3">
-          {paramEntries
-            .map(([paramName, paramValue]) => {
-              const displayValue = formatParamValue(paramValue);
-              const isMultiLine = displayValue.includes("\n");
+          {paramEntries.map(([paramName, paramValue]) => {
+            if (expected) {
               return (
-                <div key={paramName}>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    {paramName}
-                  </label>
-                  {expected ? (
-                    <ExpectedArgValue value={paramValue} />
-                  ) : (
-                    <div
-                      className={`px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground whitespace-pre-wrap break-all ${
-                        isMultiLine ? "font-mono text-xs" : ""
-                      }`}
-                    >
-                      {displayValue}
-                    </div>
-                  )}
-                </div>
+                <ExpectedArgValue
+                  key={paramName}
+                  name={paramName}
+                  value={paramValue}
+                />
               );
-            })}
+            }
+            const displayValue = formatParamValue(paramValue);
+            const isMultiLine = displayValue.includes("\n");
+            return (
+              <div key={paramName}>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  {paramName}
+                </label>
+                <div
+                  className={`px-3 py-2 rounded-lg text-sm bg-background border border-border text-foreground whitespace-pre-wrap break-all ${
+                    isMultiLine ? "font-mono text-xs" : ""
+                  }`}
+                >
+                  {displayValue}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
       {hasOutput && (
