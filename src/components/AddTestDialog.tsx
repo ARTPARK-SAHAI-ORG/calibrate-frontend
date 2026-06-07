@@ -1725,7 +1725,7 @@ export function AddTestDialog({
         value={dataType}
         onChange={(e) => updateExpectedParamType(toolId, path, e.target.value)}
         aria-label="Parameter type"
-        className="h-9 pl-3 pr-8 rounded-lg text-sm bg-background text-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer appearance-none capitalize"
+        className="h-7 pl-2.5 pr-6 rounded-lg text-xs bg-background text-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer appearance-none capitalize"
       >
         {EXPECTED_PARAM_TYPES.map((t) => (
           <option key={t} value={t} className="capitalize">
@@ -1733,9 +1733,9 @@ export function AddTestDialog({
           </option>
         ))}
       </select>
-      <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+      <div className="absolute inset-y-0 right-0 flex items-center pr-1.5 pointer-events-none">
         <svg
-          className="w-4 h-4 text-muted-foreground"
+          className="w-3 h-3 text-muted-foreground"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
