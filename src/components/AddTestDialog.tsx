@@ -39,10 +39,23 @@ const EXPECTED_PARAM_TYPES = [
   "array",
 ] as const;
 
+// How a leaf parameter's expected value is matched against the actual tool call:
+// `exact` compares the literal value, `llm_judge` hands the actual value to an
+// LLM along with the user's free-text criteria. Booleans are always `exact`.
+type MatchType = "exact" | "llm_judge";
+
 type ExpectedParam = {
   id: string;
   name: string;
   value: string;
+  // Match strategy for this leaf row. Always `exact` for objects (containers)
+  // and booleans. Drives whether the value box or the criteria box is shown.
+  matchType: MatchType;
+  // Free-text judging criteria, used only when `matchType === "llm_judge"`.
+  criteria: string;
+  // Optional per-parameter judge model override (round-tripped from saved
+  // tests; not surfaced as an input in the UI).
+  judgeModel?: string;
   required: boolean;
   // JSON-schema data type ("string", "integer", "object", "array", …). Drives
   // the type picker for custom rows and how the value is coerced on save.
@@ -53,6 +66,33 @@ type ExpectedParam = {
   // arbitrary key/value rows under them.
   allowCustomKeys: boolean;
   properties?: ExpectedParam[];
+};
+
+// Read a saved tool-call argument value into a leaf row's match fields. Argument
+// values may be a literal (legacy exact match), an explicit
+// `{ match_type: "exact", value }`, or `{ match_type: "llm_judge", criteria,
+// judge_model? }`. A dict containing a `match_type` key is always a spec.
+const parseArgMatch = (
+  v: any,
+): { matchType: MatchType; value: any; criteria: string; judgeModel?: string } => {
+  if (
+    v !== null &&
+    typeof v === "object" &&
+    !Array.isArray(v) &&
+    "match_type" in v
+  ) {
+    if (v.match_type === "llm_judge") {
+      return {
+        matchType: "llm_judge",
+        value: undefined,
+        criteria: typeof v.criteria === "string" ? v.criteria : "",
+        judgeModel: typeof v.judge_model === "string" ? v.judge_model : undefined,
+      };
+    }
+    // Explicit exact spec — unwrap to the literal value.
+    return { matchType: "exact", value: v.value, criteria: "" };
+  }
+  return { matchType: "exact", value: v, criteria: "" };
 };
 
 // Best-effort JSON data type for a saved argument value (edit mode).
@@ -136,6 +176,8 @@ const normalizedToExpectedParam = (n: NormalizedToolParam): ExpectedParam => {
     id: newExpParamId(),
     name: n.name,
     value: "",
+    matchType: "exact",
+    criteria: "",
     required: n.required,
     dataType: n.dataType,
     isObject,
@@ -167,6 +209,7 @@ const cloneExpParamFresh = (param: ExpectedParam): ExpectedParam => ({
   ...param,
   id: newExpParamId(),
   value: "",
+  criteria: "",
   properties: param.properties
     ? param.properties.map(cloneExpParamFresh)
     : param.properties,
@@ -180,6 +223,8 @@ const makeCustomParam = (dataType: string = "string"): ExpectedParam => {
     name: "",
     // Booleans default to "true" since the only valid values are true/false.
     value: dataType === "boolean" ? "true" : "",
+    matchType: "exact",
+    criteria: "",
     required: false,
     dataType,
     isObject,
@@ -190,12 +235,31 @@ const makeCustomParam = (dataType: string = "string"): ExpectedParam => {
 };
 
 // Build a custom param row from a saved argument value, inferring its type.
-const customParamFromArg = (name: string, v: any): ExpectedParam => {
+const customParamFromArg = (name: string, raw: any): ExpectedParam => {
+  const { matchType, value: v, criteria, judgeModel } = parseArgMatch(raw);
+  if (matchType === "llm_judge") {
+    return {
+      id: newExpParamId(),
+      name,
+      value: "",
+      matchType: "llm_judge",
+      criteria,
+      judgeModel,
+      required: false,
+      dataType: "string",
+      isObject: false,
+      custom: true,
+      allowCustomKeys: false,
+      properties: undefined,
+    };
+  }
   const isObj = v !== null && typeof v === "object" && !Array.isArray(v);
   return {
     id: newExpParamId(),
     name,
     value: isObj ? "" : expectedValueToString(v),
+    matchType: "exact",
+    criteria: "",
     required: false,
     dataType: inferExpectedDataType(v),
     isObject: isObj,
@@ -227,16 +291,30 @@ const overlayArgsOntoParams = (
       if (p.required) merged.push(p);
       continue;
     }
-    const v = args[p.name];
+    const rawVal = args[p.name];
     if (p.isObject) {
+      // Objects are containers; if a saved value arrived wrapped in an explicit
+      // exact spec, unwrap it before recursing into the nested properties.
+      const unwrapped = parseArgMatch(rawVal).value;
       const childArgs =
-        v !== null && typeof v === "object" && !Array.isArray(v) ? v : {};
+        unwrapped !== null &&
+        typeof unwrapped === "object" &&
+        !Array.isArray(unwrapped)
+          ? unwrapped
+          : {};
       merged.push({
         ...p,
         properties: overlayArgsOntoParams(p.properties || [], childArgs),
       });
     } else {
-      merged.push({ ...p, value: expectedValueToString(v) });
+      const { matchType, value, criteria, judgeModel } = parseArgMatch(rawVal);
+      merged.push({
+        ...p,
+        matchType,
+        criteria,
+        judgeModel,
+        value: matchType === "llm_judge" ? "" : expectedValueToString(value),
+      });
     }
   }
 
@@ -298,8 +376,11 @@ const addExpParamAtPath = (
 };
 
 // Convert the expected-parameter tree into the `arguments` object sent to the
-// backend. Empty optional/custom rows are skipped; values are parsed as JSON
-// when possible so numbers/booleans/objects round-trip.
+// backend. Objects recurse into a nested container; leaf rows are always emitted
+// as an explicit match spec — `{ match_type: "exact", value }` or
+// `{ match_type: "llm_judge", criteria, judge_model? }` — never a bare literal.
+// Empty optional/custom rows are skipped; exact values are parsed as JSON when
+// possible so numbers/booleans/objects round-trip.
 const buildArgsFromExpectedParams = (
   params: ExpectedParam[],
 ): Record<string, any> => {
@@ -309,9 +390,20 @@ const buildArgsFromExpectedParams = (
     if (!name) continue;
     if (p.isObject) {
       obj[name] = buildArgsFromExpectedParams(p.properties || []);
+    } else if (p.matchType === "llm_judge") {
+      if (!p.criteria.trim() && !p.required) continue;
+      const spec: Record<string, any> = {
+        match_type: "llm_judge",
+        criteria: p.criteria.trim(),
+      };
+      if (p.judgeModel?.trim()) spec.judge_model = p.judgeModel.trim();
+      obj[name] = spec;
     } else {
       if (!p.value.trim() && !p.required) continue;
-      obj[name] = coerceExpectedValue(p.value, p.dataType);
+      obj[name] = {
+        match_type: "exact",
+        value: coerceExpectedValue(p.value, p.dataType),
+      };
     }
   }
   return obj;
@@ -327,16 +419,23 @@ const hasInvalidExpectedParams = (params: ExpectedParam[]): boolean => {
       continue;
     }
     const named = p.name.trim();
-    const valued = p.value.trim();
+    // The required/filled field depends on the match strategy: criteria for an
+    // LLM judge, the expected value otherwise.
+    const filled =
+      p.matchType === "llm_judge" ? p.criteria.trim() : p.value.trim();
     if (p.custom) {
       // A fully-blank custom row is ignored (not yet used).
-      if (!named && !valued) continue;
-      if (!named || !valued) return true;
-    } else if (!valued) {
+      if (!named && !filled) continue;
+      if (!named || !filled) return true;
+    } else if (!filled) {
       return true;
     }
-    // A filled-in value must also be well-formed for its type.
-    if (expectedValueTypeError(p.value, p.dataType)) return true;
+    // A filled-in exact value must also be well-formed for its type.
+    if (
+      p.matchType !== "llm_judge" &&
+      expectedValueTypeError(p.value, p.dataType)
+    )
+      return true;
   }
   return false;
 };
@@ -1483,6 +1582,26 @@ export function AddTestDialog({
       updateExpParamAtPath(params, path, (p) => ({ ...p, name })),
     );
 
+  // Switch a leaf parameter between exact-match and LLM-judge.
+  const updateExpectedParamMatchType = (
+    toolId: string,
+    path: string[],
+    matchType: MatchType,
+  ) =>
+    mutateToolParams(toolId, (params) =>
+      updateExpParamAtPath(params, path, (p) => ({ ...p, matchType })),
+    );
+
+  // Update an LLM-judged parameter's criteria text.
+  const updateExpectedParamCriteria = (
+    toolId: string,
+    path: string[],
+    criteria: string,
+  ) =>
+    mutateToolParams(toolId, (params) =>
+      updateExpParamAtPath(params, path, (p) => ({ ...p, criteria })),
+    );
+
   // Update a custom expected parameter's data type, re-deriving the object/
   // nested-keys flags so switching to/from `object` behaves correctly.
   const updateExpectedParamType = (
@@ -1505,6 +1624,10 @@ export function AddTestDialog({
             : p.dataType === "boolean"
               ? ""
               : p.value;
+        // Booleans and objects are always exact-matched, so drop any LLM-judge
+        // selection (and its criteria) when switching to those types.
+        const matchType =
+          isObject || dataType === "boolean" ? "exact" : p.matchType;
         return {
           ...p,
           dataType,
@@ -1512,6 +1635,8 @@ export function AddTestDialog({
           allowCustomKeys: isObject,
           properties: isObject ? p.properties || [] : undefined,
           value,
+          matchType,
+          criteria: matchType === "exact" ? "" : p.criteria,
         };
       }),
     );
@@ -1566,6 +1691,43 @@ export function AddTestDialog({
             {t}
           </option>
         ))}
+      </select>
+      <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+        <svg
+          className="w-4 h-4 text-muted-foreground"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+          />
+        </svg>
+      </div>
+    </div>
+  );
+
+  // Match-strategy picker shown beside each non-boolean leaf parameter: "Exact"
+  // compares the literal value, "LLM" judges the actual value against criteria.
+  const renderMatchTypeSelect = (
+    toolId: string,
+    path: string[],
+    matchType: MatchType,
+  ) => (
+    <div className="relative flex-shrink-0">
+      <select
+        value={matchType}
+        onChange={(e) =>
+          updateExpectedParamMatchType(toolId, path, e.target.value as MatchType)
+        }
+        aria-label="Match type"
+        className="h-9 pl-3 pr-8 rounded-lg text-sm bg-background text-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer appearance-none"
+      >
+        <option value="exact">Exact</option>
+        <option value="llm_judge">LLM</option>
       </select>
       <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
         <svg
@@ -1659,13 +1821,17 @@ export function AddTestDialog({
       const showErrors =
         localValidationAttempted && activeTab === "tool-invocation";
 
-      // Header: name (label, or editable input for custom rows) + badge +
-      // remove button for optional / custom rows.
+      // The "filled in" field for a leaf depends on its match strategy: the
+      // judging criteria for an LLM judge, the expected value otherwise.
+      const leafFilled =
+        param.matchType === "llm_judge"
+          ? !!param.criteria.trim()
+          : !!param.value.trim();
+
+      // Header: name (label, or editable input for custom rows) + match-type
+      // picker (non-boolean leaves) + badge + remove button.
       const nameError =
-        showErrors &&
-        param.custom &&
-        !!param.value.trim() &&
-        !param.name.trim();
+        showErrors && param.custom && leafFilled && !param.name.trim();
       const header = (
         <div className="flex items-center gap-2">
           {param.custom ? (
@@ -1688,6 +1854,10 @@ export function AddTestDialog({
               {param.name}
             </span>
           )}
+          {/* Booleans are always exact (yes/no) — no match-type picker. */}
+          {!param.isObject &&
+            param.dataType !== "boolean" &&
+            renderMatchTypeSelect(toolId, paramPath, param.matchType)}
           {renderRequiredBadge(param.required)}
           {!param.required && renderRemoveParamButton(toolId, paramPath)}
         </div>
@@ -1807,19 +1977,25 @@ export function AddTestDialog({
         );
       }
 
-      // A value is "missing" when it's empty but required (or a kept named row);
-      // it's "malformed" when present but wrong for its type (e.g. non-numeric).
-      // A boolean is "unset" when it holds neither true nor false.
-      const typeError = expectedValueTypeError(param.value, param.dataType);
+      // For LLM-judged rows the criteria box replaces the value box. The field
+      // is "missing" when empty but required (or a kept named row); a value is
+      // "malformed" when present but wrong for its type (e.g. non-numeric); a
+      // boolean is "unset" when it holds neither true nor false.
+      const isLlm = param.matchType === "llm_judge";
+      const typeError =
+        !isLlm && expectedValueTypeError(param.value, param.dataType);
       const booleanUnset =
         param.dataType === "boolean" &&
         param.value !== "true" &&
         param.value !== "false";
       const missingValue =
-        !param.value.trim() &&
+        !leafFilled &&
         (param.required || (!param.custom ? true : !!param.name.trim()));
       const valueError = showErrors && (missingValue || typeError || booleanUnset);
       const fieldClass = `w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+        valueError ? "border-red-500" : "border-border"
+      }`;
+      const criteriaClass = `w-full px-4 py-2.5 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent resize-y ${
         valueError ? "border-red-500" : "border-border"
       }`;
       return (
@@ -1860,6 +2036,17 @@ export function AddTestDialog({
                 </svg>
               </div>
             </div>
+          ) : isLlm ? (
+            // LLM judge — describe what a correct value looks like.
+            <textarea
+              value={param.criteria}
+              onChange={(e) =>
+                updateExpectedParamCriteria(toolId, paramPath, e.target.value)
+              }
+              rows={2}
+              placeholder="Describe what a correct value looks like, e.g. A friendly reminder that includes the date"
+              className={criteriaClass}
+            />
           ) : (
             <input
               type="text"
@@ -1876,6 +2063,9 @@ export function AddTestDialog({
               }
               className={fieldClass}
             />
+          )}
+          {showErrors && isLlm && missingValue && (
+            <p className="text-xs text-red-500">Enter judging criteria.</p>
           )}
           {showErrors && booleanUnset && (
             <p className="text-xs text-red-500">Select true or false.</p>
