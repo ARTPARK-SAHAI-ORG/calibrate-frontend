@@ -13,6 +13,10 @@ import { useAccessToken } from "@/hooks";
 import { getDefaultHeaders } from "@/lib/api";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
 import { NestedContainer } from "@/components/ui/NestedContainer";
+import {
+  readToolParameters,
+  NormalizedToolParam,
+} from "@/lib/toolParams";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { formatTurnTimestamp } from "@/components/test-results/shared";
@@ -91,6 +95,17 @@ const coerceExpectedValue = (value: string, dataType: string): any => {
   }
 };
 
+// True when a leaf row's (non-empty) value is malformed for its declared type —
+// e.g. non-numeric text in a number/integer field. Drives inline error styling
+// and gates saving. Empty values are handled separately by required-ness.
+const expectedValueTypeError = (value: string, dataType: string): boolean => {
+  const v = value.trim();
+  if (!v) return false;
+  if (dataType === "integer") return !/^[+-]?\d+$/.test(v);
+  if (dataType === "number") return !Number.isFinite(Number(v));
+  return false;
+};
+
 type SelectedToolConfig = {
   id: string;
   name: string;
@@ -113,39 +128,24 @@ const expectedValueToString = (v: any): string => {
   return String(v);
 };
 
-// Convert a single JSON-schema-ish node into an ExpectedParam (without a value).
-const schemaNodeToExpectedParam = (
-  name: string,
-  schema: any,
-  required: boolean,
-): ExpectedParam => {
-  const dataType = schema?.type || (schema?.properties ? "object" : "string");
-  const isObject = dataType === "object";
-  const param: ExpectedParam = {
+// Map a normalized schema parameter (from @/lib/toolParams, shared with the
+// tool builder) into an ExpectedParam, attaching test-editor-specific fields.
+const normalizedToExpectedParam = (n: NormalizedToolParam): ExpectedParam => {
+  const isObject = n.dataType === "object";
+  return {
     id: newExpParamId(),
-    name,
+    name: n.name,
     value: "",
-    required,
-    dataType,
+    required: n.required,
+    dataType: n.dataType,
     isObject,
     custom: false,
-    allowCustomKeys: false,
-  };
-  if (isObject) {
-    const props = schema?.properties || {};
-    const requiredArr = Array.isArray(schema?.required) ? schema.required : [];
-    const entries = Object.entries(props);
-    param.properties = entries.map(([propName, propSchema]) =>
-      schemaNodeToExpectedParam(
-        propName,
-        propSchema,
-        requiredArr.includes(propName),
-      ),
-    );
     // An object that declares no properties lets the user add arbitrary keys.
-    param.allowCustomKeys = entries.length === 0;
-  }
-  return param;
+    allowCustomKeys: isObject && (n.properties?.length ?? 0) === 0,
+    properties: isObject
+      ? (n.properties ?? []).map(normalizedToExpectedParam)
+      : undefined,
+  };
 };
 
 // Build the expected-parameter tree (no values) from a tool's stored config.
@@ -155,38 +155,9 @@ const buildExpectedParamsFromToolConfig = (
   config: Record<string, any> | undefined,
 ): { params: ExpectedParam[]; allowCustom: boolean } => {
   const isWebhook = config?.type === "webhook";
-  const params = config?.parameters;
-  let list: ExpectedParam[] = [];
-
-  if (Array.isArray(params)) {
-    // New array format: each entry carries its own `required` boolean.
-    list = params.map((p: any) =>
-      schemaNodeToExpectedParam(p.id || p.name || "", p, p.required !== false),
-    );
-  } else {
-    // Legacy object format: a properties map plus an optional `required` array.
-    const propsObj =
-      config?.parameters?.properties ||
-      config?.function?.parameters?.properties ||
-      config?.properties ||
-      config?.parameters ||
-      {};
-    const requiredArr = Array.isArray(config?.parameters?.required)
-      ? config.parameters.required
-      : [];
-    list = Object.entries(propsObj).map(([name, schema]) =>
-      schemaNodeToExpectedParam(
-        name,
-        schema,
-        // No declared required array → treat every legacy param as required
-        // (matches the prior behaviour of demanding a value for each).
-        requiredArr.length ? requiredArr.includes(name) : true,
-      ),
-    );
-  }
-
-  const allowCustom = list.length === 0 && !isWebhook;
-  return { params: list, allowCustom };
+  const params = readToolParameters(config).map(normalizedToExpectedParam);
+  const allowCustom = params.length === 0 && !isWebhook;
+  return { params, allowCustom };
 };
 
 // Deep-clone an expected-parameter node, assigning fresh ids throughout so the
@@ -357,11 +328,14 @@ const hasInvalidExpectedParams = (params: ExpectedParam[]): boolean => {
     const named = p.name.trim();
     const valued = p.value.trim();
     if (p.custom) {
+      // A fully-blank custom row is ignored (not yet used).
       if (!named && !valued) continue;
       if (!named || !valued) return true;
-      continue;
+    } else if (!valued) {
+      return true;
     }
-    if (!valued) return true;
+    // A filled-in value must also be well-formed for its type.
+    if (expectedValueTypeError(p.value, p.dataType)) return true;
   }
   return false;
 };
@@ -1533,28 +1507,12 @@ export function AddTestDialog({
       addExpParamAtPath(params, parentPath, makeCustomParam("string")),
     );
 
-  // Check if a tool has parameters in its original config
+  // Check if a tool declares any parameters in its config.
   const toolHasParams = (toolId: string, toolName: string) => {
     const tool = availableTools.find(
       (t) => t.uuid === toolId || t.name === toolName,
     );
-    if (!tool) return false;
-
-    const params = tool.config?.parameters;
-
-    // Handle array format (new)
-    if (Array.isArray(params)) {
-      return params.length > 0;
-    }
-
-    // Handle object format (legacy)
-    const propsObj =
-      tool.config?.parameters?.properties ||
-      tool.config?.function?.parameters?.properties ||
-      tool.config?.properties ||
-      tool.config?.parameters ||
-      {};
-    return Object.keys(propsObj).length > 0;
+    return readToolParameters(tool?.config).length > 0;
   };
 
   // Small "Required" / "Optional" pill shown next to each parameter row.
@@ -1830,35 +1788,75 @@ export function AddTestDialog({
         );
       }
 
-      const valueError =
-        showErrors &&
+      // A value is "missing" when it's empty but required (or a kept named row);
+      // it's "malformed" when present but wrong for its type (e.g. non-numeric).
+      const typeError = expectedValueTypeError(param.value, param.dataType);
+      const missingValue =
         !param.value.trim() &&
         (param.required || (!param.custom ? true : !!param.name.trim()));
+      const valueError = showErrors && (missingValue || typeError);
+      const fieldClass = `w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+        valueError ? "border-red-500" : "border-border"
+      }`;
       return (
         <div
           key={param.id}
           className="bg-background border border-border rounded-xl p-4 space-y-1.5"
         >
           {header}
-          <input
-            type="text"
-            value={param.value}
-            onChange={(e) =>
-              updateExpectedParamValue(toolId, paramPath, e.target.value)
-            }
-            placeholder={
-              param.dataType === "boolean"
-                ? "true or false"
-                : param.dataType === "array"
+          {param.dataType === "boolean" ? (
+            // Booleans can only be true or false — offer a fixed dropdown.
+            <div className="relative">
+              <select
+                value={param.value}
+                onChange={(e) =>
+                  updateExpectedParamValue(toolId, paramPath, e.target.value)
+                }
+                className={`${fieldClass} pr-10 cursor-pointer appearance-none`}
+              >
+                <option value="">Select…</option>
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <svg
+                  className="w-4 h-4 text-muted-foreground"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                  />
+                </svg>
+              </div>
+            </div>
+          ) : (
+            <input
+              type="text"
+              value={param.value}
+              onChange={(e) =>
+                updateExpectedParamValue(toolId, paramPath, e.target.value)
+              }
+              placeholder={
+                param.dataType === "array"
                   ? 'Expected value, e.g. ["a", "b"]'
                   : param.dataType === "integer" || param.dataType === "number"
                     ? "Expected number"
                     : "Expected value"
-            }
-            className={`w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
-              valueError ? "border-red-500" : "border-border"
-            }`}
-          />
+              }
+              className={fieldClass}
+            />
+          )}
+          {showErrors && typeError && (
+            <p className="text-xs text-red-500">
+              Enter a valid {param.dataType === "integer" ? "integer" : "number"}
+              .
+            </p>
+          )}
         </div>
       );
     });

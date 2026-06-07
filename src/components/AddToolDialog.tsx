@@ -7,6 +7,7 @@ import { NestedContainer } from "@/components/ui/NestedContainer";
 import { FieldError } from "@/components/ui/FieldError";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { readNameConflictMessage } from "@/lib/parseBackendError";
+import { parseSchemaNode, NormalizedToolParam } from "@/lib/toolParams";
 
 type ToolData = {
   uuid: string;
@@ -719,110 +720,32 @@ export function AddToolDialog({
     );
   };
 
-  // Normalize a JSON-schema "type" that may be a nullable union
-  // (e.g. ["integer", "null"]) into a single dataType plus a nullable flag.
-  // The first non-"null" member wins; nullable fields are treated as optional.
-  const normalizeSchemaType = (
-    rawType: any,
-  ): { dataType: string; nullable: boolean } => {
-    if (Array.isArray(rawType)) {
-      const nullable = rawType.includes("null");
-      const nonNull = rawType.find((t) => t !== "null");
-      return {
-        dataType: typeof nonNull === "string" ? nonNull : "string",
-        nullable,
-      };
-    }
-    return {
-      dataType: typeof rawType === "string" ? rawType : "string",
-      nullable: false,
-    };
-  };
-
-  const parseItemsSchema = (itemsConfig: any): Parameter => {
-    const { dataType } = normalizeSchemaType(itemsConfig.type);
-    const itemParam: Parameter = {
+  // Attach fresh ids to a normalized schema tree, producing the ParameterCard
+  // `Parameter` shape used by this dialog's form state. The recursive schema
+  // parsing itself lives in @/lib/toolParams (shared with the test editor).
+  const normalizedToParameter = (n: NormalizedToolParam): Parameter => {
+    const param: Parameter = {
       id: crypto.randomUUID(),
-      name: "",
-      dataType,
-      required: true,
-      description: itemsConfig.description || "",
+      name: n.name,
+      dataType: n.dataType,
+      required: n.required,
+      description: n.description,
     };
-
-    if (dataType === "object" && itemsConfig.properties) {
-      itemParam.properties = [];
-      // `required` on an object schema is the JSON-schema array of required
-      // property names. Some stored configs carry a boolean here instead (the
-      // object param's own required flag), so guard before calling .includes.
-      const requiredProps = Array.isArray(itemsConfig.required)
-        ? itemsConfig.required
-        : [];
-      Object.entries(itemsConfig.properties).forEach(
-        ([propName, propConfig]: [string, any]) => {
-          itemParam.properties!.push(
-            parseParameterSchema(
-              propName,
-              propConfig,
-              requiredProps.includes(propName),
-            ),
-          );
-        },
-      );
+    if (n.properties) {
+      param.properties = n.properties.map(normalizedToParameter);
     }
-
-    if (dataType === "array" && itemsConfig.items) {
-      itemParam.items = parseItemsSchema(itemsConfig.items);
+    if (n.items) {
+      param.items = normalizedToParameter(n.items);
     }
-
-    return itemParam;
+    return param;
   };
 
   const parseParameterSchema = (
     paramName: string,
     paramConfig: any,
     isRequired: boolean = true,
-  ): Parameter => {
-    const { dataType, nullable } = normalizeSchemaType(paramConfig.type);
-    const param: Parameter = {
-      id: crypto.randomUUID(),
-      name: paramName,
-      dataType,
-      // A nullable union (e.g. ["integer", "null"]) marks the field optional.
-      // `required` is only a self-flag when it's a boolean; on object schemas it
-      // is the array of required child names, so fall back to isRequired there.
-      required: nullable
-        ? false
-        : typeof paramConfig.required === "boolean"
-          ? paramConfig.required
-          : isRequired,
-      description: paramConfig.description || "",
-    };
-
-    if (dataType === "array" && paramConfig.items) {
-      param.items = parseItemsSchema(paramConfig.items);
-    }
-
-    if (dataType === "object" && paramConfig.properties) {
-      param.properties = [];
-      // See note in parseItemsSchema: guard against a boolean `required`.
-      const requiredProps = Array.isArray(paramConfig.required)
-        ? paramConfig.required
-        : [];
-      Object.entries(paramConfig.properties).forEach(
-        ([propName, propConfig]: [string, any]) => {
-          param.properties!.push(
-            parseParameterSchema(
-              propName,
-              propConfig,
-              requiredProps.includes(propName),
-            ),
-          );
-        },
-      );
-    }
-
-    return param;
-  };
+  ): Parameter =>
+    normalizedToParameter(parseSchemaNode(paramName, paramConfig, isRequired));
 
   // ----- JSON view (serialize / parse / apply) -----
 
