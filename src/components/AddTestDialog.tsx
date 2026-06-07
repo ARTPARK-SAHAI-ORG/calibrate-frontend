@@ -2059,9 +2059,6 @@ export function AddTestDialog({
       const fieldClass = `w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed ${
         valueError ? "border-red-500" : "border-border"
       }`;
-      const criteriaClass = `w-full px-4 py-2.5 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent resize-y ${
-        valueError ? "border-red-500" : "border-border"
-      }`;
       return (
         <div
           key={param.id}
@@ -2119,7 +2116,8 @@ export function AddTestDialog({
               {renderMatchTypeSelect(toolId, paramPath, param.matchType)}
               {isLlm ? (
                 // LLM judge — describe what a correct value looks like.
-                <textarea
+                <input
+                  type="text"
                   value={param.criteria}
                   onChange={(e) =>
                     updateExpectedParamCriteria(
@@ -2128,9 +2126,8 @@ export function AddTestDialog({
                       e.target.value,
                     )
                   }
-                  rows={2}
                   placeholder="e.g. A friendly reminder with the date"
-                  className={`${criteriaClass} flex-1 min-w-0`}
+                  className={`${fieldClass} flex-1 min-w-0`}
                 />
               ) : isNull ? (
                 <input
