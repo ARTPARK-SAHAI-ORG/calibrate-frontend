@@ -687,16 +687,17 @@ export function AddToolDialog({
 
   // Convert a list of parameters into an OpenAI-style object schema
   // ({ type: "object", properties: { name: {...} }, required: [...] }).
-  // Empty-named (in-progress) params are dropped, matching buildParametersConfig.
+  // In-progress params with no name yet are kept under an empty-string ("") key
+  // so their description / nested props survive a JSON round-trip instead of
+  // silently vanishing. The backend payload (buildParametersConfig) still drops
+  // nameless params, and validation blocks saving until they're named.
   const paramsToObjectSchema = (params: Parameter[]): Record<string, any> => {
     const properties: Record<string, any> = {};
     const required: string[] = [];
-    params
-      .filter((param) => param.name)
-      .forEach((param) => {
-        properties[param.name] = parameterToJsonSchema(param);
-        if (param.required) required.push(param.name);
-      });
+    params.forEach((param) => {
+      properties[param.name] = parameterToJsonSchema(param);
+      if (param.required) required.push(param.name);
+    });
     const schema: Record<string, any> = { type: "object", properties };
     if (required.length > 0) schema.required = required;
     return schema;
