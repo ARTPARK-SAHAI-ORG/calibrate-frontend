@@ -538,10 +538,11 @@ export function AddTestDialog({
 
   // Two-phase create flow: when creating a brand-new test we first show a
   // centred type picker (the same three boxes as the bulk-upload modal),
-  // then animate into the full editor. Editing (type is immutable) and
-  // labelItem mode skip the intro entirely. `typeChosen` gates which phase
-  // renders; `editorEntered` drives the entrance transition once chosen.
-  const showTypeIntroFlow = !isLabelItem && !isEditing;
+  // then animate into the full editor. Editing (type is immutable),
+  // labelItem mode, and duplicating (the type is inherited via `initialTab`)
+  // all skip the intro entirely. `typeChosen` gates which phase renders;
+  // `editorEntered` drives the entrance transition once chosen.
+  const showTypeIntroFlow = !isLabelItem && !isEditing && !initialTab;
   const [typeChosen, setTypeChosen] = useState<boolean>(!showTypeIntroFlow);
   const [editorEntered, setEditorEntered] =
     useState<boolean>(!showTypeIntroFlow);
@@ -550,10 +551,10 @@ export function AddTestDialog({
   // starts on the picker and an edit always lands straight in the editor.
   useEffect(() => {
     if (!isOpen) return;
-    const skipIntro = isLabelItem || isEditing;
+    const skipIntro = isLabelItem || isEditing || !!initialTab;
     setTypeChosen(skipIntro);
     setEditorEntered(skipIntro);
-  }, [isOpen, isLabelItem, isEditing]);
+  }, [isOpen, isLabelItem, isEditing, initialTab]);
 
   // Drive the editor's scale/opacity entrance on the frame after the type is
   // chosen, so the swap from the intro picker reads as an animation.

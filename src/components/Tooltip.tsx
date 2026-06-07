@@ -130,6 +130,12 @@ export function Tooltip({
         className={`relative ${className}`}
         onMouseEnter={() => setIsVisible(true)}
         onMouseLeave={() => setIsVisible(false)}
+        // Hide on click too: clicking the trigger often opens a dialog/overlay
+        // on top of it, so the pointer never physically leaves and no
+        // mouseleave fires — leaving the tooltip stuck on screen. Use the
+        // capture phase so it still fires when the child button calls
+        // stopPropagation() in its own (bubble-phase) onClick.
+        onClickCapture={() => setIsVisible(false)}
       >
         {children}
       </div>

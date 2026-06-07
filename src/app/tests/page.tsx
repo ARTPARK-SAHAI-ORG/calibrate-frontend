@@ -25,6 +25,7 @@ import {
 import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
+import { Tooltip } from "@/components/Tooltip";
 import { useSidebarState } from "@/lib/sidebar";
 import { testTypeLabel } from "@/lib/testTypes";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
@@ -1219,29 +1220,24 @@ function LLMPageInner() {
                   </p>
                   <div className="flex items-center gap-1">
                     {/* Play Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openRunTestDialog(test);
-                      }}
-                      className="group relative w-8 h-8 flex items-center justify-center rounded-lg bg-foreground/90 text-background hover:bg-foreground transition-colors cursor-pointer"
-                    >
-                      <svg
-                        className="w-3.5 h-3.5"
-                        fill="currentColor"
-                        viewBox="0 0 24 24"
+                    <Tooltip content="Run this test">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openRunTestDialog(test);
+                        }}
+                        aria-label="Run this test"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-foreground/90 text-background hover:bg-foreground transition-colors cursor-pointer"
                       >
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                      {/* Tooltip */}
-                      <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                        <span className="px-3 py-1.5 text-sm font-medium text-gray-900 bg-white rounded-full whitespace-nowrap shadow-lg">
-                          Run this test
-                        </span>
-                        {/* Arrow */}
-                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white"></div>
-                      </div>
-                    </button>
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </button>
+                    </Tooltip>
                     {/* Duplicate Button — opens the create dialog pre-filled
                         from this test; nothing is saved until submit. */}
                     <DuplicateIconButton
