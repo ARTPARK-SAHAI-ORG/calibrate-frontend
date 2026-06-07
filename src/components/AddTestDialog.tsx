@@ -178,7 +178,8 @@ const makeCustomParam = (dataType: string = "string"): ExpectedParam => {
   return {
     id: newExpParamId(),
     name: "",
-    value: "",
+    // Booleans default to "true" since the only valid values are true/false.
+    value: dataType === "boolean" ? "true" : "",
     required: false,
     dataType,
     isObject,
@@ -829,6 +830,11 @@ export function AddTestDialog({
 
   const [localValidationAttempted, setLocalValidationAttempted] =
     useState(false);
+  // Dialog-level message for failed tool-call validation (e.g. an unset boolean
+  // or an incomplete parameter). Shown in the footer; cleared on each attempt.
+  const [toolValidationError, setToolValidationError] = useState<string | null>(
+    null,
+  );
   const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
   // Collapsed object-parameter rows (keyed by the param's unique id). Objects
   // default to expanded; the user can fold them to tame deeply nested schemas.
@@ -1486,13 +1492,22 @@ export function AddTestDialog({
     mutateToolParams(toolId, (params) =>
       updateExpParamAtPath(params, path, (p) => {
         const isObject = dataType === "object";
+        // Booleans can only be true/false — default to "true" so there's always
+        // a valid selection. Objects clear their (now meaningless) value.
+        const value = isObject
+          ? ""
+          : dataType === "boolean"
+            ? p.value === "true" || p.value === "false"
+              ? p.value
+              : "true"
+            : p.value;
         return {
           ...p,
           dataType,
           isObject,
           allowCustomKeys: isObject,
           properties: isObject ? p.properties || [] : undefined,
-          value: isObject ? "" : p.value,
+          value,
         };
       }),
     );
@@ -1790,11 +1805,16 @@ export function AddTestDialog({
 
       // A value is "missing" when it's empty but required (or a kept named row);
       // it's "malformed" when present but wrong for its type (e.g. non-numeric).
+      // A boolean is "unset" when it holds neither true nor false.
       const typeError = expectedValueTypeError(param.value, param.dataType);
+      const booleanUnset =
+        param.dataType === "boolean" &&
+        param.value !== "true" &&
+        param.value !== "false";
       const missingValue =
         !param.value.trim() &&
         (param.required || (!param.custom ? true : !!param.name.trim()));
-      const valueError = showErrors && (missingValue || typeError);
+      const valueError = showErrors && (missingValue || typeError || booleanUnset);
       const fieldClass = `w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
         valueError ? "border-red-500" : "border-border"
       }`;
@@ -1808,13 +1828,15 @@ export function AddTestDialog({
             // Booleans can only be true or false — offer a fixed dropdown.
             <div className="relative">
               <select
-                value={param.value}
+                value={booleanUnset ? "" : param.value}
                 onChange={(e) =>
                   updateExpectedParamValue(toolId, paramPath, e.target.value)
                 }
                 className={`${fieldClass} pr-10 cursor-pointer appearance-none`}
               >
-                <option value="">Select…</option>
+                {/* Hidden placeholder so an unset boolean renders blank without
+                  adding a selectable "Select…" entry to the list. */}
+                <option value="" disabled hidden></option>
                 <option value="true">true</option>
                 <option value="false">false</option>
               </select>
@@ -1850,6 +1872,9 @@ export function AddTestDialog({
               }
               className={fieldClass}
             />
+          )}
+          {showErrors && booleanUnset && (
+            <p className="text-xs text-red-500">Select true or false.</p>
           )}
           {showErrors && typeError && (
             <p className="text-xs text-red-500">
@@ -2044,10 +2069,12 @@ export function AddTestDialog({
   // Handle form submission
   const handleSubmit = () => {
     setLocalValidationAttempted(true);
+    setToolValidationError(null);
 
     // Auto-hide validation errors after 3 seconds
     setTimeout(() => {
       setLocalValidationAttempted(false);
+      setToolValidationError(null);
     }, 3000);
 
     // Validate tool call params in conversation history (for both test types)
@@ -2101,6 +2128,9 @@ export function AddTestDialog({
           !tool.acceptAnyParameterValues &&
           hasInvalidExpectedParams(tool.expectedParameters)
         ) {
+          setToolValidationError(
+            "Please complete every highlighted parameter — booleans need true or false, and numbers must be valid.",
+          );
           return;
         }
       }
@@ -2896,6 +2926,11 @@ export function AddTestDialog({
             <div className="px-4 md:px-6 py-3 md:py-4 bg-background">
               {createError && (
                 <p className="text-sm text-red-500 mb-3">{createError}</p>
+              )}
+              {toolValidationError && (
+                <p className="text-sm text-red-500 mb-3">
+                  {toolValidationError}
+                </p>
               )}
               <div className="flex items-center justify-between gap-2">
                 <button
