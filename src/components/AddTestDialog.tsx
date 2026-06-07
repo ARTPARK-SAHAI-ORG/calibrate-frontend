@@ -53,6 +53,9 @@ type ExpectedParam = {
   matchType: MatchType;
   // Free-text judging criteria, used only when `matchType === "llm_judge"`.
   criteria: string;
+  // When true, the expected value is `null` — the value field is disabled and
+  // the row emits `{ match_type: "exact", value: null }`. Exact-match only.
+  isNull?: boolean;
   // Optional per-parameter judge model override (round-tripped from saved
   // tests; not surfaced as an input in the UI).
   judgeModel?: string;
@@ -210,6 +213,7 @@ const cloneExpParamFresh = (param: ExpectedParam): ExpectedParam => ({
   id: newExpParamId(),
   value: "",
   criteria: "",
+  isNull: false,
   properties: param.properties
     ? param.properties.map(cloneExpParamFresh)
     : param.properties,
@@ -257,9 +261,10 @@ const customParamFromArg = (name: string, raw: any): ExpectedParam => {
   return {
     id: newExpParamId(),
     name,
-    value: isObj ? "" : expectedValueToString(v),
+    value: isObj || v === null ? "" : expectedValueToString(v),
     matchType: "exact",
     criteria: "",
+    isNull: v === null,
     required: false,
     dataType: inferExpectedDataType(v),
     isObject: isObj,
@@ -308,12 +313,17 @@ const overlayArgsOntoParams = (
       });
     } else {
       const { matchType, value, criteria, judgeModel } = parseArgMatch(rawVal);
+      const isNull = matchType === "exact" && value === null;
       merged.push({
         ...p,
         matchType,
         criteria,
         judgeModel,
-        value: matchType === "llm_judge" ? "" : expectedValueToString(value),
+        isNull,
+        value:
+          matchType === "llm_judge" || isNull
+            ? ""
+            : expectedValueToString(value),
       });
     }
   }
@@ -398,6 +408,9 @@ const buildArgsFromExpectedParams = (
       };
       if (p.judgeModel?.trim()) spec.judge_model = p.judgeModel.trim();
       obj[name] = spec;
+    } else if (p.isNull) {
+      // Explicit null assertion — always emitted, even for optional params.
+      obj[name] = { match_type: "exact", value: null };
     } else {
       if (!p.value.trim() && !p.required) continue;
       obj[name] = {
@@ -420,9 +433,14 @@ const hasInvalidExpectedParams = (params: ExpectedParam[]): boolean => {
     }
     const named = p.name.trim();
     // The required/filled field depends on the match strategy: criteria for an
-    // LLM judge, the expected value otherwise.
+    // LLM judge, the expected value otherwise. A null assertion always counts
+    // as filled.
     const filled =
-      p.matchType === "llm_judge" ? p.criteria.trim() : p.value.trim();
+      p.matchType === "llm_judge"
+        ? p.criteria.trim()
+        : p.isNull
+          ? "null"
+          : p.value.trim();
     if (p.custom) {
       // A fully-blank custom row is ignored (not yet used).
       if (!named && !filled) continue;
@@ -433,6 +451,7 @@ const hasInvalidExpectedParams = (params: ExpectedParam[]): boolean => {
     // A filled-in exact value must also be well-formed for its type.
     if (
       p.matchType !== "llm_judge" &&
+      !p.isNull &&
       expectedValueTypeError(p.value, p.dataType)
     )
       return true;
@@ -1582,14 +1601,34 @@ export function AddTestDialog({
       updateExpParamAtPath(params, path, (p) => ({ ...p, name })),
     );
 
-  // Switch a leaf parameter between exact-match and LLM-judge.
+  // Switch a leaf parameter between exact-match and LLM-judge. The null
+  // assertion only applies to exact matches, so it's cleared when judging.
   const updateExpectedParamMatchType = (
     toolId: string,
     path: string[],
     matchType: MatchType,
   ) =>
     mutateToolParams(toolId, (params) =>
-      updateExpParamAtPath(params, path, (p) => ({ ...p, matchType })),
+      updateExpParamAtPath(params, path, (p) => ({
+        ...p,
+        matchType,
+        isNull: matchType === "exact" ? p.isNull : false,
+      })),
+    );
+
+  // Toggle a leaf parameter's "expected value is null" flag. Marking null
+  // clears any typed value so the disabled field doesn't show stale text.
+  const updateExpectedParamNull = (
+    toolId: string,
+    path: string[],
+    isNull: boolean,
+  ) =>
+    mutateToolParams(toolId, (params) =>
+      updateExpParamAtPath(params, path, (p) => ({
+        ...p,
+        isNull,
+        value: isNull ? "" : p.value,
+      })),
     );
 
   // Update an LLM-judged parameter's criteria text.
@@ -1637,6 +1676,8 @@ export function AddTestDialog({
           value,
           matchType,
           criteria: matchType === "exact" ? "" : p.criteria,
+          // Objects are containers and can't carry a null assertion.
+          isNull: isObject ? false : p.isNull,
         };
       }),
     );
@@ -1749,6 +1790,26 @@ export function AddTestDialog({
     </div>
   );
 
+  // "null" checkbox beside an exact-match value: ticking it asserts the value is
+  // null and disables the value field.
+  const renderNullCheckbox = (
+    toolId: string,
+    path: string[],
+    isNull: boolean,
+  ) => (
+    <label className="flex flex-shrink-0 items-center gap-1.5 h-10 px-1 text-sm text-muted-foreground cursor-pointer select-none">
+      <input
+        type="checkbox"
+        checked={isNull}
+        onChange={(e) =>
+          updateExpectedParamNull(toolId, path, e.target.checked)
+        }
+        className="w-4 h-4 cursor-pointer accent-foreground"
+      />
+      null
+    </label>
+  );
+
   // Small trash button for removing optional / custom parameter rows.
   const renderRemoveParamButton = (toolId: string, path: string[]) => (
     <button
@@ -1824,11 +1885,12 @@ export function AddTestDialog({
         localValidationAttempted && activeTab === "tool-invocation";
 
       // The "filled in" field for a leaf depends on its match strategy: the
-      // judging criteria for an LLM judge, the expected value otherwise.
+      // judging criteria for an LLM judge, the expected value otherwise. A null
+      // assertion always counts as filled.
       const leafFilled =
         param.matchType === "llm_judge"
           ? !!param.criteria.trim()
-          : !!param.value.trim();
+          : param.isNull || !!param.value.trim();
 
       // Header: name (label, or editable input for custom rows) + badge +
       // remove button. The match-type picker lives on the value row below.
@@ -1980,9 +2042,13 @@ export function AddTestDialog({
       // "malformed" when present but wrong for its type (e.g. non-numeric); a
       // boolean is "unset" when it holds neither true nor false.
       const isLlm = param.matchType === "llm_judge";
+      const isNull = !isLlm && !!param.isNull;
       const typeError =
-        !isLlm && expectedValueTypeError(param.value, param.dataType);
+        !isLlm &&
+        !isNull &&
+        expectedValueTypeError(param.value, param.dataType);
       const booleanUnset =
+        !isNull &&
         param.dataType === "boolean" &&
         param.value !== "true" &&
         param.value !== "false";
@@ -1990,7 +2056,7 @@ export function AddTestDialog({
         !leafFilled &&
         (param.required || (!param.custom ? true : !!param.name.trim()));
       const valueError = showErrors && (missingValue || typeError || booleanUnset);
-      const fieldClass = `w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+      const fieldClass = `w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed ${
         valueError ? "border-red-500" : "border-border"
       }`;
       const criteriaClass = `w-full px-4 py-2.5 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent resize-y ${
@@ -2004,35 +2070,48 @@ export function AddTestDialog({
           {header}
           {param.dataType === "boolean" ? (
             // Booleans can only be true or false — offer a fixed dropdown.
-            <div className="relative">
-              <select
-                value={booleanUnset ? "" : param.value}
-                onChange={(e) =>
-                  updateExpectedParamValue(toolId, paramPath, e.target.value)
-                }
-                className={`${fieldClass} pr-10 cursor-pointer appearance-none`}
-              >
-                {/* Hidden placeholder so an unset boolean renders blank without
-                  adding a selectable "Select…" entry to the list. */}
-                <option value="" disabled hidden></option>
-                <option value="true">true</option>
-                <option value="false">false</option>
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                <svg
-                  className="w-4 h-4 text-muted-foreground"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                  />
-                </svg>
-              </div>
+            <div className="flex items-center gap-2">
+              {isNull ? (
+                <input
+                  type="text"
+                  value="null"
+                  disabled
+                  readOnly
+                  className={`${fieldClass} flex-1 min-w-0`}
+                />
+              ) : (
+                <div className="relative flex-1 min-w-0">
+                  <select
+                    value={booleanUnset ? "" : param.value}
+                    onChange={(e) =>
+                      updateExpectedParamValue(toolId, paramPath, e.target.value)
+                    }
+                    className={`${fieldClass} pr-10 cursor-pointer appearance-none`}
+                  >
+                    {/* Hidden placeholder so an unset boolean renders blank
+                      without adding a selectable "Select…" entry to the list. */}
+                    <option value="" disabled hidden></option>
+                    <option value="true">true</option>
+                    <option value="false">false</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <svg
+                      className="w-4 h-4 text-muted-foreground"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              )}
+              {renderNullCheckbox(toolId, paramPath, isNull)}
             </div>
           ) : (
             // Match-type picker sits inline with the expected value / criteria.
@@ -2053,6 +2132,14 @@ export function AddTestDialog({
                   placeholder="Describe what a correct value looks like, e.g. A friendly reminder that includes the date"
                   className={`${criteriaClass} flex-1 min-w-0`}
                 />
+              ) : isNull ? (
+                <input
+                  type="text"
+                  value="null"
+                  disabled
+                  readOnly
+                  className={`${fieldClass} flex-1 min-w-0`}
+                />
               ) : (
                 <input
                   type="text"
@@ -2071,6 +2158,8 @@ export function AddTestDialog({
                   className={`${fieldClass} flex-1 min-w-0`}
                 />
               )}
+              {/* No null assertion for LLM-judged rows — criteria-based. */}
+              {!isLlm && renderNullCheckbox(toolId, paramPath, isNull)}
             </div>
           )}
           {showErrors && isLlm && missingValue && (
