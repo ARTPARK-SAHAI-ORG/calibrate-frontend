@@ -324,7 +324,7 @@ function ExpectedArgValue({ value }: { value: any }) {
       <div className="space-y-2 pl-3 border-l-2 border-border">
         {Object.entries(value).map(([k, v]) => (
           <div key={k}>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
+            <label className="block text-xs font-medium text-foreground mb-1">
               {k}
             </label>
             <ExpectedArgValue value={v} />
@@ -482,7 +482,7 @@ export function ToolCallCard({
               const isMultiLine = displayValue.includes("\n");
               return (
                 <div key={paramName}>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
                     {paramName}
                   </label>
                   {expected ? (
@@ -503,7 +503,7 @@ export function ToolCallCard({
       )}
       {hasOutput && (
         <div className="mt-3 pt-3 border-t border-border">
-          <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+          <label className="block text-sm font-medium text-foreground mb-1.5">
             Output
           </label>
           <div
