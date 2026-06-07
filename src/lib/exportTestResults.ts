@@ -49,6 +49,23 @@ function historyToString(history: TestCaseHistory[] | undefined): string {
   return JSON.stringify(history);
 }
 
+// Serialize the agent's actual output for CSV. Response tests populate
+// `output.response`; tool-call tests populate `output.tool_calls` (often
+// with no text reply). When both are present, export the full object.
+function outputToAgentResponse(output: TestCaseOutput | null | undefined): string {
+  if (!output) return "";
+  const { response, tool_calls } = output;
+  const hasResponse = typeof response === "string" && response.length > 0;
+  const hasToolCalls = Array.isArray(tool_calls) && tool_calls.length > 0;
+
+  if (hasResponse && hasToolCalls) {
+    return JSON.stringify({ response, tool_calls });
+  }
+  if (hasResponse) return response;
+  if (hasToolCalls) return JSON.stringify(tool_calls);
+  return "";
+}
+
 // Determine whether a row is a tool-call test or a response test. Prefers
 // the explicit `evaluation.type` echoed by the API, falls back to peeking
 // at the agent output (`tool_calls` present and non-empty ⇒ tool-call).
@@ -235,7 +252,7 @@ export function buildTestRunCsv(
       name: r.name ?? "",
       status: statusLabel(r.status),
       history: historyToString(r.testCase?.history),
-      agent_response: r.output?.response ?? "",
+      agent_response: outputToAgentResponse(r.output),
       ...(hasToolCall
         ? {
             tool_call_result: isToolCall
@@ -294,7 +311,7 @@ export function buildBenchmarkCsv(
       name: r.name ?? "",
       status: r.passed ? "passed" : "failed",
       history: historyToString(r.testCase?.history),
-      agent_response: r.output?.response ?? "",
+      agent_response: outputToAgentResponse(r.output),
       ...(hasToolCall
         ? {
             tool_call_result: isToolCall ? (r.passed ? "true" : "false") : "",
