@@ -1892,32 +1892,39 @@ export function AddTestDialog({
           ? !!param.criteria.trim()
           : param.isNull || !!param.value.trim();
 
-      // Header: name (label, or editable input for custom rows) + badge +
-      // remove button. The match-type picker lives on the value row below.
+      // Header: a label for declared params, or — for custom (user-added) rows —
+      // a type-picker / badge / remove row with the name input on its own line
+      // below. The match-type picker lives on the value row.
       const nameError =
         showErrors && param.custom && leafFilled && !param.name.trim();
-      const header = (
+      const nameInput = (
+        <input
+          type="text"
+          value={param.name}
+          onChange={(e) =>
+            updateExpectedParamName(toolId, paramPath, e.target.value)
+          }
+          placeholder="Parameter name"
+          className={`w-full h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+            nameError ? "border-red-500" : "border-border"
+          }`}
+        />
+      );
+      const header = param.custom ? (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            {renderParamTypeSelect(toolId, paramPath, param.dataType)}
+            <div className="flex-1" />
+            {renderRequiredBadge(param.required)}
+            {!param.required && renderRemoveParamButton(toolId, paramPath)}
+          </div>
+          {nameInput}
+        </div>
+      ) : (
         <div className="flex items-center gap-2">
-          {param.custom ? (
-            <>
-              {renderParamTypeSelect(toolId, paramPath, param.dataType)}
-              <input
-                type="text"
-                value={param.name}
-                onChange={(e) =>
-                  updateExpectedParamName(toolId, paramPath, e.target.value)
-                }
-                placeholder="Parameter name"
-                className={`flex-1 min-w-0 h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
-                  nameError ? "border-red-500" : "border-border"
-                }`}
-              />
-            </>
-          ) : (
-            <span className="flex-1 text-sm font-medium text-foreground">
-              {param.name}
-            </span>
-          )}
+          <span className="flex-1 text-sm font-medium text-foreground">
+            {param.name}
+          </span>
           {renderRequiredBadge(param.required)}
           {!param.required && renderRemoveParamButton(toolId, paramPath)}
         </div>
@@ -1971,29 +1978,36 @@ export function AddTestDialog({
             key={param.id}
             className="bg-background border border-border rounded-xl p-4 space-y-2"
           >
-            <div className="flex items-center gap-2">
-              {param.custom ? (
-                <>
+            {param.custom ? (
+              // Custom object row: controls on top, name input on its own line.
+              <>
+                <div className="flex items-center gap-2">
                   {renderParamTypeSelect(toolId, paramPath, param.dataType)}
-                  <input
-                    type="text"
-                    value={param.name}
-                    onChange={(e) =>
-                      updateExpectedParamName(toolId, paramPath, e.target.value)
-                    }
-                    placeholder="Parameter name"
-                    className="flex-1 min-w-0 h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent"
-                  />
-                </>
-              ) : (
+                  <div className="flex-1" />
+                  {collapseToggle}
+                  {renderRequiredBadge(param.required)}
+                  {!param.required && renderRemoveParamButton(toolId, paramPath)}
+                </div>
+                <input
+                  type="text"
+                  value={param.name}
+                  onChange={(e) =>
+                    updateExpectedParamName(toolId, paramPath, e.target.value)
+                  }
+                  placeholder="Parameter name"
+                  className="w-full h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
                 <span className="flex-1 text-sm font-medium text-foreground">
                   {param.name}
                 </span>
-              )}
-              {collapseToggle}
-              {renderRequiredBadge(param.required)}
-              {!param.required && renderRemoveParamButton(toolId, paramPath)}
-            </div>
+                {collapseToggle}
+                {renderRequiredBadge(param.required)}
+                {!param.required && renderRemoveParamButton(toolId, paramPath)}
+              </div>
+            )}
             {collapsed ? (
               <p className="text-xs text-muted-foreground">
                 {childCount > 0
