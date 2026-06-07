@@ -69,6 +69,13 @@ export function AddToolDialog({
   const [validationAttempted, setValidationAttempted] = useState(false);
   const sidebarContentRef = useRef<HTMLDivElement>(null);
 
+  // UI ⇆ JSON view toggle. In JSON mode the whole tool definition is edited as
+  // raw text; valid JSON syncs live into the form state below (the single source
+  // of truth), so the existing create/update paths keep working unchanged.
+  const [viewMode, setViewMode] = useState<"ui" | "json">("ui");
+  const [jsonText, setJsonText] = useState("");
+  const [jsonError, setJsonError] = useState<string | null>(null);
+
   // Webhook-specific state
   const [webhookMethod, setWebhookMethod] = useState<
     "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
@@ -99,6 +106,10 @@ export function AddToolDialog({
   // Reset form when dialog opens/closes or editingToolUuid changes
   useEffect(() => {
     if (isOpen) {
+      // Always open in Form view, with a clean JSON editor buffer.
+      setViewMode("ui");
+      setJsonText("");
+      setJsonError(null);
       if (editingToolUuid) {
         // Load existing tool data
         loadToolData(editingToolUuid);
@@ -136,6 +147,9 @@ export function AddToolDialog({
     setQueryParameters([]);
     setBodyDescription("");
     setBodyParameters([]);
+    setViewMode("ui");
+    setJsonText("");
+    setJsonError(null);
   };
 
   const handleClose = () => {
@@ -674,6 +688,39 @@ export function AddToolDialog({
       });
   };
 
+  // Convert a list of parameters into an OpenAI-style object schema
+  // ({ type: "object", properties: { name: {...} }, required: [...] }).
+  // Empty-named (in-progress) params are dropped, matching buildParametersConfig.
+  const paramsToObjectSchema = (params: Parameter[]): Record<string, any> => {
+    const properties: Record<string, any> = {};
+    const required: string[] = [];
+    params
+      .filter((param) => param.name)
+      .forEach((param) => {
+        properties[param.name] = parameterToJsonSchema(param);
+        if (param.required) required.push(param.name);
+      });
+    const schema: Record<string, any> = { type: "object", properties };
+    if (required.length > 0) schema.required = required;
+    return schema;
+  };
+
+  // Inverse of paramsToObjectSchema: turn an object schema back into Parameter[].
+  const objectSchemaToParams = (schema: any): Parameter[] => {
+    if (!schema || typeof schema !== "object" || !schema.properties) return [];
+    const requiredProps: string[] = Array.isArray(schema.required)
+      ? schema.required
+      : [];
+    return Object.entries(schema.properties).map(
+      ([propName, propConfig]: [string, any]) =>
+        parseParameterSchema(
+          propName,
+          propConfig,
+          requiredProps.includes(propName)
+        )
+    );
+  };
+
   const parseItemsSchema = (itemsConfig: any): Parameter => {
     const itemParam: Parameter = {
       id: crypto.randomUUID(),
@@ -740,6 +787,189 @@ export function AddToolDialog({
     }
 
     return param;
+  };
+
+  // ----- JSON view (serialize / parse / apply) -----
+
+  // Serialize the current form state into the canonical tool JSON (OpenAI
+  // function-call schema for parameters, plus the webhook block for webhooks).
+  const buildToolJson = (): string => {
+    const base: Record<string, any> = {
+      name: toolName,
+      description: toolDescription,
+    };
+    if (toolType === "webhook") {
+      const webhook: Record<string, any> = {
+        method: webhookMethod,
+        url: webhookUrl,
+        timeout: responseTimeout,
+        headers: webhookHeaders.map((h) => ({ name: h.name, value: h.value })),
+        queryParameters: paramsToObjectSchema(queryParameters),
+      };
+      if (["POST", "PUT", "PATCH"].includes(webhookMethod)) {
+        webhook.body = {
+          description: bodyDescription,
+          parameters: paramsToObjectSchema(bodyParameters),
+        };
+      }
+      base.webhook = webhook;
+    } else {
+      base.parameters = paramsToObjectSchema(parameters);
+    }
+    return JSON.stringify(base, null, 2);
+  };
+
+  const isObjectSchema = (value: any): boolean =>
+    typeof value === "object" && value !== null && !Array.isArray(value);
+
+  // Validate the structural shape of pasted/edited JSON. Returns a single
+  // human-readable error string, or the parsed object when it is acceptable.
+  const parseToolJson = (
+    text: string
+  ): { value?: any; error?: string } => {
+    let obj: any;
+    try {
+      obj = JSON.parse(text);
+    } catch (e) {
+      return { error: `Invalid JSON: ${(e as Error).message}` };
+    }
+    if (!isObjectSchema(obj)) {
+      return { error: "The top-level value must be a JSON object." };
+    }
+    if (obj.name != null && typeof obj.name !== "string") {
+      return { error: '"name" must be a string.' };
+    }
+    if (obj.description != null && typeof obj.description !== "string") {
+      return { error: '"description" must be a string.' };
+    }
+    if (toolType === "webhook") {
+      if (obj.webhook != null && !isObjectSchema(obj.webhook)) {
+        return { error: '"webhook" must be an object.' };
+      }
+      const qp = obj.webhook?.queryParameters;
+      if (qp != null && !isObjectSchema(qp)) {
+        return {
+          error:
+            '"webhook.queryParameters" must be an object schema (with "properties").',
+        };
+      }
+      const bp = obj.webhook?.body?.parameters;
+      if (bp != null && !isObjectSchema(bp)) {
+        return {
+          error:
+            '"webhook.body.parameters" must be an object schema (with "properties").',
+        };
+      }
+    } else if (obj.parameters != null && !isObjectSchema(obj.parameters)) {
+      return {
+        error:
+          '"parameters" must be an object schema (type "object" with "properties").',
+      };
+    }
+    return { value: obj };
+  };
+
+  // Push a parsed JSON object into the form state.
+  const applyToolJson = (obj: any) => {
+    setToolName(typeof obj.name === "string" ? obj.name : "");
+    setToolDescription(
+      typeof obj.description === "string" ? obj.description : ""
+    );
+    if (toolType === "webhook") {
+      const webhook = obj.webhook || {};
+      const method = ["GET", "POST", "PUT", "PATCH", "DELETE"].includes(
+        webhook.method
+      )
+        ? webhook.method
+        : "POST";
+      setWebhookMethod(method);
+      setWebhookUrl(typeof webhook.url === "string" ? webhook.url : "");
+      setResponseTimeout(
+        typeof webhook.timeout === "number" ? webhook.timeout : 20
+      );
+      setWebhookHeaders(
+        (Array.isArray(webhook.headers) ? webhook.headers : []).map(
+          (h: any) => ({
+            id: crypto.randomUUID(),
+            name: typeof h?.name === "string" ? h.name : "",
+            value: typeof h?.value === "string" ? h.value : "",
+          })
+        )
+      );
+      setQueryParameters(objectSchemaToParams(webhook.queryParameters));
+      setBodyDescription(
+        typeof webhook.body?.description === "string"
+          ? webhook.body.description
+          : ""
+      );
+      setBodyParameters(objectSchemaToParams(webhook.body?.parameters));
+    } else {
+      setParameters(objectSchemaToParams(obj.parameters));
+    }
+  };
+
+  // Live-sync: valid JSON flows into form state on every keystroke; invalid JSON
+  // surfaces an inline error and leaves the last-good state untouched.
+  const handleJsonChange = (text: string) => {
+    setJsonText(text);
+    const result = parseToolJson(text);
+    if (result.error) {
+      setJsonError(result.error);
+      return;
+    }
+    setJsonError(null);
+    applyToolJson(result.value);
+  };
+
+  const switchToJson = () => {
+    setJsonText(buildToolJson());
+    setJsonError(null);
+    setViewMode("json");
+  };
+
+  const switchToUi = () => {
+    setViewMode("ui");
+  };
+
+  // Mirrors the inline validation inside createTool/updateTool so JSON-mode Save
+  // can surface a single readable message instead of silently no-op'ing.
+  const validateForSubmit = (): string | null => {
+    if (!toolName.trim()) return "Name is required.";
+    if (!toolDescription.trim()) return "Description is required.";
+    if (toolType === "webhook") {
+      if (!isValidUrl(webhookUrl)) return "A valid webhook URL is required.";
+      if (webhookHeaders.length > 0 && hasInvalidHeaders(webhookHeaders)) {
+        return "Each header needs both a name and a value.";
+      }
+      if (queryParameters.length > 0 && hasInvalidParameters(queryParameters)) {
+        return "One or more query parameters are incomplete.";
+      }
+      if (["POST", "PUT", "PATCH"].includes(webhookMethod)) {
+        if (!bodyDescription.trim()) return "Body description is required.";
+        if (bodyParameters.length > 0 && hasInvalidParameters(bodyParameters)) {
+          return "One or more body parameters are incomplete.";
+        }
+      }
+    } else if (hasInvalidParameters(parameters)) {
+      return "One or more parameters are incomplete (each needs a name and description; objects need at least one property).";
+    }
+    return null;
+  };
+
+  const handleSubmit = () => {
+    if (viewMode === "json") {
+      if (jsonError) return;
+      const err = validateForSubmit();
+      if (err) {
+        setJsonError(err);
+        return;
+      }
+    }
+    if (editingToolUuid) {
+      updateTool();
+    } else {
+      createTool();
+    }
   };
 
   // Load tool data for editing
@@ -1157,6 +1387,57 @@ export function AddToolDialog({
             </div>
           ) : (
             <>
+              {/* View mode toggle: Form ⇆ JSON */}
+              <div className="flex items-center justify-end">
+                <div className="flex items-center gap-0.5 rounded-full bg-muted/60 p-0.5">
+                  <button
+                    type="button"
+                    onClick={switchToUi}
+                    disabled={viewMode === "json" && !!jsonError}
+                    className={`h-7 px-3 rounded-full text-xs font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                      viewMode === "ui"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Form
+                  </button>
+                  <button
+                    type="button"
+                    onClick={switchToJson}
+                    className={`h-7 px-3 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                      viewMode === "json"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    JSON
+                  </button>
+                </div>
+              </div>
+
+              {viewMode === "json" ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Edit the full tool definition as JSON. The parameters use the
+                    OpenAI function-call schema. Valid edits sync back to the form
+                    when you switch views.
+                  </p>
+                  <textarea
+                    value={jsonText}
+                    onChange={(e) => handleJsonChange(e.target.value)}
+                    spellCheck={false}
+                    placeholder='{ "name": "", "description": "", "parameters": { "type": "object", "properties": {} } }'
+                    className={`w-full min-h-[480px] px-4 py-3 rounded-md text-sm font-mono bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-y ${
+                      jsonError ? "border-red-500" : "border-border"
+                    }`}
+                  />
+                  {jsonError && (
+                    <p className="text-sm text-red-500">{jsonError}</p>
+                  )}
+                </div>
+              ) : (
+                <>
               {/* Helper Callout */}
               <div className="flex gap-3 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
                 <svg
@@ -1619,6 +1900,8 @@ export function AddToolDialog({
                     </div>
                   </div>
                 )}
+                </>
+              )}
             </>
           )}
         </div>
@@ -1635,8 +1918,12 @@ export function AddToolDialog({
               Cancel
             </button>
             <button
-              onClick={editingToolUuid ? updateTool : createTool}
-              disabled={isCreating || isLoadingTool}
+              onClick={handleSubmit}
+              disabled={
+                isCreating ||
+                isLoadingTool ||
+                (viewMode === "json" && !!jsonError)
+              }
               className="h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isCreating ? (
