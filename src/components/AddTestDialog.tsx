@@ -1769,8 +1769,8 @@ export function AddTestDialog({
         aria-label="Match type"
         className="h-10 pl-3 pr-8 rounded-lg text-sm font-medium bg-foreground text-background border border-transparent hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer appearance-none transition-opacity"
       >
-        <option value="exact">Exact</option>
-        <option value="llm_judge">LLM</option>
+        <option value="exact">Is exactly</option>
+        <option value="llm_judge">satisfies the criteria</option>
       </select>
       <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
         <svg
@@ -2129,7 +2129,7 @@ export function AddTestDialog({
                     )
                   }
                   rows={2}
-                  placeholder="Describe what a correct value looks like, e.g. A friendly reminder that includes the date"
+                  placeholder="e.g. A friendly reminder with the date"
                   className={`${criteriaClass} flex-1 min-w-0`}
                 />
               ) : isNull ? (
