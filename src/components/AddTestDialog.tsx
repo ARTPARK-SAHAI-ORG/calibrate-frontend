@@ -1559,36 +1559,55 @@ export function AddTestDialog({
         const children = param.properties || [];
         const collapsed = collapsedParamIds.has(param.id);
         const childCount = children.length;
+        const collapseToggle = (
+          <button
+            type="button"
+            onClick={() => toggleParamCollapsed(param.id)}
+            aria-label={collapsed ? "Expand parameter" : "Collapse parameter"}
+            aria-expanded={!collapsed}
+            className="w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
+          >
+            <svg
+              className={`w-4 h-4 transition-transform ${
+                collapsed ? "" : "rotate-90"
+              }`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          </button>
+        );
         return (
           <div key={param.id} className="space-y-2">
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => toggleParamCollapsed(param.id)}
-                aria-label={collapsed ? "Expand parameter" : "Collapse parameter"}
-                aria-expanded={!collapsed}
-                className="w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
-              >
-                <svg
-                  className={`w-4 h-4 transition-transform ${
-                    collapsed ? "" : "rotate-90"
-                  }`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </button>
-              <div className="flex-1">{header}</div>
+              {param.custom ? (
+                <input
+                  type="text"
+                  value={param.name}
+                  onChange={(e) =>
+                    updateExpectedParamName(toolId, paramPath, e.target.value)
+                  }
+                  placeholder="Parameter name"
+                  className="flex-1 h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              ) : (
+                <span className="flex-1 text-sm font-medium text-foreground">
+                  {param.name}
+                </span>
+              )}
+              {collapseToggle}
+              {renderRequiredBadge(param.required)}
+              {!param.required && renderRemoveParamButton(toolId, paramPath)}
             </div>
             {collapsed ? (
-              <p className="pl-8 text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 {childCount > 0
                   ? `${childCount} parameter${childCount === 1 ? "" : "s"} hidden`
                   : param.allowCustomKeys
