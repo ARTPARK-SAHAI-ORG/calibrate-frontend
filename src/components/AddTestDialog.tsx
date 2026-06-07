@@ -1565,28 +1565,28 @@ export function AddTestDialog({
             onClick={() => toggleParamCollapsed(param.id)}
             aria-label={collapsed ? "Expand parameter" : "Collapse parameter"}
             aria-expanded={!collapsed}
-            className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
+            className="flex-shrink-0 inline-flex items-center justify-center px-2 py-1 rounded-md border border-transparent bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
           >
             <svg
-              className="w-4 h-4"
+              className="w-3 h-3"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
-              strokeWidth={2}
+              strokeWidth={2.5}
             >
               {collapsed ? (
-                // arrows pointing out (click to expand)
+                // chevron down (click to expand)
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"
+                  d="M19.5 8.25l-7.5 7.5-7.5-7.5"
                 />
               ) : (
-                // arrows pointing in (click to collapse)
+                // chevron up (click to collapse)
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  d="M9 9V4.5M9 9H4.5M9 9 3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5 5.25 5.25"
+                  d="M4.5 15.75l7.5-7.5 7.5 7.5"
                 />
               )}
             </svg>
