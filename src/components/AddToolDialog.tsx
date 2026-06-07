@@ -201,7 +201,7 @@ export function AddToolDialog({
   const updateParameterAtPath = (
     params: Parameter[],
     path: string[],
-    updates: Partial<Parameter>
+    updates: Partial<Parameter>,
   ): Parameter[] => {
     if (path.length === 0) return params;
     const [currentId, ...restPath] = path;
@@ -225,7 +225,7 @@ export function AddToolDialog({
         const updatedItems = updateSingleParameterAtPath(
           currentItems,
           deeperPath,
-          updates
+          updates,
         );
         return { ...p, items: updatedItems };
       }
@@ -234,7 +234,7 @@ export function AddToolDialog({
         properties: updateParameterAtPath(
           p.properties || [],
           restPath,
-          updates
+          updates,
         ),
       };
     });
@@ -243,7 +243,7 @@ export function AddToolDialog({
   const updateSingleParameterAtPath = (
     param: Parameter,
     path: string[],
-    updates: Partial<Parameter>
+    updates: Partial<Parameter>,
   ): Parameter => {
     if (path.length === 0) {
       return { ...param, ...updates };
@@ -273,7 +273,7 @@ export function AddToolDialog({
 
   const addPropertyAtPath = (
     params: Parameter[],
-    path: string[]
+    path: string[],
   ): Parameter[] => {
     if (path.length === 0) return params;
     const [currentId, ...restPath] = path;
@@ -309,7 +309,7 @@ export function AddToolDialog({
 
   const addPropertyToSingleParam = (
     param: Parameter,
-    path: string[]
+    path: string[],
   ): Parameter => {
     if (path.length === 0) {
       return {
@@ -341,7 +341,7 @@ export function AddToolDialog({
   const removePropertyAtPath = (
     params: Parameter[],
     path: string[],
-    idToRemove: string
+    idToRemove: string,
   ): Parameter[] => {
     if (path.length === 0) {
       return params.filter((p) => p.id !== idToRemove);
@@ -355,7 +355,7 @@ export function AddToolDialog({
           items: removePropertyFromSingleParam(
             p.items,
             restPath.slice(1),
-            idToRemove
+            idToRemove,
           ),
         };
       }
@@ -363,7 +363,7 @@ export function AddToolDialog({
         return {
           ...p,
           properties: (p.properties || []).filter(
-            (prop) => prop.id !== idToRemove
+            (prop) => prop.id !== idToRemove,
           ),
         };
       }
@@ -372,7 +372,7 @@ export function AddToolDialog({
         properties: removePropertyAtPath(
           p.properties || [],
           restPath,
-          idToRemove
+          idToRemove,
         ),
       };
     });
@@ -381,7 +381,7 @@ export function AddToolDialog({
   const removePropertyFromSingleParam = (
     param: Parameter,
     path: string[],
-    idToRemove: string
+    idToRemove: string,
   ): Parameter => {
     if (path.length === 0) {
       return {
@@ -395,7 +395,7 @@ export function AddToolDialog({
         items: removePropertyFromSingleParam(
           param.items,
           path.slice(1),
-          idToRemove
+          idToRemove,
         ),
       };
     }
@@ -404,7 +404,7 @@ export function AddToolDialog({
       properties: removePropertyAtPath(
         param.properties || [],
         path,
-        idToRemove
+        idToRemove,
       ),
     };
   };
@@ -412,7 +412,7 @@ export function AddToolDialog({
   const setItemsAtPath = (
     params: Parameter[],
     path: string[],
-    items: Parameter | undefined
+    items: Parameter | undefined,
   ): Parameter[] => {
     if (path.length === 0) return params;
     const [currentId, ...restPath] = path;
@@ -437,7 +437,7 @@ export function AddToolDialog({
   const setItemsOnSingleParam = (
     param: Parameter,
     path: string[],
-    items: Parameter | undefined
+    items: Parameter | undefined,
   ): Parameter => {
     if (path.length === 0) {
       return { ...param, items };
@@ -471,7 +471,7 @@ export function AddToolDialog({
 
   const handleSetItemsAtPath = (
     path: string[],
-    items: Parameter | undefined
+    items: Parameter | undefined,
   ) => {
     setValidationAttempted(false);
     setParameters((prev) => setItemsAtPath(prev, path, items));
@@ -480,7 +480,7 @@ export function AddToolDialog({
   // Query parameter handlers (same logic, different state)
   const handleQueryUpdateAtPath = (
     path: string[],
-    updates: Partial<Parameter>
+    updates: Partial<Parameter>,
   ) => {
     setQueryParameters((prev) => updateParameterAtPath(prev, path, updates));
   };
@@ -497,7 +497,7 @@ export function AddToolDialog({
 
   const handleQuerySetItemsAtPath = (
     path: string[],
-    items: Parameter | undefined
+    items: Parameter | undefined,
   ) => {
     setValidationAttempted(false);
     setQueryParameters((prev) => setItemsAtPath(prev, path, items));
@@ -522,7 +522,7 @@ export function AddToolDialog({
   // Body parameter handlers (same logic, different state)
   const handleBodyUpdateAtPath = (
     path: string[],
-    updates: Partial<Parameter>
+    updates: Partial<Parameter>,
   ) => {
     setBodyParameters((prev) => updateParameterAtPath(prev, path, updates));
   };
@@ -539,7 +539,7 @@ export function AddToolDialog({
 
   const handleBodySetItemsAtPath = (
     path: string[],
-    items: Parameter | undefined
+    items: Parameter | undefined,
   ) => {
     setValidationAttempted(false);
     setBodyParameters((prev) => setItemsAtPath(prev, path, items));
@@ -674,7 +674,7 @@ export function AddToolDialog({
   };
 
   const buildParametersConfig = (
-    params: Parameter[]
+    params: Parameter[],
   ): Array<Record<string, any>> => {
     return params
       .filter((param) => param.name)
@@ -716,21 +716,42 @@ export function AddToolDialog({
         parseParameterSchema(
           propName,
           propConfig,
-          requiredProps.includes(propName)
-        )
+          requiredProps.includes(propName),
+        ),
     );
   };
 
+  // Normalize a JSON-schema "type" that may be a nullable union
+  // (e.g. ["integer", "null"]) into a single dataType plus a nullable flag.
+  // The first non-"null" member wins; nullable fields are treated as optional.
+  const normalizeSchemaType = (
+    rawType: any,
+  ): { dataType: string; nullable: boolean } => {
+    if (Array.isArray(rawType)) {
+      const nullable = rawType.includes("null");
+      const nonNull = rawType.find((t) => t !== "null");
+      return {
+        dataType: typeof nonNull === "string" ? nonNull : "string",
+        nullable,
+      };
+    }
+    return {
+      dataType: typeof rawType === "string" ? rawType : "string",
+      nullable: false,
+    };
+  };
+
   const parseItemsSchema = (itemsConfig: any): Parameter => {
+    const { dataType } = normalizeSchemaType(itemsConfig.type);
     const itemParam: Parameter = {
       id: crypto.randomUUID(),
       name: "",
-      dataType: itemsConfig.type || "string",
+      dataType,
       required: true,
       description: itemsConfig.description || "",
     };
 
-    if (itemsConfig.type === "object" && itemsConfig.properties) {
+    if (dataType === "object" && itemsConfig.properties) {
       itemParam.properties = [];
       const requiredProps = itemsConfig.required || [];
       Object.entries(itemsConfig.properties).forEach(
@@ -739,14 +760,14 @@ export function AddToolDialog({
             parseParameterSchema(
               propName,
               propConfig,
-              requiredProps.includes(propName)
-            )
+              requiredProps.includes(propName),
+            ),
           );
-        }
+        },
       );
     }
 
-    if (itemsConfig.type === "array" && itemsConfig.items) {
+    if (dataType === "array" && itemsConfig.items) {
       itemParam.items = parseItemsSchema(itemsConfig.items);
     }
 
@@ -756,21 +777,23 @@ export function AddToolDialog({
   const parseParameterSchema = (
     paramName: string,
     paramConfig: any,
-    isRequired: boolean = true
+    isRequired: boolean = true,
   ): Parameter => {
+    const { dataType, nullable } = normalizeSchemaType(paramConfig.type);
     const param: Parameter = {
       id: crypto.randomUUID(),
       name: paramName,
-      dataType: paramConfig.type || "string",
-      required: paramConfig.required ?? isRequired,
+      dataType,
+      // A nullable union (e.g. ["integer", "null"]) marks the field optional.
+      required: nullable ? false : (paramConfig.required ?? isRequired),
       description: paramConfig.description || "",
     };
 
-    if (paramConfig.type === "array" && paramConfig.items) {
+    if (dataType === "array" && paramConfig.items) {
       param.items = parseItemsSchema(paramConfig.items);
     }
 
-    if (paramConfig.type === "object" && paramConfig.properties) {
+    if (dataType === "object" && paramConfig.properties) {
       param.properties = [];
       const requiredProps = paramConfig.required || [];
       Object.entries(paramConfig.properties).forEach(
@@ -779,10 +802,10 @@ export function AddToolDialog({
             parseParameterSchema(
               propName,
               propConfig,
-              requiredProps.includes(propName)
-            )
+              requiredProps.includes(propName),
+            ),
           );
-        }
+        },
       );
     }
 
@@ -824,9 +847,7 @@ export function AddToolDialog({
 
   // Validate the structural shape of pasted/edited JSON. Returns a single
   // human-readable error string, or the parsed object when it is acceptable.
-  const parseToolJson = (
-    text: string
-  ): { value?: any; error?: string } => {
+  const parseToolJson = (text: string): { value?: any; error?: string } => {
     let obj: any;
     try {
       obj = JSON.parse(text);
@@ -873,19 +894,19 @@ export function AddToolDialog({
   const applyToolJson = (obj: any) => {
     setToolName(typeof obj.name === "string" ? obj.name : "");
     setToolDescription(
-      typeof obj.description === "string" ? obj.description : ""
+      typeof obj.description === "string" ? obj.description : "",
     );
     if (toolType === "webhook") {
       const webhook = obj.webhook || {};
       const method = ["GET", "POST", "PUT", "PATCH", "DELETE"].includes(
-        webhook.method
+        webhook.method,
       )
         ? webhook.method
         : "POST";
       setWebhookMethod(method);
       setWebhookUrl(typeof webhook.url === "string" ? webhook.url : "");
       setResponseTimeout(
-        typeof webhook.timeout === "number" ? webhook.timeout : 20
+        typeof webhook.timeout === "number" ? webhook.timeout : 20,
       );
       setWebhookHeaders(
         (Array.isArray(webhook.headers) ? webhook.headers : []).map(
@@ -893,14 +914,14 @@ export function AddToolDialog({
             id: crypto.randomUUID(),
             name: typeof h?.name === "string" ? h.name : "",
             value: typeof h?.value === "string" ? h.value : "",
-          })
-        )
+          }),
+        ),
       );
       setQueryParameters(objectSchemaToParams(webhook.queryParameters));
       setBodyDescription(
         typeof webhook.body?.description === "string"
           ? webhook.body.description
-          : ""
+          : "",
       );
       setBodyParameters(objectSchemaToParams(webhook.body?.parameters));
     } else {
@@ -1004,7 +1025,7 @@ export function AddToolDialog({
 
       setToolName(toolData.name || "");
       setToolDescription(
-        toolData.description || toolData.config?.description || ""
+        toolData.description || toolData.config?.description || "",
       );
 
       const toolParams: Parameter[] = [];
@@ -1018,7 +1039,7 @@ export function AddToolDialog({
           Object.entries(toolData.config.parameters).forEach(
             ([paramName, paramConfig]: [string, any]) => {
               toolParams.push(parseParameterSchema(paramName, paramConfig));
-            }
+            },
           );
         }
       }
@@ -1036,7 +1057,7 @@ export function AddToolDialog({
               id: crypto.randomUUID(),
               name: h.name || "",
               value: h.value || "",
-            }))
+            })),
           );
         }
         // Load query parameters (same format as parameters)
@@ -1047,7 +1068,7 @@ export function AddToolDialog({
               (paramConfig: any) => {
                 const paramName = paramConfig.id || paramConfig.name || "";
                 queryParams.push(parseParameterSchema(paramName, paramConfig));
-              }
+              },
             );
           }
           setQueryParameters(queryParams);
@@ -1062,7 +1083,7 @@ export function AddToolDialog({
                 (paramConfig: any) => {
                   const paramName = paramConfig.id || paramConfig.name || "";
                   bodyParams.push(parseParameterSchema(paramName, paramConfig));
-                }
+                },
               );
             }
             setBodyParameters(bodyParams);
@@ -1072,7 +1093,7 @@ export function AddToolDialog({
     } catch (err) {
       console.error("Error fetching tool:", err);
       setCreateError(
-        err instanceof Error ? err.message : "Failed to load tool"
+        err instanceof Error ? err.message : "Failed to load tool",
       );
     } finally {
       setIsLoadingTool(false);
@@ -1196,7 +1217,7 @@ export function AddToolDialog({
     } catch (err) {
       console.error("Error creating tool:", err);
       setCreateError(
-        err instanceof Error ? err.message : "Failed to create tool"
+        err instanceof Error ? err.message : "Failed to create tool",
       );
     } finally {
       setIsCreating(false);
@@ -1301,7 +1322,7 @@ export function AddToolDialog({
     } catch (err) {
       console.error("Error updating tool:", err);
       setCreateError(
-        err instanceof Error ? err.message : "Failed to update tool"
+        err instanceof Error ? err.message : "Failed to update tool",
       );
     } finally {
       setIsCreating(false);
@@ -1313,7 +1334,10 @@ export function AddToolDialog({
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleClose} />
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={handleClose}
+      />
       {/* Sidebar */}
       <div className="relative w-full md:w-[40%] md:min-w-[500px] bg-background md:border-l border-border flex flex-col h-full shadow-2xl">
         {/* Header */}
@@ -1387,6 +1411,26 @@ export function AddToolDialog({
             </div>
           ) : (
             <>
+              {/* Helper Callout — shown at the top in both Form and JSON views */}
+              <div className="flex gap-3 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                <svg
+                  className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                  />
+                </svg>
+                <p className="text-sm text-blue-700 dark:text-blue-200">
+                  {TOOL_TYPE_CONFIG[toolType].description}
+                </p>
+              </div>
+
               {/* View mode toggle: Form ⇆ JSON */}
               <div className="flex items-center justify-end">
                 <div className="flex items-center gap-0.5 rounded-full bg-muted/60 p-0.5">
@@ -1418,11 +1462,6 @@ export function AddToolDialog({
 
               {viewMode === "json" ? (
                 <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    Edit the full tool definition as JSON. The parameters use the
-                    OpenAI function-call schema. Valid edits sync back to the form
-                    when you switch views.
-                  </p>
                   <textarea
                     value={jsonText}
                     onChange={(e) => handleJsonChange(e.target.value)}
@@ -1438,468 +1477,465 @@ export function AddToolDialog({
                 </div>
               ) : (
                 <>
-              {/* Helper Callout */}
-              <div className="flex gap-3 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                <svg
-                  className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-                  />
-                </svg>
-                <p className="text-sm text-blue-700 dark:text-blue-200">
-                  {TOOL_TYPE_CONFIG[toolType].description}
-                </p>
-              </div>
-
-              {/* Configuration Section */}
-              <div className="border border-border rounded-xl p-5 space-y-5 bg-muted/100">
-                <div>
-                  <h3 className="text-base font-medium mb-1">Configuration</h3>
-                </div>
-
-                {/* Name */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={toolName}
-                    onChange={(e) => {
-                      setToolName(e.target.value);
-                      if (nameConflictError) setNameConflictError(null);
-                    }}
-                    placeholder="An informative name for the tool that reflects its purpose"
-                    className={`w-full h-10 px-4 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
-                      nameConflictError ||
-                      (validationAttempted && !toolName.trim())
-                        ? "border-red-500"
-                        : "border-border"
-                    }`}
-                  />
-                  {nameConflictError && (
-                    <p className="mt-1 text-sm text-red-500">
-                      {nameConflictError}
-                    </p>
-                  )}
-                </div>
-
-                {/* Description */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Description <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    value={toolDescription}
-                    onChange={(e) => setToolDescription(e.target.value)}
-                    placeholder="Describe to the LLM how and when to use the tool along with what should be passed to the tool"
-                    rows={3}
-                    className={`w-full px-4 py-3 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none ${
-                      validationAttempted && !toolDescription.trim()
-                        ? "border-red-500"
-                        : "border-border"
-                    }`}
-                  />
-                </div>
-
-                {/* Webhook-specific fields */}
-                {toolType === "webhook" && (
-                  <>
-                    {/* Method and URL */}
-                    <div className="flex gap-4">
-                      <div className="w-36">
-                        <label className="block text-sm font-medium mb-2">
-                          Method
-                        </label>
-                        <div className="relative">
-                          <select
-                            value={webhookMethod}
-                            onChange={(e) =>
-                              setWebhookMethod(
-                                e.target.value as
-                                  | "GET"
-                                  | "POST"
-                                  | "PUT"
-                                  | "PATCH"
-                                  | "DELETE"
-                              )
-                            }
-                            className="w-full h-10 px-4 pr-10 rounded-md text-base border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent appearance-none cursor-pointer"
-                          >
-                            <option value="GET">GET</option>
-                            <option value="POST">POST</option>
-                            <option value="PUT">PUT</option>
-                            <option value="PATCH">PATCH</option>
-                            <option value="DELETE">DELETE</option>
-                          </select>
-                          <svg
-                            className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M19 9l-7 7-7-7"
-                            />
-                          </svg>
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <label className="block text-sm font-medium mb-2">
-                          URL <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={webhookUrl}
-                          onChange={(e) => setWebhookUrl(e.target.value)}
-                          placeholder="https://example.com/{hi}/webhook"
-                          className={`w-full h-10 px-4 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
-                            validationAttempted &&
-                            toolType === "webhook" &&
-                            !isValidUrl(webhookUrl)
-                              ? "border-red-500"
-                              : "border-border"
-                          }`}
-                        />
-                        {validationAttempted &&
-                          toolType === "webhook" &&
-                          !isValidUrl(webhookUrl) && (
-                            <p className="text-xs text-red-500 mt-1">
-                              {webhookUrl.trim()
-                                ? "Please enter a valid URL"
-                                : "URL is required"}
-                            </p>
-                          )}
-                      </div>
-                    </div>
-
-                    {/* Response Timeout */}
-                    <div>
-                      <label className="block text-sm font-medium mb-1">
-                        Response timeout (seconds)
-                      </label>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        How long to wait for the webhook tool to respond before
-                        timing out. Default is 20 seconds.
-                      </p>
-                      <div className="relative pt-6">
-                        {/* Tooltip */}
-                        {showTimeoutTooltip && (
-                          <div
-                            className="absolute -top-1 transform -translate-x-1/2 pointer-events-none z-10"
-                            style={{
-                              left: `calc(${
-                                ((responseTimeout - 1) / 119) * 100
-                              }% + ${
-                                8 - ((responseTimeout - 1) / 119) * 16
-                              }px)`,
-                            }}
-                          >
-                            <div className="bg-foreground text-background text-xs font-medium px-2 py-1 rounded-md whitespace-nowrap">
-                              {responseTimeout} secs
-                            </div>
-                            <div className="w-2 h-2 bg-foreground transform rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1" />
-                          </div>
-                        )}
-                        {/* Track background */}
-                        <div className="relative h-2">
-                          {/* Unfilled track */}
-                          <div className="absolute inset-0 bg-muted rounded-full" />
-                          {/* Filled track */}
-                          <div
-                            className="absolute top-0 left-0 h-full bg-foreground rounded-full"
-                            style={{
-                              width: `${((responseTimeout - 1) / 119) * 100}%`,
-                            }}
-                          />
-                          {/* Input */}
-                          <input
-                            type="range"
-                            min={1}
-                            max={120}
-                            value={responseTimeout}
-                            onChange={(e) =>
-                              setResponseTimeout(parseInt(e.target.value, 10))
-                            }
-                            onMouseEnter={() => setShowTimeoutTooltip(true)}
-                            onMouseLeave={() => setShowTimeoutTooltip(false)}
-                            onFocus={() => setShowTimeoutTooltip(true)}
-                            onBlur={() => setShowTimeoutTooltip(false)}
-                            className="absolute inset-0 w-full h-full appearance-none bg-transparent cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-foreground [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-foreground [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Headers Section - Webhook only */}
-              {toolType === "webhook" && (
-                <div className="border border-border rounded-xl p-5 space-y-5 bg-muted/100">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-base font-medium mb-1">Headers</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Define headers that will be sent with the request
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setWebhookHeaders([
-                          ...webhookHeaders,
-                          {
-                            id: crypto.randomUUID(),
-                            name: "",
-                            value: "",
-                          },
-                        ]);
-                      }}
-                      className="h-9 px-4 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0"
-                    >
-                      Add header
-                    </button>
-                  </div>
-
-                  {/* Header Cards */}
-                  {webhookHeaders.map((header) => (
-                    <div
-                      key={header.id}
-                      className="border border-border rounded-xl p-4 space-y-4 bg-background"
-                    >
-                      {/* Name */}
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Name <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={header.name}
-                          onChange={(e) => {
-                            setWebhookHeaders(
-                              webhookHeaders.map((h) =>
-                                h.id === header.id
-                                  ? { ...h, name: e.target.value }
-                                  : h
-                              )
-                            );
-                          }}
-                          placeholder="e.g. Authorization"
-                          className={`w-full h-10 px-4 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
-                            validationAttempted && !header.name.trim()
-                              ? "border-red-500"
-                              : "border-border"
-                          }`}
-                        />
-                      </div>
-
-                      {/* Value */}
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Value <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={header.value}
-                          onChange={(e) => {
-                            setWebhookHeaders(
-                              webhookHeaders.map((h) =>
-                                h.id === header.id
-                                  ? { ...h, value: e.target.value }
-                                  : h
-                              )
-                            );
-                          }}
-                          placeholder="Header value"
-                          className={`w-full h-10 px-4 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
-                            validationAttempted && !header.value.trim()
-                              ? "border-red-500"
-                              : "border-border"
-                          }`}
-                        />
-                      </div>
-
-                      {/* Delete button */}
-                      <div className="flex justify-end">
-                        <button
-                          onClick={() => {
-                            setWebhookHeaders(
-                              webhookHeaders.filter((h) => h.id !== header.id)
-                            );
-                          }}
-                          className="h-9 px-4 rounded-md text-sm font-medium text-red-500 bg-red-500/10 hover:text-red-600 hover:bg-red-500/20 transition-colors cursor-pointer"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Parameters Section - Structured Output Tools Only */}
-              {toolType === "structured_output" && (
-                <div className="border border-border rounded-xl p-5 space-y-5 bg-muted/100">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-base font-medium mb-1">Parameters</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Define the structure of the output that the agent should
-                        produce
-                      </p>
-                    </div>
-                    <button
-                      onClick={addParameter}
-                      className="h-9 px-4 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0"
-                    >
-                      Add param
-                    </button>
-                  </div>
-
-                  {/* Parameter Cards */}
-                  {parameters.map((param) => (
-                    <ParameterCard
-                      key={param.id}
-                      param={param}
-                      path={[]}
-                      onUpdate={handleUpdateAtPath}
-                      onRemove={handleRemoveAtPath}
-                      onAddProperty={handleAddPropertyAtPath}
-                      onSetItems={handleSetItemsAtPath}
-                      validationAttempted={validationAttempted}
-                      siblingNames={parameters
-                        .filter((p) => p.id !== param.id)
-                        .map((p) => p.name)}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Query Parameters Section - Webhook Tools Only */}
-              {toolType === "webhook" && (
-                <div className="border border-border rounded-xl p-5 space-y-5 bg-muted/100">
-                  <div className="flex items-start justify-between">
+                  {/* Configuration Section */}
+                  <div className="border border-border rounded-xl p-5 space-y-5 bg-muted/100">
                     <div>
                       <h3 className="text-base font-medium mb-1">
-                        Query parameters
+                        Configuration
                       </h3>
-                      <p className="text-sm text-muted-foreground">
-                        Define parameters that will be collected by the LLM and
-                        sent as the query of the request.
-                      </p>
                     </div>
-                    <button
-                      onClick={addQueryParameter}
-                      className="h-9 px-4 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0"
-                    >
-                      Add param
-                    </button>
-                  </div>
 
-                  {/* Query Parameter Cards */}
-                  {queryParameters.map((param) => (
-                    <div
-                      key={param.id}
-                      ref={(el) => {
-                        if (el) {
-                          queryParamRefs.current.set(param.id, el);
-                        } else {
-                          queryParamRefs.current.delete(param.id);
-                        }
-                      }}
-                    >
-                      <ParameterCard
-                        param={param}
-                        path={[]}
-                        onUpdate={handleQueryUpdateAtPath}
-                        onRemove={handleQueryRemoveAtPath}
-                        onAddProperty={handleQueryAddPropertyAtPath}
-                        onSetItems={handleQuerySetItemsAtPath}
-                        validationAttempted={validationAttempted}
-                        siblingNames={queryParameters
-                          .filter((p) => p.id !== param.id)
-                          .map((p) => p.name)}
+                    {/* Name */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={toolName}
+                        onChange={(e) => {
+                          setToolName(e.target.value);
+                          if (nameConflictError) setNameConflictError(null);
+                        }}
+                        placeholder="An informative name for the tool that reflects its purpose"
+                        className={`w-full h-10 px-4 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
+                          nameConflictError ||
+                          (validationAttempted && !toolName.trim())
+                            ? "border-red-500"
+                            : "border-border"
+                        }`}
+                      />
+                      {nameConflictError && (
+                        <p className="mt-1 text-sm text-red-500">
+                          {nameConflictError}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Description <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        value={toolDescription}
+                        onChange={(e) => setToolDescription(e.target.value)}
+                        placeholder="Describe to the LLM how and when to use the tool along with what should be passed to the tool"
+                        rows={3}
+                        className={`w-full px-4 py-3 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none ${
+                          validationAttempted && !toolDescription.trim()
+                            ? "border-red-500"
+                            : "border-border"
+                        }`}
                       />
                     </div>
-                  ))}
-                </div>
-              )}
 
-              {/* Body Parameters Section - Webhook Tools with POST, PUT, PATCH Only */}
-              {toolType === "webhook" &&
-                ["POST", "PUT", "PATCH"].includes(webhookMethod) && (
-                  <div className="border border-border rounded-xl p-5 space-y-5 bg-muted/50">
-                    <div>
-                      <h3 className="text-base font-medium mb-1">
-                        Body parameters
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        Define parameters that will be collected by the LLM and
-                        sent as the body of the request.
-                      </p>
-                    </div>
-
-                    {/* Inner container for body content */}
-                    <div className="border border-border rounded-xl p-4 space-y-4 bg-background">
-                      {/* Body Description */}
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Description <span className="text-red-500">*</span>
-                        </label>
-                        <textarea
-                          value={bodyDescription}
-                          onChange={(e) => setBodyDescription(e.target.value)}
-                          placeholder="Describe the body structure"
-                          rows={3}
-                          className={`w-full px-4 py-3 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none ${
-                            validationAttempted && !bodyDescription.trim()
-                              ? "border-red-500"
-                              : "border-border"
-                          }`}
-                        />
-                      </div>
-
-                      {/* Properties - same UI as object type properties */}
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Properties
-                        </label>
-                        <NestedContainer onAddProperty={addBodyParameter}>
-                          {/* Body Parameter Cards */}
-                          {bodyParameters.length > 0 && (
-                            <div className="space-y-4">
-                              {bodyParameters.map((param) => (
-                                <ParameterCard
-                                  key={param.id}
-                                  param={param}
-                                  path={[]}
-                                  onUpdate={handleBodyUpdateAtPath}
-                                  onRemove={handleBodyRemoveAtPath}
-                                  onAddProperty={handleBodyAddPropertyAtPath}
-                                  onSetItems={handleBodySetItemsAtPath}
-                                  validationAttempted={validationAttempted}
-                                  siblingNames={bodyParameters
-                                    .filter((p) => p.id !== param.id)
-                                    .map((p) => p.name)}
+                    {/* Webhook-specific fields */}
+                    {toolType === "webhook" && (
+                      <>
+                        {/* Method and URL */}
+                        <div className="flex gap-4">
+                          <div className="w-36">
+                            <label className="block text-sm font-medium mb-2">
+                              Method
+                            </label>
+                            <div className="relative">
+                              <select
+                                value={webhookMethod}
+                                onChange={(e) =>
+                                  setWebhookMethod(
+                                    e.target.value as
+                                      | "GET"
+                                      | "POST"
+                                      | "PUT"
+                                      | "PATCH"
+                                      | "DELETE",
+                                  )
+                                }
+                                className="w-full h-10 px-4 pr-10 rounded-md text-base border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent appearance-none cursor-pointer"
+                              >
+                                <option value="GET">GET</option>
+                                <option value="POST">POST</option>
+                                <option value="PUT">PUT</option>
+                                <option value="PATCH">PATCH</option>
+                                <option value="DELETE">DELETE</option>
+                              </select>
+                              <svg
+                                className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M19 9l-7 7-7-7"
                                 />
-                              ))}
+                              </svg>
                             </div>
-                          )}
-                        </NestedContainer>
-                      </div>
-                    </div>
+                          </div>
+                          <div className="flex-1">
+                            <label className="block text-sm font-medium mb-2">
+                              URL <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={webhookUrl}
+                              onChange={(e) => setWebhookUrl(e.target.value)}
+                              placeholder="https://example.com/{hi}/webhook"
+                              className={`w-full h-10 px-4 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
+                                validationAttempted &&
+                                toolType === "webhook" &&
+                                !isValidUrl(webhookUrl)
+                                  ? "border-red-500"
+                                  : "border-border"
+                              }`}
+                            />
+                            {validationAttempted &&
+                              toolType === "webhook" &&
+                              !isValidUrl(webhookUrl) && (
+                                <p className="text-xs text-red-500 mt-1">
+                                  {webhookUrl.trim()
+                                    ? "Please enter a valid URL"
+                                    : "URL is required"}
+                                </p>
+                              )}
+                          </div>
+                        </div>
+
+                        {/* Response Timeout */}
+                        <div>
+                          <label className="block text-sm font-medium mb-1">
+                            Response timeout (seconds)
+                          </label>
+                          <p className="text-sm text-muted-foreground mb-3">
+                            How long to wait for the webhook tool to respond
+                            before timing out. Default is 20 seconds.
+                          </p>
+                          <div className="relative pt-6">
+                            {/* Tooltip */}
+                            {showTimeoutTooltip && (
+                              <div
+                                className="absolute -top-1 transform -translate-x-1/2 pointer-events-none z-10"
+                                style={{
+                                  left: `calc(${
+                                    ((responseTimeout - 1) / 119) * 100
+                                  }% + ${
+                                    8 - ((responseTimeout - 1) / 119) * 16
+                                  }px)`,
+                                }}
+                              >
+                                <div className="bg-foreground text-background text-xs font-medium px-2 py-1 rounded-md whitespace-nowrap">
+                                  {responseTimeout} secs
+                                </div>
+                                <div className="w-2 h-2 bg-foreground transform rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1" />
+                              </div>
+                            )}
+                            {/* Track background */}
+                            <div className="relative h-2">
+                              {/* Unfilled track */}
+                              <div className="absolute inset-0 bg-muted rounded-full" />
+                              {/* Filled track */}
+                              <div
+                                className="absolute top-0 left-0 h-full bg-foreground rounded-full"
+                                style={{
+                                  width: `${((responseTimeout - 1) / 119) * 100}%`,
+                                }}
+                              />
+                              {/* Input */}
+                              <input
+                                type="range"
+                                min={1}
+                                max={120}
+                                value={responseTimeout}
+                                onChange={(e) =>
+                                  setResponseTimeout(
+                                    parseInt(e.target.value, 10),
+                                  )
+                                }
+                                onMouseEnter={() => setShowTimeoutTooltip(true)}
+                                onMouseLeave={() =>
+                                  setShowTimeoutTooltip(false)
+                                }
+                                onFocus={() => setShowTimeoutTooltip(true)}
+                                onBlur={() => setShowTimeoutTooltip(false)}
+                                className="absolute inset-0 w-full h-full appearance-none bg-transparent cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-foreground [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-foreground [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-md"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
-                )}
+
+                  {/* Headers Section - Webhook only */}
+                  {toolType === "webhook" && (
+                    <div className="border border-border rounded-xl p-5 space-y-5 bg-muted/100">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="text-base font-medium mb-1">
+                            Headers
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            Define headers that will be sent with the request
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setWebhookHeaders([
+                              ...webhookHeaders,
+                              {
+                                id: crypto.randomUUID(),
+                                name: "",
+                                value: "",
+                              },
+                            ]);
+                          }}
+                          className="h-9 px-4 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0"
+                        >
+                          Add header
+                        </button>
+                      </div>
+
+                      {/* Header Cards */}
+                      {webhookHeaders.map((header) => (
+                        <div
+                          key={header.id}
+                          className="border border-border rounded-xl p-4 space-y-4 bg-background"
+                        >
+                          {/* Name */}
+                          <div>
+                            <label className="block text-sm font-medium mb-2">
+                              Name <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={header.name}
+                              onChange={(e) => {
+                                setWebhookHeaders(
+                                  webhookHeaders.map((h) =>
+                                    h.id === header.id
+                                      ? { ...h, name: e.target.value }
+                                      : h,
+                                  ),
+                                );
+                              }}
+                              placeholder="e.g. Authorization"
+                              className={`w-full h-10 px-4 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
+                                validationAttempted && !header.name.trim()
+                                  ? "border-red-500"
+                                  : "border-border"
+                              }`}
+                            />
+                          </div>
+
+                          {/* Value */}
+                          <div>
+                            <label className="block text-sm font-medium mb-2">
+                              Value <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={header.value}
+                              onChange={(e) => {
+                                setWebhookHeaders(
+                                  webhookHeaders.map((h) =>
+                                    h.id === header.id
+                                      ? { ...h, value: e.target.value }
+                                      : h,
+                                  ),
+                                );
+                              }}
+                              placeholder="Header value"
+                              className={`w-full h-10 px-4 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
+                                validationAttempted && !header.value.trim()
+                                  ? "border-red-500"
+                                  : "border-border"
+                              }`}
+                            />
+                          </div>
+
+                          {/* Delete button */}
+                          <div className="flex justify-end">
+                            <button
+                              onClick={() => {
+                                setWebhookHeaders(
+                                  webhookHeaders.filter(
+                                    (h) => h.id !== header.id,
+                                  ),
+                                );
+                              }}
+                              className="h-9 px-4 rounded-md text-sm font-medium text-red-500 bg-red-500/10 hover:text-red-600 hover:bg-red-500/20 transition-colors cursor-pointer"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Parameters Section - Structured Output Tools Only */}
+                  {toolType === "structured_output" && (
+                    <div className="border border-border rounded-xl p-5 space-y-5 bg-muted/100">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="text-base font-medium mb-1">
+                            Parameters
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            Define the structure of the output that the agent
+                            should produce
+                          </p>
+                        </div>
+                        <button
+                          onClick={addParameter}
+                          className="h-9 px-4 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0"
+                        >
+                          Add param
+                        </button>
+                      </div>
+
+                      {/* Parameter Cards */}
+                      {parameters.map((param) => (
+                        <ParameterCard
+                          key={param.id}
+                          param={param}
+                          path={[]}
+                          onUpdate={handleUpdateAtPath}
+                          onRemove={handleRemoveAtPath}
+                          onAddProperty={handleAddPropertyAtPath}
+                          onSetItems={handleSetItemsAtPath}
+                          validationAttempted={validationAttempted}
+                          siblingNames={parameters
+                            .filter((p) => p.id !== param.id)
+                            .map((p) => p.name)}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Query Parameters Section - Webhook Tools Only */}
+                  {toolType === "webhook" && (
+                    <div className="border border-border rounded-xl p-5 space-y-5 bg-muted/100">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="text-base font-medium mb-1">
+                            Query parameters
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            Define parameters that will be collected by the LLM
+                            and sent as the query of the request.
+                          </p>
+                        </div>
+                        <button
+                          onClick={addQueryParameter}
+                          className="h-9 px-4 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0"
+                        >
+                          Add param
+                        </button>
+                      </div>
+
+                      {/* Query Parameter Cards */}
+                      {queryParameters.map((param) => (
+                        <div
+                          key={param.id}
+                          ref={(el) => {
+                            if (el) {
+                              queryParamRefs.current.set(param.id, el);
+                            } else {
+                              queryParamRefs.current.delete(param.id);
+                            }
+                          }}
+                        >
+                          <ParameterCard
+                            param={param}
+                            path={[]}
+                            onUpdate={handleQueryUpdateAtPath}
+                            onRemove={handleQueryRemoveAtPath}
+                            onAddProperty={handleQueryAddPropertyAtPath}
+                            onSetItems={handleQuerySetItemsAtPath}
+                            validationAttempted={validationAttempted}
+                            siblingNames={queryParameters
+                              .filter((p) => p.id !== param.id)
+                              .map((p) => p.name)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Body Parameters Section - Webhook Tools with POST, PUT, PATCH Only */}
+                  {toolType === "webhook" &&
+                    ["POST", "PUT", "PATCH"].includes(webhookMethod) && (
+                      <div className="border border-border rounded-xl p-5 space-y-5 bg-muted/50">
+                        <div>
+                          <h3 className="text-base font-medium mb-1">
+                            Body parameters
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            Define parameters that will be collected by the LLM
+                            and sent as the body of the request.
+                          </p>
+                        </div>
+
+                        {/* Inner container for body content */}
+                        <div className="border border-border rounded-xl p-4 space-y-4 bg-background">
+                          {/* Body Description */}
+                          <div>
+                            <label className="block text-sm font-medium mb-2">
+                              Description{" "}
+                              <span className="text-red-500">*</span>
+                            </label>
+                            <textarea
+                              value={bodyDescription}
+                              onChange={(e) =>
+                                setBodyDescription(e.target.value)
+                              }
+                              placeholder="Describe the body structure"
+                              rows={3}
+                              className={`w-full px-4 py-3 rounded-md text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none ${
+                                validationAttempted && !bodyDescription.trim()
+                                  ? "border-red-500"
+                                  : "border-border"
+                              }`}
+                            />
+                          </div>
+
+                          {/* Properties - same UI as object type properties */}
+                          <div>
+                            <label className="block text-sm font-medium mb-2">
+                              Properties
+                            </label>
+                            <NestedContainer onAddProperty={addBodyParameter}>
+                              {/* Body Parameter Cards */}
+                              {bodyParameters.length > 0 && (
+                                <div className="space-y-4">
+                                  {bodyParameters.map((param) => (
+                                    <ParameterCard
+                                      key={param.id}
+                                      param={param}
+                                      path={[]}
+                                      onUpdate={handleBodyUpdateAtPath}
+                                      onRemove={handleBodyRemoveAtPath}
+                                      onAddProperty={
+                                        handleBodyAddPropertyAtPath
+                                      }
+                                      onSetItems={handleBodySetItemsAtPath}
+                                      validationAttempted={validationAttempted}
+                                      siblingNames={bodyParameters
+                                        .filter((p) => p.id !== param.id)
+                                        .map((p) => p.name)}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                            </NestedContainer>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                 </>
               )}
             </>
