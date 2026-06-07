@@ -1593,7 +1593,10 @@ export function AddTestDialog({
           </button>
         );
         return (
-          <div key={param.id} className="space-y-2">
+          <div
+            key={param.id}
+            className="bg-background border border-border rounded-xl p-4 space-y-2"
+          >
             <div className="flex items-center gap-2">
               {param.custom ? (
                 <input
@@ -1650,7 +1653,10 @@ export function AddTestDialog({
         !param.value.trim() &&
         (param.required || (!param.custom ? true : !!param.name.trim()));
       return (
-        <div key={param.id} className="space-y-1.5">
+        <div
+          key={param.id}
+          className="bg-background border border-border rounded-xl p-4 space-y-1.5"
+        >
           {header}
           <input
             type="text"
