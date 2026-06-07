@@ -44,6 +44,10 @@ const EXPECTED_PARAM_TYPES = [
 // LLM along with the user's free-text criteria. Booleans are always `exact`.
 type MatchType = "exact" | "llm_judge";
 
+// The UI-level match mode shown in the per-parameter dropdown. "null" is a
+// presentation-only variant of an exact match (emitted as value: null).
+type MatchMode = "exact" | "llm_judge" | "null";
+
 type ExpectedParam = {
   id: string;
   name: string;
@@ -1601,33 +1605,21 @@ export function AddTestDialog({
       updateExpParamAtPath(params, path, (p) => ({ ...p, name })),
     );
 
-  // Switch a leaf parameter between exact-match and LLM-judge. The null
-  // assertion only applies to exact matches, so it's cleared when judging.
-  const updateExpectedParamMatchType = (
+  // Switch a leaf parameter's match mode: exact value, LLM-judge, or null.
+  // "null" is modelled as an exact match with the `isNull` flag set; switching
+  // into it clears any typed value so the disabled field doesn't show stale
+  // text.
+  const updateExpectedParamMatchMode = (
     toolId: string,
     path: string[],
-    matchType: MatchType,
+    mode: MatchMode,
   ) =>
     mutateToolParams(toolId, (params) =>
       updateExpParamAtPath(params, path, (p) => ({
         ...p,
-        matchType,
-        isNull: matchType === "exact" ? p.isNull : false,
-      })),
-    );
-
-  // Toggle a leaf parameter's "expected value is null" flag. Marking null
-  // clears any typed value so the disabled field doesn't show stale text.
-  const updateExpectedParamNull = (
-    toolId: string,
-    path: string[],
-    isNull: boolean,
-  ) =>
-    mutateToolParams(toolId, (params) =>
-      updateExpParamAtPath(params, path, (p) => ({
-        ...p,
-        isNull,
-        value: isNull ? "" : p.value,
+        matchType: mode === "llm_judge" ? "llm_judge" : "exact",
+        isNull: mode === "null",
+        value: mode === "null" ? "" : p.value,
       })),
     );
 
@@ -1751,26 +1743,31 @@ export function AddTestDialog({
     </div>
   );
 
-  // Match-strategy picker shown beside each non-boolean leaf parameter's value:
-  // "Exact" compares the literal value, "LLM" judges the actual value against
-  // criteria. Styled in the inverted (foreground) palette to set it apart from
-  // the value/criteria field beside it.
+  // Match-mode picker shown beside each leaf parameter's value: "Is exactly"
+  // compares the literal value, "satisfies the criteria" judges the actual
+  // value against an LLM (non-boolean only), and "Is null" asserts the value is
+  // null. Styled in the inverted (foreground) palette to set it apart from the
+  // value / criteria field beside it.
   const renderMatchTypeSelect = (
     toolId: string,
     path: string[],
-    matchType: MatchType,
+    mode: MatchMode,
+    allowLlm: boolean,
   ) => (
     <div className="relative flex-shrink-0">
       <select
-        value={matchType}
+        value={mode}
         onChange={(e) =>
-          updateExpectedParamMatchType(toolId, path, e.target.value as MatchType)
+          updateExpectedParamMatchMode(toolId, path, e.target.value as MatchMode)
         }
-        aria-label="Match type"
+        aria-label="Match mode"
         className="h-10 pl-3 pr-8 rounded-lg text-sm font-medium bg-foreground text-background border border-transparent hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer appearance-none transition-opacity"
       >
         <option value="exact">Is exactly</option>
-        <option value="llm_judge">satisfies the criteria</option>
+        {allowLlm && (
+          <option value="llm_judge">satisfies the criteria</option>
+        )}
+        <option value="null">Is null</option>
       </select>
       <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
         <svg
@@ -1788,26 +1785,6 @@ export function AddTestDialog({
         </svg>
       </div>
     </div>
-  );
-
-  // "null" checkbox beside an exact-match value: ticking it asserts the value is
-  // null and disables the value field.
-  const renderNullCheckbox = (
-    toolId: string,
-    path: string[],
-    isNull: boolean,
-  ) => (
-    <label className="flex flex-shrink-0 items-center gap-1.5 h-10 px-1 text-sm text-muted-foreground cursor-pointer select-none">
-      <input
-        type="checkbox"
-        checked={isNull}
-        onChange={(e) =>
-          updateExpectedParamNull(toolId, path, e.target.checked)
-        }
-        className="w-4 h-4 cursor-pointer accent-foreground"
-      />
-      null
-    </label>
   );
 
   // Small trash button for removing optional / custom parameter rows.
@@ -2057,6 +2034,7 @@ export function AddTestDialog({
       // boolean is "unset" when it holds neither true nor false.
       const isLlm = param.matchType === "llm_judge";
       const isNull = !isLlm && !!param.isNull;
+      const mode: MatchMode = isLlm ? "llm_judge" : isNull ? "null" : "exact";
       const typeError =
         !isLlm &&
         !isNull &&
@@ -2080,8 +2058,9 @@ export function AddTestDialog({
         >
           {header}
           {param.dataType === "boolean" ? (
-            // Booleans can only be true or false — offer a fixed dropdown.
+            // Booleans match exactly (yes/no) or assert null — no LLM judging.
             <div className="flex items-center gap-2">
+              {renderMatchTypeSelect(toolId, paramPath, mode, false)}
               {isNull ? (
                 <input
                   type="text"
@@ -2122,12 +2101,11 @@ export function AddTestDialog({
                   </div>
                 </div>
               )}
-              {renderNullCheckbox(toolId, paramPath, isNull)}
             </div>
           ) : (
-            // Match-type picker sits inline with the expected value / criteria.
+            // Match-mode picker sits inline with the expected value / criteria.
             <div className="flex items-start gap-2">
-              {renderMatchTypeSelect(toolId, paramPath, param.matchType)}
+              {renderMatchTypeSelect(toolId, paramPath, mode, true)}
               {isLlm ? (
                 // LLM judge — describe what a correct value looks like.
                 <input
@@ -2169,8 +2147,6 @@ export function AddTestDialog({
                   className={`${fieldClass} flex-1 min-w-0`}
                 />
               )}
-              {/* No null assertion for LLM-judged rows — criteria-based. */}
-              {!isLlm && renderNullCheckbox(toolId, paramPath, isNull)}
             </div>
           )}
           {showErrors && isLlm && missingValue && (
