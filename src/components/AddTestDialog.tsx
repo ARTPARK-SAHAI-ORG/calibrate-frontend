@@ -12,9 +12,30 @@ import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import { getDefaultHeaders } from "@/lib/api";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
+import { NestedContainer } from "@/components/ui/NestedContainer";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { formatTurnTimestamp } from "@/components/test-results/shared";
+
+// A single expected parameter row in a tool-call test. The shape is recursive:
+// `object`-typed parameters carry their own `properties` (nested rows) so the
+// dialog can render a section-within-a-section. `required` is derived from the
+// tool's declared schema and gates whether the row can be removed. `custom`
+// rows are user-added (free-form name + value) — they appear for
+// structured-output tools with no declared parameters and for `object` params
+// that declare no properties of their own.
+type ExpectedParam = {
+  id: string;
+  name: string;
+  value: string;
+  required: boolean;
+  isObject: boolean;
+  custom: boolean;
+  // True for `object` params that declare no properties — the user may add
+  // arbitrary key/value rows under them.
+  allowCustomKeys: boolean;
+  properties?: ExpectedParam[];
+};
 
 type SelectedToolConfig = {
   id: string;
@@ -22,11 +43,266 @@ type SelectedToolConfig = {
   expectation: "should-call" | "should-not-call";
   acceptAnyParameterValues: boolean;
   isInbuilt: boolean;
-  expectedParameters: Array<{
-    id: string;
-    name: string;
-    value: string;
-  }>;
+  // True when the tool declares no parameters but is a structured-output tool —
+  // the user may add arbitrary top-level expected parameters for the test.
+  allowCustomParameters: boolean;
+  expectedParameters: ExpectedParam[];
+};
+
+let expParamIdCounter = 0;
+const newExpParamId = () =>
+  `exp-${++expParamIdCounter}-${Math.random().toString(36).slice(2, 8)}`;
+
+const expectedValueToString = (v: any): string => {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v);
+};
+
+// Convert a single JSON-schema-ish node into an ExpectedParam (without a value).
+const schemaNodeToExpectedParam = (
+  name: string,
+  schema: any,
+  required: boolean,
+): ExpectedParam => {
+  const dataType = schema?.type || (schema?.properties ? "object" : "string");
+  const isObject = dataType === "object";
+  const param: ExpectedParam = {
+    id: newExpParamId(),
+    name,
+    value: "",
+    required,
+    isObject,
+    custom: false,
+    allowCustomKeys: false,
+  };
+  if (isObject) {
+    const props = schema?.properties || {};
+    const requiredArr = Array.isArray(schema?.required) ? schema.required : [];
+    const entries = Object.entries(props);
+    param.properties = entries.map(([propName, propSchema]) =>
+      schemaNodeToExpectedParam(
+        propName,
+        propSchema,
+        requiredArr.includes(propName),
+      ),
+    );
+    // An object that declares no properties lets the user add arbitrary keys.
+    param.allowCustomKeys = entries.length === 0;
+  }
+  return param;
+};
+
+// Build the expected-parameter tree (no values) from a tool's stored config.
+// Returns the param list plus whether the user may add arbitrary top-level keys
+// (true for structured-output tools that declare no parameters).
+const buildExpectedParamsFromToolConfig = (
+  config: Record<string, any> | undefined,
+): { params: ExpectedParam[]; allowCustom: boolean } => {
+  const isWebhook = config?.type === "webhook";
+  const params = config?.parameters;
+  let list: ExpectedParam[] = [];
+
+  if (Array.isArray(params)) {
+    // New array format: each entry carries its own `required` boolean.
+    list = params.map((p: any) =>
+      schemaNodeToExpectedParam(p.id || p.name || "", p, p.required !== false),
+    );
+  } else {
+    // Legacy object format: a properties map plus an optional `required` array.
+    const propsObj =
+      config?.parameters?.properties ||
+      config?.function?.parameters?.properties ||
+      config?.properties ||
+      config?.parameters ||
+      {};
+    const requiredArr = Array.isArray(config?.parameters?.required)
+      ? config.parameters.required
+      : [];
+    list = Object.entries(propsObj).map(([name, schema]) =>
+      schemaNodeToExpectedParam(
+        name,
+        schema,
+        // No declared required array → treat every legacy param as required
+        // (matches the prior behaviour of demanding a value for each).
+        requiredArr.length ? requiredArr.includes(name) : true,
+      ),
+    );
+  }
+
+  const allowCustom = list.length === 0 && !isWebhook;
+  return { params: list, allowCustom };
+};
+
+// A blank user-added parameter row.
+const makeCustomParam = (isObject: boolean): ExpectedParam => ({
+  id: newExpParamId(),
+  name: "",
+  value: "",
+  required: false,
+  isObject,
+  custom: true,
+  allowCustomKeys: isObject,
+  properties: isObject ? [] : undefined,
+});
+
+// Build a pure-custom tree from a saved arguments object when no schema is
+// available (e.g. the tool was deleted, or it declares no parameters).
+const argsToCustomParams = (args: Record<string, any>): ExpectedParam[] =>
+  Object.entries(args).map(([name, v]) => {
+    const isObj = v !== null && typeof v === "object" && !Array.isArray(v);
+    return {
+      id: newExpParamId(),
+      name,
+      value: isObj ? "" : expectedValueToString(v),
+      required: false,
+      isObject: isObj,
+      custom: true,
+      allowCustomKeys: isObj,
+      properties: isObj ? argsToCustomParams(v) : undefined,
+    };
+  });
+
+// Overlay saved tool-call argument values onto a schema-derived param tree
+// (edit mode). Required params are always kept; optional ones the saved test
+// didn't assert are dropped; saved keys with no matching schema param surface
+// as custom rows.
+const overlayArgsOntoParams = (
+  schemaParams: ExpectedParam[],
+  args: Record<string, any>,
+): ExpectedParam[] => {
+  const schemaNames = new Set(schemaParams.map((p) => p.name));
+  const merged: ExpectedParam[] = [];
+
+  for (const p of schemaParams) {
+    const present = Object.prototype.hasOwnProperty.call(args, p.name);
+    if (!present) {
+      if (p.required) merged.push(p);
+      continue;
+    }
+    const v = args[p.name];
+    if (p.isObject) {
+      const childArgs =
+        v !== null && typeof v === "object" && !Array.isArray(v) ? v : {};
+      merged.push({
+        ...p,
+        properties: overlayArgsOntoParams(p.properties || [], childArgs),
+      });
+    } else {
+      merged.push({ ...p, value: expectedValueToString(v) });
+    }
+  }
+
+  for (const [name, v] of Object.entries(args)) {
+    if (schemaNames.has(name)) continue;
+    const isObj = v !== null && typeof v === "object" && !Array.isArray(v);
+    merged.push({
+      id: newExpParamId(),
+      name,
+      value: isObj ? "" : expectedValueToString(v),
+      required: false,
+      isObject: isObj,
+      custom: true,
+      allowCustomKeys: isObj,
+      properties: isObj ? argsToCustomParams(v) : undefined,
+    });
+  }
+
+  return merged;
+};
+
+// Pure tree helpers keyed by a path of param ids.
+const updateExpParamAtPath = (
+  params: ExpectedParam[],
+  path: string[],
+  fn: (p: ExpectedParam) => ExpectedParam,
+): ExpectedParam[] => {
+  if (path.length === 0) return params;
+  const [head, ...rest] = path;
+  return params.map((p) => {
+    if (p.id !== head) return p;
+    if (rest.length === 0) return fn(p);
+    return {
+      ...p,
+      properties: updateExpParamAtPath(p.properties || [], rest, fn),
+    };
+  });
+};
+
+const removeExpParamAtPath = (
+  params: ExpectedParam[],
+  path: string[],
+): ExpectedParam[] => {
+  if (path.length === 0) return params;
+  const [head, ...rest] = path;
+  if (rest.length === 0) return params.filter((p) => p.id !== head);
+  return params.map((p) =>
+    p.id === head
+      ? { ...p, properties: removeExpParamAtPath(p.properties || [], rest) }
+      : p,
+  );
+};
+
+const addExpParamAtPath = (
+  params: ExpectedParam[],
+  parentPath: string[],
+  newParam: ExpectedParam,
+): ExpectedParam[] => {
+  if (parentPath.length === 0) return [...params, newParam];
+  const [head, ...rest] = parentPath;
+  return params.map((p) =>
+    p.id === head
+      ? {
+          ...p,
+          properties: addExpParamAtPath(p.properties || [], rest, newParam),
+        }
+      : p,
+  );
+};
+
+// Convert the expected-parameter tree into the `arguments` object sent to the
+// backend. Empty optional/custom rows are skipped; values are parsed as JSON
+// when possible so numbers/booleans/objects round-trip.
+const buildArgsFromExpectedParams = (
+  params: ExpectedParam[],
+): Record<string, any> => {
+  const obj: Record<string, any> = {};
+  for (const p of params) {
+    const name = p.name.trim();
+    if (!name) continue;
+    if (p.isObject) {
+      obj[name] = buildArgsFromExpectedParams(p.properties || []);
+    } else {
+      if (!p.value.trim() && !p.required) continue;
+      try {
+        obj[name] = JSON.parse(p.value);
+      } catch {
+        obj[name] = p.value;
+      }
+    }
+  }
+  return obj;
+};
+
+// True when any row is incomplete: a kept schema param missing its value, or a
+// half-filled custom row. Fully-blank custom rows are ignored (treated as not
+// yet used) so a freshly-added row doesn't hard-block until touched.
+const hasInvalidExpectedParams = (params: ExpectedParam[]): boolean => {
+  for (const p of params) {
+    if (p.isObject) {
+      if (hasInvalidExpectedParams(p.properties || [])) return true;
+      continue;
+    }
+    const named = p.name.trim();
+    const valued = p.value.trim();
+    if (p.custom) {
+      if (!named && !valued) continue;
+      if (!named || !valued) return true;
+      continue;
+    }
+    if (!valued) return true;
+  }
+  return false;
 };
 
 export type TestConfig = {
@@ -440,29 +716,47 @@ export function AddTestDialog({
           } else {
             // Populate all tool calls
             const tools: SelectedToolConfig[] = toolCalls.map(
-              (toolCall, idx) => {
+              (toolCall) => {
                 const expectation: "should-call" | "should-not-call" =
                   toolCall.is_called === false
                     ? "should-not-call"
                     : "should-call";
                 const acceptAny = toolCall.accept_any_arguments === true;
-                const params =
-                  !acceptAny &&
-                  toolCall.arguments &&
-                  Object.keys(toolCall.arguments).length > 0
-                    ? Object.entries(toolCall.arguments).map(
-                        ([name, value], paramIdx) => ({
-                          id: `param-${idx}-${paramIdx}`,
-                          name,
-                          value: String(value),
-                        }),
-                      )
-                    : [];
 
                 // Check if this is an inbuilt tool by matching tool id or name
                 const inbuiltTool = INBUILT_TOOLS.find(
                   (t) => t.id === toolCall.tool || t.name === toolCall.tool,
                 );
+                const matchedTool = availableTools.find(
+                  (t) => t.uuid === toolCall.tool || t.name === toolCall.tool,
+                );
+                const savedArgs =
+                  toolCall.arguments &&
+                  typeof toolCall.arguments === "object" &&
+                  !Array.isArray(toolCall.arguments)
+                    ? toolCall.arguments
+                    : {};
+
+                // Reconstruct the expected-parameter tree. When the tool's
+                // schema is available we overlay saved values onto it so we
+                // recover required/optional flags and nesting; otherwise we
+                // rebuild flat custom rows straight from the saved arguments.
+                let expectedParameters: ExpectedParam[] = [];
+                let allowCustomParameters = false;
+                if (!acceptAny) {
+                  if (matchedTool && !inbuiltTool) {
+                    const { params, allowCustom } =
+                      buildExpectedParamsFromToolConfig(matchedTool.config);
+                    allowCustomParameters = allowCustom;
+                    expectedParameters = overlayArgsOntoParams(
+                      params,
+                      savedArgs,
+                    );
+                  } else {
+                    expectedParameters = argsToCustomParams(savedArgs);
+                    allowCustomParameters = !inbuiltTool;
+                  }
+                }
 
                 return {
                   id: inbuiltTool ? inbuiltTool.id : toolCall.tool,
@@ -470,7 +764,8 @@ export function AddTestDialog({
                   expectation,
                   acceptAnyParameterValues: acceptAny,
                   isInbuilt: !!inbuiltTool,
-                  expectedParameters: params,
+                  allowCustomParameters,
+                  expectedParameters,
                 };
               },
             );
@@ -1019,42 +1314,20 @@ export function AddTestDialog({
   };
 
   const addToolFromSelection = (tool: AvailableTool) => {
-    // Check if tool is a webhook type - default to accept any arguments for webhooks
+    // Webhook tools default to "accept any arguments".
     const isWebhook = tool.config?.type === "webhook";
-
-    // Extract parameters from tool config - handle both array (new) and object (legacy) formats
-    let paramList: Array<{ id: string; name: string; value: string }> = [];
-    const params = tool.config?.parameters;
-
-    if (Array.isArray(params)) {
-      // New array format
-      paramList = params.map((param: any) => ({
-        id: Date.now().toString() + (param.id || param.name),
-        name: param.id || param.name || "",
-        value: "",
-      }));
-    } else {
-      // Legacy object format
-      const propsObj =
-        tool.config?.parameters?.properties ||
-        tool.config?.function?.parameters?.properties ||
-        tool.config?.properties ||
-        tool.config?.parameters ||
-        {};
-      paramList = Object.keys(propsObj).map((name) => ({
-        id: Date.now().toString() + name,
-        name,
-        value: "",
-      }));
-    }
+    const { params, allowCustom } = buildExpectedParamsFromToolConfig(
+      tool.config,
+    );
 
     const newTool: SelectedToolConfig = {
       id: tool.uuid,
       name: tool.name,
       expectation: "should-call",
-      acceptAnyParameterValues: isWebhook, // Default to true for webhook tools
+      acceptAnyParameterValues: isWebhook,
       isInbuilt: false,
-      expectedParameters: paramList,
+      allowCustomParameters: allowCustom,
+      expectedParameters: params,
     };
 
     setSelectedTools([...selectedTools, newTool]);
@@ -1068,6 +1341,7 @@ export function AddTestDialog({
       expectation: "should-call",
       acceptAnyParameterValues: false,
       isInbuilt: true,
+      allowCustomParameters: false,
       expectedParameters: [],
     };
     setSelectedTools([...selectedTools, newTool]);
@@ -1078,36 +1352,12 @@ export function AddTestDialog({
     setSelectedTools(selectedTools.filter((t) => t.id !== toolId));
   };
 
-  // Helper function to get parameters from tool config for selected tool
-  const getToolParamsForSelectedTool = (toolId: string, toolName: string) => {
+  // Rebuild the expected-parameter tree for a selected tool from its schema.
+  const getExpectedParamsForTool = (toolId: string, toolName: string) => {
     const tool = availableTools.find(
       (t) => t.uuid === toolId || t.name === toolName,
     );
-    if (!tool) return [];
-
-    const params = tool.config?.parameters;
-
-    // Handle array format (new)
-    if (Array.isArray(params)) {
-      return params.map((param: any) => ({
-        id: Date.now().toString() + (param.id || param.name),
-        name: param.id || param.name || "",
-        value: "",
-      }));
-    }
-
-    // Handle object format (legacy)
-    const propsObj =
-      tool.config?.parameters?.properties ||
-      tool.config?.function?.parameters?.properties ||
-      tool.config?.properties ||
-      tool.config?.parameters ||
-      {};
-    return Object.keys(propsObj).map((name) => ({
-      id: Date.now().toString() + name,
-      name,
-      value: "",
-    }));
+    return buildExpectedParamsFromToolConfig(tool?.config);
   };
 
   // Update a specific tool's configuration
@@ -1121,28 +1371,28 @@ export function AddTestDialog({
 
         const updatedTool = { ...tool, ...updates };
 
-        // If toggling acceptAnyParameterValues off, populate parameters
+        // If toggling acceptAnyParameterValues off, repopulate parameters
         if (
           updates.acceptAnyParameterValues === false &&
           tool.acceptAnyParameterValues === true
         ) {
-          updatedTool.expectedParameters = getToolParamsForSelectedTool(
+          updatedTool.expectedParameters = getExpectedParamsForTool(
             tool.id,
             tool.name,
-          );
+          ).params;
         }
 
-        // If changing to should-call and params are empty and acceptAny is false
+        // If changing to should-call and params are empty and acceptAny is off
         if (
           updates.expectation === "should-call" &&
           tool.expectation !== "should-call" &&
           !updatedTool.acceptAnyParameterValues &&
           updatedTool.expectedParameters.length === 0
         ) {
-          updatedTool.expectedParameters = getToolParamsForSelectedTool(
+          updatedTool.expectedParameters = getExpectedParamsForTool(
             tool.id,
             tool.name,
-          );
+          ).params;
         }
 
         return updatedTool;
@@ -1150,24 +1400,49 @@ export function AddTestDialog({
     );
   };
 
-  // Update a parameter value for a specific tool
-  const updateToolParameterValue = (
+  // Apply a pure transform to a tool's expected-parameter tree.
+  const mutateToolParams = (
     toolId: string,
-    paramId: string,
-    value: string,
+    fn: (params: ExpectedParam[]) => ExpectedParam[],
   ) => {
-    setSelectedTools(
-      selectedTools.map((tool) => {
-        if (tool.id !== toolId) return tool;
-        return {
-          ...tool,
-          expectedParameters: tool.expectedParameters.map((param) =>
-            param.id === paramId ? { ...param, value } : param,
-          ),
-        };
-      }),
+    setSelectedTools((prev) =>
+      prev.map((tool) =>
+        tool.id === toolId
+          ? { ...tool, expectedParameters: fn(tool.expectedParameters) }
+          : tool,
+      ),
     );
   };
+
+  // Update an expected parameter's value (by path of param ids).
+  const updateExpectedParamValue = (
+    toolId: string,
+    path: string[],
+    value: string,
+  ) =>
+    mutateToolParams(toolId, (params) =>
+      updateExpParamAtPath(params, path, (p) => ({ ...p, value })),
+    );
+
+  // Update a custom expected parameter's name.
+  const updateExpectedParamName = (
+    toolId: string,
+    path: string[],
+    name: string,
+  ) =>
+    mutateToolParams(toolId, (params) =>
+      updateExpParamAtPath(params, path, (p) => ({ ...p, name })),
+    );
+
+  // Remove an optional / custom expected parameter.
+  const removeExpectedParam = (toolId: string, path: string[]) =>
+    mutateToolParams(toolId, (params) => removeExpParamAtPath(params, path));
+
+  // Add a blank custom expected parameter under the given parent (root = []).
+  const addCustomExpectedParam = (toolId: string, parentPath: string[]) =>
+    mutateToolParams(toolId, (params) =>
+      addExpParamAtPath(params, parentPath, makeCustomParam(false)),
+    );
 
   // Check if a tool has parameters in its original config
   const toolHasParams = (toolId: string, toolName: string) => {
@@ -1192,6 +1467,131 @@ export function AddTestDialog({
       {};
     return Object.keys(propsObj).length > 0;
   };
+
+  // Small "Required" / "Optional" pill shown next to each parameter row.
+  const renderRequiredBadge = (required: boolean) => (
+    <span
+      className={`text-[11px] leading-none px-2 py-1 rounded-full border ${
+        required
+          ? "border-border bg-background text-muted-foreground"
+          : "border-border bg-muted text-muted-foreground"
+      }`}
+    >
+      {required ? "Required" : "Optional"}
+    </span>
+  );
+
+  // Small trash button for removing optional / custom parameter rows.
+  const renderRemoveParamButton = (toolId: string, path: string[]) => (
+    <button
+      onClick={() => removeExpectedParam(toolId, path)}
+      aria-label="Remove parameter"
+      className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
+    >
+      <svg
+        className="w-4 h-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+        />
+      </svg>
+    </button>
+  );
+
+  // Recursively render a tool's expected-parameter rows. `object` params render
+  // a nested section (with an "Add parameter" affordance when they accept
+  // arbitrary keys); leaf params render a name + expected-value input.
+  const renderExpectedParams = (
+    toolId: string,
+    params: ExpectedParam[],
+    path: string[],
+  ): React.ReactNode =>
+    params.map((param) => {
+      const paramPath = [...path, param.id];
+      const showErrors =
+        localValidationAttempted && activeTab === "tool-invocation";
+
+      // Header: name (label, or editable input for custom rows) + badge +
+      // remove button for optional / custom rows.
+      const nameError =
+        showErrors && param.custom && !!param.value.trim() && !param.name.trim();
+      const header = (
+        <div className="flex items-center gap-2">
+          {param.custom ? (
+            <input
+              type="text"
+              value={param.name}
+              onChange={(e) =>
+                updateExpectedParamName(toolId, paramPath, e.target.value)
+              }
+              placeholder="Parameter name"
+              className={`flex-1 h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+                nameError ? "border-red-500" : "border-border"
+              }`}
+            />
+          ) : (
+            <span className="flex-1 text-sm font-medium text-foreground">
+              {param.name}
+            </span>
+          )}
+          {renderRequiredBadge(param.required)}
+          {!param.required && renderRemoveParamButton(toolId, paramPath)}
+        </div>
+      );
+
+      if (param.isObject) {
+        const children = param.properties || [];
+        return (
+          <div key={param.id} className="space-y-2">
+            {header}
+            <NestedContainer
+              showAddButton={param.allowCustomKeys}
+              addButtonText="Add parameter"
+              onAddProperty={() => addCustomExpectedParam(toolId, paramPath)}
+            >
+              {children.length > 0 ? (
+                <div className="space-y-3">
+                  {renderExpectedParams(toolId, children, paramPath)}
+                </div>
+              ) : (
+                !param.allowCustomKeys && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    This object has no parameters.
+                  </p>
+                )
+              )}
+            </NestedContainer>
+          </div>
+        );
+      }
+
+      const valueError =
+        showErrors &&
+        !param.value.trim() &&
+        (param.required || (!param.custom ? true : !!param.name.trim()));
+      return (
+        <div key={param.id} className="space-y-1.5">
+          {header}
+          <input
+            type="text"
+            value={param.value}
+            onChange={(e) =>
+              updateExpectedParamValue(toolId, paramPath, e.target.value)
+            }
+            placeholder="Expected value"
+            className={`w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
+              valueError ? "border-red-500" : "border-border"
+            }`}
+          />
+        </div>
+      );
+    });
 
   // Generate a UUID for tool calls
   const generateUUID = () => {
@@ -1296,20 +1696,13 @@ export function AddTestDialog({
         const toolCalls = selectedTools.map((tool) => {
           const toolIdentifier = tool.isInbuilt ? tool.id : tool.name;
 
-          const expectedArgs: Record<string, any> = {};
-          if (!tool.acceptAnyParameterValues) {
-            for (const param of tool.expectedParameters) {
-              try {
-                expectedArgs[param.name] = JSON.parse(param.value);
-              } catch {
-                expectedArgs[param.name] = param.value;
-              }
-            }
-          }
+          const expectedArgs = tool.acceptAnyParameterValues
+            ? {}
+            : buildArgsFromExpectedParams(tool.expectedParameters);
 
           return {
             tool: toolIdentifier,
-            arguments: tool.acceptAnyParameterValues ? {} : expectedArgs,
+            arguments: expectedArgs,
             accept_any_arguments: tool.acceptAnyParameterValues,
           };
         });
@@ -1431,19 +1824,16 @@ export function AddTestDialog({
       if (!testName.trim() || selectedTools.length === 0) {
         return;
       }
-      // For each tool that should be called with specific params, all params must have values
+      // For each tool that should be called with specific params, every kept
+      // parameter (required ones, plus any optional/custom rows the user filled
+      // in) must be complete.
       for (const tool of selectedTools) {
         if (
           tool.expectation === "should-call" &&
-          tool.expectedParameters.length > 0 &&
-          !tool.acceptAnyParameterValues
+          !tool.acceptAnyParameterValues &&
+          hasInvalidExpectedParams(tool.expectedParameters)
         ) {
-          const hasEmptyParams = tool.expectedParameters.some(
-            (param) => !param.value.trim(),
-          );
-          if (hasEmptyParams) {
-            return;
-          }
+          return;
         }
       }
       // Validate that all tool_response messages have valid JSON
@@ -2167,49 +2557,47 @@ export function AddTestDialog({
                                 </div>
                               )}
 
-                            {/* Expected parameters section - only show when "should call" is selected and toggle is off */}
+                            {/* Expected parameters section - only show when
+                              "should call" is selected and accept-any is off.
+                              Renders for tools with declared parameters and for
+                              structured-output tools that allow custom ones. */}
                             {tool.expectation === "should-call" &&
-                              tool.expectedParameters.length > 0 &&
-                              !tool.acceptAnyParameterValues && (
+                              !tool.acceptAnyParameterValues &&
+                              (tool.expectedParameters.length > 0 ||
+                                tool.allowCustomParameters) && (
                                 <div className="mt-4">
                                   <div className="mb-3">
                                     <h4 className="text-sm font-medium text-foreground">
                                       Expected extracted parameters
                                     </h4>
                                     <p className="text-xs text-muted-foreground mt-1">
-                                      Configure how each parameter should be
-                                      evaluated when the agent calls this tool
+                                      {tool.allowCustomParameters &&
+                                      tool.expectedParameters.length === 0
+                                        ? "This tool declares no parameters. Add the parameter names you expect the agent to extract and their expected values."
+                                        : "Configure how each parameter should be evaluated when the agent calls this tool. Required parameters must be filled; optional ones can be removed."}
                                     </p>
                                   </div>
 
-                                  <div className="space-y-3">
-                                    {tool.expectedParameters.map((param) => (
-                                      <div key={param.id}>
-                                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-                                          {param.name}
-                                        </label>
-                                        <input
-                                          type="text"
-                                          value={param.value}
-                                          onChange={(e) =>
-                                            updateToolParameterValue(
-                                              tool.id,
-                                              param.id,
-                                              e.target.value,
-                                            )
-                                          }
-                                          placeholder="Expected value"
-                                          className={`w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
-                                            localValidationAttempted &&
-                                            activeTab === "tool-invocation" &&
-                                            !param.value.trim()
-                                              ? "border-red-500"
-                                              : "border-border"
-                                          }`}
-                                        />
-                                      </div>
-                                    ))}
-                                  </div>
+                                  {tool.expectedParameters.length > 0 && (
+                                    <div className="space-y-3">
+                                      {renderExpectedParams(
+                                        tool.id,
+                                        tool.expectedParameters,
+                                        [],
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {tool.allowCustomParameters && (
+                                    <button
+                                      onClick={() =>
+                                        addCustomExpectedParam(tool.id, [])
+                                      }
+                                      className="mt-3 h-9 px-4 rounded-lg text-sm font-medium bg-background text-foreground border border-border hover:bg-muted transition-colors cursor-pointer"
+                                    >
+                                      + Add parameter
+                                    </button>
+                                  )}
                                 </div>
                               )}
                           </div>
