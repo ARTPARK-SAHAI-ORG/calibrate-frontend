@@ -715,60 +715,55 @@ export function AddTestDialog({
             setSelectedTools([]);
           } else {
             // Populate all tool calls
-            const tools: SelectedToolConfig[] = toolCalls.map(
-              (toolCall) => {
-                const expectation: "should-call" | "should-not-call" =
-                  toolCall.is_called === false
-                    ? "should-not-call"
-                    : "should-call";
-                const acceptAny = toolCall.accept_any_arguments === true;
+            const tools: SelectedToolConfig[] = toolCalls.map((toolCall) => {
+              const expectation: "should-call" | "should-not-call" =
+                toolCall.is_called === false
+                  ? "should-not-call"
+                  : "should-call";
+              const acceptAny = toolCall.accept_any_arguments === true;
 
-                // Check if this is an inbuilt tool by matching tool id or name
-                const inbuiltTool = INBUILT_TOOLS.find(
-                  (t) => t.id === toolCall.tool || t.name === toolCall.tool,
-                );
-                const matchedTool = availableTools.find(
-                  (t) => t.uuid === toolCall.tool || t.name === toolCall.tool,
-                );
-                const savedArgs =
-                  toolCall.arguments &&
-                  typeof toolCall.arguments === "object" &&
-                  !Array.isArray(toolCall.arguments)
-                    ? toolCall.arguments
-                    : {};
+              // Check if this is an inbuilt tool by matching tool id or name
+              const inbuiltTool = INBUILT_TOOLS.find(
+                (t) => t.id === toolCall.tool || t.name === toolCall.tool,
+              );
+              const matchedTool = availableTools.find(
+                (t) => t.uuid === toolCall.tool || t.name === toolCall.tool,
+              );
+              const savedArgs =
+                toolCall.arguments &&
+                typeof toolCall.arguments === "object" &&
+                !Array.isArray(toolCall.arguments)
+                  ? toolCall.arguments
+                  : {};
 
-                // Reconstruct the expected-parameter tree. When the tool's
-                // schema is available we overlay saved values onto it so we
-                // recover required/optional flags and nesting; otherwise we
-                // rebuild flat custom rows straight from the saved arguments.
-                let expectedParameters: ExpectedParam[] = [];
-                let allowCustomParameters = false;
-                if (!acceptAny) {
-                  if (matchedTool && !inbuiltTool) {
-                    const { params, allowCustom } =
-                      buildExpectedParamsFromToolConfig(matchedTool.config);
-                    allowCustomParameters = allowCustom;
-                    expectedParameters = overlayArgsOntoParams(
-                      params,
-                      savedArgs,
-                    );
-                  } else {
-                    expectedParameters = argsToCustomParams(savedArgs);
-                    allowCustomParameters = !inbuiltTool;
-                  }
+              // Reconstruct the expected-parameter tree. When the tool's
+              // schema is available we overlay saved values onto it so we
+              // recover required/optional flags and nesting; otherwise we
+              // rebuild flat custom rows straight from the saved arguments.
+              let expectedParameters: ExpectedParam[] = [];
+              let allowCustomParameters = false;
+              if (!acceptAny) {
+                if (matchedTool && !inbuiltTool) {
+                  const { params, allowCustom } =
+                    buildExpectedParamsFromToolConfig(matchedTool.config);
+                  allowCustomParameters = allowCustom;
+                  expectedParameters = overlayArgsOntoParams(params, savedArgs);
+                } else {
+                  expectedParameters = argsToCustomParams(savedArgs);
+                  allowCustomParameters = !inbuiltTool;
                 }
+              }
 
-                return {
-                  id: inbuiltTool ? inbuiltTool.id : toolCall.tool,
-                  name: inbuiltTool ? inbuiltTool.name : toolCall.tool,
-                  expectation,
-                  acceptAnyParameterValues: acceptAny,
-                  isInbuilt: !!inbuiltTool,
-                  allowCustomParameters,
-                  expectedParameters,
-                };
-              },
-            );
+              return {
+                id: inbuiltTool ? inbuiltTool.id : toolCall.tool,
+                name: inbuiltTool ? inbuiltTool.name : toolCall.tool,
+                expectation,
+                acceptAnyParameterValues: acceptAny,
+                isInbuilt: !!inbuiltTool,
+                allowCustomParameters,
+                expectedParameters,
+              };
+            });
             setSelectedTools(tools);
           }
         }
@@ -800,6 +795,18 @@ export function AddTestDialog({
   const [localValidationAttempted, setLocalValidationAttempted] =
     useState(false);
   const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
+  // Collapsed object-parameter rows (keyed by the param's unique id). Objects
+  // default to expanded; the user can fold them to tame deeply nested schemas.
+  const [collapsedParamIds, setCollapsedParamIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const toggleParamCollapsed = (paramId: string) =>
+    setCollapsedParamIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(paramId)) next.delete(paramId);
+      else next.add(paramId);
+      return next;
+    });
   const [chatMessages, setChatMessages] = useState<
     Array<{
       id: string;
@@ -1520,7 +1527,10 @@ export function AddTestDialog({
       // Header: name (label, or editable input for custom rows) + badge +
       // remove button for optional / custom rows.
       const nameError =
-        showErrors && param.custom && !!param.value.trim() && !param.name.trim();
+        showErrors &&
+        param.custom &&
+        !!param.value.trim() &&
+        !param.name.trim();
       const header = (
         <div className="flex items-center gap-2">
           {param.custom ? (
@@ -1547,26 +1557,63 @@ export function AddTestDialog({
 
       if (param.isObject) {
         const children = param.properties || [];
+        const collapsed = collapsedParamIds.has(param.id);
+        const childCount = children.length;
         return (
           <div key={param.id} className="space-y-2">
-            {header}
-            <NestedContainer
-              showAddButton={param.allowCustomKeys}
-              addButtonText="Add parameter"
-              onAddProperty={() => addCustomExpectedParam(toolId, paramPath)}
-            >
-              {children.length > 0 ? (
-                <div className="space-y-3">
-                  {renderExpectedParams(toolId, children, paramPath)}
-                </div>
-              ) : (
-                !param.allowCustomKeys && (
-                  <p className="text-xs text-muted-foreground text-center">
-                    This object has no parameters.
-                  </p>
-                )
-              )}
-            </NestedContainer>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => toggleParamCollapsed(param.id)}
+                aria-label={collapsed ? "Expand parameter" : "Collapse parameter"}
+                aria-expanded={!collapsed}
+                className="w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
+              >
+                <svg
+                  className={`w-4 h-4 transition-transform ${
+                    collapsed ? "" : "rotate-90"
+                  }`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+              <div className="flex-1">{header}</div>
+            </div>
+            {collapsed ? (
+              <p className="pl-8 text-xs text-muted-foreground">
+                {childCount > 0
+                  ? `${childCount} parameter${childCount === 1 ? "" : "s"} hidden`
+                  : param.allowCustomKeys
+                    ? "No parameters added"
+                    : "No parameters"}
+              </p>
+            ) : (
+              <NestedContainer
+                showAddButton={param.allowCustomKeys}
+                addButtonText="Add parameter"
+                onAddProperty={() => addCustomExpectedParam(toolId, paramPath)}
+              >
+                {children.length > 0 ? (
+                  <div className="space-y-3">
+                    {renderExpectedParams(toolId, children, paramPath)}
+                  </div>
+                ) : (
+                  !param.allowCustomKeys && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      This object has no parameters.
+                    </p>
+                  )
+                )}
+              </NestedContainer>
+            )}
           </div>
         );
       }
@@ -2567,14 +2614,11 @@ export function AddTestDialog({
                                 tool.allowCustomParameters) && (
                                 <div className="mt-4">
                                   <div className="mb-3">
-                                    <h4 className="text-sm font-medium text-foreground">
-                                      Expected extracted parameters
-                                    </h4>
                                     <p className="text-xs text-muted-foreground mt-1">
                                       {tool.allowCustomParameters &&
                                       tool.expectedParameters.length === 0
                                         ? "This tool declares no parameters. Add the parameter names you expect the agent to extract and their expected values."
-                                        : "Configure how each parameter should be evaluated when the agent calls this tool. Required parameters must be filled; optional ones can be removed."}
+                                        : "Configure how each parameter for the tool call should be evaluated"}
                                     </p>
                                   </div>
 
