@@ -80,6 +80,8 @@ export function AddToolDialog({
   // names/descriptions/properties). Surfaced as the form's inline red errors,
   // and shown at the top of the JSON editor when toggled back.
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Bumped on each failed submit to scroll the first invalid field into view.
+  const [errorScrollTick, setErrorScrollTick] = useState(0);
 
   // Webhook-specific state
   const [webhookMethod, setWebhookMethod] = useState<
@@ -163,6 +165,20 @@ export function AddToolDialog({
     resetForm();
     onClose();
   };
+
+  // After a failed submit, scroll the first invalid field into view. The timeout
+  // lets React paint the red borders (and any json→form view switch) first.
+  // Every invalid field shares the `border-red-500` class, so the first match in
+  // document order is the topmost error.
+  useEffect(() => {
+    if (errorScrollTick === 0) return;
+    const timer = setTimeout(() => {
+      const firstError =
+        sidebarContentRef.current?.querySelector(".border-red-500");
+      firstError?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [errorScrollTick]);
 
   // Scroll to newly added query parameter
   useEffect(() => {
@@ -1044,20 +1060,22 @@ export function AddToolDialog({
   };
 
   const handleSubmit = () => {
-    if (viewMode === "json") {
-      // Can't submit (or validate fields on) unparseable JSON.
-      if (jsonError) return;
-      setValidationAttempted(true);
-      const message = collectIncompleteFields();
-      if (message) {
-        // Switch to the form so the user sees the inline red errors in context,
-        // and keep the message so it's still visible if they toggle back to JSON.
-        setSubmitError(message);
-        setViewMode("ui");
-        return;
-      }
-      setSubmitError(null);
+    // Can't submit (or validate fields on) unparseable JSON.
+    if (viewMode === "json" && jsonError) return;
+
+    setValidationAttempted(true);
+    const message = collectIncompleteFields();
+    if (message) {
+      setSubmitError(message);
+      // From JSON mode, switch to the form so the inline red errors show in
+      // context (the message stays visible at the top if they toggle back).
+      if (viewMode === "json") setViewMode("ui");
+      // Scroll the first invalid field into view (after the switch + repaint).
+      setErrorScrollTick((t) => t + 1);
+      return;
     }
+
+    setSubmitError(null);
     if (editingToolUuid) {
       updateTool();
     } else {
