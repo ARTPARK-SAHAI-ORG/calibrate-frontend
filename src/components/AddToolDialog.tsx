@@ -74,7 +74,12 @@ export function AddToolDialog({
   // of truth), so the existing create/update paths keep working unchanged.
   const [viewMode, setViewMode] = useState<"ui" | "json">("ui");
   const [jsonText, setJsonText] = useState("");
+  // JSON syntax / structural parse error (the "JSON mistake").
   const [jsonError, setJsonError] = useState<string | null>(null);
+  // Field-completeness errors from a failed submit (valid JSON, but missing
+  // names/descriptions/properties). Surfaced as the form's inline red errors,
+  // and shown at the top of the JSON editor when toggled back.
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Webhook-specific state
   const [webhookMethod, setWebhookMethod] = useState<
@@ -110,6 +115,7 @@ export function AddToolDialog({
       setViewMode("ui");
       setJsonText("");
       setJsonError(null);
+      setSubmitError(null);
       if (editingToolUuid) {
         // Load existing tool data
         loadToolData(editingToolUuid);
@@ -150,6 +156,7 @@ export function AddToolDialog({
     setViewMode("ui");
     setJsonText("");
     setJsonError(null);
+    setSubmitError(null);
   };
 
   const handleClose = () => {
@@ -930,9 +937,11 @@ export function AddToolDialog({
   };
 
   // Live-sync: valid JSON flows into form state on every keystroke; invalid JSON
-  // surfaces an inline error and leaves the last-good state untouched.
+  // surfaces an inline error and leaves the last-good state untouched. Editing the
+  // JSON also clears any stale field-completeness message from a prior submit.
   const handleJsonChange = (text: string) => {
     setJsonText(text);
+    setSubmitError(null);
     const result = parseToolJson(text);
     if (result.error) {
       setJsonError(result.error);
@@ -944,7 +953,11 @@ export function AddToolDialog({
 
   const switchToJson = () => {
     setJsonText(buildToolJson());
+    // Rebuilt JSON is always syntactically valid, so no parse error. Recompute the
+    // field-completeness message (only after a submit was attempted) so it stays
+    // accurate and visible at the top of the editor when toggling back.
     setJsonError(null);
+    setSubmitError(validationAttempted ? collectIncompleteFields() : null);
     setViewMode("json");
   };
 
@@ -952,39 +965,98 @@ export function AddToolDialog({
     setViewMode("ui");
   };
 
-  // Mirrors the inline validation inside createTool/updateTool so JSON-mode Save
-  // can surface a single readable message instead of silently no-op'ing.
-  const validateForSubmit = (): string | null => {
-    if (!toolName.trim()) return "Name is required.";
-    if (!toolDescription.trim()) return "Description is required.";
-    if (toolType === "webhook") {
-      if (!isValidUrl(webhookUrl)) return "A valid webhook URL is required.";
-      if (webhookHeaders.length > 0 && hasInvalidHeaders(webhookHeaders)) {
-        return "Each header needs both a name and a value.";
+  // Build a specific, field-by-field list of what is missing. Mirrors the rules in
+  // hasInvalidParameters / hasInvalidSingleParameter exactly, but reports each
+  // offending field by name/path instead of a single boolean.
+  const collectItemIssues = (item: Parameter, label: string): string[] => {
+    const issues: string[] = [];
+    if (!item.description.trim()) {
+      issues.push(`${label}: item description is required`);
+    }
+    if (item.dataType === "object") {
+      if (!item.properties || item.properties.length === 0) {
+        issues.push(`${label}: object items need at least one property`);
+      } else {
+        issues.push(...collectParamIssues(item.properties, `${label} › `));
       }
-      if (queryParameters.length > 0 && hasInvalidParameters(queryParameters)) {
-        return "One or more query parameters are incomplete.";
+    }
+    if (item.dataType === "array" && item.items) {
+      issues.push(...collectItemIssues(item.items, `${label}[]`));
+    }
+    return issues;
+  };
+
+  const collectParamIssues = (
+    params: Parameter[],
+    prefix: string,
+  ): string[] => {
+    const issues: string[] = [];
+    const counts = new Map<string, number>();
+    params.forEach((p) => {
+      const key = p.name.trim().toLowerCase();
+      if (key) counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    const reportedDup = new Set<string>();
+    params.forEach((p) => {
+      const name = p.name.trim();
+      const label = `${prefix}${name || "(unnamed)"}`;
+      if (!name) issues.push(`${label}: name is required`);
+      if (!p.description.trim()) issues.push(`${label}: description is required`);
+      const dupKey = name.toLowerCase();
+      if (name && (counts.get(dupKey) || 0) > 1 && !reportedDup.has(dupKey)) {
+        reportedDup.add(dupKey);
+        issues.push(`${prefix}${name}: duplicate name`);
       }
-      if (["POST", "PUT", "PATCH"].includes(webhookMethod)) {
-        if (!bodyDescription.trim()) return "Body description is required.";
-        if (bodyParameters.length > 0 && hasInvalidParameters(bodyParameters)) {
-          return "One or more body parameters are incomplete.";
+      if (p.dataType === "object") {
+        if (!p.properties || p.properties.length === 0) {
+          issues.push(`${label}: object needs at least one property`);
+        } else {
+          issues.push(...collectParamIssues(p.properties, `${label} › `));
         }
       }
-    } else if (hasInvalidParameters(parameters)) {
-      return "One or more parameters are incomplete (each needs a name and description; objects need at least one property).";
+      if (p.dataType === "array" && p.items) {
+        issues.push(...collectItemIssues(p.items, `${label}[]`));
+      }
+    });
+    return issues;
+  };
+
+  // Returns a multi-line message naming every incomplete field, or null if valid.
+  const collectIncompleteFields = (): string | null => {
+    const issues: string[] = [];
+    if (!toolName.trim()) issues.push("Name is required");
+    if (!toolDescription.trim()) issues.push("Description is required");
+    if (toolType === "webhook") {
+      if (!isValidUrl(webhookUrl)) issues.push("A valid webhook URL is required");
+      if (webhookHeaders.length > 0 && hasInvalidHeaders(webhookHeaders)) {
+        issues.push("Each header needs both a name and a value");
+      }
+      issues.push(...collectParamIssues(queryParameters, "Query param "));
+      if (["POST", "PUT", "PATCH"].includes(webhookMethod)) {
+        if (!bodyDescription.trim()) issues.push("Body description is required");
+        issues.push(...collectParamIssues(bodyParameters, "Body param "));
+      }
+    } else {
+      issues.push(...collectParamIssues(parameters, "Parameter "));
     }
-    return null;
+    if (issues.length === 0) return null;
+    return `Please fix:\n${issues.map((i) => `• ${i}`).join("\n")}`;
   };
 
   const handleSubmit = () => {
     if (viewMode === "json") {
+      // Can't submit (or validate fields on) unparseable JSON.
       if (jsonError) return;
-      const err = validateForSubmit();
-      if (err) {
-        setJsonError(err);
+      setValidationAttempted(true);
+      const message = collectIncompleteFields();
+      if (message) {
+        // Switch to the form so the user sees the inline red errors in context,
+        // and keep the message so it's still visible if they toggle back to JSON.
+        setSubmitError(message);
+        setViewMode("ui");
         return;
       }
+      setSubmitError(null);
     }
     if (editingToolUuid) {
       updateTool();
@@ -1437,8 +1509,7 @@ export function AddToolDialog({
                   <button
                     type="button"
                     onClick={switchToUi}
-                    disabled={viewMode === "json" && !!jsonError}
-                    className={`h-7 px-3 rounded-full text-xs font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                    className={`h-7 px-3 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                       viewMode === "ui"
                         ? "bg-background text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
@@ -1462,18 +1533,24 @@ export function AddToolDialog({
 
               {viewMode === "json" ? (
                 <div className="space-y-2">
+                  {(jsonError || submitError) && (
+                    <div className="rounded-md border border-red-500 bg-red-500/10 px-4 py-3">
+                      <p className="text-sm text-red-500 whitespace-pre-line">
+                        {jsonError || submitError}
+                      </p>
+                    </div>
+                  )}
                   <textarea
                     value={jsonText}
                     onChange={(e) => handleJsonChange(e.target.value)}
                     spellCheck={false}
                     placeholder='{ "name": "", "description": "", "parameters": { "type": "object", "properties": {} } }'
                     className={`w-full min-h-[480px] px-4 py-3 rounded-md text-sm font-mono bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-y ${
-                      jsonError ? "border-red-500" : "border-border"
+                      jsonError || submitError
+                        ? "border-red-500"
+                        : "border-border"
                     }`}
                   />
-                  {jsonError && (
-                    <p className="text-sm text-red-500">{jsonError}</p>
-                  )}
                 </div>
               ) : (
                 <>
