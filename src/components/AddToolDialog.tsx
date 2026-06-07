@@ -751,7 +751,12 @@ export function AddToolDialog({
 
     if (dataType === "object" && itemsConfig.properties) {
       itemParam.properties = [];
-      const requiredProps = itemsConfig.required || [];
+      // `required` on an object schema is the JSON-schema array of required
+      // property names. Some stored configs carry a boolean here instead (the
+      // object param's own required flag), so guard before calling .includes.
+      const requiredProps = Array.isArray(itemsConfig.required)
+        ? itemsConfig.required
+        : [];
       Object.entries(itemsConfig.properties).forEach(
         ([propName, propConfig]: [string, any]) => {
           itemParam.properties!.push(
@@ -783,7 +788,13 @@ export function AddToolDialog({
       name: paramName,
       dataType,
       // A nullable union (e.g. ["integer", "null"]) marks the field optional.
-      required: nullable ? false : (paramConfig.required ?? isRequired),
+      // `required` is only a self-flag when it's a boolean; on object schemas it
+      // is the array of required child names, so fall back to isRequired there.
+      required: nullable
+        ? false
+        : typeof paramConfig.required === "boolean"
+          ? paramConfig.required
+          : isRequired,
       description: paramConfig.description || "",
     };
 
@@ -793,7 +804,10 @@ export function AddToolDialog({
 
     if (dataType === "object" && paramConfig.properties) {
       param.properties = [];
-      const requiredProps = paramConfig.required || [];
+      // See note in parseItemsSchema: guard against a boolean `required`.
+      const requiredProps = Array.isArray(paramConfig.required)
+        ? paramConfig.required
+        : [];
       Object.entries(paramConfig.properties).forEach(
         ([propName, propConfig]: [string, any]) => {
           param.properties!.push(
