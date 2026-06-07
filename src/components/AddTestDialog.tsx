@@ -823,6 +823,7 @@ export function AddTestDialog({
           toolId?: string;
           toolParams?: Array<{ name: string; value: string; group?: string }>;
           isWebhook?: boolean;
+          isInbuilt?: boolean;
           linkedToolCallId?: string;
           createdAt?: string;
         }> = [];
@@ -868,6 +869,11 @@ export function AddTestDialog({
                 (t) => t.name === toolCall.function.name,
               );
               const isWebhook = tool?.config?.type === "webhook";
+              const isInbuilt = !!INBUILT_TOOLS.find(
+                (t) =>
+                  t.id === toolCall.function.name ||
+                  t.name === toolCall.function.name,
+              );
 
               let toolParams: Array<{
                 name: string;
@@ -914,6 +920,7 @@ export function AddTestDialog({
                 toolName: toolCall.function.name,
                 toolParams,
                 isWebhook,
+                isInbuilt,
                 ...(createdAt ? { createdAt } : {}),
               });
             } else {
@@ -962,7 +969,7 @@ export function AddTestDialog({
         const withResponses: typeof messages = [];
         messages.forEach((msg, idx) => {
           withResponses.push(msg);
-          if (msg.role === "tool_call") {
+          if (msg.role === "tool_call" && !msg.isInbuilt) {
             const next = messages[idx + 1];
             const alreadyHasResponse =
               next?.role === "tool_response" &&
@@ -1122,6 +1129,7 @@ export function AddTestDialog({
       toolId?: string;
       toolParams?: Array<{ name: string; value: string; group?: string }>;
       isWebhook?: boolean;
+      isInbuilt?: boolean;
       linkedToolCallId?: string; // For tool_response to link back to tool_call
       createdAt?: string;
     }>
@@ -1166,6 +1174,7 @@ export function AddTestDialog({
     toolName: string,
     params: Array<{ name: string; value: string; group?: string }>,
     isWebhook: boolean = false,
+    isInbuilt: boolean = false,
   ) => {
     const toolCallId = Date.now().toString();
     const newMessages: typeof chatMessages = [
@@ -1178,20 +1187,25 @@ export function AddTestDialog({
         toolName,
         toolParams: params,
         isWebhook,
+        isInbuilt,
       },
     ];
 
-    // Always add a tool response message after the tool call.
+    // Add a tool response message after the tool call for workspace tools.
     // Webhook tools get a pre-filled JSON body (required); structured-output
-    // tools get an empty box that the user can optionally fill.
-    newMessages.push({
-      id: (Date.now() + 1).toString(),
-      role: "tool_response",
-      content: isWebhook ? DEFAULT_WEBHOOK_RESPONSE : "",
-      linkedToolCallId: toolCallId,
-      toolName,
-      isWebhook,
-    });
+    // tools get an empty optional box. Inbuilt tools (e.g. "End conversation")
+    // don't have a meaningful response — they're side-effects — so we skip
+    // the box entirely for them.
+    if (!isInbuilt) {
+      newMessages.push({
+        id: (Date.now() + 1).toString(),
+        role: "tool_response",
+        content: isWebhook ? DEFAULT_WEBHOOK_RESPONSE : "",
+        linkedToolCallId: toolCallId,
+        toolName,
+        isWebhook,
+      });
+    }
 
     setChatMessages(newMessages);
     setToolCallDropdownOpen(false);
@@ -4355,6 +4369,8 @@ export function AddTestDialog({
                                                   toolId,
                                                   toolName,
                                                   [],
+                                                  false,
+                                                  true,
                                                 );
                                               }}
                                               onSelectCustomTool={(tool) => {
