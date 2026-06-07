@@ -411,6 +411,22 @@ export function BulkUploadTestsModal({
     return names;
   }, [availableTools]);
 
+  // Map a live library-tool name to its uuid, used to stamp `tool_uuid` onto
+  // imported tool-call entries so they get rename-tracking. Names shared by
+  // more than one live tool are excluded so we never guess the wrong link —
+  // those entries fall back to name-only. Inbuilt tools (e.g. `end_call`)
+  // aren't in GET /tools, so they're never stamped and stay name-only.
+  const toolUuidByName = useMemo(() => {
+    const byName = new Map<string, string>();
+    const ambiguous = new Set<string>();
+    for (const t of availableTools) {
+      if (byName.has(t.name)) ambiguous.add(t.name);
+      else byName.set(t.name, t.uuid);
+    }
+    for (const name of ambiguous) byName.delete(name);
+    return byName;
+  }, [availableTools]);
+
   // Evaluators to render in the preview's pill row and per-variable
   // column headers. Sourced directly from the user's up-front pick — the
   // CSV doesn't carry an evaluator list anymore.
@@ -869,7 +885,24 @@ export function BulkUploadTestsModal({
             evaluators: test.evaluators ?? [],
           };
         } else {
-          const tool_calls = parseJsonLenient(test.tool_calls!);
+          const parsed = parseJsonLenient(test.tool_calls!);
+          // Stamp `tool_uuid` onto each entry whose `tool` name resolves to a
+          // live library tool, so renames track. Entries that already carry a
+          // tool_uuid keep it (the author-supplied id wins); inbuilt and
+          // unknown tool names are left name-only. Non-array / malformed input
+          // is passed through untouched for the backend to reject.
+          const tool_calls = Array.isArray(parsed)
+            ? parsed.map((entry) => {
+                if (!entry || typeof entry !== "object") return entry;
+                const e = entry as Record<string, unknown>;
+                if (typeof e.tool_uuid === "string" && e.tool_uuid) return e;
+                const uuid =
+                  typeof e.tool === "string"
+                    ? toolUuidByName.get(e.tool)
+                    : undefined;
+                return uuid ? { ...e, tool_uuid: uuid } : e;
+              })
+            : parsed;
           return {
             name: test.name,
             conversation_history,
