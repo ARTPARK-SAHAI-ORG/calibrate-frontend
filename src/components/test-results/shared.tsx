@@ -321,7 +321,7 @@ function ExpectedArgValue({ value }: { value: any }) {
   }
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
     return (
-      <div className="space-y-2 pl-3 border-l-2 border-border">
+      <div className="space-y-3 rounded-xl border border-border bg-background/50 p-3">
         {Object.entries(value).map(([k, v]) => (
           <div key={k}>
             <label className="block text-xs font-medium text-foreground mb-1">
