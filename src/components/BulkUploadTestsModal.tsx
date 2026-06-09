@@ -216,7 +216,6 @@ export function BulkUploadTestsModal({
   // parse effect once `evaluatorsFetched` flips to true. Lets us validate
   // the upload as soon as data is available without forcing a re-upload.
   const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [assignToAgents, setAssignToAgents] = useState(false);
   const [selectedAgentUuids, setSelectedAgentUuids] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -267,7 +266,6 @@ export function BulkUploadTestsModal({
       setParsedTests([]);
       setParseError(null);
       setPendingFile(null);
-      setAssignToAgents(false);
       setSelectedAgentUuids([]);
       setIsUploading(false);
       setUploadError(null);
@@ -926,7 +924,9 @@ export function BulkUploadTestsModal({
       } = { type: testType, tests };
       if (lockedAgentUuid) {
         body.agent_uuids = [lockedAgentUuid];
-      } else if (assignToAgents && selectedAgentUuids.length > 0) {
+      } else {
+        // Unlocked (global /tests) uploads must link to at least one agent;
+        // the submit button stays disabled until one is picked.
         body.agent_uuids = selectedAgentUuids;
       }
 
@@ -1707,59 +1707,25 @@ export function BulkUploadTestsModal({
             </div>
           )}
 
-          {/* Step 3: Assign to Agents (optional, hidden when modal is
-              locked to a specific agent — see lockedAgentUuid prop). */}
+          {/* Step 3: Assign to Agents (required, hidden when modal is
+              locked to a specific agent — see lockedAgentUuid prop). Bulk
+              uploads must link to at least one agent so the new tests are
+              never orphaned in the library. */}
           {testType && parsedTests.length > 0 && !lockedAgentUuid && (
             <div ref={assignAgentsSectionRef}>
-              <div className="flex items-center gap-3 mb-3">
-                <button
-                  onClick={() => {
-                    const next = !assignToAgents;
-                    setAssignToAgents(next);
-                    if (!next) {
-                      setSelectedAgentUuids([]);
-                    } else {
-                      setTimeout(() => {
-                        assignAgentsSectionRef.current?.scrollIntoView({
-                          behavior: "smooth",
-                          block: "end",
-                        });
-                      }, 50);
-                    }
-                  }}
-                  className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
-                    assignToAgents
-                      ? "bg-foreground border-foreground"
-                      : "bg-background border-muted-foreground hover:border-foreground"
-                  }`}
-                >
-                  {assignToAgents && (
-                    <svg
-                      className="w-3 h-3 text-background"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M4.5 12.75l6 6 9-13.5"
-                      />
-                    </svg>
-                  )}
-                </button>
+              <div className="flex items-center gap-2 mb-1">
                 <span className="text-sm font-medium text-foreground">
                   Assign tests to agents
                 </span>
+                <span className="text-red-500">*</span>
               </div>
-
-              {assignToAgents && (
-                <MultiAgentPicker
-                  selectedAgentUuids={selectedAgentUuids}
-                  onToggleAgent={toggleAgentSelection}
-                />
-              )}
+              <p className="text-xs text-muted-foreground mb-3">
+                Select one or more agents to link these tests to.
+              </p>
+              <MultiAgentPicker
+                selectedAgentUuids={selectedAgentUuids}
+                onToggleAgent={toggleAgentSelection}
+              />
             </div>
           )}
         </div>
@@ -1803,9 +1769,7 @@ export function BulkUploadTestsModal({
                   disabled={
                     isUploading ||
                     parsedTests.length === 0 ||
-                    (!lockedAgentUuid &&
-                      assignToAgents &&
-                      selectedAgentUuids.length === 0)
+                    (!lockedAgentUuid && selectedAgentUuids.length === 0)
                   }
                   className="h-10 px-5 rounded-lg text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
