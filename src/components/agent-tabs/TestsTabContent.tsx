@@ -713,14 +713,13 @@ export function TestsTabContent({
         throw new Error("Failed to add tests to agent");
       }
 
-      // Prepend the newly-attached tests so they surface at the top of the
-      // table (most-recently-added first) rather than the bottom.
-      const selected = new Set(testUuids);
-      const addedTests = availableTests.filter((t) => selected.has(t.uuid));
-      setAgentTests((prev) => [...addedTests, ...prev]);
+      // Refetch the agent's tests instead of locally splicing them in, so the
+      // table reflects the backend's ordering rather than a hardcoded
+      // top/bottom placement.
       setShowTestDropdown(false);
       setSearchQuery("");
       setSelectedAvailableUuids(new Set());
+      await fetchAgentTests();
     } catch (err) {
       console.error("Error adding tests to agent:", err);
     } finally {
