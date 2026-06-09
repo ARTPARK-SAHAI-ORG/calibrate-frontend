@@ -144,6 +144,48 @@ function formatRelativeTime(dateString: string): string {
   return `${diffInYears}y ago`;
 }
 
+/**
+ * Square check indicator shared by every test checkbox — the attach-existing
+ * dropdown (select-all + rows) and the agent tests table (select-all + desktop
+ * and mobile rows). Renders only the box and checkmark; the caller owns the
+ * click target. Pass `hoverBorder` for the table variant (border highlights on
+ * hover) and `className` for layout tweaks like `mt-0.5`.
+ */
+function TestCheckbox({
+  checked,
+  hoverBorder = false,
+  className = "",
+}: {
+  checked: boolean;
+  hoverBorder?: boolean;
+  className?: string;
+}) {
+  const stateClass = checked
+    ? "bg-foreground border-foreground"
+    : `border-border${hoverBorder ? " hover:border-muted-foreground" : ""}`;
+  return (
+    <span
+      className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${stateClass} ${className}`}
+    >
+      {checked && (
+        <svg
+          className="w-3 h-3 text-background"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={3}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M4.5 12.75l6 6 9-13.5"
+          />
+        </svg>
+      )}
+    </span>
+  );
+}
+
 type TestsTabContentProps = {
   agentUuid: string;
   agentName?: string;
@@ -1365,29 +1407,7 @@ export function TestsTabContent({
               onClick={toggleSelectAllAvailable}
               className="w-full flex items-center gap-2.5 px-4 py-2 border-b border-border hover:bg-muted/50 transition-colors cursor-pointer text-left"
             >
-              <span
-                className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
-                  allFilteredAvailableSelected
-                    ? "bg-foreground border-foreground"
-                    : "border-border"
-                }`}
-              >
-                {allFilteredAvailableSelected && (
-                  <svg
-                    className="w-3 h-3 text-background"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={3}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M4.5 12.75l6 6 9-13.5"
-                    />
-                  </svg>
-                )}
-              </span>
+              <TestCheckbox checked={allFilteredAvailableSelected} />
               <span className="text-sm font-medium text-foreground">
                 Select all
                 {searchQuery ? " matching" : ""}
@@ -1437,29 +1457,7 @@ export function TestsTabContent({
                     onClick={() => toggleAvailableTest(test.uuid)}
                     className="w-full flex items-start gap-2.5 px-4 py-3 text-left hover:bg-muted/50 transition-colors cursor-pointer border-b border-border last:border-b-0"
                   >
-                    <span
-                      className={`mt-0.5 w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
-                        checked
-                          ? "bg-foreground border-foreground"
-                          : "border-border"
-                      }`}
-                    >
-                      {checked && (
-                        <svg
-                          className="w-3 h-3 text-background"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={3}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M4.5 12.75l6 6 9-13.5"
-                          />
-                        </svg>
-                      )}
-                    </span>
+                    <TestCheckbox checked={checked} className="mt-0.5" />
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-medium text-foreground truncate">
                         {test.name}
@@ -2051,31 +2049,17 @@ export function TestsTabContent({
                       <button
                         type="button"
                         onClick={toggleSelectAll}
-                        className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
-                          selectedTestUuids.size ===
-                            filteredAgentTests.length &&
-                          filteredAgentTests.length > 0
-                            ? "bg-foreground border-foreground"
-                            : "border-border hover:border-muted-foreground"
-                        }`}
+                        className="cursor-pointer"
                         title="Select all"
                       >
-                        {selectedTestUuids.size === filteredAgentTests.length &&
-                          filteredAgentTests.length > 0 && (
-                            <svg
-                              className="w-3 h-3 text-background"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={3}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M4.5 12.75l6 6 9-13.5"
-                              />
-                            </svg>
-                          )}
+                        <TestCheckbox
+                          checked={
+                            selectedTestUuids.size ===
+                              filteredAgentTests.length &&
+                            filteredAgentTests.length > 0
+                          }
+                          hoverBorder
+                        />
                       </button>
                     </div>
                     <div className="text-sm font-medium text-muted-foreground">
@@ -2103,28 +2087,13 @@ export function TestsTabContent({
                             e.stopPropagation();
                             toggleTestSelection(test.uuid);
                           }}
-                          className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
-                            selectedTestUuids.has(test.uuid)
-                              ? "bg-foreground border-foreground"
-                              : "border-border hover:border-muted-foreground"
-                          }`}
+                          className="cursor-pointer"
                           title="Select test"
                         >
-                          {selectedTestUuids.has(test.uuid) && (
-                            <svg
-                              className="w-3 h-3 text-background"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={3}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M4.5 12.75l6 6 9-13.5"
-                              />
-                            </svg>
-                          )}
+                          <TestCheckbox
+                            checked={selectedTestUuids.has(test.uuid)}
+                            hoverBorder
+                          />
                         </button>
                       </div>
                       {/* Name Column */}
@@ -2267,28 +2236,13 @@ export function TestsTabContent({
                               e.stopPropagation();
                               toggleTestSelection(test.uuid);
                             }}
-                            className={`w-5 h-5 mt-0.5 rounded border flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
-                              selectedTestUuids.has(test.uuid)
-                                ? "bg-foreground border-foreground"
-                                : "border-border hover:border-muted-foreground"
-                            }`}
+                            className="mt-0.5 cursor-pointer"
                             title="Select test"
                           >
-                            {selectedTestUuids.has(test.uuid) && (
-                              <svg
-                                className="w-3 h-3 text-background"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={3}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M4.5 12.75l6 6 9-13.5"
-                                />
-                              </svg>
-                            )}
+                            <TestCheckbox
+                              checked={selectedTestUuids.has(test.uuid)}
+                              hoverBorder
+                            />
                           </button>
                           <div className="flex-1 min-w-0">
                             <h4 className="text-sm font-medium text-foreground truncate">
