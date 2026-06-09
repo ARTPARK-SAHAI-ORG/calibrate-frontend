@@ -865,11 +865,11 @@ export function BulkUploadTestsModal({
 
         setParsedTests(tests);
 
-        // Now that the tests parsed, the required "Assign tests to agents"
+        // Now that the tests parsed, the optional "Assign tests to agents"
         // picker renders below the preview. Scroll it into view so the user
-        // notices they must link at least one agent before the upload button
-        // enables. Skipped when the modal is locked to a single agent (the
-        // picker isn't shown then). The timeout lets the section mount first.
+        // notices they can link the tests to agents here. Skipped when the
+        // modal is locked to a single agent (the picker isn't shown then).
+        // The timeout lets the section mount first.
         if (!lockedAgentUuid) {
           setTimeout(() => {
             assignAgentsSectionRef.current?.scrollIntoView({
@@ -939,9 +939,9 @@ export function BulkUploadTestsModal({
       } = { type: testType, tests };
       if (lockedAgentUuid) {
         body.agent_uuids = [lockedAgentUuid];
-      } else {
-        // Unlocked (global /tests) uploads must link to at least one agent;
-        // the submit button stays disabled until one is picked.
+      } else if (selectedAgentUuids.length > 0) {
+        // Linking to agents is optional in the global /tests flow; only send
+        // the field when the user actually picked some.
         body.agent_uuids = selectedAgentUuids;
       }
 
@@ -1722,20 +1722,23 @@ export function BulkUploadTestsModal({
             </div>
           )}
 
-          {/* Step 3: Assign to Agents (required, hidden when modal is
-              locked to a specific agent — see lockedAgentUuid prop). Bulk
-              uploads must link to at least one agent so the new tests are
-              never orphaned in the library. */}
+          {/* Step 3: Assign to Agents (optional, hidden when modal is locked
+              to a specific agent — see lockedAgentUuid prop). Linking is not
+              required: tests can be uploaded to the library and attached to an
+              agent later, so a workspace with no agents yet isn't blocked. */}
           {testType && parsedTests.length > 0 && !lockedAgentUuid && (
             <div ref={assignAgentsSectionRef}>
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-sm font-medium text-foreground">
                   Assign tests to agents
                 </span>
-                <span className="text-red-500">*</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  (optional)
+                </span>
               </div>
               <p className="text-xs text-muted-foreground mb-3">
-                Select one or more agents to link these tests to.
+                Optionally link these tests to one or more agents — you can
+                attach them later instead.
               </p>
               <MultiAgentPicker
                 selectedAgentUuids={selectedAgentUuids}
@@ -1781,11 +1784,7 @@ export function BulkUploadTestsModal({
                 </button>
                 <button
                   onClick={handleSubmit}
-                  disabled={
-                    isUploading ||
-                    parsedTests.length === 0 ||
-                    (!lockedAgentUuid && selectedAgentUuids.length === 0)
-                  }
+                  disabled={isUploading || parsedTests.length === 0}
                   className="h-10 px-5 rounded-lg text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {isUploading ? (
