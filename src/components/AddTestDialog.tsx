@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, {
   useState,
@@ -1387,7 +1388,7 @@ export function AddTestDialog({
         const data: AvailableTool[] = await response.json();
         setAvailableTools(data);
       } catch (err) {
-        console.error("Error fetching tools:", err);
+        reportError("Error fetching tools:", err);
       } finally {
         setAvailableToolsLoading(false);
         setToolsFetched(true);
@@ -1457,7 +1458,7 @@ export function AddTestDialog({
           }));
         setAvailableLLMEvaluators(llm);
       } catch (err) {
-        console.error("Error fetching evaluators:", err);
+        reportError("Error fetching evaluators:", err);
       } finally {
         setEvaluatorsLoading(false);
         setEvaluatorsFetched(true);

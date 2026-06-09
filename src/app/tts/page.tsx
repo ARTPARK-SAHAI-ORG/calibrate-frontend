@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -144,7 +145,7 @@ function TTSPageInner() {
 
         setJobs(validatedJobs);
       } catch (err) {
-        console.error("Error fetching TTS jobs:", err);
+        reportError("Error fetching TTS jobs:", err);
         setError(
           err instanceof Error ? err.message : "Failed to load TTS jobs",
         );

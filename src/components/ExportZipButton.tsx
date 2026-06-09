@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, { useState } from "react";
 import JSZip from "jszip";
@@ -101,7 +102,7 @@ export function ExportZipButton({
             result.reason instanceof Error
               ? result.reason.message
               : String(result.reason);
-          console.error(`Export: failed to fetch ${file.url}`, result.reason);
+          reportError(`Export: failed to fetch ${file.url}`, result.reason);
           zip.file(`${file.path}.error.txt`, message);
         }
       });

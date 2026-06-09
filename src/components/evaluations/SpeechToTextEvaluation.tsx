@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -224,7 +225,7 @@ export function SpeechToTextEvaluation({
             })),
         );
       } catch (err) {
-        console.error("Error fetching evaluators:", err);
+        reportError("Error fetching evaluators:", err);
       } finally {
         setEvaluatorsLoading(false);
       }
@@ -304,7 +305,7 @@ export function SpeechToTextEvaluation({
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
-        console.error("BACKEND_URL environment variable is not set");
+        reportError("BACKEND_URL environment variable is not set");
         setIsEvaluating(false);
         return;
       }
@@ -362,7 +363,7 @@ export function SpeechToTextEvaluation({
         router.push(`/stt/${result.task_id}`);
       }
     } catch (error) {
-      console.error("Error evaluating:", error);
+      reportError("Error evaluating:", error);
       setIsEvaluating(false);
     }
   };

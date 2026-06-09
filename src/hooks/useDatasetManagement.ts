@@ -1,3 +1,4 @@
+import { reportError } from "@/lib/reportError";
 import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import {
@@ -51,7 +52,7 @@ export function useDatasetManagement(
       setDeleteDatasetId(null);
       onDeleted?.(uuid);
     } catch (err) {
-      console.error("Failed to delete dataset:", err);
+      reportError("Failed to delete dataset:", err);
       toast.error("Failed to delete dataset. Please try again.");
     } finally {
       setIsDeletingDataset(false);
@@ -71,7 +72,7 @@ export function useDatasetManagement(
       setNewDatasetName("");
       onCreated(dataset.uuid);
     } catch (err) {
-      console.error("Failed to create dataset:", err);
+      reportError("Failed to create dataset:", err);
       toast.error("Failed to create dataset. Please try again.");
     } finally {
       setIsCreating(false);

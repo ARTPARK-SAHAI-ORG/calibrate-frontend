@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -145,7 +146,7 @@ function STTPageInner() {
 
         setJobs(validatedJobs);
       } catch (err) {
-        console.error("Error fetching STT jobs:", err);
+        reportError("Error fetching STT jobs:", err);
         setError(
           err instanceof Error ? err.message : "Failed to load STT jobs",
         );

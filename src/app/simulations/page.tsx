@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -79,7 +80,7 @@ export default function SimulationsPage() {
         const data: SimulationData[] = await response.json();
         setSimulations(data);
       } catch (err) {
-        console.error("Error fetching simulations:", err);
+        reportError("Error fetching simulations:", err);
         setSimulationsError(
           err instanceof Error ? err.message : "Failed to load simulations"
         );
@@ -144,7 +145,7 @@ export default function SimulationsPage() {
       );
       closeDeleteDialog();
     } catch (err) {
-      console.error("Error deleting simulation:", err);
+      reportError("Error deleting simulation:", err);
     } finally {
       setIsSimulationDeleting(false);
     }

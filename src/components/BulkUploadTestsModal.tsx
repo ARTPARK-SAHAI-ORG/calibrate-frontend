@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
@@ -340,7 +341,7 @@ export function BulkUploadTestsModal({
           }));
         setAvailableLLMEvaluators(llm);
       } catch (err) {
-        console.error("Error fetching evaluators:", err);
+        reportError("Error fetching evaluators:", err);
         setEvaluatorsFetchError(
           err instanceof Error ? err.message : "Failed to load evaluators",
         );
@@ -396,7 +397,7 @@ export function BulkUploadTestsModal({
         const data: AvailableTool[] = await response.json();
         setAvailableTools(data);
       } catch (err) {
-        console.error("Error fetching tools:", err);
+        reportError("Error fetching tools:", err);
         setToolsFetchError(
           err instanceof Error ? err.message : "Failed to load tools",
         );
@@ -983,7 +984,7 @@ export function BulkUploadTestsModal({
         onClose();
       }
     } catch (err) {
-      console.error("Error bulk uploading tests:", err);
+      reportError("Error bulk uploading tests:", err);
       setUploadError(
         err instanceof Error ? err.message : "Failed to upload tests",
       );

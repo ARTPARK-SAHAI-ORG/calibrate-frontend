@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useRef } from "react";
 import {
@@ -342,7 +343,7 @@ export function BenchmarkResultsDialog({
         }
 
         if (result.error) {
-          console.error("Benchmark error:", result.error);
+          reportError("Benchmark error:", result.error);
           setError(result.error);
         } else {
           setLeaderboardSummary(result.leaderboard_summary);
@@ -351,7 +352,7 @@ export function BenchmarkResultsDialog({
         }
       }
     } catch (err) {
-      console.error("Error polling benchmark status:", err);
+      reportError("Error polling benchmark status:", err);
       setIsInitialLoading(false);
       setTaskStatus("failed");
       setError(err instanceof Error ? err.message : "Failed to poll status");
@@ -412,7 +413,7 @@ export function BenchmarkResultsDialog({
       // Also poll immediately
       pollBenchmarkStatus(newTaskId, backendUrl);
     } catch (err) {
-      console.error("Error starting benchmark:", err);
+      reportError("Error starting benchmark:", err);
       setIsInitialLoading(false);
       setError(
         err instanceof Error ? err.message : "Failed to start benchmark",

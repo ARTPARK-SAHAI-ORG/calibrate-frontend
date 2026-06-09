@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -297,7 +298,7 @@ export default function TTSEvaluationDetailPage() {
           : [];
         setTtsEvaluators(items);
       } catch (err) {
-        console.error("Error fetching evaluators:", err);
+        reportError("Error fetching evaluators:", err);
       }
     };
 
@@ -410,7 +411,7 @@ export default function TTSEvaluationDetailPage() {
           }, POLLING_INTERVAL_MS);
         }
       } catch (err) {
-        console.error("Error fetching evaluation result:", err);
+        reportError("Error fetching evaluation result:", err);
         setError(
           err instanceof Error ? err.message : "Failed to load evaluation",
         );
@@ -469,7 +470,7 @@ export default function TTSEvaluationDetailPage() {
         }
       }
     } catch (error) {
-      console.error("Error polling task status:", error);
+      reportError("Error polling task status:", error);
       // Set status to failed so the UI shows the error state
       setEvaluationResult((prev) =>
         prev ? { ...prev, status: "failed" } : prev,

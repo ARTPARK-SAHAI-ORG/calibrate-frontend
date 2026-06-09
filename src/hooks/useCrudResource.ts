@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import { useState, useEffect, useCallback } from "react";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
@@ -61,7 +62,7 @@ export function useCrudResource<T extends { uuid: string }>({
       const data = await apiGet<T[]>(endpoint, accessToken);
       setItems(data);
     } catch (err) {
-      console.error(`Error fetching ${endpoint}:`, err);
+      reportError(`Error fetching ${endpoint}:`, err);
       setError(err instanceof Error ? err.message : `Failed to load data`);
     } finally {
       setIsLoading(false);
@@ -88,7 +89,7 @@ export function useCrudResource<T extends { uuid: string }>({
         
         return newItem;
       } catch (err) {
-        console.error(`Error creating ${endpoint}:`, err);
+        reportError(`Error creating ${endpoint}:`, err);
         setCreateError(err instanceof Error ? err.message : "Failed to create");
         return null;
       } finally {
@@ -113,7 +114,7 @@ export function useCrudResource<T extends { uuid: string }>({
         
         return updatedItem;
       } catch (err) {
-        console.error(`Error updating ${endpoint}/${id}:`, err);
+        reportError(`Error updating ${endpoint}/${id}:`, err);
         setCreateError(err instanceof Error ? err.message : "Failed to update");
         return null;
       } finally {
@@ -137,7 +138,7 @@ export function useCrudResource<T extends { uuid: string }>({
         
         return true;
       } catch (err) {
-        console.error(`Error deleting ${endpoint}/${id}:`, err);
+        reportError(`Error deleting ${endpoint}/${id}:`, err);
         return false;
       } finally {
         setIsDeleting(false);
@@ -196,7 +197,7 @@ export function useFetchResource<T>({
       const result = await apiGet<T>(`${endpoint}/${id}`, accessToken);
       setData(result);
     } catch (err) {
-      console.error(`Error fetching ${endpoint}/${id}:`, err);
+      reportError(`Error fetching ${endpoint}/${id}:`, err);
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
       setIsLoading(false);

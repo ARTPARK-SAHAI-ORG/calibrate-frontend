@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import { useState, useCallback } from "react";
 import { signOut } from "next-auth/react";
@@ -84,7 +85,7 @@ export function useVerifyConnection(): VerifyConnectionResult {
 
         return await handleResponse(response);
       } catch (err) {
-        console.error("Error verifying connection:", err);
+        reportError("Error verifying connection:", err);
         setVerifyError(
           err instanceof Error ? err.message : "Verification failed",
         );
@@ -132,7 +133,7 @@ export function useVerifyConnection(): VerifyConnectionResult {
 
         return await handleResponse(response);
       } catch (err) {
-        console.error("Error verifying connection:", err);
+        reportError("Error verifying connection:", err);
         setVerifyError(
           err instanceof Error ? err.message : "Verification failed",
         );

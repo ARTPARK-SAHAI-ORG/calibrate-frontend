@@ -1,3 +1,4 @@
+import { reportError } from "@/lib/reportError";
 /**
  * Shared backend-error parsing for surfaces that POST to the calibrate API
  * and need to render the failure to a user.
@@ -122,7 +123,7 @@ export async function parseBackendErrorResponse(
 
   if (res.status >= 500) {
     if (logPrefix && body?.detail) {
-      console.error(`${logPrefix}: server error`, res.status, body.detail);
+      reportError(`${logPrefix}: server error`, res.status, body.detail);
     }
     return GENERIC_5XX_MESSAGE;
   }
@@ -145,7 +146,7 @@ export function parseBackendErrorMessage(
   const status = Number(match[1]);
   const rawBody = match[2];
   if (status >= 500) {
-    console.error("Server error from apiClient:", status, rawBody);
+    reportError("Server error from apiClient:", status, rawBody);
     return GENERIC_5XX_MESSAGE;
   }
   let parsed: DetailObject;

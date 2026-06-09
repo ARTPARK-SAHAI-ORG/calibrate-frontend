@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useRef } from "react";
 import { signOut } from "next-auth/react";
@@ -470,7 +471,7 @@ export function TestRunnerDialog({
         }
       }
     } catch (error) {
-      console.error("Error polling task status:", error);
+      reportError("Error polling task status:", error);
       setRunStatus("failed");
       setIsRunning(false);
       setCurrentTaskId(null);
@@ -492,7 +493,7 @@ export function TestRunnerDialog({
 
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     if (!backendUrl) {
-      console.error("BACKEND_URL environment variable is not set");
+      reportError("BACKEND_URL environment variable is not set");
       setIsRunning(false);
       return;
     }
@@ -542,7 +543,7 @@ export function TestRunnerDialog({
       // Also poll immediately to get the first result
       pollTaskStatus(newTaskId, backendUrl);
     } catch (error) {
-      console.error("Error starting test run:", error);
+      reportError("Error starting test run:", error);
       setTestResults((prev) =>
         prev.map((r) => ({
           ...r,
@@ -741,7 +742,7 @@ export function TestRunnerDialog({
 
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     if (!backendUrl) {
-      console.error("BACKEND_URL environment variable is not set");
+      reportError("BACKEND_URL environment variable is not set");
       setIsRunning(false);
       return;
     }
@@ -810,7 +811,7 @@ export function TestRunnerDialog({
         setIsRunning(false);
       }
     } catch (error) {
-      console.error("Error retrying failed tests:", error);
+      reportError("Error retrying failed tests:", error);
       setTestResults((prev) =>
         prev.map((r) =>
           r.status === "running"

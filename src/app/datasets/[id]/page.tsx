@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -83,7 +84,7 @@ export default function DatasetDetailPage() {
         };
       });
     } catch (err) {
-      console.error("Failed to delete item:", err);
+      reportError("Failed to delete item:", err);
       toast.error("Failed to delete item. Please try again.");
       throw err;
     }
@@ -130,7 +131,7 @@ export default function DatasetDetailPage() {
         );
       toast.success(parts.join(", ") + ".");
     } catch (err) {
-      console.error("Failed to save:", err);
+      reportError("Failed to save:", err);
       toast.error("Failed to save. Please try again.");
     } finally {
       setIsSaving(false);

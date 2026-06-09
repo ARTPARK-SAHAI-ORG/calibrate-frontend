@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -107,7 +108,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
           : [];
         setAgents(formattedAgents);
       } catch (err) {
-        console.error("Error fetching agents:", err);
+        reportError("Error fetching agents:", err);
         setError(err instanceof Error ? err.message : "Failed to load agents");
       } finally {
         setIsLoading(false);
@@ -202,7 +203,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
       );
       closeDeleteDialog();
     } catch (err) {
-      console.error("Error deleting agent:", err);
+      reportError("Error deleting agent:", err);
     } finally {
       setDeletingAgentUuid(null);
     }
@@ -746,7 +747,7 @@ function NewAgentDialog({
         onCreateAgent(agentUuid);
       }
     } catch (err) {
-      console.error("Error creating agent:", err);
+      reportError("Error creating agent:", err);
       setError(err instanceof Error ? err.message : "Failed to create agent");
     } finally {
       setIsCreating(false);
@@ -1021,7 +1022,7 @@ function DuplicateAgentDialog({
         onNavigateToAgent(data.uuid);
       }
     } catch (err) {
-      console.error("Error duplicating agent:", err);
+      reportError("Error duplicating agent:", err);
       setError(
         err instanceof Error ? err.message : "Failed to duplicate agent",
       );

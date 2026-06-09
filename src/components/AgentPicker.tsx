@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useRef } from "react";
 import { signOut } from "next-auth/react";
@@ -128,7 +129,7 @@ export function AgentPicker({
           : [];
         setAgents(formattedAgents);
       } catch (err) {
-        console.error("Error fetching agents:", err);
+        reportError("Error fetching agents:", err);
       } finally {
         setAgentsLoading(false);
       }
@@ -227,7 +228,7 @@ export function MultiAgentPicker({
           : [];
         setAgents(formattedAgents);
       } catch (err) {
-        console.error("Error fetching agents:", err);
+        reportError("Error fetching agents:", err);
       } finally {
         setAgentsLoading(false);
       }

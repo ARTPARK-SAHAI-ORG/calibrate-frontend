@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -225,7 +226,7 @@ export default function SimulationDetailPage() {
 
       router.push(`/simulations/${uuid}/runs/${runId}`);
     } catch (err) {
-      console.error("Error launching simulation:", err);
+      reportError("Error launching simulation:", err);
       alert(err instanceof Error ? err.message : "Failed to launch simulation");
     } finally {
       setIsLaunching(false);
@@ -276,7 +277,7 @@ export default function SimulationDetailPage() {
 
       setIsConfigured(true);
     } catch (err) {
-      console.error("Error updating simulation:", err);
+      reportError("Error updating simulation:", err);
       alert(err instanceof Error ? err.message : "Failed to update simulation");
     } finally {
       setIsCreating(false);
@@ -366,7 +367,7 @@ export default function SimulationDetailPage() {
           }
         }
       } catch (err) {
-        console.error("Error fetching simulation:", err);
+        reportError("Error fetching simulation:", err);
         setError(
           err instanceof Error ? err.message : "Failed to load simulation"
         );
@@ -417,7 +418,7 @@ export default function SimulationDetailPage() {
           : [];
         setPersonas(formattedPersonas);
       } catch (err) {
-        console.error("Error fetching personas:", err);
+        reportError("Error fetching personas:", err);
       } finally {
         setPersonasLoading(false);
       }
@@ -463,7 +464,7 @@ export default function SimulationDetailPage() {
           : [];
         setScenarios(formattedScenarios);
       } catch (err) {
-        console.error("Error fetching scenarios:", err);
+        reportError("Error fetching scenarios:", err);
       } finally {
         setScenariosLoading(false);
       }
@@ -526,7 +527,7 @@ export default function SimulationDetailPage() {
           : [];
         setMetrics(formattedMetrics);
       } catch (err) {
-        console.error("Error fetching evaluators:", err);
+        reportError("Error fetching evaluators:", err);
       } finally {
         setMetricsLoading(false);
       }
@@ -587,7 +588,7 @@ export default function SimulationDetailPage() {
       setIsEditNameDialogOpen(false);
       toast.success("Simulation name updated");
     } catch (err) {
-      console.error("Error saving simulation name:", err);
+      reportError("Error saving simulation name:", err);
       toast.error(err instanceof Error ? err.message : "Failed to save name");
     } finally {
       setIsSavingName(false);

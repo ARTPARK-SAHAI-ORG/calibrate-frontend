@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -94,7 +95,7 @@ export default function ScenariosPage() {
         const data: ScenarioData[] = await response.json();
         setScenarios(data);
       } catch (err) {
-        console.error("Error fetching scenarios:", err);
+        reportError("Error fetching scenarios:", err);
         setScenariosError(
           err instanceof Error ? err.message : "Failed to load scenarios"
         );
@@ -157,7 +158,7 @@ export default function ScenariosPage() {
       );
       closeDeleteDialog();
     } catch (err) {
-      console.error("Error deleting scenario:", err);
+      reportError("Error deleting scenario:", err);
     } finally {
       setIsScenarioDeleting(false);
     }
@@ -232,7 +233,7 @@ export default function ScenariosPage() {
       resetForm();
       setAddScenarioSidebarOpen(false);
     } catch (err) {
-      console.error("Error creating scenario:", err);
+      reportError("Error creating scenario:", err);
       setCreateError(
         err instanceof Error ? err.message : "Failed to create scenario"
       );
@@ -277,7 +278,7 @@ export default function ScenariosPage() {
       setScenarioLabel(scenarioData.name || "");
       setScenarioDescription(scenarioData.description || DEFAULT_DESCRIPTION);
     } catch (err) {
-      console.error("Error fetching scenario:", err);
+      reportError("Error fetching scenario:", err);
       setCreateError(
         err instanceof Error ? err.message : "Failed to load scenario"
       );
@@ -353,7 +354,7 @@ export default function ScenariosPage() {
       resetForm();
       setAddScenarioSidebarOpen(false);
     } catch (err) {
-      console.error("Error updating scenario:", err);
+      reportError("Error updating scenario:", err);
       setCreateError(
         err instanceof Error ? err.message : "Failed to update scenario"
       );

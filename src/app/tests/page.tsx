@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -237,7 +238,7 @@ function LLMPageInner() {
       const data: TestData[] = await response.json();
       setTests(data);
     } catch (err) {
-      console.error("Error fetching tests:", err);
+      reportError("Error fetching tests:", err);
       setTestsError(
         err instanceof Error ? err.message : "Failed to load tests"
       );
@@ -267,7 +268,7 @@ function LLMPageInner() {
         const data = await response.json();
         setAllRuns(data.runs || []);
       } catch (err) {
-        console.error("Error fetching all runs:", err);
+        reportError("Error fetching all runs:", err);
       } finally {
         setAllRunsLoading(false);
       }
@@ -375,7 +376,7 @@ function LLMPageInner() {
             }),
           );
         } catch (err) {
-          console.error(`Error polling run ${run.uuid}:`, err);
+          reportError(`Error polling run ${run.uuid}:`, err);
         }
       }
     };
@@ -521,7 +522,7 @@ function LLMPageInner() {
       setSelectedTestUuids(new Set());
       closeDeleteDialog();
     } catch (err) {
-      console.error("Error deleting test(s):", err);
+      reportError("Error deleting test(s):", err);
     } finally {
       setIsTestDeleting(false);
     }
@@ -567,7 +568,7 @@ function LLMPageInner() {
         }
 
         if (!response.ok) {
-          console.error("Failed to attach test to agent");
+          reportError("Failed to attach test to agent");
         }
       }
 
@@ -579,7 +580,7 @@ function LLMPageInner() {
       setTestRunnerAgentName(agentName);
       setTestRunnerOpen(true);
     } catch (err) {
-      console.error("Error running test:", err);
+      reportError("Error running test:", err);
       setRunTestDialogOpen(false);
       setTestToRun(null);
     }
@@ -671,7 +672,7 @@ function LLMPageInner() {
       // Close the sidebar
       setAddTestSidebarOpen(false);
     } catch (err) {
-      console.error("Error creating test:", err);
+      reportError("Error creating test:", err);
       setCreateError(
         err instanceof Error ? err.message : "Failed to create test"
       );
@@ -744,7 +745,7 @@ function LLMPageInner() {
         setInitialEvaluators([]);
       }
     } catch (err) {
-      console.error("Error fetching test:", err);
+      reportError("Error fetching test:", err);
       setCreateError(
         err instanceof Error ? err.message : "Failed to load test"
       );
@@ -815,7 +816,7 @@ function LLMPageInner() {
       // Open the dialog only now that the fresh data is in state.
       setAddTestSidebarOpen(true);
     } catch (err) {
-      console.error("Error duplicating test:", err);
+      reportError("Error duplicating test:", err);
       setCreateError(
         err instanceof Error ? err.message : "Failed to load test"
       );
@@ -901,7 +902,7 @@ function LLMPageInner() {
       resetForm();
       setAddTestSidebarOpen(false);
     } catch (err) {
-      console.error("Error updating test:", err);
+      reportError("Error updating test:", err);
       setCreateError(
         err instanceof Error ? err.message : "Failed to update test"
       );

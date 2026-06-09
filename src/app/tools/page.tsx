@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -76,7 +77,7 @@ export default function ToolsPage() {
         const data: ToolData[] = await response.json();
         setTools(data);
       } catch (err) {
-        console.error("Error fetching tools:", err);
+        reportError("Error fetching tools:", err);
         setToolsError(
           err instanceof Error ? err.message : "Failed to load tools"
         );
@@ -134,7 +135,7 @@ export default function ToolsPage() {
       setTools(tools.filter((tool) => tool.uuid !== toolToDelete.uuid));
       closeDeleteDialog();
     } catch (err) {
-      console.error("Error deleting tool:", err);
+      reportError("Error deleting tool:", err);
     } finally {
       setIsToolDeleting(false);
     }

@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, { useState } from "react";
 import { signOut } from "next-auth/react";
@@ -76,7 +77,7 @@ export function DeleteToolDialog({
       onToolDeleted(tool.uuid);
       onClose();
     } catch (err) {
-      console.error("Error removing tool from agent:", err);
+      reportError("Error removing tool from agent:", err);
     } finally {
       setIsDeleting(false);
     }

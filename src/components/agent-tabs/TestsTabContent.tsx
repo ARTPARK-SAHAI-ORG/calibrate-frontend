@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { signOut } from "next-auth/react";
@@ -339,7 +340,7 @@ export function TestsTabContent({
       const data: TestData[] = await response.json();
       setAgentTests(data);
     } catch (err) {
-      console.error("Error fetching agent tests:", err);
+      reportError("Error fetching agent tests:", err);
       setAgentTestsError(
         err instanceof Error ? err.message : "Failed to load agent tests",
       );
@@ -385,7 +386,7 @@ export function TestsTabContent({
       setAllTests(data);
       setAllTestsFetched(true);
     } catch (err) {
-      console.error("Error fetching tests:", err);
+      reportError("Error fetching tests:", err);
     } finally {
       setAllTestsLoading(false);
       // Mark the attempt complete regardless of outcome so the empty-
@@ -475,14 +476,14 @@ export function TestsTabContent({
 
         if (!response.ok) {
           // Silently handle errors for past runs - it's not critical
-          console.error("Failed to fetch past runs");
+          reportError("Failed to fetch past runs");
           return;
         }
 
         const data = await response.json();
         setPastRuns(data.runs || []);
       } catch (err) {
-        console.error("Error fetching past runs:", err);
+        reportError("Error fetching past runs:", err);
       } finally {
         setPastRunsLoading(false);
       }
@@ -576,7 +577,7 @@ export function TestsTabContent({
             }),
           );
         } catch (err) {
-          console.error(`Error polling run ${run.uuid}:`, err);
+          reportError(`Error polling run ${run.uuid}:`, err);
           // Mark this specific run as failed
           setPastRuns((prev) =>
             prev.map((r) =>
@@ -721,7 +722,7 @@ export function TestsTabContent({
       setSelectedAvailableUuids(new Set());
       await fetchAgentTests();
     } catch (err) {
-      console.error("Error adding tests to agent:", err);
+      reportError("Error adding tests to agent:", err);
     } finally {
       setIsAddingTests(false);
     }
@@ -818,7 +819,7 @@ export function TestsTabContent({
       setValidationAttempted(false);
       setCreateDialogOpen(false);
     } catch (err) {
-      console.error("Error creating test:", err);
+      reportError("Error creating test:", err);
       setCreateError(
         err instanceof Error ? err.message : "Failed to create test",
       );
@@ -898,7 +899,7 @@ export function TestsTabContent({
         setInitialEvaluators([]);
       }
     } catch (err) {
-      console.error("Error fetching test:", err);
+      reportError("Error fetching test:", err);
       setCreateError(
         err instanceof Error ? err.message : "Failed to load test",
       );
@@ -962,7 +963,7 @@ export function TestsTabContent({
         setInitialEvaluators([]);
       }
     } catch (err) {
-      console.error("Error duplicating test:", err);
+      reportError("Error duplicating test:", err);
       setCreateError(
         err instanceof Error ? err.message : "Failed to load test",
       );
@@ -1039,7 +1040,7 @@ export function TestsTabContent({
       setCreateDialogOpen(false);
       resetTestDialog();
     } catch (err) {
-      console.error("Error updating test:", err);
+      reportError("Error updating test:", err);
       setCreateError(
         err instanceof Error ? err.message : "Failed to update test",
       );
@@ -1266,7 +1267,7 @@ export function TestsTabContent({
       setSelectedTestUuids(new Set());
       closeDeleteDialog();
     } catch (err) {
-      console.error(
+      reportError(
         deleteMode === "permanent"
           ? "Error deleting test(s):"
           : "Error removing test(s) from agent:",

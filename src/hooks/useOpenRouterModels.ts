@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import { useState, useEffect, useCallback } from "react";
 import type { LLMProvider, LLMModel } from "@/components/agent-tabs/constants/providers";
@@ -222,7 +223,7 @@ export function useOpenRouterModels(): {
           }
         })
         .catch((err: unknown) => {
-          console.error("Failed to fetch OpenRouter models:", err);
+          reportError("Failed to fetch OpenRouter models:", err);
           if (!cancelled) {
             setIsLoading(false);
             const isDisabled =

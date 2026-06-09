@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, {
   useState,
@@ -162,7 +163,7 @@ export default function SimulationRunPage() {
       frozenSimulationRef.current = null;
       setRunData(data);
     } catch (err) {
-      console.error("Error refreshing run data for audio URLs:", err);
+      reportError("Error refreshing run data for audio URLs:", err);
     }
   }, [runId, backendAccessToken]);
 
@@ -266,7 +267,7 @@ export default function SimulationRunPage() {
           }
         }
       } catch (err) {
-        console.error("Error fetching simulation name:", err);
+        reportError("Error fetching simulation name:", err);
       }
     };
 
@@ -323,7 +324,7 @@ export default function SimulationRunPage() {
           pollInterval = null;
         }
       } catch (err) {
-        console.error("Error fetching run data:", err);
+        reportError("Error fetching run data:", err);
         if (isInitialLoad) {
           setError(err instanceof Error ? err.message : "Failed to load run");
         } else {
@@ -605,14 +606,14 @@ export default function SimulationRunPage() {
       }
 
       if (!response.ok) {
-        console.error("Failed to abort simulation");
+        reportError("Failed to abort simulation");
         return;
       }
 
       const data: RunData = await response.json();
       setRunData(data);
     } catch (err) {
-      console.error("Error aborting simulation:", err);
+      reportError("Error aborting simulation:", err);
     } finally {
       setIsAborting(false);
     }

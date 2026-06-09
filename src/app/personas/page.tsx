@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -108,7 +109,7 @@ export default function PersonasPage() {
         const data: PersonaData[] = await response.json();
         setPersonas(data);
       } catch (err) {
-        console.error("Error fetching personas:", err);
+        reportError("Error fetching personas:", err);
         setPersonasError(
           err instanceof Error ? err.message : "Failed to load personas"
         );
@@ -171,7 +172,7 @@ export default function PersonasPage() {
       );
       closeDeleteDialog();
     } catch (err) {
-      console.error("Error deleting persona:", err);
+      reportError("Error deleting persona:", err);
     } finally {
       setIsPersonaDeleting(false);
     }
@@ -256,7 +257,7 @@ export default function PersonasPage() {
       resetForm();
       setAddPersonaSidebarOpen(false);
     } catch (err) {
-      console.error("Error creating persona:", err);
+      reportError("Error creating persona:", err);
       setCreateError(
         err instanceof Error ? err.message : "Failed to create persona"
       );
@@ -308,7 +309,7 @@ export default function PersonasPage() {
       );
       setPersonaLanguage(personaData.config?.language || "english");
     } catch (err) {
-      console.error("Error fetching persona:", err);
+      reportError("Error fetching persona:", err);
       setCreateError(
         err instanceof Error ? err.message : "Failed to load persona"
       );
@@ -389,7 +390,7 @@ export default function PersonasPage() {
       resetForm();
       setAddPersonaSidebarOpen(false);
     } catch (err) {
-      console.error("Error updating persona:", err);
+      reportError("Error updating persona:", err);
       setCreateError(
         err instanceof Error ? err.message : "Failed to update persona"
       );

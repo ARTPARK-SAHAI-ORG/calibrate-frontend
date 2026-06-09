@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, { useState } from "react";
 import { signOut } from "next-auth/react";
@@ -88,7 +89,7 @@ export function AddToolDialog({
       // Close dialog and reset state
       handleClose();
     } catch (err) {
-      console.error("Error adding tools to agent:", err);
+      reportError("Error adding tools to agent:", err);
     }
   };
 

@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
@@ -282,7 +283,7 @@ function MetricsPageInner() {
         const data: EvaluatorData[] = await response.json();
         setEvaluators(data);
       } catch (err) {
-        console.error("Error fetching evaluators:", err);
+        reportError("Error fetching evaluators:", err);
         setEvaluatorsError(
           err instanceof Error ? err.message : "Failed to load evaluators",
         );
@@ -336,7 +337,7 @@ function MetricsPageInner() {
       // On any other failure, leave the form blank — prefill is best-effort
       // and shouldn't block the create flow.
       if (!response.ok) {
-        console.error(
+        reportError(
           "Failed to fetch default prompt for purpose:",
           purpose,
           response.status,
@@ -399,7 +400,7 @@ function MetricsPageInner() {
       // them so the user can override either and we only send a
       // scale payload when they do.
     } catch (err) {
-      console.error("Error prefilling default prompt:", err);
+      reportError("Error prefilling default prompt:", err);
     }
   };
 
@@ -454,7 +455,7 @@ function MetricsPageInner() {
       );
       closeDeleteDialog();
     } catch (err) {
-      console.error("Error deleting evaluator:", err);
+      reportError("Error deleting evaluator:", err);
     } finally {
       setIsEvaluatorDeleting(false);
     }
@@ -500,7 +501,7 @@ function MetricsPageInner() {
           setEvaluators(updatedEvaluators);
         }
       } catch (err) {
-        console.error("Error refetching evaluators:", err);
+        reportError("Error refetching evaluators:", err);
       }
     }
     // Navigate to the new evaluator's detail page
@@ -656,7 +657,7 @@ function MetricsPageInner() {
       setAddEvaluatorSidebarOpen(false);
       changeActiveTab("mine");
     } catch (err) {
-      console.error("Error creating evaluator:", err);
+      reportError("Error creating evaluator:", err);
       setCreateError(
         err instanceof Error ? err.message : "Failed to create evaluator",
       );
@@ -1176,7 +1177,7 @@ function DuplicateEvaluatorDialog({
       onDuplicated(newEvaluator);
       onClose();
     } catch (err) {
-      console.error("Error duplicating evaluator:", err);
+      reportError("Error duplicating evaluator:", err);
       setError(
         err instanceof Error ? err.message : "Failed to duplicate evaluator",
       );

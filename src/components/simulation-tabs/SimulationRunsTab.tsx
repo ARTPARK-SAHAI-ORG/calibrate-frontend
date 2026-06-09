@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -61,7 +62,7 @@ export function SimulationRunsTab({ simulationUuid }: SimulationRunsTabProps) {
         const data = await response.json();
         setRuns(data.runs || []);
       } catch (err) {
-        console.error("Error fetching runs:", err);
+        reportError("Error fetching runs:", err);
         setError(err instanceof Error ? err.message : "Failed to load runs");
       } finally {
         setIsLoading(false);

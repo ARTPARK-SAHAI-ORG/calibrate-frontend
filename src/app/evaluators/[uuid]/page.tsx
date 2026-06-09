@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -259,7 +260,7 @@ function EvaluatorDetailPageInner() {
         const data: EvaluatorDetail = await res.json();
         setEvaluator(data);
       } catch (err) {
-        console.error("Error fetching evaluator:", err);
+        reportError("Error fetching evaluator:", err);
         setError(
           err instanceof Error ? err.message : "Failed to load evaluator",
         );
@@ -324,7 +325,7 @@ function EvaluatorDetailPageInner() {
         setEvaluator(data);
       }
     } catch (err) {
-      console.error("Error setting live version:", err);
+      reportError("Error setting live version:", err);
     } finally {
       setSettingLiveUuid(null);
     }
@@ -385,7 +386,7 @@ function EvaluatorDetailPageInner() {
       );
       setEditOpen(false);
     } catch (err) {
-      console.error("Error saving evaluator:", err);
+      reportError("Error saving evaluator:", err);
       setEditError(
         err instanceof Error ? err.message : "Failed to save evaluator",
       );
@@ -582,7 +583,7 @@ function EvaluatorDetailPageInner() {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
     } catch (err) {
-      console.error("Error creating version:", err);
+      reportError("Error creating version:", err);
       setNewVersionError(
         err instanceof Error ? err.message : "Failed to create version",
       );

@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import { useState, useEffect, useRef } from "react";
 import { signOut } from "next-auth/react";
@@ -1105,7 +1106,7 @@ export function AddToolDialog({
         }
       }
     } catch (err) {
-      console.error("Error fetching tool:", err);
+      reportError("Error fetching tool:", err);
       setCreateError(
         err instanceof Error ? err.message : "Failed to load tool",
       );
@@ -1231,7 +1232,7 @@ export function AddToolDialog({
       await refetchTools();
       handleClose();
     } catch (err) {
-      console.error("Error creating tool:", err);
+      reportError("Error creating tool:", err);
       setCreateError(
         err instanceof Error ? err.message : "Failed to create tool",
       );
@@ -1338,7 +1339,7 @@ export function AddToolDialog({
       await refetchTools();
       handleClose();
     } catch (err) {
-      console.error("Error updating tool:", err);
+      reportError("Error updating tool:", err);
       setCreateError(
         err instanceof Error ? err.message : "Failed to update tool",
       );

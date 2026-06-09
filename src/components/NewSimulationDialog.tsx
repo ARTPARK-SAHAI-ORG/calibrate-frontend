@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, { useState } from "react";
 import { signOut } from "next-auth/react";
@@ -74,7 +75,7 @@ export function NewSimulationDialog({
         onCreateSimulation(simulationUuid);
       }
     } catch (err) {
-      console.error("Error creating simulation:", err);
+      reportError("Error creating simulation:", err);
       setError(
         err instanceof Error ? err.message : "Failed to create simulation"
       );

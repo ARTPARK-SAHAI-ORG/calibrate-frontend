@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient, apiDelete, apiGet, apiPost } from "@/lib/api";
@@ -85,7 +86,7 @@ export async function fetchOrganizationsDedup(
       cachedForToken = accessToken;
       return data;
     } catch (err) {
-      console.error("Error fetching organizations:", err);
+      reportError("Error fetching organizations:", err);
       return null;
     } finally {
       inFlightFetch = null;
@@ -180,7 +181,7 @@ export function useOrganizations(
         notifyOrganizationsChanged(instanceRef.current);
         return created;
       } catch (err) {
-        console.error("Error creating organization:", err);
+        reportError("Error creating organization:", err);
         throw err;
       }
     },
@@ -205,7 +206,7 @@ export function useOrganizations(
         notifyOrganizationsChanged(instanceRef.current);
         return updated;
       } catch (err) {
-        console.error("Error renaming organization:", err);
+        reportError("Error renaming organization:", err);
         throw err;
       }
     },
@@ -280,7 +281,7 @@ export function useOrgMembers(
       );
       setMembers(data);
     } catch (err) {
-      console.error("Error fetching members:", err);
+      reportError("Error fetching members:", err);
       setError(err instanceof Error ? err.message : "Failed to load members");
     } finally {
       setIsLoading(false);
@@ -365,7 +366,7 @@ export function useWorkspaceApiKeys(
       );
       setApiKeys(data);
     } catch (err) {
-      console.error("Error fetching API keys:", err);
+      reportError("Error fetching API keys:", err);
       setError(err instanceof Error ? err.message : "Failed to load API keys");
     } finally {
       setIsLoading(false);

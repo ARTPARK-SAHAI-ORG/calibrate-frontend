@@ -1,4 +1,5 @@
 "use client";
+import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
@@ -446,7 +447,7 @@ export function AgentDetail({
           }
         }
       } catch (err) {
-        console.error("Error fetching agent:", err);
+        reportError("Error fetching agent:", err);
         setError(err instanceof Error ? err.message : "Failed to load agent");
       } finally {
         setIsLoading(false);
@@ -503,7 +504,7 @@ export function AgentDetail({
         const data: ToolData[] = await response.json();
         setAgentTools(data);
       } catch (err) {
-        console.error("Error fetching agent tools:", err);
+        reportError("Error fetching agent tools:", err);
         setAgentToolsError(
           err instanceof Error ? err.message : "Failed to load agent tools",
         );
@@ -548,7 +549,7 @@ export function AgentDetail({
         const data: ToolData[] = await response.json();
         setAllTools(data);
       } catch (err) {
-        console.error("Error fetching tools:", err);
+        reportError("Error fetching tools:", err);
         setAllToolsError(
           err instanceof Error ? err.message : "Failed to load tools",
         );
@@ -668,7 +669,7 @@ export function AgentDetail({
           setShowSaveToast(true);
         }
       } catch (err) {
-        console.error("Error saving agent:", err);
+        reportError("Error saving agent:", err);
         if (!silent) {
           alert(err instanceof Error ? err.message : "Failed to save agent");
         }
@@ -857,7 +858,7 @@ export function AgentDetail({
       setIsEditNameDialogOpen(false);
       setShowSaveToast(true);
     } catch (err) {
-      console.error("Error saving agent name:", err);
+      reportError("Error saving agent name:", err);
       alert(err instanceof Error ? err.message : "Failed to save agent name");
     } finally {
       setIsSaving(false);
