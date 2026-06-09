@@ -863,6 +863,20 @@ export function BulkUploadTestsModal({
         }
 
         setParsedTests(tests);
+
+        // Now that the tests parsed, the required "Assign tests to agents"
+        // picker renders below the preview. Scroll it into view so the user
+        // notices they must link at least one agent before the upload button
+        // enables. Skipped when the modal is locked to a single agent (the
+        // picker isn't shown then). The timeout lets the section mount first.
+        if (!lockedAgentUuid) {
+          setTimeout(() => {
+            assignAgentsSectionRef.current?.scrollIntoView({
+              behavior: "smooth",
+              block: "end",
+            });
+          }, 50);
+        }
       },
       error: (error) => {
         setParseError(`Failed to parse CSV: ${error.message}`);
