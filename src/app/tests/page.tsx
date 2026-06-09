@@ -1045,7 +1045,8 @@ function LLMPageInner() {
 
         {tests.length > 0 && (
           <p className="text-sm text-muted-foreground">
-            {tests.length} {tests.length === 1 ? "test" : "tests"}
+            {filteredTests.length}{" "}
+            {filteredTests.length === 1 ? "test" : "tests"}
           </p>
         )}
 
