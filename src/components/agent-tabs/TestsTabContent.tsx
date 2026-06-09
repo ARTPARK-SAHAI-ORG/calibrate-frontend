@@ -2400,10 +2400,10 @@ export function TestsTabContent({
           deleteMode === "permanent"
             ? testsToDeleteBulk.length > 0
               ? `Are you sure you want to permanently delete ${testsToDeleteBulk.length} test${testsToDeleteBulk.length > 1 ? "s" : ""} from your library? This will remove them from every agent and cannot be undone.`
-              : `Permanently deleting "${testToDelete?.name}" will remove it from every agent that uses it and cannot be undone.`
+              : `Permanently deleting this test will remove it from every agent that uses it and cannot be undone.`
             : testsToDeleteBulk.length > 0
               ? `Are you sure you want to remove ${testsToDeleteBulk.length} test${testsToDeleteBulk.length > 1 ? "s" : ""} from this agent?`
-              : `Are you sure you want to remove "${testToDelete?.name}" from this agent? It will stay in your test library and on any other agents that use it.`
+              : `Are you sure you want to remove this test from this agent? It will stay in your test library and on any other agents that use it.`
         }
         // Keep confirmText a single word — the dialog auto-suffixes "ing..." while
         // submitting by stripping a trailing 'e', which only works on one-token labels.
