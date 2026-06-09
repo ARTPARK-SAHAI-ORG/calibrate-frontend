@@ -713,10 +713,11 @@ export function TestsTabContent({
         throw new Error("Failed to add tests to agent");
       }
 
-      // Add the newly-attached tests to local state, preserving order.
+      // Prepend the newly-attached tests so they surface at the top of the
+      // table (most-recently-added first) rather than the bottom.
       const selected = new Set(testUuids);
       const addedTests = availableTests.filter((t) => selected.has(t.uuid));
-      setAgentTests((prev) => [...prev, ...addedTests]);
+      setAgentTests((prev) => [...addedTests, ...prev]);
       setShowTestDropdown(false);
       setSearchQuery("");
       setSelectedAvailableUuids(new Set());
