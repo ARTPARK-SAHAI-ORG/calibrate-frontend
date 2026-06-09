@@ -162,15 +162,6 @@ export function TestRunnerDialog({
   // immediately re-trigger the auto-open, making the list view unreachable.
   const hasAutoSelectedRef = useRef(false);
 
-  // Debug: Log when selectedTestUuid changes
-  useEffect(() => {
-    console.log("selectedTestUuid changed to:", selectedTestUuid);
-    console.log(
-      "testResults:",
-      testResults.map((r) => ({ uuid: r.test.uuid, name: r.test.name })),
-    );
-  }, [selectedTestUuid, testResults]);
-
   // Auto-open the first completed test when nothing is selected. Covers both
   // - live runs: as soon as one test transitions to passed/failed (and the
   //   user hasn't manually picked anything), open it.
@@ -854,16 +845,6 @@ export function TestRunnerDialog({
   const selectedResult = testResults.find(
     (r) => r.test.uuid === selectedTestUuid,
   );
-
-  // Debug: Log selectedResult
-  useEffect(() => {
-    console.log(
-      "selectedResult:",
-      selectedResult
-        ? { name: selectedResult.test.name, status: selectedResult.status }
-        : null,
-    );
-  }, [selectedResult]);
 
   const passedTests = testResults.filter((r) => r.status === "passed");
   const failedTests = testResults.filter((r) => r.status === "failed");
