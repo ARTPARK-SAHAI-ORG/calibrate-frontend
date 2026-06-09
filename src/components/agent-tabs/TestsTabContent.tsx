@@ -192,6 +192,13 @@ export function TestsTabContent({
   // UI state
   const [showTestDropdown, setShowTestDropdown] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  // Attach-existing dropdown multi-select. Holds the uuids ticked in the
+  // dropdown (distinct from `selectedTestUuids`, which drives the agent
+  // tests table's bulk actions). Cleared whenever the dropdown closes.
+  const [selectedAvailableUuids, setSelectedAvailableUuids] = useState<
+    Set<string>
+  >(new Set());
+  const [isAddingTests, setIsAddingTests] = useState(false);
   const [testsSearchQuery, setTestsSearchQuery] = useState("");
   // Filter the agent's tests by test type. "all" shows both kinds; "response"
   // is Next Reply, "tool_call" is Tool Call. The "select all" checkbox keys
@@ -428,6 +435,7 @@ export function TestsTabContent({
       ) {
         setShowTestDropdown(false);
         setSearchQuery("");
+        setSelectedAvailableUuids(new Set());
       }
     };
 
@@ -619,6 +627,14 @@ export function TestsTabContent({
         test.description.toLowerCase().includes(searchQuery.toLowerCase())),
   );
 
+  // True when every currently-visible (filtered) dropdown row is selected;
+  // drives the select-all header's checked state.
+  const allFilteredAvailableSelected =
+    filteredAvailableTests.length > 0 &&
+    filteredAvailableTests.every((test) =>
+      selectedAvailableUuids.has(test.uuid),
+    );
+
   // Filter agent tests by search query AND test type. Both filters apply
   // together (AND). The type filter also constrains the select-all checkbox
   // since it operates on `filteredAgentTests`.
@@ -632,14 +648,50 @@ export function TestsTabContent({
     );
   });
 
-  // Add test to agent
-  const handleSelectTest = async (test: TestData) => {
+  // Toggle a single test's selection in the attach-existing dropdown.
+  const toggleAvailableTest = (uuid: string) => {
+    setSelectedAvailableUuids((prev) => {
+      const next = new Set(prev);
+      if (next.has(uuid)) {
+        next.delete(uuid);
+      } else {
+        next.add(uuid);
+      }
+      return next;
+    });
+  };
+
+  // Select-all toggle scoped to the *filtered* dropdown list, so when a
+  // search query narrows the dropdown only those rows get selected.
+  const toggleSelectAllAvailable = () => {
+    const filteredUuids = filteredAvailableTests.map((t) => t.uuid);
+    const allFilteredSelected =
+      filteredUuids.length > 0 &&
+      filteredUuids.every((uuid) => selectedAvailableUuids.has(uuid));
+    setSelectedAvailableUuids((prev) => {
+      const next = new Set(prev);
+      if (allFilteredSelected) {
+        filteredUuids.forEach((uuid) => next.delete(uuid));
+      } else {
+        filteredUuids.forEach((uuid) => next.add(uuid));
+      }
+      return next;
+    });
+  };
+
+  // Attach all selected tests to the agent in a single request. The
+  // /agent-tests endpoint accepts an array of test_uuids, so a multi-select
+  // add is one POST rather than one per test.
+  const handleAddSelectedTests = async () => {
+    if (selectedAvailableUuids.size === 0) return;
     try {
+      setIsAddingTests(true);
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
         throw new Error("BACKEND_URL environment variable is not set");
       }
 
+      const testUuids = Array.from(selectedAvailableUuids);
       const response = await fetch(`${backendUrl}/agent-tests`, {
         method: "POST",
         headers: {
@@ -648,7 +700,7 @@ export function TestsTabContent({
         },
         body: JSON.stringify({
           agent_uuid: agentUuid,
-          test_uuids: [test.uuid],
+          test_uuids: testUuids,
         }),
       });
 
@@ -658,15 +710,20 @@ export function TestsTabContent({
       }
 
       if (!response.ok) {
-        throw new Error("Failed to add test to agent");
+        throw new Error("Failed to add tests to agent");
       }
 
-      // Add the test to local state
-      setAgentTests((prev) => [...prev, test]);
+      // Add the newly-attached tests to local state, preserving order.
+      const selected = new Set(testUuids);
+      const addedTests = availableTests.filter((t) => selected.has(t.uuid));
+      setAgentTests((prev) => [...prev, ...addedTests]);
       setShowTestDropdown(false);
       setSearchQuery("");
+      setSelectedAvailableUuids(new Set());
     } catch (err) {
-      console.error("Error adding test to agent:", err);
+      console.error("Error adding tests to agent:", err);
+    } finally {
+      setIsAddingTests(false);
     }
   };
 
@@ -1299,6 +1356,43 @@ export function TestsTabContent({
               />
             </div>
           </div>
+          {/* Select-all header — scoped to the filtered list so a search
+              query narrows what "select all" picks. */}
+          {!allTestsLoading && filteredAvailableTests.length > 0 && (
+            <button
+              type="button"
+              onClick={toggleSelectAllAvailable}
+              className="w-full flex items-center gap-2.5 px-4 py-2 border-b border-border hover:bg-muted/50 transition-colors cursor-pointer text-left"
+            >
+              <span
+                className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
+                  allFilteredAvailableSelected
+                    ? "bg-foreground border-foreground"
+                    : "border-border"
+                }`}
+              >
+                {allFilteredAvailableSelected && (
+                  <svg
+                    className="w-3 h-3 text-background"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={3}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M4.5 12.75l6 6 9-13.5"
+                    />
+                  </svg>
+                )}
+              </span>
+              <span className="text-sm font-medium text-foreground">
+                Select all
+                {searchQuery ? " matching" : ""}
+              </span>
+            </button>
+          )}
           <div className="max-h-64 overflow-y-auto">
             {allTestsLoading ? (
               <div className="flex items-center justify-center py-8">
@@ -1322,34 +1416,87 @@ export function TestsTabContent({
                   ></path>
                 </svg>
               </div>
-            ) : filteredAvailableTests.length === 0 ? (
+            ) : availableTests.length === 0 ? (
               <div className="py-8 text-center">
                 <p className="text-sm text-muted-foreground">
-                  {searchQuery ? "No tests found" : "No tests available"}
+                  All tests have been added to this agent
                 </p>
               </div>
+            ) : filteredAvailableTests.length === 0 ? (
+              <div className="py-8 text-center">
+                <p className="text-sm text-muted-foreground">No tests found</p>
+              </div>
             ) : (
-              filteredAvailableTests.map((test) => (
-                <button
-                  key={test.uuid}
-                  onClick={() => handleSelectTest(test)}
-                  className="w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors cursor-pointer border-b border-border last:border-b-0"
-                >
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {test.name}
-                  </p>
-                  {test.description && (
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                      {test.description}
-                    </p>
-                  )}
-                  <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">
-                    {testTypeLabel(test.type)}
-                  </span>
-                </button>
-              ))
+              filteredAvailableTests.map((test) => {
+                const checked = selectedAvailableUuids.has(test.uuid);
+                return (
+                  <button
+                    key={test.uuid}
+                    type="button"
+                    onClick={() => toggleAvailableTest(test.uuid)}
+                    className="w-full flex items-start gap-2.5 px-4 py-3 text-left hover:bg-muted/50 transition-colors cursor-pointer border-b border-border last:border-b-0"
+                  >
+                    <span
+                      className={`mt-0.5 w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
+                        checked
+                          ? "bg-foreground border-foreground"
+                          : "border-border"
+                      }`}
+                    >
+                      {checked && (
+                        <svg
+                          className="w-3 h-3 text-background"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={3}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M4.5 12.75l6 6 9-13.5"
+                          />
+                        </svg>
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium text-foreground truncate">
+                        {test.name}
+                      </span>
+                      {test.description && (
+                        <span className="block text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                          {test.description}
+                        </span>
+                      )}
+                      <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">
+                        {testTypeLabel(test.type)}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })
             )}
           </div>
+          {/* Footer — confirm the multi-select. Hidden when there's nothing
+              to attach so the empty/loading states stand alone. */}
+          {!allTestsLoading && availableTests.length > 0 && (
+            <div className="p-3 border-t border-border">
+              <button
+                type="button"
+                onClick={handleAddSelectedTests}
+                disabled={selectedAvailableUuids.size === 0 || isAddingTests}
+                className="w-full h-9 rounded-md text-sm font-medium bg-foreground text-background transition-opacity cursor-pointer hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isAddingTests
+                  ? "Adding..."
+                  : selectedAvailableUuids.size > 0
+                    ? `Add ${selectedAvailableUuids.size} ${
+                        selectedAvailableUuids.size === 1 ? "test" : "tests"
+                      }`
+                    : "Add tests"}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1581,107 +1728,7 @@ export function TestsTabContent({
 
           {/* Right group: add-more-tests buttons. */}
           <div className="flex flex-wrap items-center gap-2 md:gap-3">
-            <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => setShowTestDropdown(!showTestDropdown)}
-                className={ADD_TEST_BUTTON_CLASS}
-              >
-                Add test
-              </button>
-
-              {/* Test Selection Dropdown */}
-              {showTestDropdown && (
-                <div className="absolute top-full left-0 mt-2 w-80 bg-background border border-border rounded-lg shadow-lg z-50">
-                  {/* Search Input */}
-                  <div className="p-3 border-b border-border">
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                        <svg
-                          className="w-4 h-4 text-muted-foreground"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                          />
-                        </svg>
-                      </div>
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search tests"
-                        className="w-full h-9 pl-9 pr-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                        autoFocus
-                      />
-                    </div>
-                  </div>
-
-                  {/* Tests List */}
-                  <div className="max-h-64 overflow-y-auto">
-                    {allTestsLoading ? (
-                      <div className="flex items-center justify-center py-8">
-                        <svg
-                          className="w-5 h-5 animate-spin text-muted-foreground"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          ></circle>
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          ></path>
-                        </svg>
-                      </div>
-                    ) : availableTests.length === 0 ? (
-                      <div className="py-8 text-center">
-                        <p className="text-sm text-muted-foreground">
-                          All tests have been added to this agent
-                        </p>
-                      </div>
-                    ) : filteredAvailableTests.length === 0 ? (
-                      <div className="py-8 text-center">
-                        <p className="text-sm text-muted-foreground">
-                          No tests found
-                        </p>
-                      </div>
-                    ) : (
-                      filteredAvailableTests.map((test) => (
-                        <button
-                          key={test.uuid}
-                          onClick={() => handleSelectTest(test)}
-                          className="w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors cursor-pointer border-b border-border last:border-b-0"
-                        >
-                          <p className="text-sm font-medium text-foreground truncate">
-                            {test.name}
-                          </p>
-                          {test.description && (
-                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                              {test.description}
-                            </p>
-                          )}
-                          <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">
-                            {testTypeLabel(test.type)}
-                          </span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+            {renderAddTestControl()}
             {/* Create test / Bulk upload (new tests, auto-attached to this agent) */}
             {renderNewTestButtons()}
           </div>
