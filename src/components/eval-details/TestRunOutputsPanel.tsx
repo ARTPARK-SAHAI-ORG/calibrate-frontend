@@ -9,6 +9,7 @@ import {
   EmptyStateView,
   EvaluationCriteriaPanel,
 } from "@/components/test-results/shared";
+import { SearchInput } from "@/components/ui/SearchInput";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
 
 export type TestRunResult = {
@@ -60,6 +61,7 @@ export function TestRunOutputsPanel({
   legacyDefaultEvaluator,
 }: TestRunOutputsPanelProps) {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
 
   const toggleSection = (key: string) => {
     setCollapsedSections((prev) => {
@@ -69,12 +71,22 @@ export function TestRunOutputsPanel({
     });
   };
 
+  // A test that surfaced an `error` neither passed nor failed evaluation —
+  // it errored out. Bucket those separately from genuine evaluation failures.
+  const isErrored = (r: TestRunResult) => !!r.error;
+
+  const query = searchQuery.trim().toLowerCase();
+  const filteredResults = query
+    ? results.filter((r) => r.name.toLowerCase().includes(query))
+    : results;
+
   const groups: StatusGroup[] = [
-    { key: "failed", label: "Failed", dotColor: "bg-red-500", items: results.filter((r) => r.status === "failed") },
-    { key: "passed", label: "Passed", dotColor: "bg-green-500", items: results.filter((r) => r.status === "passed") },
-    { key: "queued", label: "Queued", dotColor: "bg-gray-400", items: results.filter((r) => r.status === "queued") },
-    { key: "running", label: "Running", dotColor: "bg-yellow-500 animate-pulse", items: results.filter((r) => r.status === "running") },
-    { key: "pending", label: "Pending", dotColor: "bg-gray-400", items: results.filter((r) => r.status === "pending") },
+    { key: "failed", label: "Failed", dotColor: "bg-red-500", items: filteredResults.filter((r) => r.status === "failed" && !isErrored(r)) },
+    { key: "errored", label: "Errored", dotColor: "bg-amber-500", items: filteredResults.filter((r) => isErrored(r)) },
+    { key: "passed", label: "Passed", dotColor: "bg-green-500", items: filteredResults.filter((r) => r.status === "passed") },
+    { key: "queued", label: "Queued", dotColor: "bg-gray-400", items: filteredResults.filter((r) => r.status === "queued") },
+    { key: "running", label: "Running", dotColor: "bg-yellow-500 animate-pulse", items: filteredResults.filter((r) => r.status === "running") },
+    { key: "pending", label: "Pending", dotColor: "bg-gray-400", items: filteredResults.filter((r) => r.status === "pending") },
   ].filter((g) => g.items.length > 0);
 
   const selectedResult = results.find((r) => r.id === selectedId);
@@ -87,7 +99,20 @@ export function TestRunOutputsPanel({
           selectedId ? "hidden md:flex" : "flex"
         }`}
       >
+        {/* Search */}
+        <div className="shrink-0 border-b border-border p-3">
+          <SearchInput
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search tests"
+          />
+        </div>
         <div className="flex-1 overflow-y-auto">
+          {groups.length === 0 && query && (
+            <div className="p-4 text-sm text-muted-foreground">
+              No tests match &ldquo;{searchQuery}&rdquo;
+            </div>
+          )}
           {groups.map((group) => (
             <div key={group.key} className="p-4">
               <button
@@ -115,7 +140,7 @@ export function TestRunOutputsPanel({
                         selectedId === result.id ? "bg-muted" : "hover:bg-muted/50"
                       }`}
                     >
-                      <StatusIcon status={result.status} />
+                      <StatusIcon status={isErrored(result) ? "error" : result.status} />
                       <span className="text-sm text-foreground truncate">{result.name}</span>
                     </button>
                   ))}
@@ -162,7 +187,7 @@ export function TestRunOutputsPanel({
 
       {/* Right Panel - Evaluators / Expected Tool Calls (desktop only).
           On mobile this content is rendered inline by `TestDetailView`. */}
-      {selectedResult && (selectedResult.status === "passed" || selectedResult.status === "failed") && (
+      {selectedResult && !isErrored(selectedResult) && (selectedResult.status === "passed" || selectedResult.status === "failed") && (
         <div className="hidden md:flex w-[32rem] border-l border-border flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto">
             <EvaluationCriteriaPanel

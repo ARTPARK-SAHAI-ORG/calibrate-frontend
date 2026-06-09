@@ -15,6 +15,7 @@ import {
   DocumentIcon,
   CloseIcon,
   ChevronDownIcon,
+  WarningTriangleIcon,
 } from "@/components/icons";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
 import { getBinaryLabel, toRatingScale } from "@/lib/binaryLabels";
@@ -209,7 +210,7 @@ function legacyEvaluatorEntry(
 export function StatusIcon({
   status,
 }: {
-  status: "passed" | "failed" | "running" | "pending" | "queued";
+  status: "passed" | "failed" | "error" | "running" | "pending" | "queued";
 }) {
   if (status === "passed") {
     return (
@@ -222,6 +223,13 @@ export function StatusIcon({
     return (
       <div className="w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
         <XIcon className="w-3 h-3 text-red-500" />
+      </div>
+    );
+  }
+  if (status === "error") {
+    return (
+      <div className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+        <WarningTriangleIcon className="w-3 h-3 text-amber-500" />
       </div>
     );
   }

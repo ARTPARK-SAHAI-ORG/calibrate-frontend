@@ -9,6 +9,7 @@ import {
   EmptyStateView,
   EvaluationCriteriaPanel,
 } from "@/components/test-results/shared";
+import { SearchInput } from "@/components/ui/SearchInput";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
 import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSummary";
 
@@ -18,6 +19,8 @@ export type BenchmarkTestResult = {
   reasoning?: string;
   output?: TestCaseOutput;
   test_case?: TestCaseData;
+  /** Set when the test errored out (neither passed nor failed evaluation). */
+  error?: string;
   /** Per-evaluator verdicts for response (next-reply) tests. Null for
    * tool-call tests; legacy rows omit the field and fall back to the
    * legacy single-reasoning UI. */
@@ -79,7 +82,8 @@ export function BenchmarkOutputsPanel({
   enableEvaluatorLinks = true,
   legacyDefaultEvaluator,
 }: BenchmarkOutputsPanelProps) {
-  const [statusFilter, setStatusFilter] = useState<"all" | "passed" | "failed">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "passed" | "failed" | "errored">("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const getSelectedTestResult = (): BenchmarkTestResult | null => {
     if (!selectedTest) return null;
@@ -98,6 +102,16 @@ export function BenchmarkOutputsPanel({
           selectedTest ? "hidden md:flex" : "flex"
         }`}
       >
+        {/* Search */}
+        {modelResults.length > 0 && (
+          <div className="shrink-0 border-b border-border p-3">
+            <SearchInput
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search tests"
+            />
+          </div>
+        )}
         {/* Filter pills + collapse/expand */}
         {showControls && modelResults.length > 0 && (
           <div className="shrink-0 border-b border-border flex items-center justify-between px-3 py-2">
@@ -123,6 +137,17 @@ export function BenchmarkOutputsPanel({
                 }`}
               >
                 Failed
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter(statusFilter === "errored" ? "all" : "errored")}
+                className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer transition-colors ${
+                  statusFilter === "errored"
+                    ? "bg-amber-100 text-amber-700 dark:bg-amber-500/30 dark:text-amber-400 ring-1 ring-amber-500/50"
+                    : "bg-amber-100/50 text-amber-700/60 dark:bg-amber-500/10 dark:text-amber-400/60 hover:bg-amber-100 hover:dark:bg-amber-500/20"
+                }`}
+              >
+                Errored
               </button>
             </div>
             <button
@@ -158,6 +183,7 @@ export function BenchmarkOutputsPanel({
                 onTestSelect={(testIndex) => onSelectTest(modelResult.model, testIndex)}
                 testNames={testNames}
                 statusFilter={statusFilter}
+                searchQuery={searchQuery}
                 formatModelName={formatModelName}
                 showRunningSpinner={showRunningSpinner}
               />
@@ -191,7 +217,21 @@ export function BenchmarkOutputsPanel({
 
         <div className="flex-1 overflow-y-auto">
           {selectedTestResult ? (
-            selectedTestResult.passed === null && showRunningSpinner ? (
+            selectedTestResult.error ? (
+              <div className="p-4 md:p-6">
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                    </svg>
+                    <span className="font-medium text-red-500">Something went wrong</span>
+                  </div>
+                  <p className="text-sm text-red-400">
+                    This test errored out before it could be evaluated. Please reach out to us if this issue persists.
+                  </p>
+                </div>
+              </div>
+            ) : selectedTestResult.passed === null && showRunningSpinner ? (
               <div className="flex items-center justify-center h-full">
                 <div className="flex items-center gap-3">
                   <svg className="w-5 h-5 animate-spin text-muted-foreground" fill="none" viewBox="0 0 24 24">
@@ -222,7 +262,7 @@ export function BenchmarkOutputsPanel({
 
       {/* Right Panel - Evaluators / Expected Tool Calls (desktop only).
           On mobile this content is rendered inline by `TestDetailView`. */}
-      {selectedTestResult && selectedTestResult.passed !== null && (
+      {selectedTestResult && !selectedTestResult.error && selectedTestResult.passed !== null && (
         <div className="hidden md:flex w-[32rem] border-l border-border flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto">
             <EvaluationCriteriaPanel
@@ -251,6 +291,7 @@ function ModelSection({
   onTestSelect,
   testNames,
   statusFilter,
+  searchQuery,
   formatModelName,
   showRunningSpinner = false,
 }: {
@@ -260,15 +301,20 @@ function ModelSection({
   selectedTest: { model: string; testIndex: number } | null;
   onTestSelect: (testIndex: number) => void;
   testNames: string[];
-  statusFilter: "all" | "passed" | "failed";
+  statusFilter: "all" | "passed" | "failed" | "errored";
+  searchQuery: string;
   formatModelName: (name: string) => string;
   showRunningSpinner?: boolean;
 }) {
   const isProcessing = modelResult.success === null;
   const hasResults = modelResult.test_results && modelResult.test_results.length > 0;
   const passedCount = modelResult.passed ?? 0;
-  const failedCount = modelResult.failed ?? 0;
+  const erroredCount = (modelResult.test_results ?? []).filter((t) => t?.error).length;
+  // Errored tests may be lumped into the API's `failed` count — subtract them
+  // so the header buckets line up with the categorised rows below.
+  const failedCount = Math.max((modelResult.failed ?? 0) - erroredCount, 0);
   const totalTests = modelResult.total_tests ?? testNames.length;
+  const query = searchQuery.trim().toLowerCase();
 
   return (
     <div className="border-b border-border">
@@ -301,6 +347,9 @@ function ModelSection({
             {(statusFilter === "all" || statusFilter === "failed") && (
               <span className="text-red-500">{failedCount} failed</span>
             )}
+            {(statusFilter === "all" || statusFilter === "errored") && erroredCount > 0 && (
+              <span className="text-amber-500">{erroredCount} errored</span>
+            )}
           </div>
         )}
       </button>
@@ -329,15 +378,21 @@ function ModelSection({
                   if (!hasResult && !showRunningSpinner) return null;
 
                   const status = hasResult
-                    ? testResult.passed === null ? "running" : testResult.passed ? "passed" : "failed"
+                    ? testResult.error
+                      ? "error"
+                      : testResult.passed === null ? "running" : testResult.passed ? "passed" : "failed"
                     : "running";
 
-                  if (statusFilter !== "all" && status !== statusFilter) return null;
+                  // statusFilter uses "errored" as the label for the "error" status.
+                  const filterStatus = statusFilter === "errored" ? "error" : statusFilter;
+                  if (statusFilter !== "all" && status !== filterStatus) return null;
 
                   const isSelected = selectedTest?.model === modelResult.model && selectedTest?.testIndex === index;
                   const testName = hasResult
                     ? testResult.name || testResult.test_case?.name || testNames[index] || `Test ${index + 1}`
                     : testNames[index] || `Test ${index + 1}`;
+
+                  if (query && !testName.toLowerCase().includes(query)) return null;
 
                   if (hasResult) {
                     return (
@@ -349,7 +404,7 @@ function ModelSection({
                           isSelected ? "bg-muted" : "hover:bg-muted/50"
                         }`}
                       >
-                        <StatusIcon status={status as "running" | "passed" | "failed"} />
+                        <StatusIcon status={status as "running" | "passed" | "failed" | "error"} />
                         <span className="text-sm text-foreground truncate">{testName}</span>
                       </button>
                     );
