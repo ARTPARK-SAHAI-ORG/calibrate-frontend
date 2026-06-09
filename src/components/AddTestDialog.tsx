@@ -1266,6 +1266,16 @@ export function AddTestDialog({
   } | null>(null);
   const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
 
+  // Discard-guard baseline. `baselineRef` holds a serialized snapshot of the
+  // form's canonical (would-be-saved) content, captured once the dialog has
+  // finished its async initialization. A backdrop click only raises the
+  // "Discard changes?" prompt when the current form differs from this
+  // baseline — so clicking outside a pristine (just-opened, unedited) dialog
+  // closes immediately. `baselineArmed` defers the capture by one render so
+  // the populate effects' state updates are reflected first.
+  const baselineRef = useRef<string | null>(null);
+  const [baselineArmed, setBaselineArmed] = useState(false);
+
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // The tool-call dropdown is anchored to the "Add message" button but its
@@ -1568,6 +1578,46 @@ export function AddTestDialog({
     isLoading,
     activeTab,
   ]);
+
+  // Discard-guard baseline capture (paired with `baselineRef`).
+  //
+  // Reset on close so the next open re-captures from scratch.
+  useEffect(() => {
+    if (!isOpen) {
+      baselineRef.current = null;
+      setBaselineArmed(false);
+    }
+  }, [isOpen]);
+
+  // Phase 1 — arm once the editor is shown and async init has settled:
+  // a type is chosen, evaluators are initialized, and (when editing/
+  // duplicating) the initialConfig-driven history/tools have populated.
+  useEffect(() => {
+    if (!isOpen || baselineArmed || baselineRef.current !== null) return;
+    const initSettled =
+      typeChosen &&
+      attachedEvaluatorsInitialized &&
+      (!initialConfig || toolsFetched);
+    if (initSettled) setBaselineArmed(true);
+  }, [
+    isOpen,
+    baselineArmed,
+    typeChosen,
+    attachedEvaluatorsInitialized,
+    initialConfig,
+    toolsFetched,
+  ]);
+
+  // Phase 2 — capture one render after arming, by which point the populate
+  // effects' state updates are reflected in the form.
+  useEffect(() => {
+    if (baselineArmed && baselineRef.current === null) {
+      baselineRef.current = serializeFormState();
+    }
+    // serializeFormState is intentionally omitted: the baseline must be taken
+    // exactly once, at the moment of arming, not re-derived on every edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baselineArmed]);
 
   // Create-mode only: when the user switches between the evaluator-based
   // tabs (next-reply ↔ conversation), drop every attached evaluator that
@@ -2522,6 +2572,32 @@ export function AddTestDialog({
     });
   };
 
+  // Serialize the form's canonical (would-be-saved) content for the discard
+  // guard. Built from the same buildConfig()/buildEvaluatorsPayload() output
+  // that submission uses, so it's dirty iff what would be saved differs from
+  // the captured baseline. buildConfig() mints fresh UUIDs for tool_call ids
+  // on every call, so those volatile ids are stripped before comparing.
+  const serializeFormState = (): string => {
+    const config = buildConfig();
+    const history = config.history.map((item) => {
+      const next: Record<string, unknown> = { ...item };
+      if (Array.isArray(next.tool_calls)) {
+        next.tool_calls = (
+          next.tool_calls as Array<{ function: unknown; type: unknown }>
+        ).map((tc) => ({ function: tc.function, type: tc.type }));
+      }
+      delete next.tool_call_id;
+      return next;
+    });
+    return JSON.stringify({
+      name: testName,
+      description: itemDescription ?? "",
+      history,
+      evaluation: config.evaluation,
+      evaluators: buildEvaluatorsPayload(),
+    });
+  };
+
   // Returns true if any attached evaluator has at least one variable whose
   // value is empty (after trim). Used to gate the Save button.
   const hasUnfilledEvaluatorVariables = () => {
@@ -2626,6 +2702,17 @@ export function AddTestDialog({
   };
 
   const handleBackdropClick = () => {
+    // Skip the discard prompt when the form is unchanged from the baseline
+    // captured after load (pristine open, or edits reverted). When the
+    // baseline hasn't been captured yet — e.g. an existing test is still
+    // loading — keep the prompt to err on the side of not losing edits.
+    if (
+      baselineRef.current !== null &&
+      serializeFormState() === baselineRef.current
+    ) {
+      onClose();
+      return;
+    }
     setShowCloseConfirmation(true);
   };
 
