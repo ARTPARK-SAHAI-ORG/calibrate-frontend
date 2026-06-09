@@ -2040,8 +2040,13 @@ export function TestsTabContent({
               <>
                 {/* Desktop Table */}
                 <div className="hidden md:block border border-border rounded-xl overflow-hidden">
+                  {/* The list scrolls on its own so the search, filters, and
+                      surrounding page chrome stay in place for long test
+                      lists; the header is pinned to the top via `sticky` and
+                      given an opaque background so rows don't show through. */}
+                  <div className="overflow-y-auto max-h-[60vh]">
                   {/* Table Header */}
-                  <div className="grid grid-cols-[40px_minmax(0,1fr)_120px_auto_auto_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+                  <div className="grid grid-cols-[40px_minmax(0,1fr)_120px_auto_auto_auto] gap-4 px-4 py-2 border-b border-border bg-background sticky top-0 z-10">
                     <div className="flex items-center">
                       <button
                         type="button"
@@ -2243,10 +2248,11 @@ export function TestsTabContent({
                         </button>
                       </div>
                     </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
                 {/* Mobile Cards */}
-                <div className="md:hidden space-y-3">
+                <div className="md:hidden space-y-3 overflow-y-auto max-h-[60vh]">
                   {filteredAgentTests.map((test) => (
                     <div
                       key={test.uuid}
