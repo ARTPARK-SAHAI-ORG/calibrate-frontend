@@ -1203,7 +1203,8 @@ export function EvaluationCriteriaPanel({
     <div className="p-4 md:p-6 space-y-4">
       {testName && (
         <div className="-mx-4 md:-mx-6 -mt-4 md:-mt-6 mb-1 px-4 md:px-6 py-2 border-b border-border overflow-x-auto">
-          <span className="block text-sm font-semibold text-foreground whitespace-nowrap">
+          <span className="block text-[11px] text-muted-foreground">Name</span>
+          <span className="block text-xs text-foreground whitespace-nowrap">
             {testName}
           </span>
         </div>
