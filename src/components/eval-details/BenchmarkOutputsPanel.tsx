@@ -478,7 +478,7 @@ export function BenchmarkOutputsPanel({
       {/* Right Panel - Evaluators / Expected Tool Calls (desktop only).
           On mobile this content is rendered inline by `TestDetailView`. */}
       {selectedTestResult && !selectedTestResult.error && selectedTestResult.passed !== null && (
-        <div className="hidden md:flex w-[32rem] border-l border-border flex-col overflow-hidden">
+        <div className="hidden md:flex w-[26rem] border-l border-border flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto">
             <EvaluationCriteriaPanel
               testName={selectedTestName}
