@@ -566,14 +566,14 @@ function ModelSection({
 
             if (expectedCount === 0 && !hasResults) {
               return (
-                <div className="ml-4 px-3 py-2 text-sm text-muted-foreground">
+                <div className="px-3 py-2 text-sm text-muted-foreground">
                   {isProcessing ? "Processing..." : "No test results"}
                 </div>
               );
             }
 
             return (
-              <div className="space-y-1 ml-4">
+              <div className="space-y-1">
                 {Array.from({ length: expectedCount }).map((_, index) => {
                   const testResult = modelResult.test_results?.[index];
                   const hasResult = !!testResult;
