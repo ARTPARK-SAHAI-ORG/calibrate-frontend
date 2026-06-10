@@ -28,7 +28,7 @@ import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
 import { Tooltip } from "@/components/Tooltip";
 import { useSidebarState } from "@/lib/sidebar";
-import { testTypeLabel } from "@/lib/testTypes";
+import { testTypeLabel, getUnitTestBreakdown } from "@/lib/testTypes";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import {
   readBulkNameConflictMessage,
@@ -106,28 +106,6 @@ function getRunDisplayName(run: AllRun): string {
     if (testName) return testName;
   }
   return `${totalTests} test${totalTests !== 1 ? "s" : ""}`;
-}
-
-// Bucket a unit-test run's per-test results into passed / failed / errored.
-// Genuine failures come back with `passed: false`; errored tests never reached
-// evaluation and surface with no verdict (`passed: null`) — or an explicit
-// `error` / `status: "error"`. The runs-list payload omits the `error` field,
-// so the `passed == null` signal is what separates errored from failed. Only
-// called for terminal runs, so a null verdict means errored, not still-running.
-// Returns null when the run has no usable per-test results.
-function getUnitTestBreakdown(
-  run: AllRun,
-): { passed: number; failed: number; errored: number } | null {
-  const results = run.results ?? [];
-  if (results.length === 0) return null;
-  const isPassed = (r: TestRunResult) =>
-    r.passed === true || r.status === "passed";
-  const isErrored = (r: TestRunResult) =>
-    !!r.error || r.status === "error" || r.passed === null || r.passed === undefined;
-  const passed = results.filter((r) => isPassed(r)).length;
-  const errored = results.filter((r) => !isPassed(r) && isErrored(r)).length;
-  const failed = results.length - passed - errored;
-  return { passed, failed, errored };
 }
 
 function formatRelativeTime(dateString: string): string {
@@ -1579,7 +1557,7 @@ function LLMPageInner() {
                               // errored out shows "N Pass / N Fail / N Error"
                               // instead of a single blanket "Error" pill. Fall
                               // back to run-level status when there are no results.
-                              const breakdown = getUnitTestBreakdown(run);
+                              const breakdown = getUnitTestBreakdown(run.results);
                               if (!breakdown) {
                                 return run.status === "failed" || run.error ? (
                                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-500">Error</span>
@@ -1643,7 +1621,7 @@ function LLMPageInner() {
                               </span>
                             ) : run.type === "llm-unit-test" ? (
                               (() => {
-                                const breakdown = getUnitTestBreakdown(run);
+                                const breakdown = getUnitTestBreakdown(run.results);
                                 if (!breakdown) {
                                   return run.status === "failed" || run.error ? (
                                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-500">Error</span>

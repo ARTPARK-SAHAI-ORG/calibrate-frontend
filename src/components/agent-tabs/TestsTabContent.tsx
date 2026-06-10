@@ -20,7 +20,7 @@ import {
 import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { showLimitToast } from "@/constants/limits";
-import { testTypeLabel } from "@/lib/testTypes";
+import { testTypeLabel, getUnitTestBreakdown } from "@/lib/testTypes";
 import {
   readBulkNameConflictMessage,
   readNameConflictMessage,
@@ -62,30 +62,6 @@ type TestRunResult = {
     evaluation?: Record<string, any>;
   } | null;
 };
-
-// Bucket a unit-test run's per-test results into passed / failed / errored.
-// Genuine failures come back with `passed: false` (evaluation ran and the test
-// did not pass); errored tests never reached evaluation, so they surface with
-// no verdict (`passed: null`) — or, on the detail endpoint, an explicit
-// `error` / `status: "error"`. The runs-list payload omits the `error` field,
-// so the `passed == null` signal is what separates errored from failed here.
-// This is only called for terminal runs (the badge branch above already
-// handles pending/queued/in_progress), so a null verdict means errored, not
-// "still running". Returns null when the run has no usable per-test results.
-function getUnitTestBreakdown(
-  run: TestRun,
-): { passed: number; failed: number; errored: number } | null {
-  const results = run.results ?? [];
-  if (results.length === 0) return null;
-  const isPassed = (r: TestRunResult) =>
-    r.passed === true || r.status === "passed";
-  const isErrored = (r: TestRunResult) =>
-    !!r.error || r.status === "error" || r.passed === null || r.passed === undefined;
-  const passed = results.filter((r) => isPassed(r)).length;
-  const errored = results.filter((r) => !isPassed(r) && isErrored(r)).length;
-  const failed = results.length - passed - errored;
-  return { passed, failed, errored };
-}
 
 type TestRun = {
   uuid: string;
@@ -1618,7 +1594,7 @@ export function TestsTabContent({
                     // out shows "N Success / N Fail / N Error" instead of a
                     // single blanket "Error" pill. Fall back to the run-level
                     // status only when there are no usable results.
-                    const breakdown = getUnitTestBreakdown(run);
+                    const breakdown = getUnitTestBreakdown(run.results);
                     if (!breakdown) {
                       return run.status === "failed" ? (
                         <span className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-500">
