@@ -1197,20 +1197,40 @@ export function EvaluationCriteriaPanel({
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      <h3 className="text-sm font-semibold text-foreground">
-        {isToolCall ? "Expected Tool Calls" : "Evaluators"}
-      </h3>
+      {!isToolCall && (
+        <h3 className="text-sm font-semibold text-foreground">Evaluators</h3>
+      )}
 
-      {/* Tool-call test: expected tool calls + verdict-coloured reasoning
-          card. The deterministic tool-call match is binary, so we surface
-          it through the same `EvaluatorVerdictCard` (read mode) the
-          response-test per-evaluator cards use — name fixed to "Tool call
-          test", verdict driven by the top-level `passed` field, reasoning
-          attached as the collapsible explainer. While the run is still
-          pending (`passed` null/undefined), we fall back to the neutral
-          reasoning strip so the card doesn't show a misleading colour. */}
+      {/* Tool-call test: the result (pass/fail + reasoning) shows first,
+          followed by the expected tool calls below it. The deterministic
+          tool-call match is binary, so we surface it through the same
+          `EvaluatorVerdictCard` (read mode) the response-test per-evaluator
+          cards use — name fixed to "Tool call test", verdict driven by the
+          top-level `passed` field, reasoning attached as the collapsible
+          explainer. While the run is still pending (`passed` null/undefined),
+          we fall back to the neutral reasoning strip so the card doesn't show
+          a misleading colour. */}
       {isToolCall && (
         <>
+          {typeof passed === "boolean" ? (
+            <EvaluatorVerdictCard
+              mode="read"
+              name="Tool call test"
+              outputType="binary"
+              enableLink={false}
+              match={passed}
+              reasoning={reasoning ?? null}
+            />
+          ) : (
+            <CollapsibleReasoningStrip
+              text={reasoning}
+              mutedBody={false}
+              leadingLabel="Reasoning"
+            />
+          )}
+          <h3 className="text-sm font-semibold text-foreground">
+            Expected Tool Calls
+          </h3>
           {hasExpectedToolCalls ? (
             <div className="space-y-2">
               {evaluation!.tool_calls!.map((tc, i) => {
@@ -1229,22 +1249,6 @@ export function EvaluationCriteriaPanel({
             <p className="text-xs text-muted-foreground">
               No expected tool calls specified
             </p>
-          )}
-          {typeof passed === "boolean" ? (
-            <EvaluatorVerdictCard
-              mode="read"
-              name="Tool call test"
-              outputType="binary"
-              enableLink={false}
-              match={passed}
-              reasoning={reasoning ?? null}
-            />
-          ) : (
-            <CollapsibleReasoningStrip
-              text={reasoning}
-              mutedBody={false}
-              leadingLabel="Reasoning"
-            />
           )}
         </>
       )}
