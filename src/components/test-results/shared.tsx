@@ -1126,6 +1126,7 @@ function EvaluatorPanelCard({
 export function EvaluationCriteriaPanel({
   evaluation,
   testType,
+  testName,
   passed,
   judgeResults,
   reasoning,
@@ -1136,6 +1137,9 @@ export function EvaluationCriteriaPanel({
 }: {
   evaluation?: TestCaseEvaluation;
   testType?: string;
+  /** Selected test name, pinned at the top of the panel above the results.
+   * Full text with horizontal scroll for names wider than the column. */
+  testName?: string;
   /** Top-level test verdict. Used to colour the tool-call evaluator card
    * (green=pass, red=fail). Null/undefined leaves the card neutral, which
    * is the right default while a run is still in progress. */
@@ -1197,6 +1201,13 @@ export function EvaluationCriteriaPanel({
 
   return (
     <div className="p-4 md:p-6 space-y-4">
+      {testName && (
+        <div className="-mx-4 md:-mx-6 -mt-4 md:-mt-6 mb-1 px-4 md:px-6 py-2 border-b border-border overflow-x-auto">
+          <span className="block text-sm font-semibold text-foreground whitespace-nowrap">
+            {testName}
+          </span>
+        </div>
+      )}
       {!isToolCall && (
         <h3 className="text-sm font-semibold text-foreground">Evaluators</h3>
       )}
@@ -1303,6 +1314,29 @@ export function EvaluationCriteriaPanel({
   );
 }
 
+// Scroll a list container so the given row is visible, a page at a time: if the
+// row sits below the viewport it's aligned to the top (revealing a full page of
+// following rows), and if it sits above it's aligned to the bottom. This avoids
+// the row-by-row creep of `scrollIntoView({ block: "nearest" })` during rapid
+// navigation. No-op when the row is already fully visible.
+export function scrollRowByPage(
+  container: HTMLElement | null,
+  row: HTMLElement | null,
+): void {
+  if (!container || !row) return;
+  const cRect = container.getBoundingClientRect();
+  const rRect = row.getBoundingClientRect();
+  const rowTop = rRect.top - cRect.top + container.scrollTop;
+  const rowBottom = rowTop + rRect.height;
+  const viewTop = container.scrollTop;
+  const viewBottom = viewTop + container.clientHeight;
+  if (rowBottom > viewBottom) {
+    container.scrollTop = rowTop;
+  } else if (rowTop < viewTop) {
+    container.scrollTop = rowBottom - container.clientHeight;
+  }
+}
+
 // True when a keyboard event originates from a text-entry element, so global
 // shortcuts (e.g. arrow-key result navigation) don't hijack typing.
 export function isTypingTarget(target: EventTarget | null): boolean {
@@ -1317,10 +1351,21 @@ export function isTypingTarget(target: EventTarget | null): boolean {
   );
 }
 
-// Shared Previous/Next pager for stepping through the selected result in the
-// detail panel. `currentIndex` is the 0-based position in the displayed list
-// (-1 when the selection isn't in the current filtered view); `total` is the
-// list length. Buttons disable at the ends.
+// Navigation state surfaced by the result panels so a parent (e.g. a dialog
+// header) can render the Previous/Next pager outside the panel itself.
+export type PagerNav = {
+  /** 0-based position in the displayed list, or -1 when the current selection
+   * isn't part of the filtered view. */
+  currentIndex: number;
+  /** Number of items in the displayed list. */
+  total: number;
+  goPrev: () => void;
+  goNext: () => void;
+};
+
+// Shared Previous/Next pager. Renders inline (no border/padding of its own) so
+// it can be dropped into a dialog header next to the title and stats. Buttons
+// disable at the ends; the "N of M" counter shows between them.
 export function ResultPager({
   currentIndex,
   total,
@@ -1335,9 +1380,9 @@ export function ResultPager({
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex >= 0 && currentIndex < total - 1;
   const btn =
-    "inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-sm text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors";
+    "inline-flex items-center gap-1 px-2 py-1 rounded-md text-sm text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors shrink-0";
   return (
-    <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-border flex-shrink-0">
+    <div className="flex items-center gap-2">
       <button type="button" onClick={onPrev} disabled={!hasPrev} className={btn}>
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -1345,7 +1390,7 @@ export function ResultPager({
         Previous
       </button>
       {total > 0 && currentIndex >= 0 && (
-        <span className="text-xs text-muted-foreground tabular-nums">
+        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
           {currentIndex + 1} of {total}
         </span>
       )}

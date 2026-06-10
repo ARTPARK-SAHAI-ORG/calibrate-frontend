@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   TestCaseOutput,
   TestCaseData,
@@ -8,8 +8,9 @@ import {
   TestDetailView,
   EmptyStateView,
   EvaluationCriteriaPanel,
-  ResultPager,
   isTypingTarget,
+  scrollRowByPage,
+  type PagerNav,
 } from "@/components/test-results/shared";
 import { SearchInput } from "@/components/ui/SearchInput";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
@@ -65,6 +66,9 @@ type BenchmarkOutputsPanelProps = {
   enableEvaluatorLinks?: boolean;
   /** Default correctness evaluator used for legacy next-reply criteria. */
   legacyDefaultEvaluator?: DefaultEvaluatorSummary | null;
+  /** Reports Previous/Next navigation state so a parent (the dialog header)
+   * can render the pager. Must be a stable callback (e.g. a useState setter). */
+  onNavChange?: (nav: PagerNav) => void;
 };
 
 export function BenchmarkOutputsPanel({
@@ -83,10 +87,13 @@ export function BenchmarkOutputsPanel({
   evaluatorsByUuid,
   enableEvaluatorLinks = true,
   legacyDefaultEvaluator,
+  onNavChange,
 }: BenchmarkOutputsPanelProps) {
   const [statusFilter, setStatusFilter] = useState<"all" | "passed" | "failed" | "errored">("all");
   const [searchQuery, setSearchQuery] = useState("");
-  // Ref to the currently-selected row, so navigation keeps it in view.
+  // Refs to the list scroll container and the currently-selected row, so
+  // navigation keeps the selection in view (a page at a time).
+  const listContainerRef = useRef<HTMLDivElement>(null);
   const selectedRowRef = useRef<HTMLButtonElement>(null);
 
   const getSelectedTestResult = (): BenchmarkTestResult | null => {
@@ -99,26 +106,30 @@ export function BenchmarkOutputsPanel({
   const selectedTestResult = getSelectedTestResult();
 
   // Flattened display order across all models (respecting the status filter
-  // and search), used by the Previous/Next pager in the detail panel.
-  const pagerQuery = searchQuery.trim().toLowerCase();
-  const pagerFilterStatus = statusFilter === "errored" ? "error" : statusFilter;
-  const orderedTests: { model: string; testIndex: number }[] = [];
-  for (const m of modelResults) {
-    (m.test_results ?? []).forEach((tr, index) => {
-      const status = tr.error
-        ? "error"
-        : tr.passed === null
-          ? "running"
-          : tr.passed
-            ? "passed"
-            : "failed";
-      if (statusFilter !== "all" && status !== pagerFilterStatus) return;
-      const testName =
-        tr.name || tr.test_case?.name || testNames[index] || `Test ${index + 1}`;
-      if (pagerQuery && !testName.toLowerCase().includes(pagerQuery)) return;
-      orderedTests.push({ model: m.model, testIndex: index });
-    });
-  }
+  // and search), used by the Previous/Next pager the parent renders in the
+  // dialog header.
+  const orderedTests = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const fStatus = statusFilter === "errored" ? "error" : statusFilter;
+    const out: { model: string; testIndex: number }[] = [];
+    for (const m of modelResults) {
+      (m.test_results ?? []).forEach((tr, index) => {
+        const status = tr.error
+          ? "error"
+          : tr.passed === null
+            ? "running"
+            : tr.passed
+              ? "passed"
+              : "failed";
+        if (statusFilter !== "all" && status !== fStatus) return;
+        const name =
+          tr.name || tr.test_case?.name || testNames[index] || `Test ${index + 1}`;
+        if (q && !name.toLowerCase().includes(q)) return;
+        out.push({ model: m.model, testIndex: index });
+      });
+    }
+    return out;
+  }, [modelResults, statusFilter, searchQuery, testNames]);
   const currentTestIndex = selectedTest
     ? orderedTests.findIndex(
         (t) =>
@@ -145,6 +156,30 @@ export function BenchmarkOutputsPanel({
       selectAndReveal(orderedTests[currentTestIndex + 1]);
   };
 
+  // Surface navigation state to the parent (dialog header pager).
+  useEffect(() => {
+    if (!onNavChange) return;
+    const idx = selectedTest
+      ? orderedTests.findIndex(
+          (t) =>
+            t.model === selectedTest.model &&
+            t.testIndex === selectedTest.testIndex,
+        )
+      : -1;
+    onNavChange({
+      currentIndex: idx,
+      total: orderedTests.length,
+      goPrev: () => {
+        if (idx > 0) selectAndReveal(orderedTests[idx - 1]);
+      },
+      goNext: () => {
+        if (idx >= 0 && idx < orderedTests.length - 1)
+          selectAndReveal(orderedTests[idx + 1]);
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onNavChange, orderedTests, selectedTest, expandedModels]);
+
   // Arrow-key navigation: Up = previous, Down = next. Ignored while typing in
   // an input (e.g. the search box).
   useEffect(() => {
@@ -164,9 +199,10 @@ export function BenchmarkOutputsPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTest, currentTestIndex, orderedTests.length]);
 
-  // Keep the selected row visible in the list as the selection changes.
+  // Keep the selected row visible in the list as the selection changes,
+  // scrolling a page at a time rather than row by row.
   useEffect(() => {
-    selectedRowRef.current?.scrollIntoView({ block: "nearest" });
+    scrollRowByPage(listContainerRef.current, selectedRowRef.current);
   }, [selectedTest?.model, selectedTest?.testIndex]);
 
   const selectedTestName = selectedTest
@@ -253,7 +289,7 @@ export function BenchmarkOutputsPanel({
             </button>
           </div>
         )}
-        <div className="flex-1 overflow-y-auto">
+        <div ref={listContainerRef} className="flex-1 overflow-y-auto">
           {modelResults.length > 0 ? (
             modelResults.map((modelResult) => (
               <ModelSection
@@ -295,24 +331,6 @@ export function BenchmarkOutputsPanel({
               </svg>
               Back to models
             </button>
-          </div>
-        )}
-
-        {selectedTest && (
-          <ResultPager
-            currentIndex={currentTestIndex}
-            total={orderedTests.length}
-            onPrev={goPrevTest}
-            onNext={goNextTest}
-          />
-        )}
-        {/* Selected test name — pinned above the scrolling conversation, with
-            horizontal scroll for names wider than the panel. */}
-        {selectedTest && selectedTestName && (
-          <div className="flex-shrink-0 border-b border-border px-4 py-2 overflow-x-auto">
-            <span className="block text-sm font-semibold text-foreground whitespace-nowrap">
-              {selectedTestName}
-            </span>
           </div>
         )}
 
@@ -367,6 +385,7 @@ export function BenchmarkOutputsPanel({
         <div className="hidden md:flex w-[32rem] border-l border-border flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto">
             <EvaluationCriteriaPanel
+              testName={selectedTestName}
               evaluation={selectedTestResult.test_case?.evaluation}
               testCaseEvaluators={selectedTestResult.test_case?.evaluators}
               passed={selectedTestResult.passed}

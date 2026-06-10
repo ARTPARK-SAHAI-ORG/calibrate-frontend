@@ -5,7 +5,9 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   CloseIcon,
   SpinnerIcon,
+  ResultPager,
   type TestRunEvaluator,
+  type PagerNav,
 } from "./test-results/shared";
 import {
   BenchmarkOutputsPanel,
@@ -86,6 +88,7 @@ export function BenchmarkResultsDialog({
     model: string;
     testIndex: number;
   } | null>(null);
+  const [nav, setNav] = useState<PagerNav | null>(null);
 
   // Loading and data state
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -500,6 +503,17 @@ export function BenchmarkResultsDialog({
             </div>
             <p className="text-xs text-muted-foreground truncate">{agentName}</p>
           </div>
+          {/* Previous/Next pager - centered, desktop only, outputs tab */}
+          {activeTab === "outputs" && nav && selectedTest && (
+            <div className="hidden md:flex flex-1 justify-center">
+              <ResultPager
+                currentIndex={nav.currentIndex}
+                total={nav.total}
+                onPrev={nav.goPrev}
+                onNext={nav.goNext}
+              />
+            </div>
+          )}
           <div className="flex items-center gap-2">
             {/* Export results — only shown when benchmark is done */}
             {isDone && !error && hasAnyResults && (
@@ -684,6 +698,7 @@ export function BenchmarkResultsDialog({
                 selectedTest={selectedTest}
                 onSelectTest={handleTestSelect}
                 onClearSelection={() => setSelectedTest(null)}
+                onNavChange={setNav}
                 testNames={testNames}
                 formatModelName={(n) => n.replace("__", "/")}
                 showControls={isDone}

@@ -12,6 +12,8 @@ import {
   TestRunEvaluator,
   CloseIcon,
   TestStats,
+  ResultPager,
+  type PagerNav,
 } from "./test-results/shared";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
@@ -141,6 +143,7 @@ export function TestRunnerDialog({
   const backendAccessToken = useAccessToken();
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [selectedTestUuid, setSelectedTestUuid] = useState<string | null>(null);
+  const [nav, setNav] = useState<PagerNav | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [runStatus, setRunStatus] = useState<
     "queued" | "in_progress" | "done" | "failed"
@@ -877,6 +880,17 @@ export function TestRunnerDialog({
             </h2>
             <p className="text-xs text-muted-foreground truncate">{agentName}</p>
           </div>
+          {/* Previous/Next pager - centered, desktop only */}
+          {nav && selectedTestUuid && (
+            <div className="hidden md:flex flex-1 justify-center">
+              <ResultPager
+                currentIndex={nav.currentIndex}
+                total={nav.total}
+                onPrev={nav.goPrev}
+                onNext={nav.goNext}
+              />
+            </div>
+          )}
           <div className="flex items-center gap-3">
             {/* Passed/Failed counts - desktop only */}
             {!isOverallError &&
@@ -982,6 +996,7 @@ export function TestRunnerDialog({
               selectedId={selectedTestUuid}
               onSelect={setSelectedTestUuid}
               onClearSelection={() => setSelectedTestUuid(null)}
+              onNavChange={setNav}
               evaluatorsByUuid={Object.fromEntries(
                 runEvaluators.map((e) => [e.uuid, e]),
               )}

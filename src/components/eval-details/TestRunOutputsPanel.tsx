@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   TestCaseOutput,
   TestCaseData,
@@ -8,8 +8,9 @@ import {
   TestDetailView as SharedTestDetailView,
   EmptyStateView,
   EvaluationCriteriaPanel,
-  ResultPager,
   isTypingTarget,
+  scrollRowByPage,
+  type PagerNav,
 } from "@/components/test-results/shared";
 import { SearchInput } from "@/components/ui/SearchInput";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
@@ -43,6 +44,9 @@ type TestRunOutputsPanelProps = {
   enableEvaluatorLinks?: boolean;
   /** Default correctness evaluator used for legacy next-reply criteria. */
   legacyDefaultEvaluator?: DefaultEvaluatorSummary | null;
+  /** Reports Previous/Next navigation state so a parent (the dialog header)
+   * can render the pager. Must be a stable callback (e.g. a useState setter). */
+  onNavChange?: (nav: PagerNav) => void;
 };
 
 type StatusGroup = {
@@ -61,10 +65,13 @@ export function TestRunOutputsPanel({
   evaluatorsByUuid,
   enableEvaluatorLinks = true,
   legacyDefaultEvaluator,
+  onNavChange,
 }: TestRunOutputsPanelProps) {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
-  // Ref to the currently-selected row, so navigation keeps it in view.
+  // Refs to the list scroll container and the currently-selected row, so
+  // navigation keeps the selection in view (a page at a time).
+  const listContainerRef = useRef<HTMLDivElement>(null);
   const selectedRowRef = useRef<HTMLButtonElement>(null);
 
   const toggleSection = (key: string) => {
@@ -96,8 +103,22 @@ export function TestRunOutputsPanel({
   const selectedResult = results.find((r) => r.id === selectedId);
 
   // Flattened display order (group order, respecting the search filter) used
-  // by the Previous/Next pager in the detail panel.
-  const orderedItems = groups.flatMap((g) => g.items);
+  // by the Previous/Next pager that the parent renders in the dialog header.
+  const orderedItems = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const fr = q
+      ? results.filter((r) => r.name.toLowerCase().includes(q))
+      : results;
+    const err = (r: TestRunResult) => !!r.error;
+    return [
+      ...fr.filter((r) => r.status === "failed" && !err(r)),
+      ...fr.filter((r) => err(r)),
+      ...fr.filter((r) => r.status === "passed"),
+      ...fr.filter((r) => r.status === "queued"),
+      ...fr.filter((r) => r.status === "running"),
+      ...fr.filter((r) => r.status === "pending"),
+    ];
+  }, [results, searchQuery]);
   const currentIndex = orderedItems.findIndex((r) => r.id === selectedId);
   const goPrev = () => {
     if (currentIndex > 0) onSelect(orderedItems[currentIndex - 1].id);
@@ -106,6 +127,23 @@ export function TestRunOutputsPanel({
     if (currentIndex >= 0 && currentIndex < orderedItems.length - 1)
       onSelect(orderedItems[currentIndex + 1].id);
   };
+
+  // Surface navigation state to the parent (dialog header pager).
+  useEffect(() => {
+    if (!onNavChange) return;
+    const idx = orderedItems.findIndex((r) => r.id === selectedId);
+    onNavChange({
+      currentIndex: idx,
+      total: orderedItems.length,
+      goPrev: () => {
+        if (idx > 0) onSelect(orderedItems[idx - 1].id);
+      },
+      goNext: () => {
+        if (idx >= 0 && idx < orderedItems.length - 1)
+          onSelect(orderedItems[idx + 1].id);
+      },
+    });
+  }, [onNavChange, orderedItems, selectedId, onSelect]);
 
   // Arrow-key navigation: Up = previous, Down = next. Ignored while typing in
   // an input (e.g. the search box).
@@ -126,9 +164,10 @@ export function TestRunOutputsPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, currentIndex, orderedItems.length]);
 
-  // Keep the selected row visible in the list as the selection changes.
+  // Keep the selected row visible in the list as the selection changes,
+  // scrolling a page at a time rather than row by row.
   useEffect(() => {
-    selectedRowRef.current?.scrollIntoView({ block: "nearest" });
+    scrollRowByPage(listContainerRef.current, selectedRowRef.current);
   }, [selectedId]);
 
   return (
@@ -147,7 +186,7 @@ export function TestRunOutputsPanel({
             placeholder="Search tests"
           />
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div ref={listContainerRef} className="flex-1 overflow-y-auto">
           {groups.length === 0 && query && (
             <div className="p-4 text-sm text-muted-foreground">
               No tests match &ldquo;{searchQuery}&rdquo;
@@ -212,19 +251,6 @@ export function TestRunOutputsPanel({
                 </button>
               </div>
             )}
-            <ResultPager
-              currentIndex={currentIndex}
-              total={orderedItems.length}
-              onPrev={goPrev}
-              onNext={goNext}
-            />
-            {/* Selected test name — pinned above the scrolling conversation,
-                with horizontal scroll for names wider than the panel. */}
-            <div className="flex-shrink-0 border-b border-border px-4 py-2 overflow-x-auto">
-              <span className="block text-sm font-semibold text-foreground whitespace-nowrap">
-                {selectedResult.name}
-              </span>
-            </div>
             <div className="flex-1 overflow-y-auto">
               <TestResultDetail
                 result={selectedResult}
@@ -245,6 +271,7 @@ export function TestRunOutputsPanel({
         <div className="hidden md:flex w-[32rem] border-l border-border flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto">
             <EvaluationCriteriaPanel
+              testName={selectedResult.name}
               evaluation={selectedResult.testCase?.evaluation}
               testCaseEvaluators={selectedResult.testCase?.evaluators}
               passed={

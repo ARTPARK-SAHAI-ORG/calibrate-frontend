@@ -7,6 +7,8 @@ import {
   TestCaseData,
   JudgeResult,
   TestRunEvaluator,
+  ResultPager,
+  type PagerNav,
 } from "@/components/test-results/shared";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
 import { TestRunOutputsPanel } from "@/components/eval-details";
@@ -53,6 +55,7 @@ export default function PublicTestRunPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [nav, setNav] = useState<PagerNav | null>(null);
 
   useEffect(() => { document.title = "LLM unit test | Calibrate"; }, []);
 
@@ -116,6 +119,16 @@ export default function PublicTestRunPage() {
             </div>
             <span className="text-[13px] text-muted-foreground">{results.length} total tests</span>
           </div>
+          {nav && selectedId && (
+            <div className="hidden md:flex flex-1 justify-center">
+              <ResultPager
+                currentIndex={nav.currentIndex}
+                total={nav.total}
+                onPrev={nav.goPrev}
+                onNext={nav.goNext}
+              />
+            </div>
+          )}
           {results.length > 0 && (
             <ExportResultsButton
               filename={`test-run-${token}`}
@@ -155,6 +168,7 @@ export default function PublicTestRunPage() {
               selectedId={selectedId}
               onSelect={setSelectedId}
               onClearSelection={() => setSelectedId(null)}
+              onNavChange={setNav}
               evaluatorsByUuid={Object.fromEntries(
                 (data.evaluators ?? []).map((e) => [e.uuid, e]),
               )}
