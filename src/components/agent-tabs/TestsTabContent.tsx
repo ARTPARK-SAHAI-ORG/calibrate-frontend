@@ -1957,7 +1957,8 @@ export function TestsTabContent({
             </div>
 
             <p className="text-sm text-muted-foreground mb-3 md:mb-4">
-              {agentTests.length} {agentTests.length === 1 ? "test" : "tests"}
+              {filteredAgentTests.length}{" "}
+              {filteredAgentTests.length === 1 ? "test" : "tests"}
             </p>
 
             {/* Bulk-action toolbar — sits immediately above the table when
