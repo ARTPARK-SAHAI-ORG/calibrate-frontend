@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   TestCaseOutput,
   TestCaseData,
@@ -9,6 +9,7 @@ import {
   EmptyStateView,
   EvaluationCriteriaPanel,
   ResultPager,
+  isTypingTarget,
 } from "@/components/test-results/shared";
 import { SearchInput } from "@/components/ui/SearchInput";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
@@ -142,6 +143,32 @@ export function BenchmarkOutputsPanel({
       selectAndReveal(orderedTests[currentTestIndex + 1]);
   };
 
+  // Arrow-key navigation: Up = previous, Down = next. Ignored while typing in
+  // an input (e.g. the search box).
+  useEffect(() => {
+    if (!selectedTest) return;
+    const handler = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        goPrevTest();
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        goNextTest();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTest, currentTestIndex, orderedTests.length]);
+
+  const selectedTestName = selectedTest
+    ? selectedTestResult?.name ||
+      selectedTestResult?.test_case?.name ||
+      testNames[selectedTest.testIndex] ||
+      `Test ${selectedTest.testIndex + 1}`
+    : "";
+
   return (
     <div className="flex h-full overflow-hidden" style={height ? { height } : undefined}>
       {/* Left Panel - Model list with tests */}
@@ -270,6 +297,15 @@ export function BenchmarkOutputsPanel({
             onPrev={goPrevTest}
             onNext={goNextTest}
           />
+        )}
+        {/* Selected test name — pinned above the scrolling conversation, with
+            horizontal scroll for names wider than the panel. */}
+        {selectedTest && selectedTestName && (
+          <div className="flex-shrink-0 border-b border-border px-4 py-2 overflow-x-auto">
+            <span className="block text-sm font-semibold text-foreground whitespace-nowrap">
+              {selectedTestName}
+            </span>
+          </div>
         )}
 
         <div className="flex-1 overflow-y-auto">

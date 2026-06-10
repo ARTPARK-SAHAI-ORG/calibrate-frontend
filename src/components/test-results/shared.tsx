@@ -1303,6 +1303,20 @@ export function EvaluationCriteriaPanel({
   );
 }
 
+// True when a keyboard event originates from a text-entry element, so global
+// shortcuts (e.g. arrow-key result navigation) don't hijack typing.
+export function isTypingTarget(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (!el || !el.tagName) return false;
+  const tag = el.tagName.toUpperCase();
+  return (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    tag === "SELECT" ||
+    el.isContentEditable
+  );
+}
+
 // Shared Previous/Next pager for stepping through the selected result in the
 // detail panel. `currentIndex` is the 0-based position in the displayed list
 // (-1 when the selection isn't in the current filtered view); `total` is the
