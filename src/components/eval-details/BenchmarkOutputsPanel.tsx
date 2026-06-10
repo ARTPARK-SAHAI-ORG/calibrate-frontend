@@ -481,7 +481,7 @@ function ModelSection({
     <div className="border-b border-border">
       <button
         onClick={onToggle}
-        className="w-full px-4 py-3 flex items-center justify-between hover:bg-muted/50 transition-colors cursor-pointer"
+        className="sticky top-0 z-10 bg-background w-full px-4 py-3 flex items-center justify-between border-b border-border hover:bg-muted/50 transition-colors cursor-pointer"
       >
         <div className="flex items-center gap-2 min-w-0">
           <svg
