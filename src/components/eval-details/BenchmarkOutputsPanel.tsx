@@ -155,6 +155,19 @@ export function BenchmarkOutputsPanel({
     (statusCounts.errored > 0 ? 1 : 0);
   const showFilterPills = distinctStatuses >= 2;
 
+  // Size the model-list column to fit the longest model name so it never
+  // truncates. Budget extra room for the chevron, gaps, padding, and the
+  // per-model pass/fail counts; clamp so it stays reasonable on both ends.
+  const longestModelNameChars = useMemo(
+    () =>
+      modelResults.reduce(
+        (max, m) => Math.max(max, formatModelName(m.model).length),
+        0,
+      ),
+    [modelResults, formatModelName],
+  );
+  const listColumnWidth = `clamp(20rem, calc(${longestModelNameChars}ch + 12rem), 42rem)`;
+
   // If the active filter's status disappears (live runs change counts) or the
   // pills are hidden entirely, fall back to showing all tests.
   useEffect(() => {
@@ -292,7 +305,8 @@ export function BenchmarkOutputsPanel({
     <div className="flex h-full overflow-hidden" style={height ? { height } : undefined}>
       {/* Left Panel - Model list with tests */}
       <div
-        className={`w-full md:w-80 border-r border-border flex flex-col overflow-hidden ${
+        style={{ "--list-w": listColumnWidth } as React.CSSProperties}
+        className={`w-full md:w-[var(--list-w)] shrink-0 border-r border-border flex flex-col overflow-hidden ${
           selectedTest ? "hidden md:flex" : "flex"
         }`}
       >
