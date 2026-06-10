@@ -174,8 +174,9 @@ const TOOL_CALL_FIELDS: GuidelineField[] = [
     name: "tool",
     meta: "(required, string)",
     description:
-      'The identifier of the tool the agent is expected to call. For custom tools, use the tool name exactly as configured under your Tools tab. For Calibrate inbuilt tools, use the inbuilt tool id (currently end_call for the End-conversation tool). The tool must exist on your workspace — uploads referencing unknown tools are rejected before submit.',
-    example: '"book_room"   // or "end_call" for the inbuilt End-conversation tool',
+      "The identifier of the tool the agent is expected to call. For custom tools, use the tool name exactly as configured under your Tools tab. For Calibrate inbuilt tools, use the inbuilt tool id (currently end_call for the End-conversation tool). The tool must exist on your workspace — uploads referencing unknown tools are rejected before submit.",
+    example:
+      '"book_room"   // or "end_call" for the inbuilt End-conversation tool',
   },
   {
     name: "arguments",
@@ -218,6 +219,10 @@ export function BulkUploadTestsModal({
   // the upload as soon as data is available without forcing a re-upload.
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [selectedAgentUuids, setSelectedAgentUuids] = useState<string[]>([]);
+  // Number of agents in the workspace, learned from the agent picker once it
+  // loads. `null` = not resolved yet. When it resolves to 0 the whole "Assign
+  // tests to agents" section is hidden (nothing to pick).
+  const [agentCount, setAgentCount] = useState<number | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadWarnings, setUploadWarnings] = useState<string[] | null>(null);
@@ -268,6 +273,7 @@ export function BulkUploadTestsModal({
       setParseError(null);
       setPendingFile(null);
       setSelectedAgentUuids([]);
+      setAgentCount(null);
       setIsUploading(false);
       setUploadError(null);
       setUploadWarnings(null);
@@ -530,12 +536,11 @@ export function BulkUploadTestsModal({
         {
           name: "tool_calls",
           description:
-            'A JSON array of expected tool call objects. Each object describes a tool the agent is expected to call and what arguments to expect. The array may contain multiple entries if the agent is expected to call multiple tools — order is not significant. Each object has the following fields:',
+            "A JSON array of expected tool call objects. Each object describes a tool the agent is expected to call and what arguments to expect. The array may contain multiple entries if the agent is expected to call multiple tools — order is not significant. Each object has the following fields:",
           fields: TOOL_CALL_FIELDS,
           trailingExamples: [
             {
-              label:
-                "Example 1 — single tool call with exact-match arguments",
+              label: "Example 1 — single tool call with exact-match arguments",
               example:
                 '[{\n  "tool": "book_room",\n  "arguments": {\n    "room": { "match_type": "exact", "value": "101" }\n  }\n}]',
             },
@@ -1725,8 +1730,13 @@ export function BulkUploadTestsModal({
           {/* Step 3: Assign to Agents (optional, hidden when modal is locked
               to a specific agent — see lockedAgentUuid prop). Linking is not
               required: tests can be uploaded to the library and attached to an
-              agent later, so a workspace with no agents yet isn't blocked. */}
-          {testType && parsedTests.length > 0 && !lockedAgentUuid && (
+              agent later, so a workspace with no agents yet isn't blocked.
+              The whole section is also hidden once we learn the workspace has
+              no agents at all (agentCount === 0) — nothing to pick. */}
+          {testType &&
+            parsedTests.length > 0 &&
+            !lockedAgentUuid &&
+            agentCount !== 0 && (
             <div ref={assignAgentsSectionRef}>
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-sm font-medium text-foreground">
@@ -1737,12 +1747,13 @@ export function BulkUploadTestsModal({
                 </span>
               </div>
               <p className="text-xs text-muted-foreground mb-3">
-                Optionally link these tests to one or more agents — you can
-                attach them later instead.
+                Automatically link these tests to one or more agents but you can
+                also attach them later
               </p>
               <MultiAgentPicker
                 selectedAgentUuids={selectedAgentUuids}
                 onToggleAgent={toggleAgentSelection}
+                onAgentsLoaded={(agents) => setAgentCount(agents.length)}
               />
             </div>
           )}
