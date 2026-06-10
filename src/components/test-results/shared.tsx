@@ -1307,9 +1307,12 @@ export function EvaluationCriteriaPanel({
 export function TestStats({
   passedCount,
   failedCount,
+  erroredCount = 0,
 }: {
   passedCount: number;
   failedCount: number;
+  /** Tests that errored out (neither passed nor failed). Hidden when 0. */
+  erroredCount?: number;
 }) {
   return (
     <div className="flex items-center gap-3 text-sm">
@@ -1321,6 +1324,12 @@ export function TestStats({
         <div className="w-2 h-2 rounded-full bg-red-500"></div>
         <span className="text-muted-foreground">{failedCount} failed</span>
       </div>
+      {erroredCount > 0 && (
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+          <span className="text-muted-foreground">{erroredCount} errored</span>
+        </div>
+      )}
     </div>
   );
 }

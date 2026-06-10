@@ -88,7 +88,12 @@ export default function PublicTestRunPage() {
 
   const results = data.results ?? [];
   const passed = results.filter((r) => getStatus(r) === "passed").length;
-  const failed = results.filter((r) => getStatus(r) === "failed").length;
+  // Errored tests carry an `error` and are shown as their own category in the
+  // list; keep them out of the "failed" count so the summary matches.
+  const errored = results.filter((r) => !!r.error).length;
+  const failed = results.filter(
+    (r) => getStatus(r) === "failed" && !r.error,
+  ).length;
 
   return (
     <PublicPageLayout title="LLM unit test" contentClassName="max-w-[92rem]">
@@ -103,6 +108,11 @@ export default function PublicTestRunPage() {
               <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400">
                 {failed} failed
               </span>
+              {errored > 0 && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
+                  {errored} errored
+                </span>
+              )}
             </div>
             <span className="text-[13px] text-muted-foreground">{results.length} total tests</span>
           </div>

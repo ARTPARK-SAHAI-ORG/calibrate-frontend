@@ -848,7 +848,12 @@ export function TestRunnerDialog({
   );
 
   const passedTests = testResults.filter((r) => r.status === "passed");
-  const failedTests = testResults.filter((r) => r.status === "failed");
+  // Errored tests carry an `error` and are surfaced as their own category in
+  // the list; keep them out of the "failed" count so the header matches.
+  const erroredTests = testResults.filter((r) => !!r.error);
+  const failedTests = testResults.filter(
+    (r) => r.status === "failed" && !r.error,
+  );
   const queuedTests = testResults.filter((r) => r.status === "queued");
   const runningTests = testResults.filter((r) => r.status === "running");
   const pendingTests = testResults.filter((r) => r.status === "pending");
@@ -876,11 +881,14 @@ export function TestRunnerDialog({
             {/* Passed/Failed counts - desktop only */}
             {!isOverallError &&
               testResults.length > 0 &&
-              (passedTests.length > 0 || failedTests.length > 0) && (
+              (passedTests.length > 0 ||
+                failedTests.length > 0 ||
+                erroredTests.length > 0) && (
                 <div className="hidden md:block">
                   <TestStats
                     passedCount={passedTests.length}
                     failedCount={failedTests.length}
+                    erroredCount={erroredTests.length}
                   />
                 </div>
               )}
