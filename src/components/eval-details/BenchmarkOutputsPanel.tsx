@@ -573,7 +573,7 @@ function ModelSection({
       </button>
 
       {isExpanded && (
-        <div className="px-4 pb-3">
+        <div className="px-4 pt-3 pb-3">
           {(() => {
             const resultsCount = modelResult.test_results?.length ?? 0;
             const expectedCount = Math.max(totalTests, testNames.length, resultsCount);
