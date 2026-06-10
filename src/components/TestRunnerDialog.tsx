@@ -874,7 +874,7 @@ export function TestRunnerDialog({
       <div className="bg-background rounded-none md:rounded-xl w-full max-w-[92rem] h-full md:h-[92vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="relative flex items-center justify-between gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-border">
-          {/* Left: title + action buttons */}
+          {/* Left: title + pass/fail stats */}
           <div className="flex items-center gap-3 min-w-0">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -893,6 +893,34 @@ export function TestRunnerDialog({
               </div>
               <p className="text-xs text-muted-foreground truncate">{agentName}</p>
             </div>
+            {/* Passed/Failed counts - desktop only */}
+            {!isOverallError &&
+              testResults.length > 0 &&
+              (passedTests.length > 0 ||
+                failedTests.length > 0 ||
+                erroredTests.length > 0) && (
+                <div className="hidden md:block">
+                  <TestStats
+                    passedCount={passedTests.length}
+                    failedCount={failedTests.length}
+                    erroredCount={erroredTests.length}
+                  />
+                </div>
+              )}
+          </div>
+          {/* Previous/Next pager - centered, desktop only */}
+          {nav && selectedTestUuid && (
+            <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+              <ResultPager
+                currentIndex={nav.currentIndex}
+                total={nav.total}
+                onPrev={nav.goPrev}
+                onNext={nav.goNext}
+              />
+            </div>
+          )}
+          {/* Right: action buttons + close */}
+          <div className="flex items-center gap-2 shrink-0">
             {/* Export results — only shown when run is done */}
             {runStatus === "done" && testResults.length > 0 && (
               <div className="hidden md:block">
@@ -928,34 +956,6 @@ export function TestRunnerDialog({
                 />
               </div>
             )}
-          </div>
-          {/* Previous/Next pager - centered, desktop only */}
-          {nav && selectedTestUuid && (
-            <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-              <ResultPager
-                currentIndex={nav.currentIndex}
-                total={nav.total}
-                onPrev={nav.goPrev}
-                onNext={nav.goNext}
-              />
-            </div>
-          )}
-          {/* Right: stats + close */}
-          <div className="flex items-center gap-3 shrink-0">
-            {/* Passed/Failed counts - desktop only */}
-            {!isOverallError &&
-              testResults.length > 0 &&
-              (passedTests.length > 0 ||
-                failedTests.length > 0 ||
-                erroredTests.length > 0) && (
-                <div className="hidden md:block">
-                  <TestStats
-                    passedCount={passedTests.length}
-                    failedCount={failedTests.length}
-                    erroredCount={erroredTests.length}
-                  />
-                </div>
-              )}
             <button
               onClick={onClose}
               className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer shrink-0"
