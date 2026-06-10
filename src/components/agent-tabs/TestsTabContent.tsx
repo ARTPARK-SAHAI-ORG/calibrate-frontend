@@ -1594,7 +1594,7 @@ export function TestsTabContent({
               <span className="hidden sm:block sm:w-full sm:min-w-0 text-sm text-muted-foreground text-right tabular-nums">
                 {formatRelativeTime(run.updated_at)}
               </span>
-              <div className="flex flex-wrap items-center sm:justify-end gap-2 sm:flex-nowrap sm:justify-self-end">
+              <div className="flex flex-wrap items-center sm:justify-end gap-2 sm:justify-self-end">
                 {run.status === "pending" ||
                 run.status === "queued" ||
                 run.status === "in_progress" ? (
