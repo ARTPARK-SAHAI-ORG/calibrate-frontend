@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   TestCaseOutput,
   TestCaseData,
@@ -86,6 +86,8 @@ export function BenchmarkOutputsPanel({
 }: BenchmarkOutputsPanelProps) {
   const [statusFilter, setStatusFilter] = useState<"all" | "passed" | "failed" | "errored">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  // Ref to the currently-selected row, so navigation keeps it in view.
+  const selectedRowRef = useRef<HTMLButtonElement>(null);
 
   const getSelectedTestResult = (): BenchmarkTestResult | null => {
     if (!selectedTest) return null;
@@ -161,6 +163,11 @@ export function BenchmarkOutputsPanel({
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTest, currentTestIndex, orderedTests.length]);
+
+  // Keep the selected row visible in the list as the selection changes.
+  useEffect(() => {
+    selectedRowRef.current?.scrollIntoView({ block: "nearest" });
+  }, [selectedTest?.model, selectedTest?.testIndex]);
 
   const selectedTestName = selectedTest
     ? selectedTestResult?.name ||
@@ -261,6 +268,7 @@ export function BenchmarkOutputsPanel({
                 searchQuery={searchQuery}
                 formatModelName={formatModelName}
                 showRunningSpinner={showRunningSpinner}
+                selectedRowRef={selectedRowRef}
               />
             ))
           ) : (
@@ -387,6 +395,7 @@ function ModelSection({
   searchQuery,
   formatModelName,
   showRunningSpinner = false,
+  selectedRowRef,
 }: {
   modelResult: BenchmarkModelResult;
   isExpanded: boolean;
@@ -398,6 +407,7 @@ function ModelSection({
   searchQuery: string;
   formatModelName: (name: string) => string;
   showRunningSpinner?: boolean;
+  selectedRowRef: React.RefObject<HTMLButtonElement | null>;
 }) {
   const isProcessing = modelResult.success === null;
   const hasResults = modelResult.test_results && modelResult.test_results.length > 0;
@@ -491,6 +501,7 @@ function ModelSection({
                     return (
                       <button
                         key={index}
+                        ref={isSelected ? selectedRowRef : undefined}
                         type="button"
                         onClick={() => onTestSelect(index)}
                         className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${

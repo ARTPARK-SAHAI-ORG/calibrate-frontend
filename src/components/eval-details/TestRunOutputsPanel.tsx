@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   TestCaseOutput,
   TestCaseData,
@@ -64,6 +64,8 @@ export function TestRunOutputsPanel({
 }: TestRunOutputsPanelProps) {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
+  // Ref to the currently-selected row, so navigation keeps it in view.
+  const selectedRowRef = useRef<HTMLButtonElement>(null);
 
   const toggleSection = (key: string) => {
     setCollapsedSections((prev) => {
@@ -124,6 +126,11 @@ export function TestRunOutputsPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, currentIndex, orderedItems.length]);
 
+  // Keep the selected row visible in the list as the selection changes.
+  useEffect(() => {
+    selectedRowRef.current?.scrollIntoView({ block: "nearest" });
+  }, [selectedId]);
+
   return (
     <div className="flex h-full overflow-hidden" style={height ? { height } : undefined}>
       {/* Left Panel - Test List */}
@@ -167,6 +174,7 @@ export function TestRunOutputsPanel({
                   {group.items.map((result) => (
                     <button
                       key={result.id}
+                      ref={selectedId === result.id ? selectedRowRef : undefined}
                       type="button"
                       onClick={() => onSelect(result.id)}
                       className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
