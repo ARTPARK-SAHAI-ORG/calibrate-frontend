@@ -8,6 +8,7 @@ import {
   TestDetailView,
   EmptyStateView,
   EvaluationCriteriaPanel,
+  ResultPager,
 } from "@/components/test-results/shared";
 import { SearchInput } from "@/components/ui/SearchInput";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
@@ -93,6 +94,53 @@ export function BenchmarkOutputsPanel({
   };
 
   const selectedTestResult = getSelectedTestResult();
+
+  // Flattened display order across all models (respecting the status filter
+  // and search), used by the Previous/Next pager in the detail panel.
+  const pagerQuery = searchQuery.trim().toLowerCase();
+  const pagerFilterStatus = statusFilter === "errored" ? "error" : statusFilter;
+  const orderedTests: { model: string; testIndex: number }[] = [];
+  for (const m of modelResults) {
+    (m.test_results ?? []).forEach((tr, index) => {
+      const status = tr.error
+        ? "error"
+        : tr.passed === null
+          ? "running"
+          : tr.passed
+            ? "passed"
+            : "failed";
+      if (statusFilter !== "all" && status !== pagerFilterStatus) return;
+      const testName =
+        tr.name || tr.test_case?.name || testNames[index] || `Test ${index + 1}`;
+      if (pagerQuery && !testName.toLowerCase().includes(pagerQuery)) return;
+      orderedTests.push({ model: m.model, testIndex: index });
+    });
+  }
+  const currentTestIndex = selectedTest
+    ? orderedTests.findIndex(
+        (t) =>
+          t.model === selectedTest.model && t.testIndex === selectedTest.testIndex,
+      )
+    : -1;
+  // Stepping across model boundaries should reveal the target's model so the
+  // list highlight stays in sync.
+  const selectAndReveal = (t: { model: string; testIndex: number }) => {
+    if (!expandedModels.has(t.model)) {
+      if (onSetExpandedModels) {
+        onSetExpandedModels(new Set([...expandedModels, t.model]));
+      } else {
+        onToggleModel(t.model);
+      }
+    }
+    onSelectTest(t.model, t.testIndex);
+  };
+  const goPrevTest = () => {
+    if (currentTestIndex > 0) selectAndReveal(orderedTests[currentTestIndex - 1]);
+  };
+  const goNextTest = () => {
+    if (currentTestIndex >= 0 && currentTestIndex < orderedTests.length - 1)
+      selectAndReveal(orderedTests[currentTestIndex + 1]);
+  };
 
   return (
     <div className="flex h-full overflow-hidden" style={height ? { height } : undefined}>
@@ -213,6 +261,15 @@ export function BenchmarkOutputsPanel({
               Back to models
             </button>
           </div>
+        )}
+
+        {selectedTest && (
+          <ResultPager
+            currentIndex={currentTestIndex}
+            total={orderedTests.length}
+            onPrev={goPrevTest}
+            onNext={goNextTest}
+          />
         )}
 
         <div className="flex-1 overflow-y-auto">

@@ -8,6 +8,7 @@ import {
   TestDetailView as SharedTestDetailView,
   EmptyStateView,
   EvaluationCriteriaPanel,
+  ResultPager,
 } from "@/components/test-results/shared";
 import { SearchInput } from "@/components/ui/SearchInput";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
@@ -91,6 +92,18 @@ export function TestRunOutputsPanel({
 
   const selectedResult = results.find((r) => r.id === selectedId);
 
+  // Flattened display order (group order, respecting the search filter) used
+  // by the Previous/Next pager in the detail panel.
+  const orderedItems = groups.flatMap((g) => g.items);
+  const currentIndex = orderedItems.findIndex((r) => r.id === selectedId);
+  const goPrev = () => {
+    if (currentIndex > 0) onSelect(orderedItems[currentIndex - 1].id);
+  };
+  const goNext = () => {
+    if (currentIndex >= 0 && currentIndex < orderedItems.length - 1)
+      onSelect(orderedItems[currentIndex + 1].id);
+  };
+
   return (
     <div className="flex h-full overflow-hidden" style={height ? { height } : undefined}>
       {/* Left Panel - Test List */}
@@ -171,6 +184,12 @@ export function TestRunOutputsPanel({
                 </button>
               </div>
             )}
+            <ResultPager
+              currentIndex={currentIndex}
+              total={orderedItems.length}
+              onPrev={goPrev}
+              onNext={goNext}
+            />
             <div className="flex-1 overflow-y-auto">
               <TestResultDetail
                 result={selectedResult}

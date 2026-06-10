@@ -1303,6 +1303,48 @@ export function EvaluationCriteriaPanel({
   );
 }
 
+// Shared Previous/Next pager for stepping through the selected result in the
+// detail panel. `currentIndex` is the 0-based position in the displayed list
+// (-1 when the selection isn't in the current filtered view); `total` is the
+// list length. Buttons disable at the ends.
+export function ResultPager({
+  currentIndex,
+  total,
+  onPrev,
+  onNext,
+}: {
+  currentIndex: number;
+  total: number;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex >= 0 && currentIndex < total - 1;
+  const btn =
+    "inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-sm text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors";
+  return (
+    <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-border flex-shrink-0">
+      <button type="button" onClick={onPrev} disabled={!hasPrev} className={btn}>
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+        Previous
+      </button>
+      {total > 0 && currentIndex >= 0 && (
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {currentIndex + 1} of {total}
+        </span>
+      )}
+      <button type="button" onClick={onNext} disabled={!hasNext} className={btn}>
+        Next
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 // Shared Stats Display Component
 export function TestStats({
   passedCount,
