@@ -166,7 +166,7 @@ export function BenchmarkOutputsPanel({
       ),
     [modelResults, formatModelName],
   );
-  const listColumnWidth = `clamp(20rem, calc(${longestModelNameChars}ch + 12rem), 42rem)`;
+  const listColumnWidth = `clamp(18rem, calc(${longestModelNameChars} * 0.5rem + 8.5rem), 30rem)`;
 
   // If the active filter's status disappears (live runs change counts) or the
   // pills are hidden entirely, fall back to showing all tests.
