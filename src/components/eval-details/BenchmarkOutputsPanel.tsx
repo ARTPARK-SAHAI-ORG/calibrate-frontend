@@ -130,6 +130,43 @@ export function BenchmarkOutputsPanel({
   const listContainerRef = useRef<HTMLDivElement>(null);
   const selectedRowRef = useRef<HTMLButtonElement>(null);
 
+  // Count how many tests fall in each filterable status across all models, so
+  // we only render a pill when there's something to filter to. A pill is shown
+  // only if its count > 0, and the whole pill row is hidden when fewer than two
+  // statuses are present (i.e. everything passed / failed / errored — nothing
+  // meaningful to filter between).
+  const statusCounts = useMemo(() => {
+    let passed = 0;
+    let failed = 0;
+    let errored = 0;
+    for (const m of modelResults) {
+      for (const tr of m.test_results ?? []) {
+        const status = benchmarkTestStatus(tr);
+        if (status === "passed") passed++;
+        else if (status === "failed") failed++;
+        else if (status === "error") errored++;
+      }
+    }
+    return { passed, failed, errored };
+  }, [modelResults]);
+  const distinctStatuses =
+    (statusCounts.passed > 0 ? 1 : 0) +
+    (statusCounts.failed > 0 ? 1 : 0) +
+    (statusCounts.errored > 0 ? 1 : 0);
+  const showFilterPills = distinctStatuses >= 2;
+
+  // If the active filter's status disappears (live runs change counts) or the
+  // pills are hidden entirely, fall back to showing all tests.
+  useEffect(() => {
+    if (statusFilter === "all") return;
+    const stillValid =
+      showFilterPills &&
+      ((statusFilter === "passed" && statusCounts.passed > 0) ||
+        (statusFilter === "failed" && statusCounts.failed > 0) ||
+        (statusFilter === "errored" && statusCounts.errored > 0));
+    if (!stillValid) setStatusFilter("all");
+  }, [statusFilter, statusCounts, showFilterPills]);
+
   const getSelectedTestResult = (): BenchmarkTestResult | null => {
     if (!selectedTest) return null;
     const modelResult = modelResults.find((m) => m.model === selectedTest.model);
@@ -273,39 +310,45 @@ export function BenchmarkOutputsPanel({
         {showControls && modelResults.length > 0 && (
           <div className="shrink-0 border-b border-border flex items-center justify-between px-3 py-2">
             <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setStatusFilter(statusFilter === "passed" ? "all" : "passed")}
-                className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer transition-colors ${
-                  statusFilter === "passed"
-                    ? "bg-green-100 text-green-700 dark:bg-green-500/30 dark:text-green-400 ring-1 ring-green-500/50"
-                    : "bg-green-100/50 text-green-700/60 dark:bg-green-500/10 dark:text-green-400/60 hover:bg-green-100 hover:dark:bg-green-500/20"
-                }`}
-              >
-                Passed
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatusFilter(statusFilter === "failed" ? "all" : "failed")}
-                className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer transition-colors ${
-                  statusFilter === "failed"
-                    ? "bg-red-100 text-red-700 dark:bg-red-500/30 dark:text-red-400 ring-1 ring-red-500/50"
-                    : "bg-red-100/50 text-red-700/60 dark:bg-red-500/10 dark:text-red-400/60 hover:bg-red-100 hover:dark:bg-red-500/20"
-                }`}
-              >
-                Failed
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatusFilter(statusFilter === "errored" ? "all" : "errored")}
-                className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer transition-colors ${
-                  statusFilter === "errored"
-                    ? "bg-amber-100 text-amber-700 dark:bg-amber-500/30 dark:text-amber-400 ring-1 ring-amber-500/50"
-                    : "bg-amber-100/50 text-amber-700/60 dark:bg-amber-500/10 dark:text-amber-400/60 hover:bg-amber-100 hover:dark:bg-amber-500/20"
-                }`}
-              >
-                Errored
-              </button>
+              {showFilterPills && statusCounts.passed > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter(statusFilter === "passed" ? "all" : "passed")}
+                  className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer transition-colors ${
+                    statusFilter === "passed"
+                      ? "bg-green-100 text-green-700 dark:bg-green-500/30 dark:text-green-400 ring-1 ring-green-500/50"
+                      : "bg-green-100/50 text-green-700/60 dark:bg-green-500/10 dark:text-green-400/60 hover:bg-green-100 hover:dark:bg-green-500/20"
+                  }`}
+                >
+                  Passed
+                </button>
+              )}
+              {showFilterPills && statusCounts.failed > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter(statusFilter === "failed" ? "all" : "failed")}
+                  className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer transition-colors ${
+                    statusFilter === "failed"
+                      ? "bg-red-100 text-red-700 dark:bg-red-500/30 dark:text-red-400 ring-1 ring-red-500/50"
+                      : "bg-red-100/50 text-red-700/60 dark:bg-red-500/10 dark:text-red-400/60 hover:bg-red-100 hover:dark:bg-red-500/20"
+                  }`}
+                >
+                  Failed
+                </button>
+              )}
+              {showFilterPills && statusCounts.errored > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter(statusFilter === "errored" ? "all" : "errored")}
+                  className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer transition-colors ${
+                    statusFilter === "errored"
+                      ? "bg-amber-100 text-amber-700 dark:bg-amber-500/30 dark:text-amber-400 ring-1 ring-amber-500/50"
+                      : "bg-amber-100/50 text-amber-700/60 dark:bg-amber-500/10 dark:text-amber-400/60 hover:bg-amber-100 hover:dark:bg-amber-500/20"
+                  }`}
+                >
+                  Errored
+                </button>
+              )}
             </div>
             <button
               type="button"
