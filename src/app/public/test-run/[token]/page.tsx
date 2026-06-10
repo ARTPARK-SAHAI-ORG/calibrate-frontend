@@ -102,7 +102,7 @@ export default function PublicTestRunPage() {
     <PublicPageLayout title="LLM unit test" contentClassName="max-w-[92rem]">
       <div className="space-y-4 md:space-y-6">
         {/* Summary stats */}
-        <div className="flex items-center justify-between gap-4">
+        <div className="relative flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400">
@@ -120,7 +120,7 @@ export default function PublicTestRunPage() {
             <span className="text-[13px] text-muted-foreground">{results.length} total tests</span>
           </div>
           {nav && selectedId && (
-            <div className="hidden md:flex flex-1 justify-center">
+            <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
               <ResultPager
                 currentIndex={nav.currentIndex}
                 total={nav.total}

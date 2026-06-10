@@ -156,29 +156,44 @@ export function BenchmarkOutputsPanel({
       selectAndReveal(orderedTests[currentTestIndex + 1]);
   };
 
-  // Surface navigation state to the parent (dialog header pager).
+  // Keep the latest list/selection in a ref so the reported goPrev/goNext stay
+  // stable while reading fresh values when invoked.
+  const navStateRef = useRef({ orderedTests, selectedTest, selectAndReveal });
+  navStateRef.current = { orderedTests, selectedTest, selectAndReveal };
+
+  // Surface navigation state to the parent (dialog header pager). Depends only
+  // on the primitive index/length so it doesn't re-fire every render — the
+  // `modelResults` prop (and thus `orderedTests`) is rebuilt by callers each
+  // render, which would otherwise loop setState in the parent.
   useEffect(() => {
     if (!onNavChange) return;
-    const idx = selectedTest
-      ? orderedTests.findIndex(
-          (t) =>
-            t.model === selectedTest.model &&
-            t.testIndex === selectedTest.testIndex,
-        )
-      : -1;
     onNavChange({
-      currentIndex: idx,
+      currentIndex: currentTestIndex,
       total: orderedTests.length,
       goPrev: () => {
-        if (idx > 0) selectAndReveal(orderedTests[idx - 1]);
+        const s = navStateRef.current;
+        const st = s.selectedTest;
+        const i = st
+          ? s.orderedTests.findIndex(
+              (t) => t.model === st.model && t.testIndex === st.testIndex,
+            )
+          : -1;
+        if (i > 0) s.selectAndReveal(s.orderedTests[i - 1]);
       },
       goNext: () => {
-        if (idx >= 0 && idx < orderedTests.length - 1)
-          selectAndReveal(orderedTests[idx + 1]);
+        const s = navStateRef.current;
+        const st = s.selectedTest;
+        const i = st
+          ? s.orderedTests.findIndex(
+              (t) => t.model === st.model && t.testIndex === st.testIndex,
+            )
+          : -1;
+        if (i >= 0 && i < s.orderedTests.length - 1)
+          s.selectAndReveal(s.orderedTests[i + 1]);
       },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onNavChange, orderedTests, selectedTest, expandedModels]);
+  }, [onNavChange, currentTestIndex, orderedTests.length]);
 
   // Arrow-key navigation: Up = previous, Down = next. Ignored while typing in
   // an input (e.g. the search box).

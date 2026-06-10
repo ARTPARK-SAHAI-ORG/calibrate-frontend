@@ -1384,7 +1384,7 @@ export function ResultPager({
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex >= 0 && currentIndex < total - 1;
   const btn =
-    "inline-flex items-center gap-1 px-2 py-1 rounded-md text-sm text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors shrink-0";
+    "inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-border bg-background text-sm font-medium text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors shrink-0";
   return (
     <div className="flex items-center gap-2">
       <button type="button" onClick={onPrev} disabled={!hasPrev} className={btn}>
@@ -1394,7 +1394,7 @@ export function ResultPager({
         Previous
       </button>
       {total > 0 && currentIndex >= 0 && (
-        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+        <span className="shrink-0 px-1 text-xs text-muted-foreground tabular-nums">
           {currentIndex + 1} of {total}
         </span>
       )}

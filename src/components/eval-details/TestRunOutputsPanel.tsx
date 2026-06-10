@@ -128,22 +128,34 @@ export function TestRunOutputsPanel({
       onSelect(orderedItems[currentIndex + 1].id);
   };
 
-  // Surface navigation state to the parent (dialog header pager).
+  // Keep the latest list/selection in a ref so the reported goPrev/goNext stay
+  // stable while reading fresh values when invoked.
+  const navStateRef = useRef({ orderedItems, selectedId, onSelect });
+  navStateRef.current = { orderedItems, selectedId, onSelect };
+
+  // Surface navigation state to the parent (dialog header pager). Depends only
+  // on the primitive index/length so it doesn't re-fire every render — the
+  // `results` prop (and thus `orderedItems`) is rebuilt by callers each render,
+  // which would otherwise loop setState in the parent.
   useEffect(() => {
     if (!onNavChange) return;
-    const idx = orderedItems.findIndex((r) => r.id === selectedId);
     onNavChange({
-      currentIndex: idx,
+      currentIndex,
       total: orderedItems.length,
       goPrev: () => {
-        if (idx > 0) onSelect(orderedItems[idx - 1].id);
+        const s = navStateRef.current;
+        const i = s.orderedItems.findIndex((r) => r.id === s.selectedId);
+        if (i > 0) s.onSelect(s.orderedItems[i - 1].id);
       },
       goNext: () => {
-        if (idx >= 0 && idx < orderedItems.length - 1)
-          onSelect(orderedItems[idx + 1].id);
+        const s = navStateRef.current;
+        const i = s.orderedItems.findIndex((r) => r.id === s.selectedId);
+        if (i >= 0 && i < s.orderedItems.length - 1)
+          s.onSelect(s.orderedItems[i + 1].id);
       },
     });
-  }, [onNavChange, orderedItems, selectedId, onSelect]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onNavChange, currentIndex, orderedItems.length]);
 
   // Arrow-key navigation: Up = previous, Down = next. Ignored while typing in
   // an input (e.g. the search box).

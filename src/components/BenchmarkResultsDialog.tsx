@@ -491,7 +491,7 @@ export function BenchmarkResultsDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-background rounded-none md:rounded-xl w-full max-w-[92rem] h-full md:h-[92vh] flex flex-col shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4">
+        <div className="relative flex items-center justify-between px-4 md:px-6 py-3 md:py-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2 md:gap-3 min-w-0">
               <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
@@ -505,7 +505,7 @@ export function BenchmarkResultsDialog({
           </div>
           {/* Previous/Next pager - centered, desktop only, outputs tab */}
           {activeTab === "outputs" && nav && selectedTest && (
-            <div className="hidden md:flex flex-1 justify-center">
+            <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
               <ResultPager
                 currentIndex={nav.currentIndex}
                 total={nav.total}

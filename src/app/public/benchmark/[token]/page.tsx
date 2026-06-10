@@ -87,7 +87,7 @@ export default function PublicBenchmarkPage() {
     <PublicPageLayout title="LLM benchmark" contentClassName="max-w-[92rem]">
       <div className="space-y-4 md:space-y-6">
         {/* Tab nav */}
-        <div className="flex items-end justify-between gap-2 border-b border-border">
+        <div className="relative flex items-end justify-between gap-2 border-b border-border">
           <div className="flex gap-2">
             {(["leaderboard", "outputs"] as const).map((tab) => (
               <button
@@ -100,7 +100,7 @@ export default function PublicBenchmarkPage() {
             ))}
           </div>
           {activeTab === "outputs" && nav && selectedTest && (
-            <div className="hidden md:flex flex-1 justify-center pb-2">
+            <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
               <ResultPager
                 currentIndex={nav.currentIndex}
                 total={nav.total}
