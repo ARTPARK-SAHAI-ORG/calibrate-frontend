@@ -873,25 +873,15 @@ export function TestRunnerDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-0 md:p-4">
       <div className="bg-background rounded-none md:rounded-xl w-full max-w-[92rem] h-full md:h-[92vh] flex flex-col shadow-2xl">
         {/* Header */}
-        <div className="relative flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-border">
-          <div className="min-w-0">
-            <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
-              {runName ?? "Test run"}
-            </h2>
-            <p className="text-xs text-muted-foreground truncate">{agentName}</p>
-          </div>
-          {/* Previous/Next pager - centered, desktop only */}
-          {nav && selectedTestUuid && (
-            <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-              <ResultPager
-                currentIndex={nav.currentIndex}
-                total={nav.total}
-                onPrev={nav.goPrev}
-                onNext={nav.goNext}
-              />
+        <div className="relative flex items-center justify-between gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-border">
+          {/* Left: title + stats + actions */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="min-w-0">
+              <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
+                {runName ?? "Test run"}
+              </h2>
+              <p className="text-xs text-muted-foreground truncate">{agentName}</p>
             </div>
-          )}
-          <div className="flex items-center gap-3">
             {/* Passed/Failed counts - desktop only */}
             {!isOverallError &&
               testResults.length > 0 &&
@@ -941,13 +931,25 @@ export function TestRunnerDialog({
                 />
               </div>
             )}
-            <button
-              onClick={onClose}
-              className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
-            >
-              <CloseIcon className="w-5 h-5" />
-            </button>
           </div>
+          {/* Previous/Next pager - centered, desktop only */}
+          {nav && selectedTestUuid && (
+            <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+              <ResultPager
+                currentIndex={nav.currentIndex}
+                total={nav.total}
+                onPrev={nav.goPrev}
+                onNext={nav.goNext}
+              />
+            </div>
+          )}
+          {/* Right: close */}
+          <button
+            onClick={onClose}
+            className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer shrink-0"
+          >
+            <CloseIcon className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Overall Error State - replaces split panel */}
