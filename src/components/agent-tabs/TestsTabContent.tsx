@@ -107,17 +107,9 @@ function getTestRunDisplayName(run: TestRun): string {
     return `${modelCount} model${modelCount !== 1 ? "s" : ""}`;
   }
 
-  // For llm-unit-test: if only 1 test and it has a name, show the test name
+  // For llm-unit-test: always show the test count ("1 test" / "N tests"),
+  // including single-test runs (previously these showed the test name).
   const totalTests = run.total_tests ?? run.results?.length ?? 0;
-  if (totalTests === 1 && run.results?.[0]) {
-    // Check name field first (in-progress), then test_case.name (completed)
-    const testName = run.results[0].name || run.results[0].test_case?.name;
-    if (testName) {
-      return testName;
-    }
-  }
-
-  // Otherwise show "N tests"
   return `${totalTests} test${totalTests !== 1 ? "s" : ""}`;
 }
 
