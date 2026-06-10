@@ -1330,10 +1330,14 @@ export function scrollRowByPage(
   const rowBottom = rowTop + rRect.height;
   const viewTop = container.scrollTop;
   const viewBottom = viewTop + container.clientHeight;
+  let nextTop: number | null = null;
   if (rowBottom > viewBottom) {
-    container.scrollTop = rowTop;
+    nextTop = rowTop;
   } else if (rowTop < viewTop) {
-    container.scrollTop = rowBottom - container.clientHeight;
+    nextTop = rowBottom - container.clientHeight;
+  }
+  if (nextTop !== null) {
+    container.scrollTo({ top: nextTop, behavior: "smooth" });
   }
 }
 
