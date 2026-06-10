@@ -298,7 +298,7 @@ export function BenchmarkOutputsPanel({
       >
         {/* Search */}
         {modelResults.length > 0 && (
-          <div className="shrink-0 border-b border-border p-3">
+          <div className="shrink-0 p-3">
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
