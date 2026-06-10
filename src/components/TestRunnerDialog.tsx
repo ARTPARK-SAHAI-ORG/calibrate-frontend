@@ -877,9 +877,20 @@ export function TestRunnerDialog({
           {/* Left: title + action buttons */}
           <div className="flex items-center gap-3 min-w-0">
             <div className="min-w-0">
-              <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
-                {runName ?? "Test run"}
-              </h2>
+              <div className="flex items-center gap-2">
+                {(runStatus === "queued" || runStatus === "in_progress") && (
+                  <span
+                    className="relative flex h-2.5 w-2.5 shrink-0"
+                    title="Run in progress"
+                  >
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-400 opacity-75" />
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-yellow-400" />
+                  </span>
+                )}
+                <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
+                  {runName ?? "Test run"}
+                </h2>
+              </div>
               <p className="text-xs text-muted-foreground truncate">{agentName}</p>
             </div>
             {/* Export results — only shown when run is done */}
