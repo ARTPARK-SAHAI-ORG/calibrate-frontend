@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   TestCaseOutput,
   TestCaseData,
@@ -102,23 +102,10 @@ export function TestRunOutputsPanel({
 
   const selectedResult = results.find((r) => r.id === selectedId);
 
-  // Flattened display order (group order, respecting the search filter) used
-  // by the Previous/Next pager that the parent renders in the dialog header.
-  const orderedItems = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    const fr = q
-      ? results.filter((r) => r.name.toLowerCase().includes(q))
-      : results;
-    const err = (r: TestRunResult) => !!r.error;
-    return [
-      ...fr.filter((r) => r.status === "failed" && !err(r)),
-      ...fr.filter((r) => err(r)),
-      ...fr.filter((r) => r.status === "passed"),
-      ...fr.filter((r) => r.status === "queued"),
-      ...fr.filter((r) => r.status === "running"),
-      ...fr.filter((r) => r.status === "pending"),
-    ];
-  }, [results, searchQuery]);
+  // Flattened display order — the same buckets/order as the rendered `groups`,
+  // so the Previous/Next pager (parent renders it in the dialog header) always
+  // matches the visible list. `groups` is already filtered by search above.
+  const orderedItems = groups.flatMap((g) => g.items);
   const currentIndex = orderedItems.findIndex((r) => r.id === selectedId);
   const goPrev = () => {
     if (currentIndex > 0) onSelect(orderedItems[currentIndex - 1].id);
@@ -154,7 +141,6 @@ export function TestRunOutputsPanel({
           s.onSelect(s.orderedItems[i + 1].id);
       },
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onNavChange, currentIndex, orderedItems.length]);
 
   // Arrow-key navigation: Up = previous, Down = next. Ignored while typing in

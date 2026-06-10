@@ -71,6 +71,40 @@ type BenchmarkOutputsPanelProps = {
   onNavChange?: (nav: PagerNav) => void;
 };
 
+// Derive a benchmark test's display status, shared by the pager ordering and
+// the rendered rows so they always agree.
+function benchmarkTestStatus(
+  tr: BenchmarkTestResult,
+): "error" | "running" | "passed" | "failed" {
+  if (tr.error) return "error";
+  if (tr.passed === null) return "running";
+  return tr.passed ? "passed" : "failed";
+}
+
+// Display name for a benchmark test row (falls back to the placeholder name
+// when the result hasn't arrived yet).
+function benchmarkTestName(
+  tr: BenchmarkTestResult | undefined,
+  index: number,
+  testNames: string[],
+): string {
+  return tr?.name || tr?.test_case?.name || testNames[index] || `Test ${index + 1}`;
+}
+
+// Whether a row passes the current status filter + search query. "errored" is
+// the filter label for the "error" status. `query` must already be lowercased.
+function matchesBenchmarkFilters(
+  status: string,
+  name: string,
+  statusFilter: "all" | "passed" | "failed" | "errored",
+  query: string,
+): boolean {
+  const fStatus = statusFilter === "errored" ? "error" : statusFilter;
+  if (statusFilter !== "all" && status !== fStatus) return false;
+  if (query && !name.toLowerCase().includes(query)) return false;
+  return true;
+}
+
 export function BenchmarkOutputsPanel({
   modelResults,
   expandedModels,
@@ -110,21 +144,12 @@ export function BenchmarkOutputsPanel({
   // dialog header.
   const orderedTests = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    const fStatus = statusFilter === "errored" ? "error" : statusFilter;
     const out: { model: string; testIndex: number }[] = [];
     for (const m of modelResults) {
       (m.test_results ?? []).forEach((tr, index) => {
-        const status = tr.error
-          ? "error"
-          : tr.passed === null
-            ? "running"
-            : tr.passed
-              ? "passed"
-              : "failed";
-        if (statusFilter !== "all" && status !== fStatus) return;
-        const name =
-          tr.name || tr.test_case?.name || testNames[index] || `Test ${index + 1}`;
-        if (q && !name.toLowerCase().includes(q)) return;
+        const status = benchmarkTestStatus(tr);
+        const name = benchmarkTestName(tr, index, testNames);
+        if (!matchesBenchmarkFilters(status, name, statusFilter, q)) return;
         out.push({ model: m.model, testIndex: index });
       });
     }
@@ -192,7 +217,6 @@ export function BenchmarkOutputsPanel({
           s.selectAndReveal(s.orderedTests[i + 1]);
       },
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onNavChange, currentTestIndex, orderedTests.length]);
 
   // Arrow-key navigation: Up = previous, Down = next. Ignored while typing in
@@ -515,21 +539,16 @@ function ModelSection({
                   if (!hasResult && !showRunningSpinner) return null;
 
                   const status = hasResult
-                    ? testResult.error
-                      ? "error"
-                      : testResult.passed === null ? "running" : testResult.passed ? "passed" : "failed"
+                    ? benchmarkTestStatus(testResult)
                     : "running";
+                  const testName = benchmarkTestName(testResult, index, testNames);
 
-                  // statusFilter uses "errored" as the label for the "error" status.
-                  const filterStatus = statusFilter === "errored" ? "error" : statusFilter;
-                  if (statusFilter !== "all" && status !== filterStatus) return null;
+                  if (!matchesBenchmarkFilters(status, testName, statusFilter, query))
+                    return null;
 
-                  const isSelected = selectedTest?.model === modelResult.model && selectedTest?.testIndex === index;
-                  const testName = hasResult
-                    ? testResult.name || testResult.test_case?.name || testNames[index] || `Test ${index + 1}`
-                    : testNames[index] || `Test ${index + 1}`;
-
-                  if (query && !testName.toLowerCase().includes(query)) return null;
+                  const isSelected =
+                    selectedTest?.model === modelResult.model &&
+                    selectedTest?.testIndex === index;
 
                   if (hasResult) {
                     return (
