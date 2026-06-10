@@ -166,7 +166,7 @@ export function BenchmarkOutputsPanel({
       ),
     [modelResults, formatModelName],
   );
-  const listColumnWidth = `clamp(18rem, calc(${longestModelNameChars} * 0.5rem + 8.5rem), 30rem)`;
+  const listColumnWidth = `clamp(18rem, calc(${longestModelNameChars} * 0.5rem + 11rem), 32rem)`;
 
   // If the active filter's status disappears (live runs change counts) or the
   // pills are hidden entirely, fall back to showing all tests.
@@ -558,7 +558,7 @@ function ModelSection({
           )}
         </div>
         {!isProcessing && modelResult.success !== null && (
-          <div className="flex items-center gap-2 text-xs flex-shrink-0">
+          <div className="flex items-center gap-2 text-xs flex-shrink-0 ml-4">
             {(statusFilter === "all" || statusFilter === "passed") && (
               <span className="text-green-500">{passedCount} passed</span>
             )}
