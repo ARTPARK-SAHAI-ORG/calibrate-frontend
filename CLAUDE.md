@@ -94,6 +94,13 @@ Use `useSidebarState()` from `src/lib/sidebar.ts` for the open/closed state — 
 - Mobile-first. Primary breakpoint is `md:` (768px). Tables convert to card layouts on mobile (`hidden md:block` for the table, `md:hidden` for the card version).
 - Page titles are set via `document.title` in a `useEffect` in the page component AND via `metadata` export in the route's `layout.tsx` — keep them in sync when renaming.
 
+## Parallel execution (default)
+For any multi-step or multi-file task, first write a short plan that splits the work
+into subtasks and marks which are independent. Run independent subtasks as parallel
+agents, each owning a disjoint set of files/sections so they never edit the same file
+at once. Keep dependent subtasks sequential. Show the plan before launching. See the
+`parallelize` skill for the full playbook.
+
 ## Workflow
 
 - **Auto-commit when done**: once all changes for the user's request are complete and verified, create a git commit without waiting for the user to ask. Use a clear, scoped commit message that explains the why. Do not push unless the user asks.
