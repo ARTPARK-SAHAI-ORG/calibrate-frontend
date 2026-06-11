@@ -149,8 +149,7 @@ export function CreateLabellingTaskDialog({
   const step1Valid = !!name.trim();
   const step2Valid = !!taskType;
   const step3Valid = selectedEvaluatorIds.size >= 1;
-  const canSubmit =
-    step1Valid && step2Valid && step3Valid && !submitting;
+  const canSubmit = step1Valid && step2Valid && step3Valid && !submitting;
   const stepValid: Record<Step, boolean> = {
     1: step1Valid,
     2: step2Valid,
@@ -279,7 +278,7 @@ export function CreateLabellingTaskDialog({
                     setName(e.target.value);
                     if (nameConflictError) setNameConflictError(null);
                   }}
-                  placeholder="e.g., Helpfulness review — Q2 batch"
+                  placeholder="e.g. Copilot review — Q2 batch"
                   className={`w-full h-10 px-3 rounded-md text-sm border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent ${
                     nameConflictError ? "border-red-500" : "border-border"
                   }`}
@@ -440,15 +439,8 @@ export function CreateLabellingTaskDialog({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between gap-2 md:gap-3 px-5 md:px-6 py-4 border-t border-border">
-          <button
-            onClick={onClose}
-            disabled={submitting}
-            className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Cancel
-          </button>
+        {/* Footer — dismissal is handled by the header ✕, so no Cancel here. */}
+        <div className="flex items-center justify-end gap-2 md:gap-3 px-5 md:px-6 py-4 border-t border-border">
           <div className="flex items-center gap-2 md:gap-3">
             {step > 1 && (
               <button
