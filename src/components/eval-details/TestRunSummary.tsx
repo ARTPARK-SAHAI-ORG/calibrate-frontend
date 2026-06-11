@@ -129,7 +129,7 @@ function evaluatorCardContent(entry: BenchmarkEvaluatorSummaryEntry): {
     return {
       label: name,
       value: `${parseFloat(entry.pass_rate.toFixed(1))}%`,
-      subtitle: `${entry.passed}/${entry.total} passed`,
+      subtitle: `${entry.passed}/${entry.total}`,
       progress: entry.pass_rate,
     };
   }
@@ -176,7 +176,7 @@ export function TestRunSummary({
           <MetricCard
             label="Pass rate"
             value={rate !== null ? `${parseFloat(rate.toFixed(1))}%` : "—"}
-            subtitle={`${passed}/${total} passed`}
+            subtitle={`${passed}/${total}`}
             progress={rate ?? undefined}
           />
           <MetricCard
