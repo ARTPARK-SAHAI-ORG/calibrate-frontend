@@ -17,6 +17,14 @@ type TaskEvaluator = {
   description?: string | null;
 };
 
+/** Returns a new Set with `id` toggled in or out. */
+function toggleInSet(set: Set<string>, id: string): Set<string> {
+  const next = new Set(set);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
+
 function parseApiError(err: unknown, fallback: string): string {
   if (!(err instanceof Error)) return fallback;
   const match = err.message.match(/Request failed: \d+ - (.+)$/);
@@ -99,14 +107,7 @@ export function AssignAnnotatorsDialog({
 
   if (!isOpen) return null;
 
-  const toggle = (id: string) => {
-    setPicked((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const toggle = (id: string) => setPicked((prev) => toggleInSet(prev, id));
 
   const allPicked = annotators.length > 0 && picked.size === annotators.length;
   const somePicked = picked.size > 0 && !allPicked;
@@ -118,14 +119,8 @@ export function AssignAnnotatorsDialog({
     }
   };
 
-  const toggleEvaluator = (id: string) => {
-    setPickedEvaluators((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const toggleEvaluator = (id: string) =>
+    setPickedEvaluators((prev) => toggleInSet(prev, id));
 
   const evaluatorSelectionValid =
     includeAllEvaluators || pickedEvaluators.size > 0;
