@@ -113,7 +113,6 @@ const EVALUATOR_TYPE_OPTIONS: {
     title: "LLM response",
     description: "Judge the output of an LLM given a text input",
     group: "text",
-    recommended: true,
   },
   {
     value: "stt",
