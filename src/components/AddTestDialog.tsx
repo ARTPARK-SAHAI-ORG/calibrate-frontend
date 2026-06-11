@@ -42,12 +42,13 @@ const EXPECTED_PARAM_TYPES = [
 
 // How a leaf parameter's expected value is matched against the actual tool call:
 // `exact` compares the literal value, `llm_judge` hands the actual value to an
-// LLM along with the user's free-text criteria. Booleans are always `exact`.
-type MatchType = "exact" | "llm_judge";
+// LLM along with the user's free-text criteria, `any` accepts whatever value the
+// agent passed (the parameter is asserted present but its value is ignored).
+type MatchType = "exact" | "llm_judge" | "any";
 
 // The UI-level match mode shown in the per-parameter dropdown. "null" is a
 // presentation-only variant of an exact match (emitted as value: null).
-type MatchMode = "exact" | "llm_judge" | "null";
+type MatchMode = "exact" | "llm_judge" | "null" | "any";
 
 type ExpectedParam = {
   id: string;
@@ -77,9 +78,10 @@ type ExpectedParam = {
 };
 
 // Read a saved tool-call argument value into a leaf row's match fields. Argument
-// values may be a literal (legacy exact match), an explicit
-// `{ match_type: "exact", value }`, or `{ match_type: "llm_judge", criteria,
-// judge_model? }`. A dict containing a `match_type` key is always a spec.
+// values may be a literal (legacy exact match), the bare string `"any"`
+// (wildcard — value ignored), an explicit `{ match_type: "exact", value }`, or
+// `{ match_type: "llm_judge", criteria, judge_model? }`. A dict containing a
+// `match_type` key is always a spec.
 const parseArgMatch = (
   v: any,
 ): { matchType: MatchType; value: any; criteria: string; judgeModel?: string } => {
@@ -99,6 +101,11 @@ const parseArgMatch = (
     }
     // Explicit exact spec — unwrap to the literal value.
     return { matchType: "exact", value: v.value, criteria: "" };
+  }
+  // The bare string "any" is the wildcard sentinel — the parameter is asserted
+  // present but its value is ignored.
+  if (v === "any") {
+    return { matchType: "any", value: undefined, criteria: "" };
   }
   return { matchType: "exact", value: v, criteria: "" };
 };
@@ -407,11 +414,12 @@ const addExpParamAtPath = (
 };
 
 // Convert the expected-parameter tree into the `arguments` object sent to the
-// backend. Objects recurse into a nested container; leaf rows are always emitted
-// as an explicit match spec — `{ match_type: "exact", value }` or
-// `{ match_type: "llm_judge", criteria, judge_model? }` — never a bare literal.
-// Empty optional/custom rows are skipped; exact values are parsed as JSON when
-// possible so numbers/booleans/objects round-trip.
+// backend. Objects recurse into a nested container; leaf rows are emitted as an
+// explicit match spec — `{ match_type: "exact", value }` or
+// `{ match_type: "llm_judge", criteria, judge_model? }` — or the bare string
+// `"any"` for the wildcard mode; never a bare literal otherwise. Empty optional/
+// custom rows are skipped; exact values are parsed as JSON when possible so
+// numbers/booleans/objects round-trip.
 const buildArgsFromExpectedParams = (
   params: ExpectedParam[],
 ): Record<string, any> => {
@@ -429,6 +437,10 @@ const buildArgsFromExpectedParams = (
       };
       if (p.judgeModel?.trim()) spec.judge_model = p.judgeModel.trim();
       obj[name] = spec;
+    } else if (p.matchType === "any") {
+      // Wildcard assertion — emitted as the bare string "any", always (even for
+      // optional params), so the parameter is asserted present but unchecked.
+      obj[name] = "any";
     } else if (p.isNull) {
       // Explicit null assertion — always emitted, even for optional params.
       obj[name] = { match_type: "exact", value: null };
@@ -454,14 +466,16 @@ const hasInvalidExpectedParams = (params: ExpectedParam[]): boolean => {
     }
     const named = p.name.trim();
     // The required/filled field depends on the match strategy: criteria for an
-    // LLM judge, the expected value otherwise. A null assertion always counts
-    // as filled.
+    // LLM judge, the expected value otherwise. A null assertion and the "any"
+    // wildcard always count as filled.
     const filled =
       p.matchType === "llm_judge"
         ? p.criteria.trim()
-        : p.isNull
-          ? "null"
-          : p.value.trim();
+        : p.matchType === "any"
+          ? "any"
+          : p.isNull
+            ? "null"
+            : p.value.trim();
     if (p.custom) {
       // A fully-blank custom row is ignored (not yet used).
       if (!named && !filled) continue;
@@ -472,6 +486,7 @@ const hasInvalidExpectedParams = (params: ExpectedParam[]): boolean => {
     // A filled-in exact value must also be well-formed for its type.
     if (
       p.matchType !== "llm_judge" &&
+      p.matchType !== "any" &&
       !p.isNull &&
       expectedValueTypeError(p.value, p.dataType)
     )
@@ -1866,10 +1881,10 @@ export function AddTestDialog({
       updateExpParamAtPath(params, path, (p) => ({ ...p, name })),
     );
 
-  // Switch a leaf parameter's match mode: exact value, LLM-judge, or null.
-  // "null" is modelled as an exact match with the `isNull` flag set; switching
-  // into it clears any typed value so the disabled field doesn't show stale
-  // text.
+  // Switch a leaf parameter's match mode: exact value, LLM-judge, null, or any.
+  // "null" is modelled as an exact match with the `isNull` flag set; "any" is the
+  // wildcard mode (value ignored). Switching into null/any clears any typed value
+  // so the disabled field doesn't show stale text.
   const updateExpectedParamMatchMode = (
     toolId: string,
     path: string[],
@@ -1878,9 +1893,10 @@ export function AddTestDialog({
     mutateToolParams(toolId, (params) =>
       updateExpParamAtPath(params, path, (p) => ({
         ...p,
-        matchType: mode === "llm_judge" ? "llm_judge" : "exact",
+        matchType:
+          mode === "llm_judge" ? "llm_judge" : mode === "any" ? "any" : "exact",
         isNull: mode === "null",
-        value: mode === "null" ? "" : p.value,
+        value: mode === "null" || mode === "any" ? "" : p.value,
       })),
     );
 
@@ -2006,9 +2022,10 @@ export function AddTestDialog({
 
   // Match-mode picker shown beside each leaf parameter's value: "Is exactly"
   // compares the literal value, "satisfies the criteria" judges the actual
-  // value against an LLM (non-boolean only), and "Is null" asserts the value is
-  // null. Styled in the inverted (foreground) palette to set it apart from the
-  // value / criteria field beside it.
+  // value against an LLM (non-boolean only), "Is null" asserts the value is
+  // null, and "Is any" accepts any value (the parameter is checked for presence
+  // but its value is ignored). Styled in the inverted (foreground) palette to set
+  // it apart from the value / criteria field beside it.
   const renderMatchTypeSelect = (
     toolId: string,
     path: string[],
@@ -2029,6 +2046,7 @@ export function AddTestDialog({
           <option value="llm_judge">satisfies the criteria</option>
         )}
         <option value="null">Is null</option>
+        <option value="any">Is any</option>
       </select>
       <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
         <svg
@@ -2133,11 +2151,13 @@ export function AddTestDialog({
 
       // The "filled in" field for a leaf depends on its match strategy: the
       // judging criteria for an LLM judge, the expected value otherwise. A null
-      // assertion always counts as filled.
+      // assertion and the "any" wildcard always count as filled.
       const leafFilled =
         param.matchType === "llm_judge"
           ? !!param.criteria.trim()
-          : param.isNull || !!param.value.trim();
+          : param.matchType === "any"
+            ? true
+            : param.isNull || !!param.value.trim();
 
       // Header: a label for declared params, or — for custom (user-added) rows —
       // a type-picker / badge / remove row with the name input on its own line
@@ -2288,14 +2308,23 @@ export function AddTestDialog({
       // "malformed" when present but wrong for its type (e.g. non-numeric); a
       // boolean is "unset" when it holds neither true nor false.
       const isLlm = param.matchType === "llm_judge";
-      const isNull = !isLlm && !!param.isNull;
-      const mode: MatchMode = isLlm ? "llm_judge" : isNull ? "null" : "exact";
+      const isAny = param.matchType === "any";
+      const isNull = !isLlm && !isAny && !!param.isNull;
+      const mode: MatchMode = isLlm
+        ? "llm_judge"
+        : isAny
+          ? "any"
+          : isNull
+            ? "null"
+            : "exact";
       const typeError =
         !isLlm &&
+        !isAny &&
         !isNull &&
         expectedValueTypeError(param.value, param.dataType);
       const booleanUnset =
         !isNull &&
+        !isAny &&
         param.dataType === "boolean" &&
         param.value !== "true" &&
         param.value !== "false";
@@ -2313,13 +2342,14 @@ export function AddTestDialog({
         >
           {header}
           {param.dataType === "boolean" ? (
-            // Booleans match exactly (yes/no) or assert null — no LLM judging.
+            // Booleans match exactly (yes/no), assert null, or accept any value —
+            // no LLM judging.
             <div className="flex items-center gap-2">
               {renderMatchTypeSelect(toolId, paramPath, mode, false)}
-              {isNull ? (
+              {isNull || isAny ? (
                 <input
                   type="text"
-                  value="null"
+                  value={isAny ? "any value" : "null"}
                   disabled
                   readOnly
                   className={`${fieldClass} flex-1 min-w-0`}
@@ -2376,10 +2406,10 @@ export function AddTestDialog({
                   placeholder="e.g. A friendly reminder with the date"
                   className={`${fieldClass} flex-1 min-w-0`}
                 />
-              ) : isNull ? (
+              ) : isNull || isAny ? (
                 <input
                   type="text"
-                  value="null"
+                  value={isAny ? "any value" : "null"}
                   disabled
                   readOnly
                   className={`${fieldClass} flex-1 min-w-0`}

@@ -294,14 +294,28 @@ function isMatchSpec(
 
 // Read-only render of an expected argument (name + value), mirroring the
 // add-test dialog's per-parameter controls: the parameter name sits on one line
-// with a match-mode chip ("Is exactly" / "satisfies the criteria" / "Is null"),
-// and the value or criteria below. Object-typed params recurse inside a boxed
-// group so each nested field shows its own mode; bare literals (legacy expected
-// values) fall back to a plain value box.
+// with a match-mode chip ("Is exactly" / "satisfies the criteria" / "Is null" /
+// "Is any"), and the value or criteria below. The wildcard "Is any" mode (the
+// bare string "any") renders the chip with no value box. Object-typed params
+// recurse inside a boxed group so each nested field shows its own mode; bare
+// literals (legacy expected values) fall back to a plain value box.
 function ExpectedArgValue({ name, value }: { name: string; value: any }) {
   const nameLabel = (
     <label className="text-sm font-medium text-foreground">{name}</label>
   );
+
+  // The bare string "any" is the wildcard sentinel — the argument is asserted
+  // present but its value is ignored, so there's no value box to show.
+  if (value === "any") {
+    return (
+      <div className="flex items-center gap-2 flex-wrap">
+        {nameLabel}
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-foreground text-background">
+          Is any
+        </span>
+      </div>
+    );
+  }
 
   if (isMatchSpec(value)) {
     const isLlm = value.match_type === "llm_judge";
