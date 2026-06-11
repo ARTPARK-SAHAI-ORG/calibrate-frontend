@@ -103,6 +103,8 @@ export function AddLlmGeneralItemsDialog({
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Shown when the user tries to close with unsaved changes.
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
 
   // Reset whenever the dialog opens so a fresh edit/add starts from the
   // current seed item.
@@ -116,6 +118,7 @@ export function AddLlmGeneralItemsDialog({
       setOutput(s?.output ?? "");
       setVarValues(seedVarValues(s?.varValues));
       setError(null);
+      setDiscardConfirmOpen(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialRows]);
@@ -136,11 +139,34 @@ export function AddLlmGeneralItemsDialog({
   const valid =
     !!name.trim() && !!input.trim() && !!output.trim() && varsComplete;
 
-  const handleClose = () => {
-    if (!submitting) {
-      setError(null);
-      onClose();
-    }
+  // Unsaved-changes check: any field differs from what the dialog was seeded
+  // with (blank for add, the item's values for edit).
+  const baseVarValues = seedVarValues(seed?.varValues);
+  const isDirty =
+    name.trim() !== (seed?.name ?? "").trim() ||
+    description.trim() !== (seed?.description ?? "").trim() ||
+    input.trim() !== (seed?.input ?? "").trim() ||
+    output.trim() !== (seed?.output ?? "").trim() ||
+    evaluatorsWithVariables.some((e) =>
+      e.variables.some(
+        (v) =>
+          (varValues[e.uuid]?.[v.name] ?? "").trim() !==
+          (baseVarValues[e.uuid]?.[v.name] ?? "").trim(),
+      ),
+    );
+
+  const doClose = () => {
+    setError(null);
+    setDiscardConfirmOpen(false);
+    onClose();
+  };
+
+  // Close request from the ✕ or (edit mode) the backdrop: close straight away
+  // when clean, otherwise confirm discarding.
+  const attemptClose = () => {
+    if (submitting) return;
+    if (isDirty) setDiscardConfirmOpen(true);
+    else doClose();
   };
 
   const handleSubmit = async () => {
@@ -181,7 +207,12 @@ export function AddLlmGeneralItemsDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={handleClose}
+      onClick={() => {
+        // Backdrop click is disabled while adding a new item (so accidental
+        // outside clicks can't discard work). When editing an existing item
+        // it closes if unchanged, or asks to discard if there are edits.
+        if (isEdit) attemptClose();
+      }}
     >
       <div
         className="bg-background border border-border rounded-xl md:rounded-2xl w-full max-w-[90rem] h-[95vh] md:h-[85vh] mx-2 md:mx-4 shadow-2xl flex flex-col overflow-hidden"
@@ -198,7 +229,7 @@ export function AddLlmGeneralItemsDialog({
             </p>
           </div>
           <button
-            onClick={handleClose}
+            onClick={attemptClose}
             disabled={submitting}
             className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -360,6 +391,43 @@ export function AddLlmGeneralItemsDialog({
           </button>
         </div>
       </div>
+
+      {/* Discard-changes confirmation, shown when closing with unsaved edits. */}
+      {discardConfirmOpen && (
+        <div
+          className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            setDiscardConfirmOpen(false);
+          }}
+        >
+          <div
+            className="bg-background border border-border rounded-xl w-full max-w-sm shadow-2xl p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-semibold text-foreground">
+              Discard changes?
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              You have unsaved changes. If you close now, they&apos;ll be lost.
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-2 md:gap-3">
+              <button
+                onClick={() => setDiscardConfirmOpen(false)}
+                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent transition-colors cursor-pointer"
+              >
+                Keep editing
+              </button>
+              <button
+                onClick={doClose}
+                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-red-600 text-white hover:bg-red-700 transition-colors cursor-pointer"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
