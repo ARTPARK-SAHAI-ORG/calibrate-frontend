@@ -20,6 +20,7 @@ import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
+import { AddRunToLabellingTaskDialog } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
 import { useAccessToken } from "@/hooks";
 import {
@@ -112,6 +113,7 @@ export function BenchmarkResultsDialog({
   // Top-level evaluators block from the benchmark response. See the
   // matching state in TestRunnerDialog for the same plumbing.
   const [runEvaluators, setRunEvaluators] = useState<TestRunEvaluator[]>([]);
+  const [addToTaskOpen, setAddToTaskOpen] = useState(false);
   const backendAccessToken = useAccessToken();
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   /** Once per dialog open: select first test of `models[0]` when its row exists. */
@@ -558,6 +560,15 @@ export function BenchmarkResultsDialog({
                 />
               </div>
             )}
+            {/* Add to labelling task — only shown when benchmark is done */}
+            {isDone && !error && hasAnyResults && currentTaskId && (
+              <button
+                onClick={() => setAddToTaskOpen(true)}
+                className="hidden md:flex items-center gap-2 h-8 px-2 md:px-3 rounded-md text-xs md:text-sm font-medium border border-border hover:bg-muted/50 transition-colors cursor-pointer"
+              >
+                Add to labelling task
+              </button>
+            )}
             {/* Rerun button - show when benchmark is complete (not loading and no error) */}
             {isDone && !error && onGoBack && (
               <button
@@ -717,6 +728,19 @@ export function BenchmarkResultsDialog({
           </div>
         )}
       </div>
+      {currentTaskId && (
+        <AddRunToLabellingTaskDialog
+          isOpen={addToTaskOpen}
+          onClose={() => setAddToTaskOpen(false)}
+          source={{
+            type: "benchmark_run",
+            benchmarkUuid: currentTaskId,
+            benchmarkName: runName ?? undefined,
+            modelResults: modelResults,
+            evaluators: runEvaluators,
+          }}
+        />
+      )}
     </div>
   );
 }

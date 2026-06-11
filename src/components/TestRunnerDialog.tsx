@@ -18,6 +18,7 @@ import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
+import { AddRunToLabellingTaskDialog } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { TestRunOutputsPanel, TestRunSummary } from "./eval-details";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
 import { buildEvaluatorSummaryFromResults } from "@/lib/testRunSummary";
@@ -62,7 +63,7 @@ type TestResult = {
   error?: string;
 };
 
-type TestCaseResult = {
+export type TestCaseResult = {
   test_uuid?: string;
   test_name?: string;
   name?: string; // Test name from in-progress API response
@@ -180,6 +181,7 @@ export function TestRunnerDialog({
   // Which tab is showing. Tabs only render once the run is done; we default to
   // the Summary tab on completion (mirrors the benchmark dialog).
   const [activeTab, setActiveTab] = useState<"summary" | "outputs">("outputs");
+  const [addToTaskOpen, setAddToTaskOpen] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   // Tracks whether the dialog has already auto-opened a completed test for
   // this open lifecycle. Set back to false on every dialog open / new run /
@@ -992,6 +994,17 @@ export function TestRunnerDialog({
                 />
               </div>
             )}
+            {runStatus === "done" && testResults.length > 0 && (currentTaskId || taskId) && (
+              <div className="hidden md:block">
+                <button
+                  type="button"
+                  onClick={() => setAddToTaskOpen(true)}
+                  className="flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-teal-500/12 border-teal-500/45 text-teal-950 dark:text-teal-100 hover:bg-teal-500/22 dark:hover:bg-teal-500/18"
+                >
+                  Add to labelling task
+                </button>
+              </div>
+            )}
             {/* Share button — only shown when run is done and we have a taskId */}
             {runStatus === "done" && (currentTaskId || taskId) && backendAccessToken && (
               <div className="hidden md:block">
@@ -1111,6 +1124,39 @@ export function TestRunnerDialog({
           </div>
         )}
       </div>
+      {(currentTaskId || taskId) && (
+        <AddRunToLabellingTaskDialog
+          isOpen={addToTaskOpen}
+          onClose={() => setAddToTaskOpen(false)}
+          source={{
+            type: "test_run",
+            runUuid: (currentTaskId || taskId)!,
+            runName: runName ?? undefined,
+            results: testResults.map((r) => ({
+              test_uuid: r.test.uuid,
+              test_name: r.test.name,
+              status:
+                r.status === "passed" || r.status === "failed"
+                  ? r.status
+                  : undefined,
+              passed:
+                r.status === "passed"
+                  ? true
+                  : r.status === "failed"
+                    ? false
+                    : null,
+              reasoning: r.reasoning,
+              output: r.output ?? null,
+              test_case: r.testCase ?? null,
+              chat_history: r.chatHistory,
+              evaluation: r.evaluation,
+              judge_results: r.judgeResults,
+              error: r.error,
+            })),
+            evaluators: runEvaluators,
+          }}
+        />
+      )}
     </div>
   );
 }
