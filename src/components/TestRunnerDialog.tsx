@@ -11,7 +11,6 @@ import {
   JudgeResult,
   TestRunEvaluator,
   CloseIcon,
-  TestStats,
   ResultPager,
   type PagerNav,
 } from "./test-results/shared";
@@ -893,21 +892,6 @@ export function TestRunnerDialog({
               </div>
               <p className="text-xs text-muted-foreground truncate">{agentName}</p>
             </div>
-            {/* Passed/Failed counts - desktop only; sits to the right of the
-                title + agent-name block so it clears the width of both. */}
-            {!isOverallError &&
-              testResults.length > 0 &&
-              (passedTests.length > 0 ||
-                failedTests.length > 0 ||
-                erroredTests.length > 0) && (
-                <div className="hidden md:block shrink-0">
-                  <TestStats
-                    passedCount={passedTests.length}
-                    failedCount={failedTests.length}
-                    erroredCount={erroredTests.length}
-                  />
-                </div>
-              )}
           </div>
           {/* Previous/Next pager - centered, desktop only */}
           {nav && selectedTestUuid && (
