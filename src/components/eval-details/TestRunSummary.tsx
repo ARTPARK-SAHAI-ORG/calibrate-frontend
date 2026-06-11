@@ -94,21 +94,27 @@ function CardFooter({
 }
 
 // One metric card (matches the SimulationMetricsGrid card style). `progress`
-// adds a pass-rate bar; `subtitle` is the small caption below the value.
+// adds a pass-rate bar; `subtitle` is the small caption below the value;
+// `info` adds a hover tooltip (ⓘ) next to the label.
 function MetricCard({
   label,
   value,
   subtitle,
   progress,
+  info,
 }: {
   label: string;
   value: string;
   subtitle?: string;
   progress?: number;
+  info?: string;
 }) {
   return (
     <div className="border border-border rounded-xl p-4 bg-muted/10">
-      <div className="text-[12px] text-muted-foreground mb-1">{label}</div>
+      <div className="text-[12px] text-muted-foreground mb-1 flex items-center gap-1.5">
+        <span>{label}</span>
+        {info && <Tooltip content={info}>{descriptionIcon}</Tooltip>}
+      </div>
       <div className="text-[18px] font-semibold text-foreground">{value}</div>
       <CardFooter progress={progress} subtitle={subtitle} />
     </div>
@@ -186,11 +192,13 @@ export function TestRunSummary({
             label="Average latency"
             value={formatLatencyMs(latency?.mean)}
             subtitle={latencySubtitle}
+            info="Average agent response time across all tests in this run. Evaluation time is excluded."
           />
           <MetricCard
             label="Average cost"
             value={formatCostUsd(cost?.mean)}
             subtitle={costSubtitle}
+            info="Average cost per test across all tests in this run."
           />
         </div>
       </div>
