@@ -1644,6 +1644,26 @@ export function BulkUploadTestsModal({
                   const evaluatorNameByUuid = new Map(
                     committedEvaluators.map((e) => [e.uuid, e.name] as const),
                   );
+                  // Per-column minimum widths (px), matching the
+                  // gridTemplateColumns below: Name, Chat history, Evaluators,
+                  // then one per variable column.
+                  const columnMinPx = [
+                    160,
+                    220,
+                    160,
+                    ...variableColumns.map(() => 220),
+                  ];
+                  const GRID_GAP_PX = 12; // gap-3
+                  const GRID_PADDING_PX = 32; // px-4 (left + right)
+                  // Force the grid element to span the full table width even
+                  // when it overflows the scroll container. Without this the
+                  // grid box only stretches to the visible width, so its
+                  // background and bottom border (the row divider) get clipped
+                  // mid-scroll while the column content spills past them.
+                  const gridMinWidth =
+                    columnMinPx.reduce((sum, w) => sum + w, 0) +
+                    GRID_GAP_PX * (columnMinPx.length - 1) +
+                    GRID_PADDING_PX;
                   const gridStyle = {
                     gridTemplateColumns: [
                       "160px",
@@ -1651,6 +1671,7 @@ export function BulkUploadTestsModal({
                       "minmax(160px,0.8fr)",
                       ...variableColumns.map(() => "minmax(220px,1fr)"),
                     ].join(" "),
+                    minWidth: `${gridMinWidth}px`,
                   };
                   return (
                     <div className="mt-3 space-y-2">
