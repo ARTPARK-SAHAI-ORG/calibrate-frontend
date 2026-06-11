@@ -29,7 +29,8 @@ export function formatLatencyMs(ms: number | null | undefined): string {
   if (ms == null) return "—";
   const n = Number(ms);
   if (!Number.isFinite(n)) return "—";
-  if (n >= 1000) return `${(n / 1000).toFixed(2)} s`;
+  // parseFloat drops trailing zeros so whole values show no decimals (2 s, not 2.00 s).
+  if (n >= 1000) return `${parseFloat((n / 1000).toFixed(2))} s`;
   return `${Math.round(n)} ms`;
 }
 
@@ -44,5 +45,6 @@ export function formatCostUsd(usd: number | null | undefined): string {
   if (!Number.isFinite(n)) return "—";
   if (n === 0) return "$0";
   const decimals = n >= 1 ? 2 : n >= 0.01 ? 4 : 6;
-  return `$${n.toFixed(decimals)}`;
+  // parseFloat drops trailing zeros so whole values show no decimals ($2, not $2.00).
+  return `$${parseFloat(n.toFixed(decimals))}`;
 }

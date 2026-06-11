@@ -90,7 +90,7 @@ function evaluatorCardContent(entry: BenchmarkEvaluatorSummaryEntry): {
   if (entry.type === "binary") {
     return {
       label: name,
-      value: `${entry.pass_rate.toFixed(1)}%`,
+      value: `${parseFloat(entry.pass_rate.toFixed(1))}%`,
       subtitle: `${entry.passed}/${entry.total} passed`,
     };
   }
@@ -98,7 +98,7 @@ function evaluatorCardContent(entry: BenchmarkEvaluatorSummaryEntry): {
     label: benchmarkRatingEvaluatorCaption(name, entry.scale_min, entry.scale_max),
     value: Number.isFinite(entry.scale_max)
       ? `${parseFloat(entry.mean.toFixed(2))}/${entry.scale_max}`
-      : entry.mean.toFixed(2),
+      : `${parseFloat(entry.mean.toFixed(2))}`,
     subtitle: `mean of ${entry.count}`,
   };
 }
@@ -136,7 +136,7 @@ export function TestRunSummary({
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <MetricCard
             label="Pass rate"
-            value={rate !== null ? `${rate.toFixed(1)}%` : "—"}
+            value={rate !== null ? `${parseFloat(rate.toFixed(1))}%` : "—"}
             subtitle={`${passed}/${total} passed`}
           />
           <MetricCard
