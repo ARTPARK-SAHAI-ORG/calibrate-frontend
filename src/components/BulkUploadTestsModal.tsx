@@ -209,15 +209,15 @@ const TOOL_CALL_ARG_MATCH_FIELDS: GuidelineField[] = [
   },
   {
     name: "Match any",
-    meta: '"any"',
+    meta: '{ "match_type": "any" }',
     description:
-      'The bare string "any" is a wildcard — the parameter is asserted to have been passed but its actual value is ignored, so any value (or none) passes. Use this when you only care that the agent supplied the argument, not what it set it to.',
-    example: '"confirmation_id": "any"',
+      "A wildcard — the parameter is asserted to have been passed but its actual value is ignored, so any value passes. Use this when you only care that the agent supplied the argument, not what it set it to.",
+    example: '"confirmation_id": { "match_type": "any" }',
   },
   {
     name: "Nested object",
     description:
-      "For object-typed parameters, pass a nested JSON object. Each leaf inside the nested object is itself a matcher (exact, llm_judge, or the \"any\" wildcard) and nesting can go to any depth, mirroring the parameter schema configured on the tool.",
+      "For object-typed parameters, pass a nested JSON object. Each leaf inside the nested object is itself a matcher (exact, llm_judge, or any) and nesting can go to any depth, mirroring the parameter schema configured on the tool.",
     example:
       '"address": {\n  "line1": { "match_type": "exact",     "value": "221B Baker Street" },\n  "line2": { "match_type": "exact",     "value": null },\n  "city":  { "match_type": "exact",     "value": "London" },\n  "notes": { "match_type": "llm_judge", "criteria": "Mentions a signature is required on delivery." }\n}',
   },

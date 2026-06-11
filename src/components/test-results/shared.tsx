@@ -280,7 +280,7 @@ function formatParamValue(value: any): string {
 }
 
 // True when a value is an expected-argument match spec — a dict carrying a
-// `match_type` key (`exact` or `llm_judge`).
+// `match_type` key (`exact`, `llm_judge`, or `any`).
 function isMatchSpec(
   v: any,
 ): v is { match_type: string; value?: any; criteria?: string } {
@@ -295,36 +295,37 @@ function isMatchSpec(
 // Read-only render of an expected argument (name + value), mirroring the
 // add-test dialog's per-parameter controls: the parameter name sits on one line
 // with a match-mode chip ("Is exactly" / "satisfies the criteria" / "Is null" /
-// "Is any"), and the value or criteria below. The wildcard "Is any" mode (the
-// bare string "any") renders the chip with no value box. Object-typed params
-// recurse inside a boxed group so each nested field shows its own mode; bare
-// literals (legacy expected values) fall back to a plain value box.
+// "Is any"), and the value or criteria below. The wildcard "Is any" mode
+// (`{ match_type: "any" }`) renders the chip with no value box. Object-typed
+// params recurse inside a boxed group so each nested field shows its own mode;
+// bare literals (legacy expected values) fall back to a plain value box.
 function ExpectedArgValue({ name, value }: { name: string; value: any }) {
   const nameLabel = (
     <label className="text-sm font-medium text-foreground">{name}</label>
   );
 
-  // The bare string "any" is the wildcard sentinel — the argument is asserted
-  // present but its value is ignored, so there's no value box to show.
-  if (value === "any") {
-    return (
-      <div className="flex items-center gap-2 flex-wrap">
-        {nameLabel}
-        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-foreground text-background">
-          Is any
-        </span>
-      </div>
-    );
-  }
-
   if (isMatchSpec(value)) {
     const isLlm = value.match_type === "llm_judge";
-    const isNull = !isLlm && value.value === null;
+    const isAny = value.match_type === "any";
+    const isNull = !isLlm && !isAny && value.value === null;
     const label = isLlm
       ? "satisfies the criteria"
-      : isNull
-        ? "Is null"
-        : "Is exactly";
+      : isAny
+        ? "Is any"
+        : isNull
+          ? "Is null"
+          : "Is exactly";
+    // The wildcard "Is any" mode has no value to show — render the chip alone.
+    if (isAny) {
+      return (
+        <div className="flex items-center gap-2 flex-wrap">
+          {nameLabel}
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-foreground text-background">
+            {label}
+          </span>
+        </div>
+      );
+    }
     const text = isLlm
       ? typeof value.criteria === "string"
         ? value.criteria

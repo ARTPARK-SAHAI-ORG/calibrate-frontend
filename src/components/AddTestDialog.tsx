@@ -78,10 +78,10 @@ type ExpectedParam = {
 };
 
 // Read a saved tool-call argument value into a leaf row's match fields. Argument
-// values may be a literal (legacy exact match), the bare string `"any"`
-// (wildcard — value ignored), an explicit `{ match_type: "exact", value }`, or
-// `{ match_type: "llm_judge", criteria, judge_model? }`. A dict containing a
-// `match_type` key is always a spec.
+// values may be a literal (legacy exact match), an explicit
+// `{ match_type: "exact", value }`, `{ match_type: "llm_judge", criteria,
+// judge_model? }`, or `{ match_type: "any" }` (wildcard — value ignored). A dict
+// containing a `match_type` key is always a spec.
 const parseArgMatch = (
   v: any,
 ): { matchType: MatchType; value: any; criteria: string; judgeModel?: string } => {
@@ -99,13 +99,12 @@ const parseArgMatch = (
         judgeModel: typeof v.judge_model === "string" ? v.judge_model : undefined,
       };
     }
+    if (v.match_type === "any") {
+      // Wildcard — the parameter is asserted present but its value is ignored.
+      return { matchType: "any", value: undefined, criteria: "" };
+    }
     // Explicit exact spec — unwrap to the literal value.
     return { matchType: "exact", value: v.value, criteria: "" };
-  }
-  // The bare string "any" is the wildcard sentinel — the parameter is asserted
-  // present but its value is ignored.
-  if (v === "any") {
-    return { matchType: "any", value: undefined, criteria: "" };
   }
   return { matchType: "exact", value: v, criteria: "" };
 };
@@ -414,12 +413,12 @@ const addExpParamAtPath = (
 };
 
 // Convert the expected-parameter tree into the `arguments` object sent to the
-// backend. Objects recurse into a nested container; leaf rows are emitted as an
-// explicit match spec — `{ match_type: "exact", value }` or
-// `{ match_type: "llm_judge", criteria, judge_model? }` — or the bare string
-// `"any"` for the wildcard mode; never a bare literal otherwise. Empty optional/
-// custom rows are skipped; exact values are parsed as JSON when possible so
-// numbers/booleans/objects round-trip.
+// backend. Objects recurse into a nested container; leaf rows are always emitted
+// as an explicit match spec — `{ match_type: "exact", value }`,
+// `{ match_type: "llm_judge", criteria, judge_model? }`, or `{ match_type: "any" }`
+// for the wildcard mode — never a bare literal. Empty optional/custom rows are
+// skipped; exact values are parsed as JSON when possible so numbers/booleans/
+// objects round-trip.
 const buildArgsFromExpectedParams = (
   params: ExpectedParam[],
 ): Record<string, any> => {
@@ -438,9 +437,9 @@ const buildArgsFromExpectedParams = (
       if (p.judgeModel?.trim()) spec.judge_model = p.judgeModel.trim();
       obj[name] = spec;
     } else if (p.matchType === "any") {
-      // Wildcard assertion — emitted as the bare string "any", always (even for
-      // optional params), so the parameter is asserted present but unchecked.
-      obj[name] = "any";
+      // Wildcard assertion — always emitted (even for optional params) so the
+      // parameter is asserted present but its value is left unchecked.
+      obj[name] = { match_type: "any" };
     } else if (p.isNull) {
       // Explicit null assertion — always emitted, even for optional params.
       obj[name] = { match_type: "exact", value: null };
