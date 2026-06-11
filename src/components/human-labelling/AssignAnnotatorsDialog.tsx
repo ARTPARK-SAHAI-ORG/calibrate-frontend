@@ -198,12 +198,13 @@ export function AssignAnnotatorsDialog({
                 : ""
             }
           >
-            <div className="space-y-2">
+            <div className="space-y-2 flex flex-col min-h-0">
               {showEvaluatorChoice && (
                 <p className="text-xs font-medium text-muted-foreground">
                   Annotators
                 </p>
               )}
+              <div className="space-y-2 overflow-y-auto pr-1 max-h-[55vh]">
               {loading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <svg
@@ -296,10 +297,11 @@ export function AssignAnnotatorsDialog({
               ))}
                 </>
               )}
+              </div>
             </div>
 
             {showEvaluatorChoice && (
-              <div className="space-y-2 md:col-span-2">
+              <div className="space-y-2 md:col-span-2 flex flex-col min-h-0">
                 <p className="text-xs font-medium text-muted-foreground">
                   Evaluators shown in labelling
                 </p>
@@ -307,30 +309,47 @@ export function AssignAnnotatorsDialog({
                   <input
                     type="checkbox"
                     checked={includeAllEvaluators}
-                    onChange={(e) => setIncludeAllEvaluators(e.target.checked)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setIncludeAllEvaluators(checked);
+                      // Seed the explicit picks with everything so unchecking
+                      // "all" doesn't visually flip every card off at once.
+                      if (!checked && pickedEvaluators.size === 0) {
+                        setPickedEvaluators(
+                          new Set(evaluators.map((ev) => ev.uuid)),
+                        );
+                      }
+                    }}
                     className="w-4 h-4 cursor-pointer accent-foreground"
                   />
                   <span className="text-sm font-medium">
                     Include all evaluators
                   </span>
                 </label>
-                {!includeAllEvaluators && (
-                  <div className="space-y-2 pl-1">
-                    <p className="text-xs text-muted-foreground">
-                      Pick one or more evaluators to show in these labelling
-                      jobs.
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {evaluators.map((ev) => (
+                <p className="text-xs text-muted-foreground pl-1">
+                  {includeAllEvaluators
+                    ? "All evaluators will be shown in these labelling jobs."
+                    : "Pick one or more evaluators to show in these labelling jobs."}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-y-auto pr-1 max-h-[50vh]">
+                  {evaluators.map((ev) => {
+                    const checked =
+                      includeAllEvaluators || pickedEvaluators.has(ev.uuid);
+                    return (
                       <label
                         key={ev.uuid}
-                        className="flex items-start gap-3 px-3 py-2 rounded-md border border-border hover:bg-muted/30 transition-colors cursor-pointer"
+                        className={`flex items-start gap-3 px-3 py-2 rounded-md border border-border transition-colors ${
+                          includeAllEvaluators
+                            ? "opacity-60 cursor-not-allowed"
+                            : "hover:bg-muted/30 cursor-pointer"
+                        }`}
                       >
                         <input
                           type="checkbox"
-                          checked={pickedEvaluators.has(ev.uuid)}
+                          checked={checked}
+                          disabled={includeAllEvaluators}
                           onChange={() => toggleEvaluator(ev.uuid)}
-                          className="mt-0.5 w-4 h-4 cursor-pointer accent-foreground"
+                          className="mt-0.5 w-4 h-4 accent-foreground cursor-pointer disabled:cursor-not-allowed"
                         />
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-medium truncate">
@@ -343,10 +362,9 @@ export function AssignAnnotatorsDialog({
                           )}
                         </div>
                       </label>
-                    ))}
-                    </div>
-                  </div>
-                )}
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
