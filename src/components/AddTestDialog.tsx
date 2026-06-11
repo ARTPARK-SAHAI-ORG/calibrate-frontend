@@ -284,6 +284,22 @@ const customParamFromArg = (name: string, raw: any): ExpectedParam => {
       properties: undefined,
     };
   }
+  if (matchType === "any") {
+    // Wildcard — preserve the "Is any" mode; no value/type to infer.
+    return {
+      id: newExpParamId(),
+      name,
+      value: "",
+      matchType: "any",
+      criteria: "",
+      required: false,
+      dataType: "string",
+      isObject: false,
+      custom: true,
+      allowCustomKeys: false,
+      properties: undefined,
+    };
+  }
   const isObj = v !== null && typeof v === "object" && !Array.isArray(v);
   return {
     id: newExpParamId(),
