@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { humaniseDetailObject } from "./bulk-upload-shared";
+import {
+  DiscardChangesDialog,
+  useUnsavedCloseGuard,
+} from "./unsavedCloseGuard";
 
 export type LlmGeneralEvaluatorDef = {
   uuid: string;
@@ -103,8 +107,6 @@ export function AddLlmGeneralItemsDialog({
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Shown when the user tries to close with unsaved changes.
-  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
 
   // Reset whenever the dialog opens so a fresh edit/add starts from the
   // current seed item.
@@ -118,26 +120,9 @@ export function AddLlmGeneralItemsDialog({
       setOutput(s?.output ?? "");
       setVarValues(seedVarValues(s?.varValues));
       setError(null);
-      setDiscardConfirmOpen(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialRows]);
-
-  if (!isOpen) return null;
-
-  const updateVar = (evaluatorUuid: string, varName: string, value: string) => {
-    setVarValues((prev) => ({
-      ...prev,
-      [evaluatorUuid]: { ...(prev[evaluatorUuid] ?? {}), [varName]: value },
-    }));
-  };
-
-  // Every variable on every evaluator must have a non-empty value.
-  const varsComplete = evaluatorsWithVariables.every((e) =>
-    e.variables.every((v) => (varValues[e.uuid]?.[v.name] ?? "").trim()),
-  );
-  const valid =
-    !!name.trim() && !!input.trim() && !!output.trim() && varsComplete;
 
   // Unsaved-changes check: any field differs from what the dialog was seeded
   // with (blank for add, the item's values for edit).
@@ -155,19 +140,36 @@ export function AddLlmGeneralItemsDialog({
       ),
     );
 
-  const doClose = () => {
-    setError(null);
-    setDiscardConfirmOpen(false);
-    onClose();
+  const {
+    discardConfirmOpen,
+    closeDiscardConfirm,
+    doClose,
+    attemptClose,
+    handleBackdropClick,
+  } = useUnsavedCloseGuard({
+    isOpen,
+    isDirty,
+    isEdit,
+    submitting,
+    onClose,
+    onBeforeClose: () => setError(null),
+  });
+
+  if (!isOpen) return null;
+
+  const updateVar = (evaluatorUuid: string, varName: string, value: string) => {
+    setVarValues((prev) => ({
+      ...prev,
+      [evaluatorUuid]: { ...(prev[evaluatorUuid] ?? {}), [varName]: value },
+    }));
   };
 
-  // Close request from the ✕ or (edit mode) the backdrop: close straight away
-  // when clean, otherwise confirm discarding.
-  const attemptClose = () => {
-    if (submitting) return;
-    if (isDirty) setDiscardConfirmOpen(true);
-    else doClose();
-  };
+  // Every variable on every evaluator must have a non-empty value.
+  const varsComplete = evaluatorsWithVariables.every((e) =>
+    e.variables.every((v) => (varValues[e.uuid]?.[v.name] ?? "").trim()),
+  );
+  const valid =
+    !!name.trim() && !!input.trim() && !!output.trim() && varsComplete;
 
   const handleSubmit = async () => {
     if (!valid || submitting) return;
@@ -207,12 +209,7 @@ export function AddLlmGeneralItemsDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={() => {
-        // Backdrop click is disabled while adding a new item (so accidental
-        // outside clicks can't discard work). When editing an existing item
-        // it closes if unchanged, or asks to discard if there are edits.
-        if (isEdit) attemptClose();
-      }}
+      onClick={handleBackdropClick}
     >
       <div
         className="bg-background border border-border rounded-xl md:rounded-2xl w-full max-w-[90rem] h-[95vh] md:h-[85vh] mx-2 md:mx-4 shadow-2xl flex flex-col overflow-hidden"
@@ -392,42 +389,11 @@ export function AddLlmGeneralItemsDialog({
         </div>
       </div>
 
-      {/* Discard-changes confirmation, shown when closing with unsaved edits. */}
-      {discardConfirmOpen && (
-        <div
-          className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 p-4"
-          onClick={(e) => {
-            e.stopPropagation();
-            setDiscardConfirmOpen(false);
-          }}
-        >
-          <div
-            className="bg-background border border-border rounded-xl w-full max-w-sm shadow-2xl p-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-base font-semibold text-foreground">
-              Discard changes?
-            </h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              You have unsaved changes. If you close now, they&apos;ll be lost.
-            </p>
-            <div className="mt-5 flex items-center justify-end gap-2 md:gap-3">
-              <button
-                onClick={() => setDiscardConfirmOpen(false)}
-                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent transition-colors cursor-pointer"
-              >
-                Keep editing
-              </button>
-              <button
-                onClick={doClose}
-                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-red-600 text-white hover:bg-red-700 transition-colors cursor-pointer"
-              >
-                Discard
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DiscardChangesDialog
+        open={discardConfirmOpen}
+        onKeepEditing={closeDiscardConfirm}
+        onDiscard={doClose}
+      />
     </div>
   );
 }
