@@ -226,7 +226,7 @@ export function AddLlmGeneralItemsDialog({
         <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
           {/* Left: name + evaluators (with variable inputs) — mirrors the
               AddTestDialog left column. */}
-          <div className="w-full md:w-1/4 flex flex-col border-b md:border-b-0 md:border-r border-border overflow-y-auto p-4 md:p-6 space-y-6">
+          <div className="w-full md:w-[27%] flex flex-col border-b md:border-b-0 md:border-r border-border overflow-y-auto p-4 md:p-6 space-y-6">
             <div>
               <label className="block text-base font-medium text-foreground mb-2">
                 Name

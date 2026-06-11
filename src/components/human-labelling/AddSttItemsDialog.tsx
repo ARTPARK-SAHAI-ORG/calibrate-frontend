@@ -84,6 +84,8 @@ export function AddSttItemsDialog({
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Shown when the user tries to close with unsaved changes.
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
 
   // Reset rows whenever the dialog opens (so a fresh edit starts from the
   // latest selected items, and a reopened add starts blank).
@@ -101,6 +103,7 @@ export function AddSttItemsDialog({
           : [newRow()],
       );
       setError(null);
+      setDiscardConfirmOpen(false);
     }
   }, [isOpen, initialRows]);
 
@@ -129,11 +132,34 @@ export function AddSttItemsDialog({
     }))
     .filter((r) => r.name && r.actual_transcript && r.predicted_transcript);
 
-  const handleClose = () => {
-    if (!submitting) {
-      setError(null);
-      onClose();
-    }
+  // Unsaved-changes check. Add mode: any field has content. Edit mode: any
+  // field differs from the item it was seeded with (rows align 1:1 with
+  // initialRows since edit mode can't add/remove rows).
+  const isDirty = isEdit
+    ? rows.some((r, i) => {
+        const init = initialRows?.[i];
+        return (
+          r.name.trim() !== (init?.name ?? "").trim() ||
+          r.actual.trim() !== (init?.actual ?? "").trim() ||
+          r.predicted.trim() !== (init?.predicted ?? "").trim()
+        );
+      })
+    : rows.some(
+        (r) => r.name.trim() || r.actual.trim() || r.predicted.trim(),
+      );
+
+  const doClose = () => {
+    setError(null);
+    setDiscardConfirmOpen(false);
+    onClose();
+  };
+
+  // Close request from the ✕, footer Cancel, or (edit mode) the backdrop:
+  // close straight away when clean, otherwise confirm discarding.
+  const attemptClose = () => {
+    if (submitting) return;
+    if (isDirty) setDiscardConfirmOpen(true);
+    else doClose();
   };
 
   const handleSubmit = async () => {
@@ -157,7 +183,12 @@ export function AddSttItemsDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={handleClose}
+      onClick={() => {
+        // Backdrop click is disabled while adding new items (so accidental
+        // outside clicks can't discard work). When editing an existing item
+        // it closes if unchanged, or asks to discard if there are edits.
+        if (isEdit) attemptClose();
+      }}
     >
       <div
         className="bg-background border border-border rounded-xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh]"
@@ -175,7 +206,7 @@ export function AddSttItemsDialog({
             </p>
           </div>
           <button
-            onClick={handleClose}
+            onClick={attemptClose}
             disabled={submitting}
             className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -302,7 +333,7 @@ export function AddSttItemsDialog({
         <div className="flex items-center justify-end gap-2 md:gap-3 px-5 md:px-6 py-4 border-t border-border">
           <div className="flex items-center gap-2 md:gap-3">
             <button
-              onClick={handleClose}
+              onClick={attemptClose}
               disabled={submitting}
               className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -328,6 +359,43 @@ export function AddSttItemsDialog({
           </div>
         </div>
       </div>
+
+      {/* Discard-changes confirmation, shown when closing with unsaved edits. */}
+      {discardConfirmOpen && (
+        <div
+          className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            setDiscardConfirmOpen(false);
+          }}
+        >
+          <div
+            className="bg-background border border-border rounded-xl w-full max-w-sm shadow-2xl p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-semibold text-foreground">
+              Discard changes?
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              You have unsaved changes. If you close now, they&apos;ll be lost.
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-2 md:gap-3">
+              <button
+                onClick={() => setDiscardConfirmOpen(false)}
+                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent transition-colors cursor-pointer"
+              >
+                Keep editing
+              </button>
+              <button
+                onClick={doClose}
+                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-red-600 text-white hover:bg-red-700 transition-colors cursor-pointer"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
