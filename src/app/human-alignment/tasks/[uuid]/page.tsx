@@ -3115,7 +3115,7 @@ function LabellingTaskPageInner() {
                 </div>
               ) : taskType === "stt" ? (
                 <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-2 border-b border-border bg-muted/30 items-center">
+                  <div className="grid grid-cols-[40px_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-2 border-b border-border bg-muted/30 items-center">
                     <input
                       type="checkbox"
                       checked={allSelected}
@@ -3128,12 +3128,6 @@ function LabellingTaskPageInner() {
                     />
                     <div className="text-sm font-medium text-muted-foreground">
                       Name
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Reference transcript
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Predicted transcript
                     </div>
                     <div className="text-sm font-medium text-muted-foreground">
                       Labelled by
@@ -3154,14 +3148,6 @@ function LabellingTaskPageInner() {
                   {items.map((item) => {
                     const p = (item.payload ?? {}) as Record<string, unknown>;
                     const name = typeof p.name === "string" ? p.name : "";
-                    const ref =
-                      typeof p.reference_transcript === "string"
-                        ? p.reference_transcript
-                        : "";
-                    const pred =
-                      typeof p.predicted_transcript === "string"
-                        ? p.predicted_transcript
-                        : "";
                     const isSelected =
                       selectAllTotal || selectedItemIds.has(item.uuid);
                     const labellerIds = labellersByItem.get(item.uuid);
@@ -3181,7 +3167,7 @@ function LabellingTaskPageInner() {
                             }
                             openItemDetail(item.uuid);
                           }}
-                          className={`grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
+                          className={`grid grid-cols-[40px_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
                             isSelected ? "bg-muted/30" : "hover:bg-muted/20"
                           }`}
                         >
@@ -3205,12 +3191,6 @@ function LabellingTaskPageInner() {
                           />
                           <p className="text-sm text-foreground line-clamp-2">
                             {name || "—"}
-                          </p>
-                          <p className="text-sm text-foreground line-clamp-2">
-                            {ref || "—"}
-                          </p>
-                          <p className="text-sm text-foreground line-clamp-2">
-                            {pred || "—"}
                           </p>
                           <LabelledByCell
                             labellers={labellerIds}

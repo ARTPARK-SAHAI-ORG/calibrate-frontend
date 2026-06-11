@@ -181,15 +181,7 @@ export function AddSttItemsDialog({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={() => {
-        // Backdrop click is disabled while adding new items (so accidental
-        // outside clicks can't discard work). When editing an existing item
-        // it closes if unchanged, or asks to discard if there are edits.
-        if (isEdit) attemptClose();
-      }}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div
         className="bg-background border border-border rounded-xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
