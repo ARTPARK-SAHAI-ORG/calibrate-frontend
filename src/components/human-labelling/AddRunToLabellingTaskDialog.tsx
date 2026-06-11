@@ -131,7 +131,6 @@ function buildOneItem(
   raw: RawTestCaseLike,
   nameOverride?: string,
 ): { item: BuiltItem; evaluatorUuids: string[] } | null {
-  const evalType = raw.test_case?.evaluation?.type;
   if (!isLabellingEligibleRaw(raw)) return null;
 
   const name =
@@ -234,11 +233,16 @@ export function buildItemsFromSource(
           }
         }
       }
-      // Always merge the top-level run evaluators (TestRunStatusResponse.
-      // evaluators[]). They're the canonical evaluator set for the run
-      // and per-test/per-result echoes may be sparse.
-      for (const ev of source.evaluators ?? []) {
-        if (ev?.uuid) evaluatorUuids.add(ev.uuid);
+      // `evaluatorUuids` is built from the SELECTED tests' per-test echoes
+      // (judge_results / test_case.evaluators), so the evaluator set — and
+      // therefore the task filter and new-task evaluator_ids — reflects only
+      // the tests being submitted. Fall back to the run-level evaluators[]
+      // only when those echoes are entirely absent (sparse run payloads), so
+      // we never produce an item set with zero evaluators.
+      if (evaluatorUuids.size === 0) {
+        for (const ev of source.evaluators ?? []) {
+          if (ev?.uuid) evaluatorUuids.add(ev.uuid);
+        }
       }
       return { items, skippedCount, evaluatorUuids };
     }
