@@ -13,7 +13,7 @@ export type EvaluatorType =
   | "conversation";
 
 const baseClasses =
-  "inline-flex items-center px-2 py-0.5 rounded-md text-[10px] md:text-[11px] font-medium uppercase tracking-wide";
+  "inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-md text-[10px] md:text-[11px] font-medium uppercase tracking-wide";
 
 export function DefaultPill() {
   return (

@@ -601,7 +601,7 @@ function HumanLabellingPageInner() {
             <>
               {/* Desktop table */}
               <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-                <div className="grid grid-cols-[minmax(0,1fr)_160px_100px_minmax(0,1.2fr)_40px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-2 border-b border-border bg-muted/30">
+                <div className="grid grid-cols-[minmax(0,1fr)_200px_100px_minmax(0,1.2fr)_40px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-2 border-b border-border bg-muted/30">
                   <div className="text-sm font-medium text-muted-foreground">
                     Name
                   </div>
@@ -626,7 +626,7 @@ function HumanLabellingPageInner() {
                       onClick={() =>
                         router.push(`/human-alignment/tasks/${task.uuid}`)
                       }
-                      className="grid grid-cols-[minmax(0,1fr)_160px_100px_minmax(0,1.2fr)_40px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                      className="grid grid-cols-[minmax(0,1fr)_200px_100px_minmax(0,1.2fr)_40px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                     >
                       <p className="text-sm font-medium text-foreground truncate">
                         {task.name}
