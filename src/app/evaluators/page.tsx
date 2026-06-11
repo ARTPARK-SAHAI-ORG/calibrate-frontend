@@ -27,6 +27,7 @@ import {
 } from "@/components/evaluators/BinaryScaleEditor";
 import { defaultBinaryLabel } from "@/lib/binaryLabels";
 import { UseCasePickerDialog } from "@/components/evaluators/UseCasePickerDialog";
+import { EVALUATOR_USE_CASE_OPTIONS } from "@/components/evaluators/evaluatorUseCases";
 import { Select } from "@/components/ui/Select";
 import { extractVariableNames } from "@/lib/evaluatorVariables";
 import {
@@ -82,51 +83,6 @@ const EVALUATOR_TYPE_TO_DATA_TYPE: Record<EvaluatorType, "text" | "audio"> = {
   "llm-general": "text",
   conversation: "text",
 };
-
-// Ordered for the use-case picker: the most common pick (a single,
-// non-conversational LLM output) leads, the rest of the text/LLM cases
-// follow, and the audio cases are grouped at the end. Descriptions are
-// kept to one short, plain-language line so the picker stays scannable for
-// first-time users; the `group` field drives the section headers and
-// `recommended` flags the "Most common" badge in UseCasePickerDialog.
-const EVALUATOR_TYPE_OPTIONS: {
-  value: EvaluatorType;
-  title: string;
-  description: string;
-  group: "conversation" | "text" | "audio";
-  recommended?: boolean;
-}[] = [
-  {
-    value: "llm",
-    title: "Conversational reply",
-    description: "Judge an agent's next reply in a conversation",
-    group: "conversation",
-  },
-  {
-    value: "conversation",
-    title: "Full conversation",
-    description: "Judge the agent's performance in a whole conversation",
-    group: "conversation",
-  },
-  {
-    value: "llm-general",
-    title: "LLM response",
-    description: "Judge the output of an LLM given a text input",
-    group: "text",
-  },
-  {
-    value: "stt",
-    title: "Speech to Text",
-    description: "Judge transcription accuracy against a reference transcript",
-    group: "audio",
-  },
-  {
-    value: "tts",
-    title: "Text to Speech (TTS)",
-    description: "Judge generated the quality of generated audio",
-    group: "audio",
-  },
-];
 
 async function getEvaluatorErrorMessage(
   response: Response,
@@ -817,7 +773,7 @@ function MetricsPageInner() {
               aria-label="Filter by purpose"
             >
               <option value="all">All purposes</option>
-              {EVALUATOR_TYPE_OPTIONS.map((opt) => (
+              {EVALUATOR_USE_CASE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {EVALUATOR_TYPE_LABELS[opt.value]}
                 </option>
@@ -1067,7 +1023,7 @@ function MetricsPageInner() {
       {useCasePickerOpen && (
         <UseCasePickerDialog
           initialValue={newEvaluatorType}
-          options={EVALUATOR_TYPE_OPTIONS}
+          options={EVALUATOR_USE_CASE_OPTIONS}
           onCancel={() => {
             setUseCasePickerOpen(false);
             if (!addEvaluatorSidebarOpen) {
