@@ -162,6 +162,12 @@ const expectedValueTypeError = (value: string, dataType: string): boolean => {
 
 type SelectedToolConfig = {
   id: string;
+  // The tool's permanent uuid, set only for library tools resolved from
+  // GET /tools. Undefined for inbuilt tools and for name-only entries whose
+  // tool isn't a live library tool (agent-owned, CSV-imported, or deleted).
+  // Drives whether `tool_uuid` is sent on save — never derive it from `id`,
+  // which for those name-only cases holds the name, not a uuid.
+  toolUuid?: string;
   name: string;
   expectation: "should-call" | "should-not-call";
   acceptAnyParameterValues: boolean;
@@ -614,7 +620,15 @@ export type TestConfig = {
   evaluation: {
     type: "tool_call" | "response" | "conversation";
     tool_calls?: Array<{
+      // Display name. On write this can be anything — the backend overwrites
+      // it with the live name resolved from `tool_uuid`. On read it's always
+      // the tool's current name (or last-known name if the tool was deleted).
       tool: string;
+      // Optional permanent link to the tool. Sent for library tools (those in
+      // GET /tools) to get rename-tracking; omitted for inbuilt/agent-owned
+      // tools, which are stored by name. A sent uuid is validated by the
+      // backend (404 if it isn't a live tool in the org).
+      tool_uuid?: string;
       arguments: Record<string, any>;
       is_called?: boolean;
       accept_any_arguments?: boolean;
@@ -1051,12 +1065,19 @@ export function AddTestDialog({
                   : "should-call";
               const acceptAny = toolCall.accept_any_arguments === true;
 
-              // Check if this is an inbuilt tool by matching tool id or name
+              // Check if this is an inbuilt tool by matching tool id or name.
+              // Inbuilt system tools (e.g. end_call) carry no tool_uuid.
               const inbuiltTool = INBUILT_TOOLS.find(
                 (t) => t.id === toolCall.tool || t.name === toolCall.tool,
               );
+              // Custom tools now link by their permanent `tool_uuid`. Match on
+              // that first; fall back to name for any pre-link/edge data. A
+              // tool that was deleted won't be found here — we keep the saved
+              // uuid + last-known name so the row still renders.
               const matchedTool = availableTools.find(
-                (t) => t.uuid === toolCall.tool || t.name === toolCall.tool,
+                (t) =>
+                  (toolCall.tool_uuid && t.uuid === toolCall.tool_uuid) ||
+                  t.name === toolCall.tool,
               );
               const savedArgs =
                 toolCall.arguments &&
@@ -1084,7 +1105,16 @@ export function AddTestDialog({
               }
 
               return {
-                id: inbuiltTool ? inbuiltTool.id : toolCall.tool,
+                // `id` is just the row key/dedup handle. Prefer a stable uuid
+                // (the saved link or a live match), falling back to the name.
+                id: inbuiltTool
+                  ? inbuiltTool.id
+                  : (toolCall.tool_uuid ?? matchedTool?.uuid ?? toolCall.tool),
+                // Only carry a uuid forward to the next save when it resolves
+                // to a LIVE library tool. A saved uuid whose tool was deleted
+                // (or belongs to another org) is intentionally dropped so the
+                // re-save falls back to name-only rather than 404-ing.
+                toolUuid: inbuiltTool ? undefined : matchedTool?.uuid,
                 name: inbuiltTool ? inbuiltTool.name : toolCall.tool,
                 expectation,
                 acceptAnyParameterValues: acceptAny,
@@ -1732,6 +1762,7 @@ export function AddTestDialog({
 
     const newTool: SelectedToolConfig = {
       id: tool.uuid,
+      toolUuid: tool.uuid,
       name: tool.name,
       expectation: "should-call",
       acceptAnyParameterValues: isWebhook,
@@ -2560,11 +2591,21 @@ export function AddTestDialog({
             ? {}
             : buildArgsFromExpectedParams(tool.expectedParameters);
 
-          return {
+          const entry: NonNullable<
+            TestConfig["evaluation"]["tool_calls"]
+          >[number] = {
             tool: toolIdentifier,
             arguments: expectedArgs,
             accept_any_arguments: tool.acceptAnyParameterValues,
           };
+          // Link library tools by their permanent uuid so renames track; the
+          // backend resolves the live name from it. `toolUuid` is set only for
+          // live library tools — inbuilt, agent-owned and deleted tools leave
+          // it undefined and are stored by name (a sent uuid would 404).
+          if (tool.toolUuid) {
+            entry.tool_uuid = tool.toolUuid;
+          }
+          return entry;
         });
 
         evaluation = {
