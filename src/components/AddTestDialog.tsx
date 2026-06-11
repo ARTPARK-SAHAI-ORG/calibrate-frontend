@@ -2345,15 +2345,8 @@ export function AddTestDialog({
             // no LLM judging.
             <div className="flex items-center gap-2">
               {renderMatchTypeSelect(toolId, paramPath, mode, false)}
-              {isNull || isAny ? (
-                <input
-                  type="text"
-                  value={isAny ? "any value" : "null"}
-                  disabled
-                  readOnly
-                  className={`${fieldClass} flex-1 min-w-0`}
-                />
-              ) : (
+              {/* "Is null" / "Is any" assert presence only — no value box. */}
+              {!isNull && !isAny && (
                 <div className="relative flex-1 min-w-0">
                   <select
                     value={booleanUnset ? "" : param.value}
@@ -2406,13 +2399,8 @@ export function AddTestDialog({
                   className={`${fieldClass} flex-1 min-w-0`}
                 />
               ) : isNull || isAny ? (
-                <input
-                  type="text"
-                  value={isAny ? "any value" : "null"}
-                  disabled
-                  readOnly
-                  className={`${fieldClass} flex-1 min-w-0`}
-                />
+                // "Is null" / "Is any" assert presence only — no value box.
+                null
               ) : (
                 <input
                   type="text"
