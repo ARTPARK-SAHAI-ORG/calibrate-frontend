@@ -31,12 +31,12 @@ export function LlmGeneralItemPane({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Section title="Input" subtitle="What the LLM was given">
+      <Section title="Input">
         <p className="text-sm whitespace-pre-wrap break-words">
           {input || "—"}
         </p>
       </Section>
-      <Section title="Output" subtitle="What the LLM produced">
+      <Section title="Output">
         <p className="text-sm whitespace-pre-wrap break-words">
           {output || "—"}
         </p>
