@@ -46,6 +46,7 @@ type EvaluatorRef = {
 };
 
 const NAME_HEADERS = ["name", "title", "label", "item_name"];
+const DESCRIPTION_HEADERS = ["description", "desc", "notes"];
 const INPUT_HEADERS = ["input", "prompt", "question", "request"];
 const OUTPUT_HEADERS = ["output", "response", "completion", "answer", "reply"];
 
@@ -62,6 +63,7 @@ function variableColumnName(evalName: string, varName: string): string {
 
 const SAMPLE_BASE_ROWS: Array<{
   name: string;
+  description: string;
   input: string;
   output: string;
   sampleVariableValue: string;
@@ -69,6 +71,7 @@ const SAMPLE_BASE_ROWS: Array<{
 }> = [
   {
     name: "Summary 1",
+    description: "Summarisation quality check.",
     input: "Summarise: The cat sat on the mat and then went to sleep.",
     output: "A cat sat on a mat and fell asleep.",
     sampleVariableValue:
@@ -77,6 +80,7 @@ const SAMPLE_BASE_ROWS: Array<{
   },
   {
     name: "Classification 1",
+    description: "",
     input: "Classify the sentiment: I absolutely loved this product!",
     output: "positive",
     sampleVariableValue:
@@ -97,6 +101,7 @@ function buildSampleCsv(
   }
   const headerCells = [
     "name",
+    "description",
     "input",
     "output",
     ...variableColumns.map((c) =>
@@ -112,6 +117,7 @@ function buildSampleCsv(
   const lines = SAMPLE_BASE_ROWS.map((r) =>
     [
       csvEscape(r.name),
+      csvEscape(r.description),
       csvEscape(r.input),
       csvEscape(r.output),
       ...variableColumns.map(() => csvEscape(r.sampleVariableValue)),
@@ -128,6 +134,7 @@ function buildSampleCsv(
 
 type ParsedItem = {
   name: string;
+  description: string;
   input: string;
   output: string;
   evaluators: EvaluatorRef[];
@@ -236,6 +243,7 @@ export function BulkUploadLlmGeneralItemsDialog({
       complete: (results) => {
         const headers = results.meta.fields ?? [];
         const nameKey = findHeaderKey(headers, NAME_HEADERS);
+        const descriptionKey = findHeaderKey(headers, DESCRIPTION_HEADERS);
         const inputKey = findHeaderKey(headers, INPUT_HEADERS);
         const outputKey = findHeaderKey(headers, OUTPUT_HEADERS);
         if (!nameKey || !inputKey || !outputKey) {
@@ -308,6 +316,9 @@ export function BulkUploadLlmGeneralItemsDialog({
         for (let i = 0; i < results.data.length; i++) {
           const r = results.data[i];
           const name = (r[nameKey] ?? "").trim();
+          const description = descriptionKey
+            ? (r[descriptionKey] ?? "").trim()
+            : "";
           const input = (r[inputKey] ?? "").trim();
           const output = (r[outputKey] ?? "").trim();
           const anyVariableValue = evaluatorsWithVariables.some((e) =>
@@ -382,7 +393,14 @@ export function BulkUploadLlmGeneralItemsDialog({
               });
             }
           }
-          items.push({ name, input, output, evaluators: refs, annotations });
+          items.push({
+            name,
+            description,
+            input,
+            output,
+            evaluators: refs,
+            annotations,
+          });
         }
         if (items.length === 0) {
           setParseError("No rows with content were found in the CSV.");
@@ -425,6 +443,7 @@ export function BulkUploadLlmGeneralItemsDialog({
         return {
           payload: {
             name: p.name,
+            ...(p.description ? { description: p.description } : {}),
             input: p.input,
             output: p.output,
             ...(Object.keys(evaluator_variables).length > 0
@@ -499,6 +518,12 @@ export function BulkUploadLlmGeneralItemsDialog({
       }
     }
 
+    columns.push({
+      name: "description",
+      description:
+        "(optional) A description of this item. Shown to annotators alongside the evaluators while they label.",
+    });
+
     return {
       title: "Bulk upload — LLM response labelling items",
       intro:
@@ -529,9 +554,16 @@ export function BulkUploadLlmGeneralItemsDialog({
           },
         ])
       : [];
+  // Surface a Description column in the preview only when at least one row
+  // carries a non-empty description — keeps the preview tight for the common
+  // case where descriptions aren't used.
+  const showDescriptionColumn = parsedItems.some(
+    (p) => p.description.trim().length > 0,
+  );
   const gridStyle = {
     gridTemplateColumns: [
       "minmax(80px, 140px)",
+      ...(showDescriptionColumn ? ["minmax(120px, 200px)"] : []),
       "minmax(120px, 220px)",
       "minmax(120px, 220px)",
       ...variableColumns.map(() => "minmax(120px, 200px)"),
@@ -552,6 +584,11 @@ export function BulkUploadLlmGeneralItemsDialog({
         style={gridStyle}
       >
         <div className="text-xs font-medium text-muted-foreground">Name</div>
+        {showDescriptionColumn && (
+          <div className="text-xs font-medium text-muted-foreground">
+            Description
+          </div>
+        )}
         <div className="text-xs font-medium text-muted-foreground">Input</div>
         <div className="text-xs font-medium text-muted-foreground">Output</div>
         {variableColumns.map((c) => (
@@ -593,6 +630,14 @@ export function BulkUploadLlmGeneralItemsDialog({
               <div className="truncate text-foreground" title={p.name}>
                 {p.name || <span className="text-muted-foreground">—</span>}
               </div>
+              {showDescriptionColumn && (
+                <div
+                  className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                  title={p.description || undefined}
+                >
+                  {p.description}
+                </div>
+              )}
               <div
                 className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
                 title={p.input}
