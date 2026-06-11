@@ -1760,7 +1760,8 @@ export function BulkUploadTestsModal({
                                     return (
                                       <div
                                         key={`${idx}-${c.evaluatorUuid}-${c.varName}`}
-                                        className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                                        title={attached ? value : undefined}
+                                        className="min-w-0 pr-1 leading-snug text-foreground break-words line-clamp-4"
                                       >
                                         {!attached ? (
                                           <span className="text-muted-foreground italic">
