@@ -10,16 +10,18 @@ export type EvaluatorTypeOption = {
   description: string;
   // Drives the section the card is grouped under. Optional so older callers
   // that pass an ungrouped list still render (everything falls under "text").
-  group?: "text" | "audio";
+  group?: "conversation" | "text" | "audio";
   // Flags the "Most common" badge — a starting-point cue for new users.
   recommended?: boolean;
 };
 
 // Section headers shown above each group of cards, in render order.
-const GROUP_ORDER: { key: "text" | "audio"; label: string }[] = [
-  { key: "text", label: "Text & LLM" },
-  { key: "audio", label: "Audio" },
-];
+const GROUP_ORDER: { key: "conversation" | "text" | "audio"; label: string }[] =
+  [
+    { key: "conversation", label: "Conversation" },
+    { key: "text", label: "Text" },
+    { key: "audio", label: "Audio" },
+  ];
 
 const TYPE_INACTIVE_CLASSES: Record<EvaluatorType, string> = {
   tts: "border-purple-500/20 bg-purple-500/[0.04] hover:bg-purple-500/10 hover:border-purple-500/40",

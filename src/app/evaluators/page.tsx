@@ -69,9 +69,7 @@ function buildBinaryOutputConfig(rows: BinaryScaleRow[]): {
       scale: rows.map((r) => ({
         value: r.value,
         name: r.name.trim() || defaultBinaryLabel(r.value),
-        ...(r.description.trim()
-          ? { description: r.description.trim() }
-          : {}),
+        ...(r.description.trim() ? { description: r.description.trim() } : {}),
       })),
     },
   };
@@ -95,38 +93,38 @@ const EVALUATOR_TYPE_OPTIONS: {
   value: EvaluatorType;
   title: string;
   description: string;
-  group: "text" | "audio";
+  group: "conversation" | "text" | "audio";
   recommended?: boolean;
 }[] = [
   {
-    value: "llm-general",
-    title: "LLM response",
-    description: "Judge a single AI output — classify, extract, summarise",
-    group: "text",
-    recommended: true,
-  },
-  {
     value: "llm",
     title: "Conversational reply",
-    description: "Judge a chatbot's next reply in a chat",
-    group: "text",
+    description: "Judge an agent's next reply in a conversation",
+    group: "conversation",
   },
   {
     value: "conversation",
     title: "Full conversation",
-    description: "Judge a whole conversation, start to finish",
+    description: "Judge the agent's performance in a whole conversation",
+    group: "conversation",
+  },
+  {
+    value: "llm-general",
+    title: "LLM response",
+    description: "Judge the output of an LLM given a text input",
     group: "text",
+    recommended: true,
   },
   {
     value: "stt",
     title: "Speech to Text",
-    description: "Judge transcription accuracy against a reference",
+    description: "Judge transcription accuracy against a reference transcript",
     group: "audio",
   },
   {
     value: "tts",
     title: "Text to Speech (TTS)",
-    description: "Judge generated audio quality",
+    description: "Judge generated the quality of generated audio",
     group: "audio",
   },
 ];
@@ -253,9 +251,8 @@ function MetricsPageInner() {
     { value: 2, name: "", description: "" },
     { value: 3, name: "", description: "" },
   ]);
-  const [newEvaluatorBinaryScale, setNewEvaluatorBinaryScale] = useState<
-    BinaryScaleRow[]
-  >(defaultBinaryScale());
+  const [newEvaluatorBinaryScale, setNewEvaluatorBinaryScale] =
+    useState<BinaryScaleRow[]>(defaultBinaryScale());
 
   // Delete confirmation state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -472,7 +469,9 @@ function MetricsPageInner() {
 
       // Remove the evaluator from local state
       setEvaluators(
-        evaluators.filter((evaluator) => evaluator.uuid !== evaluatorToDelete.uuid),
+        evaluators.filter(
+          (evaluator) => evaluator.uuid !== evaluatorToDelete.uuid,
+        ),
       );
       closeDeleteDialog();
     } catch (err) {
@@ -503,11 +502,11 @@ function MetricsPageInner() {
         const evaluatorsResponse = await fetch(
           `${backendUrl}/evaluators?include_defaults=true`,
           {
-          method: "GET",
-          headers: {
-            accept: "application/json",
-            Authorization: `Bearer ${backendAccessToken}`,
-          },
+            method: "GET",
+            headers: {
+              accept: "application/json",
+              Authorization: `Bearer ${backendAccessToken}`,
+            },
           },
         );
 
@@ -1356,4 +1355,3 @@ function DuplicateEvaluatorDialog({
     </div>
   );
 }
-
