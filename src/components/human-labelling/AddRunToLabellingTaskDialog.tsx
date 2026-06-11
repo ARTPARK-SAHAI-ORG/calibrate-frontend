@@ -195,6 +195,77 @@ export function buildItemsFromSource(
   }
 }
 
+type SelectableTest = { key: string; name: string };
+
+function getAvailableTests(
+  source: AddRunToLabellingTaskSource,
+): SelectableTest[] {
+  if (source.type === "test_run") {
+    return source.results.map((r, i) => {
+      const raw = r as RawTestCaseLike;
+      const name =
+        raw.test_case?.name ?? raw.test_name ?? raw.name ?? "Untitled test";
+      const key = raw.test_name ?? raw.test_case?.name ?? `idx-${i}`;
+      return { key: `${key}#${i}`, name };
+    });
+  }
+  const seen = new Map<string, SelectableTest>();
+  for (const mr of source.modelResults) {
+    const results = mr.test_results ?? [];
+    for (const r of results) {
+      const raw = r as RawTestCaseLike;
+      const name =
+        raw.test_case?.name ?? raw.test_name ?? raw.name ?? "Untitled test";
+      if (!seen.has(name)) seen.set(name, { key: name, name });
+    }
+  }
+  return Array.from(seen.values());
+}
+
+function getAvailableModels(source: AddRunToLabellingTaskSource): string[] {
+  if (source.type !== "benchmark_run") return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const mr of source.modelResults) {
+    if (!seen.has(mr.model)) {
+      seen.add(mr.model);
+      out.push(mr.model);
+    }
+  }
+  return out;
+}
+
+function filterSourceBySelection(
+  source: AddRunToLabellingTaskSource,
+  selectedTestKeys: Set<string>,
+  selectedModels: Set<string>,
+): AddRunToLabellingTaskSource {
+  if (source.type === "test_run") {
+    return {
+      ...source,
+      results: source.results.filter((r, i) => {
+        const raw = r as RawTestCaseLike;
+        const baseKey = raw.test_name ?? raw.test_case?.name ?? `idx-${i}`;
+        return selectedTestKeys.has(`${baseKey}#${i}`);
+      }),
+    };
+  }
+  return {
+    ...source,
+    modelResults: source.modelResults
+      .filter((mr) => selectedModels.has(mr.model))
+      .map((mr) => ({
+        ...mr,
+        test_results: (mr.test_results ?? []).filter((r) => {
+          const raw = r as RawTestCaseLike;
+          const name =
+            raw.test_case?.name ?? raw.test_name ?? raw.name ?? "Untitled test";
+          return selectedTestKeys.has(name);
+        }),
+      })),
+  };
+}
+
 type Mode = "existing" | "new";
 
 export function AddRunToLabellingTaskDialog({
@@ -215,6 +286,15 @@ export function AddRunToLabellingTaskDialog({
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [nameInvalid, setNameInvalid] = useState(false);
+
+  const availableTests = useMemo(() => getAvailableTests(source), [source]);
+  const availableModels = useMemo(() => getAvailableModels(source), [source]);
+  const [selectedTestKeys, setSelectedTestKeys] = useState<Set<string>>(
+    () => new Set(availableTests.map((t) => t.key)),
+  );
+  const [selectedModels, setSelectedModels] = useState<Set<string>>(
+    () => new Set(availableModels),
+  );
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -247,8 +327,10 @@ export function AddRunToLabellingTaskDialog({
     setSubmitting(false);
     setSubmitError(null);
     setSuccess(null);
+    setSelectedTestKeys(new Set(availableTests.map((t) => t.key)));
+    setSelectedModels(new Set(availableModels));
     onAddedFiredRef.current = false;
-  }, [isOpen]);
+  }, [isOpen, availableTests, availableModels]);
 
   useEffect(() => {
     if (!isOpen || !accessToken) return;
@@ -297,11 +379,46 @@ export function AddRunToLabellingTaskDialog({
     }
   }, [mode, supportedTasks, selectedTaskUuid]);
 
+  const filteredSource = useMemo(
+    () => filterSourceBySelection(source, selectedTestKeys, selectedModels),
+    [source, selectedTestKeys, selectedModels],
+  );
   const transform = useMemo(
-    () => buildItemsFromSource(source, targetTaskType),
-    [source, targetTaskType],
+    () => buildItemsFromSource(filteredSource, targetTaskType),
+    [filteredSource, targetTaskType],
   );
   const { items, skippedCount, evaluatorUuids } = transform;
+
+  const toggleAllTests = () => {
+    if (selectedTestKeys.size === availableTests.length) {
+      setSelectedTestKeys(new Set());
+    } else {
+      setSelectedTestKeys(new Set(availableTests.map((t) => t.key)));
+    }
+  };
+  const toggleTestKey = (key: string) => {
+    setSelectedTestKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+  const toggleAllModels = () => {
+    if (selectedModels.size === availableModels.length) {
+      setSelectedModels(new Set());
+    } else {
+      setSelectedModels(new Set(availableModels));
+    }
+  };
+  const toggleModel = (model: string) => {
+    setSelectedModels((prev) => {
+      const next = new Set(prev);
+      if (next.has(model)) next.delete(model);
+      else next.add(model);
+      return next;
+    });
+  };
 
   const selectedTask = useMemo(
     () => supportedTasks.find((t) => t.uuid === selectedTaskUuid) ?? null,
@@ -419,7 +536,7 @@ export function AddRunToLabellingTaskDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-xl bg-background border border-border p-6 shadow-xl">
+      <div className="w-full max-w-xl rounded-xl bg-background border border-border p-6 shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-start justify-between gap-3 mb-4">
           <h2 className="text-base md:text-lg font-semibold text-foreground">
             Add to labelling task
@@ -589,6 +706,81 @@ export function AddRunToLabellingTaskDialog({
                     disabled={submitting}
                     className="w-full px-3 py-2 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent resize-y disabled:opacity-50 disabled:cursor-not-allowed"
                   />
+                </div>
+              </div>
+            )}
+
+            {availableTests.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium">
+                    Tests to add ({selectedTestKeys.size} of{" "}
+                    {availableTests.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={toggleAllTests}
+                    disabled={submitting}
+                    className="text-xs text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {selectedTestKeys.size === availableTests.length
+                      ? "Deselect all"
+                      : "Select all"}
+                  </button>
+                </div>
+                <div className="max-h-40 overflow-y-auto rounded-md border border-border bg-background">
+                  {availableTests.map((t) => (
+                    <label
+                      key={t.key}
+                      className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted/30 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedTestKeys.has(t.key)}
+                        onChange={() => toggleTestKey(t.key)}
+                        disabled={submitting}
+                        className="cursor-pointer disabled:cursor-not-allowed"
+                      />
+                      <span className="truncate">{t.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {availableModels.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium">
+                    Models ({selectedModels.size} of {availableModels.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={toggleAllModels}
+                    disabled={submitting}
+                    className="text-xs text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {selectedModels.size === availableModels.length
+                      ? "Deselect all"
+                      : "Select all"}
+                  </button>
+                </div>
+                <div className="max-h-32 overflow-y-auto rounded-md border border-border bg-background">
+                  {availableModels.map((m) => (
+                    <label
+                      key={m}
+                      className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted/30 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedModels.has(m)}
+                        onChange={() => toggleModel(m)}
+                        disabled={submitting}
+                        className="cursor-pointer disabled:cursor-not-allowed"
+                      />
+                      <span className="truncate">{m}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
             )}
