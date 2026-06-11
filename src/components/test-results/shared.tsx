@@ -157,6 +157,11 @@ export type TestRunEvaluator = {
   uuid: string;
   name: string;
   description?: string | null;
+  /** Version number of the pinned evaluator version the run executed
+   * against. Rendered as a small "vN" pill next to the evaluator name —
+   * mirrors the labelling evaluator-run page. Optional because older run
+   * snapshots (and legacy stub entries) may not carry it. */
+  version_number?: number | null;
   output_type: "binary" | "rating";
   output_config?: {
     scale?: {
@@ -204,6 +209,17 @@ function legacyEvaluatorEntry(
     description: defaultEvaluator.description ?? null,
     output_type: "binary",
   };
+}
+
+// Format a pinned evaluator version as a "vN" label for the verdict card
+// pill. Returns null when no numeric version is available (legacy stub
+// entries / older run snapshots) so the pill is simply omitted.
+function evaluatorVersionLabel(
+  evaluator: TestRunEvaluator | null,
+): string | null {
+  return typeof evaluator?.version_number === "number"
+    ? `v${evaluator.version_number}`
+    : null;
 }
 
 // Shared Status Icon Component
@@ -662,6 +678,7 @@ function JudgeResultCard({
       mode="read"
       name={evaluator?.name ?? "Evaluator"}
       description={evaluator?.description ?? null}
+      versionLabel={evaluatorVersionLabel(evaluator)}
       outputType={isRating ? "rating" : "binary"}
       evaluatorUuid={result.evaluator_uuid ?? undefined}
       enableLink={enableEvaluatorLinks}
@@ -1123,6 +1140,7 @@ function EvaluatorPanelCard({
       mode="read"
       name={evaluator?.name ?? "Evaluator"}
       description={evaluator?.description ?? null}
+      versionLabel={evaluatorVersionLabel(evaluator)}
       outputType={isRating ? "rating" : "binary"}
       evaluatorUuid={result.evaluator_uuid ?? undefined}
       enableLink={enableEvaluatorLinks}
