@@ -560,13 +560,13 @@ export function BenchmarkResultsDialog({
                 />
               </div>
             )}
-            {/* Add to labelling task — only shown when benchmark is done */}
+            {/* Submit for labelling — only shown when benchmark is done */}
             {isDone && !error && hasAnyResults && currentTaskId && (
               <button
                 onClick={() => setAddToTaskOpen(true)}
-                className="hidden md:flex items-center gap-2 h-8 px-2 md:px-3 rounded-md text-xs md:text-sm font-medium border border-border hover:bg-muted/50 transition-colors cursor-pointer"
+                className="hidden md:flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-amber-500/16 border-amber-500/50 text-amber-950 dark:text-amber-100 hover:bg-amber-500/28 dark:hover:bg-amber-500/22"
               >
-                Add to labelling task
+                Submit for labelling
               </button>
             )}
             {/* Rerun button - show when benchmark is complete (not loading and no error) */}

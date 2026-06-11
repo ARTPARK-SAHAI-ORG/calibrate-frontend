@@ -171,15 +171,16 @@ export function buildItemsFromSource(
 
   switch (taskType) {
     case "llm": {
+      const runSuffix =
+        source.type === "test_run"
+          ? source.runUuid.slice(0, 8)
+          : source.benchmarkUuid.slice(0, 8);
       if (source.type === "test_run") {
         for (const r of source.results) {
           const raw = r as RawTestCaseLike;
           const baseName =
             raw.test_case?.name ?? raw.test_name ?? raw.name ?? "Untitled test";
-          const built = buildOneItem(
-            raw,
-            `${baseName} — ${source.runUuid}`,
-          );
+          const built = buildOneItem(raw, `${baseName} — ${runSuffix}`);
           if (!built) {
             skippedCount += 1;
             continue;
@@ -196,7 +197,7 @@ export function buildItemsFromSource(
               raw.test_case?.name ?? raw.test_name ?? raw.name ?? "Untitled test";
             const built = buildOneItem(
               raw,
-              `${baseName} — ${source.benchmarkUuid} — ${mr.model}`,
+              `${baseName} — ${runSuffix} — ${mr.model}`,
             );
             if (!built) {
               skippedCount += 1;

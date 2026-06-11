@@ -999,9 +999,9 @@ export function TestRunnerDialog({
                 <button
                   type="button"
                   onClick={() => setAddToTaskOpen(true)}
-                  className="flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-teal-500/12 border-teal-500/45 text-teal-950 dark:text-teal-100 hover:bg-teal-500/22 dark:hover:bg-teal-500/18"
+                  className="flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-amber-500/16 border-amber-500/50 text-amber-950 dark:text-amber-100 hover:bg-amber-500/28 dark:hover:bg-amber-500/22"
                 >
-                  Add to labelling task
+                  Submit for labelling
                 </button>
               </div>
             )}
