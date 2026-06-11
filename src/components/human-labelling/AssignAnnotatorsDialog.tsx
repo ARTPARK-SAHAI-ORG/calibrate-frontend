@@ -308,7 +308,7 @@ export function AssignAnnotatorsDialog({
 
             {showEvaluatorChoice && (
               <div className="space-y-2 md:col-span-2 flex flex-col min-h-0">
-                <label className="flex items-center gap-3 pr-3 py-2 cursor-pointer select-none">
+                <label className="flex items-center gap-3 pr-3 pb-2 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={includeAllEvaluators}
