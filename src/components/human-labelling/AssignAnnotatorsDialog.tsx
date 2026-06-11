@@ -130,6 +130,10 @@ export function AssignAnnotatorsDialog({
   const evaluatorSelectionValid =
     includeAllEvaluators || pickedEvaluators.size > 0;
 
+  // Only worth offering an evaluator choice (and the wider layout) when the
+  // task has more than one evaluator to pick between.
+  const showEvaluatorChoice = evaluators.length > 1;
+
   const handleConfirm = async () => {
     if (picked.size === 0 || !evaluatorSelectionValid || submitting) return;
     setSubmitting(true);
@@ -154,7 +158,9 @@ export function AssignAnnotatorsDialog({
       }}
     >
       <div
-        className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh]"
+        className={`bg-background border border-border rounded-xl shadow-2xl w-full flex flex-col max-h-[90vh] ${
+          showEvaluatorChoice ? "max-w-3xl" : "max-w-md"
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-6 py-4 border-b border-border flex items-center justify-between">
@@ -184,8 +190,21 @@ export function AssignAnnotatorsDialog({
             </svg>
           </button>
         </div>
-        <div className="p-4 md:p-6 space-y-2 max-h-80 overflow-y-auto">
-          {loading ? (
+        <div className="p-4 md:p-6 overflow-y-auto">
+          <div
+            className={
+              showEvaluatorChoice
+                ? "grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 md:divide-x md:divide-border"
+                : ""
+            }
+          >
+            <div className="space-y-2">
+              {showEvaluatorChoice && (
+                <p className="text-xs font-medium text-muted-foreground">
+                  Annotators
+                </p>
+              )}
+              {loading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <svg
                 className="w-4 h-4 animate-spin"
@@ -275,59 +294,64 @@ export function AssignAnnotatorsDialog({
                   </div>
                 </label>
               ))}
-            </>
-          )}
-
-          {evaluators.length > 1 && (
-            <div className="pt-3 mt-1 border-t border-border space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">
-                Evaluators shown in labelling
-              </p>
-              <label className="flex items-center gap-3 px-3 py-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={includeAllEvaluators}
-                  onChange={(e) => setIncludeAllEvaluators(e.target.checked)}
-                  className="w-4 h-4 cursor-pointer accent-foreground"
-                />
-                <span className="text-sm font-medium">
-                  Include all evaluators
-                </span>
-              </label>
-              {!includeAllEvaluators && (
-                <div className="space-y-2 pl-1">
-                  <p className="text-xs text-muted-foreground">
-                    Pick one or more evaluators to show in these labelling jobs.
-                  </p>
-                  {evaluators.map((ev) => (
-                    <label
-                      key={ev.uuid}
-                      className="flex items-start gap-3 px-3 py-2 rounded-md border border-border hover:bg-muted/30 transition-colors cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={pickedEvaluators.has(ev.uuid)}
-                        onChange={() => toggleEvaluator(ev.uuid)}
-                        className="mt-0.5 w-4 h-4 cursor-pointer accent-foreground"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium truncate">
-                          {ev.name}
-                        </div>
-                        {ev.description && (
-                          <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                            {ev.description}
-                          </div>
-                        )}
-                      </div>
-                    </label>
-                  ))}
-                </div>
+                </>
               )}
             </div>
-          )}
 
-          {submitError && <p className="text-sm text-red-500">{submitError}</p>}
+            {showEvaluatorChoice && (
+              <div className="space-y-2 md:pl-8">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Evaluators shown in labelling
+                </p>
+                <label className="flex items-center gap-3 px-3 py-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={includeAllEvaluators}
+                    onChange={(e) => setIncludeAllEvaluators(e.target.checked)}
+                    className="w-4 h-4 cursor-pointer accent-foreground"
+                  />
+                  <span className="text-sm font-medium">
+                    Include all evaluators
+                  </span>
+                </label>
+                {!includeAllEvaluators && (
+                  <div className="space-y-2 pl-1">
+                    <p className="text-xs text-muted-foreground">
+                      Pick one or more evaluators to show in these labelling
+                      jobs.
+                    </p>
+                    {evaluators.map((ev) => (
+                      <label
+                        key={ev.uuid}
+                        className="flex items-start gap-3 px-3 py-2 rounded-md border border-border hover:bg-muted/30 transition-colors cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={pickedEvaluators.has(ev.uuid)}
+                          onChange={() => toggleEvaluator(ev.uuid)}
+                          className="mt-0.5 w-4 h-4 cursor-pointer accent-foreground"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium truncate">
+                            {ev.name}
+                          </div>
+                          {ev.description && (
+                            <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                              {ev.description}
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {submitError && (
+            <p className="text-sm text-red-500 mt-3">{submitError}</p>
+          )}
         </div>
         <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-3">
           <button
