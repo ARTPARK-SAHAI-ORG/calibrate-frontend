@@ -875,9 +875,9 @@ export function TestRunnerDialog({
         {/* Header */}
         <div className="relative flex items-center justify-between gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-border">
           {/* Left: title + pass/fail stats */}
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-3 md:gap-5 min-w-0">
             <div className="min-w-0">
-              <div className="flex items-center gap-2 md:gap-5">
+              <div className="flex items-center gap-2">
                 {(runStatus === "queued" || runStatus === "in_progress") && (
                   <span
                     className="relative flex h-2.5 w-2.5 shrink-0"
@@ -890,23 +890,24 @@ export function TestRunnerDialog({
                 <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
                   {runName ?? "Test run"}
                 </h2>
-                {/* Passed/Failed counts - desktop only */}
-                {!isOverallError &&
-                  testResults.length > 0 &&
-                  (passedTests.length > 0 ||
-                    failedTests.length > 0 ||
-                    erroredTests.length > 0) && (
-                    <div className="hidden md:block shrink-0">
-                      <TestStats
-                        passedCount={passedTests.length}
-                        failedCount={failedTests.length}
-                        erroredCount={erroredTests.length}
-                      />
-                    </div>
-                  )}
               </div>
               <p className="text-xs text-muted-foreground truncate">{agentName}</p>
             </div>
+            {/* Passed/Failed counts - desktop only; sits to the right of the
+                title + agent-name block so it clears the width of both. */}
+            {!isOverallError &&
+              testResults.length > 0 &&
+              (passedTests.length > 0 ||
+                failedTests.length > 0 ||
+                erroredTests.length > 0) && (
+                <div className="hidden md:block shrink-0">
+                  <TestStats
+                    passedCount={passedTests.length}
+                    failedCount={failedTests.length}
+                    erroredCount={erroredTests.length}
+                  />
+                </div>
+              )}
           </div>
           {/* Previous/Next pager - centered, desktop only */}
           {nav && selectedTestUuid && (
