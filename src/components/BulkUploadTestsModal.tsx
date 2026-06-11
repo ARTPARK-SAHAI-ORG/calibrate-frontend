@@ -1660,9 +1660,16 @@ export function BulkUploadTestsModal({
                         upload
                       </p>
                       <div className="border border-border rounded-xl overflow-hidden">
-                        <div className="overflow-x-auto">
+                        {/* Single scroll container for BOTH axes. The header
+                            row is sticky so it stays put while the body scrolls
+                            vertically, and everything scrolls together
+                            horizontally — avoids the nested-scroller setup
+                            (an inner overflow-y-auto silently promotes its
+                            overflow-x to auto, spawning a duplicate horizontal
+                            scrollbar). */}
+                        <div className="max-h-[18rem] overflow-auto">
                           <div
-                            className="grid gap-3 px-4 py-2 border-b border-border bg-muted/30"
+                            className="grid gap-3 px-4 py-2 border-b border-border bg-muted/80 backdrop-blur-sm sticky top-0 z-10"
                             style={gridStyle}
                           >
                             <div className="text-xs font-medium text-muted-foreground">
@@ -1684,7 +1691,7 @@ export function BulkUploadTestsModal({
                               </div>
                             ))}
                           </div>
-                          <div className="max-h-[15rem] overflow-y-auto divide-y divide-border">
+                          <div className="divide-y divide-border">
                             {parsedTests.slice(0, 50).map((test, idx) => {
                               let turns: TurnObject[] = [];
                               try {
