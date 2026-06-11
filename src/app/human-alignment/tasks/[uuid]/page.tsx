@@ -2543,9 +2543,7 @@ function LabellingTaskPageInner() {
                     d="M12 4.5v15m7.5-7.5h-15"
                   />
                 </svg>
-                {taskType === "stt" || taskType === "llm-general"
-                  ? "Add items"
-                  : "Add item"}
+                {taskType === "stt" ? "Add items" : "Add item"}
               </button>
               {(() => {
                 // LLM / LLM-response bulk upload references evaluators by

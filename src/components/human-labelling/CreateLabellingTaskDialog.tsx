@@ -310,8 +310,8 @@ export function CreateLabellingTaskDialog({
                 What are you labelling? <span className="text-red-500">*</span>
               </label>
               <p className="text-xs text-muted-foreground mb-3">
-                Sets the type of item annotators will see. Can&apos;t be changed
-                after the task is created.
+                Select carefully as it cannot be changed after the task is
+                created
               </p>
               <EvaluatorUseCaseCards
                 options={TASK_TYPE_OPTIONS}

@@ -32,12 +32,11 @@ export const EVALUATOR_TYPE_LABELS: Record<EvaluatorType, string> = {
 };
 
 export const EVALUATOR_TYPE_TOOLTIPS: Record<EvaluatorType, string> = {
-  tts: "Evaluate the quality of generated audio.",
-  stt: "Evaluate the output of transcription of an audio.",
-  llm: "Given a conversation history, evaluate the agent's next response.",
-  "llm-general":
-    "Evaluate an LLM's output for a single, non-conversational prompt or input.",
-  conversation: "Evaluate an entire conversation history.",
+  tts: "Evaluate the quality of generated audio",
+  stt: "Evaluate the output of transcription of an audio",
+  llm: "Evaluate the agent's next reply in a conversation",
+  "llm-general": "Evaluate an LLM's output for a given text input",
+  conversation: "Evaluate the agent's performance in a whole conversation",
 };
 
 const EVALUATOR_TYPE_COLORS: Record<EvaluatorType, string> = {
