@@ -1262,6 +1262,7 @@ function LabellingTaskPageInner() {
     {
       uuid: string;
       name: string;
+      description?: string;
       input: string;
       output: string;
       varValues?: Record<string, Record<string, string>>;
@@ -3433,6 +3434,10 @@ function LabellingTaskPageInner() {
                                   {
                                     uuid: item.uuid,
                                     name: `Copy of ${name}`,
+                                    description:
+                                      typeof p?.description === "string"
+                                        ? (p.description as string)
+                                        : "",
                                     input:
                                       typeof p?.input === "string"
                                         ? (p.input as string)
@@ -4154,6 +4159,7 @@ function LabellingTaskPageInner() {
               items: rows.map((r) => ({
                 payload: {
                   ...(r.name ? { name: r.name } : {}),
+                  ...(r.description ? { description: r.description } : {}),
                   input: r.input,
                   output: r.output,
                   ...(Object.keys(r.evaluator_variables).length > 0
@@ -4185,6 +4191,8 @@ function LabellingTaskPageInner() {
             return {
               uuid: it.uuid,
               name: typeof p.name === "string" ? p.name : "",
+              description:
+                typeof p.description === "string" ? p.description : "",
               input: typeof p.input === "string" ? p.input : "",
               output: typeof p.output === "string" ? p.output : "",
               varValues: readEvaluatorVariables(p),
@@ -4208,6 +4216,7 @@ function LabellingTaskPageInner() {
                     uuid: r.uuid,
                     payload: {
                       ...(r.name ? { name: r.name } : {}),
+                      ...(r.description ? { description: r.description } : {}),
                       input: r.input,
                       output: r.output,
                       ...(Object.keys(r.evaluator_variables).length > 0

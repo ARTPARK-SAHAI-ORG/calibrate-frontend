@@ -17,6 +17,7 @@ type VarValues = Record<string, Record<string, string>>;
 export type LlmGeneralItemRowSubmission = {
   uuid?: string;
   name: string;
+  description: string;
   input: string;
   output: string;
   evaluator_variables: VarValues;
@@ -34,6 +35,7 @@ type AddLlmGeneralItemsDialogProps = {
   initialRows?: {
     uuid: string;
     name: string;
+    description?: string;
     input: string;
     output: string;
     varValues?: VarValues;
@@ -93,6 +95,7 @@ export function AddLlmGeneralItemsDialog({
   const seed = initialRows?.[0];
   const [uuid, setUuid] = useState<string | undefined>(seed?.uuid);
   const [name, setName] = useState(seed?.name ?? "");
+  const [description, setDescription] = useState(seed?.description ?? "");
   const [input, setInput] = useState(seed?.input ?? "");
   const [output, setOutput] = useState(seed?.output ?? "");
   const [varValues, setVarValues] = useState<VarValues>(() =>
@@ -108,6 +111,7 @@ export function AddLlmGeneralItemsDialog({
       const s = initialRows?.[0];
       setUuid(s?.uuid);
       setName(s?.name ?? "");
+      setDescription(s?.description ?? "");
       setInput(s?.input ?? "");
       setOutput(s?.output ?? "");
       setVarValues(seedVarValues(s?.varValues));
@@ -160,6 +164,7 @@ export function AddLlmGeneralItemsDialog({
         {
           uuid,
           name: name.trim(),
+          description: description.trim(),
           input: input.trim(),
           output: output.trim(),
           evaluator_variables,
@@ -233,6 +238,20 @@ export function AddLlmGeneralItemsDialog({
                 placeholder="Your item name"
                 disabled={submitting}
                 className="w-full h-11 px-4 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-base font-medium text-foreground mb-2">
+                Description
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Optional — what is this item about? Shown to annotators alongside the evaluators."
+                disabled={submitting}
+                rows={3}
+                className="w-full px-4 py-2.5 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-y disabled:opacity-50"
               />
             </div>
 
