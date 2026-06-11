@@ -159,7 +159,7 @@ export function AssignAnnotatorsDialog({
     >
       <div
         className={`bg-background border border-border rounded-xl shadow-2xl w-full flex flex-col max-h-[90vh] ${
-          showEvaluatorChoice ? "max-w-3xl" : "max-w-md"
+          showEvaluatorChoice ? "max-w-5xl" : "max-w-md"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -194,7 +194,7 @@ export function AssignAnnotatorsDialog({
           <div
             className={
               showEvaluatorChoice
-                ? "grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4"
+                ? "grid grid-cols-1 md:grid-cols-3 gap-x-10 gap-y-4"
                 : ""
             }
           >
@@ -299,7 +299,7 @@ export function AssignAnnotatorsDialog({
             </div>
 
             {showEvaluatorChoice && (
-              <div className="space-y-2">
+              <div className="space-y-2 md:col-span-2">
                 <p className="text-xs font-medium text-muted-foreground">
                   Evaluators shown in labelling
                 </p>
@@ -320,6 +320,7 @@ export function AssignAnnotatorsDialog({
                       Pick one or more evaluators to show in these labelling
                       jobs.
                     </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {evaluators.map((ev) => (
                       <label
                         key={ev.uuid}
@@ -343,6 +344,7 @@ export function AssignAnnotatorsDialog({
                         </div>
                       </label>
                     ))}
+                    </div>
                   </div>
                 )}
               </div>
