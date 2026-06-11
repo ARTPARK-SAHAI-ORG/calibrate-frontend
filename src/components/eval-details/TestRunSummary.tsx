@@ -140,7 +140,11 @@ function evaluatorCardContent(entry: BenchmarkEvaluatorSummaryEntry): {
     };
   }
   return {
-    label: benchmarkRatingEvaluatorCaption(name, entry.scale_min, entry.scale_max),
+    label: benchmarkRatingEvaluatorCaption(
+      name,
+      entry.scale_min,
+      entry.scale_max,
+    ),
     value: Number.isFinite(entry.scale_max)
       ? `${parseFloat(entry.mean.toFixed(2))}/${entry.scale_max}`
       : `${parseFloat(entry.mean.toFixed(2))}`,
@@ -192,20 +196,22 @@ export function TestRunSummary({
             label="Average latency"
             value={formatLatencyMs(latency?.mean)}
             subtitle={latencySubtitle}
-            info="Average agent response time across all tests in this run. Evaluation time is excluded."
+            info="Average agent response time across all tests"
           />
           <MetricCard
             label="Average cost"
             value={formatCostUsd(cost?.mean)}
             subtitle={costSubtitle}
-            info="Average cost per test across all tests in this run."
+            info="Average cost per test across all tests"
           />
         </div>
       </div>
 
       {evaluators.length > 0 && (
         <div>
-          <h2 className="text-base md:text-lg font-semibold mb-3">Evaluators</h2>
+          <h2 className="text-base md:text-lg font-semibold mb-3">
+            Evaluators
+          </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {evaluators.map((entry) => {
               const { label, value, subtitle, progress } =
