@@ -85,39 +85,49 @@ const EVALUATOR_TYPE_TO_DATA_TYPE: Record<EvaluatorType, "text" | "audio"> = {
   conversation: "text",
 };
 
+// Ordered for the use-case picker: the most common pick (a single,
+// non-conversational LLM output) leads, the rest of the text/LLM cases
+// follow, and the audio cases are grouped at the end. Descriptions are
+// kept to one short, plain-language line so the picker stays scannable for
+// first-time users; the `group` field drives the section headers and
+// `recommended` flags the "Most common" badge in UseCasePickerDialog.
 const EVALUATOR_TYPE_OPTIONS: {
   value: EvaluatorType;
   title: string;
   description: string;
+  group: "text" | "audio";
+  recommended?: boolean;
 }[] = [
   {
-    value: "tts",
-    title: "Text to Speech (TTS)",
-    description:
-      "Evaluate the quality of generated audio (e.g. naturalness, pronunciation, clarity)",
-  },
-  {
-    value: "stt",
-    title: "Speech to Text",
-    description: "Evaluate the transcription quality against a reference text",
+    value: "llm-general",
+    title: "LLM response",
+    description: "Judge a single AI output — classify, extract, summarise",
+    group: "text",
+    recommended: true,
   },
   {
     value: "llm",
     title: "Conversational reply",
-    description:
-      "Given a conversation history, evaluate the agent's next response",
-  },
-  {
-    value: "llm-general",
-    title: "LLM response",
-    description:
-      "Evaluate an LLM's output for a single, non-conversational prompt or input (e.g. classification, extraction, summarisation)",
+    description: "Judge a chatbot's next reply in a chat",
+    group: "text",
   },
   {
     value: "conversation",
     title: "Full conversation",
-    description:
-      "Evaluate the agent's performance during a complete conversation",
+    description: "Judge a whole conversation, start to finish",
+    group: "text",
+  },
+  {
+    value: "stt",
+    title: "Speech to Text",
+    description: "Judge transcription accuracy against a reference",
+    group: "audio",
+  },
+  {
+    value: "tts",
+    title: "Text to Speech (TTS)",
+    description: "Judge generated audio quality",
+    group: "audio",
   },
 ];
 

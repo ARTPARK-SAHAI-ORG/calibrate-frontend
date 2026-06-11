@@ -8,7 +8,18 @@ export type EvaluatorTypeOption = {
   value: EvaluatorType;
   title: string;
   description: string;
+  // Drives the section the card is grouped under. Optional so older callers
+  // that pass an ungrouped list still render (everything falls under "text").
+  group?: "text" | "audio";
+  // Flags the "Most common" badge — a starting-point cue for new users.
+  recommended?: boolean;
 };
+
+// Section headers shown above each group of cards, in render order.
+const GROUP_ORDER: { key: "text" | "audio"; label: string }[] = [
+  { key: "text", label: "Text & LLM" },
+  { key: "audio", label: "Audio" },
+];
 
 const TYPE_INACTIVE_CLASSES: Record<EvaluatorType, string> = {
   tts: "border-purple-500/20 bg-purple-500/[0.04] hover:bg-purple-500/10 hover:border-purple-500/40",
@@ -91,33 +102,53 @@ export function UseCasePickerDialog({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {options.map((opt) => {
-              const active = selected === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setSelected(opt.value)}
-                  className={`flex flex-col items-start text-left p-4 rounded-md border transition-colors cursor-pointer ${
-                    active
-                      ? TYPE_ACTIVE_CLASSES[opt.value]
-                      : TYPE_INACTIVE_CLASSES[opt.value]
-                  }`}
-                >
-                  <div
-                    className={`text-sm md:text-base font-medium ${TYPE_TITLE_CLASSES[opt.value]}`}
-                  >
-                    {opt.title}
-                  </div>
-                  <div className="text-xs md:text-sm text-muted-foreground mt-1 leading-relaxed">
-                    {opt.description}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
+          {GROUP_ORDER.map(({ key, label }) => {
+            const groupOptions = options.filter(
+              (o) => (o.group ?? "text") === key,
+            );
+            if (groupOptions.length === 0) return null;
+            return (
+              <div key={key}>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2.5 px-0.5">
+                  {label}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {groupOptions.map((opt) => {
+                    const active = selected === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setSelected(opt.value)}
+                        className={`flex flex-col items-start text-left p-4 rounded-md border transition-colors cursor-pointer ${
+                          active
+                            ? TYPE_ACTIVE_CLASSES[opt.value]
+                            : TYPE_INACTIVE_CLASSES[opt.value]
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2 w-full">
+                          <div
+                            className={`text-sm md:text-base font-medium ${TYPE_TITLE_CLASSES[opt.value]}`}
+                          >
+                            {opt.title}
+                          </div>
+                          {opt.recommended && (
+                            <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30">
+                              Most common
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs md:text-sm text-muted-foreground mt-1 leading-relaxed">
+                          {opt.description}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div className="flex items-center justify-end gap-2 md:gap-3 px-5 md:px-6 py-4 border-t border-border">
