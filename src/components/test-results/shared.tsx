@@ -248,6 +248,44 @@ export function StatusIcon({
   );
 }
 
+/** Square check indicator for labelling selection in test/benchmark output lists. */
+export function LabellingRowCheckbox({
+  checked,
+  disabled = false,
+  className = "",
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const stateClass = disabled
+    ? "border-border opacity-40"
+    : checked
+      ? "bg-foreground border-foreground"
+      : "border-border hover:border-muted-foreground";
+  return (
+    <span
+      className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${stateClass} ${className}`}
+    >
+      {checked && !disabled && (
+        <svg
+          className="w-3 h-3 text-background"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={3}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M4.5 12.75l6 6 9-13.5"
+          />
+        </svg>
+      )}
+    </span>
+  );
+}
+
 // Shared Small Status Badge Component
 export function SmallStatusBadge({ passed }: { passed: boolean }) {
   return (
@@ -1218,7 +1256,9 @@ export function EvaluationCriteriaPanel({
     <div className="p-4 md:p-6 space-y-4">
       {testName && (
         <div className="overflow-x-auto">
-          <span className="block text-[11px] text-muted-foreground">Name</span>
+          <span className="block text-sm font-semibold text-foreground">
+            Name
+          </span>
           <span className="block text-xs text-foreground whitespace-nowrap">
             {testName}
           </span>

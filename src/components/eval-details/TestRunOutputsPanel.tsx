@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   TestCaseOutput,
   TestCaseData,
   JudgeResult,
   TestRunEvaluator,
   StatusIcon,
+  LabellingRowCheckbox,
   TestDetailView as SharedTestDetailView,
   EmptyStateView,
   EvaluationCriteriaPanel,
@@ -47,6 +48,11 @@ type TestRunOutputsPanelProps = {
   /** Reports Previous/Next navigation state so a parent (the dialog header)
    * can render the pager. Must be a stable callback (e.g. a useState setter). */
   onNavChange?: (nav: PagerNav) => void;
+  /** When set, renders a labelling checkbox on each completed test row. */
+  labellingSelection?: Set<string>;
+  onToggleLabellingSelection?: (id: string) => void;
+  /** Toggle select-all / deselect-all for the given ids. */
+  onLabellingBulkToggle?: (ids: string[]) => void;
 };
 
 type StatusGroup = {
@@ -66,13 +72,16 @@ export function TestRunOutputsPanel({
   enableEvaluatorLinks = true,
   legacyDefaultEvaluator,
   onNavChange,
+  labellingSelection,
+  onToggleLabellingSelection,
+  onLabellingBulkToggle,
 }: TestRunOutputsPanelProps) {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   // Refs to the list scroll container and the currently-selected row, so
   // navigation keeps the selection in view (a page at a time).
   const listContainerRef = useRef<HTMLDivElement>(null);
-  const selectedRowRef = useRef<HTMLButtonElement>(null);
+  const selectedRowRef = useRef<HTMLDivElement>(null);
 
   const toggleSection = (key: string) => {
     setCollapsedSections((prev) => {
@@ -85,6 +94,21 @@ export function TestRunOutputsPanel({
   // A test that surfaced an `error` neither passed nor failed evaluation —
   // it errored out. Bucket those separately from genuine evaluation failures.
   const isErrored = (r: TestRunResult) => !!r.error;
+  const isLabellingEligible = (r: TestRunResult) =>
+    r.testCase?.evaluation?.type === "response";
+  const isLabellingSelectable = (r: TestRunResult) =>
+    r.status === "passed" || r.status === "failed" || isErrored(r);
+  const showLabellingCheckboxes = !!onToggleLabellingSelection;
+
+  const allSelectableIds = useMemo(
+    () => results.filter(isLabellingSelectable).map((r) => r.id),
+    [results],
+  );
+  const allLabellingSelected =
+    allSelectableIds.length > 0 &&
+    allSelectableIds.every((id) => labellingSelection?.has(id));
+
+  const labellingGroupKeys = new Set(["failed", "errored", "passed"]);
 
   const query = searchQuery.trim().toLowerCase();
   const filteredResults = query
@@ -177,12 +201,21 @@ export function TestRunOutputsPanel({
         }`}
       >
         {/* Search */}
-        <div className="shrink-0 border-b border-border p-3">
+        <div className="shrink-0 border-b border-border p-3 space-y-2">
           <SearchInput
             value={searchQuery}
             onChange={setSearchQuery}
             placeholder="Search tests"
           />
+          {showLabellingCheckboxes && onLabellingBulkToggle && allSelectableIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onLabellingBulkToggle(allSelectableIds)}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            >
+              {allLabellingSelected ? "Deselect all" : "Select all"}
+            </button>
+          )}
         </div>
         <div ref={listContainerRef} className="flex-1 overflow-y-auto">
           {groups.length === 0 && query && (
@@ -190,42 +223,96 @@ export function TestRunOutputsPanel({
               No tests match &ldquo;{searchQuery}&rdquo;
             </div>
           )}
-          {groups.map((group) => (
+          {groups.map((group) => {
+            const groupSelectableIds = group.items
+              .filter(isLabellingSelectable)
+              .map((r) => r.id);
+            const groupAllSelected =
+              groupSelectableIds.length > 0 &&
+              groupSelectableIds.every((id) => labellingSelection?.has(id));
+            const showGroupSelectAll =
+              showLabellingCheckboxes &&
+              onLabellingBulkToggle &&
+              labellingGroupKeys.has(group.key) &&
+              groupSelectableIds.length > 0;
+
+            return (
             <div key={group.key}>
-              <button
-                type="button"
-                onClick={() => toggleSection(group.key)}
-                className="sticky top-0 z-10 bg-background w-full text-sm font-medium text-muted-foreground px-4 py-3 flex items-center gap-2 cursor-pointer hover:text-foreground transition-colors border-b border-border"
-              >
-                <svg
-                  className={`w-3 h-3 text-muted-foreground transition-transform shrink-0 ${collapsedSections.has(group.key) ? "" : "rotate-90"}`}
-                  fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+              <div className="sticky top-0 z-10 bg-background border-b border-border flex items-center">
+                <button
+                  type="button"
+                  onClick={() => toggleSection(group.key)}
+                  className="flex-1 text-sm font-medium text-muted-foreground px-4 py-3 flex items-center gap-2 cursor-pointer hover:text-foreground transition-colors min-w-0"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                </svg>
-                <div className={`w-2 h-2 rounded-full ${group.dotColor}`}></div>
-                {group.label} ({group.items.length})
-              </button>
+                  <svg
+                    className={`w-3 h-3 text-muted-foreground transition-transform shrink-0 ${collapsedSections.has(group.key) ? "" : "rotate-90"}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                  <div className={`w-2 h-2 rounded-full ${group.dotColor}`}></div>
+                  <span className="truncate">{group.label} ({group.items.length})</span>
+                </button>
+                {showGroupSelectAll && (
+                  <button
+                    type="button"
+                    onClick={() => onLabellingBulkToggle(groupSelectableIds)}
+                    title={groupAllSelected ? `Deselect all ${group.label.toLowerCase()}` : `Select all ${group.label.toLowerCase()}`}
+                    className="px-3 py-3 shrink-0 cursor-pointer"
+                  >
+                    <LabellingRowCheckbox checked={groupAllSelected} />
+                  </button>
+                )}
+              </div>
               {!collapsedSections.has(group.key) && (
                 <div className="space-y-1 px-4 py-2">
                   {group.items.map((result) => (
-                    <button
+                    <div
                       key={result.id}
                       ref={selectedId === result.id ? selectedRowRef : undefined}
-                      type="button"
-                      onClick={() => onSelect(result.id)}
-                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
                         selectedId === result.id ? "bg-muted" : "hover:bg-muted/50"
                       }`}
                     >
-                      <StatusIcon status={isErrored(result) ? "error" : result.status} />
-                      <span className="text-sm text-foreground truncate">{result.name}</span>
-                    </button>
+                      {showLabellingCheckboxes && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isLabellingSelectable(result)) {
+                              onToggleLabellingSelection(result.id);
+                            }
+                          }}
+                          disabled={!isLabellingSelectable(result)}
+                          title={
+                            isLabellingSelectable(result)
+                              ? isLabellingEligible(result)
+                                ? "Select for labelling"
+                                : "Tool-call tests will be skipped when submitting for labelling"
+                              : "Available once the test completes"
+                          }
+                          className="cursor-pointer disabled:cursor-not-allowed shrink-0"
+                        >
+                          <LabellingRowCheckbox
+                            checked={labellingSelection?.has(result.id) ?? false}
+                            disabled={!isLabellingSelectable(result)}
+                          />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => onSelect(result.id)}
+                        className="flex-1 flex items-center gap-2 min-w-0 cursor-pointer text-left"
+                      >
+                        <StatusIcon status={isErrored(result) ? "error" : result.status} />
+                        <span className="text-sm text-foreground truncate">{result.name}</span>
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

@@ -2,6 +2,7 @@
 import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { toast } from "sonner";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import { getDefaultHeaders } from "@/lib/api";
@@ -18,7 +19,7 @@ import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
-import { AddRunToLabellingTaskDialog } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
+import { AddRunToLabellingTaskDialog, isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { TestRunOutputsPanel, TestRunSummary } from "./eval-details";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
 import { buildEvaluatorSummaryFromResults } from "@/lib/testRunSummary";
@@ -182,6 +183,9 @@ export function TestRunnerDialog({
   // the Summary tab on completion (mirrors the benchmark dialog).
   const [activeTab, setActiveTab] = useState<"summary" | "outputs">("outputs");
   const [addToTaskOpen, setAddToTaskOpen] = useState(false);
+  const [labellingSelectedIds, setLabellingSelectedIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   // Tracks whether the dialog has already auto-opened a completed test for
   // this open lifecycle. Set back to false on every dialog open / new run /
@@ -196,6 +200,28 @@ export function TestRunnerDialog({
     setLatencyAgg(null);
     setCostAgg(null);
     setTokensAgg(null);
+  };
+
+  const toggleLabellingSelection = (id: string) => {
+    setLabellingSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleLabellingBulk = (ids: string[]) => {
+    setLabellingSelectedIds((prev) => {
+      const next = new Set(prev);
+      const allSelected =
+        ids.length > 0 && ids.every((id) => next.has(id));
+      for (const id of ids) {
+        if (allSelected) next.delete(id);
+        else next.add(id);
+      }
+      return next;
+    });
   };
 
   // Auto-open the first completed test when nothing is selected. Covers both
@@ -253,6 +279,7 @@ export function TestRunnerDialog({
     // Initialize state for viewing existing run
     setSelectedTestUuid(null);
     hasAutoSelectedRef.current = false;
+    setLabellingSelectedIds(new Set());
     setCurrentTaskId(taskId);
     setRunEvaluators([]);
     resetSummary();
@@ -301,6 +328,7 @@ export function TestRunnerDialog({
 
     setSelectedTestUuid(null);
     hasAutoSelectedRef.current = false;
+    setLabellingSelectedIds(new Set());
     setCurrentTaskId(null);
     setRunEvaluators([]);
     resetSummary();
@@ -353,7 +381,8 @@ export function TestRunnerDialog({
       // Capture name and share state from backend
       if (result.name) setRunName(result.name);
       if (result.is_public !== undefined) setIsPublic(result.is_public);
-      if (result.share_token !== undefined) setShareToken(result.share_token ?? null);
+      if (result.share_token !== undefined)
+        setShareToken(result.share_token ?? null);
       // Always sync to the latest payload (including the empty case) so
       // the prior run's evaluator metadata can't leak into a fresh run
       // / past-run-view that omits the field.
@@ -909,6 +938,9 @@ export function TestRunnerDialog({
   const failedTests = testResults.filter(
     (r) => r.status === "failed" && !r.error,
   );
+  const hasLabellingEligibleTests = testResults.some((r) =>
+    isLabellingEligibleRaw({ test_case: r.testCase ?? null }),
+  );
   const queuedTests = testResults.filter((r) => r.status === "queued");
   const runningTests = testResults.filter((r) => r.status === "running");
   const pendingTests = testResults.filter((r) => r.status === "pending");
@@ -955,7 +987,9 @@ export function TestRunnerDialog({
                   {runName ?? "Test run"}
                 </h2>
               </div>
-              <p className="text-xs text-muted-foreground truncate">{agentName}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {agentName}
+              </p>
             </div>
           </div>
           {/* Previous/Next pager - centered, desktop only. Outputs tab only. */}
@@ -986,37 +1020,64 @@ export function TestRunnerDialog({
                         reasoning: r.reasoning,
                         judgeResults: r.judgeResults,
                       })),
-                      Object.fromEntries(
-                        runEvaluators.map((e) => [e.uuid, e]),
-                      ),
+                      Object.fromEntries(runEvaluators.map((e) => [e.uuid, e])),
                     )
                   }
                 />
               </div>
             )}
-            {runStatus === "done" && testResults.length > 0 && (currentTaskId || taskId) && (
-              <div className="hidden md:block">
-                <button
-                  type="button"
-                  onClick={() => setAddToTaskOpen(true)}
-                  className="flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
-                >
-                  Submit for labelling
-                </button>
-              </div>
-            )}
+            {runStatus === "done" &&
+              testResults.length > 0 &&
+              hasLabellingEligibleTests &&
+              (currentTaskId || taskId) && (
+                <div className="hidden md:block">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeTab === "summary") {
+                        setActiveTab("outputs");
+                      }
+                      if (labellingSelectedIds.size === 0) {
+                        toast.error(
+                          "Select one or more tests to submit for labelling",
+                        );
+                        return;
+                      }
+                      const hasEligibleSelected = testResults.some(
+                        (r) =>
+                          labellingSelectedIds.has(r.test.uuid) &&
+                          isLabellingEligibleRaw({
+                            test_case: r.testCase ?? null,
+                          }),
+                      );
+                      if (!hasEligibleSelected) {
+                        toast.error(
+                          "Tool-call tests can't be submitted for labelling. Select at least one response test.",
+                        );
+                        return;
+                      }
+                      setAddToTaskOpen(true);
+                    }}
+                    className="flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
+                  >
+                    Submit for labelling
+                  </button>
+                </div>
+              )}
             {/* Share button — only shown when run is done and we have a taskId */}
-            {runStatus === "done" && (currentTaskId || taskId) && backendAccessToken && (
-              <div className="hidden md:block">
-                <ShareButton
-                  entityType="test-run"
-                  entityId={(currentTaskId || taskId)!}
-                  accessToken={backendAccessToken}
-                  initialIsPublic={isPublic}
-                  initialShareToken={shareToken}
-                />
-              </div>
-            )}
+            {runStatus === "done" &&
+              (currentTaskId || taskId) &&
+              backendAccessToken && (
+                <div className="hidden md:block">
+                  <ShareButton
+                    entityType="test-run"
+                    entityId={(currentTaskId || taskId)!}
+                    accessToken={backendAccessToken}
+                    initialIsPublic={isPublic}
+                    initialShareToken={shareToken}
+                  />
+                </div>
+              )}
             <button
               onClick={onClose}
               className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer shrink-0"
@@ -1097,29 +1158,43 @@ export function TestRunnerDialog({
                 />
               </div>
             ) : (
-          <div className="flex-1 overflow-hidden">
-            <TestRunOutputsPanel
-              results={testResults.map((r) => ({
-                id: r.test.uuid,
-                name: r.test.name,
-                status: r.status as "passed" | "failed" | "running" | "pending" | "queued",
-                output: r.output,
-                testCase: r.testCase,
-                reasoning: r.reasoning,
-                evaluation: r.evaluation,
-                judgeResults: r.judgeResults,
-                error: r.error,
-              }))}
-              selectedId={selectedTestUuid}
-              onSelect={setSelectedTestUuid}
-              onClearSelection={() => setSelectedTestUuid(null)}
-              onNavChange={setNav}
-              evaluatorsByUuid={Object.fromEntries(
-                runEvaluators.map((e) => [e.uuid, e]),
-              )}
-              legacyDefaultEvaluator={defaultNextReplyEvaluator}
+              <div className="flex-1 overflow-hidden">
+                <TestRunOutputsPanel
+                  results={testResults.map((r) => ({
+                    id: r.test.uuid,
+                    name: r.test.name,
+                    status: r.status as
+                      | "passed"
+                      | "failed"
+                      | "running"
+                      | "pending"
+                      | "queued",
+                    output: r.output,
+                    testCase: r.testCase,
+                    reasoning: r.reasoning,
+                    evaluation: r.evaluation,
+                    judgeResults: r.judgeResults,
+                    error: r.error,
+                  }))}
+                  selectedId={selectedTestUuid}
+                  onSelect={setSelectedTestUuid}
+                  onClearSelection={() => setSelectedTestUuid(null)}
+                  onNavChange={setNav}
+                  evaluatorsByUuid={Object.fromEntries(
+                    runEvaluators.map((e) => [e.uuid, e]),
+                  )}
+                  legacyDefaultEvaluator={defaultNextReplyEvaluator}
+                  labellingSelection={
+                    runStatus === "done" ? labellingSelectedIds : undefined
+                  }
+              onToggleLabellingSelection={
+                runStatus === "done" ? toggleLabellingSelection : undefined
+              }
+              onLabellingBulkToggle={
+                runStatus === "done" ? toggleLabellingBulk : undefined
+              }
             />
-          </div>
+              </div>
             )}
           </div>
         )}
@@ -1132,27 +1207,29 @@ export function TestRunnerDialog({
             type: "test_run",
             runUuid: (currentTaskId || taskId)!,
             runName: runName ?? undefined,
-            results: testResults.map((r) => ({
-              test_uuid: r.test.uuid,
-              test_name: r.test.name,
-              status:
-                r.status === "passed" || r.status === "failed"
-                  ? r.status
-                  : undefined,
-              passed:
-                r.status === "passed"
-                  ? true
-                  : r.status === "failed"
-                    ? false
-                    : null,
-              reasoning: r.reasoning,
-              output: r.output ?? null,
-              test_case: r.testCase ?? null,
-              chat_history: r.chatHistory,
-              evaluation: r.evaluation,
-              judge_results: r.judgeResults,
-              error: r.error,
-            })),
+            results: testResults
+              .filter((r) => labellingSelectedIds.has(r.test.uuid))
+              .map((r) => ({
+                test_uuid: r.test.uuid,
+                test_name: r.test.name,
+                status:
+                  r.status === "passed" || r.status === "failed"
+                    ? r.status
+                    : undefined,
+                passed:
+                  r.status === "passed"
+                    ? true
+                    : r.status === "failed"
+                      ? false
+                      : null,
+                reasoning: r.reasoning,
+                output: r.output ?? null,
+                test_case: r.testCase ?? null,
+                chat_history: r.chatHistory,
+                evaluation: r.evaluation,
+                judge_results: r.judgeResults,
+                error: r.error,
+              })),
             evaluators: runEvaluators,
           }}
         />

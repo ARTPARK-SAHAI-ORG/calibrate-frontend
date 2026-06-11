@@ -2,6 +2,7 @@
 import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import {
   CloseIcon,
   SpinnerIcon,
@@ -12,6 +13,7 @@ import {
 import {
   BenchmarkOutputsPanel,
   BenchmarkCombinedLeaderboard,
+  benchmarkLabellingKey,
   type BenchmarkModelResult,
 } from "./eval-details";
 import { StatusBadge } from "@/components/ui";
@@ -20,7 +22,7 @@ import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
-import { AddRunToLabellingTaskDialog } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
+import { AddRunToLabellingTaskDialog, isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
 import { useAccessToken } from "@/hooks";
 import {
@@ -114,6 +116,9 @@ export function BenchmarkResultsDialog({
   // matching state in TestRunnerDialog for the same plumbing.
   const [runEvaluators, setRunEvaluators] = useState<TestRunEvaluator[]>([]);
   const [addToTaskOpen, setAddToTaskOpen] = useState(false);
+  const [labellingSelectedKeys, setLabellingSelectedKeys] = useState<
+    Set<string>
+  >(() => new Set());
   const backendAccessToken = useAccessToken();
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   /** Once per dialog open: select first test of `models[0]` when its row exists. */
@@ -131,6 +136,37 @@ export function BenchmarkResultsDialog({
     taskStatus === "completed" ||
     taskStatus === "done" ||
     taskStatus === "failed";
+
+  const toggleLabellingSelection = (key: string) => {
+    setLabellingSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleLabellingBulk = (ids: string[]) => {
+    setLabellingSelectedKeys((prev) => {
+      const next = new Set(prev);
+      const allSelected =
+        ids.length > 0 && ids.every((id) => next.has(id));
+      for (const id of ids) {
+        if (allSelected) next.delete(id);
+        else next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const labellingModelResults = modelResults
+    .map((mr) => ({
+      ...mr,
+      test_results: (mr.test_results ?? []).filter((_, index) =>
+        labellingSelectedKeys.has(benchmarkLabellingKey(mr.model, index)),
+      ),
+    }))
+    .filter((mr) => (mr.test_results?.length ?? 0) > 0);
 
   useEffect(() => {
     if (!isOpen || !backendAccessToken) return;
@@ -207,6 +243,7 @@ export function BenchmarkResultsDialog({
         setExpandedProviders(new Set(models.length > 0 ? [models[0]] : []));
         setSelectedTest(null);
         hasAutoSelectedFirstBenchmarkTestRef.current = false;
+        setLabellingSelectedKeys(new Set());
         setActiveTab("outputs");
         setIsPublic(false);
         setShareToken(null);
@@ -310,7 +347,8 @@ export function BenchmarkResultsDialog({
       // Capture name and share state from backend
       if (result.name) setRunName(result.name);
       if (result.is_public !== undefined) setIsPublic(result.is_public);
-      if (result.share_token !== undefined) setShareToken(result.share_token ?? null);
+      if (result.share_token !== undefined)
+        setShareToken(result.share_token ?? null);
       // Always sync (including the empty case) so the previous
       // benchmark's evaluator metadata can't leak into a new task in
       // the same dialog lifecycle.
@@ -467,15 +505,17 @@ export function BenchmarkResultsDialog({
       const existingModels = new Set(modelResults.map((m) => m.model));
       const missingModels = models.filter((m) => !existingModels.has(m));
       if (missingModels.length > 0) {
-        const placeholders: BenchmarkModelResult[] = missingModels.map((model) => ({
-          model,
-          success: null,
-          message: "",
-          total_tests: testNames.length,
-          passed: null,
-          failed: null,
-          test_results: null,
-        }));
+        const placeholders: BenchmarkModelResult[] = missingModels.map(
+          (model) => ({
+            model,
+            success: null,
+            message: "",
+            total_tests: testNames.length,
+            passed: null,
+            failed: null,
+            test_results: null,
+          }),
+        );
         return [...modelResults, ...placeholders];
       }
     }
@@ -493,6 +533,9 @@ export function BenchmarkResultsDialog({
   const hasAnyResults = modelResults.some(
     (m) => m.test_results && m.test_results.length > 0,
   );
+  const hasLabellingEligibleTests = modelResults.some((mr) =>
+    (mr.test_results ?? []).some((tr) => isLabellingEligibleRaw(tr)),
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm">
@@ -508,7 +551,9 @@ export function BenchmarkResultsDialog({
                 <StatusBadge status={taskStatus} showSpinner />
               )}
             </div>
-            <p className="text-xs text-muted-foreground truncate">{agentName}</p>
+            <p className="text-xs text-muted-foreground truncate">
+              {agentName}
+            </p>
           </div>
           {/* Previous/Next pager - centered, desktop only, outputs tab */}
           {activeTab === "outputs" && nav && selectedTest && (
@@ -540,9 +585,7 @@ export function BenchmarkResultsDialog({
                           judgeResults: tr.judge_results,
                         })),
                       ),
-                      Object.fromEntries(
-                        runEvaluators.map((e) => [e.uuid, e]),
-                      ),
+                      Object.fromEntries(runEvaluators.map((e) => [e.uuid, e])),
                     )
                   }
                 />
@@ -561,9 +604,38 @@ export function BenchmarkResultsDialog({
               </div>
             )}
             {/* Submit for labelling — only shown when benchmark is done */}
-            {isDone && !error && hasAnyResults && currentTaskId && (
+            {isDone &&
+              !error &&
+              hasAnyResults &&
+              hasLabellingEligibleTests &&
+              currentTaskId && (
               <button
-                onClick={() => setAddToTaskOpen(true)}
+                onClick={() => {
+                  if (activeTab === "leaderboard") {
+                    setActiveTab("outputs");
+                  }
+                  if (labellingSelectedKeys.size === 0) {
+                    toast.error(
+                      "Select one or more tests to submit for labelling",
+                    );
+                    return;
+                  }
+                  const hasEligibleSelected = modelResults.some((mr) =>
+                    (mr.test_results ?? []).some(
+                      (tr, index) =>
+                        labellingSelectedKeys.has(
+                          benchmarkLabellingKey(mr.model, index),
+                        ) && isLabellingEligibleRaw(tr),
+                    ),
+                  );
+                  if (!hasEligibleSelected) {
+                    toast.error(
+                      "Tool-call tests can't be submitted for labelling. Select at least one response test.",
+                    );
+                    return;
+                  }
+                  setAddToTaskOpen(true);
+                }}
                 className="hidden md:flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
               >
                 Submit for labelling
@@ -723,6 +795,11 @@ export function BenchmarkResultsDialog({
                   runEvaluators.map((e) => [e.uuid, e]),
                 )}
                 legacyDefaultEvaluator={defaultNextReplyEvaluator}
+                labellingSelection={isDone ? labellingSelectedKeys : undefined}
+                onToggleLabellingSelection={
+                  isDone ? toggleLabellingSelection : undefined
+                }
+                onLabellingBulkToggle={isDone ? toggleLabellingBulk : undefined}
               />
             )}
           </div>
@@ -736,7 +813,7 @@ export function BenchmarkResultsDialog({
             type: "benchmark_run",
             benchmarkUuid: currentTaskId,
             benchmarkName: runName ?? undefined,
-            modelResults: modelResults,
+            modelResults: labellingModelResults,
             evaluators: runEvaluators,
           }}
         />

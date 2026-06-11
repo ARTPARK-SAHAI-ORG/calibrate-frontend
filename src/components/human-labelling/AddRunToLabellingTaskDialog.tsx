@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { apiClient } from "@/lib/api";
 import { reportError } from "@/lib/reportError";
 import { useAccessToken } from "@/hooks/useAccessToken";
@@ -10,6 +11,7 @@ import type {
   TestCaseHistory,
   TestRunEvaluator,
 } from "@/components/test-results/shared";
+import { Select } from "@/components/ui/Select";
 
 export const SUPPORTED_TARGET_TASK_TYPES = ["llm"] as const;
 export type SupportedTaskType = (typeof SUPPORTED_TARGET_TASK_TYPES)[number];
@@ -67,19 +69,36 @@ type TransformResult = {
   evaluatorUuids: Set<string>;
 };
 
-function parseApiError(err: unknown, fallback: string): string {
-  if (!(err instanceof Error)) return fallback;
+// The backend wraps failures as `Request failed: <status> - <json>`. The
+// json's `detail` is sometimes a plain string and sometimes a structured
+// object (`{ code, message, ... }`). Pull out the JSON body once so callers
+// can both render a clean message and inspect a machine-readable `code`.
+type ApiErrorDetail = {
+  code?: string;
+  message?: string;
+  conflicting_names?: string[];
+};
+
+function extractApiErrorDetail(err: unknown): ApiErrorDetail | null {
+  if (!(err instanceof Error)) return null;
   const match = err.message.match(/Request failed: \d+ - (.+)$/);
-  if (match) {
-    try {
-      const parsed = JSON.parse(match[1]);
-      if (parsed && typeof parsed.detail === "string") return parsed.detail;
-    } catch {
-      // not JSON
-    }
-    return match[1];
+  if (!match) return null;
+  try {
+    const parsed = JSON.parse(match[1]);
+    const detail = parsed?.detail;
+    if (detail && typeof detail === "object") return detail as ApiErrorDetail;
+    if (typeof detail === "string") return { message: detail };
+  } catch {
+    // not JSON
   }
-  return err.message || fallback;
+  return { message: match[1] };
+}
+
+function parseApiError(err: unknown, fallback: string): string {
+  const detail = extractApiErrorDetail(err);
+  if (detail?.message) return detail.message;
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
 }
 
 type RawTestCaseLike = {
@@ -103,12 +122,17 @@ type RawTestCaseLike = {
   }> | null;
 };
 
+/** Response (next-reply) tests can be added to LLM labelling tasks; tool-call tests cannot. */
+export function isLabellingEligibleRaw(raw: RawTestCaseLike): boolean {
+  return raw.test_case?.evaluation?.type === "response";
+}
+
 function buildOneItem(
   raw: RawTestCaseLike,
   nameOverride?: string,
 ): { item: BuiltItem; evaluatorUuids: string[] } | null {
   const evalType = raw.test_case?.evaluation?.type;
-  if (evalType !== "response") return null;
+  if (!isLabellingEligibleRaw(raw)) return null;
 
   const name =
     nameOverride ??
@@ -117,8 +141,7 @@ function buildOneItem(
     raw.name ??
     "Untitled test";
 
-  const chat_history =
-    raw.test_case?.config?.history ?? raw.chat_history ?? [];
+  const chat_history = raw.test_case?.config?.history ?? raw.chat_history ?? [];
   const agent_response = raw.output?.response ?? "";
 
   const evaluator_variables: Record<string, Record<string, string>> = {};
@@ -194,7 +217,10 @@ export function buildItemsFromSource(
           for (const r of testResults) {
             const raw = r as RawTestCaseLike;
             const baseName =
-              raw.test_case?.name ?? raw.test_name ?? raw.name ?? "Untitled test";
+              raw.test_case?.name ??
+              raw.test_name ??
+              raw.name ??
+              "Untitled test";
             const built = buildOneItem(
               raw,
               `${baseName} — ${runSuffix} — ${mr.model}`,
@@ -221,77 +247,6 @@ export function buildItemsFromSource(
   }
 }
 
-type SelectableTest = { key: string; name: string };
-
-function getAvailableTests(
-  source: AddRunToLabellingTaskSource,
-): SelectableTest[] {
-  if (source.type === "test_run") {
-    return source.results.map((r, i) => {
-      const raw = r as RawTestCaseLike;
-      const name =
-        raw.test_case?.name ?? raw.test_name ?? raw.name ?? "Untitled test";
-      const key = raw.test_name ?? raw.test_case?.name ?? `idx-${i}`;
-      return { key: `${key}#${i}`, name };
-    });
-  }
-  const seen = new Map<string, SelectableTest>();
-  for (const mr of source.modelResults) {
-    const results = mr.test_results ?? [];
-    for (const r of results) {
-      const raw = r as RawTestCaseLike;
-      const name =
-        raw.test_case?.name ?? raw.test_name ?? raw.name ?? "Untitled test";
-      if (!seen.has(name)) seen.set(name, { key: name, name });
-    }
-  }
-  return Array.from(seen.values());
-}
-
-function getAvailableModels(source: AddRunToLabellingTaskSource): string[] {
-  if (source.type !== "benchmark_run") return [];
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const mr of source.modelResults) {
-    if (!seen.has(mr.model)) {
-      seen.add(mr.model);
-      out.push(mr.model);
-    }
-  }
-  return out;
-}
-
-function filterSourceBySelection(
-  source: AddRunToLabellingTaskSource,
-  selectedTestKeys: Set<string>,
-  selectedModels: Set<string>,
-): AddRunToLabellingTaskSource {
-  if (source.type === "test_run") {
-    return {
-      ...source,
-      results: source.results.filter((r, i) => {
-        const raw = r as RawTestCaseLike;
-        const baseKey = raw.test_name ?? raw.test_case?.name ?? `idx-${i}`;
-        return selectedTestKeys.has(`${baseKey}#${i}`);
-      }),
-    };
-  }
-  return {
-    ...source,
-    modelResults: source.modelResults
-      .filter((mr) => selectedModels.has(mr.model))
-      .map((mr) => ({
-        ...mr,
-        test_results: (mr.test_results ?? []).filter((r) => {
-          const raw = r as RawTestCaseLike;
-          const name =
-            raw.test_case?.name ?? raw.test_name ?? raw.name ?? "Untitled test";
-          return selectedTestKeys.has(name);
-        }),
-      })),
-  };
-}
-
 type Mode = "existing" | "new";
 
 export function AddRunToLabellingTaskDialog({
@@ -313,21 +268,13 @@ export function AddRunToLabellingTaskDialog({
   const [newDescription, setNewDescription] = useState("");
   const [nameInvalid, setNameInvalid] = useState(false);
 
-  const availableTests = useMemo(() => getAvailableTests(source), [source]);
-  const availableModels = useMemo(() => getAvailableModels(source), [source]);
-  const [selectedTestKeys, setSelectedTestKeys] = useState<Set<string>>(
-    () => new Set(availableTests.map((t) => t.key)),
-  );
-  const [selectedModels, setSelectedModels] = useState<Set<string>>(
-    () => new Set(availableModels),
-  );
-
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{
     taskUuid: string;
     taskName: string;
     itemsCreated: number;
+    itemsSkipped: number;
   } | null>(null);
   const onAddedFiredRef = useRef(false);
 
@@ -353,10 +300,8 @@ export function AddRunToLabellingTaskDialog({
     setSubmitting(false);
     setSubmitError(null);
     setSuccess(null);
-    setSelectedTestKeys(new Set(availableTests.map((t) => t.key)));
-    setSelectedModels(new Set(availableModels));
     onAddedFiredRef.current = false;
-  }, [isOpen, availableTests, availableModels]);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || !accessToken) return;
@@ -388,7 +333,14 @@ export function AddRunToLabellingTaskDialog({
     };
   }, [isOpen, accessToken]);
 
-  const supportedTasks = useMemo(
+  const transform = useMemo(
+    () => buildItemsFromSource(source, targetTaskType),
+    [source, targetTaskType],
+  );
+  const { items, skippedCount, evaluatorUuids } = transform;
+
+  // First relevance gate: the task must be of a supported type.
+  const typeMatchedTasks = useMemo(
     () =>
       tasks.filter((t) =>
         (SUPPORTED_TARGET_TASK_TYPES as readonly string[]).includes(
@@ -398,6 +350,23 @@ export function AddRunToLabellingTaskDialog({
     [tasks],
   );
 
+  // Second relevance gate: the task must already carry (at least) every
+  // evaluator the run uses. Items reference these evaluators by uuid in
+  // their `evaluator_variables`, so a task missing any of them can't be
+  // labelled/evaluated against the full set. `evaluatorUuids` is the union
+  // across the run's tests, so this follows any future per-test selection.
+  const supportedTasks = useMemo(
+    () =>
+      typeMatchedTasks.filter((t) => {
+        const taskEvals = new Set((t.evaluators ?? []).map((e) => e.uuid));
+        for (const id of evaluatorUuids) {
+          if (!taskEvals.has(id)) return false;
+        }
+        return true;
+      }),
+    [typeMatchedTasks, evaluatorUuids],
+  );
+
   useEffect(() => {
     if (mode !== "existing") return;
     if (supportedTasks.length === 1 && !selectedTaskUuid) {
@@ -405,62 +374,30 @@ export function AddRunToLabellingTaskDialog({
     }
   }, [mode, supportedTasks, selectedTaskUuid]);
 
-  const filteredSource = useMemo(
-    () => filterSourceBySelection(source, selectedTestKeys, selectedModels),
-    [source, selectedTestKeys, selectedModels],
-  );
-  const transform = useMemo(
-    () => buildItemsFromSource(filteredSource, targetTaskType),
-    [filteredSource, targetTaskType],
-  );
-  const { items, skippedCount, evaluatorUuids } = transform;
-
-  const toggleAllTests = () => {
-    if (selectedTestKeys.size === availableTests.length) {
-      setSelectedTestKeys(new Set());
-    } else {
-      setSelectedTestKeys(new Set(availableTests.map((t) => t.key)));
-    }
-  };
-  const toggleTestKey = (key: string) => {
-    setSelectedTestKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-  const toggleAllModels = () => {
-    if (selectedModels.size === availableModels.length) {
-      setSelectedModels(new Set());
-    } else {
-      setSelectedModels(new Set(availableModels));
-    }
-  };
-  const toggleModel = (model: string) => {
-    setSelectedModels((prev) => {
-      const next = new Set(prev);
-      if (next.has(model)) next.delete(model);
-      else next.add(model);
-      return next;
-    });
-  };
-
   const selectedTask = useMemo(
     () => supportedTasks.find((t) => t.uuid === selectedTaskUuid) ?? null,
     [supportedTasks, selectedTaskUuid],
   );
 
+  const showExistingTaskPicker =
+    !tasksLoading && !tasksError && supportedTasks.length > 0;
+  const effectiveMode: Mode = showExistingTaskPicker ? mode : "new";
+
+  useEffect(() => {
+    if (!isOpen || tasksLoading || tasksError) return;
+    setMode(supportedTasks.length === 0 ? "new" : "existing");
+  }, [isOpen, tasksLoading, tasksError, supportedTasks.length]);
+
   const canSubmit = (() => {
     if (submitting || success) return false;
     if (items.length === 0) return false;
-    if (mode === "existing") return !!selectedTaskUuid;
+    if (effectiveMode === "existing") return !!selectedTaskUuid;
     return newName.trim().length > 0;
   })();
 
   const handleSubmit = async () => {
     if (!canSubmit || !accessToken) return;
-    if (mode === "new" && !newName.trim()) {
+    if (effectiveMode === "new" && !newName.trim()) {
       setNameInvalid(true);
       return;
     }
@@ -470,7 +407,7 @@ export function AddRunToLabellingTaskDialog({
       let taskUuid: string;
       let taskName: string;
 
-      if (mode === "new") {
+      if (effectiveMode === "new") {
         const body: {
           name: string;
           type: SupportedTaskType;
@@ -524,16 +461,54 @@ export function AddRunToLabellingTaskDialog({
         }
       }
 
-      await apiClient(`/annotation-tasks/${taskUuid}/items`, accessToken, {
-        method: "POST",
-        body: { items },
-      });
+      // `payload.name` is unique within a task, so re-adding the same run's
+      // tests conflicts. The backend reports the exact `conflicting_names`;
+      // drop those and retry with the rest so partial re-adds still go
+      // through instead of failing the whole batch.
+      let toPost = items;
+      let itemsSkipped = 0;
+      try {
+        await apiClient(`/annotation-tasks/${taskUuid}/items`, accessToken, {
+          method: "POST",
+          body: { items: toPost },
+        });
+      } catch (err) {
+        const detail = extractApiErrorDetail(err);
+        if (
+          detail?.code !== "ITEM_NAME_CONFLICT" ||
+          !Array.isArray(detail.conflicting_names)
+        ) {
+          throw err;
+        }
+        const conflicting = new Set(detail.conflicting_names);
+        toPost = items.filter((i) => !conflicting.has(i.payload.name));
+        itemsSkipped = items.length - toPost.length;
+        if (toPost.length === 0) {
+          if (!mountedRef.current) return;
+          setSubmitError(
+            items.length === 1
+              ? "This test is already in the task"
+              : `All ${items.length} tests are already in the task`,
+          );
+          setSubmitting(false);
+          return;
+        }
+        await apiClient(`/annotation-tasks/${taskUuid}/items`, accessToken, {
+          method: "POST",
+          body: { items: toPost },
+        });
+      }
 
       if (!mountedRef.current) return;
-      setSuccess({ taskUuid, taskName, itemsCreated: items.length });
+      setSuccess({
+        taskUuid,
+        taskName,
+        itemsCreated: toPost.length,
+        itemsSkipped,
+      });
       if (onAdded && !onAddedFiredRef.current) {
         onAddedFiredRef.current = true;
-        onAdded(taskUuid, items.length);
+        onAdded(taskUuid, toPost.length);
       }
     } catch (err) {
       reportError(
@@ -549,23 +524,58 @@ export function AddRunToLabellingTaskDialog({
 
   if (!isOpen) return null;
 
-  const previewText = (() => {
-    if (items.length === 0) return "No supported results to add.";
-    const itemPart = `${items.length} item${items.length === 1 ? "" : "s"} will be added.`;
-    const skipPart = skippedCount
-      ? ` ${skippedCount} tool-call result${skippedCount === 1 ? "" : "s"} will be skipped.`
-      : "";
-    return `${itemPart}${skipPart}`;
-  })();
+  const actionLabel =
+    effectiveMode === "new" ? "Create task & add" : "Add to task";
 
-  const actionLabel = mode === "new" ? "Create task & add" : "Add to task";
+  const noExistingTasksMessage =
+    evaluatorUuids.size > 0
+      ? `No existing tasks were found that include all ${evaluatorUuids.size} evaluator${evaluatorUuids.size === 1 ? "" : "s"} in the selected tests.`
+      : "No existing labelling tasks were found.";
+
+  const newTaskForm = (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium mb-2">
+          Name <span className="text-red-500">*</span>
+        </label>
+        <input
+          autoFocus
+          value={newName}
+          onChange={(e) => {
+            setNewName(e.target.value);
+            if (nameInvalid) setNameInvalid(false);
+          }}
+          placeholder="e.g. Copilot review — May batch"
+          disabled={submitting}
+          className={`w-full h-10 px-3 rounded-md text-sm border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed ${
+            nameInvalid ? "border-red-500" : "border-border"
+          }`}
+        />
+        {nameInvalid && (
+          <p className="mt-1 text-sm text-red-500">Name is required.</p>
+        )}
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-2">Description</label>
+        <textarea
+          value={newDescription}
+          onChange={(e) => setNewDescription(e.target.value)}
+          placeholder="Short description of the labelling task"
+          rows={3}
+          disabled={submitting}
+          className="w-full px-3 py-2 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent resize-y disabled:opacity-50 disabled:cursor-not-allowed"
+        />
+      </div>
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-xl rounded-xl bg-background border border-border p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+      <div className="w-full max-w-md rounded-xl bg-background border border-border p-6 shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-start justify-between gap-3 mb-4">
           <h2 className="text-base md:text-lg font-semibold text-foreground">
-            Add to labelling task
+            Submit {items.length} test{items.length === 1 ? "" : "s"} for
+            labelling
           </h2>
           <button
             onClick={onClose}
@@ -590,228 +600,150 @@ export function AddRunToLabellingTaskDialog({
         </div>
 
         {success ? (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <p className="text-sm text-foreground">
-              Added {success.itemsCreated} item
+              Added {success.itemsCreated} test
               {success.itemsCreated === 1 ? "" : "s"} to{" "}
               <span className="font-medium">{success.taskName}</span>.
+              {success.itemsSkipped > 0
+                ? ` ${success.itemsSkipped} test${
+                    success.itemsSkipped === 1 ? "" : "s"
+                  } already in the task ${
+                    success.itemsSkipped === 1 ? "was" : "were"
+                  } skipped.`
+                : ""}{" "}
+              View the task to start labelling.
             </p>
-            <div className="flex items-center justify-end">
+            <div className="flex items-center justify-end gap-2 md:gap-3">
               <button
                 onClick={onClose}
-                className="h-9 md:h-10 px-4 rounded-lg text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+                className="h-9 md:h-10 px-4 rounded-lg text-sm md:text-base font-medium border border-border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent transition-colors cursor-pointer"
               >
-                Close
+                Back
               </button>
+              <Link
+                href={`/human-alignment/tasks/${success.taskUuid}`}
+                className="h-9 md:h-10 px-4 flex items-center rounded-lg text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+              >
+                View task
+              </Link>
             </div>
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="inline-flex rounded-lg border border-border p-0.5 bg-muted/30">
-              <button
-                type="button"
-                onClick={() => setMode("existing")}
-                disabled={submitting}
-                className={`h-8 px-3 rounded-md text-xs md:text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-                  mode === "existing"
-                    ? "bg-foreground text-background"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Use existing task
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("new")}
-                disabled={submitting}
-                className={`h-8 px-3 rounded-md text-xs md:text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-                  mode === "new"
-                    ? "bg-foreground text-background"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Create new task
-              </button>
-            </div>
+            {skippedCount > 0 && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-foreground">
+                <svg
+                  className="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"
+                  />
+                </svg>
+                <span>Tool call tests are not added to labelling tasks</span>
+              </div>
+            )}
+            {showExistingTaskPicker && (
+              <div className="inline-flex rounded-lg border border-border p-0.5 bg-muted/30">
+                <button
+                  type="button"
+                  onClick={() => setMode("existing")}
+                  disabled={submitting}
+                  className={`h-8 px-3 rounded-md text-xs md:text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                    mode === "existing"
+                      ? "bg-foreground text-background"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Use existing task
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("new")}
+                  disabled={submitting}
+                  className={`h-8 px-3 rounded-md text-xs md:text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                    mode === "new"
+                      ? "bg-foreground text-background"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Create new task
+                </button>
+              </div>
+            )}
 
-            {mode === "existing" ? (
+            {tasksLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <svg
+                  className="w-4 h-4 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                Loading tasks
+              </div>
+            ) : tasksError ? (
+              <p className="text-sm text-red-500">{tasksError}</p>
+            ) : showExistingTaskPicker && mode === "existing" ? (
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Labelling task
+                  Select the labelling task to add the tests to
                 </label>
-                {tasksLoading ? (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <svg
-                      className="w-4 h-4 animate-spin"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                    Loading tasks
-                  </div>
-                ) : tasksError ? (
-                  <p className="text-sm text-red-500">{tasksError}</p>
-                ) : supportedTasks.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No LLM labelling tasks yet. Switch to{" "}
-                    <button
-                      type="button"
-                      onClick={() => setMode("new")}
-                      className="underline cursor-pointer"
-                    >
-                      create new task
-                    </button>{" "}
-                    to make one.
+                <Select
+                  value={selectedTaskUuid}
+                  onChange={(e) => setSelectedTaskUuid(e.target.value)}
+                  disabled={submitting}
+                  className="cursor-pointer disabled:cursor-not-allowed"
+                >
+                  <option value="">Select a task</option>
+                  {supportedTasks.map((t) => (
+                    <option key={t.uuid} value={t.uuid}>
+                      {t.name}
+                      {typeof t.item_count === "number"
+                        ? ` (${t.item_count} items)`
+                        : ""}
+                    </option>
+                  ))}
+                </Select>
+                {evaluatorUuids.size > 0 && (
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Only tasks that already include all {evaluatorUuids.size}{" "}
+                    evaluator
+                    {evaluatorUuids.size === 1 ? "" : "s"} used by this run are
+                    shown
                   </p>
-                ) : (
-                  <select
-                    value={selectedTaskUuid}
-                    onChange={(e) => setSelectedTaskUuid(e.target.value)}
-                    disabled={submitting}
-                    className="w-full h-10 px-3 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                  >
-                    <option value="">Select a task…</option>
-                    {supportedTasks.map((t) => (
-                      <option key={t.uuid} value={t.uuid}>
-                        {t.name}
-                        {typeof t.item_count === "number"
-                          ? ` (${t.item_count} items)`
-                          : ""}
-                      </option>
-                    ))}
-                  </select>
                 )}
               </div>
             ) : (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    autoFocus
-                    value={newName}
-                    onChange={(e) => {
-                      setNewName(e.target.value);
-                      if (nameInvalid) setNameInvalid(false);
-                    }}
-                    placeholder="e.g. Next-reply review — May batch"
-                    disabled={submitting}
-                    className={`w-full h-10 px-3 rounded-md text-sm border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed ${
-                      nameInvalid ? "border-red-500" : "border-border"
-                    }`}
-                  />
-                  {nameInvalid && (
-                    <p className="mt-1 text-sm text-red-500">
-                      Name is required.
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    value={newDescription}
-                    onChange={(e) => setNewDescription(e.target.value)}
-                    placeholder="Short description of the labelling task"
-                    rows={3}
-                    disabled={submitting}
-                    className="w-full px-3 py-2 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent resize-y disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                </div>
-              </div>
+              <>
+                {!showExistingTaskPicker && (
+                  <p className="text-sm text-muted-foreground">
+                    {noExistingTasksMessage}
+                  </p>
+                )}
+                {newTaskForm}
+              </>
             )}
-
-            {availableTests.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-medium">
-                    Tests to add ({selectedTestKeys.size} of{" "}
-                    {availableTests.length})
-                  </label>
-                  <button
-                    type="button"
-                    onClick={toggleAllTests}
-                    disabled={submitting}
-                    className="text-xs text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {selectedTestKeys.size === availableTests.length
-                      ? "Deselect all"
-                      : "Select all"}
-                  </button>
-                </div>
-                <div className="max-h-40 overflow-y-auto rounded-md border border-border bg-background">
-                  {availableTests.map((t) => (
-                    <label
-                      key={t.key}
-                      className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted/30 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedTestKeys.has(t.key)}
-                        onChange={() => toggleTestKey(t.key)}
-                        disabled={submitting}
-                        className="cursor-pointer disabled:cursor-not-allowed"
-                      />
-                      <span className="truncate">{t.name}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {availableModels.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-medium">
-                    Models ({selectedModels.size} of {availableModels.length})
-                  </label>
-                  <button
-                    type="button"
-                    onClick={toggleAllModels}
-                    disabled={submitting}
-                    className="text-xs text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {selectedModels.size === availableModels.length
-                      ? "Deselect all"
-                      : "Select all"}
-                  </button>
-                </div>
-                <div className="max-h-32 overflow-y-auto rounded-md border border-border bg-background">
-                  {availableModels.map((m) => (
-                    <label
-                      key={m}
-                      className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted/30 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedModels.has(m)}
-                        onChange={() => toggleModel(m)}
-                        disabled={submitting}
-                        className="cursor-pointer disabled:cursor-not-allowed"
-                      />
-                      <span className="truncate">{m}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <p className="text-xs text-muted-foreground">{previewText}</p>
 
             {submitError && (
               <p className="text-sm text-red-500">{submitError}</p>

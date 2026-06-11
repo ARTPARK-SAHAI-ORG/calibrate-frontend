@@ -37,7 +37,7 @@ export type {
   TTSProviderResultForDetails,
 } from "./EvaluationRunDetails";
 
-export { BenchmarkOutputsPanel } from "./BenchmarkOutputsPanel";
+export { BenchmarkOutputsPanel, benchmarkLabellingKey } from "./BenchmarkOutputsPanel";
 export type { BenchmarkTestResult, BenchmarkModelResult } from "./BenchmarkOutputsPanel";
 
 export { BenchmarkCombinedLeaderboard } from "./BenchmarkCombinedLeaderboard";
