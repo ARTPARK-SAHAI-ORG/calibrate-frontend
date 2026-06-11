@@ -160,14 +160,17 @@ export function TestRunSummary({
 
   const evaluators = evaluatorSummary ?? [];
 
-  // Range subtitle (min–max) for an aggregate, or a "n cases" hint. Only shown
-  // when the block is present; null blocks fall through to a plain "—" value.
-  const latencySubtitle = latency
-    ? `${formatLatencyMs(latency.min)} – ${formatLatencyMs(latency.max)}`
-    : undefined;
-  const costSubtitle = cost
-    ? `${formatCostUsd(cost.min)} – ${formatCostUsd(cost.max)}`
-    : undefined;
+  // Min–max range subtitle for an aggregate. Skipped when there's a single
+  // sample or every case had the same value (the range would just repeat the
+  // mean), and for null blocks (which render a plain "—" value).
+  const latencySubtitle =
+    latency && latency.count > 1 && latency.min !== latency.max
+      ? `${formatLatencyMs(latency.min)} – ${formatLatencyMs(latency.max)}`
+      : undefined;
+  const costSubtitle =
+    cost && cost.count > 1 && cost.min !== cost.max
+      ? `${formatCostUsd(cost.min)} – ${formatCostUsd(cost.max)}`
+      : undefined;
 
   return (
     <div className="p-4 md:p-6 space-y-6 overflow-y-auto h-full">
@@ -180,12 +183,12 @@ export function TestRunSummary({
             progress={rate ?? undefined}
           />
           <MetricCard
-            label="Avg latency"
+            label="Average latency"
             value={formatLatencyMs(latency?.mean)}
             subtitle={latencySubtitle}
           />
           <MetricCard
-            label="Avg cost"
+            label="Average cost"
             value={formatCostUsd(cost?.mean)}
             subtitle={costSubtitle}
           />
