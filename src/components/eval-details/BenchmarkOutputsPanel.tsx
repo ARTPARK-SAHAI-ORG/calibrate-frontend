@@ -361,6 +361,15 @@ export function BenchmarkOutputsPanel({
       `Test ${selectedTest.testIndex + 1}`
     : "";
 
+  const allModelsExpanded =
+    modelResults.length > 0 &&
+    modelResults.every((m) => expandedModels.has(m.model));
+  const showBulkSelect =
+    showLabellingCheckboxes &&
+    !!onLabellingBulkToggle &&
+    allLabellingKeys.length > 0;
+  const showBulkExpand = showControls && modelResults.length > 0;
+
   return (
     <div className="flex h-full overflow-hidden" style={height ? { height } : undefined}>
       {/* Left Panel - Model list with tests */}
@@ -372,26 +381,65 @@ export function BenchmarkOutputsPanel({
       >
         {/* Search */}
         {modelResults.length > 0 && (
-          <div className="shrink-0 p-3 space-y-2 border-b border-border">
+          <div className="shrink-0 p-3 border-b border-border">
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
               placeholder="Search tests"
             />
-            {showLabellingCheckboxes && onLabellingBulkToggle && allLabellingKeys.length > 0 && (
+          </div>
+        )}
+        {(showBulkSelect || showBulkExpand) && (
+          <div className="shrink-0 border-b border-border px-3 py-2 flex items-center gap-2">
+            {showBulkSelect && (
               <button
                 type="button"
-                onClick={() => onLabellingBulkToggle(allLabellingKeys)}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                onClick={() => onLabellingBulkToggle!(allLabellingKeys)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer transition-colors border border-border bg-muted/60 text-foreground hover:bg-muted"
               >
+                <LabellingRowCheckbox checked={allLabellingSelected} />
                 {allLabellingSelected ? "Deselect all" : "Select all"}
+              </button>
+            )}
+            {showBulkExpand && (
+              <button
+                type="button"
+                onClick={() => {
+                  const allModels = modelResults.map((m) => m.model);
+                  if (onSetExpandedModels) {
+                    onSetExpandedModels(
+                      allModelsExpanded ? new Set() : new Set(allModels),
+                    );
+                  } else {
+                    const toToggle = allModelsExpanded
+                      ? allModels
+                      : allModels.filter((m) => !expandedModels.has(m));
+                    toToggle.forEach((m) => onToggleModel(m));
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer transition-colors border border-dashed border-muted-foreground/40 text-muted-foreground hover:text-foreground hover:border-muted-foreground/60 hover:bg-muted/30"
+              >
+                <svg
+                  className={`w-3 h-3 shrink-0 transition-transform ${allModelsExpanded ? "" : "rotate-180"}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                  />
+                </svg>
+                {allModelsExpanded ? "Collapse all" : "Expand all"}
               </button>
             )}
           </div>
         )}
-        {/* Filter pills + collapse/expand */}
-        {showControls && modelResults.length > 0 && (
-          <div className="shrink-0 border-b border-border flex items-center justify-between px-3 py-2">
+        {/* Filter pills */}
+        {showControls && modelResults.length > 0 && showFilterPills && (
+          <div className="shrink-0 border-b border-border flex items-center px-3 py-2">
             <div className="flex items-center gap-1.5">
               {showFilterPills && statusCounts.passed > 0 && (
                 <button
@@ -433,25 +481,6 @@ export function BenchmarkOutputsPanel({
                 </button>
               )}
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                const allModels = modelResults.map((m) => m.model);
-                const allExpanded = allModels.every((m) => expandedModels.has(m));
-                if (onSetExpandedModels) {
-                  onSetExpandedModels(allExpanded ? new Set() : new Set(allModels));
-                } else {
-                  // Fallback: toggle individually
-                  const toToggle = allExpanded ? allModels : allModels.filter((m) => !expandedModels.has(m));
-                  toToggle.forEach((m) => onToggleModel(m));
-                }
-              }}
-              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            >
-              {modelResults.every((m) => expandedModels.has(m.model))
-                ? "Collapse all"
-                : "Expand all"}
-            </button>
           </div>
         )}
         <div ref={listContainerRef} className="flex-1 overflow-y-auto">
