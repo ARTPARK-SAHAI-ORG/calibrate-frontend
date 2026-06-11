@@ -24,6 +24,27 @@ import {
   useAnnotators,
 } from "./bulk-upload-shared";
 
+type EvaluatorVariableDef = {
+  name: string;
+  description?: string;
+  default?: string;
+};
+
+export type LlmGeneralLinkedEvaluator = {
+  uuid: string;
+  name: string;
+  slug: string | null;
+  variables: EvaluatorVariableDef[];
+  output_type: "binary" | "rating" | null;
+  scale_min: number | null;
+  scale_max: number | null;
+};
+
+type EvaluatorRef = {
+  evaluator_uuid: string;
+  variable_values?: Record<string, string>;
+};
+
 const NAME_HEADERS = ["name", "title", "label", "item_name"];
 const INPUT_HEADERS = ["input", "prompt", "question", "request"];
 const OUTPUT_HEADERS = ["output", "response", "completion", "answer", "reply"];
@@ -32,42 +53,57 @@ function csvEscape(s: string): string {
   return `"${s.replace(/"/g, '""')}"`;
 }
 
+// Column header for an evaluator variable, e.g. "Correctness/criteria".
+// One column per variable per evaluator — keeps the CSV flat instead of
+// asking users to hand-author JSON in a single cell.
+function variableColumnName(evalName: string, varName: string): string {
+  return `${evalName}/${varName}`;
+}
+
 const SAMPLE_BASE_ROWS: Array<{
   name: string;
   input: string;
   output: string;
+  sampleVariableValue: string;
   reasoning: string;
 }> = [
   {
     name: "Summary 1",
     input: "Summarise: The cat sat on the mat and then went to sleep.",
     output: "A cat sat on a mat and fell asleep.",
+    sampleVariableValue:
+      "The summary should be accurate, concise, and capture the key facts.",
     reasoning: "Accurate and concise.",
   },
   {
     name: "Classification 1",
     input: "Classify the sentiment: I absolutely loved this product!",
     output: "positive",
-    reasoning: "",
-  },
-  {
-    name: "Extraction 1",
-    input: "Extract the city: The meeting is in Berlin next week.",
-    output: "Berlin",
+    sampleVariableValue:
+      "The label should correctly reflect the sentiment of the text.",
     reasoning: "",
   },
 ];
 
 function buildSampleCsv(
-  evaluators: EvaluatorMeta[],
+  linked: LlmGeneralLinkedEvaluator[],
   includeAnnotations: boolean,
 ): string {
+  const variableColumns: { evalName: string; varName: string }[] = [];
+  for (const e of linked) {
+    for (const v of e.variables) {
+      variableColumns.push({ evalName: e.name, varName: v.name });
+    }
+  }
   const headerCells = [
     "name",
     "input",
     "output",
+    ...variableColumns.map((c) =>
+      csvEscape(variableColumnName(c.evalName, c.varName)),
+    ),
     ...(includeAnnotations
-      ? evaluators.flatMap((e) => [
+      ? linked.flatMap((e) => [
           csvEscape(evaluatorValueColumn(e.name)),
           csvEscape(evaluatorReasoningColumn(e.name)),
         ])
@@ -78,8 +114,9 @@ function buildSampleCsv(
       csvEscape(r.name),
       csvEscape(r.input),
       csvEscape(r.output),
+      ...variableColumns.map(() => csvEscape(r.sampleVariableValue)),
       ...(includeAnnotations
-        ? evaluators.flatMap((e) => [
+        ? linked.flatMap((e) => [
             csvEscape(sampleEvaluatorValue(e)),
             csvEscape(r.reasoning),
           ])
@@ -93,15 +130,8 @@ type ParsedItem = {
   name: string;
   input: string;
   output: string;
+  evaluators: EvaluatorRef[];
   annotations: ParsedAnnotation[];
-};
-
-export type LlmGeneralLinkedEvaluator = {
-  uuid: string;
-  name: string;
-  output_type: "binary" | "rating" | null;
-  scale_min: number | null;
-  scale_max: number | null;
 };
 
 type BulkUploadLlmGeneralItemsDialogProps = {
@@ -157,9 +187,14 @@ export function BulkUploadLlmGeneralItemsDialog({
     (e) => e.output_type !== "binary" && e.output_type !== "rating",
   );
 
-  // Two linked evaluators sharing a name produce duplicate CSV headers that
-  // PapaParse silently overwrites. Block the annotation flow until renamed.
+  // Two linked evaluators with the same name produce duplicate CSV headers —
+  // this also breaks the `<evalName>/<varName>` variable columns, so it has
+  // to block regardless of whether the user is uploading annotations.
   const duplicateNames = duplicateEvaluatorNames(annotationEvaluatorsMeta);
+
+  const evaluatorsWithVariables = linkedEvaluators.filter(
+    (e) => e.variables.length > 0,
+  );
 
   const reset = () => {
     setCsvFile(null);
@@ -186,6 +221,14 @@ export function BulkUploadLlmGeneralItemsDialog({
     setParsedItems([]);
     setCsvFile(file);
     if (!file) return;
+    if (duplicateNames.length > 0) {
+      setParseError(
+        `Two or more linked evaluators share the same name (${duplicateNames
+          .map((n) => `"${n}"`)
+          .join(", ")}). Rename one before uploading.`,
+      );
+      return;
+    }
     Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,
@@ -201,6 +244,43 @@ export function BulkUploadLlmGeneralItemsDialog({
           );
           return;
         }
+
+        // Resolve a column for each evaluator variable up front.
+        const variableHeaderMap = new Map<
+          string,
+          {
+            evaluator: LlmGeneralLinkedEvaluator;
+            varName: string;
+            columnKey: string;
+          }[]
+        >();
+        const missingColumns: string[] = [];
+        for (const e of evaluatorsWithVariables) {
+          const slots: {
+            evaluator: LlmGeneralLinkedEvaluator;
+            varName: string;
+            columnKey: string;
+          }[] = [];
+          for (const v of e.variables) {
+            const expected = variableColumnName(e.name, v.name);
+            const key = headers.find((h) => h === expected);
+            if (!key) {
+              missingColumns.push(expected);
+              continue;
+            }
+            slots.push({ evaluator: e, varName: v.name, columnKey: key });
+          }
+          variableHeaderMap.set(e.uuid, slots);
+        }
+        if (missingColumns.length > 0) {
+          setParseError(
+            `CSV is missing column(s) for evaluator variables: ${missingColumns
+              .map((c) => `"${c}"`)
+              .join(", ")}. Download the sample CSV above for the exact format.`,
+          );
+          return;
+        }
+
         if (uploadAnnotations) {
           if (evaluatorsMissingOutputType.length > 0) {
             setParseError(
@@ -230,7 +310,12 @@ export function BulkUploadLlmGeneralItemsDialog({
           const name = (r[nameKey] ?? "").trim();
           const input = (r[inputKey] ?? "").trim();
           const output = (r[outputKey] ?? "").trim();
-          if (!name && !input && !output) continue;
+          const anyVariableValue = evaluatorsWithVariables.some((e) =>
+            (variableHeaderMap.get(e.uuid) ?? []).some(
+              (slot) => (r[slot.columnKey] ?? "").trim() !== "",
+            ),
+          );
+          if (!name && !input && !output && !anyVariableValue) continue;
           if (!name) {
             setParseError(`Row ${i + 1}: "name" is required.`);
             return;
@@ -241,6 +326,31 @@ export function BulkUploadLlmGeneralItemsDialog({
             );
             return;
           }
+
+          const refs: EvaluatorRef[] = [];
+          let rowError: string | null = null;
+          for (const e of evaluatorsWithVariables) {
+            const slots = variableHeaderMap.get(e.uuid) ?? [];
+            const variableValues: Record<string, string> = {};
+            for (const slot of slots) {
+              const raw = (r[slot.columnKey] ?? "").trim();
+              if (!raw) {
+                rowError = `Row ${i + 1}: missing value for "${variableColumnName(
+                  e.name,
+                  slot.varName,
+                )}".`;
+                break;
+              }
+              variableValues[slot.varName] = raw;
+            }
+            if (rowError) break;
+            refs.push({ evaluator_uuid: e.uuid, variable_values: variableValues });
+          }
+          if (rowError) {
+            setParseError(rowError);
+            return;
+          }
+
           const annotations: ParsedAnnotation[] = [];
           if (uploadAnnotations) {
             for (const meta of annotationEvaluatorsMeta) {
@@ -272,7 +382,7 @@ export function BulkUploadLlmGeneralItemsDialog({
               });
             }
           }
-          items.push({ name, input, output, annotations });
+          items.push({ name, input, output, evaluators: refs, annotations });
         }
         if (items.length === 0) {
           setParseError("No rows with content were found in the CSV.");
@@ -300,6 +410,15 @@ export function BulkUploadLlmGeneralItemsDialog({
     setUploadError(null);
     try {
       const itemsBody = parsedItems.map((p) => {
+        const evaluator_variables: Record<
+          string,
+          Record<string, string>
+        > = {};
+        for (const ref of p.evaluators) {
+          if (ref.variable_values) {
+            evaluator_variables[ref.evaluator_uuid] = { ...ref.variable_values };
+          }
+        }
         const annotationsObj = uploadAnnotations
           ? buildItemAnnotationsPayload(p.annotations)
           : undefined;
@@ -308,6 +427,9 @@ export function BulkUploadLlmGeneralItemsDialog({
             name: p.name,
             input: p.input,
             output: p.output,
+            ...(Object.keys(evaluator_variables).length > 0
+              ? { evaluator_variables }
+              : {}),
           },
           ...(annotationsObj ? { annotations: annotationsObj } : {}),
         };
@@ -346,6 +468,16 @@ export function BulkUploadLlmGeneralItemsDialog({
       },
     ];
 
+    for (const e of evaluatorsWithVariables) {
+      for (const v of e.variables) {
+        const desc = v.description ? ` — ${v.description}` : "";
+        columns.push({
+          name: variableColumnName(e.name, v.name),
+          description: `Required. Used for the "${e.name}" evaluator${desc}`,
+        });
+      }
+    }
+
     if (uploadAnnotations && annotationEvaluatorsMeta.length > 0) {
       for (const e of annotationEvaluatorsMeta) {
         const range =
@@ -375,6 +507,13 @@ export function BulkUploadLlmGeneralItemsDialog({
     };
   };
 
+  const variableColumns = evaluatorsWithVariables.flatMap((e) =>
+    e.variables.map((v) => ({
+      evaluatorUuid: e.uuid,
+      varName: v.name,
+      header: variableColumnName(e.name, v.name),
+    })),
+  );
   const annotationColumns =
     uploadAnnotations && annotationEvaluatorsMeta.length > 0
       ? annotationEvaluatorsMeta.flatMap((e) => [
@@ -395,6 +534,7 @@ export function BulkUploadLlmGeneralItemsDialog({
       "minmax(80px, 140px)",
       "minmax(120px, 220px)",
       "minmax(120px, 220px)",
+      ...variableColumns.map(() => "minmax(120px, 200px)"),
       ...annotationColumns.map((c) =>
         c.kind === "value" ? "minmax(64px, 88px)" : "minmax(100px, 176px)",
       ),
@@ -414,6 +554,15 @@ export function BulkUploadLlmGeneralItemsDialog({
         <div className="text-xs font-medium text-muted-foreground">Name</div>
         <div className="text-xs font-medium text-muted-foreground">Input</div>
         <div className="text-xs font-medium text-muted-foreground">Output</div>
+        {variableColumns.map((c) => (
+          <div
+            key={`h-${c.evaluatorUuid}-${c.varName}`}
+            className="text-xs font-medium text-muted-foreground font-mono truncate"
+            title={c.header}
+          >
+            {c.header}
+          </div>
+        ))}
         {annotationColumns.map((c) => (
           <div
             key={`ah-${c.evaluatorUuid}-${c.kind}`}
@@ -425,52 +574,75 @@ export function BulkUploadLlmGeneralItemsDialog({
         ))}
       </div>
       <div className="divide-y divide-border">
-        {parsedItems.slice(0, 50).map((p, idx) => (
-          <div
-            key={idx}
-            className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
-            style={gridStyle}
-          >
-            <div className="truncate text-foreground" title={p.name}>
-              {p.name || <span className="text-muted-foreground">—</span>}
-            </div>
+        {parsedItems.slice(0, 50).map((p, idx) => {
+          const valuesByKey = new Map<string, string>();
+          for (const ref of p.evaluators) {
+            if (!ref.variable_values) continue;
+            for (const [varName, value] of Object.entries(
+              ref.variable_values,
+            )) {
+              valuesByKey.set(`${ref.evaluator_uuid}/${varName}`, value);
+            }
+          }
+          return (
             <div
-              className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
-              title={p.input}
+              key={idx}
+              className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
+              style={gridStyle}
             >
-              {p.input}
+              <div className="truncate text-foreground" title={p.name}>
+                {p.name || <span className="text-muted-foreground">—</span>}
+              </div>
+              <div
+                className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                title={p.input}
+              >
+                {p.input}
+              </div>
+              <div
+                className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                title={p.output}
+              >
+                {p.output}
+              </div>
+              {variableColumns.map((c) => {
+                const value =
+                  valuesByKey.get(`${c.evaluatorUuid}/${c.varName}`) ?? "";
+                return (
+                  <div
+                    key={`${idx}-${c.evaluatorUuid}-${c.varName}`}
+                    className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                  >
+                    {value}
+                  </div>
+                );
+              })}
+              {annotationColumns.map((c) => {
+                const ann = p.annotations.find(
+                  (a) => a.evaluator_uuid === c.evaluatorUuid,
+                );
+                const display =
+                  c.kind === "value"
+                    ? ann
+                      ? typeof ann.value === "boolean"
+                        ? ann.value
+                          ? "true"
+                          : "false"
+                        : String(ann.value)
+                      : ""
+                    : (ann?.reasoning ?? "");
+                return (
+                  <div
+                    key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
+                    className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                  >
+                    {display}
+                  </div>
+                );
+              })}
             </div>
-            <div
-              className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
-              title={p.output}
-            >
-              {p.output}
-            </div>
-            {annotationColumns.map((c) => {
-              const ann = p.annotations.find(
-                (a) => a.evaluator_uuid === c.evaluatorUuid,
-              );
-              const display =
-                c.kind === "value"
-                  ? ann
-                    ? typeof ann.value === "boolean"
-                      ? ann.value
-                        ? "true"
-                        : "false"
-                      : String(ann.value)
-                    : ""
-                  : (ann?.reasoning ?? "");
-              return (
-                <div
-                  key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
-                  className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
-                >
-                  {display}
-                </div>
-              );
-            })}
-          </div>
-        ))}
+          );
+        })}
         {parsedItems.length > 50 && (
           <div className="px-4 py-2 text-xs text-muted-foreground">
             + {parsedItems.length - 50} more rows
@@ -481,22 +653,25 @@ export function BulkUploadLlmGeneralItemsDialog({
   );
 
   const annotationOptIn =
-    linkedEvaluators.length > 0 ? (
+    linkedEvaluators.length > 0 || duplicateNames.length > 0 ? (
       <div className="space-y-3">
-        <AnnotationOptIn
-          annotators={annotatorsState.annotators}
-          loading={annotatorsState.loading}
-          error={annotatorsState.error}
-          uploadAnnotations={uploadAnnotations}
-          onToggle={setUploadAnnotations}
-          selectedAnnotatorId={selectedAnnotatorId}
-          onSelectAnnotator={setSelectedAnnotatorId}
-        />
-        {uploadAnnotations && duplicateNames.length > 0 && (
+        {linkedEvaluators.length > 0 && (
+          <AnnotationOptIn
+            annotators={annotatorsState.annotators}
+            loading={annotatorsState.loading}
+            error={annotatorsState.error}
+            uploadAnnotations={uploadAnnotations}
+            onToggle={setUploadAnnotations}
+            selectedAnnotatorId={selectedAnnotatorId}
+            onSelectAnnotator={setSelectedAnnotatorId}
+          />
+        )}
+        {duplicateNames.length > 0 && (
           <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
             Two or more linked evaluators share the same name (
-            {duplicateNames.map((n) => `"${n}"`).join(", ")}). Rename one on the
-            evaluators page before uploading annotations.
+            {duplicateNames.map((n) => `"${n}"`).join(", ")}). Their variable
+            and annotation columns would collide in the CSV — rename one on the
+            evaluators page before uploading.
           </div>
         )}
         {uploadAnnotations && evaluatorsMissingOutputType.length > 0 && (
@@ -510,19 +685,17 @@ export function BulkUploadLlmGeneralItemsDialog({
     ) : null;
 
   const uploadBlocked =
-    uploadAnnotations &&
-    (annotatorsState.annotators.length === 0 ||
-      !selectedAnnotatorId ||
-      duplicateNames.length > 0 ||
-      evaluatorsMissingOutputType.length > 0);
+    duplicateNames.length > 0 ||
+    (uploadAnnotations &&
+      (annotatorsState.annotators.length === 0 ||
+        !selectedAnnotatorId ||
+        evaluatorsMissingOutputType.length > 0));
 
   return (
     <BulkUploadDialogShell
       isOpen={isOpen}
       title="Bulk upload items"
-      buildSampleCsv={() =>
-        buildSampleCsv(annotationEvaluatorsMeta, uploadAnnotations)
-      }
+      buildSampleCsv={() => buildSampleCsv(linkedEvaluators, uploadAnnotations)}
       sampleFilename={() =>
         uploadAnnotations
           ? "sample_llm_response_items_with_annotations.csv"
@@ -547,10 +720,9 @@ export function BulkUploadLlmGeneralItemsDialog({
       topContent={annotationOptIn}
       uploadBlocked={uploadBlocked}
       hideUploadSection={
-        uploadAnnotations &&
-        (!selectedAnnotatorId ||
-          duplicateNames.length > 0 ||
-          evaluatorsMissingOutputType.length > 0)
+        duplicateNames.length > 0 ||
+        (uploadAnnotations &&
+          (!selectedAnnotatorId || evaluatorsMissingOutputType.length > 0))
       }
     />
   );

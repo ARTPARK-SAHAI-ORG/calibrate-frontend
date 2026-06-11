@@ -4,12 +4,22 @@ import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { humaniseDetailObject } from "./bulk-upload-shared";
 
+export type LlmGeneralEvaluatorDef = {
+  uuid: string;
+  name: string;
+  variables: { name: string; description?: string; default?: string }[];
+};
+
+// Per-evaluator, per-variable values: { [evaluatorUuid]: { [varName]: value } }.
+type VarValues = Record<string, Record<string, string>>;
+
 type LlmGeneralRowDraft = {
   id: string;
   uuid?: string; // present in edit mode; undefined for new rows
   name: string;
   input: string;
   output: string;
+  varValues: VarValues;
 };
 
 export type LlmGeneralItemRowSubmission = {
@@ -17,16 +27,21 @@ export type LlmGeneralItemRowSubmission = {
   name: string;
   input: string;
   output: string;
+  evaluator_variables: VarValues;
 };
 
 type AddLlmGeneralItemsDialogProps = {
   isOpen: boolean;
   mode?: "add" | "edit";
+  // Linked evaluators with their variable definitions, used to render the
+  // per-item variable inputs and seed defaults.
+  evaluators?: LlmGeneralEvaluatorDef[];
   initialRows?: {
     uuid: string;
     name: string;
     input: string;
     output: string;
+    varValues?: VarValues;
   }[];
   onClose: () => void;
   onSubmit: (rows: LlmGeneralItemRowSubmission[]) => Promise<void> | void;
@@ -50,19 +65,16 @@ function extractApiError(err: unknown, fallback: string): string {
   return err.message || fallback;
 }
 
-const newRow = (): LlmGeneralRowDraft => ({
-  id:
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-  name: "",
-  input: "",
-  output: "",
-});
+function makeId(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 export function AddLlmGeneralItemsDialog({
   isOpen,
   mode = "add",
+  evaluators = [],
   initialRows,
   onClose,
   onSubmit,
@@ -70,6 +82,32 @@ export function AddLlmGeneralItemsDialog({
   useHideFloatingButton(isOpen);
 
   const isEdit = mode === "edit";
+  const evaluatorsWithVariables = evaluators.filter(
+    (e) => e.variables.length > 0,
+  );
+  const hasVariables = evaluatorsWithVariables.length > 0;
+
+  // Build the variable-value map for a row, seeding each variable from a
+  // provided value (edit/duplicate) or the variable's default.
+  const seedVarValues = (provided?: VarValues): VarValues => {
+    const out: VarValues = {};
+    for (const e of evaluatorsWithVariables) {
+      const evOut: Record<string, string> = {};
+      for (const v of e.variables) {
+        evOut[v.name] = provided?.[e.uuid]?.[v.name] ?? v.default ?? "";
+      }
+      out[e.uuid] = evOut;
+    }
+    return out;
+  };
+
+  const newRow = (): LlmGeneralRowDraft => ({
+    id: makeId(),
+    name: "",
+    input: "",
+    output: "",
+    varValues: seedVarValues(),
+  });
 
   const buildRows = (): LlmGeneralRowDraft[] =>
     initialRows && initialRows.length > 0
@@ -79,6 +117,7 @@ export function AddLlmGeneralItemsDialog({
           name: r.name,
           input: r.input,
           output: r.output,
+          varValues: seedVarValues(r.varValues),
         }))
       : [newRow()];
 
@@ -102,6 +141,30 @@ export function AddLlmGeneralItemsDialog({
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   };
 
+  const updateVar = (
+    id: string,
+    evaluatorUuid: string,
+    varName: string,
+    value: string,
+  ) => {
+    setRows((prev) =>
+      prev.map((r) =>
+        r.id === id
+          ? {
+              ...r,
+              varValues: {
+                ...r.varValues,
+                [evaluatorUuid]: {
+                  ...(r.varValues[evaluatorUuid] ?? {}),
+                  [varName]: value,
+                },
+              },
+            }
+          : r,
+      ),
+    );
+  };
+
   const removeRow = (id: string) => {
     setRows((prev) =>
       prev.length === 1 ? prev : prev.filter((r) => r.id !== id),
@@ -112,14 +175,38 @@ export function AddLlmGeneralItemsDialog({
     setRows((prev) => [...prev, newRow()]);
   };
 
+  // A row's variable values are complete when every variable on every
+  // evaluator has a non-empty value (mirrors the bulk CSV requirement).
+  const rowVarsComplete = (r: LlmGeneralRowDraft): boolean =>
+    evaluatorsWithVariables.every((e) =>
+      e.variables.every((v) => (r.varValues[e.uuid]?.[v.name] ?? "").trim()),
+    );
+
   const validRows: LlmGeneralItemRowSubmission[] = rows
-    .map((r) => ({
-      uuid: r.uuid,
-      name: r.name.trim(),
-      input: r.input.trim(),
-      output: r.output.trim(),
-    }))
-    .filter((r) => r.name && r.input && r.output);
+    .filter(
+      (r) =>
+        r.name.trim() &&
+        r.input.trim() &&
+        r.output.trim() &&
+        rowVarsComplete(r),
+    )
+    .map((r) => {
+      const evaluator_variables: VarValues = {};
+      for (const e of evaluatorsWithVariables) {
+        const evVals: Record<string, string> = {};
+        for (const v of e.variables) {
+          evVals[v.name] = (r.varValues[e.uuid]?.[v.name] ?? "").trim();
+        }
+        evaluator_variables[e.uuid] = evVals;
+      }
+      return {
+        uuid: r.uuid,
+        name: r.name.trim(),
+        input: r.input.trim(),
+        output: r.output.trim(),
+        evaluator_variables,
+      };
+    });
 
   const handleClose = () => {
     if (!submitting) {
@@ -146,13 +233,16 @@ export function AddLlmGeneralItemsDialog({
     }
   };
 
+  const inputClasses =
+    "w-full min-h-9 px-3 py-2 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 resize-y";
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
       onClick={handleClose}
     >
       <div
-        className="bg-background border border-border rounded-xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh]"
+        className="bg-background border border-border rounded-xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 px-5 md:px-6 py-4 border-b border-border">
@@ -162,7 +252,7 @@ export function AddLlmGeneralItemsDialog({
             </h2>
             <p className="text-xs md:text-sm text-muted-foreground mt-1">
               {isEdit
-                ? "Update the name, input, and output for each row"
+                ? "Update the name, input, and output for each item"
                 : "Annotators will judge the output produced for the given input"}
             </p>
           </div>
@@ -187,57 +277,17 @@ export function AddLlmGeneralItemsDialog({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-2">
-          {/* Column headers (shown once) */}
-          <div className="grid grid-cols-[1fr_2fr_2fr_28px] gap-2 px-1 pb-1">
-            <div className="text-xs font-medium text-muted-foreground">
-              Name
-            </div>
-            <div className="text-xs font-medium text-muted-foreground">
-              Input
-            </div>
-            <div className="text-xs font-medium text-muted-foreground">
-              Output
-            </div>
-            <div />
-          </div>
-
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
           {rows.map((row, idx) => (
             <div
               key={row.id}
-              className="grid grid-cols-[1fr_2fr_2fr_28px] gap-2 items-start"
+              className="rounded-xl border border-border p-4 space-y-3 relative"
             >
-              <input
-                type="text"
-                value={row.name}
-                onChange={(e) => updateRow(row.id, { name: e.target.value })}
-                placeholder="e.g. Case 1"
-                disabled={submitting}
-                className="w-full h-9 px-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
-              />
-              <textarea
-                value={row.input}
-                onChange={(e) => updateRow(row.id, { input: e.target.value })}
-                placeholder="The prompt or input given to the LLM"
-                disabled={submitting}
-                rows={2}
-                className="w-full min-h-9 px-3 py-2 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 resize-y"
-              />
-              <textarea
-                value={row.output}
-                onChange={(e) => updateRow(row.id, { output: e.target.value })}
-                placeholder="The output the LLM produced"
-                disabled={submitting}
-                rows={2}
-                className="w-full min-h-9 px-3 py-2 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 resize-y"
-              />
-              {isEdit ? (
-                <div />
-              ) : (
+              {!isEdit && rows.length > 1 && (
                 <button
                   onClick={() => removeRow(row.id)}
-                  disabled={rows.length === 1 || submitting}
-                  className="w-7 h-7 mt-1 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                  disabled={submitting}
+                  className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                   aria-label={`Remove item ${idx + 1}`}
                   title="Remove this item"
                 >
@@ -255,6 +305,86 @@ export function AddLlmGeneralItemsDialog({
                     />
                   </svg>
                 </button>
+              )}
+
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-muted-foreground">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  value={row.name}
+                  onChange={(e) => updateRow(row.id, { name: e.target.value })}
+                  placeholder="e.g. Case 1"
+                  disabled={submitting}
+                  className="w-full h-9 px-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    Input
+                  </label>
+                  <textarea
+                    value={row.input}
+                    onChange={(e) =>
+                      updateRow(row.id, { input: e.target.value })
+                    }
+                    placeholder="The prompt or input given to the LLM"
+                    disabled={submitting}
+                    rows={3}
+                    className={inputClasses}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    Output
+                  </label>
+                  <textarea
+                    value={row.output}
+                    onChange={(e) =>
+                      updateRow(row.id, { output: e.target.value })
+                    }
+                    placeholder="The output the LLM produced"
+                    disabled={submitting}
+                    rows={3}
+                    className={inputClasses}
+                  />
+                </div>
+              </div>
+
+              {hasVariables && (
+                <div className="space-y-3 border-t border-border pt-3">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Evaluator variables
+                  </p>
+                  {evaluatorsWithVariables.map((e) => (
+                    <div key={e.uuid} className="space-y-2">
+                      <p className="text-xs font-semibold text-foreground">
+                        {e.name}
+                      </p>
+                      {e.variables.map((v) => (
+                        <div key={v.name} className="space-y-1">
+                          <label className="block text-[11px] font-mono text-muted-foreground">
+                            {`{{${v.name}}}`}
+                            {v.description ? ` — ${v.description}` : ""}
+                          </label>
+                          <textarea
+                            value={row.varValues[e.uuid]?.[v.name] ?? ""}
+                            onChange={(ev) =>
+                              updateVar(row.id, e.uuid, v.name, ev.target.value)
+                            }
+                            placeholder={`Value for ${v.name}`}
+                            disabled={submitting}
+                            rows={2}
+                            className={inputClasses}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           ))}

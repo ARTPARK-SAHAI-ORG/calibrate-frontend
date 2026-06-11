@@ -1259,7 +1259,14 @@ function LabellingTaskPageInner() {
   const [editLlmGeneralSingleItemUuid, setEditLlmGeneralSingleItemUuid] =
     useState<string | null>(null);
   const [duplicateLlmGeneralRows, setDuplicateLlmGeneralRows] = useState<
-    { uuid: string; name: string; input: string; output: string }[] | null
+    {
+      uuid: string;
+      name: string;
+      input: string;
+      output: string;
+      varValues?: Record<string, Record<string, string>>;
+    }[]
+    | null
   >(null);
 
   // Sort direction for the items table's Updated at column. Always
@@ -2091,6 +2098,14 @@ function LabellingTaskPageInner() {
     return out;
   };
 
+  // Linked evaluators (with their variable defs) passed to the llm-general
+  // add/edit dialog so it can render per-item variable inputs.
+  const llmGeneralEvaluatorDefs = (task?.evaluators ?? []).map((e) => ({
+    uuid: e.uuid,
+    name: e.name,
+    variables: e.variables ?? [],
+  }));
+
   // Build initialEvaluators[] from the task's linked evaluators using the
   // catalogue for variable definitions, optionally seeded with saved values.
   // If the catalogue hasn't hydrated this evaluator yet but we have saved
@@ -2533,11 +2548,13 @@ function LabellingTaskPageInner() {
                   : "Add item"}
               </button>
               {(() => {
-                // LLM bulk upload references evaluators by name in the
-                // CSV; without any linked evaluators the validator will
-                // reject every row. Disable the button instead.
+                // LLM / LLM-response bulk upload references evaluators by
+                // name in the CSV (variable columns); without any linked
+                // evaluators the validator will reject every row. Disable the
+                // button instead — same gating for both LLM task types.
                 const llmNoEvaluators =
-                  taskType === "llm" && (task?.evaluators?.length ?? 0) === 0;
+                  (taskType === "llm" || taskType === "llm-general") &&
+                  (task?.evaluators?.length ?? 0) === 0;
                 const buttonEl = (
                   <button
                     onClick={() => {
@@ -3425,6 +3442,7 @@ function LabellingTaskPageInner() {
                                       typeof p?.output === "string"
                                         ? (p.output as string)
                                         : "",
+                                    varValues: readEvaluatorVariables(p),
                                   },
                                 ]);
                                 setAddLlmGeneralItemsOpen(true);
@@ -4123,6 +4141,7 @@ function LabellingTaskPageInner() {
 
       <AddLlmGeneralItemsDialog
         isOpen={addLlmGeneralItemsOpen}
+        evaluators={llmGeneralEvaluatorDefs}
         initialRows={duplicateLlmGeneralRows ?? undefined}
         onClose={() => {
           setAddLlmGeneralItemsOpen(false);
@@ -4138,6 +4157,9 @@ function LabellingTaskPageInner() {
                   ...(r.name ? { name: r.name } : {}),
                   input: r.input,
                   output: r.output,
+                  ...(Object.keys(r.evaluator_variables).length > 0
+                    ? { evaluator_variables: r.evaluator_variables }
+                    : {}),
                 },
               })),
             },
@@ -4152,6 +4174,7 @@ function LabellingTaskPageInner() {
       <AddLlmGeneralItemsDialog
         isOpen={editLlmGeneralItemsOpen}
         mode="edit"
+        evaluators={llmGeneralEvaluatorDefs}
         initialRows={items
           .filter((it) =>
             editLlmGeneralSingleItemUuid
@@ -4165,6 +4188,7 @@ function LabellingTaskPageInner() {
               name: typeof p.name === "string" ? p.name : "",
               input: typeof p.input === "string" ? p.input : "",
               output: typeof p.output === "string" ? p.output : "",
+              varValues: readEvaluatorVariables(p),
             };
           })}
         onClose={() => {
@@ -4187,6 +4211,9 @@ function LabellingTaskPageInner() {
                       ...(r.name ? { name: r.name } : {}),
                       input: r.input,
                       output: r.output,
+                      ...(Object.keys(r.evaluator_variables).length > 0
+                        ? { evaluator_variables: r.evaluator_variables }
+                        : {}),
                     },
                   })),
               },
@@ -4208,6 +4235,8 @@ function LabellingTaskPageInner() {
           linkedEvaluators={(task?.evaluators ?? []).map((e) => ({
             uuid: e.uuid,
             name: e.name,
+            slug: e.slug ?? null,
+            variables: e.variables ?? [],
             output_type: e.output_type ?? null,
             scale_min: typeof e.scale_min === "number" ? e.scale_min : null,
             scale_max: typeof e.scale_max === "number" ? e.scale_max : null,
