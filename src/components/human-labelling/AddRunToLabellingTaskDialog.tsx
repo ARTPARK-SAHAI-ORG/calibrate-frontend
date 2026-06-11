@@ -97,6 +97,10 @@ type RawTestCaseLike = {
   name?: string;
   chat_history?: TestCaseHistory[];
   output?: { response?: string } | null;
+  judge_results?: Array<{
+    evaluator_uuid?: string | null;
+    variable_values?: Record<string, string> | null;
+  }> | null;
 };
 
 function buildOneItem(
@@ -119,12 +123,27 @@ function buildOneItem(
 
   const evaluator_variables: Record<string, Record<string, string>> = {};
   const evaluatorUuids: string[] = [];
-  const evalRefs = raw.test_case?.evaluators ?? [];
-  for (const ref of evalRefs) {
+  // judge_results is the result-level echo populated for every response
+  // test; test_case.evaluators is a config-level echo that may be absent.
+  // Prefer judge_results and fall back to test_case.evaluators so we don't
+  // lose variable values on either shape.
+  for (const jr of raw.judge_results ?? []) {
+    const uuid = jr?.evaluator_uuid ?? null;
+    if (!uuid) continue;
+    evaluatorUuids.push(uuid);
+    if (jr?.variable_values && typeof jr.variable_values === "object") {
+      evaluator_variables[uuid] = { ...jr.variable_values };
+    }
+  }
+  for (const ref of raw.test_case?.evaluators ?? []) {
     const uuid = ref?.evaluator_uuid ?? ref?.uuid ?? null;
     if (!uuid) continue;
     evaluatorUuids.push(uuid);
-    if (ref?.variable_values && typeof ref.variable_values === "object") {
+    if (
+      !evaluator_variables[uuid] &&
+      ref?.variable_values &&
+      typeof ref.variable_values === "object"
+    ) {
       evaluator_variables[uuid] = { ...ref.variable_values };
     }
   }
@@ -187,6 +206,12 @@ export function buildItemsFromSource(
             for (const id of built.evaluatorUuids) evaluatorUuids.add(id);
           }
         }
+      }
+      // Always merge the top-level run evaluators (TestRunStatusResponse.
+      // evaluators[]). They're the canonical evaluator set for the run
+      // and per-test/per-result echoes may be sparse.
+      for (const ev of source.evaluators ?? []) {
+        if (ev?.uuid) evaluatorUuids.add(ev.uuid);
       }
       return { items, skippedCount, evaluatorUuids };
     }
