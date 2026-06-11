@@ -154,7 +154,13 @@ export function buildItemsFromSource(
     case "llm": {
       if (source.type === "test_run") {
         for (const r of source.results) {
-          const built = buildOneItem(r as RawTestCaseLike);
+          const raw = r as RawTestCaseLike;
+          const baseName =
+            raw.test_case?.name ?? raw.test_name ?? raw.name ?? "Untitled test";
+          const built = buildOneItem(
+            raw,
+            `${baseName} — ${source.runUuid}`,
+          );
           if (!built) {
             skippedCount += 1;
             continue;
@@ -169,7 +175,10 @@ export function buildItemsFromSource(
             const raw = r as RawTestCaseLike;
             const baseName =
               raw.test_case?.name ?? raw.test_name ?? raw.name ?? "Untitled test";
-            const built = buildOneItem(raw, `${baseName} — ${mr.model}`);
+            const built = buildOneItem(
+              raw,
+              `${baseName} — ${source.benchmarkUuid} — ${mr.model}`,
+            );
             if (!built) {
               skippedCount += 1;
               continue;
