@@ -45,6 +45,8 @@ export { BenchmarkCombinedLeaderboard } from "./BenchmarkCombinedLeaderboard";
 export { TestRunOutputsPanel } from "./TestRunOutputsPanel";
 export type { TestRunResult } from "./TestRunOutputsPanel";
 
+export { TestRunSummary } from "./TestRunSummary";
+
 export { SimulationMetricsGrid, LATENCY_KEYS } from "./SimulationMetricsGrid";
 export type { MetricData } from "./SimulationMetricsGrid";
 

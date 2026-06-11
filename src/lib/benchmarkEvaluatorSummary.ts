@@ -45,6 +45,13 @@ export type BenchmarkLeaderboardSummaryRow = {
   passed?: string;
   total?: string;
   pass_rate: string;
+  /** Average per-test latency in milliseconds (backend aggregate). Optional /
+   * absent on older jobs that pre-date latency tracking. May arrive as a
+   * number or a numeric string. */
+  avg_latency_ms?: number | string | null;
+  /** Average per-test cost in USD (backend aggregate). Optional / absent on
+   * older jobs. May arrive as a number or a numeric string. */
+  avg_cost?: number | string | null;
 };
 
 export type BenchmarkCombinedEvaluatorColumn = {
@@ -63,9 +70,21 @@ export type BenchmarkCombinedLeaderboardPayload = {
   plan: {
     showPassedTotal: boolean;
     showOverallPassRate: boolean;
+    /** True when at least one model reported an average latency. */
+    showLatency: boolean;
+    /** True when at least one model reported an average cost. */
+    showCost: boolean;
     evaluators: BenchmarkCombinedEvaluatorColumn[];
   };
 };
+
+/** Coerce a latency / cost field (number or numeric string) to a finite
+ * number, or `undefined` when missing / unparseable. */
+function toFiniteNumber(v: unknown): number | undefined {
+  if (v == null) return undefined;
+  const n = typeof v === "number" ? v : parseFloat(String(v));
+  return Number.isFinite(n) ? n : undefined;
+}
 
 /** Table header and chart title for rating evaluators: `Name (min–max)` when scale is finite. */
 export function benchmarkRatingEvaluatorCaption(
@@ -209,6 +228,8 @@ export function buildBenchmarkCombinedLeaderboardPayload(
 
   const modelsOrdered = orderedCanonicalModels(leaderboardSummary, modelResults);
   const rows: Record<string, unknown>[] = [];
+  let showLatency = false;
+  let showCost = false;
 
   for (const model of modelsOrdered) {
     const lbRow = leaderboardSummary?.find(
@@ -223,6 +244,16 @@ export function buildBenchmarkCombinedLeaderboardPayload(
       row.total = lbRow.total;
       const pr = parseFloat(lbRow.pass_rate);
       row.pass_rate = Number.isFinite(pr) ? pr : undefined;
+      const latency = toFiniteNumber(lbRow.avg_latency_ms);
+      if (latency !== undefined) {
+        row.avg_latency_ms = latency;
+        showLatency = true;
+      }
+      const cost = toFiniteNumber(lbRow.avg_cost);
+      if (cost !== undefined) {
+        row.avg_cost = cost;
+        showCost = true;
+      }
     }
 
     for (const ev of evaluators) {
@@ -249,6 +280,24 @@ export function buildBenchmarkCombinedLeaderboardPayload(
       dataKey: "pass_rate",
       yDomain: [0, 100],
       formatTooltip: (v) => `${v.toFixed(1)}%`,
+    });
+  }
+
+  if (showLatency) {
+    allCharts.push({
+      title: "Avg latency (s)",
+      dataKey: "avg_latency_ms",
+      formatTooltip: (v) =>
+        v >= 1000 ? `${(v / 1000).toFixed(2)} s` : `${Math.round(v)} ms`,
+      yTickFormatter: (v) => `${(v / 1000).toFixed(1)}`,
+    });
+  }
+
+  if (showCost) {
+    allCharts.push({
+      title: "Avg cost (USD)",
+      dataKey: "avg_cost",
+      formatTooltip: (v) => `$${v < 0.01 ? v.toFixed(6) : v.toFixed(4)}`,
     });
   }
 
@@ -287,6 +336,8 @@ export function buildBenchmarkCombinedLeaderboardPayload(
     plan: {
       showPassedTotal,
       showOverallPassRate,
+      showLatency,
+      showCost,
       evaluators,
     },
   };

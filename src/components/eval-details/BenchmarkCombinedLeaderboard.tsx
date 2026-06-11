@@ -9,6 +9,7 @@ import {
   type BenchmarkLeaderboardSummaryRow,
   type BenchmarkModelLike,
 } from "@/lib/benchmarkEvaluatorSummary";
+import { formatLatencyMs, formatCostUsd } from "@/lib/llmMetrics";
 
 type BenchmarkCombinedLeaderboardProps = {
   leaderboardSummary?: BenchmarkLeaderboardSummaryRow[];
@@ -44,6 +45,32 @@ function columnsFromPayload(
       render: (v) =>
         typeof v === "number" && Number.isFinite(v) ? (
           `${v.toFixed(1)}%`
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    });
+  }
+
+  if (payload.plan.showLatency) {
+    cols.push({
+      key: "avg_latency_ms",
+      header: "Avg latency",
+      render: (v) =>
+        typeof v === "number" && Number.isFinite(v) ? (
+          formatLatencyMs(v)
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    });
+  }
+
+  if (payload.plan.showCost) {
+    cols.push({
+      key: "avg_cost",
+      header: "Avg cost",
+      render: (v) =>
+        typeof v === "number" && Number.isFinite(v) ? (
+          formatCostUsd(v)
         ) : (
           <span className="text-muted-foreground">—</span>
         ),

@@ -32,6 +32,10 @@ type LeaderboardSummary = {
   passed: string;
   total: string;
   pass_rate: string;
+  /** Average per-test latency (ms) / cost (USD) aggregates. Absent on older
+   * jobs that pre-date latency/cost tracking. */
+  avg_latency_ms?: number | string | null;
+  avg_cost?: number | string | null;
 };
 
 type BenchmarkStatusResponse = {

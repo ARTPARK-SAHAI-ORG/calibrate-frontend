@@ -18,8 +18,9 @@ import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
-import { TestRunOutputsPanel } from "./eval-details";
+import { TestRunOutputsPanel, TestRunSummary } from "./eval-details";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
+import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSummary";
 import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
@@ -95,6 +96,16 @@ type TestRunStatusResponse = {
    * for every uuid referenced by judge_results (synthesises stubs for
    * legacy rows). */
   evaluators?: TestRunEvaluator[];
+  /** Aggregate per-evaluator metrics across the run (binary pass rate /
+   * rating mean). Same shape benchmark uses per model. Absent on older runs. */
+  evaluator_summary?: BenchmarkEvaluatorSummaryEntry[] | null;
+  /** Overall pass rate as a percentage (0–100). Optional — the summary falls
+   * back to passed/total_tests when absent. */
+  pass_rate?: number | null;
+  /** Average per-test latency in milliseconds (backend aggregate). */
+  avg_latency_ms?: number | null;
+  /** Average per-test cost in USD (backend aggregate). */
+  avg_cost?: number | null;
   results_s3_prefix?: string;
   error?: string;
   is_public?: boolean;
@@ -157,6 +168,17 @@ export function TestRunnerDialog({
   // a uuid-keyed map below and passed into TestRunOutputsPanel as the
   // source of truth for per-evaluator metadata.
   const [runEvaluators, setRunEvaluators] = useState<TestRunEvaluator[]>([]);
+  // Aggregate summary block (per-evaluator metrics + latency/cost) surfaced
+  // on the Summary tab once the run is done.
+  const [evaluatorSummary, setEvaluatorSummary] = useState<
+    BenchmarkEvaluatorSummaryEntry[]
+  >([]);
+  const [summaryPassRate, setSummaryPassRate] = useState<number | null>(null);
+  const [avgLatencyMs, setAvgLatencyMs] = useState<number | null>(null);
+  const [avgCost, setAvgCost] = useState<number | null>(null);
+  // Which tab is showing. Tabs only render once the run is done; we default to
+  // the Summary tab on completion (mirrors the benchmark dialog).
+  const [activeTab, setActiveTab] = useState<"summary" | "outputs">("outputs");
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   // Tracks whether the dialog has already auto-opened a completed test for
   // this open lifecycle. Set back to false on every dialog open / new run /
@@ -164,6 +186,15 @@ export function TestRunnerDialog({
   // Without this guard, clicking the in-dialog "back to list" button would
   // immediately re-trigger the auto-open, making the list view unreachable.
   const hasAutoSelectedRef = useRef(false);
+
+  // Clear the aggregate summary block so a prior run's numbers can't leak into
+  // a fresh run / past-run view that omits the fields.
+  const resetSummary = () => {
+    setEvaluatorSummary([]);
+    setSummaryPassRate(null);
+    setAvgLatencyMs(null);
+    setAvgCost(null);
+  };
 
   // Auto-open the first completed test when nothing is selected. Covers both
   // - live runs: as soon as one test transitions to passed/failed (and the
@@ -222,6 +253,8 @@ export function TestRunnerDialog({
     hasAutoSelectedRef.current = false;
     setCurrentTaskId(taskId);
     setRunEvaluators([]);
+    resetSummary();
+    setActiveTab("outputs");
 
     const isInProgress =
       initialRunStatus === "pending" ||
@@ -268,6 +301,8 @@ export function TestRunnerDialog({
     hasAutoSelectedRef.current = false;
     setCurrentTaskId(null);
     setRunEvaluators([]);
+    resetSummary();
+    setActiveTab("outputs");
     const initialResults: TestResult[] = tests.map((test) => ({
       test,
       status: "pending",
@@ -323,6 +358,18 @@ export function TestRunnerDialog({
       setRunEvaluators(
         Array.isArray(result.evaluators) ? result.evaluators : [],
       );
+      // Sync the aggregate summary block (latency / cost / per-evaluator).
+      // Always set (including the empty case) so a prior run can't leak in.
+      setEvaluatorSummary(
+        Array.isArray(result.evaluator_summary) ? result.evaluator_summary : [],
+      );
+      setSummaryPassRate(
+        typeof result.pass_rate === "number" ? result.pass_rate : null,
+      );
+      setAvgLatencyMs(
+        typeof result.avg_latency_ms === "number" ? result.avg_latency_ms : null,
+      );
+      setAvgCost(typeof result.avg_cost === "number" ? result.avg_cost : null);
 
       // Update test results based on polling response
       setTestResults((prev) => {
@@ -459,6 +506,17 @@ export function TestRunnerDialog({
         if (pollingIntervalRef.current) {
           clearInterval(pollingIntervalRef.current);
           pollingIntervalRef.current = null;
+        }
+
+        // Land on the Summary tab when the run finishes cleanly (mirrors the
+        // benchmark dialog). Polling has stopped by now, so this fires once on
+        // completion and won't fight a later manual tab switch. Skip on failure
+        // since there's no useful summary to show.
+        if (
+          (result.status === "completed" || result.status === "done") &&
+          !result.error
+        ) {
+          setActiveTab("summary");
         }
 
         // If there's an overall error, update remaining pending tests
@@ -893,8 +951,8 @@ export function TestRunnerDialog({
               <p className="text-xs text-muted-foreground truncate">{agentName}</p>
             </div>
           </div>
-          {/* Previous/Next pager - centered, desktop only */}
-          {nav && selectedTestUuid && (
+          {/* Previous/Next pager - centered, desktop only. Outputs tab only. */}
+          {activeTab === "outputs" && nav && selectedTestUuid && (
             <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
               <ResultPager
                 currentIndex={nav.currentIndex}
@@ -979,7 +1037,48 @@ export function TestRunnerDialog({
             </div>
           </div>
         ) : (
-          /* Content - Split panel */
+          /* Content */
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Tab nav - only once the run is done (mirrors the benchmark dialog) */}
+            {runStatus === "done" && (
+              <div className="border-b border-border px-4 md:px-6 pt-2 overflow-x-auto hide-scrollbar shrink-0">
+                <div className="flex gap-3 md:gap-4 lg:gap-6">
+                  <button
+                    onClick={() => setActiveTab("summary")}
+                    className={`pb-3 px-1 text-sm md:text-base font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                      activeTab === "summary"
+                        ? "border-foreground text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Summary
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("outputs")}
+                    className={`pb-3 px-1 text-sm md:text-base font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                      activeTab === "outputs"
+                        ? "border-foreground text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Outputs
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {runStatus === "done" && activeTab === "summary" ? (
+              <div className="flex-1 overflow-hidden">
+                <TestRunSummary
+                  passed={passedTests.length}
+                  total={passedTests.length + failedTests.length}
+                  passRate={summaryPassRate}
+                  avgLatencyMs={avgLatencyMs}
+                  avgCost={avgCost}
+                  evaluatorSummary={evaluatorSummary}
+                />
+              </div>
+            ) : (
           <div className="flex-1 overflow-hidden">
             <TestRunOutputsPanel
               results={testResults.map((r) => ({
@@ -1002,6 +1101,8 @@ export function TestRunnerDialog({
               )}
               legacyDefaultEvaluator={defaultNextReplyEvaluator}
             />
+          </div>
+            )}
           </div>
         )}
       </div>

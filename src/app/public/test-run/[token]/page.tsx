@@ -11,9 +11,10 @@ import {
   type PagerNav,
 } from "@/components/test-results/shared";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
-import { TestRunOutputsPanel } from "@/components/eval-details";
+import { TestRunOutputsPanel, TestRunSummary } from "@/components/eval-details";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
+import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSummary";
 
 type TestCaseResult = {
   test_uuid?: string;
@@ -39,6 +40,11 @@ type TestRunStatusResponse = {
   results?: TestCaseResult[];
   /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
   evaluators?: TestRunEvaluator[];
+  /** Aggregate summary block (per-evaluator metrics + latency/cost). */
+  evaluator_summary?: BenchmarkEvaluatorSummaryEntry[] | null;
+  pass_rate?: number | null;
+  avg_latency_ms?: number | null;
+  avg_cost?: number | null;
   error?: string;
 };
 
@@ -56,6 +62,7 @@ export default function PublicTestRunPage() {
   const [notFound, setNotFound] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [nav, setNav] = useState<PagerNav | null>(null);
+  const [activeTab, setActiveTab] = useState<"summary" | "outputs">("summary");
 
   useEffect(() => { document.title = "LLM unit test | Calibrate"; }, []);
 
@@ -91,9 +98,8 @@ export default function PublicTestRunPage() {
 
   const results = data.results ?? [];
   const passed = results.filter((r) => getStatus(r) === "passed").length;
-  // Errored tests carry an `error` and are shown as their own category in the
-  // list; keep them out of the "failed" count so the summary matches.
-  const errored = results.filter((r) => !!r.error).length;
+  // Errored tests carry an `error`; keep them out of the pass-rate denominator
+  // so the rate matches the scored tests.
   const failed = results.filter(
     (r) => getStatus(r) === "failed" && !r.error,
   ).length;
@@ -101,25 +107,20 @@ export default function PublicTestRunPage() {
   return (
     <PublicPageLayout title="LLM unit test" contentClassName="max-w-[92rem]">
       <div className="space-y-4 md:space-y-6">
-        {/* Summary stats */}
-        <div className="relative flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400">
-                {passed} passed
-              </span>
-              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400">
-                {failed} failed
-              </span>
-              {errored > 0 && (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
-                  {errored} errored
-                </span>
-              )}
-            </div>
-            <span className="text-[13px] text-muted-foreground">{results.length} total tests</span>
+        {/* Tab nav */}
+        <div className="relative flex items-end justify-between gap-2 border-b border-border">
+          <div className="flex gap-2">
+            {(["summary", "outputs"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer capitalize ${activeTab === tab ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
-          {nav && selectedId && (
+          {activeTab === "outputs" && nav && selectedId && (
             <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
               <ResultPager
                 currentIndex={nav.currentIndex}
@@ -130,28 +131,44 @@ export default function PublicTestRunPage() {
             </div>
           )}
           {results.length > 0 && (
-            <ExportResultsButton
-              filename={`test-run-${token}`}
-              getRows={() =>
-                buildTestRunCsv(
-                  results.map((r) => ({
-                    name: r.name || r.test_case?.name || r.test_name,
-                    status: getStatus(r),
-                    output: r.output,
-                    testCase: r.test_case,
-                    reasoning: r.reasoning,
-                    judgeResults: r.judge_results,
-                  })),
-                  Object.fromEntries(
-                    (data.evaluators ?? []).map((e) => [e.uuid, e]),
-                  ),
-                )
-              }
-            />
+            <div className="pb-2">
+              <ExportResultsButton
+                filename={`test-run-${token}`}
+                getRows={() =>
+                  buildTestRunCsv(
+                    results.map((r) => ({
+                      name: r.name || r.test_case?.name || r.test_name,
+                      status: getStatus(r),
+                      output: r.output,
+                      testCase: r.test_case,
+                      reasoning: r.reasoning,
+                      judgeResults: r.judge_results,
+                    })),
+                    Object.fromEntries(
+                      (data.evaluators ?? []).map((e) => [e.uuid, e]),
+                    ),
+                  )
+                }
+              />
+            </div>
           )}
         </div>
 
-        {results.length > 0 && (
+        {/* Summary tab */}
+        {activeTab === "summary" && (
+          <TestRunSummary
+            passed={passed}
+            total={passed + failed}
+            passRate={data.pass_rate}
+            avgLatencyMs={data.avg_latency_ms}
+            avgCost={data.avg_cost}
+            evaluatorSummary={data.evaluator_summary}
+            enableEvaluatorLinks={false}
+          />
+        )}
+
+        {/* Outputs tab */}
+        {activeTab === "outputs" && results.length > 0 && (
           <div className="border border-border rounded-xl overflow-hidden" style={{ height: "calc(100vh - 220px)", minHeight: 620 }}>
             <TestRunOutputsPanel
               results={results.map((r, i) => ({
