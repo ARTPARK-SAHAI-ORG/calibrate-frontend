@@ -678,14 +678,17 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
 - **Set up custom evaluators**
 - **Duplicate existing evaluators** with a new name
 
-**Evaluator type (use case)** — every evaluator is scoped to one of four use cases via the `evaluator_type` field on the create payload and the GET response:
+**Evaluator type (use case)** — every evaluator is scoped to one of these use cases via the `evaluator_type` field on the create payload and the GET response:
 
-| `evaluator_type` | Label          | Purpose                                                                        | Derived `data_type` |
-| ---------------- | -------------- | ------------------------------------------------------------------------------ | ------------------- |
-| `tts`            | Text to Speech | Evaluate the quality of generated audio (naturalness, pronunciation, clarity). | `audio`             |
-| `stt`            | Speech to Text | Evaluate the accuracy of transcribed text from an audio input.                 | `audio`             |
-| `llm`            | LLM Response   | Given a conversation history, evaluate the agent's next response.              | `text`              |
-| `simulation`     | Simulation     | Evaluate an entire conversation history.                                       | `text`              |
+| `evaluator_type` | Label                | Purpose                                                                                          | Derived `data_type` |
+| ---------------- | -------------------- | ------------------------------------------------------------------------------------------------ | ------------------- |
+| `tts`            | Text to Speech       | Evaluate the quality of generated audio (naturalness, pronunciation, clarity).                   | `audio`             |
+| `stt`            | Speech to Text       | Evaluate the accuracy of transcribed text from an audio input.                                   | `audio`             |
+| `llm`            | Conversational reply | Given a conversation history, evaluate the agent's next response (conversational LLM judge).     | `text`              |
+| `llm-general`    | LLM response         | General, non-conversational LLM judge — evaluate an LLM's output for a single prompt/input (e.g. classification, extraction, summarisation). | `text` |
+| `simulation`     | Simulation           | Evaluate an entire conversation history.                                                         | `text`              |
+
+`llm` was historically labelled "Single LLM response"; it was renamed to **"Conversational reply"** to make its conversation-history bias explicit and free up the generic "LLM response" name for the non-conversational `llm-general` type. Both `llm` and `llm-general` are text judges and both support prompt variables.
 
 The backend uses `stt` (not `speech_to_text`) as the wire value for the speech-to-text use case — keep the `EvaluatorType` union in `src/components/EvaluatorPills.tsx` aligned with this, and never reintroduce `speech_to_text` as a frontend identifier.
 
@@ -719,7 +722,7 @@ Keep route files focused on data loading, API calls, URL state, and orchestratio
 
 **Pills** (`src/components/EvaluatorPills.tsx`) — list rows and the detail header show small status pills near the evaluator name. Components:
 
-- `EvaluatorTypePill` — shows `Text to Speech` / `Speech to Text` / `LLM Response` / `Simulation` with a hover `Tooltip` containing the `EVALUATOR_TYPE_TOOLTIPS` blurb. Use this whenever `evaluator.evaluator_type` is present.
+- `EvaluatorTypePill` — shows `Text to Speech` / `Speech to Text` / `Conversational reply` (`llm`) / `LLM response` (`llm-general`) / `Full conversation` with a hover `Tooltip` containing the `EVALUATOR_TYPE_TOOLTIPS` blurb. Use this whenever `evaluator.evaluator_type` is present.
 - `DataTypePill` — legacy `audio`/`text` pill. Kept as a fallback for evaluators returned without `evaluator_type` (e.g. older defaults). Pattern: `evaluator.evaluator_type ? <EvaluatorTypePill /> : <DataTypePill />`.
 - `KindPill` — `Single` / `Side by side` (with tooltip). **Currently unused on the list and detail pages** while kind is hard-coded to `"single"`; left in place for future use.
 - `OutputTypePill` — `Binary` / `Rating` (with tooltip).
@@ -737,7 +740,7 @@ Keep route files focused on data loading, API calls, URL state, and orchestratio
 
 **Variables — overall rules**
 
-Variables are **only supported for `evaluator_type === "llm"`**. The variable **name set** is pinned by the live version's variables — names cannot be added, renamed, or removed across versions of the same evaluator (the frontend enforces this with an amber-callout gate against newly-typed placeholders). **`description` and `default`, however, can be updated on every new version** — they're forwarded with each `POST /evaluators/{uuid}/versions` body. **`description` is required** in the create and new-version flows (validation gates in §2 and §3 below); on the wire it remains an optional field on the backend `VariableSpec` shape, so the POST body still defensively drops it when blank, but the frontend gate prevents that branch from being reached for LLM evaluators in normal flow. The frontend mirrors this contract in four places:
+Variables are **only supported for `evaluator_type === "llm"` and `evaluator_type === "llm-general"`** (both text LLM judges). The variable **name set** is pinned by the live version's variables — names cannot be added, renamed, or removed across versions of the same evaluator (the frontend enforces this with an amber-callout gate against newly-typed placeholders). **`description` and `default`, however, can be updated on every new version** — they're forwarded with each `POST /evaluators/{uuid}/versions` body. **`description` is required** in the create and new-version flows (validation gates in §2 and §3 below); on the wire it remains an optional field on the backend `VariableSpec` shape, so the POST body still defensively drops it when blank, but the frontend gate prevents that branch from being reached for LLM evaluators in normal flow. The frontend mirrors this contract in four places:
 
 1. **Detail-page version display** (`src/app/evaluators/[uuid]/page.tsx`) — when `v.variables?.length` is truthy, a blue-tinted info callout (`bg-blue-500/5` / `border-blue-500/20`) sits between the `Variables` label and the variable list. It reads "When this evaluator is added to an LLM test, you will be able to fill in the value of each variable for that test." This is purely informational; it does not render for evaluators with no variables (e.g. `pronunciation`, `Helpfulness`). Don't move this callout into the variable rows themselves — it's a one-time hint, not per-variable copy.
 

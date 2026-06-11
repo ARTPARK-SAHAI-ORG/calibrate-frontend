@@ -81,6 +81,7 @@ const EVALUATOR_TYPE_TO_DATA_TYPE: Record<EvaluatorType, "text" | "audio"> = {
   tts: "audio",
   stt: "audio",
   llm: "text",
+  "llm-general": "text",
   conversation: "text",
 };
 
@@ -102,9 +103,15 @@ const EVALUATOR_TYPE_OPTIONS: {
   },
   {
     value: "llm",
-    title: "Single LLM response",
+    title: "Conversational reply",
     description:
       "Given a conversation history, evaluate the agent's next response",
+  },
+  {
+    value: "llm-general",
+    title: "LLM response",
+    description:
+      "Evaluate an LLM's output for a single, non-conversational prompt or input (e.g. classification, extraction, summarisation)",
   },
   {
     value: "conversation",
@@ -551,7 +558,7 @@ function MetricsPageInner() {
         newEvaluatorScale.every((row) => row.name.trim().length > 0));
     const detectedVars = extractVariableNames(newEvaluatorSystemPrompt);
     const variableDescriptionsValid =
-      newEvaluatorType !== "llm" ||
+      (newEvaluatorType !== "llm" && newEvaluatorType !== "llm-general") ||
       detectedVars.every(
         (name) =>
           (newEvaluatorVariableDescriptions[name] ?? "").trim().length > 0,
@@ -594,7 +601,8 @@ function MetricsPageInner() {
           version: {
             judge_model: newEvaluatorJudgeModel.id,
             system_prompt: newEvaluatorSystemPrompt.trim(),
-            ...(newEvaluatorType === "llm" &&
+            ...((newEvaluatorType === "llm" ||
+              newEvaluatorType === "llm-general") &&
             extractVariableNames(newEvaluatorSystemPrompt).length > 0
               ? {
                   variables: extractVariableNames(newEvaluatorSystemPrompt).map(
@@ -680,7 +688,8 @@ function MetricsPageInner() {
   const detectedPromptVariables = extractVariableNames(
     newEvaluatorSystemPrompt,
   );
-  const variablesSupported = newEvaluatorType === "llm";
+  const variablesSupported =
+    newEvaluatorType === "llm" || newEvaluatorType === "llm-general";
 
   // Partition into default vs user-owned evaluators
   const defaultEvaluators = evaluators.filter((e) => !e.owner_user_id);

@@ -11,7 +11,10 @@ import { readNameConflictFromError } from "@/lib/parseBackendError";
 
 // Only these three task types are allowed for labelling tasks. A task's
 // type matches its evaluators' evaluator_type one-to-one.
-type TaskType = Extract<EvaluatorType, "llm" | "stt" | "conversation">;
+type TaskType = Extract<
+  EvaluatorType,
+  "llm" | "llm-general" | "stt" | "conversation"
+>;
 
 const TASK_TYPE_OPTIONS: {
   value: TaskType;
@@ -25,9 +28,15 @@ const TASK_TYPE_OPTIONS: {
   },
   {
     value: "llm",
-    title: "Single LLM response",
+    title: "Conversational reply",
     description:
       "Given a conversation history, evaluate the agent's next response.",
+  },
+  {
+    value: "llm-general",
+    title: "LLM response",
+    description:
+      "Evaluate an LLM's output for a single, non-conversational prompt or input.",
   },
   {
     value: "conversation",
@@ -44,6 +53,8 @@ const TASK_TYPE_OPTIONS: {
 // and a stronger tint + bordered ring when active.
 const TASK_TYPE_INACTIVE_CLASSES: Record<TaskType, string> = {
   llm: "border-orange-500/20 bg-orange-500/[0.04] hover:bg-orange-500/10 hover:border-orange-500/40",
+  "llm-general":
+    "border-teal-500/20 bg-teal-500/[0.04] hover:bg-teal-500/10 hover:border-teal-500/40",
   stt: "border-blue-500/20 bg-blue-500/[0.04] hover:bg-blue-500/10 hover:border-blue-500/40",
   conversation:
     "border-pink-500/20 bg-pink-500/[0.04] hover:bg-pink-500/10 hover:border-pink-500/40",
@@ -51,12 +62,14 @@ const TASK_TYPE_INACTIVE_CLASSES: Record<TaskType, string> = {
 
 const TASK_TYPE_ACTIVE_CLASSES: Record<TaskType, string> = {
   llm: "border-orange-500/60 bg-orange-500/15 ring-1 ring-orange-500/40",
+  "llm-general": "border-teal-500/60 bg-teal-500/15 ring-1 ring-teal-500/40",
   stt: "border-blue-500/60 bg-blue-500/15 ring-1 ring-blue-500/40",
   conversation: "border-pink-500/60 bg-pink-500/15 ring-1 ring-pink-500/40",
 };
 
 const TASK_TYPE_TITLE_CLASSES: Record<TaskType, string> = {
   llm: "text-orange-700 dark:text-orange-300",
+  "llm-general": "text-teal-700 dark:text-teal-300",
   stt: "text-blue-700 dark:text-blue-300",
   conversation: "text-pink-700 dark:text-pink-300",
 };

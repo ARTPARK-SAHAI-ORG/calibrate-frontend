@@ -125,7 +125,7 @@ type SummaryRow = {
 };
 type TaskSummaryResponse = {
   task_id: string;
-  task_type: "stt" | "llm" | "conversation";
+  task_type: "stt" | "llm" | "llm-general" | "conversation";
   evaluators: SummaryEvaluator[];
   annotators: SummaryAnnotator[];
   rows: SummaryRow[];
@@ -229,7 +229,7 @@ type LabellingJob = {
 type LabellingTask = {
   uuid: string;
   name: string;
-  type?: "llm" | "stt" | "tts" | "conversation";
+  type?: "llm" | "llm-general" | "stt" | "tts" | "conversation";
   description?: string;
   created_at?: string;
   updated_at?: string;
@@ -238,7 +238,7 @@ type LabellingTask = {
     name: string;
     description?: string | null;
     slug?: string | null;
-    evaluator_type?: "llm" | "stt" | "tts" | "conversation";
+    evaluator_type?: "llm" | "llm-general" | "stt" | "tts" | "conversation";
     output_type?: "binary" | "rating" | null;
     scale_min?: number | boolean | null;
     scale_max?: number | boolean | null;
@@ -259,7 +259,13 @@ type LabellingTask = {
   item_count?: number;
 };
 
-type TaskKind = "llm" | "stt" | "tts" | "conversation" | undefined;
+type TaskKind =
+  | "llm"
+  | "llm-general"
+  | "stt"
+  | "tts"
+  | "conversation"
+  | undefined;
 
 function previewItemPayload(payload: unknown, kind: TaskKind): string {
   if (payload == null || typeof payload !== "object") {
@@ -289,6 +295,11 @@ function previewItemPayload(payload: unknown, kind: TaskKind): string {
     if (Array.isArray(p.transcript) && p.transcript.length > 0) {
       const first = p.transcript[0] as { content?: unknown };
       if (typeof first?.content === "string") return first.content;
+    }
+  }
+  if (kind === "llm-general") {
+    for (const key of ["output", "response", "completion", "agent_response"]) {
+      if (typeof p[key] === "string" && p[key]) return p[key] as string;
     }
   }
   try {
@@ -4166,6 +4177,7 @@ function LabellingTaskPageInner() {
         task={
           task &&
           (task.type === "llm" ||
+            task.type === "llm-general" ||
             task.type === "stt" ||
             task.type === "conversation")
             ? {
