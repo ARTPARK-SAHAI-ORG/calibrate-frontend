@@ -94,15 +94,16 @@ export function DownloadableTable({
         </button>
       </div>
 
-      {/* Table */}
-      <div className="border rounded-xl overflow-hidden">
+      {/* Table — scrolls horizontally instead of cramming/wrapping columns
+          when there are many (headers and cells stay single-line). */}
+      <div className="border rounded-xl overflow-x-auto">
         <table className="w-full">
           <thead className="bg-muted/50 border-b border-border">
             <tr>
               {columns.map((col) => (
                 <th
                   key={col.key}
-                  className="px-4 py-3 text-left text-sm font-medium text-foreground"
+                  className="px-4 py-3 text-left text-sm font-medium text-foreground whitespace-nowrap"
                 >
                   {col.header}
                 </th>
@@ -118,7 +119,7 @@ export function DownloadableTable({
                 {columns.map((col) => (
                   <td
                     key={col.key}
-                    className="px-4 py-3 text-sm text-foreground"
+                    className="px-4 py-3 text-sm text-foreground whitespace-nowrap"
                   >
                     {col.render ? col.render(row[col.key], row) : row[col.key]}
                   </td>

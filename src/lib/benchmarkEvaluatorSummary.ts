@@ -4,6 +4,7 @@
  */
 
 import type { ChartConfig } from "@/components/eval-details/LeaderboardTab";
+import { METRIC_LABELS } from "@/lib/llmMetrics";
 
 export type BenchmarkEvaluatorSummaryBinary = {
   metric_key: string;
@@ -296,7 +297,7 @@ export function buildBenchmarkCombinedLeaderboardPayload(
 
   if (showLatency) {
     allCharts.push({
-      title: "Avg latency (s)",
+      title: `${METRIC_LABELS.latency} (s)`,
       dataKey: "avg_latency_ms",
       formatTooltip: (v) =>
         v >= 1000 ? `${(v / 1000).toFixed(2)} s` : `${Math.round(v)} ms`,
@@ -306,7 +307,7 @@ export function buildBenchmarkCombinedLeaderboardPayload(
 
   if (showCost) {
     allCharts.push({
-      title: "Avg cost (USD)",
+      title: `${METRIC_LABELS.cost} (USD)`,
       dataKey: "avg_cost",
       formatTooltip: (v) => `$${v < 0.01 ? v.toFixed(6) : v.toFixed(4)}`,
     });
@@ -314,7 +315,7 @@ export function buildBenchmarkCombinedLeaderboardPayload(
 
   if (showTokens) {
     allCharts.push({
-      title: "Avg tokens",
+      title: METRIC_LABELS.tokens,
       dataKey: "avg_tokens",
       formatTooltip: (v) => Math.round(v).toLocaleString("en-US"),
     });

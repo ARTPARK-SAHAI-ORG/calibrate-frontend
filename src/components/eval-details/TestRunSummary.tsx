@@ -5,6 +5,7 @@ import {
   formatLatencyMs,
   formatCostUsd,
   formatTokens,
+  METRIC_LABELS,
   type AggStat,
 } from "@/lib/llmMetrics";
 import {
@@ -205,19 +206,19 @@ export function TestRunSummary({
             progress={rate ?? undefined}
           />
           <MetricCard
-            label="Average latency"
+            label={METRIC_LABELS.latency}
             value={formatLatencyMs(latency?.mean)}
             subtitle={latencySubtitle}
             info="Average agent response time across all tests"
           />
           <MetricCard
-            label="Average cost"
+            label={METRIC_LABELS.cost}
             value={formatCostUsd(cost?.mean)}
             subtitle={costSubtitle}
             info="Average cost per test across all tests"
           />
           <MetricCard
-            label="Average tokens"
+            label={METRIC_LABELS.tokens}
             value={formatTokens(tokens?.mean)}
             subtitle={tokensSubtitle}
             info="Average total input + output tokens per test across all tests"

@@ -20,6 +20,17 @@ export type AggStat = {
 } | null;
 
 /**
+ * Shared display labels for the per-test latency / cost / token aggregates,
+ * reused by the test Summary cards and the benchmark leaderboard so the two
+ * always read identically (and avoid the cramped "Avg" abbreviation).
+ */
+export const METRIC_LABELS = {
+  latency: "Average latency",
+  cost: "Average cost",
+  tokens: "Average tokens",
+} as const;
+
+/**
  * Format an average latency in milliseconds. Sub-second values render as
  * whole milliseconds (`850 ms`); anything ≥ 1s renders as seconds with two
  * decimals (`1.23 s`). Returns an em dash for missing / non-finite input so
