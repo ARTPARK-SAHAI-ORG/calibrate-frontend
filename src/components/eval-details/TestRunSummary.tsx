@@ -58,35 +58,71 @@ const linkIcon = (
   </svg>
 );
 
-// One metric card (matches the SimulationMetricsGrid card style). `subtitle`
-// is the small caption shown inline next to the headline value (e.g. "12/15").
-function MetricCard({
-  label,
-  value,
+// Card footer: a thin pass-rate progress bar with the count beside it
+// (`progress` set), or a plain caption line (latency/cost range, rating
+// count). Renders nothing when there's neither.
+function CardFooter({
+  progress,
   subtitle,
 }: {
-  label: string;
-  value: string;
+  /** Fill percentage (0–100) for the progress bar. Omit to skip the bar. */
+  progress?: number;
   subtitle?: string;
 }) {
+  if (progress == null && !subtitle) return null;
+  if (progress == null) {
+    return (
+      <div className="text-[11px] text-muted-foreground mt-1.5">{subtitle}</div>
+    );
+  }
+  const pct = Math.max(0, Math.min(100, progress));
   return (
-    <div className="border border-border rounded-xl p-4 bg-muted/10">
-      <div className="text-[12px] text-muted-foreground mb-1">{label}</div>
-      <div className="flex items-baseline gap-1.5 flex-wrap">
-        <span className="text-[18px] font-semibold text-foreground">{value}</span>
-        {subtitle && (
-          <span className="text-[11px] text-muted-foreground">{subtitle}</span>
-        )}
+    <div className="flex items-center gap-2 mt-2">
+      <div className="h-1.5 flex-1 rounded-full bg-muted overflow-hidden">
+        <div
+          className="h-full rounded-full bg-green-500"
+          style={{ width: `${pct}%` }}
+        />
       </div>
+      {subtitle && (
+        <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
+          {subtitle}
+        </span>
+      )}
     </div>
   );
 }
 
-// Headline value + subtitle for one evaluator aggregate.
+// One metric card (matches the SimulationMetricsGrid card style). `progress`
+// adds a pass-rate bar; `subtitle` is the small caption below the value.
+function MetricCard({
+  label,
+  value,
+  subtitle,
+  progress,
+}: {
+  label: string;
+  value: string;
+  subtitle?: string;
+  progress?: number;
+}) {
+  return (
+    <div className="border border-border rounded-xl p-4 bg-muted/10">
+      <div className="text-[12px] text-muted-foreground mb-1">{label}</div>
+      <div className="text-[18px] font-semibold text-foreground">{value}</div>
+      <CardFooter progress={progress} subtitle={subtitle} />
+    </div>
+  );
+}
+
+// Headline value + caption (+ optional pass-rate bar) for one evaluator
+// aggregate. Binary evaluators get the bar; rating evaluators just show the
+// mean and the case count.
 function evaluatorCardContent(entry: BenchmarkEvaluatorSummaryEntry): {
   label: string;
   value: string;
   subtitle?: string;
+  progress?: number;
 } {
   const name = entry.name ?? entry.metric_key;
   if (entry.type === "binary") {
@@ -94,6 +130,7 @@ function evaluatorCardContent(entry: BenchmarkEvaluatorSummaryEntry): {
       label: name,
       value: `${parseFloat(entry.pass_rate.toFixed(1))}%`,
       subtitle: `${entry.passed}/${entry.total} passed`,
+      progress: entry.pass_rate,
     };
   }
   return {
@@ -140,6 +177,7 @@ export function TestRunSummary({
             label="Pass rate"
             value={rate !== null ? `${parseFloat(rate.toFixed(1))}%` : "—"}
             subtitle={`${passed}/${total} passed`}
+            progress={rate ?? undefined}
           />
           <MetricCard
             label="Avg latency"
@@ -159,7 +197,8 @@ export function TestRunSummary({
           <h2 className="text-base md:text-lg font-semibold mb-3">Evaluators</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {evaluators.map((entry) => {
-              const { label, value, subtitle } = evaluatorCardContent(entry);
+              const { label, value, subtitle, progress } =
+                evaluatorCardContent(entry);
               const uuid = entry.evaluator_uuid;
               const cardInner = (
                 <>
@@ -172,16 +211,10 @@ export function TestRunSummary({
                     )}
                     {uuid && enableEvaluatorLinks && linkIcon}
                   </div>
-                  <div className="flex items-baseline gap-1.5 flex-wrap">
-                    <span className="text-[18px] font-semibold text-foreground">
-                      {value}
-                    </span>
-                    {subtitle && (
-                      <span className="text-[11px] text-muted-foreground">
-                        {subtitle}
-                      </span>
-                    )}
+                  <div className="text-[18px] font-semibold text-foreground">
+                    {value}
                   </div>
+                  <CardFooter progress={progress} subtitle={subtitle} />
                 </>
               );
               if (uuid && enableEvaluatorLinks) {
