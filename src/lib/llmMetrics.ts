@@ -70,3 +70,32 @@ export function formatTokens(tokens: number | null | undefined): string {
   if (!Number.isFinite(n)) return "—";
   return Math.round(n).toLocaleString("en-US");
 }
+
+/**
+ * Format a percentage (0–100) with up to `decimals` places, dropping trailing
+ * zeros so whole values show no decimals (100%, not 100.0%). Returns an em
+ * dash for missing / non-finite input.
+ */
+export function formatPercent(
+  value: number | null | undefined,
+  decimals = 1,
+): string {
+  if (value == null) return "—";
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  return `${parseFloat(n.toFixed(decimals))}%`;
+}
+
+/**
+ * Format a rating/score with up to `decimals` places, dropping trailing zeros
+ * (4, not 4.00). Returns an em dash for missing / non-finite input.
+ */
+export function formatRating(
+  value: number | null | undefined,
+  decimals = 2,
+): string {
+  if (value == null) return "—";
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  return `${parseFloat(n.toFixed(decimals))}`;
+}

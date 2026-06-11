@@ -5,6 +5,8 @@ import {
   formatLatencyMs,
   formatCostUsd,
   formatTokens,
+  formatPercent,
+  formatRating,
   METRIC_LABELS,
   type AggStat,
 } from "@/lib/llmMetrics";
@@ -142,7 +144,7 @@ function evaluatorCardContent(entry: BenchmarkEvaluatorSummaryEntry): {
   if (entry.type === "binary") {
     return {
       label: name,
-      value: `${parseFloat(entry.pass_rate.toFixed(1))}%`,
+      value: formatPercent(entry.pass_rate),
       subtitle: `${entry.passed}/${entry.total}`,
       progress: entry.pass_rate,
     };
@@ -154,8 +156,8 @@ function evaluatorCardContent(entry: BenchmarkEvaluatorSummaryEntry): {
       entry.scale_max,
     ),
     value: Number.isFinite(entry.scale_max)
-      ? `${parseFloat(entry.mean.toFixed(2))}/${entry.scale_max}`
-      : `${parseFloat(entry.mean.toFixed(2))}`,
+      ? `${formatRating(entry.mean)}/${entry.scale_max}`
+      : formatRating(entry.mean),
     subtitle: `mean of ${entry.count}`,
   };
 }
@@ -201,7 +203,7 @@ export function TestRunSummary({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <MetricCard
             label="Pass rate"
-            value={rate !== null ? `${parseFloat(rate.toFixed(1))}%` : "—"}
+            value={formatPercent(rate)}
             subtitle={`${passed}/${total}`}
             progress={rate ?? undefined}
           />

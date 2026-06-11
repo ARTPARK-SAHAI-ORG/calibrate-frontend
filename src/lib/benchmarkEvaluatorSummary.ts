@@ -4,7 +4,14 @@
  */
 
 import type { ChartConfig } from "@/components/eval-details/LeaderboardTab";
-import { METRIC_LABELS } from "@/lib/llmMetrics";
+import {
+  METRIC_LABELS,
+  formatLatencyMs,
+  formatCostUsd,
+  formatTokens,
+  formatPercent,
+  formatRating,
+} from "@/lib/llmMetrics";
 
 export type BenchmarkEvaluatorSummaryBinary = {
   metric_key: string;
@@ -291,7 +298,7 @@ export function buildBenchmarkCombinedLeaderboardPayload(
       title: benchmarkScoreLabel,
       dataKey: "pass_rate",
       yDomain: [0, 100],
-      formatTooltip: (v) => `${v.toFixed(1)}%`,
+      formatTooltip: (v) => formatPercent(v),
     });
   }
 
@@ -299,8 +306,7 @@ export function buildBenchmarkCombinedLeaderboardPayload(
     allCharts.push({
       title: `${METRIC_LABELS.latency} (s)`,
       dataKey: "avg_latency_ms",
-      formatTooltip: (v) =>
-        v >= 1000 ? `${(v / 1000).toFixed(2)} s` : `${Math.round(v)} ms`,
+      formatTooltip: (v) => formatLatencyMs(v),
       yTickFormatter: (v) => `${(v / 1000).toFixed(1)}`,
     });
   }
@@ -309,7 +315,7 @@ export function buildBenchmarkCombinedLeaderboardPayload(
     allCharts.push({
       title: `${METRIC_LABELS.cost} (USD)`,
       dataKey: "avg_cost",
-      formatTooltip: (v) => `$${v < 0.01 ? v.toFixed(6) : v.toFixed(4)}`,
+      formatTooltip: (v) => formatCostUsd(v),
     });
   }
 
@@ -317,7 +323,7 @@ export function buildBenchmarkCombinedLeaderboardPayload(
     allCharts.push({
       title: METRIC_LABELS.tokens,
       dataKey: "avg_tokens",
-      formatTooltip: (v) => Math.round(v).toLocaleString("en-US"),
+      formatTooltip: (v) => formatTokens(v),
     });
   }
 
@@ -327,7 +333,7 @@ export function buildBenchmarkCombinedLeaderboardPayload(
         title: ev.label,
         dataKey: ev.dataKey,
         yDomain: [0, 100],
-        formatTooltip: (v) => `${v.toFixed(1)}%`,
+        formatTooltip: (v) => formatPercent(v),
       });
     } else {
       const sm = ev.scale_min;
@@ -340,7 +346,7 @@ export function buildBenchmarkCombinedLeaderboardPayload(
         title: benchmarkRatingEvaluatorCaption(ev.label, sm, sx),
         dataKey: ev.dataKey,
         yDomain,
-        formatTooltip: (v) => v.toFixed(2),
+        formatTooltip: (v) => formatRating(v),
       });
     }
   }

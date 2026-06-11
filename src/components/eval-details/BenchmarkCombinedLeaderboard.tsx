@@ -13,6 +13,8 @@ import {
   formatLatencyMs,
   formatCostUsd,
   formatTokens,
+  formatPercent,
+  formatRating,
   METRIC_LABELS,
 } from "@/lib/llmMetrics";
 
@@ -49,7 +51,7 @@ function columnsFromPayload(
       header: benchmarkScoreLabel,
       render: (v) =>
         typeof v === "number" && Number.isFinite(v) ? (
-          `${v.toFixed(1)}%`
+          formatPercent(v)
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
@@ -105,7 +107,7 @@ function columnsFromPayload(
       header,
       render: (v) =>
         typeof v === "number" && Number.isFinite(v) ? (
-          ev.type === "binary" ? `${v.toFixed(1)}%` : v.toFixed(2)
+          ev.type === "binary" ? formatPercent(v) : formatRating(v)
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
