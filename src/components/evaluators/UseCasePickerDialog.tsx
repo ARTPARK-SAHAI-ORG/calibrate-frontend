@@ -3,34 +3,12 @@
 import { useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
+import {
+  EvaluatorUseCaseCards,
+  type EvaluatorUseCaseOption,
+} from "@/components/evaluators/evaluatorUseCases";
 
-export type EvaluatorTypeOption = {
-  value: EvaluatorType;
-  title: string;
-  description: string;
-};
-
-const TYPE_INACTIVE_CLASSES: Record<EvaluatorType, string> = {
-  tts: "border-purple-500/20 bg-purple-500/[0.04] hover:bg-purple-500/10 hover:border-purple-500/40",
-  stt: "border-blue-500/20 bg-blue-500/[0.04] hover:bg-blue-500/10 hover:border-blue-500/40",
-  llm: "border-orange-500/20 bg-orange-500/[0.04] hover:bg-orange-500/10 hover:border-orange-500/40",
-  conversation:
-    "border-pink-500/20 bg-pink-500/[0.04] hover:bg-pink-500/10 hover:border-pink-500/40",
-};
-
-const TYPE_ACTIVE_CLASSES: Record<EvaluatorType, string> = {
-  tts: "border-purple-500/60 bg-purple-500/15 ring-1 ring-purple-500/40",
-  stt: "border-blue-500/60 bg-blue-500/15 ring-1 ring-blue-500/40",
-  llm: "border-orange-500/60 bg-orange-500/15 ring-1 ring-orange-500/40",
-  conversation: "border-pink-500/60 bg-pink-500/15 ring-1 ring-pink-500/40",
-};
-
-const TYPE_TITLE_CLASSES: Record<EvaluatorType, string> = {
-  tts: "text-purple-700 dark:text-purple-300",
-  stt: "text-blue-700 dark:text-blue-300",
-  llm: "text-orange-700 dark:text-orange-300",
-  conversation: "text-pink-700 dark:text-pink-300",
-};
+export type EvaluatorTypeOption = EvaluatorUseCaseOption;
 
 type UseCasePickerDialogProps = {
   initialValue: EvaluatorType | null;
@@ -88,32 +66,11 @@ export function UseCasePickerDialog({
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {options.map((opt) => {
-              const active = selected === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setSelected(opt.value)}
-                  className={`flex flex-col items-start text-left p-4 rounded-md border transition-colors cursor-pointer ${
-                    active
-                      ? TYPE_ACTIVE_CLASSES[opt.value]
-                      : TYPE_INACTIVE_CLASSES[opt.value]
-                  }`}
-                >
-                  <div
-                    className={`text-sm md:text-base font-medium ${TYPE_TITLE_CLASSES[opt.value]}`}
-                  >
-                    {opt.title}
-                  </div>
-                  <div className="text-xs md:text-sm text-muted-foreground mt-1 leading-relaxed">
-                    {opt.description}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+          <EvaluatorUseCaseCards
+            options={options}
+            selected={selected}
+            onSelect={setSelected}
+          />
         </div>
 
         <div className="flex items-center justify-end gap-2 md:gap-3 px-5 md:px-6 py-4 border-t border-border">

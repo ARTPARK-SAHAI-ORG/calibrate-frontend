@@ -27,6 +27,7 @@ import {
 } from "@/components/evaluators/BinaryScaleEditor";
 import { defaultBinaryLabel } from "@/lib/binaryLabels";
 import { UseCasePickerDialog } from "@/components/evaluators/UseCasePickerDialog";
+import { EVALUATOR_USE_CASE_OPTIONS } from "@/components/evaluators/evaluatorUseCases";
 import { Select } from "@/components/ui/Select";
 import { extractVariableNames } from "@/lib/evaluatorVariables";
 import {
@@ -69,9 +70,7 @@ function buildBinaryOutputConfig(rows: BinaryScaleRow[]): {
       scale: rows.map((r) => ({
         value: r.value,
         name: r.name.trim() || defaultBinaryLabel(r.value),
-        ...(r.description.trim()
-          ? { description: r.description.trim() }
-          : {}),
+        ...(r.description.trim() ? { description: r.description.trim() } : {}),
       })),
     },
   };
@@ -81,38 +80,9 @@ const EVALUATOR_TYPE_TO_DATA_TYPE: Record<EvaluatorType, "text" | "audio"> = {
   tts: "audio",
   stt: "audio",
   llm: "text",
+  "llm-general": "text",
   conversation: "text",
 };
-
-const EVALUATOR_TYPE_OPTIONS: {
-  value: EvaluatorType;
-  title: string;
-  description: string;
-}[] = [
-  {
-    value: "tts",
-    title: "Text to Speech (TTS)",
-    description:
-      "Evaluate the quality of generated audio (e.g. naturalness, pronunciation, clarity)",
-  },
-  {
-    value: "stt",
-    title: "Speech to Text",
-    description: "Evaluate the transcription quality against a reference text",
-  },
-  {
-    value: "llm",
-    title: "Single LLM response",
-    description:
-      "Given a conversation history, evaluate the agent's next response",
-  },
-  {
-    value: "conversation",
-    title: "Full conversation",
-    description:
-      "Evaluate the agent's performance during a complete conversation",
-  },
-];
 
 async function getEvaluatorErrorMessage(
   response: Response,
@@ -236,9 +206,8 @@ function MetricsPageInner() {
     { value: 2, name: "", description: "" },
     { value: 3, name: "", description: "" },
   ]);
-  const [newEvaluatorBinaryScale, setNewEvaluatorBinaryScale] = useState<
-    BinaryScaleRow[]
-  >(defaultBinaryScale());
+  const [newEvaluatorBinaryScale, setNewEvaluatorBinaryScale] =
+    useState<BinaryScaleRow[]>(defaultBinaryScale());
 
   // Delete confirmation state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -455,7 +424,9 @@ function MetricsPageInner() {
 
       // Remove the evaluator from local state
       setEvaluators(
-        evaluators.filter((evaluator) => evaluator.uuid !== evaluatorToDelete.uuid),
+        evaluators.filter(
+          (evaluator) => evaluator.uuid !== evaluatorToDelete.uuid,
+        ),
       );
       closeDeleteDialog();
     } catch (err) {
@@ -486,11 +457,11 @@ function MetricsPageInner() {
         const evaluatorsResponse = await fetch(
           `${backendUrl}/evaluators?include_defaults=true`,
           {
-          method: "GET",
-          headers: {
-            accept: "application/json",
-            Authorization: `Bearer ${backendAccessToken}`,
-          },
+            method: "GET",
+            headers: {
+              accept: "application/json",
+              Authorization: `Bearer ${backendAccessToken}`,
+            },
           },
         );
 
@@ -551,7 +522,7 @@ function MetricsPageInner() {
         newEvaluatorScale.every((row) => row.name.trim().length > 0));
     const detectedVars = extractVariableNames(newEvaluatorSystemPrompt);
     const variableDescriptionsValid =
-      newEvaluatorType !== "llm" ||
+      (newEvaluatorType !== "llm" && newEvaluatorType !== "llm-general") ||
       detectedVars.every(
         (name) =>
           (newEvaluatorVariableDescriptions[name] ?? "").trim().length > 0,
@@ -594,7 +565,8 @@ function MetricsPageInner() {
           version: {
             judge_model: newEvaluatorJudgeModel.id,
             system_prompt: newEvaluatorSystemPrompt.trim(),
-            ...(newEvaluatorType === "llm" &&
+            ...((newEvaluatorType === "llm" ||
+              newEvaluatorType === "llm-general") &&
             extractVariableNames(newEvaluatorSystemPrompt).length > 0
               ? {
                   variables: extractVariableNames(newEvaluatorSystemPrompt).map(
@@ -680,7 +652,8 @@ function MetricsPageInner() {
   const detectedPromptVariables = extractVariableNames(
     newEvaluatorSystemPrompt,
   );
-  const variablesSupported = newEvaluatorType === "llm";
+  const variablesSupported =
+    newEvaluatorType === "llm" || newEvaluatorType === "llm-general";
 
   // Partition into default vs user-owned evaluators
   const defaultEvaluators = evaluators.filter((e) => !e.owner_user_id);
@@ -800,7 +773,7 @@ function MetricsPageInner() {
               aria-label="Filter by purpose"
             >
               <option value="all">All purposes</option>
-              {EVALUATOR_TYPE_OPTIONS.map((opt) => (
+              {EVALUATOR_USE_CASE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {EVALUATOR_TYPE_LABELS[opt.value]}
                 </option>
@@ -1050,7 +1023,7 @@ function MetricsPageInner() {
       {useCasePickerOpen && (
         <UseCasePickerDialog
           initialValue={newEvaluatorType}
-          options={EVALUATOR_TYPE_OPTIONS}
+          options={EVALUATOR_USE_CASE_OPTIONS}
           onCancel={() => {
             setUseCasePickerOpen(false);
             if (!addEvaluatorSidebarOpen) {
@@ -1337,4 +1310,3 @@ function DuplicateEvaluatorDialog({
     </div>
   );
 }
-

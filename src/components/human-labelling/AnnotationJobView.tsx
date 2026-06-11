@@ -6,6 +6,7 @@ import { getBackendUrl } from "@/lib/api";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { getBinaryLabel, toRatingScale } from "@/lib/binaryLabels";
 import { LlmItemPane } from "./item-panes/LlmItemPane";
+import { LlmGeneralItemPane } from "./item-panes/LlmGeneralItemPane";
 import { Section } from "./item-panes/shared";
 import { ConversationItemPane } from "./item-panes/ConversationItemPane";
 import { SttItemPane } from "./item-panes/SttItemPane";
@@ -42,7 +43,7 @@ type Annotator = { uuid: string; name: string };
 export type Task = {
   uuid: string;
   name: string;
-  type: "llm" | "stt" | "tts" | "conversation";
+  type: "llm" | "llm-general" | "stt" | "tts" | "conversation";
   description: string | null;
 };
 
@@ -877,6 +878,8 @@ export function ItemPane({
   const payload = (item.payload ?? {}) as Record<string, unknown>;
   if (taskType === "stt") return <SttItemPane payload={payload} />;
   if (taskType === "llm") return <LlmItemPane payload={payload} />;
+  if (taskType === "llm-general")
+    return <LlmGeneralItemPane payload={payload} />;
   if (taskType === "conversation")
     return <ConversationItemPane payload={payload} />;
   return (

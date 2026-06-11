@@ -142,7 +142,7 @@ export type EvaluatorRunJob = {
 export type LabellingTaskFull = {
   uuid: string;
   name: string;
-  type: "llm" | "stt" | "tts" | "conversation";
+  type: "llm" | "llm-general" | "stt" | "tts" | "conversation";
   description?: string | null;
   evaluators?: { uuid: string; name: string }[];
   items?: Item[];
@@ -1374,10 +1374,10 @@ export function ItemDetailPane({
 
   return (
     <div className="flex flex-col md:flex-row min-h-0 flex-1 md:overflow-hidden">
-      <div className="md:flex-1 md:min-h-0 md:overflow-y-auto p-4 md:p-6 md:border-r border-border">
+      <div className="md:flex-[5] md:min-h-0 md:overflow-y-auto p-4 md:p-6 md:border-r border-border">
         <ItemPane item={item} taskType={taskType} />
       </div>
-      <div className="md:flex-1 md:min-h-0 md:overflow-y-auto p-4 md:p-6">
+      <div className="md:flex-[3] md:min-h-0 md:overflow-y-auto p-4 md:p-6">
         <EvaluatorResultsPane
           evaluators={evaluators}
           evaluatorNamesById={evaluatorNamesById}
@@ -1705,7 +1705,12 @@ export function EvaluatorRunDetailView({
   };
 
   if (
-    !(task.type === "stt" || task.type === "llm" || task.type === "conversation")
+    !(
+      task.type === "stt" ||
+      task.type === "llm" ||
+      task.type === "llm-general" ||
+      task.type === "conversation"
+    )
   ) {
     return null;
   }

@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { humaniseDetailObject } from "./bulk-upload-shared";
+import {
+  DiscardChangesDialog,
+  useUnsavedCloseGuard,
+} from "./unsavedCloseGuard";
 
 type SttRowDraft = {
   id: string;
@@ -104,6 +108,32 @@ export function AddSttItemsDialog({
     }
   }, [isOpen, initialRows]);
 
+  // Unsaved-changes check. Add mode: any field has content. Edit mode: any
+  // field differs from the item it was seeded with (rows align 1:1 with
+  // initialRows since edit mode can't add/remove rows).
+  const isDirty = isEdit
+    ? rows.some((r, i) => {
+        const init = initialRows?.[i];
+        return (
+          r.name.trim() !== (init?.name ?? "").trim() ||
+          r.actual.trim() !== (init?.actual ?? "").trim() ||
+          r.predicted.trim() !== (init?.predicted ?? "").trim()
+        );
+      })
+    : rows.some((r) => r.name.trim() || r.actual.trim() || r.predicted.trim());
+
+  // Note: this dialog intentionally has no backdrop-click close, so
+  // `handleBackdropClick` is not used here.
+  const { discardConfirmOpen, closeDiscardConfirm, doClose, attemptClose } =
+    useUnsavedCloseGuard({
+    isOpen,
+    isDirty,
+    isEdit,
+    submitting,
+    onClose,
+    onBeforeClose: () => setError(null),
+  });
+
   if (!isOpen) return null;
 
   const updateRow = (id: string, patch: Partial<SttRowDraft>) => {
@@ -129,13 +159,6 @@ export function AddSttItemsDialog({
     }))
     .filter((r) => r.name && r.actual_transcript && r.predicted_transcript);
 
-  const handleClose = () => {
-    if (!submitting) {
-      setError(null);
-      onClose();
-    }
-  };
-
   const handleSubmit = async () => {
     if (validRows.length === 0 || submitting) return;
     setSubmitting(true);
@@ -155,10 +178,7 @@ export function AddSttItemsDialog({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={handleClose}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div
         className="bg-background border border-border rounded-xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
@@ -175,7 +195,7 @@ export function AddSttItemsDialog({
             </p>
           </div>
           <button
-            onClick={handleClose}
+            onClick={attemptClose}
             disabled={submitting}
             className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -302,7 +322,7 @@ export function AddSttItemsDialog({
         <div className="flex items-center justify-end gap-2 md:gap-3 px-5 md:px-6 py-4 border-t border-border">
           <div className="flex items-center gap-2 md:gap-3">
             <button
-              onClick={handleClose}
+              onClick={attemptClose}
               disabled={submitting}
               className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -328,6 +348,12 @@ export function AddSttItemsDialog({
           </div>
         </div>
       </div>
+
+      <DiscardChangesDialog
+        open={discardConfirmOpen}
+        onKeepEditing={closeDiscardConfirm}
+        onDiscard={doClose}
+      />
     </div>
   );
 }

@@ -58,7 +58,7 @@ type LabellingTaskSummary = {
 type LabellingTaskEvaluator = {
   uuid: string;
   name: string;
-  evaluator_type?: "llm" | "stt" | "tts" | "conversation";
+  evaluator_type?: "llm" | "llm-general" | "stt" | "tts" | "conversation";
   output_type?: "binary" | "rating";
   owner_user_id?: string | null;
 };
@@ -66,7 +66,7 @@ type LabellingTaskEvaluator = {
 type LabellingTask = {
   uuid: string;
   name: string;
-  type?: "llm" | "stt" | "tts" | "conversation";
+  type?: "llm" | "llm-general" | "stt" | "tts" | "conversation";
   description?: string;
   created_at?: string;
   updated_at?: string;
@@ -601,7 +601,7 @@ function HumanLabellingPageInner() {
             <>
               {/* Desktop table */}
               <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-                <div className="grid grid-cols-[minmax(0,1fr)_160px_100px_minmax(0,1.2fr)_40px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-2 border-b border-border bg-muted/30">
+                <div className="grid grid-cols-[minmax(0,1fr)_200px_100px_minmax(0,1.2fr)_40px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-2 border-b border-border bg-muted/30">
                   <div className="text-sm font-medium text-muted-foreground">
                     Name
                   </div>
@@ -626,7 +626,7 @@ function HumanLabellingPageInner() {
                       onClick={() =>
                         router.push(`/human-alignment/tasks/${task.uuid}`)
                       }
-                      className="grid grid-cols-[minmax(0,1fr)_160px_100px_minmax(0,1.2fr)_40px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                      className="grid grid-cols-[minmax(0,1fr)_200px_100px_minmax(0,1.2fr)_40px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                     >
                       <p className="text-sm font-medium text-foreground truncate">
                         {task.name}
@@ -1255,7 +1255,7 @@ type SeriesRow = {
   current: number | null;
   pairCount: number;
   series: AgreementSeriesPoint[];
-  evaluatorType?: "llm" | "stt" | "tts" | "conversation";
+  evaluatorType?: "llm" | "llm-general" | "stt" | "tts" | "conversation";
   emptyTitle: string;
   emptyDescription: string;
 };
@@ -1292,7 +1292,10 @@ function AgreementOverview({
   tasks: LabellingTask[];
 }) {
   const evaluatorTypeMap = (() => {
-    const m = new Map<string, "llm" | "stt" | "tts" | "conversation">();
+    const m = new Map<
+      string,
+      "llm" | "llm-general" | "stt" | "tts" | "conversation"
+    >();
     for (const t of tasks) {
       for (const ev of t.evaluators ?? []) {
         const type = ev.evaluator_type ?? t.type;

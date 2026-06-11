@@ -30,9 +30,11 @@ import { RefreshButton } from "@/components/RefreshButton";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { AddSttItemsDialog } from "@/components/human-labelling/AddSttItemsDialog";
+import { AddLlmGeneralItemsDialog } from "@/components/human-labelling/AddLlmGeneralItemsDialog";
 import { BulkUploadSttItemsDialog } from "@/components/human-labelling/BulkUploadSttItemsDialog";
 import { BulkUploadConversationItemsDialog } from "@/components/human-labelling/BulkUploadConversationItemsDialog";
 import { BulkUploadLlmItemsDialog } from "@/components/human-labelling/BulkUploadLlmItemsDialog";
+import { BulkUploadLlmGeneralItemsDialog } from "@/components/human-labelling/BulkUploadLlmGeneralItemsDialog";
 import { AssignAnnotatorsDialog } from "@/components/human-labelling/AssignAnnotatorsDialog";
 import { EditTaskDialog } from "@/components/human-labelling/EditTaskDialog";
 import { ItemDetailDialog } from "@/components/human-labelling/ItemDetailDialog";
@@ -125,7 +127,7 @@ type SummaryRow = {
 };
 type TaskSummaryResponse = {
   task_id: string;
-  task_type: "stt" | "llm" | "conversation";
+  task_type: "stt" | "llm" | "llm-general" | "conversation";
   evaluators: SummaryEvaluator[];
   annotators: SummaryAnnotator[];
   rows: SummaryRow[];
@@ -229,7 +231,7 @@ type LabellingJob = {
 type LabellingTask = {
   uuid: string;
   name: string;
-  type?: "llm" | "stt" | "tts" | "conversation";
+  type?: "llm" | "llm-general" | "stt" | "tts" | "conversation";
   description?: string;
   created_at?: string;
   updated_at?: string;
@@ -238,7 +240,7 @@ type LabellingTask = {
     name: string;
     description?: string | null;
     slug?: string | null;
-    evaluator_type?: "llm" | "stt" | "tts" | "conversation";
+    evaluator_type?: "llm" | "llm-general" | "stt" | "tts" | "conversation";
     output_type?: "binary" | "rating" | null;
     scale_min?: number | boolean | null;
     scale_max?: number | boolean | null;
@@ -259,7 +261,13 @@ type LabellingTask = {
   item_count?: number;
 };
 
-type TaskKind = "llm" | "stt" | "tts" | "conversation" | undefined;
+type TaskKind =
+  | "llm"
+  | "llm-general"
+  | "stt"
+  | "tts"
+  | "conversation"
+  | undefined;
 
 function previewItemPayload(payload: unknown, kind: TaskKind): string {
   if (payload == null || typeof payload !== "object") {
@@ -290,6 +298,10 @@ function previewItemPayload(payload: unknown, kind: TaskKind): string {
       const first = p.transcript[0] as { content?: unknown };
       if (typeof first?.content === "string") return first.content;
     }
+  }
+  if (kind === "llm-general") {
+    if (typeof p.output === "string" && p.output) return p.output;
+    if (typeof p.input === "string" && p.input) return p.input;
   }
   try {
     return JSON.stringify(payload);
@@ -372,6 +384,9 @@ function buildItemsCsv(
       header: "conversation_history",
     });
     columns.push({ key: "agent_response", header: "agent_response" });
+  } else if (taskType === "llm-general") {
+    columns.push({ key: "input", header: "input" });
+    columns.push({ key: "output", header: "output" });
   }
 
   for (const ev of evaluators) {
@@ -445,6 +460,9 @@ function buildItemsCsv(
         : "";
       out.agent_response =
         typeof p.agent_response === "string" ? p.agent_response : "";
+    } else if (taskType === "llm-general") {
+      out.input = typeof p.input === "string" ? p.input : "";
+      out.output = typeof p.output === "string" ? p.output : "";
     }
 
     for (const ev of evaluators) {
@@ -1236,6 +1254,21 @@ function LabellingTaskPageInner() {
   const [duplicateSttRows, setDuplicateSttRows] = useState<
     { uuid: string; name: string; actual: string; predicted: string }[] | null
   >(null);
+  // llm-general items use their own input/output dialog (non-conversational).
+  const [editLlmGeneralItemsOpen, setEditLlmGeneralItemsOpen] = useState(false);
+  const [editLlmGeneralSingleItemUuid, setEditLlmGeneralSingleItemUuid] =
+    useState<string | null>(null);
+  const [duplicateLlmGeneralRows, setDuplicateLlmGeneralRows] = useState<
+    {
+      uuid: string;
+      name: string;
+      description?: string;
+      input: string;
+      output: string;
+      varValues?: Record<string, Record<string, string>>;
+    }[]
+    | null
+  >(null);
 
   // Sort direction for the items table's Updated at column. Always
   // applied to `updated_at` on the backend; defaults to desc (newest
@@ -1624,7 +1657,10 @@ function LabellingTaskPageInner() {
   const taskType =
     task?.type ?? task?.evaluators?.[0]?.evaluator_type;
   const canAddItem =
-    taskType === "llm" || taskType === "conversation" || taskType === "stt";
+    taskType === "llm" ||
+    taskType === "conversation" ||
+    taskType === "stt" ||
+    taskType === "llm-general";
 
   /**
    * Anchor for shift+click range selection — the uuid of the most
@@ -2063,6 +2099,15 @@ function LabellingTaskPageInner() {
     return out;
   };
 
+  // Linked evaluators (with their variable defs) passed to the llm-general
+  // add/edit dialog so it can render per-item variable inputs.
+  const llmGeneralEvaluatorDefs = (task?.evaluators ?? []).map((e) => ({
+    uuid: e.uuid,
+    name: e.name,
+    description: e.description ?? null,
+    variables: e.variables ?? [],
+  }));
+
   // Build initialEvaluators[] from the task's linked evaluators using the
   // catalogue for variable definitions, optionally seeded with saved values.
   // If the catalogue hasn't hydrated this evaluator yet but we have saved
@@ -2223,10 +2268,13 @@ function LabellingTaskPageInner() {
   const [editOpen, setEditOpen] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [addSttItemsOpen, setAddSttItemsOpen] = useState(false);
+  const [addLlmGeneralItemsOpen, setAddLlmGeneralItemsOpen] = useState(false);
   const [bulkUploadSttOpen, setBulkUploadSttOpen] = useState(false);
   const [bulkUploadConversationOpen, setBulkUploadConversationOpen] =
     useState(false);
   const [bulkUploadLlmOpen, setBulkUploadLlmOpen] = useState(false);
+  const [bulkUploadLlmGeneralOpen, setBulkUploadLlmGeneralOpen] =
+    useState(false);
   const [newItemName, setNewItemName] = useState("");
   const [newItemDescription, setNewItemDescription] = useState("");
   const [creatingItem, setCreatingItem] = useState(false);
@@ -2471,6 +2519,9 @@ function LabellingTaskPageInner() {
                   } else if (taskType === "stt") {
                     setDuplicateSttRows(null);
                     setAddSttItemsOpen(true);
+                  } else if (taskType === "llm-general") {
+                    setDuplicateLlmGeneralRows(null);
+                    setAddLlmGeneralItemsOpen(true);
                   }
                 }}
                 disabled={!canAddItem}
@@ -2497,11 +2548,13 @@ function LabellingTaskPageInner() {
                 {taskType === "stt" ? "Add items" : "Add item"}
               </button>
               {(() => {
-                // LLM bulk upload references evaluators by name in the
-                // CSV; without any linked evaluators the validator will
-                // reject every row. Disable the button instead.
+                // LLM / LLM-response bulk upload references evaluators by
+                // name in the CSV (variable columns); without any linked
+                // evaluators the validator will reject every row. Disable the
+                // button instead — same gating for both LLM task types.
                 const llmNoEvaluators =
-                  taskType === "llm" && (task?.evaluators?.length ?? 0) === 0;
+                  (taskType === "llm" || taskType === "llm-general") &&
+                  (task?.evaluators?.length ?? 0) === 0;
                 const buttonEl = (
                   <button
                     onClick={() => {
@@ -2512,6 +2565,8 @@ function LabellingTaskPageInner() {
                         setBulkUploadConversationOpen(true);
                       } else if (taskType === "llm") {
                         setBulkUploadLlmOpen(true);
+                      } else if (taskType === "llm-general") {
+                        setBulkUploadLlmGeneralOpen(true);
                       } else {
                         toast.info(
                           "CSV upload isn't supported yet — coming soon.",
@@ -3060,7 +3115,7 @@ function LabellingTaskPageInner() {
                 </div>
               ) : taskType === "stt" ? (
                 <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-2 border-b border-border bg-muted/30 items-center">
+                  <div className="grid grid-cols-[40px_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-2 border-b border-border bg-muted/30 items-center">
                     <input
                       type="checkbox"
                       checked={allSelected}
@@ -3073,12 +3128,6 @@ function LabellingTaskPageInner() {
                     />
                     <div className="text-sm font-medium text-muted-foreground">
                       Name
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Reference transcript
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Predicted transcript
                     </div>
                     <div className="text-sm font-medium text-muted-foreground">
                       Labelled by
@@ -3099,14 +3148,6 @@ function LabellingTaskPageInner() {
                   {items.map((item) => {
                     const p = (item.payload ?? {}) as Record<string, unknown>;
                     const name = typeof p.name === "string" ? p.name : "";
-                    const ref =
-                      typeof p.reference_transcript === "string"
-                        ? p.reference_transcript
-                        : "";
-                    const pred =
-                      typeof p.predicted_transcript === "string"
-                        ? p.predicted_transcript
-                        : "";
                     const isSelected =
                       selectAllTotal || selectedItemIds.has(item.uuid);
                     const labellerIds = labellersByItem.get(item.uuid);
@@ -3126,7 +3167,7 @@ function LabellingTaskPageInner() {
                             }
                             openItemDetail(item.uuid);
                           }}
-                          className={`grid grid-cols-[40px_minmax(0,0.6fr)_minmax(0,1fr)_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
+                          className={`grid grid-cols-[40px_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
                             isSelected ? "bg-muted/30" : "hover:bg-muted/20"
                           }`}
                         >
@@ -3150,12 +3191,6 @@ function LabellingTaskPageInner() {
                           />
                           <p className="text-sm text-foreground line-clamp-2">
                             {name || "—"}
-                          </p>
-                          <p className="text-sm text-foreground line-clamp-2">
-                            {ref || "—"}
-                          </p>
-                          <p className="text-sm text-foreground line-clamp-2">
-                            {pred || "—"}
                           </p>
                           <LabelledByCell
                             labellers={labellerIds}
@@ -3355,7 +3390,14 @@ function LabellingTaskPageInner() {
                                   }
                                 : undefined
                             }
-                            onEdit={(uuid) => setEditLlmItemUuid(uuid)}
+                            onEdit={(uuid) => {
+                              if (taskType === "llm-general") {
+                                setEditLlmGeneralSingleItemUuid(uuid);
+                                setEditLlmGeneralItemsOpen(true);
+                              } else {
+                                setEditLlmItemUuid(uuid);
+                              }
+                            }}
                             onDuplicate={(uuid) => {
                               const item = items.find((i) => i.uuid === uuid);
                               if (!item) return;
@@ -3367,6 +3409,29 @@ function LabellingTaskPageInner() {
                                 typeof p?.name === "string"
                                   ? (p.name as string)
                                   : `Item ${item.id}`;
+                              if (taskType === "llm-general") {
+                                setDuplicateLlmGeneralRows([
+                                  {
+                                    uuid: item.uuid,
+                                    name: `Copy of ${name}`,
+                                    description:
+                                      typeof p?.description === "string"
+                                        ? (p.description as string)
+                                        : "",
+                                    input:
+                                      typeof p?.input === "string"
+                                        ? (p.input as string)
+                                        : "",
+                                    output:
+                                      typeof p?.output === "string"
+                                        ? (p.output as string)
+                                        : "",
+                                    varValues: readEvaluatorVariables(p),
+                                  },
+                                ]);
+                                setAddLlmGeneralItemsOpen(true);
+                                return;
+                              }
                               const desc =
                                 typeof p?.description === "string"
                                   ? (p.description as string)
@@ -3778,7 +3843,9 @@ function LabellingTaskPageInner() {
         />
       )}
 
-      {!!editLlmItemUuid && taskType !== "stt" && (
+      {!!editLlmItemUuid &&
+        taskType !== "stt" &&
+        taskType !== "llm-general" && (
         <AddTestDialog
           key={editLlmItemUuid}
           isOpen={true}
@@ -4056,6 +4123,122 @@ function LabellingTaskPageInner() {
         }}
       />
 
+      <AddLlmGeneralItemsDialog
+        isOpen={addLlmGeneralItemsOpen}
+        evaluators={llmGeneralEvaluatorDefs}
+        initialRows={duplicateLlmGeneralRows ?? undefined}
+        onClose={() => {
+          setAddLlmGeneralItemsOpen(false);
+          setDuplicateLlmGeneralRows(null);
+        }}
+        onSubmit={async (rows) => {
+          if (!accessToken) return;
+          await apiClient(`/annotation-tasks/${uuid}/items`, accessToken, {
+            method: "POST",
+            body: {
+              items: rows.map((r) => ({
+                payload: {
+                  ...(r.name ? { name: r.name } : {}),
+                  ...(r.description ? { description: r.description } : {}),
+                  input: r.input,
+                  output: r.output,
+                  ...(Object.keys(r.evaluator_variables).length > 0
+                    ? { evaluator_variables: r.evaluator_variables }
+                    : {}),
+                },
+              })),
+            },
+          });
+          handleTabChange("items");
+          await Promise.all([fetchTask(), fetchTaskSummary()]);
+          setAddLlmGeneralItemsOpen(false);
+          setDuplicateLlmGeneralRows(null);
+        }}
+      />
+
+      <AddLlmGeneralItemsDialog
+        isOpen={editLlmGeneralItemsOpen}
+        mode="edit"
+        evaluators={llmGeneralEvaluatorDefs}
+        initialRows={items
+          .filter((it) =>
+            editLlmGeneralSingleItemUuid
+              ? it.uuid === editLlmGeneralSingleItemUuid
+              : selectedItemIds.has(it.uuid),
+          )
+          .map((it) => {
+            const p = (it.payload ?? {}) as Record<string, unknown>;
+            return {
+              uuid: it.uuid,
+              name: typeof p.name === "string" ? p.name : "",
+              description:
+                typeof p.description === "string" ? p.description : "",
+              input: typeof p.input === "string" ? p.input : "",
+              output: typeof p.output === "string" ? p.output : "",
+              varValues: readEvaluatorVariables(p),
+            };
+          })}
+        onClose={() => {
+          setEditLlmGeneralItemsOpen(false);
+          setEditLlmGeneralSingleItemUuid(null);
+        }}
+        onSubmit={async (rows) => {
+          if (!accessToken) return;
+          await apiClient<{ updated_count: number }>(
+            `/annotation-tasks/${uuid}/items`,
+            accessToken,
+            {
+              method: "PUT",
+              body: {
+                updates: rows
+                  .filter((r) => !!r.uuid)
+                  .map((r) => ({
+                    uuid: r.uuid,
+                    payload: {
+                      ...(r.name ? { name: r.name } : {}),
+                      ...(r.description ? { description: r.description } : {}),
+                      input: r.input,
+                      output: r.output,
+                      ...(Object.keys(r.evaluator_variables).length > 0
+                        ? { evaluator_variables: r.evaluator_variables }
+                        : {}),
+                    },
+                  })),
+              },
+            },
+          );
+          await Promise.all([fetchTask(), fetchTaskSummary()]);
+          setEditLlmGeneralItemsOpen(false);
+          setEditLlmGeneralSingleItemUuid(null);
+          setSelectedItemIds(new Set());
+          setSelectAllTotal(false);
+        }}
+      />
+
+      {accessToken && (
+        <BulkUploadLlmGeneralItemsDialog
+          isOpen={bulkUploadLlmGeneralOpen}
+          accessToken={accessToken}
+          taskUuid={uuid}
+          linkedEvaluators={(task?.evaluators ?? []).map((e) => ({
+            uuid: e.uuid,
+            name: e.name,
+            slug: e.slug ?? null,
+            variables: e.variables ?? [],
+            output_type: e.output_type ?? null,
+            scale_min: typeof e.scale_min === "number" ? e.scale_min : null,
+            scale_max: typeof e.scale_max === "number" ? e.scale_max : null,
+          }))}
+          onClose={() => setBulkUploadLlmGeneralOpen(false)}
+          onSuccess={async (count) => {
+            setBulkUploadLlmGeneralOpen(false);
+            handleTabChange("items");
+            await Promise.all([fetchTask(), fetchTaskSummary()]);
+            toast.success(`Added ${count} ${count === 1 ? "item" : "items"}`);
+          }}
+        />
+      )}
+
       {accessToken && (
         <AssignAnnotatorsDialog
           isOpen={assignOpen}
@@ -4166,6 +4349,7 @@ function LabellingTaskPageInner() {
         task={
           task &&
           (task.type === "llm" ||
+            task.type === "llm-general" ||
             task.type === "stt" ||
             task.type === "conversation")
             ? {
