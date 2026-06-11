@@ -2247,7 +2247,9 @@ function LabellingTaskPageInner() {
       return;
     const body: Record<string, unknown> = {
       annotator_ids: annotatorIds,
-      ...(evaluatorIds ? { evaluator_ids: evaluatorIds } : {}),
+      ...(evaluatorIds && evaluatorIds.length > 0
+        ? { evaluator_ids: evaluatorIds }
+        : {}),
       ...(selectAllTotal
         ? {
             select_all: true,
