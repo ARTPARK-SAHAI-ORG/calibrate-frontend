@@ -1374,10 +1374,10 @@ export function ItemDetailPane({
 
   return (
     <div className="flex flex-col md:flex-row min-h-0 flex-1 md:overflow-hidden">
-      <div className="md:flex-1 md:min-h-0 md:overflow-y-auto p-4 md:p-6 md:border-r border-border">
+      <div className="md:flex-[4] md:min-h-0 md:overflow-y-auto p-4 md:p-6 md:border-r border-border">
         <ItemPane item={item} taskType={taskType} />
       </div>
-      <div className="md:flex-1 md:min-h-0 md:overflow-y-auto p-4 md:p-6">
+      <div className="md:flex-[3] md:min-h-0 md:overflow-y-auto p-4 md:p-6">
         <EvaluatorResultsPane
           evaluators={evaluators}
           evaluatorNamesById={evaluatorNamesById}
