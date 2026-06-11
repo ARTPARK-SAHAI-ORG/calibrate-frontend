@@ -15,6 +15,7 @@ import {
 } from "@/components/test-results/shared";
 import { SearchInput } from "@/components/ui/SearchInput";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
+import { isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 
 export type TestRunResult = {
   id: string;
@@ -95,7 +96,7 @@ export function TestRunOutputsPanel({
   // it errored out. Bucket those separately from genuine evaluation failures.
   const isErrored = (r: TestRunResult) => !!r.error;
   const isLabellingEligible = (r: TestRunResult) =>
-    r.testCase?.evaluation?.type === "response";
+    isLabellingEligibleRaw({ test_case: r.testCase ?? null });
   const isLabellingSelectable = (r: TestRunResult) =>
     r.status === "passed" || r.status === "failed" || isErrored(r);
   const showLabellingCheckboxes = !!onToggleLabellingSelection;

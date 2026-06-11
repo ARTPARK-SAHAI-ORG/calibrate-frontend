@@ -23,6 +23,7 @@ import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { AddRunToLabellingTaskDialog, isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
+import { useLabellingSelection } from "@/components/human-labelling/useLabellingSelection";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
 import { useAccessToken } from "@/hooks";
 import {
@@ -116,9 +117,12 @@ export function BenchmarkResultsDialog({
   // matching state in TestRunnerDialog for the same plumbing.
   const [runEvaluators, setRunEvaluators] = useState<TestRunEvaluator[]>([]);
   const [addToTaskOpen, setAddToTaskOpen] = useState(false);
-  const [labellingSelectedKeys, setLabellingSelectedKeys] = useState<
-    Set<string>
-  >(() => new Set());
+  const {
+    selected: labellingSelectedKeys,
+    toggle: toggleLabellingSelection,
+    bulkToggle: toggleLabellingBulk,
+    clear: clearLabellingSelection,
+  } = useLabellingSelection();
   const backendAccessToken = useAccessToken();
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   /** Once per dialog open: select first test of `models[0]` when its row exists. */
@@ -136,28 +140,6 @@ export function BenchmarkResultsDialog({
     taskStatus === "completed" ||
     taskStatus === "done" ||
     taskStatus === "failed";
-
-  const toggleLabellingSelection = (key: string) => {
-    setLabellingSelectedKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
-  const toggleLabellingBulk = (ids: string[]) => {
-    setLabellingSelectedKeys((prev) => {
-      const next = new Set(prev);
-      const allSelected =
-        ids.length > 0 && ids.every((id) => next.has(id));
-      for (const id of ids) {
-        if (allSelected) next.delete(id);
-        else next.add(id);
-      }
-      return next;
-    });
-  };
 
   const labellingModelResults = modelResults
     .map((mr) => ({
@@ -243,7 +225,7 @@ export function BenchmarkResultsDialog({
         setExpandedProviders(new Set(models.length > 0 ? [models[0]] : []));
         setSelectedTest(null);
         hasAutoSelectedFirstBenchmarkTestRef.current = false;
-        setLabellingSelectedKeys(new Set());
+        clearLabellingSelection();
         setActiveTab("outputs");
         setIsPublic(false);
         setShareToken(null);

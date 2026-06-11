@@ -20,6 +20,7 @@ import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { AddRunToLabellingTaskDialog, isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
+import { useLabellingSelection } from "@/components/human-labelling/useLabellingSelection";
 import { TestRunOutputsPanel, TestRunSummary } from "./eval-details";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
 import { buildEvaluatorSummaryFromResults } from "@/lib/testRunSummary";
@@ -183,9 +184,12 @@ export function TestRunnerDialog({
   // the Summary tab on completion (mirrors the benchmark dialog).
   const [activeTab, setActiveTab] = useState<"summary" | "outputs">("outputs");
   const [addToTaskOpen, setAddToTaskOpen] = useState(false);
-  const [labellingSelectedIds, setLabellingSelectedIds] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const {
+    selected: labellingSelectedIds,
+    toggle: toggleLabellingSelection,
+    bulkToggle: toggleLabellingBulk,
+    clear: clearLabellingSelection,
+  } = useLabellingSelection();
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   // Tracks whether the dialog has already auto-opened a completed test for
   // this open lifecycle. Set back to false on every dialog open / new run /
@@ -200,28 +204,6 @@ export function TestRunnerDialog({
     setLatencyAgg(null);
     setCostAgg(null);
     setTokensAgg(null);
-  };
-
-  const toggleLabellingSelection = (id: string) => {
-    setLabellingSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleLabellingBulk = (ids: string[]) => {
-    setLabellingSelectedIds((prev) => {
-      const next = new Set(prev);
-      const allSelected =
-        ids.length > 0 && ids.every((id) => next.has(id));
-      for (const id of ids) {
-        if (allSelected) next.delete(id);
-        else next.add(id);
-      }
-      return next;
-    });
   };
 
   // Auto-open the first completed test when nothing is selected. Covers both
@@ -279,7 +261,7 @@ export function TestRunnerDialog({
     // Initialize state for viewing existing run
     setSelectedTestUuid(null);
     hasAutoSelectedRef.current = false;
-    setLabellingSelectedIds(new Set());
+    clearLabellingSelection();
     setCurrentTaskId(taskId);
     setRunEvaluators([]);
     resetSummary();
@@ -328,7 +310,7 @@ export function TestRunnerDialog({
 
     setSelectedTestUuid(null);
     hasAutoSelectedRef.current = false;
-    setLabellingSelectedIds(new Set());
+    clearLabellingSelection();
     setCurrentTaskId(null);
     setRunEvaluators([]);
     resetSummary();
