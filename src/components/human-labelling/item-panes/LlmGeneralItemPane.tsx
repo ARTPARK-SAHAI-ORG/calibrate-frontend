@@ -30,7 +30,7 @@ export function LlmGeneralItemPane({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <Section title="Input" subtitle="What the LLM was given">
         <p className="text-sm whitespace-pre-wrap break-words">
           {input || "—"}
