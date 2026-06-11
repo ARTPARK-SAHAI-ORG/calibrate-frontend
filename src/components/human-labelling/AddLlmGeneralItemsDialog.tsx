@@ -183,7 +183,7 @@ export function AddLlmGeneralItemsDialog({
       onClick={handleClose}
     >
       <div
-        className="bg-background border border-border rounded-xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[90vh]"
+        className="bg-background border border-border rounded-xl md:rounded-2xl w-full max-w-[90rem] h-[95vh] md:h-[85vh] mx-2 md:mx-4 shadow-2xl flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -293,9 +293,10 @@ export function AddLlmGeneralItemsDialog({
             )}
           </div>
 
-          {/* Right: input + output boxes */}
-          <div className="w-full md:w-1/2 flex flex-col bg-muted/30 overflow-y-auto p-4 md:p-6 space-y-6">
-            <div>
+          {/* Right: input + output boxes shown side by side, each filling
+              the full dialog height. */}
+          <div className="w-full md:w-1/2 flex flex-col md:flex-row bg-muted/30 min-h-0">
+            <div className="flex-1 flex flex-col min-h-0 p-4 md:p-6 border-b md:border-b-0 md:border-r border-border">
               <label className="block text-base font-medium text-foreground mb-2">
                 Input
               </label>
@@ -304,11 +305,10 @@ export function AddLlmGeneralItemsDialog({
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="The prompt or input given to the LLM"
                 disabled={submitting}
-                rows={8}
-                className="w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-y disabled:opacity-50"
+                className="flex-1 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
               />
             </div>
-            <div>
+            <div className="flex-1 flex flex-col min-h-0 p-4 md:p-6">
               <label className="block text-base font-medium text-foreground mb-2">
                 Output
               </label>
@@ -317,8 +317,7 @@ export function AddLlmGeneralItemsDialog({
                 onChange={(e) => setOutput(e.target.value)}
                 placeholder="The output the LLM produced"
                 disabled={submitting}
-                rows={8}
-                className="w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-y disabled:opacity-50"
+                className="flex-1 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
               />
             </div>
           </div>
