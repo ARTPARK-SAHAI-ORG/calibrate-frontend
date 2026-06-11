@@ -22,7 +22,10 @@ import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
-import { AddRunToLabellingTaskDialog, isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
+import {
+  AddRunToLabellingTaskDialog,
+  isLabellingEligibleRaw,
+} from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useLabellingSelection } from "@/components/human-labelling/useLabellingSelection";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
 import { useAccessToken } from "@/hooks";
@@ -591,38 +594,38 @@ export function BenchmarkResultsDialog({
               hasAnyResults &&
               hasLabellingEligibleTests &&
               currentTaskId && (
-              <button
-                onClick={() => {
-                  if (activeTab === "leaderboard") {
-                    setActiveTab("outputs");
-                  }
-                  if (labellingSelectedKeys.size === 0) {
-                    toast.error(
-                      "Select one or more tests to submit for labelling",
+                <button
+                  onClick={() => {
+                    if (activeTab === "leaderboard") {
+                      setActiveTab("outputs");
+                    }
+                    if (labellingSelectedKeys.size === 0) {
+                      toast.error(
+                        "Select one or more tests to submit for labelling",
+                      );
+                      return;
+                    }
+                    const hasEligibleSelected = modelResults.some((mr) =>
+                      (mr.test_results ?? []).some(
+                        (tr, index) =>
+                          labellingSelectedKeys.has(
+                            benchmarkLabellingKey(mr.model, index),
+                          ) && isLabellingEligibleRaw(tr),
+                      ),
                     );
-                    return;
-                  }
-                  const hasEligibleSelected = modelResults.some((mr) =>
-                    (mr.test_results ?? []).some(
-                      (tr, index) =>
-                        labellingSelectedKeys.has(
-                          benchmarkLabellingKey(mr.model, index),
-                        ) && isLabellingEligibleRaw(tr),
-                    ),
-                  );
-                  if (!hasEligibleSelected) {
-                    toast.error(
-                      "Tool-call tests can't be submitted for labelling. Select at least one response test.",
-                    );
-                    return;
-                  }
-                  setAddToTaskOpen(true);
-                }}
-                className="hidden md:flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
-              >
-                Submit for labelling
-              </button>
-            )}
+                    if (!hasEligibleSelected) {
+                      toast.error(
+                        "Tool-call tests can't be submitted for labelling",
+                      );
+                      return;
+                    }
+                    setAddToTaskOpen(true);
+                  }}
+                  className="hidden md:flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
+                >
+                  Submit for labelling
+                </button>
+              )}
             {/* Rerun button - show when benchmark is complete (not loading and no error) */}
             {isDone && !error && onGoBack && (
               <button

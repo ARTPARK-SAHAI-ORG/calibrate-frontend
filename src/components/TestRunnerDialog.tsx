@@ -19,7 +19,10 @@ import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
-import { AddRunToLabellingTaskDialog, isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
+import {
+  AddRunToLabellingTaskDialog,
+  isLabellingEligibleRaw,
+} from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useLabellingSelection } from "@/components/human-labelling/useLabellingSelection";
 import { TestRunOutputsPanel, TestRunSummary } from "./eval-details";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
@@ -1034,7 +1037,7 @@ export function TestRunnerDialog({
                       );
                       if (!hasEligibleSelected) {
                         toast.error(
-                          "Tool-call tests can't be submitted for labelling. Select at least one response test.",
+                          "Tool-call tests can't be submitted for labelling",
                         );
                         return;
                       }
@@ -1169,13 +1172,13 @@ export function TestRunnerDialog({
                   labellingSelection={
                     runStatus === "done" ? labellingSelectedIds : undefined
                   }
-              onToggleLabellingSelection={
-                runStatus === "done" ? toggleLabellingSelection : undefined
-              }
-              onLabellingBulkToggle={
-                runStatus === "done" ? toggleLabellingBulk : undefined
-              }
-            />
+                  onToggleLabellingSelection={
+                    runStatus === "done" ? toggleLabellingSelection : undefined
+                  }
+                  onLabellingBulkToggle={
+                    runStatus === "done" ? toggleLabellingBulk : undefined
+                  }
+                />
               </div>
             )}
           </div>

@@ -101,20 +101,24 @@ export function TestRunOutputsPanel({
     r.status === "passed" || r.status === "failed" || isErrored(r);
   const showLabellingCheckboxes = !!onToggleLabellingSelection;
 
-  const allSelectableIds = useMemo(
-    () => results.filter(isLabellingSelectable).map((r) => r.id),
-    [results],
+  const query = searchQuery.trim().toLowerCase();
+  const filteredResults = useMemo(
+    () =>
+      query
+        ? results.filter((r) => r.name.toLowerCase().includes(query))
+        : results,
+    [results, query],
   );
-  const allLabellingSelected =
-    allSelectableIds.length > 0 &&
-    allSelectableIds.every((id) => labellingSelection?.has(id));
+
+  const visibleSelectableIds = useMemo(
+    () => filteredResults.filter(isLabellingSelectable).map((r) => r.id),
+    [filteredResults],
+  );
+  const allVisibleLabellingSelected =
+    visibleSelectableIds.length > 0 &&
+    visibleSelectableIds.every((id) => labellingSelection?.has(id));
 
   const labellingGroupKeys = new Set(["failed", "errored", "passed"]);
-
-  const query = searchQuery.trim().toLowerCase();
-  const filteredResults = query
-    ? results.filter((r) => r.name.toLowerCase().includes(query))
-    : results;
 
   const groups: StatusGroup[] = [
     { key: "failed", label: "Failed", dotColor: "bg-red-500", items: filteredResults.filter((r) => r.status === "failed" && !isErrored(r)) },
@@ -208,13 +212,13 @@ export function TestRunOutputsPanel({
             onChange={setSearchQuery}
             placeholder="Search tests"
           />
-          {showLabellingCheckboxes && onLabellingBulkToggle && allSelectableIds.length > 0 && (
+          {showLabellingCheckboxes && onLabellingBulkToggle && visibleSelectableIds.length > 0 && (
             <button
               type="button"
-              onClick={() => onLabellingBulkToggle(allSelectableIds)}
+              onClick={() => onLabellingBulkToggle(visibleSelectableIds)}
               className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >
-              {allLabellingSelected ? "Deselect all" : "Select all"}
+              {allVisibleLabellingSelected ? "Deselect all" : "Select all"}
             </button>
           )}
         </div>

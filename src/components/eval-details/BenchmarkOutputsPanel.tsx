@@ -175,16 +175,18 @@ export function BenchmarkOutputsPanel({
   const [searchQuery, setSearchQuery] = useState("");
   const showLabellingCheckboxes = !!onToggleLabellingSelection;
 
-  const allLabellingKeys = useMemo(() => {
+  const visibleLabellingKeys = useMemo(() => {
     const keys: string[] = [];
     for (const mr of modelResults) {
-      keys.push(...collectModelLabellingKeys(mr, testNames, "all", ""));
+      keys.push(
+        ...collectModelLabellingKeys(mr, testNames, statusFilter, searchQuery),
+      );
     }
     return keys;
-  }, [modelResults, testNames]);
-  const allLabellingSelected =
-    allLabellingKeys.length > 0 &&
-    allLabellingKeys.every((key) => labellingSelection?.has(key));
+  }, [modelResults, testNames, statusFilter, searchQuery]);
+  const allVisibleLabellingSelected =
+    visibleLabellingKeys.length > 0 &&
+    visibleLabellingKeys.every((key) => labellingSelection?.has(key));
   // Refs to the list scroll container and the currently-selected row, so
   // navigation keeps the selection in view (a page at a time).
   const listContainerRef = useRef<HTMLDivElement>(null);
@@ -367,7 +369,7 @@ export function BenchmarkOutputsPanel({
   const showBulkSelect =
     showLabellingCheckboxes &&
     !!onLabellingBulkToggle &&
-    allLabellingKeys.length > 0;
+    visibleLabellingKeys.length > 0;
   const showBulkExpand = showControls && modelResults.length > 0;
 
   return (
@@ -394,11 +396,11 @@ export function BenchmarkOutputsPanel({
             {showBulkSelect && (
               <button
                 type="button"
-                onClick={() => onLabellingBulkToggle!(allLabellingKeys)}
+                onClick={() => onLabellingBulkToggle!(visibleLabellingKeys)}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer transition-colors border border-border bg-muted/60 text-foreground hover:bg-muted"
               >
-                <LabellingRowCheckbox checked={allLabellingSelected} />
-                {allLabellingSelected ? "Deselect all" : "Select all"}
+                <LabellingRowCheckbox checked={allVisibleLabellingSelected} />
+                {allVisibleLabellingSelected ? "Deselect all" : "Select all"}
               </button>
             )}
             {showBulkExpand && (
