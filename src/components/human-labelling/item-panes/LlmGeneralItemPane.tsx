@@ -14,7 +14,6 @@ export function LlmGeneralItemPane({
 }: {
   payload: Record<string, unknown>;
 }) {
-  const name = typeof payload.name === "string" ? payload.name : "";
   const input = typeof payload.input === "string" ? payload.input : "";
   const output = typeof payload.output === "string" ? payload.output : "";
 
@@ -32,7 +31,6 @@ export function LlmGeneralItemPane({
 
   return (
     <div className="space-y-4">
-      {name && <p className="text-sm font-semibold text-foreground">{name}</p>}
       <Section title="Input" subtitle="What the LLM was given">
         <p className="text-sm whitespace-pre-wrap break-words">
           {input || "—"}
