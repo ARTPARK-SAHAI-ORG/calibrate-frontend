@@ -5,7 +5,6 @@ import React, {
   useState,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useCallback,
 } from "react";
@@ -21,11 +20,7 @@ import {
 } from "@/lib/toolParams";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
 import { useHideFloatingButton } from "@/components/AppLayout";
-import {
-  formatTurnTimestamp,
-  TestDetailView,
-  type TestCaseHistory,
-} from "@/components/test-results/shared";
+import { formatTurnTimestamp } from "@/components/test-results/shared";
 
 // A single expected parameter row in a tool-call test. The shape is recursive:
 // `object`-typed parameters carry their own `properties` (nested rows) so the
@@ -1168,69 +1163,6 @@ export function AddTestDialog({
   });
 
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
-
-  // Conversation-history view mode: the editable "form" or a read-only chat
-  // "preview" that renders the same bubbles the result pages use.
-  const [conversationView, setConversationView] = useState<"form" | "preview">(
-    "form",
-  );
-
-  // Convert the editable `chatMessages` into the API history shape that
-  // `TestDetailView` renders. Mirrors `buildConfig`'s history conversion but
-  // keys tool calls by the stable message id (rather than a fresh UUID) so the
-  // preview is deterministic across re-renders.
-  const previewHistory = useMemo<TestCaseHistory[]>(() => {
-    const history: TestCaseHistory[] = [];
-    for (const message of chatMessages) {
-      const ts = message.createdAt ? { created_at: message.createdAt } : {};
-      if (message.role === "agent") {
-        history.push({ role: "assistant", content: message.content, ...ts });
-      } else if (message.role === "user") {
-        history.push({ role: "user", content: message.content, ...ts });
-      } else if (message.role === "tool_call") {
-        const toolCallId = message.id;
-        const argsObj: Record<string, any> = {};
-        for (const param of message.toolParams ?? []) {
-          if (message.isWebhook && param.group === "body") {
-            (argsObj.body ??= {})[param.name] = param.value;
-          } else if (message.isWebhook && param.group === "query") {
-            (argsObj.query ??= {})[param.name] = param.value;
-          } else {
-            argsObj[param.name] = param.value;
-          }
-        }
-        history.push({
-          role: "assistant",
-          tool_calls: [
-            {
-              id: toolCallId,
-              function: {
-                name: message.toolName || "",
-                arguments: JSON.stringify(argsObj),
-              },
-              type: "function",
-            },
-          ],
-          ...ts,
-        });
-        const linkedResponse = chatMessages.find(
-          (m) =>
-            m.role === "tool_response" && m.linkedToolCallId === message.id,
-        );
-        if (linkedResponse && linkedResponse.content.trim()) {
-          history.push({
-            role: "tool",
-            content: linkedResponse.content,
-            tool_call_id: toolCallId,
-            ...(linkedResponse.createdAt
-              ? { created_at: linkedResponse.createdAt }
-              : {}),
-          });
-        }
-      }
-    }
-    return history;
-  }, [chatMessages]);
 
   const addChatMessage = (role: "agent" | "user") => {
     const id = Date.now().toString();
@@ -3737,46 +3669,9 @@ export function AddTestDialog({
                 </p>
               </div>
             </div>
-            {/* View toggle: editable form vs read-only chat preview */}
-            <div className="flex items-center justify-end px-4 md:px-6 py-2 border-b border-border">
-              <div className="inline-flex items-center rounded-lg border border-border bg-background p-0.5">
-                <button
-                  type="button"
-                  onClick={() => setConversationView("form")}
-                  className={`px-3 py-1 text-xs font-medium rounded-md cursor-pointer transition-colors ${
-                    conversationView === "form"
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Form
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConversationView("preview")}
-                  className={`px-3 py-1 text-xs font-medium rounded-md cursor-pointer transition-colors ${
-                    conversationView === "preview"
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Preview
-                </button>
-              </div>
-            </div>
             {/* Chat Messages Area */}
-            <div
-              className={`flex-1 overflow-y-auto overflow-x-visible ${
-                conversationView === "preview" ? "" : "p-4 md:p-6"
-              }`}
-            >
-              {conversationView === "preview" ? (
-                <TestDetailView
-                  history={previewHistory}
-                  passed={false}
-                  highlightEvalTarget={requireAssistantLastMessage}
-                />
-              ) : chatMessages.length === 0 ? (
+            <div className="flex-1 overflow-y-auto overflow-x-visible p-4 md:p-6">
+              {chatMessages.length === 0 ? (
                 /* Empty State Placeholder */
                 <div className="h-full flex flex-col items-center justify-center text-center px-8">
                   {/* Globe with chat icon */}
