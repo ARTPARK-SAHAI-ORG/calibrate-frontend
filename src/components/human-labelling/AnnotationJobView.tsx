@@ -660,7 +660,7 @@ function AnnotateView({
       <header className="border-b border-border px-4 md:px-6 py-3 flex flex-col gap-3 md:grid md:grid-cols-3 md:items-center md:gap-4">
         <div className="min-w-0">
           {currentItem && (
-            <h2 className="text-sm md:text-base font-semibold truncate">
+            <h2 className="text-sm font-semibold truncate">
               {currentItemName || "Item"}
             </h2>
           )}

@@ -1828,7 +1828,7 @@ export function EvaluatorRunDetailView({
             </div>
           )}
           <header className="border-b border-border px-4 md:px-6 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-            <h2 className="text-sm md:text-base font-semibold text-foreground truncate min-w-0">
+            <h2 className="text-sm font-semibold text-foreground truncate min-w-0">
               {(() => {
                 const p =
                   currentItem?.payload &&

@@ -548,7 +548,7 @@ export function ItemDetailDialog({
             className="flex-1 min-w-0 flex items-center gap-2 md:max-w-[calc(50%-6rem)]"
             title={itemTitle(item)}
           >
-            <h2 className="text-base md:text-lg font-semibold text-foreground truncate min-w-0">
+            <h2 className="text-sm font-semibold text-foreground truncate min-w-0">
               {itemTitle(item)}
             </h2>
           </div>
