@@ -52,6 +52,9 @@ export type BenchmarkLeaderboardSummaryRow = {
   /** Mean per-test cost in USD — CSV string (mean only), blank / null when no
    * case reported one (e.g. the `openai` provider). */
   cost?: string | null;
+  /** Mean per-test total tokens — CSV string (mean only), blank / null when no
+   * case reported one. */
+  total_tokens?: string | null;
 };
 
 export type BenchmarkCombinedEvaluatorColumn = {
@@ -74,6 +77,8 @@ export type BenchmarkCombinedLeaderboardPayload = {
     showLatency: boolean;
     /** True when at least one model reported an average cost. */
     showCost: boolean;
+    /** True when at least one model reported average total tokens. */
+    showTokens: boolean;
     evaluators: BenchmarkCombinedEvaluatorColumn[];
   };
 };
@@ -230,6 +235,7 @@ export function buildBenchmarkCombinedLeaderboardPayload(
   const rows: Record<string, unknown>[] = [];
   let showLatency = false;
   let showCost = false;
+  let showTokens = false;
 
   for (const model of modelsOrdered) {
     const lbRow = leaderboardSummary?.find(
@@ -253,6 +259,11 @@ export function buildBenchmarkCombinedLeaderboardPayload(
       if (cost !== undefined) {
         row.avg_cost = cost;
         showCost = true;
+      }
+      const tokens = toFiniteNumber(lbRow.total_tokens);
+      if (tokens !== undefined) {
+        row.avg_tokens = tokens;
+        showTokens = true;
       }
     }
 
@@ -301,6 +312,14 @@ export function buildBenchmarkCombinedLeaderboardPayload(
     });
   }
 
+  if (showTokens) {
+    allCharts.push({
+      title: "Avg tokens",
+      dataKey: "avg_tokens",
+      formatTooltip: (v) => Math.round(v).toLocaleString("en-US"),
+    });
+  }
+
   for (const ev of evaluators) {
     if (ev.type === "binary") {
       allCharts.push({
@@ -338,6 +357,7 @@ export function buildBenchmarkCombinedLeaderboardPayload(
       showOverallPassRate,
       showLatency,
       showCost,
+      showTokens,
       evaluators,
     },
   };

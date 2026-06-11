@@ -32,10 +32,11 @@ type LeaderboardSummary = {
   passed: string;
   total: string;
   pass_rate: string;
-  /** Mean per-test latency (ms) / cost (USD) as CSV strings — mean only,
-   * blank/null when no case reported one. Absent on older jobs. */
+  /** Mean per-test latency (ms) / cost (USD) / total tokens as CSV strings —
+   * mean only, blank/null when no case reported one. Absent on older jobs. */
   latency_ms?: string | null;
   cost?: string | null;
+  total_tokens?: string | null;
 };
 
 type BenchmarkStatusResponse = {

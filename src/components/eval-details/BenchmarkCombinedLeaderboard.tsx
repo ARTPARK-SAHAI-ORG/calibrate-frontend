@@ -9,7 +9,7 @@ import {
   type BenchmarkLeaderboardSummaryRow,
   type BenchmarkModelLike,
 } from "@/lib/benchmarkEvaluatorSummary";
-import { formatLatencyMs, formatCostUsd } from "@/lib/llmMetrics";
+import { formatLatencyMs, formatCostUsd, formatTokens } from "@/lib/llmMetrics";
 
 type BenchmarkCombinedLeaderboardProps = {
   leaderboardSummary?: BenchmarkLeaderboardSummaryRow[];
@@ -71,6 +71,19 @@ function columnsFromPayload(
       render: (v) =>
         typeof v === "number" && Number.isFinite(v) ? (
           formatCostUsd(v)
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    });
+  }
+
+  if (payload.plan.showTokens) {
+    cols.push({
+      key: "avg_tokens",
+      header: "Avg tokens",
+      render: (v) =>
+        typeof v === "number" && Number.isFinite(v) ? (
+          formatTokens(v)
         ) : (
           <span className="text-muted-foreground">—</span>
         ),

@@ -29,9 +29,10 @@ type TestCaseResult = {
   chat_history?: { role: string; content: string }[];
   evaluation?: { passed: boolean; message?: string; details?: Record<string, any> };
   judge_results?: JudgeResult[] | null;
-  /** Per-case agent latency (ms) / cost (USD). */
+  /** Per-case agent latency (ms) / cost (USD) / total tokens. */
   latency_ms?: number | null;
   cost?: number | null;
+  total_tokens?: number | null;
   error?: string;
 };
 
@@ -44,9 +45,10 @@ type TestRunStatusResponse = {
   results?: TestCaseResult[];
   /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
   evaluators?: TestRunEvaluator[];
-  /** Aggregate per-test latency / cost ({mean,min,max,count} | null). */
+  /** Aggregate per-test latency / cost / total tokens ({mean,min,max,count} | null). */
   latency_ms?: AggStat;
   cost?: AggStat;
+  total_tokens?: AggStat;
   error?: string;
 };
 
@@ -164,6 +166,7 @@ export default function PublicTestRunPage() {
             total={passed + failed}
             latency={data.latency_ms ?? null}
             cost={data.cost ?? null}
+            tokens={data.total_tokens ?? null}
             evaluatorSummary={buildEvaluatorSummaryFromResults(
               results,
               Object.fromEntries(

@@ -1,7 +1,12 @@
 import React from "react";
 import Link from "next/link";
 import { Tooltip } from "@/components/Tooltip";
-import { formatLatencyMs, formatCostUsd, type AggStat } from "@/lib/llmMetrics";
+import {
+  formatLatencyMs,
+  formatCostUsd,
+  formatTokens,
+  type AggStat,
+} from "@/lib/llmMetrics";
 import {
   benchmarkRatingEvaluatorCaption,
   type BenchmarkEvaluatorSummaryEntry,
@@ -18,6 +23,8 @@ type TestRunSummaryProps = {
   /** Aggregate per-test cost block. Null for eval-only runs and for the
    * `openai` provider (no cost reported). */
   cost?: AggStat;
+  /** Aggregate per-test total-token block. Null for eval-only runs. */
+  tokens?: AggStat;
   /** Per-evaluator aggregates (same shape benchmark uses), single model. */
   evaluatorSummary?: BenchmarkEvaluatorSummaryEntry[] | null;
   /** Disable evaluator detail links for public share pages. */
@@ -163,6 +170,7 @@ export function TestRunSummary({
   total,
   latency,
   cost,
+  tokens,
   evaluatorSummary,
   enableEvaluatorLinks = true,
 }: TestRunSummaryProps) {
@@ -181,11 +189,15 @@ export function TestRunSummary({
     cost && cost.count > 1 && cost.min !== cost.max
       ? `${formatCostUsd(cost.min)} – ${formatCostUsd(cost.max)}`
       : undefined;
+  const tokensSubtitle =
+    tokens && tokens.count > 1 && tokens.min !== tokens.max
+      ? `${formatTokens(tokens.min)} – ${formatTokens(tokens.max)}`
+      : undefined;
 
   return (
     <div className="p-4 md:p-6 space-y-6 overflow-y-auto h-full">
       <div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <MetricCard
             label="Pass rate"
             value={rate !== null ? `${parseFloat(rate.toFixed(1))}%` : "—"}
@@ -203,6 +215,12 @@ export function TestRunSummary({
             value={formatCostUsd(cost?.mean)}
             subtitle={costSubtitle}
             info="Average cost per test across all tests"
+          />
+          <MetricCard
+            label="Average tokens"
+            value={formatTokens(tokens?.mean)}
+            subtitle={tokensSubtitle}
+            info="Average total input + output tokens per test across all tests"
           />
         </div>
       </div>

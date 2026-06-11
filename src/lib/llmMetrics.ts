@@ -48,3 +48,14 @@ export function formatCostUsd(usd: number | null | undefined): string {
   // parseFloat drops trailing zeros so whole values show no decimals ($2, not $2.00).
   return `$${parseFloat(n.toFixed(decimals))}`;
 }
+
+/**
+ * Format a token count as a rounded integer with thousands separators
+ * (1,234). Returns an em dash for missing / non-finite input.
+ */
+export function formatTokens(tokens: number | null | undefined): string {
+  if (tokens == null) return "—";
+  const n = Number(tokens);
+  if (!Number.isFinite(n)) return "—";
+  return Math.round(n).toLocaleString("en-US");
+}

@@ -80,11 +80,12 @@ type TestCaseResult = {
   /** Per-evaluator verdicts for response tests. Null for tool-call tests
    * and absent for legacy rows. */
   judge_results?: JudgeResult[] | null;
-  /** Per-case agent latency (ms) / cost (USD). Lifted to the top level by the
-   * backend (not inside `output`). Null while the case is running, for
-   * eval-only runs, and — for cost — the `openai` provider. */
+  /** Per-case agent latency (ms) / cost (USD) / total tokens. Lifted to the
+   * top level by the backend (not inside `output`). Null while the case is
+   * running, for eval-only runs, and — for cost — the `openai` provider. */
   latency_ms?: number | null;
   cost?: number | null;
+  total_tokens?: number | null;
   error?: string;
 };
 
@@ -102,11 +103,12 @@ type TestRunStatusResponse = {
    * for every uuid referenced by judge_results (synthesises stubs for
    * legacy rows). */
   evaluators?: TestRunEvaluator[];
-  /** Aggregate per-test latency / cost ({mean,min,max,count} | null) across
-   * the whole run. Null for eval-only runs or before metrics land; cost is
-   * also null for the `openai` provider. */
+  /** Aggregate per-test latency / cost / total tokens ({mean,min,max,count} |
+   * null) across the whole run. Null for eval-only runs or before metrics
+   * land; cost is also null for the `openai` provider. */
   latency_ms?: AggStat;
   cost?: AggStat;
+  total_tokens?: AggStat;
   results_s3_prefix?: string;
   error?: string;
   is_public?: boolean;
@@ -174,6 +176,7 @@ export function TestRunnerDialog({
   // derive those client-side from each case's judge_results (see useMemo below).
   const [latencyAgg, setLatencyAgg] = useState<AggStat>(null);
   const [costAgg, setCostAgg] = useState<AggStat>(null);
+  const [tokensAgg, setTokensAgg] = useState<AggStat>(null);
   // Which tab is showing. Tabs only render once the run is done; we default to
   // the Summary tab on completion (mirrors the benchmark dialog).
   const [activeTab, setActiveTab] = useState<"summary" | "outputs">("outputs");
@@ -190,6 +193,7 @@ export function TestRunnerDialog({
   const resetSummary = () => {
     setLatencyAgg(null);
     setCostAgg(null);
+    setTokensAgg(null);
   };
 
   // Auto-open the first completed test when nothing is selected. Covers both
@@ -358,6 +362,7 @@ export function TestRunnerDialog({
       // null case) so a prior run's numbers can't leak in.
       setLatencyAgg(result.latency_ms ?? null);
       setCostAgg(result.cost ?? null);
+      setTokensAgg(result.total_tokens ?? null);
 
       // Update test results based on polling response
       setTestResults((prev) => {
@@ -1074,6 +1079,7 @@ export function TestRunnerDialog({
                   total={passedTests.length + failedTests.length}
                   latency={latencyAgg}
                   cost={costAgg}
+                  tokens={tokensAgg}
                   evaluatorSummary={evaluatorSummary}
                 />
               </div>
