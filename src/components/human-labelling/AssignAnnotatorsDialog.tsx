@@ -11,6 +11,12 @@ type Annotator = {
   name: string;
 };
 
+type TaskEvaluator = {
+  uuid: string;
+  name: string;
+  description?: string | null;
+};
+
 function parseApiError(err: unknown, fallback: string): string {
   if (!(err instanceof Error)) return fallback;
   const match = err.message.match(/Request failed: \d+ - (.+)$/);
@@ -30,14 +36,24 @@ type AssignAnnotatorsDialogProps = {
   isOpen: boolean;
   accessToken: string;
   selectedItemCount: number;
+  /** Evaluators linked to the task — the pool the job can show in labelling. */
+  evaluators: TaskEvaluator[];
   onClose: () => void;
-  onConfirm: (annotatorIds: string[]) => Promise<void> | void;
+  /**
+   * `evaluatorIds` is `null` to include every task evaluator, or an explicit
+   * subset to show only those evaluators in the created labelling jobs.
+   */
+  onConfirm: (
+    annotatorIds: string[],
+    evaluatorIds: string[] | null,
+  ) => Promise<void> | void;
 };
 
 export function AssignAnnotatorsDialog({
   isOpen,
   accessToken,
   selectedItemCount,
+  evaluators,
   onClose,
   onConfirm,
 }: AssignAnnotatorsDialogProps) {
@@ -48,12 +64,18 @@ export function AssignAnnotatorsDialog({
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [includeAllEvaluators, setIncludeAllEvaluators] = useState(true);
+  const [pickedEvaluators, setPickedEvaluators] = useState<Set<string>>(
+    new Set(),
+  );
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
     setPicked(new Set());
+    setIncludeAllEvaluators(true);
+    setPickedEvaluators(new Set());
     setSubmitError(null);
     let cancelled = false;
     const run = async () => {
@@ -96,12 +118,27 @@ export function AssignAnnotatorsDialog({
     }
   };
 
+  const toggleEvaluator = (id: string) => {
+    setPickedEvaluators((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const evaluatorSelectionValid =
+    includeAllEvaluators || pickedEvaluators.size > 0;
+
   const handleConfirm = async () => {
-    if (picked.size === 0 || submitting) return;
+    if (picked.size === 0 || !evaluatorSelectionValid || submitting) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await onConfirm(Array.from(picked));
+      await onConfirm(
+        Array.from(picked),
+        includeAllEvaluators ? null : Array.from(pickedEvaluators),
+      );
     } catch (err) {
       setSubmitError(parseApiError(err, "Failed to create jobs"));
     } finally {
@@ -240,6 +277,56 @@ export function AssignAnnotatorsDialog({
               ))}
             </>
           )}
+
+          {evaluators.length > 1 && (
+            <div className="pt-3 mt-1 border-t border-border space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                Evaluators shown in labelling
+              </p>
+              <label className="flex items-center gap-3 px-3 py-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={includeAllEvaluators}
+                  onChange={(e) => setIncludeAllEvaluators(e.target.checked)}
+                  className="w-4 h-4 cursor-pointer accent-foreground"
+                />
+                <span className="text-sm font-medium">
+                  Include all evaluators
+                </span>
+              </label>
+              {!includeAllEvaluators && (
+                <div className="space-y-2 pl-1">
+                  <p className="text-xs text-muted-foreground">
+                    Pick one or more evaluators to show in these labelling jobs.
+                  </p>
+                  {evaluators.map((ev) => (
+                    <label
+                      key={ev.uuid}
+                      className="flex items-start gap-3 px-3 py-2 rounded-md border border-border hover:bg-muted/30 transition-colors cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={pickedEvaluators.has(ev.uuid)}
+                        onChange={() => toggleEvaluator(ev.uuid)}
+                        className="mt-0.5 w-4 h-4 cursor-pointer accent-foreground"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium truncate">
+                          {ev.name}
+                        </div>
+                        {ev.description && (
+                          <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                            {ev.description}
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {submitError && <p className="text-sm text-red-500">{submitError}</p>}
         </div>
         <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-3">
@@ -252,7 +339,7 @@ export function AssignAnnotatorsDialog({
           </button>
           <button
             onClick={handleConfirm}
-            disabled={picked.size === 0 || submitting}
+            disabled={picked.size === 0 || !evaluatorSelectionValid || submitting}
             className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? "Assigning..." : "Assign"}

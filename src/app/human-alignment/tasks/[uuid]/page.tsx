@@ -2235,7 +2235,10 @@ function LabellingTaskPageInner() {
     setItemDetailUuid(itemUuid);
   }, []);
 
-  const handleAssignAnnotators = async (annotatorIds: string[]) => {
+  const handleAssignAnnotators = async (
+    annotatorIds: string[],
+    evaluatorIds: string[] | null,
+  ) => {
     if (
       (selectedItemIds.size === 0 && !selectAllTotal) ||
       annotatorIds.length === 0 ||
@@ -2244,6 +2247,7 @@ function LabellingTaskPageInner() {
       return;
     const body: Record<string, unknown> = {
       annotator_ids: annotatorIds,
+      ...(evaluatorIds ? { evaluator_ids: evaluatorIds } : {}),
       ...(selectAllTotal
         ? {
             select_all: true,
@@ -4246,6 +4250,7 @@ function LabellingTaskPageInner() {
           selectedItemCount={
             selectAllTotal ? itemsTotal : selectedItemIds.size
           }
+          evaluators={task?.evaluators ?? []}
           onClose={() => setAssignOpen(false)}
           onConfirm={handleAssignAnnotators}
         />
