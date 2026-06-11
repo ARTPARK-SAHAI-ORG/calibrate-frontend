@@ -194,7 +194,7 @@ export function AssignAnnotatorsDialog({
           <div
             className={
               showEvaluatorChoice
-                ? "grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 md:divide-x md:divide-border"
+                ? "grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4"
                 : ""
             }
           >
@@ -299,7 +299,7 @@ export function AssignAnnotatorsDialog({
             </div>
 
             {showEvaluatorChoice && (
-              <div className="space-y-2 md:pl-8">
+              <div className="space-y-2">
                 <p className="text-xs font-medium text-muted-foreground">
                   Evaluators shown in labelling
                 </p>
