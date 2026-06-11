@@ -133,7 +133,6 @@ export function TestRunSummary({
   return (
     <div className="p-4 md:p-6 space-y-6 overflow-y-auto h-full">
       <div>
-        <h2 className="text-base md:text-lg font-semibold mb-3">Overview</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <MetricCard
             label="Pass rate"
