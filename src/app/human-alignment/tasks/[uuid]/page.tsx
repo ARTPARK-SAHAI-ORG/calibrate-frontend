@@ -2103,6 +2103,7 @@ function LabellingTaskPageInner() {
   const llmGeneralEvaluatorDefs = (task?.evaluators ?? []).map((e) => ({
     uuid: e.uuid,
     name: e.name,
+    description: e.description ?? null,
     variables: e.variables ?? [],
   }));
 

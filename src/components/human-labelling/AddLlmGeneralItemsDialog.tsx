@@ -7,6 +7,7 @@ import { humaniseDetailObject } from "./bulk-upload-shared";
 export type LlmGeneralEvaluatorDef = {
   uuid: string;
   name: string;
+  description?: string | null;
   variables: { name: string; description?: string; default?: string }[];
 };
 
@@ -75,7 +76,6 @@ export function AddLlmGeneralItemsDialog({
   const evaluatorsWithVariables = evaluators.filter(
     (e) => e.variables.length > 0,
   );
-  const hasVariables = evaluatorsWithVariables.length > 0;
 
   // Seed each variable from a provided value (edit / duplicate) or its default.
   const seedVarValues = (provided?: VarValues): VarValues => {
@@ -177,9 +177,6 @@ export function AddLlmGeneralItemsDialog({
     }
   };
 
-  const fieldClasses =
-    "w-full px-3 py-2 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 resize-y";
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
@@ -222,60 +219,84 @@ export function AddLlmGeneralItemsDialog({
 
         {/* Body — two panes: form on the left, input/output on the right. */}
         <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
-          {/* Left: name + evaluator variables */}
-          <div className="w-full md:w-1/2 flex flex-col border-b md:border-b-0 md:border-r border-border overflow-y-auto p-4 md:p-6 space-y-5">
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-foreground">
+          {/* Left: name + evaluators (with variable inputs) — mirrors the
+              AddTestDialog left column. */}
+          <div className="w-full md:w-1/2 flex flex-col border-b md:border-b-0 md:border-r border-border overflow-y-auto p-4 md:p-6 space-y-6">
+            <div>
+              <label className="block text-base font-medium text-foreground mb-2">
                 Name
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Case 1"
+                placeholder="Your item name"
                 disabled={submitting}
-                className="w-full h-9 px-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
+                className="w-full h-11 px-4 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
               />
             </div>
 
-            {hasVariables && (
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-foreground">
-                  Evaluator variables
-                </p>
-                {evaluatorsWithVariables.map((e) => (
-                  <div key={e.uuid} className="space-y-2">
-                    <p className="text-xs font-semibold text-foreground">
-                      {e.name}
-                    </p>
-                    {e.variables.map((v) => (
-                      <div key={v.name} className="space-y-1">
-                        <label className="block text-[11px] font-mono text-muted-foreground">
-                          {`{{${v.name}}}`}
-                          {v.description ? ` — ${v.description}` : ""}
-                        </label>
-                        <textarea
-                          value={varValues[e.uuid]?.[v.name] ?? ""}
-                          onChange={(ev) =>
-                            updateVar(e.uuid, v.name, ev.target.value)
-                          }
-                          placeholder={`Value for ${v.name}`}
-                          disabled={submitting}
-                          rows={2}
-                          className={fieldClasses}
-                        />
+            {evaluators.length > 0 && (
+              <div>
+                <label className="block text-base font-medium text-foreground mb-2">
+                  Evaluators
+                </label>
+                <div className="space-y-4">
+                  {evaluators.map((e) => (
+                    <div
+                      key={e.uuid}
+                      className="border border-border rounded-lg p-4 bg-background"
+                    >
+                      <div className="min-w-0 mb-3">
+                        <div className="text-sm font-semibold text-foreground">
+                          {e.name}
+                        </div>
+                        {e.description && (
+                          <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                            {e.description}
+                          </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                ))}
+                      {e.variables.length > 0 && (
+                        <div className="space-y-3">
+                          {e.variables.map((v) => {
+                            const placeholder =
+                              v.description && v.description.length > 0
+                                ? v.description
+                                : v.default && v.default.length > 0
+                                  ? v.default
+                                  : `Enter value for {{${v.name}}}`;
+                            return (
+                              <div key={v.name}>
+                                <div className="text-xs text-muted-foreground mb-1.5">
+                                  <code className="font-mono">{`{{${v.name}}}`}</code>
+                                </div>
+                                <textarea
+                                  value={varValues[e.uuid]?.[v.name] ?? ""}
+                                  onChange={(ev) =>
+                                    updateVar(e.uuid, v.name, ev.target.value)
+                                  }
+                                  placeholder={placeholder}
+                                  disabled={submitting}
+                                  rows={4}
+                                  className="w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
 
           {/* Right: input + output boxes */}
-          <div className="w-full md:w-1/2 flex flex-col bg-muted/30 overflow-y-auto p-4 md:p-6 space-y-4">
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-foreground">
+          <div className="w-full md:w-1/2 flex flex-col bg-muted/30 overflow-y-auto p-4 md:p-6 space-y-6">
+            <div>
+              <label className="block text-base font-medium text-foreground mb-2">
                 Input
               </label>
               <textarea
@@ -284,11 +305,11 @@ export function AddLlmGeneralItemsDialog({
                 placeholder="The prompt or input given to the LLM"
                 disabled={submitting}
                 rows={8}
-                className={fieldClasses}
+                className="w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-y disabled:opacity-50"
               />
             </div>
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-foreground">
+            <div>
+              <label className="block text-base font-medium text-foreground mb-2">
                 Output
               </label>
               <textarea
@@ -297,7 +318,7 @@ export function AddLlmGeneralItemsDialog({
                 placeholder="The output the LLM produced"
                 disabled={submitting}
                 rows={8}
-                className={fieldClasses}
+                className="w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-y disabled:opacity-50"
               />
             </div>
           </div>
