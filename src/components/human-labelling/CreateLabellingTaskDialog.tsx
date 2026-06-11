@@ -16,34 +16,49 @@ type TaskType = Extract<
   "llm" | "llm-general" | "stt" | "conversation"
 >;
 
+// Ordered + grouped + trimmed for onboarding, mirroring the evaluator
+// use-case picker (UseCasePickerDialog): the most common pick leads with a
+// "Most common" badge, descriptions are one plain line, and `group` drives
+// the section headers. Copy is kept identical to the evaluator picker so the
+// same concept reads the same way in both places.
 const TASK_TYPE_OPTIONS: {
   value: TaskType;
   title: string;
   description: string;
+  group: "text" | "audio";
+  recommended?: boolean;
 }[] = [
   {
-    value: "stt",
-    title: "Speech to Text",
-    description: "Evaluate the transcription quality against a reference text.",
+    value: "llm-general",
+    title: "LLM response",
+    description: "Judge a single AI output — classify, extract, summarise",
+    group: "text",
+    recommended: true,
   },
   {
     value: "llm",
     title: "Conversational reply",
-    description:
-      "Given a conversation history, evaluate the agent's next response.",
-  },
-  {
-    value: "llm-general",
-    title: "LLM response",
-    description:
-      "Evaluate an LLM's output for a single, non-conversational prompt or input.",
+    description: "Judge a chatbot's next reply in a chat",
+    group: "text",
   },
   {
     value: "conversation",
     title: "Full conversation",
-    description:
-      "Evaluate the agent's performance during a complete conversation.",
+    description: "Judge a whole conversation, start to finish",
+    group: "text",
   },
+  {
+    value: "stt",
+    title: "Speech to Text",
+    description: "Judge transcription accuracy against a reference",
+    group: "audio",
+  },
+];
+
+// Section headers shown above each group of task-type cards, in render order.
+const TASK_GROUP_ORDER: { key: "text" | "audio"; label: string }[] = [
+  { key: "text", label: "Text & LLM" },
+  { key: "audio", label: "Audio" },
 ];
 
 // Per-type tints, mirroring EvaluatorTypePill's palette
@@ -270,13 +285,73 @@ export function CreateLabellingTaskDialog({
                 taskType ? "md:max-w-[42rem]" : ""
               }`}
             >
+              {/* Type picker — shown first so the user decides what they're
+                  labelling before naming it. */}
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  What are you labelling?{" "}
+                  <span className="text-red-500">*</span>
+                </label>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Sets the type of item annotators will see. Can&apos;t be
+                  changed after the task is created.
+                </p>
+                <div className="space-y-4">
+                  {TASK_GROUP_ORDER.map(({ key, label }) => {
+                    const groupOptions = TASK_TYPE_OPTIONS.filter(
+                      (o) => o.group === key,
+                    );
+                    if (groupOptions.length === 0) return null;
+                    return (
+                      <div key={key}>
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2 px-0.5">
+                          {label}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {groupOptions.map((opt) => {
+                            const active = taskType === opt.value;
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => setTaskType(opt.value)}
+                                className={`flex flex-col items-start text-left p-3 rounded-md border transition-colors cursor-pointer ${
+                                  active
+                                    ? TASK_TYPE_ACTIVE_CLASSES[opt.value]
+                                    : TASK_TYPE_INACTIVE_CLASSES[opt.value]
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-2 w-full">
+                                  <div
+                                    className={`text-sm font-medium ${TASK_TYPE_TITLE_CLASSES[opt.value]}`}
+                                  >
+                                    {opt.title}
+                                  </div>
+                                  {opt.recommended && (
+                                    <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30">
+                                      Most common
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                                  {opt.description}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Name */}
               <div>
                 <label className="block text-sm font-medium mb-2">
                   Name <span className="text-red-500">*</span>
                 </label>
                 <input
-                  autoFocus
                   value={name}
                   onChange={(e) => {
                     setName(e.target.value);
@@ -306,42 +381,6 @@ export function CreateLabellingTaskDialog({
                   rows={3}
                   className="w-full px-3 py-2 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent resize-y"
                 />
-              </div>
-
-              {/* Type picker */}
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Task type <span className="text-red-500">*</span>
-                </label>
-                <p className="text-xs text-muted-foreground mb-2">
-                  The task type cannot be changed after the task is created
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {TASK_TYPE_OPTIONS.map((opt) => {
-                    const active = taskType === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setTaskType(opt.value)}
-                        className={`flex flex-col items-start text-left p-3 rounded-md border transition-colors cursor-pointer ${
-                          active
-                            ? TASK_TYPE_ACTIVE_CLASSES[opt.value]
-                            : TASK_TYPE_INACTIVE_CLASSES[opt.value]
-                        }`}
-                      >
-                        <div
-                          className={`text-sm font-medium ${TASK_TYPE_TITLE_CLASSES[opt.value]}`}
-                        >
-                          {opt.title}
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                          {opt.description}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
               </div>
             </div>
 
