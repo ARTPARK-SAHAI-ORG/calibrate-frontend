@@ -35,6 +35,10 @@ import { coerceBinaryValue, defaultBinaryLabel } from "@/lib/binaryLabels";
 import { liveVersionOf } from "@/lib/evaluatorVersions";
 import { VersionCard } from "@/components/evaluators/VersionCard";
 import { extractVariableNames } from "@/lib/evaluatorVariables";
+import {
+  isReservedEvaluatorName,
+  reservedEvaluatorNameError,
+} from "@/lib/evaluatorNames";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 
 async function getEvaluatorErrorMessage(
@@ -344,6 +348,10 @@ function EvaluatorDetailPageInner() {
     if (!backendAccessToken || !uuid) return;
     if (!editName.trim()) {
       setEditError("Name is required");
+      return;
+    }
+    if (isReservedEvaluatorName(editName)) {
+      setEditNameError(reservedEvaluatorNameError(editName));
       return;
     }
     try {

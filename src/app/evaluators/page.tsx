@@ -29,6 +29,10 @@ import { defaultBinaryLabel } from "@/lib/binaryLabels";
 import { UseCasePickerDialog } from "@/components/evaluators/UseCasePickerDialog";
 import { Select } from "@/components/ui/Select";
 import { extractVariableNames } from "@/lib/evaluatorVariables";
+import {
+  isReservedEvaluatorName,
+  reservedEvaluatorNameError,
+} from "@/lib/evaluatorNames";
 import { useSidebarState } from "@/lib/sidebar";
 
 type EvaluatorData = {
@@ -537,6 +541,10 @@ function MetricsPageInner() {
   // Create evaluator via POST API
   const createEvaluator = async () => {
     setValidationAttempted(true);
+    if (isReservedEvaluatorName(evaluatorName)) {
+      setCreateNameError(reservedEvaluatorNameError(evaluatorName));
+      return;
+    }
     const scaleValid =
       newEvaluatorOutputType === "binary" ||
       (newEvaluatorScale.length >= 2 &&
@@ -1122,6 +1130,10 @@ function DuplicateEvaluatorDialog({
 
   const handleDuplicate = async () => {
     if (!evaluatorName.trim() || isNameDuplicate(evaluatorName)) return;
+    if (isReservedEvaluatorName(evaluatorName)) {
+      setNameError(reservedEvaluatorNameError(evaluatorName));
+      return;
+    }
 
     try {
       setIsDuplicating(true);
@@ -1223,7 +1235,9 @@ function DuplicateEvaluatorDialog({
               }}
               placeholder="Enter evaluator name"
               className={`w-full h-10 px-3 pr-16 rounded-md text-[13px] border bg-background dark:bg-muted text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
-                (evaluatorName.trim() && isNameDuplicate(evaluatorName)) ||
+                (evaluatorName.trim() &&
+                  (isNameDuplicate(evaluatorName) ||
+                    isReservedEvaluatorName(evaluatorName))) ||
                 nameError
                   ? "border-red-500"
                   : "border-border"
@@ -1241,6 +1255,13 @@ function DuplicateEvaluatorDialog({
               An evaluator with this name already exists
             </p>
           )}
+          {evaluatorName.trim() &&
+            !isNameDuplicate(evaluatorName) &&
+            isReservedEvaluatorName(evaluatorName) && (
+              <p className="text-sm text-red-500 mt-1">
+                {reservedEvaluatorNameError(evaluatorName)}
+              </p>
+            )}
           {nameError && (
             <p className="text-sm text-red-500 mt-1">{nameError}</p>
           )}
@@ -1279,7 +1300,8 @@ function DuplicateEvaluatorDialog({
             disabled={
               !evaluatorName.trim() ||
               isDuplicating ||
-              isNameDuplicate(evaluatorName)
+              isNameDuplicate(evaluatorName) ||
+              isReservedEvaluatorName(evaluatorName)
             }
             className="h-9 px-4 rounded-md text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
