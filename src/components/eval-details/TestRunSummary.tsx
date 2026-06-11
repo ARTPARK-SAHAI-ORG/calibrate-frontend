@@ -59,7 +59,7 @@ const linkIcon = (
 );
 
 // One metric card (matches the SimulationMetricsGrid card style). `subtitle`
-// is the small caption under the headline value (e.g. "12/15").
+// is the small caption shown inline next to the headline value (e.g. "12/15").
 function MetricCard({
   label,
   value,
@@ -72,10 +72,12 @@ function MetricCard({
   return (
     <div className="border border-border rounded-xl p-4 bg-muted/10">
       <div className="text-[12px] text-muted-foreground mb-1">{label}</div>
-      <div className="text-[18px] font-semibold text-foreground">{value}</div>
-      {subtitle && (
-        <div className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</div>
-      )}
+      <div className="flex items-baseline gap-1.5 flex-wrap">
+        <span className="text-[18px] font-semibold text-foreground">{value}</span>
+        {subtitle && (
+          <span className="text-[11px] text-muted-foreground">{subtitle}</span>
+        )}
+      </div>
     </div>
   );
 }
@@ -170,14 +172,16 @@ export function TestRunSummary({
                     )}
                     {uuid && enableEvaluatorLinks && linkIcon}
                   </div>
-                  <div className="text-[18px] font-semibold text-foreground">
-                    {value}
+                  <div className="flex items-baseline gap-1.5 flex-wrap">
+                    <span className="text-[18px] font-semibold text-foreground">
+                      {value}
+                    </span>
+                    {subtitle && (
+                      <span className="text-[11px] text-muted-foreground">
+                        {subtitle}
+                      </span>
+                    )}
                   </div>
-                  {subtitle && (
-                    <div className="text-[11px] text-muted-foreground mt-0.5">
-                      {subtitle}
-                    </div>
-                  )}
                 </>
               );
               if (uuid && enableEvaluatorLinks) {
