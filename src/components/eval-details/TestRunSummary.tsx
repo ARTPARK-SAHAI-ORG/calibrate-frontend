@@ -1,7 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { Tooltip } from "@/components/Tooltip";
-import { formatLatencyMs, formatCostUsd } from "@/lib/llmMetrics";
+import { formatLatencyMs, formatCostUsd, type AggStat } from "@/lib/llmMetrics";
 import {
   benchmarkRatingEvaluatorCaption,
   type BenchmarkEvaluatorSummaryEntry,
@@ -10,16 +10,14 @@ import {
 type TestRunSummaryProps = {
   /** Tests that passed evaluation. */
   passed: number;
-  /** Total tests scored (excludes errored tests when the backend reports them
-   * separately; pass whatever denominator the pass rate is computed against). */
+  /** Total tests scored (excludes errored tests; the pass-rate denominator). */
   total: number;
-  /** Overall pass rate as a percentage (0–100). Falls back to passed/total
-   * when omitted. */
-  passRate?: number | null;
-  /** Average per-test latency in milliseconds. */
-  avgLatencyMs?: number | null;
-  /** Average per-test cost in USD. */
-  avgCost?: number | null;
+  /** Aggregate per-test latency block (`{mean,min,max,count}`). Null for
+   * eval-only runs or before metrics land. */
+  latency?: AggStat;
+  /** Aggregate per-test cost block. Null for eval-only runs and for the
+   * `openai` provider (no cost reported). */
+  cost?: AggStat;
   /** Per-evaluator aggregates (same shape benchmark uses), single model. */
   evaluatorSummary?: BenchmarkEvaluatorSummaryEntry[] | null;
   /** Disable evaluator detail links for public share pages. */
@@ -114,20 +112,23 @@ function evaluatorCardContent(entry: BenchmarkEvaluatorSummaryEntry): {
 export function TestRunSummary({
   passed,
   total,
-  passRate,
-  avgLatencyMs,
-  avgCost,
+  latency,
+  cost,
   evaluatorSummary,
   enableEvaluatorLinks = true,
 }: TestRunSummaryProps) {
-  const rate =
-    typeof passRate === "number" && Number.isFinite(passRate)
-      ? passRate
-      : total > 0
-        ? (passed / total) * 100
-        : null;
+  const rate = total > 0 ? (passed / total) * 100 : null;
 
   const evaluators = evaluatorSummary ?? [];
+
+  // Range subtitle (min–max) for an aggregate, or a "n cases" hint. Only shown
+  // when the block is present; null blocks fall through to a plain "—" value.
+  const latencySubtitle = latency
+    ? `${formatLatencyMs(latency.min)} – ${formatLatencyMs(latency.max)}`
+    : undefined;
+  const costSubtitle = cost
+    ? `${formatCostUsd(cost.min)} – ${formatCostUsd(cost.max)}`
+    : undefined;
 
   return (
     <div className="p-4 md:p-6 space-y-6 overflow-y-auto h-full">
@@ -139,8 +140,16 @@ export function TestRunSummary({
             value={rate !== null ? `${rate.toFixed(1)}%` : "—"}
             subtitle={`${passed}/${total} passed`}
           />
-          <MetricCard label="Avg latency" value={formatLatencyMs(avgLatencyMs)} />
-          <MetricCard label="Avg cost" value={formatCostUsd(avgCost)} />
+          <MetricCard
+            label="Avg latency"
+            value={formatLatencyMs(latency?.mean)}
+            subtitle={latencySubtitle}
+          />
+          <MetricCard
+            label="Avg cost"
+            value={formatCostUsd(cost?.mean)}
+            subtitle={costSubtitle}
+          />
         </div>
       </div>
 

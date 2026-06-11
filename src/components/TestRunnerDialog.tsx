@@ -1,7 +1,7 @@
 "use client";
 import { reportError } from "@/lib/reportError";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import { getDefaultHeaders } from "@/lib/api";
@@ -20,7 +20,8 @@ import { ShareButton } from "@/components/ShareButton";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { TestRunOutputsPanel, TestRunSummary } from "./eval-details";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
-import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSummary";
+import { buildEvaluatorSummaryFromResults } from "@/lib/testRunSummary";
+import type { AggStat } from "@/lib/llmMetrics";
 import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
@@ -79,6 +80,11 @@ type TestCaseResult = {
   /** Per-evaluator verdicts for response tests. Null for tool-call tests
    * and absent for legacy rows. */
   judge_results?: JudgeResult[] | null;
+  /** Per-case agent latency (ms) / cost (USD). Lifted to the top level by the
+   * backend (not inside `output`). Null while the case is running, for
+   * eval-only runs, and — for cost — the `openai` provider. */
+  latency_ms?: number | null;
+  cost?: number | null;
   error?: string;
 };
 
@@ -96,16 +102,11 @@ type TestRunStatusResponse = {
    * for every uuid referenced by judge_results (synthesises stubs for
    * legacy rows). */
   evaluators?: TestRunEvaluator[];
-  /** Aggregate per-evaluator metrics across the run (binary pass rate /
-   * rating mean). Same shape benchmark uses per model. Absent on older runs. */
-  evaluator_summary?: BenchmarkEvaluatorSummaryEntry[] | null;
-  /** Overall pass rate as a percentage (0–100). Optional — the summary falls
-   * back to passed/total_tests when absent. */
-  pass_rate?: number | null;
-  /** Average per-test latency in milliseconds (backend aggregate). */
-  avg_latency_ms?: number | null;
-  /** Average per-test cost in USD (backend aggregate). */
-  avg_cost?: number | null;
+  /** Aggregate per-test latency / cost ({mean,min,max,count} | null) across
+   * the whole run. Null for eval-only runs or before metrics land; cost is
+   * also null for the `openai` provider. */
+  latency_ms?: AggStat;
+  cost?: AggStat;
   results_s3_prefix?: string;
   error?: string;
   is_public?: boolean;
@@ -168,14 +169,11 @@ export function TestRunnerDialog({
   // a uuid-keyed map below and passed into TestRunOutputsPanel as the
   // source of truth for per-evaluator metadata.
   const [runEvaluators, setRunEvaluators] = useState<TestRunEvaluator[]>([]);
-  // Aggregate summary block (per-evaluator metrics + latency/cost) surfaced
-  // on the Summary tab once the run is done.
-  const [evaluatorSummary, setEvaluatorSummary] = useState<
-    BenchmarkEvaluatorSummaryEntry[]
-  >([]);
-  const [summaryPassRate, setSummaryPassRate] = useState<number | null>(null);
-  const [avgLatencyMs, setAvgLatencyMs] = useState<number | null>(null);
-  const [avgCost, setAvgCost] = useState<number | null>(null);
+  // Aggregate latency / cost blocks from the run-status response, surfaced on
+  // the Summary tab. Per-evaluator metrics aren't sent for single runs, so we
+  // derive those client-side from each case's judge_results (see useMemo below).
+  const [latencyAgg, setLatencyAgg] = useState<AggStat>(null);
+  const [costAgg, setCostAgg] = useState<AggStat>(null);
   // Which tab is showing. Tabs only render once the run is done; we default to
   // the Summary tab on completion (mirrors the benchmark dialog).
   const [activeTab, setActiveTab] = useState<"summary" | "outputs">("outputs");
@@ -187,13 +185,11 @@ export function TestRunnerDialog({
   // immediately re-trigger the auto-open, making the list view unreachable.
   const hasAutoSelectedRef = useRef(false);
 
-  // Clear the aggregate summary block so a prior run's numbers can't leak into
+  // Clear the aggregate latency/cost so a prior run's numbers can't leak into
   // a fresh run / past-run view that omits the fields.
   const resetSummary = () => {
-    setEvaluatorSummary([]);
-    setSummaryPassRate(null);
-    setAvgLatencyMs(null);
-    setAvgCost(null);
+    setLatencyAgg(null);
+    setCostAgg(null);
   };
 
   // Auto-open the first completed test when nothing is selected. Covers both
@@ -358,18 +354,10 @@ export function TestRunnerDialog({
       setRunEvaluators(
         Array.isArray(result.evaluators) ? result.evaluators : [],
       );
-      // Sync the aggregate summary block (latency / cost / per-evaluator).
-      // Always set (including the empty case) so a prior run can't leak in.
-      setEvaluatorSummary(
-        Array.isArray(result.evaluator_summary) ? result.evaluator_summary : [],
-      );
-      setSummaryPassRate(
-        typeof result.pass_rate === "number" ? result.pass_rate : null,
-      );
-      setAvgLatencyMs(
-        typeof result.avg_latency_ms === "number" ? result.avg_latency_ms : null,
-      );
-      setAvgCost(typeof result.avg_cost === "number" ? result.avg_cost : null);
+      // Sync the aggregate latency / cost blocks. Always set (including the
+      // null case) so a prior run's numbers can't leak in.
+      setLatencyAgg(result.latency_ms ?? null);
+      setCostAgg(result.cost ?? null);
 
       // Update test results based on polling response
       setTestResults((prev) => {
@@ -918,6 +906,18 @@ export function TestRunnerDialog({
   const runningTests = testResults.filter((r) => r.status === "running");
   const pendingTests = testResults.filter((r) => r.status === "pending");
 
+  // Per-evaluator metrics for the Summary tab. Single test runs don't ship a
+  // backend `evaluator_summary` block (only benchmarks do), so aggregate it
+  // from each case's judge_results against the run's evaluator metadata.
+  const evaluatorSummary = useMemo(
+    () =>
+      buildEvaluatorSummaryFromResults(
+        testResults.map((r) => ({ judge_results: r.judgeResults })),
+        Object.fromEntries(runEvaluators.map((e) => [e.uuid, e])),
+      ),
+    [testResults, runEvaluators],
+  );
+
   // Check if the entire run errored (all tests have errors, none have real results)
   const isOverallError =
     runStatus === "failed" &&
@@ -1072,9 +1072,8 @@ export function TestRunnerDialog({
                 <TestRunSummary
                   passed={passedTests.length}
                   total={passedTests.length + failedTests.length}
-                  passRate={summaryPassRate}
-                  avgLatencyMs={avgLatencyMs}
-                  avgCost={avgCost}
+                  latency={latencyAgg}
+                  cost={costAgg}
                   evaluatorSummary={evaluatorSummary}
                 />
               </div>

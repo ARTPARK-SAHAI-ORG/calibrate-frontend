@@ -14,7 +14,8 @@ import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/Pu
 import { TestRunOutputsPanel, TestRunSummary } from "@/components/eval-details";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
-import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSummary";
+import { buildEvaluatorSummaryFromResults } from "@/lib/testRunSummary";
+import type { AggStat } from "@/lib/llmMetrics";
 
 type TestCaseResult = {
   test_uuid?: string;
@@ -28,6 +29,9 @@ type TestCaseResult = {
   chat_history?: { role: string; content: string }[];
   evaluation?: { passed: boolean; message?: string; details?: Record<string, any> };
   judge_results?: JudgeResult[] | null;
+  /** Per-case agent latency (ms) / cost (USD). */
+  latency_ms?: number | null;
+  cost?: number | null;
   error?: string;
 };
 
@@ -40,11 +44,9 @@ type TestRunStatusResponse = {
   results?: TestCaseResult[];
   /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
   evaluators?: TestRunEvaluator[];
-  /** Aggregate summary block (per-evaluator metrics + latency/cost). */
-  evaluator_summary?: BenchmarkEvaluatorSummaryEntry[] | null;
-  pass_rate?: number | null;
-  avg_latency_ms?: number | null;
-  avg_cost?: number | null;
+  /** Aggregate per-test latency / cost ({mean,min,max,count} | null). */
+  latency_ms?: AggStat;
+  cost?: AggStat;
   error?: string;
 };
 
@@ -154,15 +156,20 @@ export default function PublicTestRunPage() {
           )}
         </div>
 
-        {/* Summary tab */}
+        {/* Summary tab. Single runs don't carry a backend evaluator_summary,
+            so derive per-evaluator metrics from the cases' judge_results. */}
         {activeTab === "summary" && (
           <TestRunSummary
             passed={passed}
             total={passed + failed}
-            passRate={data.pass_rate}
-            avgLatencyMs={data.avg_latency_ms}
-            avgCost={data.avg_cost}
-            evaluatorSummary={data.evaluator_summary}
+            latency={data.latency_ms ?? null}
+            cost={data.cost ?? null}
+            evaluatorSummary={buildEvaluatorSummaryFromResults(
+              results,
+              Object.fromEntries(
+                (data.evaluators ?? []).map((e) => [e.uuid, e]),
+              ),
+            )}
             enableEvaluatorLinks={false}
           />
         )}

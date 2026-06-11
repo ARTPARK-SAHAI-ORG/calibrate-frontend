@@ -45,13 +45,13 @@ export type BenchmarkLeaderboardSummaryRow = {
   passed?: string;
   total?: string;
   pass_rate: string;
-  /** Average per-test latency in milliseconds (backend aggregate). Optional /
-   * absent on older jobs that pre-date latency tracking. May arrive as a
-   * number or a numeric string. */
-  avg_latency_ms?: number | string | null;
-  /** Average per-test cost in USD (backend aggregate). Optional / absent on
-   * older jobs. May arrive as a number or a numeric string. */
-  avg_cost?: number | string | null;
+  /** Mean per-test latency in milliseconds — CSV string (mean only), blank /
+   * null when no case reported one. For the full {mean,min,max,count} use
+   * `model_results[].latency_ms` instead. */
+  latency_ms?: string | null;
+  /** Mean per-test cost in USD — CSV string (mean only), blank / null when no
+   * case reported one (e.g. the `openai` provider). */
+  cost?: string | null;
 };
 
 export type BenchmarkCombinedEvaluatorColumn = {
@@ -244,12 +244,12 @@ export function buildBenchmarkCombinedLeaderboardPayload(
       row.total = lbRow.total;
       const pr = parseFloat(lbRow.pass_rate);
       row.pass_rate = Number.isFinite(pr) ? pr : undefined;
-      const latency = toFiniteNumber(lbRow.avg_latency_ms);
+      const latency = toFiniteNumber(lbRow.latency_ms);
       if (latency !== undefined) {
         row.avg_latency_ms = latency;
         showLatency = true;
       }
-      const cost = toFiniteNumber(lbRow.avg_cost);
+      const cost = toFiniteNumber(lbRow.cost);
       if (cost !== undefined) {
         row.avg_cost = cost;
         showCost = true;

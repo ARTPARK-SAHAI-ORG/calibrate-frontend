@@ -5,6 +5,21 @@
  */
 
 /**
+ * Aggregate latency / cost block returned by the backend (same shape for
+ * test-runs and per-model benchmarks). `count` is how many cases actually
+ * reported a value — it can be lower than the total test count (a "partial
+ * data" hint) and is never zero-filled. The whole block is `null` for
+ * eval-only runs or before `metrics.json` lands; cost is also `null` for the
+ * `openai` provider. Always null-check.
+ */
+export type AggStat = {
+  mean: number;
+  min: number;
+  max: number;
+  count: number;
+} | null;
+
+/**
  * Format an average latency in milliseconds. Sub-second values render as
  * whole milliseconds (`850 ms`); anything ≥ 1s renders as seconds with two
  * decimals (`1.23 s`). Returns an em dash for missing / non-finite input so

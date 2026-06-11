@@ -15,6 +15,7 @@ import {
 import { SearchInput } from "@/components/ui/SearchInput";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
 import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSummary";
+import type { AggStat } from "@/lib/llmMetrics";
 
 export type BenchmarkTestResult = {
   name?: string;
@@ -28,6 +29,10 @@ export type BenchmarkTestResult = {
    * tool-call tests; legacy rows omit the field and fall back to the
    * legacy single-reasoning UI. */
   judge_results?: JudgeResult[] | null;
+  /** Per-case agent latency (ms) / cost (USD). Null while running, for
+   * eval-only runs, and — for cost — the `openai` provider. */
+  latency_ms?: number | null;
+  cost?: number | null;
 };
 
 export type BenchmarkModelResult = {
@@ -40,6 +45,11 @@ export type BenchmarkModelResult = {
   test_results: BenchmarkTestResult[] | null;
   /** Aggregate per evaluator from metrics.json criteria (finished models). Optional / null on older jobs. */
   evaluator_summary?: BenchmarkEvaluatorSummaryEntry[] | null;
+  /** This model's aggregate latency / cost ({mean,min,max,count} | null). For
+   * the leaderboard table we use `leaderboard_summary` (mean strings) instead;
+   * use these blocks when the full min/max/count is needed. */
+  latency_ms?: AggStat;
+  cost?: AggStat;
 };
 
 type BenchmarkOutputsPanelProps = {
