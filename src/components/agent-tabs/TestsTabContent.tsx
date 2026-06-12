@@ -230,6 +230,11 @@ export function TestsTabContent({
   // UI state
   const [showTestDropdown, setShowTestDropdown] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  // Filter the attach-existing dropdown by test type (mirrors the agent tests
+  // table's `typeFilter`). Reset to "all" whenever the dropdown closes.
+  const [dropdownTypeFilter, setDropdownTypeFilter] = useState<
+    "all" | "response" | "tool_call" | "conversation"
+  >("all");
   // Attach-existing dropdown multi-select. Holds the uuids ticked in the
   // dropdown (distinct from `selectedTestUuids`, which drives the agent
   // tests table's bulk actions). Cleared whenever the dropdown closes.
@@ -479,6 +484,7 @@ export function TestsTabContent({
       ) {
         setShowTestDropdown(false);
         setSearchQuery("");
+        setDropdownTypeFilter("all");
         setSelectedAvailableUuids(new Set());
       }
     };
@@ -663,13 +669,19 @@ export function TestsTabContent({
     (test) => !agentTestUuids.has(test.uuid),
   );
 
-  // Filter available tests based on search query
-  const filteredAvailableTests = availableTests.filter(
-    (test) =>
-      test.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (test.description &&
-        test.description.toLowerCase().includes(searchQuery.toLowerCase())),
-  );
+  // Filter available tests by type AND search query. Both apply together (AND),
+  // so the select-all checkbox — which keys off `filteredAvailableTests` — only
+  // picks rows matching the active type filter and query.
+  const filteredAvailableTests = availableTests.filter((test) => {
+    if (dropdownTypeFilter !== "all" && test.type !== dropdownTypeFilter)
+      return false;
+    const q = searchQuery.toLowerCase();
+    if (!q) return true;
+    return (
+      test.name.toLowerCase().includes(q) ||
+      (test.description ? test.description.toLowerCase().includes(q) : false)
+    );
+  });
 
   // True when every currently-visible (filtered) dropdown row is selected;
   // drives the select-all header's checked state.
@@ -762,6 +774,7 @@ export function TestsTabContent({
       // top/bottom placement.
       setShowTestDropdown(false);
       setSearchQuery("");
+      setDropdownTypeFilter("all");
       setSelectedAvailableUuids(new Set());
       await fetchAgentTests();
     } catch (err) {
@@ -1398,6 +1411,45 @@ export function TestsTabContent({
                 className="w-full h-9 pl-9 pr-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                 autoFocus
               />
+            </div>
+            {/* Type filter — narrows the list (and select-all) to one test
+                type. Changing it drops selections that no longer match so the
+                "Add N tests" count stays in step with what's visible. */}
+            <div className="mt-2 flex items-center gap-0.5 rounded-full bg-muted/60 p-0.5">
+              {(
+                [
+                  { value: "all", label: "All" },
+                  { value: "response", label: "Next Reply" },
+                  { value: "tool_call", label: "Tool Call" },
+                  { value: "conversation", label: "Conversation" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    setDropdownTypeFilter(opt.value);
+                    setSelectedAvailableUuids((prev) => {
+                      if (prev.size === 0) return prev;
+                      const next = new Set<string>();
+                      for (const t of availableTests) {
+                        if (!prev.has(t.uuid)) continue;
+                        if (opt.value !== "all" && t.type !== opt.value)
+                          continue;
+                        next.add(t.uuid);
+                      }
+                      return next;
+                    });
+                  }}
+                  className={`flex-1 h-6 px-1.5 rounded-full text-[11px] font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                    dropdownTypeFilter === opt.value
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
           </div>
           {/* Select-all header — scoped to the filtered list so a search
