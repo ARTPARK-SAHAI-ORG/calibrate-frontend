@@ -133,7 +133,7 @@ export function TTSResultsTable({ results, showMetrics = true, judgeLabel = "Eva
                   <td className="px-4 py-3 text-[13px] text-foreground">{index + 1}</td>
                   <td className="px-4 py-3 text-[13px] text-foreground break-words">{result.text}</td>
                   <td className="px-4 py-3 text-[13px] text-foreground">
-                    <audio controls className="w-full" src={result.audio_path}>
+                    <audio controls preload="none" className="w-full" src={result.audio_path}>
                       Your browser does not support the audio element.
                     </audio>
                   </td>
@@ -194,7 +194,7 @@ export function TTSResultsTable({ results, showMetrics = true, judgeLabel = "Eva
               </div>
               <div>
                 <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Audio</span>
-                <audio controls className="w-full mt-1" src={result.audio_path}>
+                <audio controls preload="none" className="w-full mt-1" src={result.audio_path}>
                   Your browser does not support the audio element.
                 </audio>
               </div>
