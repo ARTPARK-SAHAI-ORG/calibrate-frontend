@@ -13,6 +13,7 @@ import JSZip from "jszip";
 import { LIMITS, showLimitToast } from "@/constants/limits";
 import { DeleteConfirmationDialog } from "../DeleteConfirmationDialog";
 import { RowIndexBadge } from "./RowIndexBadge";
+import { LazyAudioPlayer } from "./LazyAudioPlayer";
 import type { DatasetItem } from "@/lib/datasets";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -570,7 +571,7 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
 
             const isPlayableUrl = item.audio_path?.startsWith("http");
             const audioEl = isPlayableUrl ? (
-              <audio src={item.audio_path!} controls preload="none" className="h-8 w-96" style={{ minWidth: "250px" }} />
+              <LazyAudioPlayer src={item.audio_path!} className="w-96" />
             ) : (
               <div className="h-8 px-3 rounded text-[12px] font-medium border border-border bg-background flex items-center gap-1.5 text-muted-foreground min-w-[140px]">
                 <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -631,7 +632,7 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
                     {deleteBtn}
                   </div>
                   {isPlayableUrl ? (
-                    <audio src={item.audio_path!} controls preload="none" className="w-full h-8" />
+                    <LazyAudioPlayer src={item.audio_path!} className="w-full" />
                   ) : (
                     <div className="h-8 px-3 rounded text-[12px] font-medium border border-border bg-background flex items-center gap-1.5 text-muted-foreground w-full">
                       <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -750,7 +751,7 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
                   <div className="flex-shrink-0 flex items-center gap-2">
                     {isUploaded && row.audioUrl ? (
                       <div className="flex items-center gap-2">
-                        <audio src={row.audioUrl} controls preload="none" className="h-8 w-96" style={{ minWidth: "250px" }} />
+                        <LazyAudioPlayer src={row.audioUrl} className="w-96" />
                         {replaceButton}
                       </div>
                     ) : (
@@ -775,7 +776,7 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
                   <div>
                     {isUploaded && row.audioUrl ? (
                       <div className="space-y-1.5">
-                        <audio src={row.audioUrl} controls preload="none" className="w-full h-8" />
+                        <LazyAudioPlayer src={row.audioUrl} className="w-full" />
                         {replaceButton}
                       </div>
                     ) : (
