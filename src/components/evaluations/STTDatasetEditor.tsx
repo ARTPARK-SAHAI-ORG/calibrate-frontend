@@ -607,7 +607,7 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
               >
                 {/* Desktop */}
                 <div className="hidden md:flex items-center gap-2">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[11px] font-medium text-muted-foreground">
+                  <div className="flex-shrink-0 min-w-6 h-6 px-1.5 rounded-full bg-muted flex items-center justify-center text-[11px] font-medium text-muted-foreground">
                     {index + 1}
                   </div>
                   <div className="flex-shrink-0">{audioEl}</div>
@@ -617,7 +617,7 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
                 {/* Mobile */}
                 <div className="md:hidden space-y-2">
                   <div className="flex items-center justify-between">
-                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[11px] font-medium text-muted-foreground">
+                    <div className="flex-shrink-0 min-w-6 h-6 px-1.5 rounded-full bg-muted flex items-center justify-center text-[11px] font-medium text-muted-foreground">
                       {index + 1}
                     </div>
                     {deleteBtn}
@@ -659,7 +659,7 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
             const triggerFileInput = () => fileInputRefs.current[row.id]?.click();
 
             const rowBadge = (
-              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[11px] font-medium text-muted-foreground">
+              <div className="flex-shrink-0 min-w-6 h-6 px-1.5 rounded-full bg-muted flex items-center justify-center text-[11px] font-medium text-muted-foreground">
                 {rowNumber}
               </div>
             );
