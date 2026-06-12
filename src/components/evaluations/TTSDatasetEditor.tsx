@@ -10,6 +10,7 @@ import {
 import { toast } from "sonner";
 import { LIMITS, showLimitToast } from "@/constants/limits";
 import { DeleteConfirmationDialog } from "../DeleteConfirmationDialog";
+import { RowIndexBadge } from "./RowIndexBadge";
 import type { DatasetItem } from "@/lib/datasets";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -254,9 +255,7 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
                 key={item.uuid}
                 className="flex items-center gap-3 px-4 py-3 border-b border-border"
               >
-                <div className="flex-shrink-0 min-w-6 h-6 px-1.5 rounded-full bg-muted flex items-center justify-center text-[11px] font-medium text-muted-foreground">
-                  {index + 1}
-                </div>
+                <RowIndexBadge value={index + 1} />
                 <input
                   type="text"
                   value={currentText}
@@ -300,9 +299,7 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
                   isInvalid ? "bg-red-500/5" : ""
                 }`}
               >
-                <div className="flex-shrink-0 min-w-6 h-6 px-1.5 rounded-full bg-muted flex items-center justify-center text-[11px] font-medium text-muted-foreground">
-                  {globalIndex + 1}
-                </div>
+                <RowIndexBadge value={globalIndex + 1} />
                 <input
                   type="text"
                   value={row.text}
