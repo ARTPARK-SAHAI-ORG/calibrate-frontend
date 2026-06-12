@@ -209,7 +209,11 @@ export function TestRunSummary({
   return (
     <div className="p-4 md:p-6 space-y-6 overflow-y-auto h-full">
       <div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div
+          className={`grid grid-cols-2 gap-4 ${
+            toolCallRate !== null ? "md:grid-cols-5" : "md:grid-cols-4"
+          }`}
+        >
           <MetricCard
             label="Pass rate"
             value={formatPercent(rate)}
@@ -222,7 +226,7 @@ export function TestRunSummary({
               value={formatPercent(toolCallRate)}
               subtitle={`${toolCall.passed}/${toolCall.total}`}
               progress={toolCallRate}
-              info="Pass rate across tool-call tests only (a subset of the overall pass rate)"
+              info="Pass rate across tool-call tests only"
             />
           )}
           <MetricCard
