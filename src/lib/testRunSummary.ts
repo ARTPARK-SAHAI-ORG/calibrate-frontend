@@ -11,6 +11,41 @@ import type { BenchmarkEvaluatorSummaryEntry } from "./benchmarkEvaluatorSummary
 
 type ResultLike = { judge_results?: JudgeResult[] | null };
 
+/** One test row reduced to the flags the tool-call pass rate cares about. */
+type ToolCallStatusLike = {
+  /** Whether this is a tool-call test. */
+  toolCall: boolean;
+  /** Scored as passed. */
+  passed: boolean;
+  /** Scored as failed (errored rows must be `false`). */
+  failed: boolean;
+};
+
+/**
+ * Pass/total over the tool-call subset of a single run's results. Total counts
+ * only scored tool-call tests (passed or failed, errored/running excluded), so
+ * it matches the overall pass-rate denominator. Callers pre-reduce each result
+ * to {@link ToolCallStatusLike} since the dialog and the public page carry
+ * different result shapes.
+ */
+export function toolCallPassFail(rows: ToolCallStatusLike[]): {
+  passed: number;
+  total: number;
+} {
+  let passed = 0;
+  let total = 0;
+  for (const r of rows) {
+    if (!r.toolCall) continue;
+    if (r.passed) {
+      passed++;
+      total++;
+    } else if (r.failed) {
+      total++;
+    }
+  }
+  return { passed, total };
+}
+
 /**
  * Group every row's `judge_results` by evaluator and produce one aggregate
  * entry per evaluator (first-seen order). Binary evaluators count `match`

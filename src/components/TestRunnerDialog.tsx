@@ -26,7 +26,10 @@ import {
 import { useLabellingSelection } from "@/components/human-labelling/useLabellingSelection";
 import { TestRunOutputsPanel, TestRunSummary } from "./eval-details";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
-import { buildEvaluatorSummaryFromResults } from "@/lib/testRunSummary";
+import {
+  buildEvaluatorSummaryFromResults,
+  toolCallPassFail,
+} from "@/lib/testRunSummary";
 import type { AggStat } from "@/lib/llmMetrics";
 import {
   fetchDefaultLLMNextReplyEvaluator,
@@ -923,19 +926,16 @@ export function TestRunnerDialog({
   const failedTests = testResults.filter(
     (r) => r.status === "failed" && !r.error,
   );
-  // Tool-call pass/fail split for the Summary tab's dedicated card. Scored
-  // tool-call tests only (errored ones excluded, matching the overall rate).
-  // Keyed off the test case's evaluation type, not `r.test.type` — the latter
-  // is hardcoded to "response" when results are rebuilt from a viewed past run.
-  const toolCallResults = testResults.filter(
-    (r) => r.testCase?.evaluation?.type === "tool_call",
+  // Tool-call pass/fail split for the Summary tab's dedicated card. Keyed off
+  // the test case's evaluation type, not `r.test.type` — the latter is
+  // hardcoded to "response" when results are rebuilt from a viewed past run.
+  const toolCall = toolCallPassFail(
+    testResults.map((r) => ({
+      toolCall: r.testCase?.evaluation?.type === "tool_call",
+      passed: r.status === "passed",
+      failed: r.status === "failed" && !r.error,
+    })),
   );
-  const toolCallPassed = toolCallResults.filter(
-    (r) => r.status === "passed",
-  ).length;
-  const toolCallScored =
-    toolCallPassed +
-    toolCallResults.filter((r) => r.status === "failed" && !r.error).length;
   const hasLabellingEligibleTests = testResults.some((r) =>
     isLabellingEligibleRaw({ test_case: r.testCase ?? null }),
   );
@@ -1152,7 +1152,7 @@ export function TestRunnerDialog({
                   latency={latencyAgg}
                   cost={costAgg}
                   tokens={tokensAgg}
-                  toolCall={{ passed: toolCallPassed, total: toolCallScored }}
+                  toolCall={toolCall}
                   evaluatorSummary={evaluatorSummary}
                 />
               </div>

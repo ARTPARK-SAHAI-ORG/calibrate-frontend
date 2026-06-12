@@ -314,8 +314,6 @@ export function buildBenchmarkCombinedLeaderboardPayload(
       const tc = benchmarkToolCallPassFail(mr);
       if (tc.total > 0) {
         row.tool_call_pass_rate = (tc.passed / tc.total) * 100;
-        row.tool_call_passed = String(tc.passed);
-        row.tool_call_total = String(tc.total);
         showToolCallPassRate = true;
       }
     }
