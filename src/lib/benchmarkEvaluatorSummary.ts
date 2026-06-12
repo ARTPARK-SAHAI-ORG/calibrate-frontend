@@ -43,10 +43,42 @@ export type BenchmarkEvaluatorSummaryEntry =
   | BenchmarkEvaluatorSummaryBinary
   | BenchmarkEvaluatorSummaryRating;
 
+/** Minimal per-test shape needed to derive the tool-call pass-rate split. */
+export type BenchmarkToolCallTestLike = {
+  passed?: boolean | null;
+  error?: string;
+  test_case?: { evaluation?: { type?: string } | null } | null;
+};
+
 export type BenchmarkModelLike = {
   model: string;
   evaluator_summary?: BenchmarkEvaluatorSummaryEntry[] | null;
+  /** Per-test results, used to derive the tool-call pass-rate column/chart.
+   * Optional — older callers / payloads may omit it. */
+  test_results?: BenchmarkToolCallTestLike[] | null;
 };
+
+/**
+ * Pass/total for the tool-call subset of a model's tests. A test counts toward
+ * the total only when it's a tool-call test that finished scoring (not errored,
+ * not still running). Returns `{passed: 0, total: 0}` when the model has no
+ * tool-call tests or no `test_results`.
+ */
+export function benchmarkToolCallPassFail(model: BenchmarkModelLike): {
+  passed: number;
+  total: number;
+} {
+  let passed = 0;
+  let total = 0;
+  for (const tr of model.test_results ?? []) {
+    if (tr.test_case?.evaluation?.type !== "tool_call") continue;
+    if (tr.error) continue;
+    if (tr.passed === null || tr.passed === undefined) continue;
+    total++;
+    if (tr.passed) passed++;
+  }
+  return { passed, total };
+}
 
 export type BenchmarkLeaderboardSummaryRow = {
   model: string;
@@ -81,6 +113,8 @@ export type BenchmarkCombinedLeaderboardPayload = {
   plan: {
     showPassedTotal: boolean;
     showOverallPassRate: boolean;
+    /** True when at least one model has scored tool-call tests. */
+    showToolCallPassRate: boolean;
     /** True when at least one model reported an average latency. */
     showLatency: boolean;
     /** True when at least one model reported an average cost. */
@@ -241,6 +275,7 @@ export function buildBenchmarkCombinedLeaderboardPayload(
 
   const modelsOrdered = orderedCanonicalModels(leaderboardSummary, modelResults);
   const rows: Record<string, unknown>[] = [];
+  let showToolCallPassRate = false;
   let showLatency = false;
   let showCost = false;
   let showTokens = false;
@@ -275,6 +310,16 @@ export function buildBenchmarkCombinedLeaderboardPayload(
       }
     }
 
+    if (mr) {
+      const tc = benchmarkToolCallPassFail(mr);
+      if (tc.total > 0) {
+        row.tool_call_pass_rate = (tc.passed / tc.total) * 100;
+        row.tool_call_passed = String(tc.passed);
+        row.tool_call_total = String(tc.total);
+        showToolCallPassRate = true;
+      }
+    }
+
     for (const ev of evaluators) {
       const entry = (mr?.evaluator_summary ?? []).find(
         (e) => e.metric_key === ev.metric_key,
@@ -297,6 +342,15 @@ export function buildBenchmarkCombinedLeaderboardPayload(
     allCharts.push({
       title: benchmarkScoreLabel,
       dataKey: "pass_rate",
+      yDomain: [0, 100],
+      formatTooltip: (v) => formatPercent(v),
+    });
+  }
+
+  if (showToolCallPassRate) {
+    allCharts.push({
+      title: "Tool-call pass rate (%)",
+      dataKey: "tool_call_pass_rate",
       yDomain: [0, 100],
       formatTooltip: (v) => formatPercent(v),
     });
@@ -362,6 +416,7 @@ export function buildBenchmarkCombinedLeaderboardPayload(
     plan: {
       showPassedTotal,
       showOverallPassRate,
+      showToolCallPassRate,
       showLatency,
       showCost,
       showTokens,

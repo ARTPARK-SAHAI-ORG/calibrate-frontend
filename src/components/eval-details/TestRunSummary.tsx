@@ -28,6 +28,10 @@ type TestRunSummaryProps = {
   cost?: AggStat;
   /** Aggregate per-test total-token block. Null for eval-only runs. */
   tokens?: AggStat;
+  /** Pass/total restricted to tool-call tests. When present with a non-zero
+   * total, a dedicated "Tool calls" pass-rate card is shown alongside the
+   * overall pass rate so tool-call results aren't hidden inside the total. */
+  toolCall?: { passed: number; total: number };
   /** Per-evaluator aggregates (same shape benchmark uses), single model. */
   evaluatorSummary?: BenchmarkEvaluatorSummaryEntry[] | null;
   /** Disable evaluator detail links for public share pages. */
@@ -174,10 +178,15 @@ export function TestRunSummary({
   latency,
   cost,
   tokens,
+  toolCall,
   evaluatorSummary,
   enableEvaluatorLinks = true,
 }: TestRunSummaryProps) {
   const rate = total > 0 ? (passed / total) * 100 : null;
+  const toolCallRate =
+    toolCall && toolCall.total > 0
+      ? (toolCall.passed / toolCall.total) * 100
+      : null;
 
   const evaluators = evaluatorSummary ?? [];
 
@@ -207,6 +216,15 @@ export function TestRunSummary({
             subtitle={`${passed}/${total}`}
             progress={rate ?? undefined}
           />
+          {toolCallRate !== null && toolCall && (
+            <MetricCard
+              label="Tool calls"
+              value={formatPercent(toolCallRate)}
+              subtitle={`${toolCall.passed}/${toolCall.total}`}
+              progress={toolCallRate}
+              info="Pass rate across tool-call tests only (a subset of the overall pass rate)"
+            />
+          )}
           <MetricCard
             label={METRIC_LABELS.latency}
             value={formatLatencyMs(latency?.mean)}

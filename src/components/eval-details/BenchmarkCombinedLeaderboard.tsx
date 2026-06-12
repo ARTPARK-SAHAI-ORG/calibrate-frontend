@@ -58,6 +58,19 @@ function columnsFromPayload(
     });
   }
 
+  if (payload.plan.showToolCallPassRate) {
+    cols.push({
+      key: "tool_call_pass_rate",
+      header: "Tool-call pass rate (%)",
+      render: (v) =>
+        typeof v === "number" && Number.isFinite(v) ? (
+          formatPercent(v)
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    });
+  }
+
   if (payload.plan.showLatency) {
     cols.push({
       key: "avg_latency_ms",

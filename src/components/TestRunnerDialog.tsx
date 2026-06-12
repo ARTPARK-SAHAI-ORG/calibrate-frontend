@@ -923,6 +923,17 @@ export function TestRunnerDialog({
   const failedTests = testResults.filter(
     (r) => r.status === "failed" && !r.error,
   );
+  // Tool-call pass/fail split for the Summary tab's dedicated card. Scored
+  // tool-call tests only (errored ones excluded, matching the overall rate).
+  const toolCallResults = testResults.filter(
+    (r) => r.test.type === "tool_call",
+  );
+  const toolCallPassed = toolCallResults.filter(
+    (r) => r.status === "passed",
+  ).length;
+  const toolCallScored =
+    toolCallPassed +
+    toolCallResults.filter((r) => r.status === "failed" && !r.error).length;
   const hasLabellingEligibleTests = testResults.some((r) =>
     isLabellingEligibleRaw({ test_case: r.testCase ?? null }),
   );
@@ -1139,6 +1150,7 @@ export function TestRunnerDialog({
                   latency={latencyAgg}
                   cost={costAgg}
                   tokens={tokensAgg}
+                  toolCall={{ passed: toolCallPassed, total: toolCallScored }}
                   evaluatorSummary={evaluatorSummary}
                 />
               </div>
