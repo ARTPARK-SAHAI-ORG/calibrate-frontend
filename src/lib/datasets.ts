@@ -77,16 +77,35 @@ export function deleteDataset(
 export type NewSTTItem = { audio_path: string; text: string };
 export type NewTTSItem = { text: string };
 
-export function addDatasetItems(
+// The backend rejects POST /{dataset_id}/items requests with more than this
+// many items (datasets.py). There is no cap on total items per dataset, so we
+// split large saves into sequential batches (sequential preserves row order).
+export const MAX_ITEMS_PER_REQUEST = 1000;
+
+export async function addDatasetItems(
   accessToken: string,
   datasetId: string,
   items: NewSTTItem[] | NewTTSItem[]
 ): Promise<DatasetItem[]> {
-  return apiPost<DatasetItem[]>(
-    `/datasets/${datasetId}/items`,
-    accessToken,
-    items
-  );
+  if (items.length <= MAX_ITEMS_PER_REQUEST) {
+    return apiPost<DatasetItem[]>(
+      `/datasets/${datasetId}/items`,
+      accessToken,
+      items
+    );
+  }
+
+  const created: DatasetItem[] = [];
+  for (let i = 0; i < items.length; i += MAX_ITEMS_PER_REQUEST) {
+    const batch = items.slice(i, i + MAX_ITEMS_PER_REQUEST);
+    const result = await apiPost<DatasetItem[]>(
+      `/datasets/${datasetId}/items`,
+      accessToken,
+      batch
+    );
+    created.push(...result);
+  }
+  return created;
 }
 
 // Update a single item's text
