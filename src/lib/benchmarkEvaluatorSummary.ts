@@ -345,15 +345,6 @@ export function buildBenchmarkCombinedLeaderboardPayload(
     });
   }
 
-  if (showToolCallPassRate) {
-    allCharts.push({
-      title: "Tool-call pass rate (%)",
-      dataKey: "tool_call_pass_rate",
-      yDomain: [0, 100],
-      formatTooltip: (v) => formatPercent(v),
-    });
-  }
-
   if (showLatency) {
     allCharts.push({
       title: `${METRIC_LABELS.latency} (s)`,
@@ -376,6 +367,17 @@ export function buildBenchmarkCombinedLeaderboardPayload(
       title: METRIC_LABELS.tokens,
       dataKey: "avg_tokens",
       formatTooltip: (v) => formatTokens(v),
+    });
+  }
+
+  // Tool-call pass rate sits after the cost/token metrics, just before the
+  // per-evaluator charts (mirrors the leaderboard column order).
+  if (showToolCallPassRate) {
+    allCharts.push({
+      title: "Tool-call pass rate (%)",
+      dataKey: "tool_call_pass_rate",
+      yDomain: [0, 100],
+      formatTooltip: (v) => formatPercent(v),
     });
   }
 
