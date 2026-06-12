@@ -1081,8 +1081,10 @@ export function TestDetailView({
         </div>
       )}
 
-      {/* Output Section - Agent's Response/Tool Call */}
-      {output && (
+      {/* Output Section - Agent's Response/Tool Call. Hidden in JSON mode
+          since the JSON view already includes the evaluated agent response
+          as the final turn. */}
+      {output && historyView !== "json" && (
         <div className="space-y-4">
           {/* Text Response */}
           {output.response && (
