@@ -74,18 +74,20 @@ export function LazyAudioPlayer({
     }
   };
 
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const seekToRatio = (clientX: number, track: HTMLDivElement) => {
+    if (!duration) return;
+    const rect = track.getBoundingClientRect();
+    const ratio = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
     const el = ensureAudio();
-    const t = Number(e.target.value);
-    el.currentTime = t;
-    setCurrentTime(t);
+    el.currentTime = ratio * duration;
+    setCurrentTime(el.currentTime);
   };
 
-  const progressMax = duration || 0;
+  const progress = duration ? Math.min(currentTime / duration, 1) * 100 : 0;
 
   return (
     <div
-      className={`flex items-center gap-2 h-8 px-2 rounded-full bg-muted ${className}`}
+      className={`inline-flex items-center gap-2.5 h-8 pl-2 pr-3 rounded-full bg-muted ${className}`}
     >
       <button
         type="button"
@@ -104,20 +106,31 @@ export function LazyAudioPlayer({
           </svg>
         )}
       </button>
-      <span className="flex-shrink-0 text-[11px] tabular-nums text-muted-foreground">
+
+      <div
+        role="slider"
+        aria-label="Seek"
+        aria-valuemin={0}
+        aria-valuemax={Math.round(duration)}
+        aria-valuenow={Math.round(currentTime)}
+        onClick={(e) => seekToRatio(e.clientX, e.currentTarget)}
+        className="group relative flex-1 h-3 flex items-center cursor-pointer"
+      >
+        <div className="h-1 w-full rounded-full bg-foreground/15">
+          <div
+            className="h-full rounded-full bg-foreground/70"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <div
+          className="absolute w-2.5 h-2.5 rounded-full bg-foreground shadow-sm opacity-0 group-hover:opacity-100 transition-opacity -translate-x-1/2"
+          style={{ left: `${progress}%` }}
+        />
+      </div>
+
+      <span className="flex-shrink-0 text-[11px] tabular-nums text-muted-foreground w-[68px] text-right">
         {formatTime(currentTime)} / {formatTime(duration)}
       </span>
-      <input
-        type="range"
-        min={0}
-        max={progressMax}
-        step={0.01}
-        value={Math.min(currentTime, progressMax)}
-        onChange={handleSeek}
-        disabled={progressMax === 0}
-        aria-label="Seek"
-        className="flex-1 h-1 cursor-pointer accent-foreground disabled:cursor-not-allowed"
-      />
     </div>
   );
 }
