@@ -927,14 +927,44 @@ export function TestDetailView({
   const [historyView, setHistoryView] = useState<"ui" | "json">("ui");
   const historyJson = useMemo(() => {
     // Mirror what the UI shows: the prior turns (`history`) followed by the
-    // agent's evaluated response (`output`) appended as the final assistant
-    // turn, so the JSON is the full conversation, not just the prefix.
+    // agent's evaluated response (`output`) appended as the final turn(s),
+    // so the JSON is the full conversation, not just the prefix.
     const turns: Array<Record<string, unknown>> = [...history];
     if (output?.response) {
       turns.push({ role: "assistant", content: output.response });
     }
     if (output?.tool_calls && output.tool_calls.length > 0) {
-      turns.push({ role: "assistant", tool_calls: output.tool_calls });
+      // Normalize the output's tool calls into the same shape used by
+      // `history` (nested `function.name`, JSON-stringified `arguments`,
+      // synthetic `id`/`type`) so the whole array is one consistent schema.
+      // A tool's execution result, when present, is emitted as a separate
+      // `role: "tool"` turn keyed by the same id — exactly as history does.
+      output.tool_calls.forEach((tc, i) => {
+        const id = `output-tool-call-${i}`;
+        turns.push({
+          role: "assistant",
+          tool_calls: [
+            {
+              id,
+              type: "function",
+              function: {
+                name: tc.tool,
+                arguments: JSON.stringify(tc.arguments ?? {}),
+              },
+            },
+          ],
+        });
+        if (tc.output !== undefined && tc.output !== null) {
+          turns.push({
+            role: "tool",
+            tool_call_id: id,
+            content:
+              typeof tc.output === "string"
+                ? tc.output
+                : JSON.stringify(tc.output),
+          });
+        }
+      });
     }
     return JSON.stringify(turns, null, 2);
   }, [history, output]);
