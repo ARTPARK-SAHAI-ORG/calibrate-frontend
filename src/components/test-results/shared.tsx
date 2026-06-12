@@ -769,6 +769,88 @@ export function formatTurnTimestamp(raw: unknown): string | null {
 }
 
 // Shared Test Detail View Component
+// Small segmented control to switch the conversation history between the
+// rendered chat UI and a raw, copyable JSON view. View-only — neither mode
+// edits the underlying data.
+function ConversationViewToggle({
+  view,
+  onChange,
+}: {
+  view: "ui" | "json";
+  onChange: (view: "ui" | "json") => void;
+}) {
+  return (
+    <div className="inline-flex items-center rounded-md border border-border bg-muted/40 p-0.5">
+      {(["ui", "json"] as const).map((option) => (
+        <button
+          key={option}
+          type="button"
+          onClick={() => onChange(option)}
+          className={`px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide rounded cursor-pointer transition-colors ${
+            view === option
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+          aria-pressed={view === option}
+        >
+          {option === "ui" ? "UI" : "JSON"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Copy-to-clipboard button used by the JSON conversation view. Shows a
+// transient "Copied" confirmation for 2s after a successful copy.
+function CopyJsonButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      const el = document.createElement("textarea");
+      el.value = value;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-md border border-border bg-background text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+    >
+      {copied ? (
+        <>
+          <CheckIcon className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+          Copied
+        </>
+      ) : (
+        <>
+          <svg
+            className="w-3.5 h-3.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+          Copy
+        </>
+      )}
+    </button>
+  );
+}
+
 export function TestDetailView({
   history,
   output,
@@ -850,11 +932,35 @@ export function TestDetailView({
   const [legacyReasoningOpen, setLegacyReasoningOpen] = useState(false);
   const showLegacyReasoningToggle =
     !hasJudgeResults && !!reasoning?.trim();
+  const [historyView, setHistoryView] = useState<"ui" | "json">("ui");
+  const historyJson = useMemo(
+    () => JSON.stringify(history, null, 2),
+    [history],
+  );
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       {/* Chat History from test_case.history */}
       {history.length > 0 && (
         <div className="space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+              Conversation history
+            </span>
+            <ConversationViewToggle
+              view={historyView}
+              onChange={setHistoryView}
+            />
+          </div>
+          {historyView === "json" ? (
+            <div className="relative rounded-lg border border-border bg-muted/30">
+              <div className="absolute right-2 top-2 z-10">
+                <CopyJsonButton value={historyJson} />
+              </div>
+              <pre className="overflow-x-auto p-3 pr-20 text-xs font-mono text-foreground whitespace-pre-wrap break-words">
+                {historyJson}
+              </pre>
+            </div>
+          ) : (
           <div className="space-y-4">
             {history.map((message, index) => {
               const isEvalTarget = index === evalTargetIndex;
@@ -965,6 +1071,7 @@ export function TestDetailView({
               );
             })}
           </div>
+          )}
         </div>
       )}
 
