@@ -30,7 +30,9 @@ export function LazyAudioPlayer({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
-  // Tear down the media player on unmount so it doesn't linger against the cap.
+  // Tear down the media player when the source changes (e.g. the row's audio
+  // was replaced) or on unmount, so it never points at a stale clip and never
+  // lingers against the WebMediaPlayer cap.
   useEffect(() => {
     return () => {
       const el = audioRef.current;
@@ -40,8 +42,11 @@ export function LazyAudioPlayer({
         el.load();
         audioRef.current = null;
       }
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setDuration(0);
     };
-  }, []);
+  }, [src]);
 
   const ensureAudio = () => {
     if (audioRef.current) return audioRef.current;
