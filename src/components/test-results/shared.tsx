@@ -951,10 +951,7 @@ export function TestDetailView({
       {/* Chat History from test_case.history */}
       {history.length > 0 && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-              Conversation history
-            </span>
+          <div className="flex items-center justify-end">
             <ConversationViewToggle
               view={historyView}
               onChange={setHistoryView}
