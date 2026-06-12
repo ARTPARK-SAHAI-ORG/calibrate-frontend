@@ -933,10 +933,19 @@ export function TestDetailView({
   const showLegacyReasoningToggle =
     !hasJudgeResults && !!reasoning?.trim();
   const [historyView, setHistoryView] = useState<"ui" | "json">("ui");
-  const historyJson = useMemo(
-    () => JSON.stringify(history, null, 2),
-    [history],
-  );
+  const historyJson = useMemo(() => {
+    // Mirror what the UI shows: the prior turns (`history`) followed by the
+    // agent's evaluated response (`output`) appended as the final assistant
+    // turn, so the JSON is the full conversation, not just the prefix.
+    const turns: Array<Record<string, unknown>> = [...history];
+    if (output?.response) {
+      turns.push({ role: "assistant", content: output.response });
+    }
+    if (output?.tool_calls && output.tool_calls.length > 0) {
+      turns.push({ role: "assistant", tool_calls: output.tool_calls });
+    }
+    return JSON.stringify(turns, null, 2);
+  }, [history, output]);
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       {/* Chat History from test_case.history */}
