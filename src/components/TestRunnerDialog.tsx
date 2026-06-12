@@ -925,8 +925,10 @@ export function TestRunnerDialog({
   );
   // Tool-call pass/fail split for the Summary tab's dedicated card. Scored
   // tool-call tests only (errored ones excluded, matching the overall rate).
+  // Keyed off the test case's evaluation type, not `r.test.type` — the latter
+  // is hardcoded to "response" when results are rebuilt from a viewed past run.
   const toolCallResults = testResults.filter(
-    (r) => r.test.type === "tool_call",
+    (r) => r.testCase?.evaluation?.type === "tool_call",
   );
   const toolCallPassed = toolCallResults.filter(
     (r) => r.status === "passed",
