@@ -508,9 +508,14 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
         setUploadStatus(builtStatus);
         setInvalidRowIds(new Set());
 
-        for (const row of builtRows) {
-          if (row.audioFile) {
-            const s3Path = await uploadFileToS3(row.audioFile);
+        // Upload audio to S3 with bounded concurrency — a sequential loop is
+        // far too slow for datasets in the thousands.
+        const pending = builtRows.filter((r) => r.audioFile);
+        let cursor = 0;
+        const worker = async () => {
+          while (cursor < pending.length) {
+            const row = pending[cursor++];
+            const s3Path = await uploadFileToS3(row.audioFile!);
             if (s3Path) {
               setNewRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, s3Path } : r)));
               setUploadStatus((prev) => ({ ...prev, [row.id]: "success" }));
@@ -518,7 +523,13 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
               setUploadStatus((prev) => ({ ...prev, [row.id]: "error" }));
             }
           }
-        }
+        };
+        await Promise.all(
+          Array.from(
+            { length: Math.min(LIMITS.STT_UPLOAD_CONCURRENCY, pending.length) },
+            worker,
+          ),
+        );
       } catch {
         toast.error("Failed to process ZIP file");
       } finally {

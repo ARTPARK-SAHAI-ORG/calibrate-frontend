@@ -17,6 +17,9 @@ export const LIMITS = {
 
   // Fallback when the per-user limit API is unreachable
   DEFAULT_MAX_ROWS_PER_EVAL: 20,
+
+  // Max concurrent S3 uploads when bulk-uploading audio (ZIP import)
+  STT_UPLOAD_CONCURRENCY: 8,
 };
 
 // Contact link for extending limits
