@@ -421,12 +421,21 @@ export function BenchmarkResultsDialog({
           },
           body: JSON.stringify({
             models: models,
+            test_uuids: testUuids,
           }),
         },
       );
 
       if (!response.ok) {
-        throw new Error("Failed to start benchmark");
+        const detail = await response
+          .json()
+          .then((body) => body?.detail)
+          .catch(() => null);
+        throw new Error(
+          typeof detail === "string" && detail
+            ? detail
+            : "Failed to start benchmark",
+        );
       }
 
       const result: BenchmarkStatusResponse = await response.json();
