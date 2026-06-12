@@ -1,5 +1,6 @@
 import React from "react";
 import { Tooltip } from "@/components/Tooltip";
+import { LazyAudioPlayer } from "@/components/evaluations/LazyAudioPlayer";
 import {
   EvaluatorScoreCell,
   readEvaluatorCell,
@@ -165,7 +166,7 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                     {hasAudio && (
                       <td className="px-3 py-3">
                         {result.audio_url ? (
-                          <audio src={result.audio_url} controls preload="none" className="h-8 w-full max-w-[160px]" />
+                          <LazyAudioPlayer src={result.audio_url} className="w-full max-w-[160px]" />
                         ) : (
                           <span className="text-[13px] text-muted-foreground">&mdash;</span>
                         )}
@@ -252,7 +253,7 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                 <div>
                   <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Audio</span>
                   <div className="mt-1">
-                    <audio src={result.audio_url} controls preload="none" className="w-full h-8" />
+                    <LazyAudioPlayer src={result.audio_url} className="w-full" />
                   </div>
                 </div>
               )}
