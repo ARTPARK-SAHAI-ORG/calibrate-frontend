@@ -19,6 +19,7 @@ import {
 } from "@/components/icons";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
 import { getBinaryLabel, toRatingScale } from "@/lib/binaryLabels";
+import { copyToClipboard } from "@/lib/clipboard";
 
 // Renders the evaluator name. Authenticated result pages can link to the
 // evaluator detail page; public share pages must render plain text because
@@ -805,16 +806,7 @@ function ConversationViewToggle({
 function CopyJsonButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-    } catch {
-      const el = document.createElement("textarea");
-      el.value = value;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand("copy");
-      document.body.removeChild(el);
-    }
+    await copyToClipboard(value);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

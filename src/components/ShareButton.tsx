@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Tooltip } from "@/components/Tooltip";
+import { copyToClipboard } from "@/lib/clipboard";
 
 export type ShareableEntityType =
   | "stt"
@@ -121,21 +122,9 @@ export function ShareButton({
 
   const copyLink = async () => {
     if (!publicUrl) return;
-    try {
-      await navigator.clipboard.writeText(publicUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback for environments without clipboard API
-      const el = document.createElement("textarea");
-      el.value = publicUrl;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand("copy");
-      document.body.removeChild(el);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+    await copyToClipboard(publicUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
