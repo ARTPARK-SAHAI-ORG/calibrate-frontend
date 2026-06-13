@@ -355,7 +355,7 @@ export function buildBenchmarkCombinedLeaderboardPayload(
 
   if (showLatency) {
     allCharts.push({
-      title: "Latency p50 (s)",
+      title: "Latency (s)",
       dataKey: "avg_latency_ms",
       formatTooltip: (v) => formatLatencyMs(v),
       yTickFormatter: (v) => `${(v / 1000).toFixed(1)}`,

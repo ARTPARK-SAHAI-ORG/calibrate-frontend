@@ -81,7 +81,7 @@ export function latencySubtitle(
  * always read identically (and avoid the cramped "Avg" abbreviation).
  */
 export const METRIC_LABELS = {
-  latency: "Latency (p50)",
+  latency: "Latency",
   cost: "Average cost",
   tokens: "Average tokens",
 } as const;
