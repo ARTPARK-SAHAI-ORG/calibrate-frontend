@@ -33,31 +33,14 @@ import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
 } from "@/lib/defaultEvaluators";
-
-type LeaderboardSummary = {
-  model: string;
-  passed: string;
-  total: string;
-  pass_rate: string;
-  /** Per-test latency percentiles (ms) as CSV strings; `latency_p50` is the
-   * headline median. `latency_ms` is the legacy mean column kept for runs from
-   * before the percentile switch. Blank/null when no case reported one. */
-  latency_p50?: string | null;
-  latency_p95?: string | null;
-  latency_p99?: string | null;
-  latency_ms?: string | null;
-  /** Mean per-test cost (USD) / total tokens as CSV strings — unchanged.
-   * Blank/null when no case reported one. Absent on older jobs. */
-  cost?: string | null;
-  total_tokens?: string | null;
-};
+import type { BenchmarkLeaderboardSummaryRow } from "@/lib/benchmarkEvaluatorSummary";
 
 type BenchmarkStatusResponse = {
   task_id: string;
   name?: string;
   status: string;
   model_results?: BenchmarkModelResult[];
-  leaderboard_summary?: LeaderboardSummary[];
+  leaderboard_summary?: BenchmarkLeaderboardSummaryRow[];
   /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
   evaluators?: TestRunEvaluator[];
   results_s3_prefix?: string;
@@ -113,7 +96,7 @@ export function BenchmarkResultsDialog({
   const [taskStatus, setTaskStatus] = useState<string>("queued");
   const [modelResults, setModelResults] = useState<BenchmarkModelResult[]>([]);
   const [leaderboardSummary, setLeaderboardSummary] = useState<
-    LeaderboardSummary[] | undefined
+    BenchmarkLeaderboardSummaryRow[] | undefined
   >(undefined);
   const [error, setError] = useState<string | null>(null);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);

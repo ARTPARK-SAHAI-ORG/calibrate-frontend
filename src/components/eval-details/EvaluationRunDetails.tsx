@@ -1,11 +1,22 @@
 import React from "react";
-import { formatEvaluatorAggregate, readProviderEvaluatorMean } from "@/lib/evaluatorMetrics";
+import {
+  formatEvaluatorAggregate,
+  readProviderEvaluatorMean,
+} from "@/lib/evaluatorMetrics";
 import { AboutMetricsTable, type MetricDescription } from "./AboutMetricsTable";
 import { LeaderboardTab, type ChartConfig } from "./LeaderboardTab";
 import { ProviderMetricsCard } from "./ProviderMetricsCard";
 import { ProviderSidebar } from "./ProviderSidebar";
-import { STTResultsTable, type STTEvaluatorColumn, type STTResultRow } from "./STTResultsTable";
-import { TTSResultsTable, type TTSEvaluatorColumn, type TTSResultRow } from "./TTSResultsTable";
+import {
+  STTResultsTable,
+  type STTEvaluatorColumn,
+  type STTResultRow,
+} from "./STTResultsTable";
+import {
+  TTSResultsTable,
+  type TTSEvaluatorColumn,
+  type TTSResultRow,
+} from "./TTSResultsTable";
 import type { LatencyMetric } from "./ttsEvalTypes";
 
 type EvaluationStatus = "queued" | "in_progress" | "done" | "failed";
@@ -39,34 +50,35 @@ export function findFirstEvaluatorRuns<T extends ProviderEvaluatorRunsLike>(
 
 export function evaluatorColumnsFromRuns<T extends { key: string }>(
   runs: EvaluatorRunLike[],
-): Array<T & {
-  label: string;
-  outputType: EvaluatorOutputType;
-  scoreField: string;
-  reasoningField: string;
-}> {
+): Array<
+  T & {
+    label: string;
+    outputType: EvaluatorOutputType;
+    scoreField: string;
+    reasoningField: string;
+  }
+> {
   return runs.map((run) => ({
     key: run.metric_key,
     label: run.name ?? run.metric_key,
     outputType: run.aggregate?.type === "rating" ? "rating" : "binary",
     scoreField: run.metric_key,
     reasoningField: `${run.metric_key}_reasoning`,
-  })) as Array<T & {
-    label: string;
-    outputType: EvaluatorOutputType;
-    scoreField: string;
-    reasoningField: string;
-  }>;
+  })) as Array<
+    T & {
+      label: string;
+      outputType: EvaluatorOutputType;
+      scoreField: string;
+      reasoningField: string;
+    }
+  >;
 }
 
 export function evaluatorDescriptionMapFromRuns(
   runs: EvaluatorRunLike[] | undefined,
 ): Map<string, string> {
   return new Map(
-    (runs ?? []).map((run) => [
-      run.metric_key,
-      run.description ?? "",
-    ]),
+    (runs ?? []).map((run) => [run.metric_key, run.description ?? ""]),
   );
 }
 
@@ -117,9 +129,9 @@ export const WER_ABOUT_METRIC: MetricDescription = {
 };
 
 export const TTFB_ABOUT_METRIC: MetricDescription = {
-  metric: "Latency (TTFB)",
+  metric: "Latency",
   description:
-    "Latency measures the time to first byte (TTFB) \u2014 from when a request is sent until the first byte of the response is received. The reported value is the median (p50) across the dataset.",
+    "Latency measures the time to first byte (TTFB) from when a request is sent until the first byte of the response is received. The reported value is the median (p50) across the dataset.",
   preference: "Lower is better",
   range: "0 - \u221E",
 };
@@ -131,7 +143,9 @@ export function ratingRange(scaleValues: number[]): string {
   return min === max ? String(min) : `${min} - ${max}`;
 }
 
-export function hasSTTEmptyPredictions(providerResult: STTProviderResultForDetails): boolean {
+export function hasSTTEmptyPredictions(
+  providerResult: STTProviderResultForDetails,
+): boolean {
   return (
     providerResult.results?.some((r) => !r.pred || r.pred.trim() === "") ??
     false
@@ -154,7 +168,8 @@ function evaluatorRowsToMetricDescriptions(
     key: row.key,
     metric: row.metric,
     description: row.description,
-    preference: row.outputType === "binary" ? "Pass is better" : "Higher is better",
+    preference:
+      row.outputType === "binary" ? "Pass is better" : "Higher is better",
     range: row.range ?? (row.outputType === "binary" ? "Pass / Fail" : "-"),
   }));
 }
@@ -224,7 +239,10 @@ export function STTEvaluationAbout({
 }) {
   return (
     <AboutMetricsTable
-      metrics={[WER_ABOUT_METRIC, ...evaluatorRowsToMetricDescriptions(evaluatorRows)]}
+      metrics={[
+        WER_ABOUT_METRIC,
+        ...evaluatorRowsToMetricDescriptions(evaluatorRows),
+      ]}
     />
   );
 }
@@ -236,7 +254,10 @@ export function TTSEvaluationAbout({
 }) {
   return (
     <AboutMetricsTable
-      metrics={[...evaluatorRowsToMetricDescriptions(evaluatorRows), TTFB_ABOUT_METRIC]}
+      metrics={[
+        ...evaluatorRowsToMetricDescriptions(evaluatorRows),
+        TTFB_ABOUT_METRIC,
+      ]}
     />
   );
 }
@@ -337,7 +358,9 @@ export function STTEvaluationOutputs({
   tableRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const selectedProvider = activeProviderKey || providerResults[0]?.provider;
-  const providerResult = providerResults.find((pr) => pr.provider === selectedProvider);
+  const providerResult = providerResults.find(
+    (pr) => pr.provider === selectedProvider,
+  );
 
   return (
     <div className={className}>
@@ -361,12 +384,17 @@ export function STTEvaluationOutputs({
           if (!providerResult) {
             return (
               <div className="flex items-center justify-center h-full">
-                <p className="text-muted-foreground">Select a provider to view details</p>
+                <p className="text-muted-foreground">
+                  Select a provider to view details
+                </p>
               </div>
             );
           }
 
-          if (providerResult.success === null && (!providerResult.results || providerResult.results.length === 0)) {
+          if (
+            providerResult.success === null &&
+            (!providerResult.results || providerResult.results.length === 0)
+          ) {
             return <ProviderLoadingState />;
           }
 
@@ -385,7 +413,9 @@ export function STTEvaluationOutputs({
               // Canonical namespaced shape from the API refresh.
               const outputs = (r as Record<string, unknown>).evaluator_outputs;
               if (outputs && typeof outputs === "object") {
-                for (const v of Object.values(outputs as Record<string, unknown>)) {
+                for (const v of Object.values(
+                  outputs as Record<string, unknown>,
+                )) {
                   if (v && typeof v === "object") return true;
                 }
               }
@@ -393,7 +423,8 @@ export function STTEvaluationOutputs({
                 const v = r[col.scoreField ?? `${col.key}_score`];
                 return v !== undefined && v !== null && v !== "";
               });
-            }) ?? false);
+            }) ??
+              false);
 
           return (
             <div className="space-y-4 md:space-y-6">
@@ -453,7 +484,9 @@ export function TTSEvaluationOutputs({
   className?: string;
 }) {
   const selectedProvider = activeProviderKey || providerResults[0]?.provider;
-  const providerResult = providerResults.find((pr) => pr.provider === selectedProvider);
+  const providerResult = providerResults.find(
+    (pr) => pr.provider === selectedProvider,
+  );
 
   return (
     <div className={className}>
@@ -472,12 +505,17 @@ export function TTSEvaluationOutputs({
           if (!providerResult) {
             return (
               <div className="flex items-center justify-center h-full">
-                <p className="text-muted-foreground">Select a provider to view details</p>
+                <p className="text-muted-foreground">
+                  Select a provider to view details
+                </p>
               </div>
             );
           }
 
-          if (providerResult.success === null && (!providerResult.results || providerResult.results.length === 0)) {
+          if (
+            providerResult.success === null &&
+            (!providerResult.results || providerResult.results.length === 0)
+          ) {
             return <ProviderLoadingState />;
           }
 
@@ -493,7 +531,9 @@ export function TTSEvaluationOutputs({
             (providerResult.results?.some((r) => {
               const outputs = (r as Record<string, unknown>).evaluator_outputs;
               if (outputs && typeof outputs === "object") {
-                for (const v of Object.values(outputs as Record<string, unknown>)) {
+                for (const v of Object.values(
+                  outputs as Record<string, unknown>,
+                )) {
                   if (v && typeof v === "object") return true;
                 }
               }
@@ -501,7 +541,8 @@ export function TTSEvaluationOutputs({
                 const v = r[col.scoreField ?? `${col.key}_score`];
                 return v !== undefined && v !== null && v !== "";
               });
-            }) ?? false);
+            }) ??
+              false);
 
           const ttfbValue = (() => {
             // p50 is the new headline TTFB; fall back to legacy `mean`.
@@ -548,9 +589,24 @@ export function TTSEvaluationOutputs({
 function ProviderLoadingState() {
   return (
     <div className="flex items-center justify-center h-full min-h-[200px]">
-      <svg className="w-5 h-5 animate-spin text-muted-foreground" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      <svg
+        className="w-5 h-5 animate-spin text-muted-foreground"
+        fill="none"
+        viewBox="0 0 24 24"
+      >
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="4"
+        ></circle>
+        <path
+          className="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+        ></path>
       </svg>
     </div>
   );
@@ -561,7 +617,8 @@ function ProviderErrorState() {
     <div className="flex items-center justify-center h-full min-h-[200px]">
       <div className="border border-red-500/50 bg-red-500/10 rounded-lg p-4 max-w-md text-center">
         <div className="text-red-500 text-[14px] font-medium mb-1">
-          There was an error running this provider. Please contact us by posting your issue to help us help you.
+          There was an error running this provider. Please contact us by posting
+          your issue to help us help you.
         </div>
       </div>
     </div>

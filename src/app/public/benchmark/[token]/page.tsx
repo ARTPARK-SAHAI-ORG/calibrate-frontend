@@ -5,33 +5,16 @@ import { useParams } from "next/navigation";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
 import { BenchmarkCombinedLeaderboard, BenchmarkOutputsPanel } from "@/components/eval-details";
 import type { BenchmarkModelResult } from "@/components/eval-details";
+import type { BenchmarkLeaderboardSummaryRow } from "@/lib/benchmarkEvaluatorSummary";
 import { ResultPager, type TestRunEvaluator, type PagerNav } from "@/components/test-results/shared";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
-
-type LeaderboardSummary = {
-  model: string;
-  passed: string;
-  total: string;
-  pass_rate: string;
-  /** Per-test latency percentiles (ms) as CSV strings; `latency_p50` is the
-   * headline median. `latency_ms` is the legacy mean column kept for runs from
-   * before the percentile switch. Blank/null when no case reported one. */
-  latency_p50?: string | null;
-  latency_p95?: string | null;
-  latency_p99?: string | null;
-  latency_ms?: string | null;
-  /** Mean per-test cost (USD) / total tokens as CSV strings — unchanged.
-   * Blank/null when no case reported one. Absent on older jobs. */
-  cost?: string | null;
-  total_tokens?: string | null;
-};
 
 type BenchmarkStatusResponse = {
   task_id: string;
   status: string;
   model_results?: BenchmarkModelResult[];
-  leaderboard_summary?: LeaderboardSummary[];
+  leaderboard_summary?: BenchmarkLeaderboardSummaryRow[];
   /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
   evaluators?: TestRunEvaluator[];
   error?: string;
