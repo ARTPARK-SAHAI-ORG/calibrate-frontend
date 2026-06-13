@@ -16,7 +16,7 @@ import {
 import { SearchInput } from "@/components/ui/SearchInput";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
 import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSummary";
-import type { AggStat } from "@/lib/llmMetrics";
+import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
 import { isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 
 export type BenchmarkTestResult = {
@@ -48,10 +48,11 @@ export type BenchmarkModelResult = {
   test_results: BenchmarkTestResult[] | null;
   /** Aggregate per evaluator from metrics.json criteria (finished models). Optional / null on older jobs. */
   evaluator_summary?: BenchmarkEvaluatorSummaryEntry[] | null;
-  /** This model's aggregate latency / cost / total tokens ({mean,min,max,count}
-   * | null). For the leaderboard table we use `leaderboard_summary` (mean
-   * strings) instead; use these blocks when the full min/max/count is needed. */
-  latency_ms?: AggStat;
+  /** This model's aggregate latency ({p50,p95,p99,count}; legacy runs use
+   * {mean,min,max,count}) plus cost / total tokens ({mean,min,max,count} |
+   * null). For the leaderboard table we use `leaderboard_summary` (p50 / mean
+   * strings) instead; use these blocks when the full percentile set is needed. */
+  latency_ms?: LatencyStat;
   cost?: AggStat;
   total_tokens?: AggStat;
 };

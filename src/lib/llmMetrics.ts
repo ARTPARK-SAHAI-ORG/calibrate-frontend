@@ -20,6 +20,62 @@ export type AggStat = {
 } | null;
 
 /**
+ * Aggregate latency block for LLM test-runs / per-model benchmarks. The backend
+ * now reports latency as percentiles (`p50` / `p95` / `p99`) rather than
+ * `mean` / `min` / `max`; use `p50` as the headline "average". Runs created
+ * before the switch still carry the old `mean` / `min` / `max` keys, so those
+ * stay optional here and the `latencyP50` / `latencySubtitle` helpers read both
+ * shapes (`p50 ?? mean`). `count` is unchanged. The whole block is `null` for
+ * eval-only runs or before metrics land — always null-check. Note: cost and
+ * token aggregates did NOT change and still use `AggStat`.
+ */
+export type LatencyStat = {
+  p50?: number;
+  p95?: number;
+  p99?: number;
+  count: number;
+  /** Legacy percentile-less keys, present only on historical runs. */
+  mean?: number;
+  min?: number;
+  max?: number;
+} | null;
+
+/** Headline latency value: `p50` for new runs, falling back to the legacy
+ * `mean` for runs generated before the percentile switch. */
+export function latencyP50(
+  latency: LatencyStat | undefined,
+): number | null | undefined {
+  if (!latency) return undefined;
+  return latency.p50 ?? latency.mean;
+}
+
+/**
+ * Caption shown under a latency card: the `p95` / `p99` tail for new runs, or
+ * the legacy `min`–`max` range for historical ones. Returns undefined for a
+ * single sample (or when there's nothing useful to show) so the caller can
+ * skip the subtitle entirely.
+ */
+export function latencySubtitle(
+  latency: LatencyStat | undefined,
+): string | undefined {
+  if (!latency || latency.count <= 1) return undefined;
+  if (latency.p95 != null || latency.p99 != null) {
+    const parts: string[] = [];
+    if (latency.p95 != null) parts.push(`p95 ${formatLatencyMs(latency.p95)}`);
+    if (latency.p99 != null) parts.push(`p99 ${formatLatencyMs(latency.p99)}`);
+    return parts.join(" · ");
+  }
+  if (
+    latency.min != null &&
+    latency.max != null &&
+    latency.min !== latency.max
+  ) {
+    return `${formatLatencyMs(latency.min)} – ${formatLatencyMs(latency.max)}`;
+  }
+  return undefined;
+}
+
+/**
  * Shared display labels for the per-test latency / cost / token aggregates,
  * reused by the test Summary cards and the benchmark leaderboard so the two
  * always read identically (and avoid the cramped "Avg" abbreviation).

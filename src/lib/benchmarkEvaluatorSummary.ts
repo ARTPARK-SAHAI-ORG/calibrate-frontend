@@ -85,9 +85,15 @@ export type BenchmarkLeaderboardSummaryRow = {
   passed?: string;
   total?: string;
   pass_rate: string;
-  /** Mean per-test latency in milliseconds — CSV string (mean only), blank /
-   * null when no case reported one. For the full {mean,min,max,count} use
-   * `model_results[].latency_ms` instead. */
+  /** Median (p50) per-test latency in milliseconds — CSV string, blank / null
+   * when no case reported one. The leaderboard now reports latency as
+   * percentiles; `latency_p95` / `latency_p99` carry the tail. For the full
+   * block use `model_results[].latency_ms`. */
+  latency_p50?: string | null;
+  latency_p95?: string | null;
+  latency_p99?: string | null;
+  /** Legacy mean-latency column, present only on runs generated before the
+   * percentile switch. Read as a fallback when `latency_p50` is absent. */
   latency_ms?: string | null;
   /** Mean per-test cost in USD — CSV string (mean only), blank / null when no
    * case reported one (e.g. the `openai` provider). */
@@ -293,7 +299,9 @@ export function buildBenchmarkCombinedLeaderboardPayload(
       row.total = lbRow.total;
       const pr = parseFloat(lbRow.pass_rate);
       row.pass_rate = Number.isFinite(pr) ? pr : undefined;
-      const latency = toFiniteNumber(lbRow.latency_ms);
+      // p50 is the new headline latency; fall back to the legacy mean column
+      // for runs generated before the percentile switch.
+      const latency = toFiniteNumber(lbRow.latency_p50 ?? lbRow.latency_ms);
       if (latency !== undefined) {
         row.avg_latency_ms = latency;
         showLatency = true;

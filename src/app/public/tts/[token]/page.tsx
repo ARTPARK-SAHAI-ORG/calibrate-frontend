@@ -22,7 +22,18 @@ import {
   type PublicDefaultEvaluator,
 } from "@/lib/publicEvaluators";
 
-type LatencyMetric = { mean: number; std: number; values: number[] };
+// Latency metrics (ttfb, processing_time) now report percentiles. `p50` is the
+// headline value; `mean` / `std` / `values` are the legacy shape kept for runs
+// generated before the switch.
+type LatencyMetric = {
+  p50?: number;
+  p95?: number;
+  p99?: number;
+  count?: number;
+  mean?: number;
+  std?: number;
+  values?: number[];
+};
 
 // Mirrors the auth TTS page: the response now optionally carries
 // `evaluator_runs` per provider with the live evaluator `name`, stable
@@ -77,6 +88,11 @@ type LeaderboardSummary = {
   run: string;
   count: number;
   llm_judge_score?: number;
+  // TTFB is now reported as percentiles; `ttfb` is the legacy mean column kept
+  // for runs from before the switch.
+  ttfb_p50?: number;
+  ttfb_p95?: number;
+  ttfb_p99?: number;
   ttfb?: number;
   processing_time?: number;
   [k: string]: string | number | undefined;

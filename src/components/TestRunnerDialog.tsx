@@ -30,7 +30,7 @@ import {
   buildEvaluatorSummaryFromResults,
   toolCallPassFail,
 } from "@/lib/testRunSummary";
-import type { AggStat } from "@/lib/llmMetrics";
+import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
 import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
@@ -112,10 +112,11 @@ type TestRunStatusResponse = {
    * for every uuid referenced by judge_results (synthesises stubs for
    * legacy rows). */
   evaluators?: TestRunEvaluator[];
-  /** Aggregate per-test latency / cost / total tokens ({mean,min,max,count} |
+  /** Aggregate per-test latency ({p50,p95,p99,count}; legacy runs use
+   * {mean,min,max,count}) plus cost / total tokens ({mean,min,max,count} |
    * null) across the whole run. Null for eval-only runs or before metrics
    * land; cost is also null for the `openai` provider. */
-  latency_ms?: AggStat;
+  latency_ms?: LatencyStat;
   cost?: AggStat;
   total_tokens?: AggStat;
   results_s3_prefix?: string;
@@ -183,7 +184,7 @@ export function TestRunnerDialog({
   // Aggregate latency / cost blocks from the run-status response, surfaced on
   // the Summary tab. Per-evaluator metrics aren't sent for single runs, so we
   // derive those client-side from each case's judge_results (see useMemo below).
-  const [latencyAgg, setLatencyAgg] = useState<AggStat>(null);
+  const [latencyAgg, setLatencyAgg] = useState<LatencyStat>(null);
   const [costAgg, setCostAgg] = useState<AggStat>(null);
   const [tokensAgg, setTokensAgg] = useState<AggStat>(null);
   // Which tab is showing. Tabs only render once the run is done; we default to

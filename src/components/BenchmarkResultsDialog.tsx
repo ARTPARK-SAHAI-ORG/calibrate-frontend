@@ -39,9 +39,15 @@ type LeaderboardSummary = {
   passed: string;
   total: string;
   pass_rate: string;
-  /** Mean per-test latency (ms) / cost (USD) / total tokens as CSV strings —
-   * mean only, blank/null when no case reported one. Absent on older jobs. */
+  /** Per-test latency percentiles (ms) as CSV strings; `latency_p50` is the
+   * headline median. `latency_ms` is the legacy mean column kept for runs from
+   * before the percentile switch. Blank/null when no case reported one. */
+  latency_p50?: string | null;
+  latency_p95?: string | null;
+  latency_p99?: string | null;
   latency_ms?: string | null;
+  /** Mean per-test cost (USD) / total tokens as CSV strings — unchanged.
+   * Blank/null when no case reported one. Absent on older jobs. */
   cost?: string | null;
   total_tokens?: string | null;
 };

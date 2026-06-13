@@ -7,8 +7,11 @@ import {
   formatTokens,
   formatPercent,
   formatRating,
+  latencyP50,
+  latencySubtitle,
   METRIC_LABELS,
   type AggStat,
+  type LatencyStat,
 } from "@/lib/llmMetrics";
 import {
   benchmarkRatingEvaluatorCaption,
@@ -20,9 +23,10 @@ type TestRunSummaryProps = {
   passed: number;
   /** Total tests scored (excludes errored tests; the pass-rate denominator). */
   total: number;
-  /** Aggregate per-test latency block (`{mean,min,max,count}`). Null for
-   * eval-only runs or before metrics land. */
-  latency?: AggStat;
+  /** Aggregate per-test latency block (`{p50,p95,p99,count}`; legacy runs
+   * carry `{mean,min,max,count}`). Null for eval-only runs or before metrics
+   * land. */
+  latency?: LatencyStat;
   /** Aggregate per-test cost block. Null for eval-only runs and for the
    * `openai` provider (no cost reported). */
   cost?: AggStat;
@@ -190,13 +194,11 @@ export function TestRunSummary({
 
   const evaluators = evaluatorSummary ?? [];
 
-  // Min–max range subtitle for an aggregate. Skipped when there's a single
-  // sample or every case had the same value (the range would just repeat the
-  // mean), and for null blocks (which render a plain "—" value).
-  const latencySubtitle =
-    latency && latency.count > 1 && latency.min !== latency.max
-      ? `${formatLatencyMs(latency.min)} – ${formatLatencyMs(latency.max)}`
-      : undefined;
+  // Caption under each aggregate card. Latency shows its p95/p99 tail (or the
+  // legacy min–max range for historical runs); cost/tokens show their min–max
+  // range. Skipped for a single sample / identical values / null blocks (which
+  // render a plain "—" value).
+  const latencyCaption = latencySubtitle(latency);
   const costSubtitle =
     cost && cost.count > 1 && cost.min !== cost.max
       ? `${formatCostUsd(cost.min)} – ${formatCostUsd(cost.max)}`
@@ -231,8 +233,8 @@ export function TestRunSummary({
           )}
           <MetricCard
             label={METRIC_LABELS.latency}
-            value={formatLatencyMs(latency?.mean)}
-            subtitle={latencySubtitle}
+            value={formatLatencyMs(latencyP50(latency))}
+            subtitle={latencyCaption}
             info="Average agent response time across all tests"
           />
           <MetricCard

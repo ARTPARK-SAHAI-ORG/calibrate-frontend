@@ -1,7 +1,11 @@
 import React from "react";
 import { formatEvaluatorAggregate, readProviderEvaluatorMean } from "@/lib/evaluatorMetrics";
 import { AboutMetricsTable, type MetricDescription } from "./AboutMetricsTable";
-import { LeaderboardTab, type ChartConfig } from "./LeaderboardTab";
+import {
+  LeaderboardTab,
+  type ChartConfig,
+  type LeaderboardColumn,
+} from "./LeaderboardTab";
 import { ProviderMetricsCard } from "./ProviderMetricsCard";
 import { ProviderSidebar } from "./ProviderSidebar";
 import { STTResultsTable, type STTEvaluatorColumn, type STTResultRow } from "./STTResultsTable";
@@ -88,7 +92,13 @@ export type STTProviderResultForDetails = ProviderResultLike & {
 };
 
 export type TTSProviderResultForDetails = ProviderResultLike & {
-  metrics?: (Record<string, unknown> & { ttfb?: { mean?: number } }) | null;
+  // `ttfb` now reports percentiles (`p50` headline + `p95` / `p99`); legacy
+  // runs still carry `mean`. Read `p50 ?? mean`.
+  metrics?:
+    | (Record<string, unknown> & {
+        ttfb?: { p50?: number; p95?: number; p99?: number; mean?: number };
+      })
+    | null;
   results?: TTSResultRow[] | null;
 };
 
@@ -282,9 +292,33 @@ export function TTSEvaluationLeaderboard({
   getProviderLabel: (value: string) => string;
   className?: string;
 }) {
+  // TTFB is now reported as percentiles (`ttfb_p50` / `ttfb_p95` / `ttfb_p99`).
+  // Runs from before the switch carry a single `ttfb` mean column — fall back
+  // to it when no percentile keys are present.
+  const hasPercentileTtfb = leaderboardSummary.some(
+    (row) =>
+      row.ttfb_p50 != null || row.ttfb_p95 != null || row.ttfb_p99 != null,
+  );
+  const renderTtfb = (v: string | number | undefined) =>
+    v != null ? parseFloat(Number(v).toFixed(4)) : "-";
+  const ttfbColumns: LeaderboardColumn[] = hasPercentileTtfb
+    ? [
+        { key: "ttfb_p50", header: "TTFB p50 (s)", render: renderTtfb },
+        { key: "ttfb_p95", header: "TTFB p95 (s)", render: renderTtfb },
+        { key: "ttfb_p99", header: "TTFB p99 (s)", render: renderTtfb },
+      ]
+    : [{ key: "ttfb", header: "TTFB (s)", render: renderTtfb }];
+  const ttfbCharts: ChartConfig[] = hasPercentileTtfb
+    ? [
+        { title: "TTFB p50 (s)", dataKey: "ttfb_p50" },
+        { title: "TTFB p95 (s)", dataKey: "ttfb_p95" },
+        { title: "TTFB p99 (s)", dataKey: "ttfb_p99" },
+      ]
+    : [{ title: "TTFB (s)", dataKey: "ttfb" }];
+
   const allCharts: ChartConfig[] = [
     ...evaluatorChartConfigs(evaluatorColumns),
-    { title: "TTFB (s)", dataKey: "ttfb" },
+    ...ttfbCharts,
   ];
   const chartRows = chunkChartRows(allCharts);
 
@@ -294,11 +328,7 @@ export function TTSEvaluationLeaderboard({
       columns={[
         { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
         ...evaluatorLeaderboardColumns(evaluatorColumns),
-        {
-          key: "ttfb",
-          header: "TTFB (s)",
-          render: (v) => (v != null ? parseFloat(v.toFixed(4)) : "-"),
-        },
+        ...ttfbColumns,
       ]}
       data={leaderboardSummary}
       charts={chartRows}
@@ -495,9 +525,11 @@ export function TTSEvaluationOutputs({
             }) ?? false);
 
           const ttfbValue = (() => {
+            // p50 is the new headline TTFB; fall back to legacy `mean`.
             const t = providerResult.metrics?.ttfb;
-            if (t && typeof t.mean === "number") {
-              return parseFloat(t.mean.toFixed(4));
+            const value = t?.p50 ?? t?.mean;
+            if (typeof value === "number") {
+              return parseFloat(value.toFixed(4));
             }
             return "-";
           })();

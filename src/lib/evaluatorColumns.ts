@@ -205,9 +205,14 @@ export const STT_RESERVED_METRIC_KEYS: ReadonlySet<string> = new Set([
   "llm_judge_score",
 ]);
 
-/** TTS-specific reserved keys — skip latency / processing-time / legacy llm_judge. */
+/** TTS-specific reserved keys — skip latency / processing-time / legacy llm_judge.
+ * `ttfb` is now split into percentile columns (`ttfb_p50` / `ttfb_p95` /
+ * `ttfb_p99`); all are reserved so none get mistaken for an evaluator metric. */
 export const TTS_RESERVED_METRIC_KEYS: ReadonlySet<string> = new Set([
   "llm_judge_score",
   "ttfb",
+  "ttfb_p50",
+  "ttfb_p95",
+  "ttfb_p99",
   "processing_time",
 ]);

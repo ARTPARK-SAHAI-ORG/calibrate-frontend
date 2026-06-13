@@ -18,7 +18,7 @@ import {
   buildEvaluatorSummaryFromResults,
   toolCallPassFail,
 } from "@/lib/testRunSummary";
-import type { AggStat } from "@/lib/llmMetrics";
+import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
 
 type TestCaseResult = {
   test_uuid?: string;
@@ -48,8 +48,9 @@ type TestRunStatusResponse = {
   results?: TestCaseResult[];
   /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
   evaluators?: TestRunEvaluator[];
-  /** Aggregate per-test latency / cost / total tokens ({mean,min,max,count} | null). */
-  latency_ms?: AggStat;
+  /** Aggregate per-test latency ({p50,p95,p99,count}; legacy runs use
+   * {mean,min,max,count}) plus cost / total tokens ({mean,min,max,count} | null). */
+  latency_ms?: LatencyStat;
   cost?: AggStat;
   total_tokens?: AggStat;
   error?: string;
