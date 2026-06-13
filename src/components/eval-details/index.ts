@@ -13,6 +13,8 @@ export type { STTResultRow, STTEvaluatorColumn } from "./STTResultsTable";
 export { LeaderboardTab } from "./LeaderboardTab";
 export type { LeaderboardColumn, ChartConfig } from "./LeaderboardTab";
 
+export type { LatencyMetric, TTSLeaderboardSummary } from "./ttsEvalTypes";
+
 export { AboutMetricsTable } from "./AboutMetricsTable";
 export type { MetricDescription } from "./AboutMetricsTable";
 

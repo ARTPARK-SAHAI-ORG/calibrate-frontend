@@ -21,6 +21,8 @@ import {
   TTSEvaluationOutputs,
   ratingRange,
   type TTSEvaluatorColumn,
+  type LatencyMetric,
+  type TTSLeaderboardSummary,
 } from "@/components/eval-details";
 import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
 import { useSidebarState } from "@/lib/sidebar";
@@ -34,19 +36,6 @@ import {
   deriveEvaluatorColumns,
   TTS_RESERVED_METRIC_KEYS,
 } from "@/lib/evaluatorColumns";
-
-// Latency metrics (ttfb, processing_time) now report percentiles. `p50` is the
-// headline value; `mean` / `std` / `values` are the legacy shape kept for runs
-// generated before the switch.
-type LatencyMetric = {
-  p50?: number;
-  p95?: number;
-  p99?: number;
-  count?: number;
-  mean?: number;
-  std?: number;
-  values?: number[];
-};
 
 // The TTS evaluate API response now carries per-attached-evaluator data in
 // three formats we need to support side-by-side:
@@ -125,20 +114,6 @@ type ProviderResult = {
   evaluator_runs?: EvaluatorRun[] | null;
 };
 
-type LeaderboardSummary = {
-  run: string;
-  count: number;
-  llm_judge_score?: number;
-  // TTFB is now reported as percentiles; `ttfb` is the legacy mean column kept
-  // for runs from before the switch.
-  ttfb_p50?: number;
-  ttfb_p95?: number;
-  ttfb_p99?: number;
-  ttfb?: number;
-  processing_time?: number;
-  [k: string]: string | number | undefined;
-};
-
 type EvaluationResult = {
   task_id: string;
   status: "queued" | "in_progress" | "done" | "failed";
@@ -147,7 +122,7 @@ type EvaluationResult = {
   dataset_name?: string | null;
   evaluator_uuids?: string[] | null;
   provider_results?: ProviderResult[];
-  leaderboard_summary?: LeaderboardSummary[];
+  leaderboard_summary?: TTSLeaderboardSummary[];
   error?: string | null;
   is_public?: boolean;
   share_token?: string | null;

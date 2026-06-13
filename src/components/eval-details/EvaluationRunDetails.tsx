@@ -10,6 +10,7 @@ import { ProviderMetricsCard } from "./ProviderMetricsCard";
 import { ProviderSidebar } from "./ProviderSidebar";
 import { STTResultsTable, type STTEvaluatorColumn, type STTResultRow } from "./STTResultsTable";
 import { TTSResultsTable, type TTSEvaluatorColumn, type TTSResultRow } from "./TTSResultsTable";
+import type { LatencyMetric } from "./ttsEvalTypes";
 
 type EvaluationStatus = "queued" | "in_progress" | "done" | "failed";
 type EvaluatorOutputType = "binary" | "rating";
@@ -94,11 +95,7 @@ export type STTProviderResultForDetails = ProviderResultLike & {
 export type TTSProviderResultForDetails = ProviderResultLike & {
   // `ttfb` now reports percentiles (`p50` headline + `p95` / `p99`); legacy
   // runs still carry `mean`. Read `p50 ?? mean`.
-  metrics?:
-    | (Record<string, unknown> & {
-        ttfb?: { p50?: number; p95?: number; p99?: number; mean?: number };
-      })
-    | null;
+  metrics?: (Record<string, unknown> & { ttfb?: LatencyMetric }) | null;
   results?: TTSResultRow[] | null;
 };
 
