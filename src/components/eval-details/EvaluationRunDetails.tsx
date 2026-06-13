@@ -1,11 +1,7 @@
 import React from "react";
 import { formatEvaluatorAggregate, readProviderEvaluatorMean } from "@/lib/evaluatorMetrics";
 import { AboutMetricsTable, type MetricDescription } from "./AboutMetricsTable";
-import {
-  LeaderboardTab,
-  type ChartConfig,
-  type LeaderboardColumn,
-} from "./LeaderboardTab";
+import { LeaderboardTab, type ChartConfig } from "./LeaderboardTab";
 import { ProviderMetricsCard } from "./ProviderMetricsCard";
 import { ProviderSidebar } from "./ProviderSidebar";
 import { STTResultsTable, type STTEvaluatorColumn, type STTResultRow } from "./STTResultsTable";
@@ -121,9 +117,9 @@ export const WER_ABOUT_METRIC: MetricDescription = {
 };
 
 export const TTFB_ABOUT_METRIC: MetricDescription = {
-  metric: "TTFB (Time To First Byte)",
+  metric: "Latency (TTFB)",
   description:
-    "Time to first byte measures the latency from when a request is sent until the first byte of the response is received.",
+    "Latency measures the time to first byte (TTFB) \u2014 from when a request is sent until the first byte of the response is received. The reported value is the median (p50) across the dataset.",
   preference: "Lower is better",
   range: "0 - \u221E",
 };
@@ -289,33 +285,19 @@ export function TTSEvaluationLeaderboard({
   getProviderLabel: (value: string) => string;
   className?: string;
 }) {
-  // TTFB is now reported as percentiles (`ttfb_p50` / `ttfb_p95` / `ttfb_p99`).
-  // Runs from before the switch carry a single `ttfb` mean column — fall back
-  // to it when no percentile keys are present.
+  // Latency (TTFB) is reported as the median (p50) under `ttfb_p50`. Runs from
+  // before the percentile switch carry the value under the legacy `ttfb` key —
+  // read whichever is present so both render in a single "Latency (s)" column.
   const hasPercentileTtfb = leaderboardSummary.some(
-    (row) =>
-      row.ttfb_p50 != null || row.ttfb_p95 != null || row.ttfb_p99 != null,
+    (row) => row.ttfb_p50 != null,
   );
+  const ttfbKey = hasPercentileTtfb ? "ttfb_p50" : "ttfb";
   const renderTtfb = (v: string | number | undefined) =>
     v != null ? parseFloat(Number(v).toFixed(4)) : "-";
-  const ttfbColumns: LeaderboardColumn[] = hasPercentileTtfb
-    ? [
-        { key: "ttfb_p50", header: "TTFB p50 (s)", render: renderTtfb },
-        { key: "ttfb_p95", header: "TTFB p95 (s)", render: renderTtfb },
-        { key: "ttfb_p99", header: "TTFB p99 (s)", render: renderTtfb },
-      ]
-    : [{ key: "ttfb", header: "TTFB (s)", render: renderTtfb }];
-  const ttfbCharts: ChartConfig[] = hasPercentileTtfb
-    ? [
-        { title: "TTFB p50 (s)", dataKey: "ttfb_p50" },
-        { title: "TTFB p95 (s)", dataKey: "ttfb_p95" },
-        { title: "TTFB p99 (s)", dataKey: "ttfb_p99" },
-      ]
-    : [{ title: "TTFB (s)", dataKey: "ttfb" }];
 
   const allCharts: ChartConfig[] = [
     ...evaluatorChartConfigs(evaluatorColumns),
-    ...ttfbCharts,
+    { title: "Latency (s)", dataKey: ttfbKey },
   ];
   const chartRows = chunkChartRows(allCharts);
 
@@ -325,7 +307,7 @@ export function TTSEvaluationLeaderboard({
       columns={[
         { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
         ...evaluatorLeaderboardColumns(evaluatorColumns),
-        ...ttfbColumns,
+        { key: ttfbKey, header: "Latency (s)", render: renderTtfb },
       ]}
       data={leaderboardSummary}
       charts={chartRows}
@@ -544,7 +526,7 @@ export function TTSEvaluationOutputs({
                         col.scaleMax,
                       ),
                     })),
-                    { label: "TTFB (s)", value: ttfbValue },
+                    { label: "Latency (s)", value: ttfbValue },
                   ]}
                 />
               )}
