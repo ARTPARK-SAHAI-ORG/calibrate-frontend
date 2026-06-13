@@ -235,7 +235,7 @@ export function TestRunSummary({
             label={METRIC_LABELS.latency}
             value={formatLatencyMs(latencyP50(latency))}
             subtitle={latencyCaption}
-            info="Average agent response time across all tests"
+            info="Median (p50) agent response time across all tests"
           />
           <MetricCard
             label={METRIC_LABELS.cost}
