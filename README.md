@@ -2,9 +2,7 @@
 
 [![CC BY-SA 4.0][cc-by-sa-shield]][cc-by-sa]
 
-[Calibrate](https://calibrate.artpark.ai) is a framework for evaluating AI agents which let you move from slow, manual testing to a fast, automated, and repeatable testing process for your entire agent stack.
-
-This repo is the frontend for Calibrate Cloud.
+Frontend for [Calibrate](https://calibrate.artpark.ai), a framework for evaluating AI agents which let you move from slow, manual testing to a fast, automated, and repeatable testing process for your entire agent stack.
 
 ## Prerequisites
 
