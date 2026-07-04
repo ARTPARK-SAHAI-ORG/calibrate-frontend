@@ -740,7 +740,7 @@ export const ttsProviders: TTSProvider[] = [
   { label: "Google", value: "google", model: "chirp_3", voiceId: "Charon", website: "https://cloud.google.com/text-to-speech", supportedLanguages: googleTTSSupportedLanguages, modelOverrides: { "Sindhi": "gemini" } },
   { label: "ElevenLabs", value: "elevenlabs", model: "eleven_multilingual_v2", voiceId: "Krishna", website: "https://elevenlabs.io", supportedLanguages: elevenlabsTTSSupportedLanguages, modelOverrides: { "Sindhi": "eleven_v3" } },
   { label: "Sarvam", value: "sarvam", model: "bulbul:v3", voiceId: "aditya", website: "https://sarvam.ai", supportedLanguages: sarvamSTTSupportedLanguages },
-  { label: "Smallest AI", value: "smallest", model: "lightning:v2", voiceId: "aditi", website: "https://smallest.ai", supportedLanguages: smallestAiSTTSupportedLanguages },
+  { label: "Smallest AI", value: "smallest", model: "lightning-v3.1", voiceId: "aditi", website: "https://smallest.ai", supportedLanguages: smallestAiSTTSupportedLanguages },
 ];
 
 /*
@@ -753,6 +753,6 @@ export const ttsProviders: TTSProvider[] = [
 │ Google      │ chirp-3                  │ Aoede                                    │
 │ ElevenLabs  │ eleven_multilingual_v2   │ IbEzPPGLXlYUvxNGhJQp                     │
 │ Sarvam      │ bulbul:v3                │ aditya                                    │
-│ Smallest    │ lightning:v2             │ emily                                    │
+│ Smallest    │ lightning-v3.1           │ emily                                    │
 └─────────────┴──────────────────────────┴──────────────────────────────────────────┘
 */

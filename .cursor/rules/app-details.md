@@ -188,7 +188,7 @@ type TTSProvider = {
 | Google | chirp_3 | Charon | https://cloud.google.com/text-to-speech |
 | ElevenLabs | eleven_multilingual_v2 | Krishna | https://elevenlabs.io |
 | Sarvam | bulbul:v3 | aditya | https://sarvam.ai |
-| Smallest | lightning | aditi | https://smallest.ai |
+| Smallest | lightning-v3.1 | aditi | https://smallest.ai |
 
 **Provider Website Links in UI:**
 
