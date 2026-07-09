@@ -55,15 +55,22 @@ type TestEvaluatorRow = {
   variable_values?: Record<string, string> | null;
 };
 
+// List shape from GET /tests. The list response does not include hydrated
+// evaluators — those come only from the GET /tests/{uuid} detail endpoint
+// (see TestDetail), which the edit/duplicate flows refetch.
 type TestData = {
   uuid: string;
   name: string;
   description: string;
   type: "response" | "tool_call" | "conversation";
   config: Record<string, any>;
-  evaluators?: TestEvaluatorRow[] | null;
   created_at: string;
   updated_at: string;
+};
+
+// Detail shape from GET /tests/{uuid}: TestData plus hydrated evaluator rows.
+type TestDetail = TestData & {
+  evaluators?: TestEvaluatorRow[] | null;
 };
 
 type Tool = {
@@ -719,7 +726,7 @@ function LLMPageInner() {
         throw new Error("Failed to fetch test details");
       }
 
-      const testData: TestData = await response.json();
+      const testData: TestDetail = await response.json();
 
       // Populate form fields with test data
       setNewTestName(testData.name || "");
@@ -791,7 +798,7 @@ function LLMPageInner() {
         throw new Error("Failed to fetch test details");
       }
 
-      const testData: TestData = await response.json();
+      const testData: TestDetail = await response.json();
 
       // Populate all dialog inputs before opening it.
       setEditingTestUuid(null);
