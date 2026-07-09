@@ -23,6 +23,10 @@ import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { showLimitToast } from "@/constants/limits";
 import { testTypeLabel, getUnitTestBreakdown } from "@/lib/testTypes";
 import {
+  TestTypeFilter,
+  type TestTypeFilterValue,
+} from "@/components/TestTypeFilter";
+import {
   readBulkNameConflictMessage,
   readNameConflictMessage,
 } from "@/lib/parseBackendError";
@@ -232,9 +236,8 @@ export function TestsTabContent({
   const [searchQuery, setSearchQuery] = useState("");
   // Filter the attach-existing dropdown by test type (mirrors the agent tests
   // table's `typeFilter`). Reset to "all" whenever the dropdown closes.
-  const [dropdownTypeFilter, setDropdownTypeFilter] = useState<
-    "all" | "response" | "tool_call" | "conversation"
-  >("all");
+  const [dropdownTypeFilter, setDropdownTypeFilter] =
+    useState<TestTypeFilterValue>("all");
   // Attach-existing dropdown multi-select. Holds the uuids ticked in the
   // dropdown (distinct from `selectedTestUuids`, which drives the agent
   // tests table's bulk actions). Cleared whenever the dropdown closes.
@@ -246,9 +249,7 @@ export function TestsTabContent({
   // Filter the agent's tests by test type. "all" shows both kinds; "response"
   // is Next Reply, "tool_call" is Tool Call. The "select all" checkbox keys
   // off `filteredAgentTests`, so this filter also narrows what gets selected.
-  const [typeFilter, setTypeFilter] = useState<
-    "all" | "response" | "tool_call" | "conversation"
-  >("all");
+  const [typeFilter, setTypeFilter] = useState<TestTypeFilterValue>("all");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Create-test dialog state (single test created in-place from the agent
@@ -1415,42 +1416,24 @@ export function TestsTabContent({
             {/* Type filter — narrows the list (and select-all) to one test
                 type. Changing it drops selections that no longer match so the
                 "Add N tests" count stays in step with what's visible. */}
-            <div className="mt-2 flex items-center gap-0.5 rounded-full bg-muted/60 p-0.5">
-              {(
-                [
-                  { value: "all", label: "All" },
-                  { value: "response", label: "Next Reply" },
-                  { value: "tool_call", label: "Tool Call" },
-                  { value: "conversation", label: "Conversation" },
-                ] as const
-              ).map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    setDropdownTypeFilter(opt.value);
-                    setSelectedAvailableUuids((prev) => {
-                      if (prev.size === 0) return prev;
-                      const next = new Set<string>();
-                      for (const t of availableTests) {
-                        if (!prev.has(t.uuid)) continue;
-                        if (opt.value !== "all" && t.type !== opt.value)
-                          continue;
-                        next.add(t.uuid);
-                      }
-                      return next;
-                    });
-                  }}
-                  className={`flex-1 h-6 px-1.5 rounded-full text-[11px] font-medium transition-colors cursor-pointer whitespace-nowrap ${
-                    dropdownTypeFilter === opt.value
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
+            <TestTypeFilter
+              size="sm"
+              className="mt-2"
+              value={dropdownTypeFilter}
+              onChange={(value) => {
+                setDropdownTypeFilter(value);
+                setSelectedAvailableUuids((prev) => {
+                  if (prev.size === 0) return prev;
+                  const next = new Set<string>();
+                  for (const t of availableTests) {
+                    if (!prev.has(t.uuid)) continue;
+                    if (value !== "all" && t.type !== value) continue;
+                    next.add(t.uuid);
+                  }
+                  return next;
+                });
+              }}
+            />
           </div>
           {/* Select-all header — scoped to the filtered list so a search
               query narrows what "select all" picks. */}
@@ -1948,45 +1931,25 @@ export function TestsTabContent({
               <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Type
               </span>
-              <div className="flex items-center gap-0.5 rounded-full bg-muted/60 p-0.5">
-                {(
-                  [
-                    { value: "all", label: "All" },
-                    { value: "response", label: "Next Reply" },
-                    { value: "tool_call", label: "Tool Call" },
-                    { value: "conversation", label: "Conversation" },
-                  ] as const
-                ).map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => {
-                      setTypeFilter(opt.value);
-                      // Drop any selection that no longer matches the new
-                      // filter so the bulk-action counts don't drift from
-                      // what's visible.
-                      setSelectedTestUuids((prev) => {
-                        if (prev.size === 0) return prev;
-                        const next = new Set<string>();
-                        for (const t of agentTests) {
-                          if (!prev.has(t.uuid)) continue;
-                          if (opt.value !== "all" && t.type !== opt.value)
-                            continue;
-                          next.add(t.uuid);
-                        }
-                        return next;
-                      });
-                    }}
-                    className={`h-7 px-3 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                      typeFilter === opt.value
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+              <TestTypeFilter
+                value={typeFilter}
+                onChange={(value) => {
+                  setTypeFilter(value);
+                  // Drop any selection that no longer matches the new
+                  // filter so the bulk-action counts don't drift from
+                  // what's visible.
+                  setSelectedTestUuids((prev) => {
+                    if (prev.size === 0) return prev;
+                    const next = new Set<string>();
+                    for (const t of agentTests) {
+                      if (!prev.has(t.uuid)) continue;
+                      if (value !== "all" && t.type !== value) continue;
+                      next.add(t.uuid);
+                    }
+                    return next;
+                  });
+                }}
+              />
             </div>
 
             <p className="text-sm text-muted-foreground mb-3 md:mb-4">
