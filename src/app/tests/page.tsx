@@ -174,7 +174,6 @@ function LLMPageInner() {
   }, []);
   const [addTestSidebarOpen, setAddTestSidebarOpen] = useState(false);
   const [newTestName, setNewTestName] = useState("");
-  const [newTestDescription, setNewTestDescription] = useState("");
   const [tests, setTests] = useState<TestData[]>([]);
   const [testsLoading, setTestsLoading] = useState(true);
   const [testsError, setTestsError] = useState<string | null>(null);
@@ -680,7 +679,6 @@ function LLMPageInner() {
 
       // Reset form fields
       setNewTestName("");
-      setNewTestDescription("");
 
       // Close the sidebar
       setAddTestSidebarOpen(false);
@@ -725,9 +723,6 @@ function LLMPageInner() {
 
       // Populate form fields with test data
       setNewTestName(testData.name || "");
-      setNewTestDescription(
-        testData.config?.description || testData.description || ""
-      );
       // Set initial tab based on test type
       setInitialTab(
         testData.type === "tool_call"
@@ -804,9 +799,6 @@ function LLMPageInner() {
       setNameConflictError(null);
       setValidationAttempted(false);
       setNewTestName(`Copy of ${testData.name || test.name}`);
-      setNewTestDescription(
-        testData.config?.description || testData.description || ""
-      );
       setInitialTab(
         testData.type === "tool_call" ? "tool-invocation" : "next-reply"
       );
@@ -927,7 +919,6 @@ function LLMPageInner() {
   // Reset form fields
   const resetForm = () => {
     setNewTestName("");
-    setNewTestDescription("");
     setEditingTestUuid(null);
     setCreateError(null);
     setNameConflictError(null);
@@ -938,18 +929,13 @@ function LLMPageInner() {
   };
 
   // Filter tests by type filter and search query. The match mode applies to
-  // each searchable field; a test matches if any field satisfies the mode.
-  // All filtering is client-side over the already-fetched list.
+  // the test name. All filtering is client-side over the already-fetched list.
   const trimmedQuery = searchQuery.trim();
   const filteredTests = tests.filter((test) => {
     if (typeFilter !== "all" && test.type !== typeFilter) return false;
     if (!trimmedQuery) return true;
-    return (
-      (test.name && matchesSearchMode(test.name, trimmedQuery, searchMode)) ||
-      (test.description &&
-        matchesSearchMode(test.description, trimmedQuery, searchMode)) ||
-      (test.config?.description &&
-        matchesSearchMode(test.config.description, trimmedQuery, searchMode))
+    return Boolean(
+      test.name && matchesSearchMode(test.name, trimmedQuery, searchMode)
     );
   });
 
