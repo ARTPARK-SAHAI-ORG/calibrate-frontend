@@ -1069,8 +1069,49 @@ function LLMPageInner() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search tests"
-            className="w-full h-9 md:h-10 pl-10 pr-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+            className="w-full h-9 md:h-10 pl-10 pr-36 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
           />
+          {/* Match mode — how the query is compared against each field.
+              Sits inside the right edge of the search bar, styled as an
+              inverted inline control (mirrors the tool-call arg matcher). */}
+          <div className="absolute inset-y-0 right-0 flex items-center pr-1.5">
+            <div className="relative">
+              <select
+                value={searchMode}
+                onChange={(e) =>
+                  setSearchMode(
+                    e.target.value as
+                      | "contains"
+                      | "starts-with"
+                      | "ends-with"
+                      | "exact"
+                  )
+                }
+                aria-label="Search match mode"
+                className="h-7 md:h-8 pl-2.5 pr-7 rounded-md text-xs font-medium bg-foreground text-background border border-transparent hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer appearance-none transition-opacity"
+              >
+                <option value="contains">Contains</option>
+                <option value="starts-with">Starts with</option>
+                <option value="ends-with">Ends with</option>
+                <option value="exact">Exact</option>
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-1.5 pointer-events-none">
+                <svg
+                  className="w-3.5 h-3.5 text-background"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Test type filter — narrows the list (and select-all) to one type.
@@ -1092,30 +1133,6 @@ function LLMPageInner() {
           }}
           className="w-fit"
         />
-
-        {/* Match mode — how the query is compared against each field */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          {(
-            [
-              ["contains", "Contains"],
-              ["starts-with", "Starts with"],
-              ["ends-with", "Ends with"],
-              ["exact", "Exact"],
-            ] as const
-          ).map(([mode, label]) => (
-            <button
-              key={mode}
-              onClick={() => setSearchMode(mode)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors cursor-pointer ${
-                searchMode === mode
-                  ? "bg-foreground text-background border-foreground"
-                  : "border-border text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
 
         {tests.length > 0 && (
           <p className="text-sm text-muted-foreground">
