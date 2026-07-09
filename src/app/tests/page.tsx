@@ -29,6 +29,10 @@ import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
 import { Tooltip } from "@/components/Tooltip";
 import { useSidebarState } from "@/lib/sidebar";
 import { testTypeLabel, getUnitTestBreakdown } from "@/lib/testTypes";
+import {
+  TestTypeFilter,
+  type TestTypeFilterValue,
+} from "@/components/TestTypeFilter";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import {
   readBulkNameConflictMessage,
@@ -142,9 +146,7 @@ function LLMPageInner() {
     searchParams.get("tab") === "runs" ? "runs" : "tests"
   );
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<
-    "all" | "response" | "tool_call" | "conversation"
-  >("all");
+  const [typeFilter, setTypeFilter] = useState<TestTypeFilterValue>("all");
 
   // All runs state
   const [allRuns, setAllRuns] = useState<AllRun[]>([]);
@@ -1049,41 +1051,25 @@ function LLMPageInner() {
           />
         </div>
 
-        {/* Test type filter */}
-        <div className="flex items-center gap-0.5 rounded-full bg-muted/60 p-0.5 w-fit">
-          {(
-            [
-              { value: "all", label: "All" },
-              { value: "response", label: "Next Reply" },
-              { value: "tool_call", label: "Tool Call" },
-              { value: "conversation", label: "Conversation" },
-            ] as const
-          ).map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => {
-                setTypeFilter(opt.value);
-                if (opt.value !== "all") {
-                  setSelectedTestUuids((prev) => {
-                    const next = new Set(prev);
-                    for (const test of tests) {
-                      if (test.type !== opt.value) next.delete(test.uuid);
-                    }
-                    return next;
-                  });
+        {/* Test type filter — narrows the list (and select-all) to one type.
+            Changing it drops selections that no longer match so the bulk
+            "Delete selected" count stays in step with what's visible. */}
+        <TestTypeFilter
+          value={typeFilter}
+          onChange={(value) => {
+            setTypeFilter(value);
+            if (value !== "all") {
+              setSelectedTestUuids((prev) => {
+                const next = new Set(prev);
+                for (const test of tests) {
+                  if (test.type !== value) next.delete(test.uuid);
                 }
-              }}
-              className={`h-7 px-3 rounded-full text-xs font-medium cursor-pointer transition-colors ${
-                typeFilter === opt.value
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+                return next;
+              });
+            }
+          }}
+          className="w-fit"
+        />
 
         {tests.length > 0 && (
           <p className="text-sm text-muted-foreground">
