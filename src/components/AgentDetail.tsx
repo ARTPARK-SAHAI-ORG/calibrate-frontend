@@ -1083,10 +1083,11 @@ export function AgentDetail({
         )}
       </div>
 
-      {/* Tab Content Container — pb clears the fixed "Talk to us" FAB so it
-          never overlaps the end of the page content (e.g. the connection
-          format docs). */}
-      <div className="pt-2 md:pt-4 pb-24">
+      {/* Tab Content Container — the outer wrapper's `space-y` already sets
+          the gap below the tab bar, so no extra top padding here. pb clears
+          the fixed "Talk to us" FAB so it never overlaps the end of the page
+          content (e.g. the connection format docs). */}
+      <div className="pb-24">
         {/* Connection Tab Content */}
         {activeTab === "connection" && agent.type === "connection" && (
           <AgentConnectionTabContent
