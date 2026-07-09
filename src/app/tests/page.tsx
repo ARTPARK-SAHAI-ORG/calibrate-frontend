@@ -1034,35 +1034,37 @@ function LLMPageInner() {
         {/* ── TESTS TAB ── */}
         {activeTab === "tests" && <>
 
-        {/* Search Input with inline match-mode selector */}
-        <SearchModeInput
-          value={searchQuery}
-          onChange={setSearchQuery}
-          mode={searchMode}
-          onModeChange={setSearchMode}
-          placeholder="Search tests"
-          className="max-w-md"
-        />
-
-        {/* Test type filter — narrows the list (and select-all) to one type.
-            Changing it drops selections that no longer match so the bulk
+        {/* Search + type filter share a row on wider screens (stacked on
+            mobile). The search's inline match-mode selector narrows how the
+            query matches; the type filter narrows the list (and select-all)
+            to one type, dropping selections that no longer match so the bulk
             "Delete selected" count stays in step with what's visible. */}
-        <TestTypeFilter
-          value={typeFilter}
-          onChange={(value) => {
-            setTypeFilter(value);
-            if (value !== "all") {
-              setSelectedTestUuids((prev) => {
-                const next = new Set(prev);
-                for (const test of tests) {
-                  if (test.type !== value) next.delete(test.uuid);
-                }
-                return next;
-              });
-            }
-          }}
-          className="w-fit"
-        />
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 md:gap-4">
+          <SearchModeInput
+            value={searchQuery}
+            onChange={setSearchQuery}
+            mode={searchMode}
+            onModeChange={setSearchMode}
+            placeholder="Search tests"
+            className="sm:max-w-md"
+          />
+          <TestTypeFilter
+            value={typeFilter}
+            onChange={(value) => {
+              setTypeFilter(value);
+              if (value !== "all") {
+                setSelectedTestUuids((prev) => {
+                  const next = new Set(prev);
+                  for (const test of tests) {
+                    if (test.type !== value) next.delete(test.uuid);
+                  }
+                  return next;
+                });
+              }
+            }}
+            className="w-fit flex-shrink-0"
+          />
+        </div>
 
         {tests.length > 0 && (
           <p className="text-sm text-muted-foreground">

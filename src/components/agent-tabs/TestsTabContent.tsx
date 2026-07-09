@@ -1704,7 +1704,7 @@ export function TestsTabContent({
           Multi-select bulk actions (Run / Remove / Delete subset) live
           above the table in their own toolbar, not here. */}
       {agentTests.length > 0 && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 md:mb-6">
           {/* Left group: act-on-the-tests buttons. */}
           <div className="flex flex-wrap items-center gap-2 md:gap-3">
             {/* Run all tests — sky tint, "play" semantic. */}
@@ -1901,7 +1901,7 @@ export function TestsTabContent({
               mode={testsSearchMode}
               onModeChange={setTestsSearchMode}
               placeholder="Search tests"
-              className="mb-2 md:mb-3"
+              className="mb-3 md:mb-4"
             />
             {/* Type filter — iOS-style segmented control. Visually
                 differentiated from the action buttons in the page header
