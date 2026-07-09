@@ -142,6 +142,9 @@ function LLMPageInner() {
     searchParams.get("tab") === "runs" ? "runs" : "tests"
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<
+    "all" | "response" | "tool_call" | "conversation"
+  >("all");
 
   // All runs state
   const [allRuns, setAllRuns] = useState<AllRun[]>([]);
@@ -926,18 +929,18 @@ function LLMPageInner() {
     setInitialEvaluators(undefined);
   };
 
-  // Filter tests based on search query
-  const filteredTests = tests.filter(
-    (test) =>
-      (test.name &&
-        test.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (test.description &&
-        test.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+  // Filter tests based on type filter and search query
+  const filteredTests = tests.filter((test) => {
+    if (typeFilter !== "all" && test.type !== typeFilter) return false;
+    const q = searchQuery.toLowerCase();
+    if (!q) return true;
+    return (
+      (test.name && test.name.toLowerCase().includes(q)) ||
+      (test.description && test.description.toLowerCase().includes(q)) ||
       (test.config?.description &&
-        test.config.description
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()))
-  );
+        test.config.description.toLowerCase().includes(q))
+    );
+  });
 
   return (
     <AppLayout
@@ -1044,6 +1047,42 @@ function LLMPageInner() {
             placeholder="Search tests"
             className="w-full h-9 md:h-10 pl-10 pr-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
           />
+        </div>
+
+        {/* Test type filter */}
+        <div className="flex items-center gap-0.5 rounded-full bg-muted/60 p-0.5 w-fit">
+          {(
+            [
+              { value: "all", label: "All" },
+              { value: "response", label: "Next Reply" },
+              { value: "tool_call", label: "Tool Call" },
+              { value: "conversation", label: "Conversation" },
+            ] as const
+          ).map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => {
+                setTypeFilter(opt.value);
+                if (opt.value !== "all") {
+                  setSelectedTestUuids((prev) => {
+                    const next = new Set(prev);
+                    for (const test of tests) {
+                      if (test.type !== opt.value) next.delete(test.uuid);
+                    }
+                    return next;
+                  });
+                }
+              }}
+              className={`h-7 px-3 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+                typeFilter === opt.value
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
 
         {tests.length > 0 && (
