@@ -1,4 +1,6 @@
 export { SearchInput } from "./SearchInput";
+export { SearchModeInput, matchesSearchMode } from "./SearchModeInput";
+export type { SearchMode } from "./SearchModeInput";
 export { Button } from "./Button";
 export { SlidePanel, SlidePanelFooter } from "./SlidePanel";
 export {

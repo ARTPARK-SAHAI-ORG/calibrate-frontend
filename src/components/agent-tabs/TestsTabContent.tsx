@@ -27,6 +27,11 @@ import {
   type TestTypeFilterValue,
 } from "@/components/TestTypeFilter";
 import {
+  SearchModeInput,
+  matchesSearchMode,
+  type SearchMode,
+} from "@/components/ui/SearchModeInput";
+import {
   readBulkNameConflictMessage,
   readNameConflictMessage,
 } from "@/lib/parseBackendError";
@@ -246,6 +251,9 @@ export function TestsTabContent({
   >(new Set());
   const [isAddingTests, setIsAddingTests] = useState(false);
   const [testsSearchQuery, setTestsSearchQuery] = useState("");
+  const [testsSearchMode, setTestsSearchMode] = useState<SearchMode>(
+    "contains"
+  );
   // Filter the agent's tests by test type. "all" shows both kinds; "response"
   // is Next Reply, "tool_call" is Tool Call. The "select all" checkbox keys
   // off `filteredAgentTests`, so this filter also narrows what gets selected.
@@ -697,11 +705,13 @@ export function TestsTabContent({
   // since it operates on `filteredAgentTests`.
   const filteredAgentTests = agentTests.filter((test) => {
     if (typeFilter !== "all" && test.type !== typeFilter) return false;
-    const q = testsSearchQuery.toLowerCase();
+    const q = testsSearchQuery.trim();
     if (!q) return true;
     return (
-      test.name.toLowerCase().includes(q) ||
-      (test.description ? test.description.toLowerCase().includes(q) : false)
+      matchesSearchMode(test.name, q, testsSearchMode) ||
+      (test.description
+        ? matchesSearchMode(test.description, q, testsSearchMode)
+        : false)
     );
   });
 
@@ -1882,32 +1892,17 @@ export function TestsTabContent({
         <div className="flex-1 flex flex-col lg:flex-row gap-4 md:gap-6">
           {/* Left Panel - Tests Table */}
           <div className="flex-1 flex flex-col min-w-0">
-            {/* Search input — full width so long test names have room to
-                wrap; the type filter sits below it on its own row. */}
-            <div className="relative mb-2 md:mb-3">
-              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <svg
-                  className="w-4 md:w-5 h-4 md:h-5 text-muted-foreground"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                  />
-                </svg>
-              </div>
-              <input
-                type="text"
-                value={testsSearchQuery}
-                onChange={(e) => setTestsSearchQuery(e.target.value)}
-                placeholder="Search tests"
-                className="w-full h-9 md:h-10 pl-9 md:pl-10 pr-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-              />
-            </div>
+            {/* Search input with inline match-mode selector — full width so
+                long test names have room to wrap; the type filter sits below
+                it on its own row. */}
+            <SearchModeInput
+              value={testsSearchQuery}
+              onChange={setTestsSearchQuery}
+              mode={testsSearchMode}
+              onModeChange={setTestsSearchMode}
+              placeholder="Search tests"
+              className="mb-2 md:mb-3"
+            />
             {/* Type filter — iOS-style segmented control. Visually
                 differentiated from the action buttons in the page header
                 (rectangular, h-9/h-10, foreground/border styling) by

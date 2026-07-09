@@ -26,6 +26,11 @@ import {
 import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
+import {
+  SearchModeInput,
+  matchesSearchMode,
+  type SearchMode,
+} from "@/components/ui/SearchModeInput";
 import { Tooltip } from "@/components/Tooltip";
 import { useSidebarState } from "@/lib/sidebar";
 import { testTypeLabel, getUnitTestBreakdown } from "@/lib/testTypes";
@@ -147,9 +152,7 @@ function LLMPageInner() {
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<TestTypeFilterValue>("all");
-  const [searchMode, setSearchMode] = useState<
-    "contains" | "starts-with" | "ends-with" | "exact"
-  >("contains");
+  const [searchMode, setSearchMode] = useState<SearchMode>("contains");
 
   // All runs state
   const [allRuns, setAllRuns] = useState<AllRun[]>([]);
@@ -934,35 +937,19 @@ function LLMPageInner() {
     setInitialEvaluators(undefined);
   };
 
-  // Filter tests based on type filter and search query. The match mode
-  // (contains / starts with / ends with / exact) applies to each searchable
-  // field; a test matches if any of its fields satisfies the mode. All
-  // filtering is client-side over the already-fetched list.
-  const matchesSearchMode = (value: string, query: string): boolean => {
-    const field = value.toLowerCase();
-    const q = query.toLowerCase();
-    switch (searchMode) {
-      case "starts-with":
-        return field.startsWith(q);
-      case "ends-with":
-        return field.endsWith(q);
-      case "exact":
-        return field === q;
-      case "contains":
-      default:
-        return field.includes(q);
-    }
-  };
-
+  // Filter tests by type filter and search query. The match mode applies to
+  // each searchable field; a test matches if any field satisfies the mode.
+  // All filtering is client-side over the already-fetched list.
   const trimmedQuery = searchQuery.trim();
   const filteredTests = tests.filter((test) => {
     if (typeFilter !== "all" && test.type !== typeFilter) return false;
     if (!trimmedQuery) return true;
     return (
-      (test.name && matchesSearchMode(test.name, trimmedQuery)) ||
-      (test.description && matchesSearchMode(test.description, trimmedQuery)) ||
+      (test.name && matchesSearchMode(test.name, trimmedQuery, searchMode)) ||
+      (test.description &&
+        matchesSearchMode(test.description, trimmedQuery, searchMode)) ||
       (test.config?.description &&
-        matchesSearchMode(test.config.description, trimmedQuery))
+        matchesSearchMode(test.config.description, trimmedQuery, searchMode))
     );
   });
 
@@ -1047,57 +1034,15 @@ function LLMPageInner() {
         {/* ── TESTS TAB ── */}
         {activeTab === "tests" && <>
 
-        {/* Search Input */}
-        <div className="relative max-w-md">
-          {/* Match mode — how the query is compared against each field.
-              Sits inside the left edge of the search bar, styled as an
-              inverted inline control (mirrors the tool-call arg matcher). */}
-          <div className="absolute inset-y-0 left-0 flex items-center pl-1.5">
-            <div className="relative">
-              <select
-                value={searchMode}
-                onChange={(e) =>
-                  setSearchMode(
-                    e.target.value as
-                      | "contains"
-                      | "starts-with"
-                      | "ends-with"
-                      | "exact"
-                  )
-                }
-                aria-label="Search match mode"
-                className="h-7 md:h-8 pl-2.5 pr-7 rounded-md text-xs font-medium bg-foreground text-background border border-transparent hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer appearance-none transition-opacity"
-              >
-                <option value="contains">Contains</option>
-                <option value="starts-with">Starts with</option>
-                <option value="ends-with">Ends with</option>
-                <option value="exact">Exact</option>
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-1.5 pointer-events-none">
-                <svg
-                  className="w-3.5 h-3.5 text-background"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                  />
-                </svg>
-              </div>
-            </div>
-          </div>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search tests"
-            className="w-full h-9 md:h-10 pl-36 pr-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-          />
-        </div>
+        {/* Search Input with inline match-mode selector */}
+        <SearchModeInput
+          value={searchQuery}
+          onChange={setSearchQuery}
+          mode={searchMode}
+          onModeChange={setSearchMode}
+          placeholder="Search tests"
+          className="max-w-md"
+        />
 
         {/* Test type filter — narrows the list (and select-all) to one type.
             Changing it drops selections that no longer match so the bulk
