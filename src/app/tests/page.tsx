@@ -147,6 +147,9 @@ function LLMPageInner() {
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<TestTypeFilterValue>("all");
+  const [searchMode, setSearchMode] = useState<
+    "contains" | "starts-with" | "ends-with" | "exact"
+  >("contains");
 
   // All runs state
   const [allRuns, setAllRuns] = useState<AllRun[]>([]);
@@ -931,16 +934,35 @@ function LLMPageInner() {
     setInitialEvaluators(undefined);
   };
 
-  // Filter tests based on type filter and search query
+  // Filter tests based on type filter and search query. The match mode
+  // (contains / starts with / ends with / exact) applies to each searchable
+  // field; a test matches if any of its fields satisfies the mode. All
+  // filtering is client-side over the already-fetched list.
+  const matchesSearchMode = (value: string, query: string): boolean => {
+    const field = value.toLowerCase();
+    const q = query.toLowerCase();
+    switch (searchMode) {
+      case "starts-with":
+        return field.startsWith(q);
+      case "ends-with":
+        return field.endsWith(q);
+      case "exact":
+        return field === q;
+      case "contains":
+      default:
+        return field.includes(q);
+    }
+  };
+
+  const trimmedQuery = searchQuery.trim();
   const filteredTests = tests.filter((test) => {
     if (typeFilter !== "all" && test.type !== typeFilter) return false;
-    const q = searchQuery.toLowerCase();
-    if (!q) return true;
+    if (!trimmedQuery) return true;
     return (
-      (test.name && test.name.toLowerCase().includes(q)) ||
-      (test.description && test.description.toLowerCase().includes(q)) ||
+      (test.name && matchesSearchMode(test.name, trimmedQuery)) ||
+      (test.description && matchesSearchMode(test.description, trimmedQuery)) ||
       (test.config?.description &&
-        test.config.description.toLowerCase().includes(q))
+        matchesSearchMode(test.config.description, trimmedQuery))
     );
   });
 
@@ -1070,6 +1092,30 @@ function LLMPageInner() {
           }}
           className="w-fit"
         />
+
+        {/* Match mode — how the query is compared against each field */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {(
+            [
+              ["contains", "Contains"],
+              ["starts-with", "Starts with"],
+              ["ends-with", "Ends with"],
+              ["exact", "Exact"],
+            ] as const
+          ).map(([mode, label]) => (
+            <button
+              key={mode}
+              onClick={() => setSearchMode(mode)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors cursor-pointer ${
+                searchMode === mode
+                  ? "bg-foreground text-background border-foreground"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
         {tests.length > 0 && (
           <p className="text-sm text-muted-foreground">
