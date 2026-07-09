@@ -13,6 +13,24 @@ export type Agent = {
   verified?: boolean;
 };
 
+// Normalise a raw GET /agents list payload into the picker's Agent shape.
+// `connection_verified` is read from the new top-level field, falling back to
+// the legacy nested `config.connection_verified` so this works whether or not
+// the slimmed backend response has shipped.
+function formatAgents(data: unknown): Agent[] {
+  if (!Array.isArray(data)) return [];
+  return data.map((agent: any) => ({
+    uuid: agent.uuid,
+    name: agent.name || agent.agent_name || String(agent),
+    type: agent.type === "connection" ? "connection" : "agent",
+    verified:
+      agent.type === "connection"
+        ? (agent.connection_verified ?? agent.config?.connection_verified) ===
+          true
+        : true,
+  }));
+}
+
 type AgentPickerProps = {
   selectedAgentUuid: string;
   onSelectAgent: (agent: Agent | null) => void;
@@ -116,17 +134,7 @@ export function AgentPicker({
         }
 
         const data = await response.json();
-        const formattedAgents: Agent[] = Array.isArray(data)
-          ? data.map((agent: any) => ({
-              uuid: agent.uuid,
-              name: agent.name || agent.agent_name || String(agent),
-              type: agent.type === "connection" ? "connection" : "agent",
-              verified:
-                agent.type === "connection"
-                  ? agent.config?.connection_verified === true
-                  : true,
-            }))
-          : [];
+        const formattedAgents = formatAgents(data);
         setAgents(formattedAgents);
       } catch (err) {
         reportError("Error fetching agents:", err);
@@ -230,17 +238,7 @@ export function MultiAgentPicker({
         if (!response.ok) return;
 
         const data = await response.json();
-        const formattedAgents: Agent[] = Array.isArray(data)
-          ? data.map((agent: any) => ({
-              uuid: agent.uuid,
-              name: agent.name || agent.agent_name || String(agent),
-              type: agent.type === "connection" ? "connection" : "agent",
-              verified:
-                agent.type === "connection"
-                  ? agent.config?.connection_verified === true
-                  : true,
-            }))
-          : [];
+        const formattedAgents = formatAgents(data);
         setAgents(formattedAgents);
         onAgentsLoadedRef.current?.(formattedAgents);
       } catch (err) {

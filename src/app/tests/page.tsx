@@ -55,15 +55,22 @@ type TestEvaluatorRow = {
   variable_values?: Record<string, string> | null;
 };
 
+// List shape from GET /tests. The list response does not include hydrated
+// evaluators — those come only from the GET /tests/{uuid} detail endpoint
+// (see TestDetail), which the edit/duplicate flows refetch.
 type TestData = {
   uuid: string;
   name: string;
   description: string;
   type: "response" | "tool_call" | "conversation";
   config: Record<string, any>;
-  evaluators?: TestEvaluatorRow[] | null;
   created_at: string;
   updated_at: string;
+};
+
+// Detail shape from GET /tests/{uuid}: TestData plus hydrated evaluator rows.
+type TestDetail = TestData & {
+  evaluators?: TestEvaluatorRow[] | null;
 };
 
 type Tool = {
@@ -174,7 +181,6 @@ function LLMPageInner() {
   }, []);
   const [addTestSidebarOpen, setAddTestSidebarOpen] = useState(false);
   const [newTestName, setNewTestName] = useState("");
-  const [newTestDescription, setNewTestDescription] = useState("");
   const [tests, setTests] = useState<TestData[]>([]);
   const [testsLoading, setTestsLoading] = useState(true);
   const [testsError, setTestsError] = useState<string | null>(null);
@@ -680,7 +686,6 @@ function LLMPageInner() {
 
       // Reset form fields
       setNewTestName("");
-      setNewTestDescription("");
 
       // Close the sidebar
       setAddTestSidebarOpen(false);
@@ -721,13 +726,10 @@ function LLMPageInner() {
         throw new Error("Failed to fetch test details");
       }
 
-      const testData: TestData = await response.json();
+      const testData: TestDetail = await response.json();
 
       // Populate form fields with test data
       setNewTestName(testData.name || "");
-      setNewTestDescription(
-        testData.config?.description || testData.description || ""
-      );
       // Set initial tab based on test type
       setInitialTab(
         testData.type === "tool_call"
@@ -796,7 +798,7 @@ function LLMPageInner() {
         throw new Error("Failed to fetch test details");
       }
 
-      const testData: TestData = await response.json();
+      const testData: TestDetail = await response.json();
 
       // Populate all dialog inputs before opening it.
       setEditingTestUuid(null);
@@ -804,9 +806,6 @@ function LLMPageInner() {
       setNameConflictError(null);
       setValidationAttempted(false);
       setNewTestName(`Copy of ${testData.name || test.name}`);
-      setNewTestDescription(
-        testData.config?.description || testData.description || ""
-      );
       setInitialTab(
         testData.type === "tool_call" ? "tool-invocation" : "next-reply"
       );
@@ -927,7 +926,6 @@ function LLMPageInner() {
   // Reset form fields
   const resetForm = () => {
     setNewTestName("");
-    setNewTestDescription("");
     setEditingTestUuid(null);
     setCreateError(null);
     setNameConflictError(null);
@@ -938,18 +936,13 @@ function LLMPageInner() {
   };
 
   // Filter tests by type filter and search query. The match mode applies to
-  // each searchable field; a test matches if any field satisfies the mode.
-  // All filtering is client-side over the already-fetched list.
+  // the test name. All filtering is client-side over the already-fetched list.
   const trimmedQuery = searchQuery.trim();
   const filteredTests = tests.filter((test) => {
     if (typeFilter !== "all" && test.type !== typeFilter) return false;
     if (!trimmedQuery) return true;
-    return (
-      (test.name && matchesSearchMode(test.name, trimmedQuery, searchMode)) ||
-      (test.description &&
-        matchesSearchMode(test.description, trimmedQuery, searchMode)) ||
-      (test.config?.description &&
-        matchesSearchMode(test.config.description, trimmedQuery, searchMode))
+    return Boolean(
+      test.name && matchesSearchMode(test.name, trimmedQuery, searchMode)
     );
   });
 

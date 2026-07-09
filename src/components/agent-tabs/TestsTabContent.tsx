@@ -686,10 +686,7 @@ export function TestsTabContent({
       return false;
     const q = searchQuery.toLowerCase();
     if (!q) return true;
-    return (
-      test.name.toLowerCase().includes(q) ||
-      (test.description ? test.description.toLowerCase().includes(q) : false)
-    );
+    return test.name.toLowerCase().includes(q);
   });
 
   // True when every currently-visible (filtered) dropdown row is selected;
@@ -707,12 +704,7 @@ export function TestsTabContent({
     if (typeFilter !== "all" && test.type !== typeFilter) return false;
     const q = testsSearchQuery.trim();
     if (!q) return true;
-    return (
-      matchesSearchMode(test.name, q, testsSearchMode) ||
-      (test.description
-        ? matchesSearchMode(test.description, q, testsSearchMode)
-        : false)
-    );
+    return matchesSearchMode(test.name, q, testsSearchMode);
   });
 
   // Toggle a single test's selection in the attach-existing dropdown.
@@ -1508,11 +1500,6 @@ export function TestsTabContent({
                       <span className="block text-sm font-medium text-foreground truncate">
                         {test.name}
                       </span>
-                      {test.description && (
-                        <span className="block text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                          {test.description}
-                        </span>
-                      )}
                       <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">
                         {testTypeLabel(test.type)}
                       </span>
