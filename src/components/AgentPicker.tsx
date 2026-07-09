@@ -123,7 +123,8 @@ export function AgentPicker({
               type: agent.type === "connection" ? "connection" : "agent",
               verified:
                 agent.type === "connection"
-                  ? agent.config?.connection_verified === true
+                  ? (agent.connection_verified ??
+                      agent.config?.connection_verified) === true
                   : true,
             }))
           : [];
@@ -237,7 +238,8 @@ export function MultiAgentPicker({
               type: agent.type === "connection" ? "connection" : "agent",
               verified:
                 agent.type === "connection"
-                  ? agent.config?.connection_verified === true
+                  ? (agent.connection_verified ??
+                      agent.config?.connection_verified) === true
                   : true,
             }))
           : [];
