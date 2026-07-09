@@ -1049,32 +1049,10 @@ function LLMPageInner() {
 
         {/* Search Input */}
         <div className="relative max-w-md">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <svg
-              className="w-5 h-5 text-muted-foreground"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-              />
-            </svg>
-          </div>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search tests"
-            className="w-full h-9 md:h-10 pl-10 pr-36 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-          />
           {/* Match mode — how the query is compared against each field.
-              Sits inside the right edge of the search bar, styled as an
+              Sits inside the left edge of the search bar, styled as an
               inverted inline control (mirrors the tool-call arg matcher). */}
-          <div className="absolute inset-y-0 right-0 flex items-center pr-1.5">
+          <div className="absolute inset-y-0 left-0 flex items-center pl-1.5">
             <div className="relative">
               <select
                 value={searchMode}
@@ -1112,6 +1090,13 @@ function LLMPageInner() {
               </div>
             </div>
           </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search tests"
+            className="w-full h-9 md:h-10 pl-36 pr-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+          />
         </div>
 
         {/* Test type filter — narrows the list (and select-all) to one type.
