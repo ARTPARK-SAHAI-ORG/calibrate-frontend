@@ -1142,16 +1142,16 @@ function LLMPageInner() {
               No tests found
             </h3>
             <p className="text-sm md:text-base text-muted-foreground mb-3 md:mb-4 text-center">
-              {searchQuery
+              {searchQuery || typeFilter !== "all"
                 ? "No tests match your search"
                 : "You haven't created any tests yet"}
             </p>
-            {/* When the library is truly empty (no search filter), show
-                both create affordances inline — the top-right area is
+            {/* When the library is truly empty (no search or type filter),
+                show both create affordances inline — the top-right area is
                 hidden in that case so this is the only entry point.
-                When the empty state is search-driven, render no button
-                (the user can clear the search). */}
-            {!searchQuery && (
+                When the empty state is filter-driven, render no button
+                (the user can clear the search or filter). */}
+            {!searchQuery && typeFilter === "all" && (
               <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
                 <button
                   onClick={() => {
