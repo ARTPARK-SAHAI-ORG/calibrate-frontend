@@ -84,6 +84,10 @@ jobs:
           path: backend
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
+        with:
+          # The cache-prune post-step can exit non-zero and fail an otherwise
+          # green job; we don't need the cache for a single backend boot.
+          enable-cache: false
       - name: Install backend system dependencies
         # simpleaudio compiles against ALSA headers; matches calibrate-backend CI.
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev
