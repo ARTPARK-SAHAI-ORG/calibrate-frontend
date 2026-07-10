@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { STORAGE_STATE } from "./e2e/storage-state";
 
 /**
  * End-to-end tests: drive a real browser through the running app.
@@ -79,7 +80,25 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    // Signs up a user against the backend and saves storage state. A
+    // dependency of `authenticated`, so it runs first.
+    { name: "setup", testMatch: /.*\.setup\.ts/ },
+    // Backend-free specs (public routes, client-side behavior). This is what
+    // `npm run test:e2e` runs — no backend required.
+    {
+      name: "public",
+      testMatch: /login\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    // Backend-backed specs. Loads the storage state from `setup` so tests
+    // start logged in. Run via `npm run test:e2e:integration` with a backend
+    // at NEXT_PUBLIC_BACKEND_URL.
+    {
+      name: "authenticated",
+      testMatch: /.*\.auth\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"], storageState: STORAGE_STATE },
+      dependencies: ["setup"],
+    },
   ],
   webServer: {
     command: `npm run dev -- -p ${PORT}`,

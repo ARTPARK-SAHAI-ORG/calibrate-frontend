@@ -24,9 +24,10 @@ First-time setup only: `npx playwright install chromium` to download the browser
 E2E coverage is **separate** from the Jest component coverage:
 
 ```bash
-npm run test:e2e:coverage   # -> coverage/e2e/   (this suite)
-npm run test:coverage       # -> coverage/component/ (Jest / RTL)
-npm run coverage            # both, into their own dirs
+npm run test:e2e:coverage              # public specs      -> coverage/e2e/
+npm run test:e2e:integration:coverage  # authenticated     -> coverage/e2e/ (needs backend)
+npm run test:coverage                  # component (Jest)  -> coverage/component/
+npm run coverage                       # component + public e2e, into their own dirs
 ```
 
 `npm run test:e2e:coverage` sets `E2E_COVERAGE=1`, which turns on the
@@ -38,19 +39,51 @@ generated bundle chunks monocart also emits, leaving only real `src/` files in
 the lcov so CI tools don't double-count. Coverage collection is Chromium-only
 and a no-op on a plain `npm run test:e2e` run.
 
-## When you need the backend
+## Two kinds of E2E: public vs. integration
 
-The starter `login.spec.ts` only touches the public `/login` route and its
-client-side validation, so it needs **no backend**.
+Specs are split into two Playwright **projects** (see `playwright.config.ts`):
 
-Authenticated flows (agents, tests, simulations) go through the auth middleware
-and call `NEXT_PUBLIC_BACKEND_URL`. Two options:
+| Project | Command | Backend | Specs |
+| --- | --- | --- | --- |
+| `public` | `npm run test:e2e` | none | `login.spec.ts` — public routes, client-side behavior |
+| `authenticated` | `npm run test:e2e:integration` | **required** | `*.auth.spec.ts` — logged-in flows against a real backend |
 
-1. **Real/staging backend** — set `NEXT_PUBLIC_BACKEND_URL` and seed an
-   `access_token` (via `page.addInitScript` writing to `localStorage` + cookie,
-   mirroring what `src/app/login/page.tsx` does on success) to skip the login UI.
-2. **Mock at the network layer** — `page.route("**/agents", route => route.fulfill({ json: [...] }))`
-   to return canned responses without a backend.
+### How authenticated specs log in (no login UI)
+
+`auth.setup.ts` runs first (a project dependency). It calls the backend's
+`POST /auth/signup` to mint a real JWT, seeds it as the `access_token` cookie +
+localStorage (exactly what `src/app/login/page.tsx` does on a real login), and
+saves it as Playwright storage state (`e2e/.auth/user.json`, gitignored). The
+`authenticated` specs load that state, so they start already logged in and can
+hit protected pages directly.
+
+### Running the backend
+
+The backend is the open-source [`calibrate-backend`](https://github.com/ARTPARK-SAHAI-ORG/calibrate-backend).
+It's a Python/`uv` app using on-disk SQLite — no external services.
+
+Locally:
+
+```bash
+# in a clone of calibrate-backend, from its src/ dir
+DB_ROOT_DIR=/tmp/cal-db OBJECT_STORAGE_MODE=local MAX_CONCURRENT_JOBS=1 \
+  JWT_SECRET_KEY=dev-secret-at-least-32-characters-long \
+  CORS_ALLOWED_ORIGINS=http://localhost:3100 \
+  uv run uvicorn main:app --port 8000
+
+# then, in this repo:
+NEXT_PUBLIC_BACKEND_URL=http://localhost:8000 npm run test:e2e:integration
+```
+
+Point `NEXT_PUBLIC_BACKEND_URL` at any backend (local or staging). CI does the
+same automatically in the `e2e-integration` job — it checks out the backend,
+boots it on `:8000`, and runs `test:e2e:integration:coverage`.
+
+> CORS: the E2E frontend runs on `:3100`, so the backend's
+> `CORS_ALLOWED_ORIGINS` must include `http://localhost:3100`.
+
+Prefer not to run a backend for a given spec? Mock at the network layer instead:
+`page.route("**/agents", route => route.fulfill({ json: [...] }))`.
 
 ## Where each kind of test goes
 

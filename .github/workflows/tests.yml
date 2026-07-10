@@ -5,8 +5,10 @@ on:
     branches: [main]
   pull_request:
 
-# Two independent jobs so each coverage layer is uploaded to Codecov under its
-# own flag (component / e2e) and reported separately in the PR comment.
+# Jobs upload coverage to Codecov under two flags — component (Jest) and e2e
+# (Playwright) — reported separately in the PR comment. The fast `e2e` job runs
+# backend-free public specs; `e2e-integration` boots the real backend and runs
+# authenticated specs. Both e2e jobs upload the `e2e` flag (Codecov merges them).
 jobs:
   component:
     name: Component tests (Jest)
@@ -54,3 +56,68 @@ jobs:
           files: ./coverage/e2e/lcov.info
           flags: e2e
           fail_ci_if_error: false
+
+  e2e-integration:
+    name: E2E integration tests (real backend)
+    runs-on: ubuntu-latest
+    env:
+      # Frontend points at the locally-run backend (started below).
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:8000
+      AUTH_SECRET: ci-placeholder-secret-not-used
+      GOOGLE_CLIENT_ID: ci-placeholder
+      GOOGLE_CLIENT_SECRET: ci-placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      # --- Boot the real backend (calibrate-backend, tracks main) ---
+      - name: Check out backend
+        uses: actions/checkout@v4
+        with:
+          repository: ARTPARK-SAHAI-ORG/calibrate-backend
+          path: backend
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+      - name: Install backend dependencies
+        run: uv sync
+        working-directory: backend
+      - name: Start backend on :8000
+        working-directory: backend/src
+        env:
+          DB_ROOT_DIR: ${{ runner.temp }}/cal-db
+          OBJECT_STORAGE_MODE: local
+          LOCAL_ARTIFACT_BASE_URL: http://localhost:8000
+          PUBLIC_API_BASE_URL: http://localhost:8000
+          MAX_CONCURRENT_JOBS: "1"
+          MAX_CONCURRENT_JOBS_PER_ORG: "1"
+          JWT_SECRET_KEY: ci-test-secret-at-least-32-characters-long
+          # E2E frontend runs on :3100 (see playwright.config.ts).
+          CORS_ALLOWED_ORIGINS: http://localhost:3100
+          DEFAULT_USER_EMAIL: seed@example.com
+        run: |
+          mkdir -p "$DB_ROOT_DIR"
+          nohup uv run uvicorn main:app --host 0.0.0.0 --port 8000 > "$RUNNER_TEMP/backend.log" 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8000/ >/dev/null; then echo "backend up"; exit 0; fi
+            sleep 2
+          done
+          echo "backend failed to start"; cat "$RUNNER_TEMP/backend.log"; exit 1
+
+      - name: Run integration E2E with coverage
+        run: npm run test:e2e:integration:coverage
+      - name: Upload E2E coverage
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/e2e/lcov.info
+          flags: e2e
+          fail_ci_if_error: false
+      - name: Backend log (on failure)
+        if: failure()
+        run: cat "$RUNNER_TEMP/backend.log" || true

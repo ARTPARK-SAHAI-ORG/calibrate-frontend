@@ -19,10 +19,12 @@ npm test               # jest (jsdom)
 npm test -- path/to/file.test.ts    # single test file
 npm test -- -t "test name"          # single test by name
 npm run test:coverage  # component (Jest) coverage -> coverage/component/
-npm run test:e2e       # playwright end-to-end (boots dev server on :3100)
+npm run test:e2e       # playwright public specs, no backend (dev server on :3100)
+npm run test:e2e:integration       # playwright authenticated specs (needs backend on :8000)
 npm run test:e2e:ui    # playwright interactive UI mode
-npm run test:e2e:coverage  # E2E coverage -> coverage/e2e/
-npm run coverage       # run BOTH coverages into their separate dirs
+npm run test:e2e:coverage          # public E2E coverage -> coverage/e2e/
+npm run test:e2e:integration:coverage  # authenticated E2E coverage -> coverage/e2e/
+npm run coverage       # component + public E2E coverage into their separate dirs
 ```
 
 Before starting dev: `cp env.example .env.local` and fill in `NEXT_PUBLIC_BACKEND_URL`, `AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`. Husky installs git hooks via `npm install` (`prepare` script).
@@ -32,13 +34,17 @@ Before starting dev: `cp env.example .env.local` and fill in `NEXT_PUBLIC_BACKEN
 Two layers, both scaffolded with runnable examples:
 
 - **Component / interaction tests** — Jest (jsdom) + React Testing Library + `@testing-library/user-event`, picked up from `src/**/__tests__/` and `*.{test,spec}.{ts,tsx}`. `jest.setup.ts` globally mocks `next-auth/react` (untranspiled ESM, pulled in via `AppLayout`) and `next/navigation` (router hooks) so components render in jsdom. **Import RTL through `src/test-utils/`** (`render`, `screen`, `setupUser`) — its `render` wraps components in the app's global providers (`FloatingButtonProvider`). Examples: `src/components/ui/__tests__/` (Button, SearchInput) and `src/components/__tests__/` (DeleteConfirmationDialog, CreateWorkspaceDialog — the async-form pattern: pass a `jest.fn()` for the `onCreate`/API callback so no network happens).
-- **End-to-end tests** — Playwright in `e2e/`, config in `playwright.config.ts` (its `webServer` boots `npm run dev -- -p 3100` on a dedicated port so it never collides with a hand-run :3000 server or another worktree; override via `E2E_PORT`). Jest ignores `e2e/` via `testPathIgnorePatterns`. The starter `e2e/login.spec.ts` drives the public `/login` route and its client-side validation with **no backend needed**; authenticated flows need `NEXT_PUBLIC_BACKEND_URL` (real/staging) or `page.route(...)` network mocks — see `e2e/README.md`.
+- **End-to-end tests** — Playwright in `e2e/`, config in `playwright.config.ts` (its `webServer` boots `npm run dev -- -p 3100` on a dedicated port so it never collides with a hand-run :3000 server or another worktree; override via `E2E_PORT`). Jest ignores `e2e/` via `testPathIgnorePatterns`. Split into two projects:
+  - **`public`** (`npm run test:e2e`) — `login.spec.ts`, public routes / client-side behavior, **no backend**.
+  - **`authenticated`** (`npm run test:e2e:integration`) — `*.auth.spec.ts`, backend-backed. `e2e/auth.setup.ts` runs first (project dependency): it `POST`s `/auth/signup` on `NEXT_PUBLIC_BACKEND_URL` to mint a real JWT, seeds it as the `access_token` cookie + localStorage, and saves Playwright storage state to `e2e/.auth/user.json` (gitignored) so specs start logged in. Needs a backend on `:8000` — the open-source [`calibrate-backend`](https://github.com/ARTPARK-SAHAI-ORG/calibrate-backend) (Python/`uv`, on-disk SQLite, no external services). Its `CORS_ALLOWED_ORIGINS` must include `http://localhost:3100`. See `e2e/README.md`.
 
 Rule of thumb: component behavior (dialog opens, form validates, filter updates a list) → RTL; full flows across pages, routing, middleware → Playwright.
 
+**CI** (`.github/workflows/tests.yml`): three jobs — `component` (Jest), `e2e` (public, backend-free), and `e2e-integration` (checks out + boots `calibrate-backend` via `uv` on `:8000`, runs the authenticated specs). Each uploads coverage to Codecov under a flag (`component` / `e2e`; both e2e jobs use `e2e`, which Codecov merges). Needs a `CODECOV_TOKEN` repo secret. `codecov.yml` declares the flags and per-flag status checks.
+
 **Coverage is measured separately per layer** — component coverage never mixes with E2E coverage:
 - **Component** (`npm run test:coverage`) — Jest v8 provider → `coverage/component/` (lcov + HTML + json-summary), `collectCoverageFrom` = `src/**` minus `src/app`, `.d.ts`, instrumentation, middleware.
-- **E2E** (`npm run test:e2e:coverage`) — sets `E2E_COVERAGE=1`, enabling `monocart-reporter` + the coverage hook in `e2e/fixtures.ts` (import `test`/`expect` from `./fixtures`, not `@playwright/test`). Collects Chromium V8 coverage, source-maps it to `src/*`, writes `coverage/e2e/` (lcov + HTML). `scripts/clean-e2e-lcov.mjs` post-strips the generated bundle chunks monocart also emits so the lcov is `src/`-only. Chromium-only; a no-op on plain `npm run test:e2e`.
+- **E2E** (`npm run test:e2e:coverage` for public, `test:e2e:integration:coverage` for authenticated) — sets `E2E_COVERAGE=1`, enabling `monocart-reporter` + the coverage hook in `e2e/fixtures.ts` (import `test`/`expect` from `./fixtures`, not `@playwright/test`). Collects Chromium V8 coverage, source-maps it to `src/*`, writes `coverage/e2e/` (lcov + HTML). `scripts/clean-e2e-lcov.mjs` post-strips the generated bundle chunks monocart also emits so the lcov is `src/`-only. Chromium-only; a no-op on plain `npm run test:e2e`. (Authenticated coverage is far higher — it exercises `AppLayout`, `Agents`, etc.)
 - `npm run coverage` runs both into their separate dirs. Both live under `/coverage` (gitignored).
 
 ## Authoritative project docs
