@@ -1,0 +1,28 @@
+# Coverage is uploaded in two independent flags so Codecov reports the
+# component (Jest/RTL) and E2E (Playwright) layers separately in every PR.
+flag_management:
+  default_rules:
+    carryforward: true # keep a flag's last coverage if its job didn't run
+  individual_flags:
+    - name: component
+      paths:
+        - src/
+    - name: e2e
+      paths:
+        - src/
+
+coverage:
+  status:
+    project:
+      default:
+        informational: true # report the number, don't fail the PR (tune later)
+      component:
+        flags: [component]
+        informational: true
+      e2e:
+        flags: [e2e]
+        informational: true
+
+comment:
+  layout: "reach, diff, flags, files"
+  require_changes: false

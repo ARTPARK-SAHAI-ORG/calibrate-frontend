@@ -1,0 +1,56 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Two independent jobs so each coverage layer is uploaded to Codecov under its
+# own flag (component / e2e) and reported separately in the PR comment.
+jobs:
+  component:
+    name: Component tests (Jest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:coverage
+      - name: Upload component coverage
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/component/lcov.info
+          flags: component
+          fail_ci_if_error: false
+
+  e2e:
+    name: E2E tests (Playwright)
+    runs-on: ubuntu-latest
+    # The starter e2e spec only hits the public /login route, so no real
+    # backend is needed — these are dummy values just so the app boots.
+    env:
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:9999
+      AUTH_SECRET: ci-placeholder-secret-not-used
+      GOOGLE_CLIENT_ID: ci-placeholder
+      GOOGLE_CLIENT_SECRET: ci-placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e:coverage
+      - name: Upload E2E coverage
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/e2e/lcov.info
+          flags: e2e
+          fail_ci_if_error: false
