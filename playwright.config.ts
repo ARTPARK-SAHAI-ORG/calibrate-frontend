@@ -11,23 +11,79 @@ import { defineConfig, devices } from "@playwright/test";
  * Note: specs that hit authenticated pages need a real or mocked backend
  * (`NEXT_PUBLIC_BACKEND_URL`). The starter spec only touches public routes so
  * it runs with no backend. See e2e/README.md.
+ *
+ * Coverage: run `E2E_COVERAGE=1 npx playwright test` (or `npm run
+ * test:e2e:coverage`) to collect V8 code coverage of the app source. The
+ * monocart-reporter maps it back to `src/` and writes lcov + HTML to
+ * coverage/e2e/ — separate from the Jest component coverage in
+ * coverage/component/. See e2e/fixtures.ts for the collection hook.
  */
+const COLLECT_COVERAGE = process.env.E2E_COVERAGE === "1";
+
+// E2E runs on its own port so it never reuses (and mixes coverage with) a dev
+// server you're running by hand on :3000, or one from another git worktree.
+const PORT = Number(process.env.E2E_PORT ?? 3100);
+const BASE_URL = `http://localhost:${PORT}`;
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  reporter: process.env.CI ? "github" : "list",
+  reporter: COLLECT_COVERAGE
+    ? [
+        ["list"],
+        [
+          "monocart-reporter",
+          {
+            name: "Calibrate E2E",
+            outputFile: "./coverage/e2e/test-report.html",
+            coverage: {
+              // Which V8 entries to process: our own dev server's app JS
+              // chunks. Drop the HTML document, HMR client, and Turbopack
+              // runtime — none carry useful app source.
+              entryFilter: (entry: { url: string }) => {
+                const url = entry.url || "";
+                if (!url.includes(`localhost:${PORT}/_next/`)) return false;
+                if (url.includes("hmr-client")) return false;
+                if (url.includes("[turbopack]")) return false;
+                return true;
+              },
+              // Unified source filter (glob, first match wins) applied to
+              // every source — including un-source-mapped generated chunks,
+              // which sourceFilter alone doesn't catch. Keep only our app
+              // dirs; drop bundles, node_modules, and the Next.js framework
+              // (its sources also map under a `src/` path, e.g. next/src/...).
+              filter: {
+                "**/_next/**": false,
+                "**/node_modules/**": false,
+                "**/next/src/**": false,
+                "**/src/app/**": true,
+                "**/src/components/**": true,
+                "**/src/hooks/**": true,
+                "**/src/lib/**": true,
+                "**/src/constants/**": true,
+                "**": false,
+              },
+              reports: [["lcovonly"], ["html"], ["console-summary"]],
+              outputDir: "./coverage/e2e",
+            },
+          },
+        ],
+      ]
+    : process.env.CI
+      ? "github"
+      : "list",
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: BASE_URL,
     trace: "on-first-retry",
   },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
   ],
   webServer: {
-    command: "npm run dev",
-    url: "http://localhost:3000",
+    command: `npm run dev -- -p ${PORT}`,
+    url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

@@ -1,4 +1,6 @@
-import { test, expect } from "@playwright/test";
+// Import from ./fixtures (not @playwright/test) so E2E coverage is collected
+// when E2E_COVERAGE=1. Behaves identically to the base test otherwise.
+import { test, expect } from "./fixtures";
 
 /**
  * Example end-to-end test: real browser, real page, real clicks.

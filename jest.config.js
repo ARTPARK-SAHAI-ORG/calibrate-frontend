@@ -18,6 +18,10 @@ const config = {
     "!src/middleware.ts",
     "!src/**/__tests__/**",
   ],
+  // Component-level coverage lands in coverage/component/ (kept separate from
+  // the Playwright E2E coverage in coverage/e2e/). `lcov` also writes an HTML
+  // report at coverage/component/lcov-report/index.html.
+  coverageDirectory: "<rootDir>/coverage/component",
   coverageReporters: ["text", "lcov", "json-summary"],
   testMatch: [
     "**/__tests__/**/*.{ts,tsx}",
