@@ -49,6 +49,8 @@ There is currently no test suite checked in — `jest.config.js` is configured b
 
 **API client**: `src/lib/api.ts` wraps fetch with default headers (Bearer token, `X-Org-UUID`) and auto-signs-out on 401. Prefer it over raw fetch when adding new backend calls.
 
+**Paginated list endpoints**: the backend list endpoints — `GET /agents`, `/tests`, `/evaluators`, `/annotation-tasks`, `/agent-tests/agent/{uuid}/tests`, `/agent-tests/agent/{uuid}/runs`, and `/agent-tests/runs` — return a `{ items, total, limit, offset }` envelope (`Paginated<T>` in `api.ts`), not a bare array. Read the array through `unwrapList<T>(data)` from `src/lib/api.ts`; it tolerates the envelope, a legacy `{ runs: [...] }` payload, and a bare array (so it's safe for the still-unchanged list endpoints like `/tools`, `/personas`, `/scenarios`). The `q`/`limit`/`offset`/`type`/`status`/`has_failures` query params are all optional and currently unused — all list filtering/search/sort is still done client-side over the fully-fetched `items`.
+
 **Workspaces / orgs**: The backend is multi-tenant — every request resolves an active workspace from the `X-Org-UUID` header (falling back to the user's personal workspace if absent). Frontend plumbing:
 - `src/lib/orgs.ts` — types (`Organization`, `OrganizationMember`), localStorage helpers (`getActiveOrgUuid`, `setActiveOrgUuid`), and the `calibrate:active-org-changed` event.
 - `src/lib/api.ts` — `getDefaultHeaders()` reads the active uuid and attaches `X-Org-UUID`.

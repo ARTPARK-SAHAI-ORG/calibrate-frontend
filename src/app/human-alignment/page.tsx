@@ -19,7 +19,7 @@ import { CreateLabellingTaskDialog } from "@/components/human-labelling/CreateLa
 import { EmptyState } from "@/components/ui/LoadingState";
 import { Select } from "@/components/ui/Select";
 import { useAccessToken } from "@/hooks";
-import { apiClient } from "@/lib/api";
+import { apiClient, unwrapList } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 
 type Tab = "overview" | "tasks" | "annotators";
@@ -242,11 +242,11 @@ function HumanLabellingPageInner() {
     setTasksLoading(true);
     setTasksError(null);
     try {
-      const data = await apiClient<LabellingTask[]>(
+      const data = await apiClient<unknown>(
         "/annotation-tasks",
         accessToken,
       );
-      setTasks(Array.isArray(data) ? data : []);
+      setTasks(unwrapList<LabellingTask>(data));
     } catch (err) {
       setTasksError(parseApiError(err, "Failed to load labelling tasks"));
     } finally {

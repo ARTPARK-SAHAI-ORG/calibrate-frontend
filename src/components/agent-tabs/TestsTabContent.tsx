@@ -4,7 +4,7 @@ import { reportError } from "@/lib/reportError";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { signOut } from "next-auth/react";
 import { useAccessToken, useMaxRowsPerEval } from "@/hooks";
-import { getDefaultHeaders } from "@/lib/api";
+import { getDefaultHeaders, unwrapList } from "@/lib/api";
 
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
@@ -394,8 +394,8 @@ export function TestsTabContent({
         throw new Error("Failed to fetch agent tests");
       }
 
-      const data: TestData[] = await response.json();
-      setAgentTests(data);
+      const data = await response.json();
+      setAgentTests(unwrapList<TestData>(data));
     } catch (err) {
       reportError("Error fetching agent tests:", err);
       setAgentTestsError(
@@ -439,8 +439,8 @@ export function TestsTabContent({
         throw new Error("Failed to fetch tests");
       }
 
-      const data: TestData[] = await response.json();
-      setAllTests(data);
+      const data = await response.json();
+      setAllTests(unwrapList<TestData>(data));
       setAllTestsFetched(true);
     } catch (err) {
       reportError("Error fetching tests:", err);
@@ -539,7 +539,7 @@ export function TestsTabContent({
         }
 
         const data = await response.json();
-        setPastRuns(data.runs || []);
+        setPastRuns(unwrapList<TestRun>(data));
       } catch (err) {
         reportError("Error fetching past runs:", err);
       } finally {

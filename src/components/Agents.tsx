@@ -1,5 +1,6 @@
 "use client";
 import { reportError } from "@/lib/reportError";
+import { unwrapList } from "@/lib/api";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -93,19 +94,19 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
 
         const data = await response.json();
         // Transform API response to match our Agent type
-        const formattedAgents: Agent[] = Array.isArray(data)
-          ? data.map((agent: any) => {
-              const rawDate =
-                agent.updated_at || agent.updatedAt || new Date().toISOString();
-              return {
-                uuid: agent.uuid,
-                name: agent.name || agent.agent_name || String(agent),
-                type: agent.type === "connection" ? "connection" : "agent",
-                updatedAt: formatDate(rawDate),
-                updatedAtRaw: rawDate,
-              };
-            })
-          : [];
+        const formattedAgents: Agent[] = unwrapList<any>(data).map(
+          (agent: any) => {
+            const rawDate =
+              agent.updated_at || agent.updatedAt || new Date().toISOString();
+            return {
+              uuid: agent.uuid,
+              name: agent.name || agent.agent_name || String(agent),
+              type: agent.type === "connection" ? "connection" : "agent",
+              updatedAt: formatDate(rawDate),
+              updatedAtRaw: rawDate,
+            };
+          },
+        );
         setAgents(formattedAgents);
       } catch (err) {
         reportError("Error fetching agents:", err);

@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
-import { getDefaultHeaders } from "@/lib/api";
+import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { AppLayout } from "@/components/AppLayout";
 import {
   ToolPicker,
@@ -254,8 +254,8 @@ function LLMPageInner() {
         throw new Error("Failed to fetch tests");
       }
 
-      const data: TestData[] = await response.json();
-      setTests(data);
+      const data = await response.json();
+      setTests(unwrapList<TestData>(data));
     } catch (err) {
       reportError("Error fetching tests:", err);
       setTestsError(
@@ -285,7 +285,7 @@ function LLMPageInner() {
         if (response.status === 401) { await signOut({ callbackUrl: "/login" }); return; }
         if (!response.ok) throw new Error("Failed to fetch runs");
         const data = await response.json();
-        setAllRuns(data.runs || []);
+        setAllRuns(unwrapList<AllRun>(data));
       } catch (err) {
         reportError("Error fetching all runs:", err);
       } finally {
@@ -680,8 +680,8 @@ function LLMPageInner() {
       });
 
       if (testsResponse.ok) {
-        const updatedTests: TestData[] = await testsResponse.json();
-        setTests(updatedTests);
+        const updatedTests = await testsResponse.json();
+        setTests(unwrapList<TestData>(updatedTests));
       }
 
       // Reset form fields
@@ -906,8 +906,8 @@ function LLMPageInner() {
       });
 
       if (testsResponse.ok) {
-        const updatedTests: TestData[] = await testsResponse.json();
-        setTests(updatedTests);
+        const updatedTests = await testsResponse.json();
+        setTests(unwrapList<TestData>(updatedTests));
       }
 
       // Reset and close

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { apiClient } from "@/lib/api";
+import { apiClient, unwrapList } from "@/lib/api";
 import { reportError } from "@/lib/reportError";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import type { TestCaseResult } from "@/components/TestRunnerDialog";
@@ -314,12 +314,12 @@ export function AddRunToLabellingTaskDialog({
       setTasksLoading(true);
       setTasksError(null);
       try {
-        const data = await apiClient<LabellingTask[]>(
+        const data = await apiClient<unknown>(
           "/annotation-tasks",
           accessToken,
         );
         if (cancelled || !mountedRef.current) return;
-        setTasks(Array.isArray(data) ? data : []);
+        setTasks(unwrapList<LabellingTask>(data));
       } catch (err) {
         reportError(
           "AddRunToLabellingTaskDialog: failed to load labelling tasks",

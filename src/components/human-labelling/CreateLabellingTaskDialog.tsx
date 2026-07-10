@@ -10,7 +10,7 @@ import {
   EvaluatorUseCaseCards,
   EVALUATOR_USE_CASE_OPTIONS,
 } from "@/components/evaluators/evaluatorUseCases";
-import { apiClient } from "@/lib/api";
+import { apiClient, unwrapList } from "@/lib/api";
 import { readNameConflictFromError } from "@/lib/parseBackendError";
 
 // Labelling tasks support every evaluator use case except text-to-speech.
@@ -95,11 +95,11 @@ export function CreateLabellingTaskDialog({
       setEvaluatorsLoading(true);
       setEvaluatorsError(null);
       try {
-        const data = await apiClient<EvaluatorListItem[]>(
+        const data = await apiClient<unknown>(
           "/evaluators?include_defaults=true",
           accessToken,
         );
-        if (!cancelled) setEvaluators(Array.isArray(data) ? data : []);
+        if (!cancelled) setEvaluators(unwrapList<EvaluatorListItem>(data));
       } catch (err) {
         if (!cancelled)
           setEvaluatorsError(parseApiError(err, "Failed to load evaluators"));

@@ -1,5 +1,6 @@
 "use client";
 import { reportError } from "@/lib/reportError";
+import { unwrapList } from "@/lib/api";
 
 import React, { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
@@ -253,8 +254,8 @@ function MetricsPageInner() {
           throw new Error("Failed to fetch evaluators");
         }
 
-        const data: EvaluatorData[] = await response.json();
-        setEvaluators(data);
+        const data = await response.json();
+        setEvaluators(unwrapList<EvaluatorData>(data));
       } catch (err) {
         reportError("Error fetching evaluators:", err);
         setEvaluatorsError(
@@ -471,9 +472,8 @@ function MetricsPageInner() {
         }
 
         if (evaluatorsResponse.ok) {
-          const updatedEvaluators: EvaluatorData[] =
-            await evaluatorsResponse.json();
-          setEvaluators(updatedEvaluators);
+          const updatedEvaluators = await evaluatorsResponse.json();
+          setEvaluators(unwrapList<EvaluatorData>(updatedEvaluators));
         }
       } catch (err) {
         reportError("Error refetching evaluators:", err);
@@ -628,8 +628,8 @@ function MetricsPageInner() {
       );
 
       if (listResponse.ok) {
-        const updated: EvaluatorData[] = await listResponse.json();
-        setEvaluators(updated);
+        const updated = await listResponse.json();
+        setEvaluators(unwrapList<EvaluatorData>(updated));
       }
 
       // Reset form fields and close sidebar

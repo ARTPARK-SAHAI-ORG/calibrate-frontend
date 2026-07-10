@@ -20,6 +20,36 @@ export function getBackendUrl(): string {
 }
 
 /**
+ * Paginated envelope returned by the list endpoints (`/agents`, `/tests`,
+ * `/evaluators`, `/annotation-tasks`, `/agent-tests/.../tests`,
+ * `/agent-tests/.../runs`). The array now lives under `items`; `total` is the
+ * count of the full filtered set before paging.
+ */
+export type Paginated<T> = {
+  items: T[];
+  total: number;
+  limit: number | null;
+  offset: number;
+};
+
+/**
+ * Extract the array from a list response, tolerating three shapes:
+ *  - the new `{ items, total, limit, offset }` envelope,
+ *  - a legacy `{ runs: [...] }` payload (the two run lists before migration),
+ *  - a bare array (endpoints that never changed, or pre-deploy responses).
+ * Anything else yields an empty array.
+ */
+export function unwrapList<T>(data: unknown): T[] {
+  if (Array.isArray(data)) return data as T[];
+  if (data && typeof data === "object") {
+    const obj = data as { items?: unknown; runs?: unknown };
+    if (Array.isArray(obj.items)) return obj.items as T[];
+    if (Array.isArray(obj.runs)) return obj.runs as T[];
+  }
+  return [];
+}
+
+/**
  * Default headers for API requests
  */
 export function getDefaultHeaders(accessToken?: string | null): Record<string, string> {

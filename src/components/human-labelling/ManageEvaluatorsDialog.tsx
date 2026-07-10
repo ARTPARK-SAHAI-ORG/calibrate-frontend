@@ -7,7 +7,7 @@ import {
   EvaluatorTypePill,
   type EvaluatorType,
 } from "@/components/EvaluatorPills";
-import { apiClient } from "@/lib/api";
+import { apiClient, unwrapList } from "@/lib/api";
 
 type EvaluatorListItem = {
   uuid: string;
@@ -77,11 +77,11 @@ export function ManageEvaluatorsDialog({
       setLoading(true);
       setLoadError(null);
       try {
-        const data = await apiClient<EvaluatorListItem[]>(
+        const data = await apiClient<unknown>(
           "/evaluators?include_defaults=true",
           accessToken,
         );
-        if (!cancelled) setEvaluators(Array.isArray(data) ? data : []);
+        if (!cancelled) setEvaluators(unwrapList<EvaluatorListItem>(data));
       } catch (err) {
         if (!cancelled)
           setLoadError(parseApiError(err, "Failed to load evaluators"));

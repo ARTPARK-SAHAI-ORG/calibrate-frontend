@@ -1,5 +1,6 @@
 "use client";
 import { reportError } from "@/lib/reportError";
+import { unwrapList } from "@/lib/api";
 
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -507,24 +508,18 @@ export default function SimulationDetailPage() {
         }
 
         const data = await response.json();
-        const formattedMetrics: PickerItem[] = Array.isArray(data)
-          ? data
-              .filter(
-                (m: { evaluator_type?: string }) =>
-                  m.evaluator_type === "conversation",
-              )
-              .map(
-                (m: {
-                  uuid: string;
-                  name: string;
-                  description?: string;
-                }) => ({
-                  uuid: m.uuid,
-                  name: m.name,
-                  description: m.description,
-                }),
-              )
-          : [];
+        const formattedMetrics: PickerItem[] = unwrapList<{
+          uuid: string;
+          name: string;
+          description?: string;
+          evaluator_type?: string;
+        }>(data)
+          .filter((m) => m.evaluator_type === "conversation")
+          .map((m) => ({
+            uuid: m.uuid,
+            name: m.name,
+            description: m.description,
+          }));
         setMetrics(formattedMetrics);
       } catch (err) {
         reportError("Error fetching evaluators:", err);

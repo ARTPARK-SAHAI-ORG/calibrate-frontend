@@ -11,7 +11,7 @@ import React, {
 import { createPortal } from "react-dom";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
-import { getDefaultHeaders } from "@/lib/api";
+import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
 import { NestedContainer } from "@/components/ui/NestedContainer";
 import {
@@ -1459,7 +1459,7 @@ export function AddTestDialog({
           throw new Error("Failed to fetch evaluators");
         }
 
-        const raw: Array<{
+        const raw = unwrapList<{
           uuid: string;
           name: string;
           description?: string;
@@ -1467,7 +1467,7 @@ export function AddTestDialog({
           owner_user_id: string | null;
           evaluator_type?: string;
           live_version?: { variables?: EvaluatorVariableDef[] | null } | null;
-        }> = await response.json();
+        }>(await response.json());
 
         const llm: LLMEvaluatorOption[] = raw
           .filter(

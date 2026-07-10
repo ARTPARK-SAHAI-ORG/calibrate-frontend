@@ -1,5 +1,6 @@
 "use client";
 import { reportError } from "@/lib/reportError";
+import { unwrapList } from "@/lib/api";
 
 import React, { useState, useEffect, useRef } from "react";
 import { signOut } from "next-auth/react";
@@ -18,8 +19,7 @@ export type Agent = {
 // the legacy nested `config.connection_verified` so this works whether or not
 // the slimmed backend response has shipped.
 function formatAgents(data: unknown): Agent[] {
-  if (!Array.isArray(data)) return [];
-  return data.map((agent: any) => ({
+  return unwrapList<any>(data).map((agent: any) => ({
     uuid: agent.uuid,
     name: agent.name || agent.agent_name || String(agent),
     type: agent.type === "connection" ? "connection" : "agent",

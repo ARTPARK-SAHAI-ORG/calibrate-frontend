@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
-import { getDefaultHeaders } from "@/lib/api";
+import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import Papa from "papaparse";
 import { MultiAgentPicker } from "@/components/AgentPicker";
 import { MultiSelectPicker } from "@/components/MultiSelectPicker";
@@ -379,13 +379,13 @@ export function BulkUploadTestsModal({
           throw new Error("Failed to fetch evaluators");
         }
 
-        const raw: Array<{
+        const raw = unwrapList<{
           uuid: string;
           name: string;
           slug: string | null;
           evaluator_type?: string;
           live_version?: { variables?: EvaluatorVariableDef[] | null } | null;
-        }> = await response.json();
+        }>(await response.json());
 
         const wanted =
           testType === "conversation" ? CONVERSATION_EVALUATOR_TYPE : "llm";

@@ -1,5 +1,6 @@
 "use client";
 import { reportError } from "@/lib/reportError";
+import { unwrapList } from "@/lib/api";
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -159,26 +160,20 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange, initia
 
         const data = await response.json();
         const ttsEvaluators: (PickerItem & { isDefault: boolean })[] =
-          Array.isArray(data)
-            ? data
-                .filter(
-                  (m: { evaluator_type?: string }) =>
-                    m.evaluator_type === "tts"
-                )
-                .map(
-                  (m: {
-                    uuid: string;
-                    name: string;
-                    description?: string;
-                    owner_user_id?: string | null;
-                  }) => ({
-                    uuid: m.uuid,
-                    name: m.name,
-                    description: m.description,
-                    isDefault: !m.owner_user_id,
-                  })
-                )
-            : [];
+          unwrapList<{
+            uuid: string;
+            name: string;
+            description?: string;
+            owner_user_id?: string | null;
+            evaluator_type?: string;
+          }>(data)
+            .filter((m) => m.evaluator_type === "tts")
+            .map((m) => ({
+              uuid: m.uuid,
+              name: m.name,
+              description: m.description,
+              isDefault: !m.owner_user_id,
+            }));
 
         setAvailableEvaluators(
           ttsEvaluators.map(({ uuid, name, description }) => ({

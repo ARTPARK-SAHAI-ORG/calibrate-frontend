@@ -1,3 +1,5 @@
+import { unwrapList } from "./api";
+
 export const DEFAULT_LLM_NEXT_REPLY_SLUG = "default-llm-next-reply";
 
 export type DefaultEvaluatorSummary = {
@@ -22,7 +24,7 @@ export async function fetchDefaultLLMNextReplyEvaluator(
 
   if (!response.ok) return null;
 
-  const data: DefaultEvaluatorSummary[] = await response.json();
+  const data = unwrapList<DefaultEvaluatorSummary>(await response.json());
   return (
     data.find(
       (e) =>
