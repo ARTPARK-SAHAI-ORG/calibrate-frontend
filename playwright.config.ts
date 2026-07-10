@@ -4,14 +4,15 @@ import { STORAGE_STATE } from "./e2e/storage-state";
 /**
  * End-to-end tests: drive a real browser through the running app.
  *
- * `webServer` boots `npm run dev` (reusing an already-running one locally) and
- * Playwright waits for :3000 before the suite starts. E2E specs live in `e2e/`
- * and are kept out of the Jest run via `testPathIgnorePatterns` in
+ * `webServer` boots `npm run dev -- -p 3100` (override via E2E_PORT) and
+ * Playwright waits for that port before the suite starts. E2E specs live in
+ * `e2e/` and are kept out of the Jest run via `testPathIgnorePatterns` in
  * jest.config.js.
  *
- * Note: specs that hit authenticated pages need a real or mocked backend
- * (`NEXT_PUBLIC_BACKEND_URL`). The starter spec only touches public routes so
- * it runs with no backend. See e2e/README.md.
+ * Two projects (see `projects` below): `public` specs run with no backend;
+ * `authenticated` specs run logged-in against a real backend at
+ * `NEXT_PUBLIC_BACKEND_URL` (auth seeded by e2e/auth.setup.ts). See
+ * e2e/README.md.
  *
  * Coverage: run `E2E_COVERAGE=1 npx playwright test` (or `npm run
  * test:e2e:coverage`) to collect V8 code coverage of the app source. The
