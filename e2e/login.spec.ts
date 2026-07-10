@@ -34,8 +34,9 @@ test.describe("Login page", () => {
     await password.fill("secret123");
     await expect(password).toHaveAttribute("type", "password");
 
-    // The toggle is the button next to the password input (no accessible name).
-    await page.locator("button[type='button']").last().click();
+    // Target the toggle via the password field's sibling button so it can't
+    // accidentally match another button elsewhere on the page.
+    await page.locator("#password ~ button").click();
     await expect(password).toHaveAttribute("type", "text");
   });
 
