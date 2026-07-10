@@ -23,6 +23,8 @@ const config = {
     "**/__tests__/**/*.{ts,tsx}",
     "**/*.{test,spec}.{ts,tsx}",
   ],
+  // Playwright specs live in e2e/ and are run by `npm run test:e2e`, not Jest.
+  testPathIgnorePatterns: ["<rootDir>/node_modules/", "<rootDir>/e2e/"],
 };
 
 module.exports = createJestConfig(config);

@@ -19,11 +19,20 @@ npm test               # jest (jsdom)
 npm test -- path/to/file.test.ts    # single test file
 npm test -- -t "test name"          # single test by name
 npm run test:coverage  # coverage report
+npm run test:e2e       # playwright end-to-end (boots dev server automatically)
+npm run test:e2e:ui    # playwright interactive UI mode
 ```
 
 Before starting dev: `cp env.example .env.local` and fill in `NEXT_PUBLIC_BACKEND_URL`, `AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`. Husky installs git hooks via `npm install` (`prepare` script).
 
-There is currently no test suite checked in — `jest.config.js` is configured but no `__tests__/` or `*.test.*` files exist.
+## Testing
+
+Two layers, both scaffolded with runnable examples:
+
+- **Component / interaction tests** — Jest (jsdom) + React Testing Library + `@testing-library/user-event`, picked up from `src/**/__tests__/` and `*.{test,spec}.{ts,tsx}`. `jest.setup.ts` globally mocks `next-auth/react` (untranspiled ESM, pulled in via `AppLayout`) and `next/navigation` (router hooks) so components render in jsdom. **Import RTL through `src/test-utils/`** (`render`, `screen`, `setupUser`) — its `render` wraps components in the app's global providers (`FloatingButtonProvider`). Examples: `src/components/ui/__tests__/` (Button, SearchInput) and `src/components/__tests__/` (DeleteConfirmationDialog, CreateWorkspaceDialog — the async-form pattern: pass a `jest.fn()` for the `onCreate`/API callback so no network happens).
+- **End-to-end tests** — Playwright in `e2e/`, config in `playwright.config.ts` (its `webServer` boots `npm run dev`). Jest ignores `e2e/` via `testPathIgnorePatterns`. The starter `e2e/login.spec.ts` drives the public `/login` route and its client-side validation with **no backend needed**; authenticated flows need `NEXT_PUBLIC_BACKEND_URL` (real/staging) or `page.route(...)` network mocks — see `e2e/README.md`.
+
+Rule of thumb: component behavior (dialog opens, form validates, filter updates a list) → RTL; full flows across pages, routing, middleware → Playwright.
 
 ## Authoritative project docs
 
