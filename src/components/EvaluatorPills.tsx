@@ -26,8 +26,8 @@ export function DefaultPill() {
 export const EVALUATOR_TYPE_LABELS: Record<EvaluatorType, string> = {
   tts: "Text to Speech",
   stt: "Speech to Text",
-  llm: "Conversational reply",
-  "llm-general": "LLM response",
+  llm: "LLM reply",
+  "llm-general": "LLM output",
   conversation: "Full conversation",
 };
 

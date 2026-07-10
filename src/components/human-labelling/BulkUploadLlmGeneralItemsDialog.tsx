@@ -94,7 +94,7 @@ export function BulkUploadLlmGeneralItemsDialog({
       linkedEvaluators={linkedEvaluators}
       contentColumns={CONTENT_COLUMNS}
       sampleRows={SAMPLE_ROWS}
-      guidelinesTitle="Bulk upload — LLM response labelling items"
+      guidelinesTitle="Bulk upload — LLM output labelling items"
       guidelinesIntro="Upload a CSV with the following columns. Each row creates one non-conversational LLM evaluation item."
       sampleFilenameBase="llm_response_items"
       onClose={onClose}
