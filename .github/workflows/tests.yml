@@ -84,8 +84,11 @@ jobs:
           path: backend
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
+      - name: Install backend system dependencies
+        # simpleaudio compiles against ALSA headers; matches calibrate-backend CI.
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
       - name: Install backend dependencies
-        run: uv sync
+        run: uv sync --frozen
         working-directory: backend
       - name: Start backend on :8000
         working-directory: backend/src
