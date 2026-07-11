@@ -14,12 +14,29 @@ export type EvaluatorData = {
   description: string;
   created_at: string;
   updated_at: string;
+  /**
+   * Present on the top-level `/evaluators` list (null for built-in defaults).
+   * NOT returned by `GET /agents/{uuid}/evaluators`, which sends `is_default`
+   * instead — use `isOwnedEvaluator()` to decide ownership across both shapes.
+   */
   owner_user_id?: string | null;
+  /** True for built-in default evaluators. Returned by the agent list. */
+  is_default?: boolean;
   data_type?: "text" | "audio";
   kind?: "single" | "side_by_side";
   output_type?: "binary" | "rating";
   evaluator_type?: EvaluatorType;
 };
+
+/**
+ * Whether the current user owns this evaluator (i.e. can delete/edit it),
+ * tolerating both list shapes: the agent list exposes `is_default`, the
+ * top-level `/evaluators` list exposes `owner_user_id` (null = built-in).
+ */
+export function isOwnedEvaluator(e: EvaluatorData): boolean {
+  if (typeof e.is_default === "boolean") return !e.is_default;
+  return !!e.owner_user_id;
+}
 
 /**
  * Signs the user out on a 401 and returns true so callers can bail early.
@@ -83,6 +100,40 @@ export async function fetchAgentEvaluators(
   if (await handledUnauthorized(response)) return [];
   if (!response.ok) throw new Error("Failed to fetch agent evaluators");
   return unwrapList<EvaluatorData>(await response.json());
+}
+
+/**
+ * Set the agent's complete evaluator set in one atomic call (recommended over
+ * per-item attach/detach). The backend reconciles: ids not yet linked are
+ * linked, currently-linked ids missing from the list are unlinked. Passing
+ * `[]` clears all links. Duplicate ids are rejected (400), so callers must
+ * de-dupe.
+ */
+export async function setAgentEvaluators(
+  agentUuid: string,
+  evaluatorIds: string[],
+  accessToken: string,
+): Promise<{ evaluator_ids: string[]; linked: string[]; unlinked: string[] }> {
+  const response = await fetch(
+    `${getBackendUrl()}/agents/${agentUuid}/evaluators`,
+    {
+      method: "PUT",
+      headers: {
+        ...getDefaultHeaders(accessToken),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ evaluator_ids: evaluatorIds }),
+    },
+  );
+  if (await handledUnauthorized(response)) {
+    return { evaluator_ids: [], linked: [], unlinked: [] };
+  }
+  if (!response.ok) {
+    throw new Error(
+      await getEvaluatorErrorMessage(response, "Failed to update evaluators"),
+    );
+  }
+  return response.json();
 }
 
 /** Attach an evaluator to an agent. */

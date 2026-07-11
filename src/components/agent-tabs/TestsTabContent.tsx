@@ -38,7 +38,7 @@ import {
 import {
   type EvaluatorData,
   fetchAgentEvaluators,
-  attachEvaluatorToAgent,
+  setAgentEvaluators as putAgentEvaluators,
   fetchAllEvaluators,
 } from "@/lib/evaluatorApi";
 
@@ -476,9 +476,15 @@ export function TestsTabContent({
     if (!agentDefaultsPrompt || !backendAccessToken) return;
     try {
       setIsAttachingDefaults(true);
-      for (const ev of agentDefaultsPrompt) {
-        await attachEvaluatorToAgent(agentUuid, ev.uuid, backendAccessToken);
-      }
+      // Atomic PUT of the full desired set (current agent evaluators ∪ the
+      // newly-referenced ones) rather than a POST per id.
+      const desired = Array.from(
+        new Set([
+          ...agentEvaluators.map((e) => e.uuid),
+          ...agentDefaultsPrompt.map((e) => e.uuid),
+        ]),
+      );
+      await putAgentEvaluators(agentUuid, desired, backendAccessToken);
       await loadAgentEvaluators();
       setAgentDefaultsPrompt(null);
     } catch (err) {

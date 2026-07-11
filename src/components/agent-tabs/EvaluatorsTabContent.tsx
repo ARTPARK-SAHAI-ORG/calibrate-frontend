@@ -15,9 +15,10 @@ import {
   type EvaluatorData,
   fetchAllEvaluators,
   fetchAgentEvaluators,
-  attachEvaluatorToAgent,
+  setAgentEvaluators,
   detachEvaluatorFromAgent,
   deleteEvaluator,
+  isOwnedEvaluator,
 } from "@/lib/evaluatorApi";
 
 // Two destructive flavours share one confirmation dialog:
@@ -100,34 +101,40 @@ export function EvaluatorsTabContent({
     };
   }, [agentUuid, backendAccessToken, loadAttached, loadLibrary]);
 
-  // Attach a batch of library evaluators to the agent, then refresh the
-  // attached list. Called by the Add dialog's onAdd.
+  // Add a batch of library evaluators to the agent in one atomic PUT (the
+  // desired set = currently attached ∪ newly selected), then refresh.
   const handleAddEvaluators = useCallback(
     async (selectedUuids: string[]) => {
       if (!backendAccessToken || selectedUuids.length === 0) return;
       try {
-        for (const uuid of selectedUuids) {
-          await attachEvaluatorToAgent(agentUuid, uuid, backendAccessToken);
-        }
+        const desired = Array.from(
+          new Set([
+            ...attachedEvaluators.map((e) => e.uuid),
+            ...selectedUuids,
+          ]),
+        );
+        await setAgentEvaluators(agentUuid, desired, backendAccessToken);
         await loadAttached();
       } catch (err) {
         reportError("Error adding evaluators to agent:", err);
       }
     },
-    [agentUuid, backendAccessToken, loadAttached],
+    [agentUuid, backendAccessToken, attachedEvaluators, loadAttached],
   );
 
-  // A freshly-created evaluator: attach it to the agent, then refresh both
+  // A freshly-created evaluator: add it to the agent's set, then refresh both
   // lists (it's new to the library too).
   const handleCreated = useCallback(
     async (evaluator: EvaluatorData) => {
       if (!backendAccessToken) return;
       try {
-        await attachEvaluatorToAgent(
-          agentUuid,
-          evaluator.uuid,
-          backendAccessToken,
+        const desired = Array.from(
+          new Set([
+            ...attachedEvaluators.map((e) => e.uuid),
+            evaluator.uuid,
+          ]),
         );
+        await setAgentEvaluators(agentUuid, desired, backendAccessToken);
         await Promise.all([loadAttached(), loadLibrary()]);
       } catch (err) {
         reportError("Error attaching created evaluator:", err);
@@ -135,7 +142,13 @@ export function EvaluatorsTabContent({
         setCreateFlowOpen(false);
       }
     },
-    [agentUuid, backendAccessToken, loadAttached, loadLibrary],
+    [
+      agentUuid,
+      backendAccessToken,
+      attachedEvaluators,
+      loadAttached,
+      loadLibrary,
+    ],
   );
 
   // A duplicate is owned but NOT auto-attached — just refresh the library so
@@ -323,7 +336,7 @@ export function EvaluatorsTabContent({
       ) : (
         <div className="space-y-3">
           {attachedEvaluators.map((evaluator) => {
-            const isOwned = !!evaluator.owner_user_id;
+            const isOwned = isOwnedEvaluator(evaluator);
             return (
               <div
                 key={evaluator.uuid}

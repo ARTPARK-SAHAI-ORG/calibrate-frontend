@@ -24,13 +24,17 @@ jest.mock("../../evaluators/DuplicateEvaluatorDialog", () => ({
 const mockFetchAgentEvaluators = jest.fn();
 const mockFetchAllEvaluators = jest.fn();
 const mockDetach = jest.fn();
+const mockSetAgentEvaluators = jest.fn();
 jest.mock("../../../lib/evaluatorApi", () => ({
   fetchAgentEvaluators: (...args: unknown[]) =>
     mockFetchAgentEvaluators(...args),
   fetchAllEvaluators: (...args: unknown[]) => mockFetchAllEvaluators(...args),
-  attachEvaluatorToAgent: jest.fn(),
+  setAgentEvaluators: (...args: unknown[]) => mockSetAgentEvaluators(...args),
   detachEvaluatorFromAgent: (...args: unknown[]) => mockDetach(...args),
   deleteEvaluator: jest.fn(),
+  // Mirror the real helper: owned unless flagged as a built-in default.
+  isOwnedEvaluator: (e: EvaluatorData) =>
+    typeof e.is_default === "boolean" ? !e.is_default : !!e.owner_user_id,
 }));
 
 const evaluator = (over: Partial<EvaluatorData> = {}): EvaluatorData => ({
