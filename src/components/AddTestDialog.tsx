@@ -21,8 +21,6 @@ import {
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { formatTurnTimestamp } from "@/components/test-results/shared";
-import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
-import type { EvaluatorData } from "@/lib/evaluatorApi";
 
 // A single expected parameter row in a tool-call test. The shape is recursive:
 // `object`-typed parameters carry their own `properties` (nested rows) so the
@@ -1137,8 +1135,6 @@ export function AddTestDialog({
     string | null
   >(null);
   const evaluatorsContainerRef = useRef<HTMLDivElement>(null);
-  // Inline "create evaluator" flow launched from the picker header.
-  const [createEvaluatorOpen, setCreateEvaluatorOpen] = useState(false);
 
   const [localValidationAttempted, setLocalValidationAttempted] =
     useState(false);
@@ -1488,12 +1484,8 @@ export function AddTestDialog({
     fetchTools();
   }, [isOpen, backendAccessToken]);
 
-  // Fetch available LLM evaluators (defaults + user-owned) when dialog opens.
-  // Used both for the "Add evaluator" picker and to resolve the default
-  // correctness evaluator on initial population.
   // Fetch the selectable evaluator list (defaults + owned, filtered to the
-  // llm / conversation types the picker supports). Also returns the mapped
-  // list so callers (e.g. inline create) can find + attach a fresh evaluator.
+  // llm / conversation types the picker supports).
   const loadLLMEvaluators = useCallback(async (): Promise<
     LLMEvaluatorOption[]
   > => {
@@ -1830,10 +1822,6 @@ export function AddTestDialog({
     closeEvaluatorPicker();
   };
 
-  const attachEvaluatorFromOption = (option: LLMEvaluatorOption) => {
-    attachEvaluatorsFromOptions([option]);
-  };
-
   const getAvailablePickerEvaluators = (): LLMEvaluatorOption[] => {
     const remaining = availableLLMEvaluators.filter(
       (o) =>
@@ -1849,21 +1837,6 @@ export function AddTestDialog({
       const desc = (o.description ?? "").toLowerCase();
       return name.includes(query) || desc.includes(query);
     });
-  };
-
-  // A freshly-created evaluator (from the inline create flow): refetch the
-  // list so it carries its live-version variables, then auto-attach it to the
-  // test — but only if its type matches the current tab (an `llm` evaluator on
-  // a conversation test would be rejected by the backend).
-  const handleEvaluatorCreated = async (created: EvaluatorData) => {
-    setCreateEvaluatorOpen(false);
-    const list = await loadLLMEvaluators();
-    const option = list.find((o) => o.uuid === created.uuid);
-    const wantedType =
-      activeTab === "conversation" ? CONVERSATION_EVALUATOR_TYPE : "llm";
-    if (option && option.evaluator_type === wantedType) {
-      attachEvaluatorFromOption(option);
-    }
   };
 
   const addToolFromSelection = (tool: AvailableTool) => {
@@ -3137,79 +3110,52 @@ export function AddTestDialog({
                         Evaluators
                       </label>
                       {!isLabelItem && (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setCreateEvaluatorOpen(true)}
-                            disabled={isLoading}
-                            // Emerald tint to distinguish "create new" from the
-                            // violet "add existing" action next to it.
-                            className="px-3 py-1.5 text-sm font-medium rounded-lg border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
-                          >
-                            Create new
-                          </button>
-                          {(() => {
-                            const remainingOptions =
-                              availableLLMEvaluators.filter(
-                                (o) =>
-                                  !attachedEvaluators.some(
-                                    (a) => a.evaluator_uuid === o.uuid,
-                                  ) &&
-                                  (activeTab === "conversation"
-                                    ? o.evaluator_type ===
-                                      CONVERSATION_EVALUATOR_TYPE
-                                    : o.evaluator_type === "llm"),
-                              );
-                            const noOptionsLeft =
-                              remainingOptions.length === 0;
-                            return (
-                              <button
-                                onClick={() => {
-                                  if (evaluatorPickerOpen) {
-                                    closeEvaluatorPicker();
-                                  } else {
-                                    setEvaluatorPickerSelectedIds(new Set());
-                                    setEvaluatorPickerOpen(true);
-                                  }
-                                }}
-                                disabled={
-                                  evaluatorsLoading ||
-                                  isLoading ||
-                                  noOptionsLeft
-                                }
-                                // Tinted violet so the action stands out from
-                                // the neutral form chrome around it. Validation
-                                // error state overrides border/text to red.
-                                className={`px-3 py-1.5 text-sm font-medium rounded-lg border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-500/12 border-violet-500/45 text-violet-950 dark:text-violet-100 hover:bg-violet-500/22 dark:hover:bg-violet-500/18 ${
-                                  localValidationAttempted &&
-                                  isEvaluatorTab &&
-                                  attachedEvaluators.length === 0
-                                    ? "!border-red-500 !text-red-500 !bg-red-500/10"
-                                    : ""
-                                }`}
-                              >
-                                Add evaluator
-                              </button>
+                        (() => {
+                          const remainingOptions =
+                            availableLLMEvaluators.filter(
+                              (o) =>
+                                !attachedEvaluators.some(
+                                  (a) => a.evaluator_uuid === o.uuid,
+                                ) &&
+                                (activeTab === "conversation"
+                                  ? o.evaluator_type ===
+                                    CONVERSATION_EVALUATOR_TYPE
+                                  : o.evaluator_type === "llm"),
                             );
-                          })()}
-                        </div>
+                          const noOptionsLeft =
+                            remainingOptions.length === 0;
+                          return (
+                            <button
+                              onClick={() => {
+                                if (evaluatorPickerOpen) {
+                                  closeEvaluatorPicker();
+                                } else {
+                                  setEvaluatorPickerSelectedIds(new Set());
+                                  setEvaluatorPickerOpen(true);
+                                }
+                              }}
+                              disabled={
+                                evaluatorsLoading ||
+                                isLoading ||
+                                noOptionsLeft
+                              }
+                              // Tinted violet so the action stands out from
+                              // the neutral form chrome around it. Validation
+                              // error state overrides border/text to red.
+                              className={`px-3 py-1.5 text-sm font-medium rounded-lg border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-500/12 border-violet-500/45 text-violet-950 dark:text-violet-100 hover:bg-violet-500/22 dark:hover:bg-violet-500/18 ${
+                                localValidationAttempted &&
+                                isEvaluatorTab &&
+                                attachedEvaluators.length === 0
+                                  ? "!border-red-500 !text-red-500 !bg-red-500/10"
+                                  : ""
+                              }`}
+                            >
+                              Add evaluator
+                            </button>
+                          );
+                        })()
                       )}
                     </div>
-
-                    {/* Inline create-evaluator flow. On success the new
-                        evaluator is refetched and auto-attached to this test
-                        (when its type matches the tab). */}
-                    <CreateEvaluatorFlow
-                      open={createEvaluatorOpen}
-                      onClose={() => setCreateEvaluatorOpen(false)}
-                      existingEvaluators={availableLLMEvaluators}
-                      onCreated={handleEvaluatorCreated}
-                      useCaseGroups={["conversation"]}
-                      useCaseTypes={
-                        activeTab === "conversation"
-                          ? [CONVERSATION_EVALUATOR_TYPE]
-                          : ["llm"]
-                      }
-                    />
 
                     {/* Evaluator picker dropdown */}
                     {evaluatorPickerOpen && (
@@ -3218,7 +3164,7 @@ export function AddTestDialog({
                           className="fixed inset-0 z-[99]"
                           onClick={closeEvaluatorPicker}
                         />
-                        <div className="absolute right-0 top-9 mt-1 w-80 max-h-80 flex flex-col bg-background border border-border rounded-xl shadow-2xl z-[100] overflow-hidden">
+                        <div className="absolute right-0 top-9 mt-1 w-[26rem] max-w-[calc(100vw-2rem)] max-h-80 flex flex-col bg-background border border-border rounded-xl shadow-2xl z-[100] overflow-hidden">
                           {/* Sticky search bar */}
                           <div className="p-2 border-b border-border bg-background">
                             <input
