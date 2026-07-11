@@ -5,7 +5,6 @@ import {
   isEvaluatorNameConflict,
   fetchAllEvaluators,
   fetchAgentEvaluators,
-  setAgentEvaluators,
   attachEvaluatorToAgent,
   detachEvaluatorFromAgent,
   deleteEvaluator,
@@ -176,13 +175,12 @@ describe("fetch helpers", () => {
     );
   });
 
-  it("setAgentEvaluators signs out and returns empty tallies on 401", async () => {
+  it("attachEvaluatorToAgent signs out on 401", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(
       mockResponse({ ok: false, status: 401 }),
     );
 
-    const result = await setAgentEvaluators("agent-1", ["ev-1"], "token");
-    expect(result).toEqual({ evaluator_ids: [], linked: [], unlinked: [] });
+    await attachEvaluatorToAgent("agent-1", "ev-1", "token");
     expect(signOut).toHaveBeenCalled();
   });
 
@@ -245,43 +243,6 @@ describe("fetch helpers", () => {
     expect(items).toEqual([
       { uuid: "ev-2", name: "Policy", is_default: true },
     ]);
-  });
-
-  it("setAgentEvaluators PUTs the desired id list", async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(
-      mockResponse({
-        jsonBody: {
-          evaluator_ids: ["ev-1", "ev-2"],
-          linked: ["ev-2"],
-          unlinked: [],
-        },
-      }),
-    );
-
-    const result = await setAgentEvaluators("agent-1", ["ev-1", "ev-2"], "token");
-    expect(result.linked).toEqual(["ev-2"]);
-    expect(global.fetch).toHaveBeenCalledWith(
-      "http://test-backend/agents/agent-1/evaluators",
-      expect.objectContaining({
-        method: "PUT",
-        body: JSON.stringify({ evaluator_ids: ["ev-1", "ev-2"] }),
-      }),
-    );
-  });
-
-  it("setAgentEvaluators surfaces backend error detail", async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(
-      mockResponse({
-        ok: false,
-        status: 400,
-        headers: { "content-type": "application/json" },
-        jsonBody: { detail: "Duplicate evaluator ids" },
-      }),
-    );
-
-    await expect(
-      setAgentEvaluators("agent-1", ["ev-1", "ev-1"], "token"),
-    ).rejects.toThrow("Duplicate evaluator ids");
   });
 
   it("attachEvaluatorToAgent POSTs a single evaluator id", async () => {

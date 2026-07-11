@@ -43,12 +43,12 @@ const mockFetchAgentEvaluators = jest.fn();
 const mockFetchAllEvaluators = jest.fn();
 const mockDetach = jest.fn();
 const mockDelete = jest.fn();
-const mockSetAgentEvaluators = jest.fn();
+const mockAttach = jest.fn();
 jest.mock("../../../lib/evaluatorApi", () => ({
   fetchAgentEvaluators: (...args: unknown[]) =>
     mockFetchAgentEvaluators(...args),
   fetchAllEvaluators: (...args: unknown[]) => mockFetchAllEvaluators(...args),
-  setAgentEvaluators: (...args: unknown[]) => mockSetAgentEvaluators(...args),
+  attachEvaluatorToAgent: (...args: unknown[]) => mockAttach(...args),
   detachEvaluatorFromAgent: (...args: unknown[]) => mockDetach(...args),
   deleteEvaluator: (...args: unknown[]) => mockDelete(...args),
   // Mirror the real helper: owned unless flagged as a built-in default.
@@ -248,17 +248,13 @@ describe("EvaluatorsTabContent", () => {
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
 
-  it("reconciles selected evaluators through setAgentEvaluators", async () => {
+  it("attaches selected evaluators via POST (add-only)", async () => {
     mockFetchAgentEvaluators.mockResolvedValue([evaluator({ uuid: "ev-1" })]);
     mockFetchAllEvaluators.mockResolvedValue([
       evaluator({ uuid: "ev-1" }),
       evaluator({ uuid: "ev-2", name: "Tone check" }),
     ]);
-    mockSetAgentEvaluators.mockResolvedValue({
-      evaluator_ids: ["ev-1", "ev-2"],
-      linked: ["ev-2"],
-      unlinked: [],
-    });
+    mockAttach.mockResolvedValue(undefined);
 
     const user = setupUser();
     render(<EvaluatorsTabContent agentUuid="agent-1" />);
@@ -268,11 +264,7 @@ describe("EvaluatorsTabContent", () => {
     await user.click(screen.getByRole("button", { name: "Confirm add" }));
 
     await waitFor(() =>
-      expect(mockSetAgentEvaluators).toHaveBeenCalledWith(
-        "agent-1",
-        ["ev-1", "ev-2"],
-        "test-token",
-      ),
+      expect(mockAttach).toHaveBeenCalledWith("agent-1", "ev-2", "test-token"),
     );
   });
 });

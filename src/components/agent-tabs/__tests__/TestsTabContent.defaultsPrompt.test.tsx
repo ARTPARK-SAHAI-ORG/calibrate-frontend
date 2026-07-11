@@ -81,14 +81,14 @@ jest.mock("../../AddTestDialog", () => ({
 
 const mockFetchAgentEvaluators = jest.fn();
 const mockFetchAllEvaluators = jest.fn();
-const mockReconcileAgentEvaluators = jest.fn();
+const mockAttachEvaluatorToAgent = jest.fn();
 
 jest.mock("../../../lib/evaluatorApi", () => ({
   fetchAgentEvaluators: (...args: unknown[]) =>
     mockFetchAgentEvaluators(...args),
   fetchAllEvaluators: (...args: unknown[]) => mockFetchAllEvaluators(...args),
-  setAgentEvaluators: (...args: unknown[]) =>
-    mockReconcileAgentEvaluators(...args),
+  attachEvaluatorToAgent: (...args: unknown[]) =>
+    mockAttachEvaluatorToAgent(...args),
 }));
 
 const attachedEvaluator = (): EvaluatorData => ({
@@ -200,11 +200,7 @@ beforeEach(() => {
     attachedEvaluator(),
     newEvaluator(),
   ]);
-  mockReconcileAgentEvaluators.mockResolvedValue({
-    evaluator_ids: ["ev-attached", "ev-new"],
-    linked: ["ev-new"],
-    unlinked: [],
-  });
+  mockAttachEvaluatorToAgent.mockResolvedValue(undefined);
   setupFetch();
 });
 
@@ -229,7 +225,7 @@ describe("TestsTabContent agent defaults prompt", () => {
       ).not.toBeInTheDocument();
     });
     expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
-    expect(mockReconcileAgentEvaluators).not.toHaveBeenCalled();
+    expect(mockAttachEvaluatorToAgent).not.toHaveBeenCalled();
   });
 
   it("updates agent defaults and closes both dialogs on Update", async () => {
@@ -240,9 +236,10 @@ describe("TestsTabContent agent defaults prompt", () => {
     await user.click(screen.getByRole("button", { name: "Update" }));
 
     await waitFor(() => {
-      expect(mockReconcileAgentEvaluators).toHaveBeenCalledWith(
+      // Add-only: POST just the evaluator not already on the agent.
+      expect(mockAttachEvaluatorToAgent).toHaveBeenCalledWith(
         AGENT_UUID,
-        ["ev-attached", "ev-new"],
+        "ev-new",
         "test-token",
       );
     });
@@ -270,7 +267,7 @@ describe("TestsTabContent agent defaults prompt", () => {
     expect(
       screen.queryByRole("heading", { name: "Update default evaluators?" }),
     ).not.toBeInTheDocument();
-    expect(mockReconcileAgentEvaluators).not.toHaveBeenCalled();
+    expect(mockAttachEvaluatorToAgent).not.toHaveBeenCalled();
   });
 
   it("shows the prompt after editing a test save", async () => {
@@ -292,13 +289,9 @@ describe("TestsTabContent agent defaults prompt", () => {
   });
 
   it("shows a visible error and allows retry when updating defaults fails", async () => {
-    mockReconcileAgentEvaluators
+    mockAttachEvaluatorToAgent
       .mockRejectedValueOnce(new Error("Network error"))
-      .mockResolvedValueOnce({
-        evaluator_ids: ["ev-attached", "ev-new"],
-        linked: ["ev-new"],
-        unlinked: [],
-      });
+      .mockResolvedValueOnce(undefined);
 
     const user = setupUser();
     render(<TestsTabContent agentUuid={AGENT_UUID} />);
@@ -314,7 +307,7 @@ describe("TestsTabContent agent defaults prompt", () => {
     await user.click(screen.getByRole("button", { name: "Try again" }));
 
     await waitFor(() => {
-      expect(mockReconcileAgentEvaluators).toHaveBeenCalledTimes(2);
+      expect(mockAttachEvaluatorToAgent).toHaveBeenCalledTimes(2);
     });
     expect(
       screen.queryByRole("heading", { name: "Update default evaluators?" }),

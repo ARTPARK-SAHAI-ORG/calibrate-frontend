@@ -39,7 +39,7 @@ import {
 import {
   type EvaluatorData,
   fetchAgentEvaluators,
-  setAgentEvaluators as reconcileAgentEvaluators,
+  attachEvaluatorToAgent,
   fetchAllEvaluators,
 } from "@/lib/evaluatorApi";
 
@@ -1000,15 +1000,11 @@ export function TestsTabContent({
     try {
       setIsAttachingDefaults(true);
       setAgentDefaultsError(null);
-      // Atomic PUT of the full desired set (current agent evaluators ∪ the
-      // newly-referenced ones) rather than a POST per id.
-      const desired = Array.from(
-        new Set([
-          ...agentEvaluators.map((e) => e.uuid),
-          ...agentDefaultsPrompt.map((e) => e.uuid),
-        ]),
-      );
-      await reconcileAgentEvaluators(agentUuid, desired, backendAccessToken);
+      // Add-only: POST each newly-referenced evaluator (the prompt already
+      // holds only the ones not on the agent), leaving existing links intact.
+      for (const ev of agentDefaultsPrompt) {
+        await attachEvaluatorToAgent(agentUuid, ev.uuid, backendAccessToken);
+      }
       await loadAgentEvaluators();
       setAgentDefaultsPrompt(null);
       setAgentDefaultsError(null);

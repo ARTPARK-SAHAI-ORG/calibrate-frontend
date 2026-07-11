@@ -102,41 +102,7 @@ export async function fetchAgentEvaluators(
   return unwrapList<EvaluatorData>(await response.json());
 }
 
-/**
- * Set the agent's complete evaluator set in one atomic call (recommended over
- * per-item attach/detach). The backend reconciles: ids not yet linked are
- * linked, currently-linked ids missing from the list are unlinked. Passing
- * `[]` clears all links. Duplicate ids are rejected (400), so callers must
- * de-dupe.
- */
-export async function setAgentEvaluators(
-  agentUuid: string,
-  evaluatorIds: string[],
-  accessToken: string,
-): Promise<{ evaluator_ids: string[]; linked: string[]; unlinked: string[] }> {
-  const response = await fetch(
-    `${getBackendUrl()}/agents/${agentUuid}/evaluators`,
-    {
-      method: "PUT",
-      headers: {
-        ...getDefaultHeaders(accessToken),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ evaluator_ids: evaluatorIds }),
-    },
-  );
-  if (await handledUnauthorized(response)) {
-    return { evaluator_ids: [], linked: [], unlinked: [] };
-  }
-  if (!response.ok) {
-    throw new Error(
-      await getEvaluatorErrorMessage(response, "Failed to update evaluators"),
-    );
-  }
-  return response.json();
-}
-
-/** Attach an evaluator to an agent. */
+/** Attach a single evaluator to an agent (add-only; leaves the rest untouched). */
 export async function attachEvaluatorToAgent(
   agentUuid: string,
   evaluatorId: string,
