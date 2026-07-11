@@ -150,4 +150,59 @@ describe("STTResultsTable", () => {
     render(<STTResultsTable results={[]} />);
     expect(screen.getAllByText("Ground Truth").length).toBeGreaterThan(0);
   });
+
+  it("renders no labelling checkboxes without selection props", () => {
+    render(<STTResultsTable results={[baseRow]} />);
+    expect(
+      screen.queryByLabelText("Select for labelling"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("toggles a row when its labelling checkbox is clicked", () => {
+    const onToggle = jest.fn();
+    render(
+      <STTResultsTable
+        results={[baseRow]}
+        labellingSelection={new Set()}
+        onToggleLabellingSelection={onToggle}
+        onLabellingBulkToggle={jest.fn()}
+        labellingKeyForRow={(_r, i) => `openai:${i}`}
+      />,
+    );
+    // desktop + mobile both render a button; click the first
+    screen.getAllByLabelText("Select for labelling")[0].click();
+    expect(onToggle).toHaveBeenCalledWith("openai:0");
+  });
+
+  it("disables the checkbox for rows with empty ground truth", () => {
+    const onToggle = jest.fn();
+    render(
+      <STTResultsTable
+        results={[{ ...baseRow, gt: "" }]}
+        labellingSelection={new Set()}
+        onToggleLabellingSelection={onToggle}
+        onLabellingBulkToggle={jest.fn()}
+        labellingKeyForRow={(_r, i) => `openai:${i}`}
+      />,
+    );
+    const buttons = screen.getAllByLabelText("Select for labelling");
+    expect(buttons[0]).toBeDisabled();
+    buttons[0].click();
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it("bulk-toggles all eligible rows via the header select-all", () => {
+    const onBulk = jest.fn();
+    render(
+      <STTResultsTable
+        results={[baseRow, { ...baseRow, id: "2" }]}
+        labellingSelection={new Set()}
+        onToggleLabellingSelection={jest.fn()}
+        onLabellingBulkToggle={onBulk}
+        labellingKeyForRow={(_r, i) => `openai:${i}`}
+      />,
+    );
+    screen.getByLabelText("Select all").click();
+    expect(onBulk).toHaveBeenCalledWith(["openai:0", "openai:1"]);
+  });
 });

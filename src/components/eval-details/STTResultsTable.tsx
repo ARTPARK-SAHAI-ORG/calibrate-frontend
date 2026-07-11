@@ -1,6 +1,7 @@
 import React from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { LazyAudioPlayer } from "@/components/evaluations/LazyAudioPlayer";
+import { LabellingRowCheckbox } from "@/components/test-results/shared";
 import {
   EvaluatorScoreCell,
   readEvaluatorCell,
@@ -80,6 +81,19 @@ type STTResultsTableProps = {
   /** When provided, replaces the single LLM-judge column with one column per entry. Each evaluator's score/reasoning is read from `result[col.scoreField ?? `${col.key}_score`]` and `result[col.reasoningField ?? `${col.key}_reasoning`]`. */
   evaluatorColumns?: STTEvaluatorColumn[];
   tableRef?: React.RefObject<HTMLDivElement | null>;
+  // --- Labelling selection (opt-in) --------------------------------------
+  // When `onToggleLabellingSelection` + `labellingKeyForRow` are provided, a
+  // leading checkbox column is rendered so rows can be picked for "Submit for
+  // labelling" (mirrors the LLM test-run flow). Callers own the selection set
+  // and the row→key mapping (STT rows are keyed per provider, e.g.
+  // `openai:0`). Public / read-only tables pass none of these and render no
+  // checkbox column.
+  labellingSelection?: Set<string>;
+  onToggleLabellingSelection?: (key: string) => void;
+  onLabellingBulkToggle?: (keys: string[]) => void;
+  labellingKeyForRow?: (row: STTResultRow, index: number) => string;
+  /** Rows for which selection is disabled (e.g. empty ground truth). Defaults to all-eligible. */
+  labellingRowEligible?: (row: STTResultRow, index: number) => boolean;
 };
 
 // Fixed pixel widths for the desktop layout. Text columns get a stable
@@ -97,11 +111,28 @@ const STT_COL_WIDTHS = {
   llmJudge: 110,
 } as const;
 
-export function STTResultsTable({ results, showMetrics = true, showSimilarity = true, judgeLabel = "Evaluator", evaluatorColumns, tableRef }: STTResultsTableProps) {
+export function STTResultsTable({ results, showMetrics = true, showSimilarity = true, judgeLabel = "Evaluator", evaluatorColumns, tableRef, labellingSelection, onToggleLabellingSelection, onLabellingBulkToggle, labellingKeyForRow, labellingRowEligible }: STTResultsTableProps) {
   const hasAudio = results.some((r) => !!r.audio_url);
   // When `evaluatorColumns` is provided, each evaluator gets its own column;
   // the legacy `llm_judge_*` rendering branch is skipped.
   const useDynamic = Array.isArray(evaluatorColumns) && evaluatorColumns.length > 0;
+
+  // Labelling checkbox column is shown only when the caller wires a toggle +
+  // key mapper. Eligibility defaults to "row has ground truth".
+  const showCheckboxes = !!onToggleLabellingSelection && !!labellingKeyForRow;
+  const rowEligible = (r: STTResultRow, i: number) =>
+    labellingRowEligible ? labellingRowEligible(r, i) : !!r.gt && r.gt.trim() !== "";
+  // Keys of every selectable row, computed against the original row index so
+  // they line up with the per-row rendering below.
+  const allSelectableKeys = showCheckboxes
+    ? results.reduce<string[]>((acc, r, i) => {
+        if (rowEligible(r, i)) acc.push(labellingKeyForRow!(r, i));
+        return acc;
+      }, [])
+    : [];
+  const allSelected =
+    allSelectableKeys.length > 0 &&
+    allSelectableKeys.every((k) => labellingSelection?.has(k));
 
   // Compute the table's minimum pixel width from the column widths above so
   // the inner `overflow-x-auto` wrapper can scroll once we run out of room.
@@ -110,6 +141,7 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
   // are several evaluators.
   const tableMinWidth = (() => {
     let total = STT_COL_WIDTHS.id + STT_COL_WIDTHS.text * 2; // ID + GT + Pred
+    if (showCheckboxes) total += 44;
     if (hasAudio) total += STT_COL_WIDTHS.audio;
     if (showMetrics) {
       total += STT_COL_WIDTHS.wer;
@@ -128,6 +160,20 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
           <table className="w-full table-fixed" style={{ minWidth: `${tableMinWidth}px` }}>
             <thead className="bg-muted/50 border-b border-border">
               <tr>
+                {showCheckboxes && (
+                  <th style={{ width: 44 }} className="px-3 py-3 text-left">
+                    <button
+                      type="button"
+                      onClick={() => onLabellingBulkToggle?.(allSelectableKeys)}
+                      disabled={allSelectableKeys.length === 0}
+                      title={allSelected ? "Deselect all" : "Select all"}
+                      aria-label={allSelected ? "Deselect all" : "Select all"}
+                      className="cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <LabellingRowCheckbox checked={allSelected} disabled={allSelectableKeys.length === 0} />
+                    </button>
+                  </th>
+                )}
                 <th style={{ width: STT_COL_WIDTHS.id }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">ID</th>
                 {hasAudio && (
                   <th style={{ width: STT_COL_WIDTHS.audio }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">Audio</th>
@@ -162,6 +208,27 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                     data-row-index={index}
                     className={`border-b border-border last:border-b-0 ${isEmptyPrediction ? "bg-red-500/10" : ""}`}
                   >
+                    {showCheckboxes && (() => {
+                      const eligible = rowEligible(result, index);
+                      const key = labellingKeyForRow!(result, index);
+                      return (
+                        <td className="px-3 py-3">
+                          <button
+                            type="button"
+                            onClick={() => eligible && onToggleLabellingSelection!(key)}
+                            disabled={!eligible}
+                            title={eligible ? "Select for labelling" : "Rows without ground truth can't be labelled"}
+                            aria-label="Select for labelling"
+                            className="cursor-pointer disabled:cursor-not-allowed"
+                          >
+                            <LabellingRowCheckbox
+                              checked={(labellingSelection?.has(key) ?? false) && eligible}
+                              disabled={!eligible}
+                            />
+                          </button>
+                        </td>
+                      );
+                    })()}
                     <td className="px-3 py-3 text-[13px] text-foreground">{index + 1}</td>
                     {hasAudio && (
                       <td className="px-3 py-3">
@@ -238,7 +305,27 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
               className={`border border-border rounded-xl p-4 space-y-3 ${isEmptyPrediction ? "bg-red-500/10" : ""}`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[12px] text-muted-foreground font-medium">#{index + 1}</span>
+                <div className="flex items-center gap-2">
+                  {showCheckboxes && (() => {
+                    const eligible = rowEligible(result, index);
+                    const key = labellingKeyForRow!(result, index);
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => eligible && onToggleLabellingSelection!(key)}
+                        disabled={!eligible}
+                        aria-label="Select for labelling"
+                        className="cursor-pointer disabled:cursor-not-allowed"
+                      >
+                        <LabellingRowCheckbox
+                          checked={(labellingSelection?.has(key) ?? false) && eligible}
+                          disabled={!eligible}
+                        />
+                      </button>
+                    );
+                  })()}
+                  <span className="text-[12px] text-muted-foreground font-medium">#{index + 1}</span>
+                </div>
                 {showMetrics && !useDynamic && result.llm_judge_score && (
                   <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
                     legacyPassed
