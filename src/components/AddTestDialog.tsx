@@ -1799,11 +1799,22 @@ export function AddTestDialog({
 
   const attachEvaluatorsFromOptions = (options: LLMEvaluatorOption[]) => {
     if (options.length === 0) return;
-    let lastAddedUuid: string | null = null;
+    // Compute the newly-added ids synchronously from current state. Deriving
+    // the scroll target *inside* the setState updater and reading it back on
+    // the next line is unreliable — the updater runs after this function
+    // returns, so the target was often still null and the scroll never fired.
+    const existing = new Set(
+      attachedEvaluators.map((e) => e.evaluator_uuid),
+    );
+    const toAdd = options.filter((option) => !existing.has(option.uuid));
+    if (toAdd.length === 0) {
+      closeEvaluatorPicker();
+      return;
+    }
     setAttachedEvaluators((prev) => {
-      const existing = new Set(prev.map((e) => e.evaluator_uuid));
-      const toAdd = options
-        .filter((option) => !existing.has(option.uuid))
+      const prevExisting = new Set(prev.map((e) => e.evaluator_uuid));
+      const rows = toAdd
+        .filter((option) => !prevExisting.has(option.uuid))
         .map((option) => ({
           evaluator_uuid: option.uuid,
           name: option.name,
@@ -1812,13 +1823,9 @@ export function AddTestDialog({
           variables: option.variables,
           variable_values: buildInitialVariableValues(option.variables),
         }));
-      if (toAdd.length === 0) return prev;
-      lastAddedUuid = toAdd[toAdd.length - 1].evaluator_uuid;
-      return [...prev, ...toAdd];
+      return [...prev, ...rows];
     });
-    if (lastAddedUuid) {
-      setScrollToEvaluatorUuid(lastAddedUuid);
-    }
+    setScrollToEvaluatorUuid(toAdd[toAdd.length - 1].uuid);
     closeEvaluatorPicker();
   };
 
