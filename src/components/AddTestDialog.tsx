@@ -1769,13 +1769,24 @@ export function AddTestDialog({
     if (prev === activeTab) return;
     if (isEditing) return;
     if (!isEvaluatorTab) return;
+    // Same guard as the initial seed: while the agent's evaluator list is
+    // still loading, don't re-seed off an empty list. The initial-seed effect
+    // fires for the current tab once the list arrives, so the switched-to tab
+    // still gets the right defaults.
+    if (agentEvaluatorsPending) return;
     // The next-reply and conversation evaluator types are mutually exclusive,
     // so nothing the user had for the old type carries over. Re-seed the
     // agent's default evaluators for the newly selected type (this also drops
     // the auto-seeded next-reply correctness evaluator when moving to the
     // conversation tab, which the backend would otherwise reject).
     setAttachedEvaluators(buildDefaultAttachedForTab(activeTab));
-  }, [activeTab, isEditing, isEvaluatorTab, buildDefaultAttachedForTab]);
+  }, [
+    activeTab,
+    isEditing,
+    isEvaluatorTab,
+    agentEvaluatorsPending,
+    buildDefaultAttachedForTab,
+  ]);
 
   const updateEvaluatorVariableValue = (
     evaluatorUuid: string,
