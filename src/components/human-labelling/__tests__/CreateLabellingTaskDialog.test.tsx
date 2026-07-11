@@ -359,6 +359,16 @@ describe("CreateLabellingTaskDialog", () => {
     await waitFor(() => expect(screen.getByText("network down")).toBeInTheDocument());
   });
 
+  it("falls back to the generic evaluators-load error for an Error with an empty message", async () => {
+    const user = setupUser();
+    mockApiClient.mockRejectedValue(new Error(""));
+    renderDialog();
+    await goToStep3(user, "LLM reply");
+    await waitFor(() =>
+      expect(screen.getByText("Failed to load evaluators")).toBeInTheDocument(),
+    );
+  });
+
   it("keeps a selected evaluator whose type still matches after evaluators are re-fetched", async () => {
     const user = setupUser();
     const onClose = jest.fn();
@@ -375,14 +385,27 @@ describe("CreateLabellingTaskDialog", () => {
     // new `evaluators` array reference while taskType/selection stay put —
     // this exercises the sync effect's branch that re-adds an
     // already-selected evaluator whose type still matches the new list.
-    mockApiClient.mockResolvedValueOnce({ items: EVALUATORS.map((e) => ({ ...e })) });
+    // Add a fresh llm evaluator so we can wait for the re-fetch to actually
+    // apply (setEvaluators flushed) before asserting — otherwise the sync
+    // effect may not have run yet.
+    mockApiClient.mockResolvedValueOnce({
+      items: [
+        ...EVALUATORS.map((e) => ({ ...e })),
+        { uuid: "ev-llm-3", name: "Freshness", evaluator_type: "llm" },
+      ],
+    });
     rerender(
       <CreateLabellingTaskDialog accessToken="tok2" onClose={onClose} onCreated={onCreated} />,
     );
-    await waitFor(() => expect(mockApiClient).toHaveBeenLastCalledWith(
-      "/evaluators?include_defaults=true",
-      "tok2",
-    ));
+    await waitFor(() =>
+      expect(screen.getByText("Freshness")).toBeInTheDocument(),
+    );
+    // Drive a benign interaction so React flushes the pending passive
+    // sync effect (scheduled by the re-fetch's setEvaluators). Without a
+    // flush the effect's re-add branch never runs.
+    await user.type(screen.getByPlaceholderText("Search evaluators"), "corr");
+    // The previously-selected llm evaluator is re-added because its type
+    // still matches after the re-fetch.
     expect(screen.getByText("(1 selected)")).toBeInTheDocument();
   });
 

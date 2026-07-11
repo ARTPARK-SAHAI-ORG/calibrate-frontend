@@ -230,6 +230,27 @@ describe("EvaluationTabContent", () => {
     await waitFor(() => expect(saveRef.current).toHaveBeenCalled());
   });
 
+  it("leaves other criteria untouched when updating one", async () => {
+    const user = setupUser();
+    const other = makeCriteria({ uuid: "c2", name: "Other" });
+    const { setEvaluationCriteria } = renderComponent({
+      evaluationCriteria: [makeCriteria(), other],
+    });
+
+    await user.click(screen.getByText("Resolved issue"));
+    const nameInput = screen.getByDisplayValue("Resolved issue");
+    await user.clear(nameInput);
+    await user.type(nameInput, "Renamed");
+    await user.click(screen.getByText("Save"));
+
+    expect(setEvaluationCriteria).toHaveBeenCalled();
+    const updater = setEvaluationCriteria.mock.calls[0][0];
+    const result = updater([makeCriteria(), other]);
+    expect(result[0].name).toBe("Renamed");
+    // The non-edited row is returned as-is (the `: c` branch of the map).
+    expect(result[1]).toBe(other);
+  });
+
   it("opens the delete dialog and deletes a criteria", async () => {
     const user = setupUser();
     const { container, setEvaluationCriteria, saveRef } = renderComponent({

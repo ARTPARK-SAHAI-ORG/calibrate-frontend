@@ -16,10 +16,20 @@ const config = {
     "!src/app/**",
     "!src/instrumentation*.ts",
     "!src/middleware.ts",
+    // NextAuth v5 config — providers, callbacks, and the backend token
+    // exchange only run inside the Auth.js runtime, not jsdom. Like
+    // middleware.ts above, it can't be executed under Jest so it only ever
+    // shows as 0% and skews the denominator.
+    "!src/auth.ts",
     "!src/**/__tests__/**",
     // Pure type module (no runtime exports) — can't be executed, so it only
     // ever shows as 0% and skews the denominator.
     "!src/components/eval-details/ttsEvalTypes.ts",
+    // Data Extraction tab is temporarily disabled — its only render site in
+    // AgentDetail.tsx is commented out (extraction UI removed, #230). Excluded
+    // while dead so we don't chase coverage on a hidden feature; re-add here
+    // when the tab is turned back on.
+    "!src/components/agent-tabs/DataExtractionTabContent.tsx",
   ],
   // Component-level coverage lands in coverage/component/ (kept separate from
   // the Playwright E2E coverage in coverage/e2e/). `lcov` also writes an HTML

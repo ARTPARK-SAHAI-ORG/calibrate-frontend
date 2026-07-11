@@ -207,9 +207,49 @@ describe("AddSttItemsDialog", () => {
     ).toBeInTheDocument();
   });
 
+  it("returns the raw detail string when the error body isn't valid JSON", async () => {
+    const user = setupUser();
+    const onSubmit = jest
+      .fn()
+      .mockRejectedValue(new Error("Request failed: 400 - not-json{{{"));
+    renderDialog({ onSubmit });
+
+    await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "Clip 1");
+    await user.type(
+      screen.getByPlaceholderText("What was actually said"),
+      "hello",
+    );
+    await user.type(
+      screen.getByPlaceholderText("What the system transcribed"),
+      "helo",
+    );
+    await user.click(screen.getByRole("button", { name: "Add item" }));
+
+    expect(await screen.findByText("not-json{{{")).toBeInTheDocument();
+  });
+
   it("falls back to the default add error for a non-Error rejection", async () => {
     const user = setupUser();
     const onSubmit = jest.fn().mockRejectedValue("boom");
+    renderDialog({ onSubmit });
+
+    await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "Clip 1");
+    await user.type(
+      screen.getByPlaceholderText("What was actually said"),
+      "hello",
+    );
+    await user.type(
+      screen.getByPlaceholderText("What the system transcribed"),
+      "helo",
+    );
+    await user.click(screen.getByRole("button", { name: "Add item" }));
+
+    expect(await screen.findByText("Failed to add items")).toBeInTheDocument();
+  });
+
+  it("falls back to the default add error for an Error with an empty message", async () => {
+    const user = setupUser();
+    const onSubmit = jest.fn().mockRejectedValue(new Error(""));
     renderDialog({ onSubmit });
 
     await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "Clip 1");
@@ -395,6 +435,19 @@ describe("AddSttItemsDialog", () => {
       expect(screen.getByDisplayValue("Fresh")).toBeInTheDocument();
     });
 
+    it("falls back to the edit-specific error message on a non-Error failure", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn().mockRejectedValue("boom");
+      renderDialog({ mode: "edit", initialRows, onSubmit });
+      const nameInputs = screen.getAllByDisplayValue(/Clip \d/);
+      await user.type(nameInputs[0], "!");
+      await user.click(screen.getByRole("button", { name: "Save 2 items" }));
+
+      expect(
+        await screen.findByText("Failed to save items"),
+      ).toBeInTheDocument();
+    });
+
     it("shows saving state while submitting", async () => {
       const user = setupUser();
       let resolveSubmit: (() => void) | undefined;
@@ -417,6 +470,19 @@ describe("AddSttItemsDialog", () => {
         expect(screen.queryByText("Saving...")).not.toBeInTheDocument(),
       );
     });
+  });
+
+  it("uses crypto.randomUUID for new row ids when available", async () => {
+    const original = global.crypto;
+    const randomUUID = jest.fn(() => "11111111-1111-1111-1111-111111111111");
+    delete (global as { crypto?: Crypto }).crypto;
+    (global as { crypto?: Partial<Crypto> }).crypto = { randomUUID };
+    const user = setupUser();
+    renderDialog();
+    await user.click(screen.getByRole("button", { name: "Add another item" }));
+    expect(screen.getAllByPlaceholderText("e.g. Clip 1")).toHaveLength(2);
+    expect(randomUUID).toHaveBeenCalled();
+    global.crypto = original;
   });
 
   it("falls back to a random id for new rows when crypto.randomUUID is unavailable", async () => {

@@ -108,6 +108,53 @@ describe("RunEvaluatorsDialog", () => {
     expect(await screen.findByText("not-json{{{")).toBeInTheDocument();
   });
 
+  it("shows the raw Error message when it doesn't match the 'Request failed' shape", async () => {
+    mockedApiClient.mockRejectedValue(new Error("Network down"));
+    renderDialog();
+    expect(await screen.findByText("Network down")).toBeInTheDocument();
+  });
+
+  it("falls back to the default load error for an Error with an empty message", async () => {
+    mockedApiClient.mockRejectedValue(new Error(""));
+    renderDialog();
+    expect(
+      await screen.findByText("Failed to load evaluator versions"),
+    ).toBeInTheDocument();
+  });
+
+  it("treats an evaluator whose versions field is absent as having no versions and blocks Run", async () => {
+    mockedApiClient.mockResolvedValue([
+      { uuid: "ev-1", live_version_id: null, live_version_index: null },
+      { uuid: "ev-2", live_version_id: null, live_version_index: null },
+    ]);
+    const onConfirm = jest.fn();
+    const user = setupUser();
+    renderDialog({ onConfirm });
+    await screen.findByText("Relevance");
+    expect(screen.getAllByText("No versions")).toHaveLength(2);
+    // Both picked by default but neither has a chosen version, so confirming
+    // produces an empty selection set and never calls onConfirm.
+    await user.click(screen.getByRole("button", { name: "Run" }));
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("skips unpicked evaluators when confirming", async () => {
+    mockedApiClient.mockResolvedValue(detailResponse);
+    const onConfirm = jest.fn();
+    const user = setupUser();
+    renderDialog({ onConfirm });
+    await screen.findByText("Relevance");
+
+    // Unpick just Fluency, leaving Relevance picked.
+    await user.click(screen.getByRole("checkbox", { name: "Pick Fluency" }));
+    await user.click(screen.getByRole("button", { name: "Run" }));
+
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onConfirm.mock.calls[0][0]).toEqual([
+      { evaluator_id: "ev-1", evaluator_version_id: "v1-live" },
+    ]);
+  });
+
   it("falls back to the default load error for a non-Error rejection", async () => {
     mockedApiClient.mockRejectedValue("boom");
     renderDialog();
