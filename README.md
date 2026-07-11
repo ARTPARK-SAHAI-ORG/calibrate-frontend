@@ -85,5 +85,5 @@ This work is licensed under a
 [cc-by-sa-image]: https://licensebuttons.net/l/by-sa/4.0/88x31.png
 [cc-by-sa-shield]: https://img.shields.io/badge/License-CC%20BY--SA%204.0-lightgrey.svg
 [codecov]: https://codecov.io/gh/ARTPARK-SAHAI-ORG/calibrate-frontend
-[component-badge]: https://codecov.io/gh/ARTPARK-SAHAI-ORG/calibrate-frontend/branch/main/graph/badge.svg?flag=component
-[e2e-badge]: https://codecov.io/gh/ARTPARK-SAHAI-ORG/calibrate-frontend/branch/main/graph/badge.svg?flag=e2e
+[component-badge]: https://img.shields.io/codecov/c/github/ARTPARK-SAHAI-ORG/calibrate-frontend/main?flag=component&label=component%20coverage&logo=codecov
+[e2e-badge]: https://img.shields.io/codecov/c/github/ARTPARK-SAHAI-ORG/calibrate-frontend/main?flag=e2e&label=e2e%20coverage&logo=codecov
