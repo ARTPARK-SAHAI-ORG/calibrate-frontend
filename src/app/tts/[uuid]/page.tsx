@@ -31,7 +31,6 @@ import { getDataset } from "@/lib/datasets";
 import { ShareButton } from "@/components/ShareButton";
 import { ExportZipButton } from "@/components/ExportZipButton";
 import type { ExportColumn } from "@/components/ExportResultsButton";
-import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { retryEvaluation } from "@/lib/retryEvaluation";
 import {
   deriveEvaluatorColumns,
@@ -170,7 +169,6 @@ export default function TTSEvaluationDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const { errorCode, captureResponse } = usePageErrorState();
   // Retry flow for failed runs.
-  const [retryConfirmOpen, setRetryConfirmOpen] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
   // Persist the active tab across reloads via the `?tab=` query param.
@@ -198,7 +196,6 @@ export default function TTSEvaluationDetailPage() {
     setRetryError(null);
     const result = await retryEvaluation("tts", taskId, backendAccessToken);
     if (result.ok) {
-      setRetryConfirmOpen(false);
       window.location.reload();
       return;
     }
@@ -702,10 +699,7 @@ export default function TTSEvaluationDetailPage() {
                 backendAccessToken &&
                 evaluationResult.dataset_id && (
                   <button
-                    onClick={() => {
-                      setRetryError(null);
-                      setRetryConfirmOpen(true);
-                    }}
+                    onClick={handleRetry}
                     disabled={retrying}
                     title="Re-run this evaluation on the same dataset, providers, and evaluators"
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -716,27 +710,11 @@ export default function TTSEvaluationDetailPage() {
                 )}
             </div>
 
-            <DeleteConfirmationDialog
-              isOpen={retryConfirmOpen}
-              onClose={() => {
-                if (!retrying) {
-                  setRetryConfirmOpen(false);
-                  setRetryError(null);
-                }
-              }}
-              onConfirm={handleRetry}
-              title="Retry evaluation"
-              message={`This will start a new TTS evaluation on the same dataset (${evaluationResult.dataset_name ?? "—"}), providers, and evaluators as the failed run.`}
-              confirmText="Retry"
-              isDeleting={retrying}
-              extraContent={
-                retryError ? (
-                  <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
-                    {retryError}
-                  </div>
-                ) : null
-              }
-            />
+            {retryError && (
+              <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+                {retryError}
+              </div>
+            )}
 
             {/* Only show tabs and content when we have at least one provider result */}
             {evaluationResult.provider_results &&
