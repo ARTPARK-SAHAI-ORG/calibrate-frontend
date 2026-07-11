@@ -1,0 +1,153 @@
+import React from "react";
+import { render, screen } from "@/test-utils";
+import { STTResultsTable, type STTResultRow, type STTEvaluatorColumn } from "../STTResultsTable";
+
+const baseRow: STTResultRow = {
+  id: "1",
+  gt: "hello world",
+  pred: "hello world",
+  wer: "0.1234",
+  string_similarity: "0.9876",
+  llm_judge_score: "true",
+  llm_judge_reasoning: "Matches well",
+};
+
+describe("STTResultsTable", () => {
+  it("renders legacy columns with WER/similarity/pass badge, no audio column when no audio_url", () => {
+    render(<STTResultsTable results={[baseRow]} />);
+    expect(screen.getAllByText("Ground Truth").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Prediction").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("WER").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Similarity").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Audio")).not.toBeInTheDocument();
+    // WER/similarity formatted values (appear in both desktop+mobile)
+    expect(screen.getAllByText("0.1234").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("0.9876").length).toBeGreaterThan(0);
+    // Pass badge (from legacy llm_judge_score true)
+    expect(screen.getAllByText("Pass").length).toBeGreaterThan(0);
+  });
+
+  it("shows audio column when a row has audio_url", () => {
+    render(<STTResultsTable results={[{ ...baseRow, audio_url: "https://example.com/a.wav" }]} />);
+    expect(screen.getAllByText("Audio").length).toBeGreaterThan(0);
+  });
+
+  it("renders em-dash placeholder for a row without audio when other rows have audio", () => {
+    render(
+      <STTResultsTable
+        results={[
+          { ...baseRow, audio_url: "https://example.com/a.wav" },
+          { ...baseRow, id: "2", audio_url: undefined },
+        ]}
+      />,
+    );
+    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+  });
+
+  it("shows empty-prediction fallback text and highlight when pred is blank/whitespace", () => {
+    render(<STTResultsTable results={[{ ...baseRow, pred: "   " }]} />);
+    expect(screen.getAllByText("No transcript generated").length).toBeGreaterThan(0);
+  });
+
+  it("renders Fail badge when llm_judge_score is falsy string", () => {
+    render(<STTResultsTable results={[{ ...baseRow, llm_judge_score: "false" }]} />);
+    expect(screen.getAllByText("Fail").length).toBeGreaterThan(0);
+  });
+
+  it("renders dash for missing llm_judge_score in legacy mode", () => {
+    render(<STTResultsTable results={[{ ...baseRow, llm_judge_score: undefined, llm_judge_reasoning: undefined }]} />);
+    // no llm_judge_score -> dash '-' rendered by LLMJudgeBadge in desktop, mobile omits pill
+    expect(screen.getAllByText("-").length).toBeGreaterThan(0);
+  });
+
+  it("falls back to 'Score: X' tooltip text when llm_judge_reasoning is missing", () => {
+    render(<STTResultsTable results={[{ ...baseRow, llm_judge_reasoning: undefined }]} />);
+    expect(screen.getAllByText("Pass").length).toBeGreaterThan(0);
+  });
+
+  it("renders dash for null wer/similarity", () => {
+    render(<STTResultsTable results={[{ ...baseRow, wer: undefined as any, string_similarity: undefined }]} />);
+    expect(screen.getAllByText("-").length).toBeGreaterThan(0);
+  });
+
+  it("hides metrics columns entirely when showMetrics=false", () => {
+    render(<STTResultsTable results={[baseRow]} showMetrics={false} />);
+    expect(screen.queryByText("WER")).not.toBeInTheDocument();
+    expect(screen.queryByText("Similarity")).not.toBeInTheDocument();
+    expect(screen.queryByText("Evaluator")).not.toBeInTheDocument();
+  });
+
+  it("hides similarity column when showSimilarity=false", () => {
+    render(<STTResultsTable results={[baseRow]} showSimilarity={false} />);
+    expect(screen.queryByText("Similarity")).not.toBeInTheDocument();
+    expect(screen.getAllByText("WER").length).toBeGreaterThan(0);
+  });
+
+  it("uses a custom judgeLabel for the legacy evaluator column", () => {
+    render(<STTResultsTable results={[baseRow]} judgeLabel="Custom Judge" />);
+    expect(screen.getAllByText("Custom Judge").length).toBeGreaterThan(0);
+  });
+
+  it("renders dynamic evaluator columns (binary + rating) from legacy flat fields", () => {
+    const cols: STTEvaluatorColumn[] = [
+      { key: "semantic_match", label: "Semantic Match", outputType: "binary", scoreField: "semantic_match_score", reasoningField: "semantic_match_reasoning" },
+      { key: "quality", label: "Quality", outputType: "rating", scoreField: "quality_score", reasoningField: "quality_reasoning", scaleMax: 5 },
+    ];
+    render(
+      <STTResultsTable
+        results={[
+          {
+            ...baseRow,
+            semantic_match_score: "true",
+            semantic_match_reasoning: "good match",
+            quality_score: "4",
+            quality_reasoning: "solid",
+          },
+        ]}
+        evaluatorColumns={cols}
+      />,
+    );
+    expect(screen.getAllByText("Semantic Match").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Quality").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("4/5").length).toBeGreaterThan(0);
+    // legacy judge column and pill should not render in dynamic mode
+    expect(screen.queryByText("Evaluator")).not.toBeInTheDocument();
+  });
+
+  it("reads dynamic evaluator via evaluator_outputs uuid path and shows error badge", () => {
+    const cols: STTEvaluatorColumn[] = [
+      { key: "ev1", label: "Ev1", outputType: "binary", evaluatorUuid: "uuid-1" },
+    ];
+    render(
+      <STTResultsTable
+        results={[
+          {
+            ...baseRow,
+            evaluator_outputs: { "uuid-1": { error: true, reasoning: "bad" } },
+          },
+        ]}
+        evaluatorColumns={cols}
+      />,
+    );
+    expect(screen.getAllByText("Error").length).toBeGreaterThan(0);
+  });
+
+  it("omits dynamic evaluator mobile block entirely when no score/reasoning/error", () => {
+    const cols: STTEvaluatorColumn[] = [
+      { key: "ev2", label: "Ev2", outputType: "binary" },
+    ];
+    render(<STTResultsTable results={[baseRow]} evaluatorColumns={cols} />);
+    expect(screen.getAllByText("Ev2").length).toBeGreaterThan(0);
+  });
+
+  it("attaches tableRef to the desktop table wrapper", () => {
+    const ref = React.createRef<HTMLDivElement>();
+    render(<STTResultsTable results={[baseRow]} tableRef={ref} />);
+    expect(ref.current).not.toBeNull();
+  });
+
+  it("renders nothing extra with empty results array", () => {
+    render(<STTResultsTable results={[]} />);
+    expect(screen.getAllByText("Ground Truth").length).toBeGreaterThan(0);
+  });
+});
