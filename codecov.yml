@@ -23,6 +23,11 @@ coverage:
         flags: [e2e]
         informational: true
 
+# The PR comment leads with the per-flag breakdown (component vs e2e) so the
+# two layers are read separately. `files`/`diff` are dropped because their
+# merged patch table blends both flags into one misleading top-line number;
+# read each layer's real coverage from the `flags` section and the per-flag
+# status checks instead.
 comment:
-  layout: "reach, diff, flags, files"
+  layout: "reach, flags"
   require_changes: false
