@@ -103,6 +103,68 @@ describe("LeaderboardBarChart", () => {
     expect(screen.getByText("Empty Chart")).toBeInTheDocument();
   });
 
+  // Recharts only invokes the Tooltip `formatter` (which routes through
+  // formatTooltip / defaultTooltipFormatter) once the chart becomes active.
+  // Recharts 3's accessibility layer makes the chart surface focusable
+  // (role="application") and activates a data point on arrow-key navigation, so
+  // drive that to exercise the tooltip formatter without needing real layout.
+  function activateTooltip(container: HTMLElement) {
+    const surface = container.querySelector(".recharts-surface");
+    if (!surface) return;
+    fireEvent.focus(surface);
+    fireEvent.keyDown(surface, { key: "ArrowRight", code: "ArrowRight" });
+  }
+
+  it("formats tooltip values with the default formatter when active", () => {
+    const { container } = render(
+      <LeaderboardBarChart
+        title="Active Chart"
+        data={[{ label: "Alpha", value: 10.123456 }]}
+      />
+    );
+    activateTooltip(container);
+    // defaultTooltipFormatter: parseFloat((10.123456).toFixed(5)).toString()
+    expect(screen.getByText("10.12346")).toBeInTheDocument();
+  });
+
+  it("formats tooltip values with a custom formatTooltip when active", () => {
+    const { container } = render(
+      <LeaderboardBarChart
+        title="Active Custom"
+        data={[{ label: "Alpha", value: 42 }]}
+        formatTooltip={(v) => `${v} pts`}
+      />
+    );
+    activateTooltip(container);
+    expect(screen.getByText("42 pts")).toBeInTheDocument();
+  });
+
+  it("passes non-numeric tooltip values through unformatted", () => {
+    const { container } = render(
+      <LeaderboardBarChart
+        title="Non Numeric"
+        // A non-number value exercises the `typeof value === "number"` false
+        // branch, where the formatter returns the raw value untouched.
+        data={[{ label: "Alpha", value: "N/A" as unknown as number }]}
+      />
+    );
+    activateTooltip(container);
+    expect(screen.getByText("N/A")).toBeInTheDocument();
+  });
+
+  it("falls back to the default bar color when the color map lacks an entry", () => {
+    // An empty color map forces `colors.get(...)` to return undefined so the
+    // `|| "#A8D5E2"` default-color fallback branch executes for every Cell.
+    render(
+      <LeaderboardBarChart
+        title="No Colors"
+        data={sampleData}
+        colorMap={new Map<string, string>()}
+      />
+    );
+    expect(screen.getByText("No Colors")).toBeInTheDocument();
+  });
+
   describe("downloadChart", () => {
     let createObjectURLSpy: jest.SpyInstance;
     let revokeObjectURLSpy: jest.SpyInstance;
@@ -172,6 +234,25 @@ describe("LeaderboardBarChart", () => {
       expect(revokeObjectURLSpy).toHaveBeenCalledWith("blob:mock-url");
       expect(clickSpy).toHaveBeenCalled();
 
+      clickSpy.mockRestore();
+    });
+
+    it("no-ops when the chart svg is missing", () => {
+      const clickSpy = jest
+        .spyOn(HTMLAnchorElement.prototype, "click")
+        .mockImplementation(() => {});
+
+      const { container } = render(
+        <LeaderboardBarChart title="No SVG" data={sampleData} />
+      );
+      // Remove the rendered chart svg so downloadChart's `!svgElement` guard
+      // short-circuits before building/exporting anything.
+      container.querySelector(".recharts-surface")?.remove();
+      const button = screen.getByRole("button", { name: /PNG/ });
+      fireEvent.click(button);
+
+      expect(createObjectURLSpy).not.toHaveBeenCalled();
+      expect(clickSpy).not.toHaveBeenCalled();
       clickSpy.mockRestore();
     });
 

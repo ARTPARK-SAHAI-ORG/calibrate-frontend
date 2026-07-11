@@ -99,6 +99,29 @@ describe("ExportZipButton", () => {
     );
   });
 
+  it("escapes object, null, and formula-injection cell values when building the csv", async () => {
+    const user = setupUser();
+    const { createObjectURL } = mockAnchor();
+    // No files, so the export proceeds purely on the csv rows and never fetches.
+    const getContents = jest.fn().mockReturnValue({
+      csv: {
+        columns: [
+          { key: "obj", header: "Obj" },
+          { key: "empty", header: "Empty" },
+          { key: "formula", header: "Formula" },
+        ],
+        rows: [{ obj: { nested: 1 }, empty: null, formula: "=SUM(A1)" }],
+      },
+      files: [],
+    });
+
+    render(<ExportZipButton filename="bundle" getContents={getContents} />);
+    await user.click(screen.getByRole("button"));
+
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalledTimes(1));
+    expect(getContents).toHaveBeenCalledTimes(1);
+  });
+
   it("records a failed file fetch as an error entry without aborting the export", async () => {
     const user = setupUser();
     const { createObjectURL } = mockAnchor();

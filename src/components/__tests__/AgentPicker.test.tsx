@@ -161,6 +161,35 @@ describe("AgentPicker", () => {
     ).toBeInTheDocument();
   });
 
+  it("normalises legacy agent shapes: agent_name fallback, stringified fallback, and config.connection_verified", async () => {
+    const legacyPayload = [
+      // name missing -> falls back to agent_name
+      { uuid: "l1", agent_name: "Legacy Named" },
+      // neither name nor agent_name -> String(agent)
+      { uuid: "l4" },
+      // connection with verification only under the legacy nested config
+      {
+        uuid: "l2",
+        name: "Config Verified",
+        type: "connection",
+        config: { connection_verified: true },
+      },
+      // connection with no verification info at all -> unverified
+      { uuid: "l3", name: "Bare Connection", type: "connection" },
+    ];
+    mockFetchOnce({ json: async () => legacyPayload });
+    const user = setupUser();
+    render(<AgentPicker selectedAgentUuid="" onSelectAgent={jest.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Select an agent" }));
+
+    expect(await screen.findByText("Legacy Named")).toBeInTheDocument();
+    expect(screen.getByText("[object Object]")).toBeInTheDocument();
+    // Only l3 (connection, no verification data) is unverified; l2's nested
+    // config.connection_verified === true makes it verified.
+    expect(screen.getAllByText("Unverified")).toHaveLength(1);
+  });
+
   it("filters agents by search query", async () => {
     mockFetchOnce({ json: async () => agentsPayload });
     const user = setupUser();

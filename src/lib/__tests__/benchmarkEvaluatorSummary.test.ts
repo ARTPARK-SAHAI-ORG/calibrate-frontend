@@ -291,6 +291,64 @@ describe("buildBenchmarkCombinedLeaderboardPayload", () => {
     expect(result!.chartRows[1][1].formatTooltip(500)).toBe("500");
   });
 
+  it("accepts numeric latency/cost/token values (not just strings)", () => {
+    const leaderboardSummary: BenchmarkLeaderboardSummaryRow[] = [
+      {
+        model: "m1",
+        pass_rate: "70",
+        // Numbers rather than numeric strings exercise toFiniteNumber's
+        // `typeof v === "number"` branch.
+        latency_p50: 1500 as unknown as string,
+        cost: 0.01 as unknown as string,
+        total_tokens: 250 as unknown as string,
+      },
+    ];
+    const modelResults: BenchmarkModelLike[] = [{ model: "m1" }];
+    const result = buildBenchmarkCombinedLeaderboardPayload(
+      leaderboardSummary,
+      modelResults,
+      "Score",
+    );
+    expect(result!.rows[0].avg_latency_ms).toBe(1500);
+    expect(result!.rows[0].avg_cost).toBe(0.01);
+    expect(result!.rows[0].avg_tokens).toBe(250);
+  });
+
+  it("finds a metric's meta on a later model when the first model lacks any evaluator_summary", () => {
+    // m1 has no evaluator_summary at all; m2 defines the only metric. This
+    // exercises the `?? []` fallbacks in firstEntryForMetric and the per-row
+    // evaluator loop, plus the found/not-found branch across models.
+    const modelResults: BenchmarkModelLike[] = [
+      { model: "m1" },
+      {
+        model: "m2",
+        evaluator_summary: [
+          {
+            metric_key: "politeness",
+            name: "Politeness",
+            type: "binary",
+            passed: 2,
+            total: 4,
+            pass_rate: 50,
+          },
+        ],
+      },
+    ];
+    const result = buildBenchmarkCombinedLeaderboardPayload(
+      undefined,
+      modelResults,
+      "Score",
+    );
+    expect(result).not.toBeNull();
+    expect(result!.plan.evaluators).toHaveLength(1);
+    expect(result!.plan.evaluators[0].metric_key).toBe("politeness");
+    const m1Row = result!.rows.find((r) => r.model === "m1")!;
+    const m2Row = result!.rows.find((r) => r.model === "m2")!;
+    // m1 has no evaluator_summary -> undefined cell for the metric.
+    expect(m1Row.ev_politeness).toBeUndefined();
+    expect(m2Row.ev_politeness).toBe(50);
+  });
+
   it("falls back to legacy latency_ms when latency_p50 is absent", () => {
     const leaderboardSummary: BenchmarkLeaderboardSummaryRow[] = [
       { model: "m1", pass_rate: "50", latency_ms: "900" },
