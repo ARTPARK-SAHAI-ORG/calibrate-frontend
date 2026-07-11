@@ -200,22 +200,6 @@ export default function STTEvaluationDetailPage() {
     window.history.replaceState(null, "", `?${next.toString()}`);
   };
 
-  const handleRetry = async () => {
-    if (!backendAccessToken || !taskId || retrying) return;
-    setRetrying(true);
-    setRetryError(null);
-    const result = await retryEvaluation("stt", taskId, backendAccessToken);
-    if (result.ok) {
-      window.location.reload();
-      return;
-    }
-    if (result.status === 401) {
-      await signOut({ callbackUrl: "/login" });
-      return;
-    }
-    setRetryError(result.error);
-    setRetrying(false);
-  };
   const [activeProviderTab, setActiveProviderTab] = useState<string | null>(
     null,
   );
@@ -465,6 +449,96 @@ export default function STTEvaluationDetailPage() {
         pollingIntervalRef.current = null;
       }
     }
+  };
+
+  const restartEvaluationAfterRetry = async () => {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl || !backendAccessToken || !taskId) {
+      setRetrying(false);
+      return;
+    }
+
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+
+    setIsLoading(true);
+    setRetryError(null);
+    setError(null);
+    setActiveProviderTab(null);
+    handleTabChange("outputs");
+
+    try {
+      const response = await fetch(`${backendUrl}/stt/evaluate/${taskId}`, {
+        method: "GET",
+        headers: {
+          accept: "application/json",
+          Authorization: `Bearer ${backendAccessToken}`,
+        },
+      });
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch evaluation result");
+      }
+
+      const result: EvaluationResult = await response.json();
+
+      if (result.dataset_id) {
+        try {
+          await getDataset(backendAccessToken, result.dataset_id);
+        } catch {
+          result.dataset_id = null;
+          result.dataset_name = null;
+        }
+      }
+
+      setEvaluationResult(result);
+
+      if (result.provider_results && result.provider_results.length > 0) {
+        setActiveProviderTab(result.provider_results[0].provider);
+      }
+
+      if (
+        result.status !== "done" &&
+        result.status !== "failed" &&
+        !pollingIntervalRef.current
+      ) {
+        pollingIntervalRef.current = setInterval(() => {
+          pollTaskStatus(taskId, backendUrl);
+        }, POLLING_INTERVAL_MS);
+      }
+    } catch (err) {
+      reportError("Error refreshing evaluation after retry:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to load evaluation",
+      );
+    } finally {
+      setIsLoading(false);
+      setRetrying(false);
+    }
+  };
+
+  const handleRetry = async () => {
+    if (!backendAccessToken || !taskId || retrying) return;
+    setRetrying(true);
+    setRetryError(null);
+    const result = await retryEvaluation("stt", taskId, backendAccessToken);
+    if (result.ok) {
+      await restartEvaluationAfterRetry();
+      return;
+    }
+    if (result.status === 401) {
+      await signOut({ callbackUrl: "/login" });
+      return;
+    }
+    setRetryError(result.error);
+    setRetrying(false);
   };
 
   // The default STT evaluator drives the column / metric label for legacy
