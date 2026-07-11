@@ -11,7 +11,7 @@ import {
   AgentTabContent,
   AgentConnectionTabContent,
   ToolsTabContent,
-  DataExtractionTabContent,
+  // DataExtractionTabContent, // TODO: temporarily disabled — extraction UI removed for now
   TestsTabContent,
   SettingsTabContent,
 } from "@/components/agent-tabs";
@@ -93,7 +93,7 @@ const tabLabels: Record<TabType, string> = {
 const calibrateTabs: TabType[] = [
   "agent",
   "tools",
-  "data-extraction",
+  // "data-extraction", // TODO: temporarily disabled — extraction UI removed for now
   "tests",
   "settings",
 ];
@@ -278,11 +278,12 @@ export function AgentDetail({
   const [dataExtractionFields, setDataExtractionFields] = useState<
     DataExtractionFieldData[]
   >([]);
-  const [dataExtractionFieldsLoading, setDataExtractionFieldsLoading] =
-    useState(false);
-  const [dataExtractionFieldsError, setDataExtractionFieldsError] = useState<
-    string | null
-  >(null);
+  // TODO: temporarily disabled — extraction UI removed for now
+  // const [dataExtractionFieldsLoading, setDataExtractionFieldsLoading] =
+  //   useState(false);
+  // const [dataExtractionFieldsError, setDataExtractionFieldsError] = useState<
+  //   string | null
+  // >(null);
 
   // Agent connection state
   const [connectionUrl, setConnectionUrl] = useState("");
@@ -1134,6 +1135,7 @@ export function AgentDetail({
         )}
 
         {/* Data Extraction Tab Content */}
+        {/* TODO: temporarily disabled — extraction UI removed for now
         {activeTab === "data-extraction" && (
           <DataExtractionTabContent
             agentUuid={agentUuid}
@@ -1144,6 +1146,7 @@ export function AgentDetail({
             saveRef={saveRef}
           />
         )}
+        */}
 
         {/* Tests Tab Content */}
         {activeTab === "tests" && (
