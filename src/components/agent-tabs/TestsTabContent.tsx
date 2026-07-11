@@ -35,6 +35,12 @@ import {
   readBulkNameConflictMessage,
   readNameConflictMessage,
 } from "@/lib/parseBackendError";
+import {
+  type EvaluatorData,
+  fetchAgentEvaluators,
+  attachEvaluatorToAgent,
+  fetchAllEvaluators,
+} from "@/lib/evaluatorApi";
 
 type TestData = {
   uuid: string;
@@ -214,6 +220,16 @@ export function TestsTabContent({
 }: TestsTabContentProps) {
   const backendAccessToken = useAccessToken();
   const maxRowsPerEval = useMaxRowsPerEval();
+  // Evaluators currently attached to this agent — used to seed a new test's
+  // evaluators and to detect which of a saved test's evaluators are "new" to
+  // the agent (so we can offer to add them to the agent's defaults).
+  const [agentEvaluators, setAgentEvaluators] = useState<EvaluatorData[]>([]);
+  // Post-save prompt: evaluators referenced by the just-saved test that aren't
+  // yet attached to the agent. Non-null while the prompt dialog is shown.
+  const [agentDefaultsPrompt, setAgentDefaultsPrompt] = useState<
+    { uuid: string; name: string }[] | null
+  >(null);
+  const [isAttachingDefaults, setIsAttachingDefaults] = useState(false);
   // Agent tests state (tests attached to the agent)
   const [agentTests, setAgentTests] = useState<TestData[]>([]);
   const [agentTestsLoading, setAgentTestsLoading] = useState(true);
@@ -411,6 +427,66 @@ export function TestsTabContent({
       fetchAgentTests();
     }
   }, [agentUuid, backendAccessToken, fetchAgentTests]);
+
+  // Load the agent's attached evaluators (best-effort; failure just means new
+  // tests fall back to the default seed and the post-save prompt is skipped).
+  const loadAgentEvaluators = useCallback(async () => {
+    if (!agentUuid || !backendAccessToken) return;
+    try {
+      setAgentEvaluators(
+        await fetchAgentEvaluators(agentUuid, backendAccessToken),
+      );
+    } catch (err) {
+      reportError("Error fetching agent evaluators:", err);
+    }
+  }, [agentUuid, backendAccessToken]);
+
+  useEffect(() => {
+    loadAgentEvaluators();
+  }, [loadAgentEvaluators]);
+
+  // After a test is created/updated, surface any evaluators it references that
+  // aren't yet attached to the agent, so the user can add them to the agent's
+  // defaults. Never removes evaluators (deletions on a test are ignored here).
+  const maybePromptAgentDefaults = async (evaluators: EvaluatorRefPayload[]) => {
+    if (!backendAccessToken || evaluators.length === 0) return;
+    const attached = new Set(agentEvaluators.map((e) => e.uuid));
+    const newUuids = Array.from(
+      new Set(evaluators.map((e) => e.evaluator_uuid)),
+    ).filter((uuid) => !attached.has(uuid));
+    if (newUuids.length === 0) return;
+    // Resolve names from a fresh library fetch so inline-created evaluators
+    // (not in our cached agent list) still show a friendly label.
+    let library: EvaluatorData[] = [];
+    try {
+      library = await fetchAllEvaluators(backendAccessToken);
+    } catch {
+      // Names are best-effort; fall back to a generic label below.
+    }
+    const nameByUuid = new Map(library.map((e) => [e.uuid, e.name]));
+    setAgentDefaultsPrompt(
+      newUuids.map((uuid) => ({
+        uuid,
+        name: nameByUuid.get(uuid) ?? "Evaluator",
+      })),
+    );
+  };
+
+  const confirmAddAgentDefaults = async () => {
+    if (!agentDefaultsPrompt || !backendAccessToken) return;
+    try {
+      setIsAttachingDefaults(true);
+      for (const ev of agentDefaultsPrompt) {
+        await attachEvaluatorToAgent(agentUuid, ev.uuid, backendAccessToken);
+      }
+      await loadAgentEvaluators();
+      setAgentDefaultsPrompt(null);
+    } catch (err) {
+      reportError("Error adding evaluators to agent defaults:", err);
+    } finally {
+      setIsAttachingDefaults(false);
+    }
+  };
 
   // Fetch the user's full /tests library. Triggered from two places: when
   // the attach-existing dropdown opens, and when the agent's tests list
@@ -877,6 +953,8 @@ export function TestsTabContent({
       setNewTestName("");
       setValidationAttempted(false);
       setCreateDialogOpen(false);
+      // Offer to add any evaluators new to this agent to its defaults.
+      if (usesEvaluators) await maybePromptAgentDefaults(evaluators);
     } catch (err) {
       reportError("Error creating test:", err);
       setCreateError(
@@ -1098,6 +1176,13 @@ export function TestsTabContent({
       await fetchAgentTests();
       setCreateDialogOpen(false);
       resetTestDialog();
+      // Offer to add any evaluators new to this agent to its defaults.
+      if (
+        config.evaluation.type === "response" ||
+        config.evaluation.type === "conversation"
+      ) {
+        await maybePromptAgentDefaults(evaluators);
+      }
     } catch (err) {
       reportError("Error updating test:", err);
       setCreateError(
@@ -2428,7 +2513,60 @@ export function TestsTabContent({
           initialTab={initialTab}
           initialConfig={initialConfig}
           initialEvaluators={initialEvaluators}
+          agentEvaluatorUuids={agentEvaluators.map((e) => e.uuid)}
         />
+      )}
+
+      {/* After saving a test, offer to add any evaluators new to this agent to
+          its default evaluator list. */}
+      {agentDefaultsPrompt && agentDefaultsPrompt.length > 0 && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => {
+            if (!isAttachingDefaults) setAgentDefaultsPrompt(null);
+          }}
+        >
+          <div
+            className="bg-background border border-border rounded-xl p-6 md:p-8 max-w-lg w-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg md:text-xl font-semibold tracking-tight mb-1">
+              Add to {agentName}&rsquo;s evaluators?
+            </h2>
+            <p className="text-sm md:text-[15px] text-muted-foreground mb-4">
+              {agentDefaultsPrompt.length === 1
+                ? "This evaluator isn't on the agent yet. Add it so new tests for this agent start with it by default?"
+                : "These evaluators aren't on the agent yet. Add them so new tests for this agent start with them by default?"}
+            </p>
+            <ul className="mb-6 space-y-1.5 max-h-48 overflow-y-auto">
+              {agentDefaultsPrompt.map((ev) => (
+                <li
+                  key={ev.uuid}
+                  className="flex items-center gap-2 text-sm text-foreground"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground flex-shrink-0" />
+                  {ev.name}
+                </li>
+              ))}
+            </ul>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setAgentDefaultsPrompt(null)}
+                disabled={isAttachingDefaults}
+                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Not now
+              </button>
+              <button
+                onClick={confirmAddAgentDefaults}
+                disabled={isAttachingDefaults}
+                className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isAttachingDefaults ? "Adding..." : "Add to agent"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Bulk-upload modal locked to this agent. The agent picker is

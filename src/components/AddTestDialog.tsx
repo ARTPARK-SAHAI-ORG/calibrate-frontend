@@ -21,6 +21,8 @@ import {
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { formatTurnTimestamp } from "@/components/test-results/shared";
+import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
+import type { EvaluatorData } from "@/lib/evaluatorApi";
 
 // A single expected parameter row in a tool-call test. The shape is recursive:
 // `object`-typed parameters carry their own `properties` (nested rows) so the
@@ -728,6 +730,13 @@ type AddTestDialogProps = {
   initialConfig?: TestConfig;
   initialEvaluators?: AttachedEvaluatorInit[];
   /**
+   * UUIDs of the evaluators currently attached to this agent. Used to seed a
+   * NEW test's evaluators from the agent's connected evaluators (filtered to
+   * the tab's type: `llm` for next-reply, `conversation` for conversation).
+   * Ignored when editing.
+   */
+  agentEvaluatorUuids?: string[];
+  /**
    * "test" (default) — original behaviour with Next reply / Tool invocation
    * tabs and "Test" labels.
    * "labelItem" — used by the human-alignment task page. Hides the tabs
@@ -767,6 +776,7 @@ export function AddTestDialog({
   initialTab,
   initialConfig,
   initialEvaluators,
+  agentEvaluatorUuids,
   mode = "test",
   allowAgentLastMessage = false,
   requireAssistantLastMessage = false,
@@ -1120,6 +1130,8 @@ export function AddTestDialog({
   const [evaluatorsFetched, setEvaluatorsFetched] = useState(false);
   const [evaluatorPickerOpen, setEvaluatorPickerOpen] = useState(false);
   const [evaluatorPickerSearch, setEvaluatorPickerSearch] = useState("");
+  // Inline "create evaluator" flow launched from the picker header.
+  const [createEvaluatorOpen, setCreateEvaluatorOpen] = useState(false);
 
   const [localValidationAttempted, setLocalValidationAttempted] =
     useState(false);
@@ -1431,72 +1443,78 @@ export function AddTestDialog({
   // Fetch available LLM evaluators (defaults + user-owned) when dialog opens.
   // Used both for the "Add evaluator" picker and to resolve the default
   // correctness evaluator on initial population.
-  useEffect(() => {
-    const fetchLLMEvaluators = async () => {
-      if (!isOpen || !backendAccessToken) return;
-
-      try {
-        setEvaluatorsLoading(true);
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-        if (!backendUrl) {
-          throw new Error("BACKEND_URL environment variable is not set");
-        }
-
-        const response = await fetch(
-          `${backendUrl}/evaluators?include_defaults=true`,
-          {
-            method: "GET",
-            headers: getDefaultHeaders(backendAccessToken),
-          },
-        );
-
-        if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch evaluators");
-        }
-
-        const raw = unwrapList<{
-          uuid: string;
-          name: string;
-          description?: string;
-          slug: string | null;
-          owner_user_id: string | null;
-          evaluator_type?: string;
-          live_version?: { variables?: EvaluatorVariableDef[] | null } | null;
-        }>(await response.json());
-
-        const llm: LLMEvaluatorOption[] = raw
-          .filter(
-            (e) =>
-              e.evaluator_type === "llm" ||
-              e.evaluator_type === CONVERSATION_EVALUATOR_TYPE,
-          )
-          .map((e) => ({
-            uuid: e.uuid,
-            name: e.name,
-            description: e.description,
-            slug: e.slug,
-            owner_user_id: e.owner_user_id,
-            evaluator_type: e.evaluator_type,
-            variables: Array.isArray(e.live_version?.variables)
-              ? (e.live_version!.variables as EvaluatorVariableDef[])
-              : [],
-          }));
-        setAvailableLLMEvaluators(llm);
-      } catch (err) {
-        reportError("Error fetching evaluators:", err);
-      } finally {
-        setEvaluatorsLoading(false);
-        setEvaluatorsFetched(true);
+  // Fetch the selectable evaluator list (defaults + owned, filtered to the
+  // llm / conversation types the picker supports). Also returns the mapped
+  // list so callers (e.g. inline create) can find + attach a fresh evaluator.
+  const loadLLMEvaluators = useCallback(async (): Promise<
+    LLMEvaluatorOption[]
+  > => {
+    if (!isOpen || !backendAccessToken) return [];
+    try {
+      setEvaluatorsLoading(true);
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) {
+        throw new Error("BACKEND_URL environment variable is not set");
       }
-    };
 
-    fetchLLMEvaluators();
+      const response = await fetch(
+        `${backendUrl}/evaluators?include_defaults=true`,
+        {
+          method: "GET",
+          headers: getDefaultHeaders(backendAccessToken),
+        },
+      );
+
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return [];
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch evaluators");
+      }
+
+      const raw = unwrapList<{
+        uuid: string;
+        name: string;
+        description?: string;
+        slug: string | null;
+        owner_user_id: string | null;
+        evaluator_type?: string;
+        live_version?: { variables?: EvaluatorVariableDef[] | null } | null;
+      }>(await response.json());
+
+      const llm: LLMEvaluatorOption[] = raw
+        .filter(
+          (e) =>
+            e.evaluator_type === "llm" ||
+            e.evaluator_type === CONVERSATION_EVALUATOR_TYPE,
+        )
+        .map((e) => ({
+          uuid: e.uuid,
+          name: e.name,
+          description: e.description,
+          slug: e.slug,
+          owner_user_id: e.owner_user_id,
+          evaluator_type: e.evaluator_type,
+          variables: Array.isArray(e.live_version?.variables)
+            ? (e.live_version!.variables as EvaluatorVariableDef[])
+            : [],
+        }));
+      setAvailableLLMEvaluators(llm);
+      return llm;
+    } catch (err) {
+      reportError("Error fetching evaluators:", err);
+      return [];
+    } finally {
+      setEvaluatorsLoading(false);
+      setEvaluatorsFetched(true);
+    }
   }, [isOpen, backendAccessToken]);
+
+  useEffect(() => {
+    loadLLMEvaluators();
+  }, [loadLLMEvaluators]);
 
   // Build initial variable_values for a freshly-attached evaluator: prefer
   // explicit values, then variable defaults, then empty string.
@@ -1516,6 +1534,38 @@ export function AddTestDialog({
     }
     return values;
   };
+
+  // Default attached-evaluators for a NEW test on the given tab: the agent's
+  // connected evaluators of the matching type (`llm` for next-reply,
+  // `conversation` for the conversation tab), falling back to the seeded
+  // default-correctness evaluator on next-reply when the agent has none.
+  const buildDefaultAttachedForTab = useCallback(
+    (tab: TestTab): AttachedEvaluator[] => {
+      const wantedType =
+        tab === "conversation" ? CONVERSATION_EVALUATOR_TYPE : "llm";
+      const toAttached = (o: LLMEvaluatorOption): AttachedEvaluator => ({
+        evaluator_uuid: o.uuid,
+        name: o.name,
+        description: o.description,
+        slug: o.slug,
+        variables: o.variables,
+        variable_values: buildInitialVariableValues(o.variables),
+      });
+      const agentSet = new Set(agentEvaluatorUuids ?? []);
+      const agentMatches = availableLLMEvaluators.filter(
+        (o) => agentSet.has(o.uuid) && o.evaluator_type === wantedType,
+      );
+      if (agentMatches.length > 0) return agentMatches.map(toAttached);
+      if (tab === "next-reply") {
+        const correctness = availableLLMEvaluators.find(
+          (o) => o.slug === DEFAULT_NEXT_REPLY_EVALUATOR_SLUG,
+        );
+        if (correctness) return [toAttached(correctness)];
+      }
+      return [];
+    },
+    [agentEvaluatorUuids, availableLLMEvaluators],
+  );
 
   // Initialize attached evaluators once props + evaluator list have settled.
   // Three cases:
@@ -1579,20 +1629,13 @@ export function AddTestDialog({
       return;
     }
 
-    // New test (or edit with no usable initial state): auto-attach default
-    // correctness only on the next-reply tab. Tool-invocation tests are
-    // unchanged and don't carry evaluators today.
-    if (!isEditing && activeTab === "next-reply" && correctness) {
-      setAttachedEvaluators([
-        {
-          evaluator_uuid: correctness.uuid,
-          name: correctness.name,
-          description: correctness.description,
-          slug: correctness.slug,
-          variables: correctness.variables,
-          variable_values: buildInitialVariableValues(correctness.variables),
-        },
-      ]);
+    // New test (or edit with no usable initial state): seed the agent's
+    // connected evaluators of the matching type (falling back to the default
+    // correctness evaluator on next-reply). Tool-invocation tests aren't an
+    // evaluator tab and stay empty.
+    if (!isEditing && isEvaluatorTab) {
+      const seed = buildDefaultAttachedForTab(activeTab);
+      if (seed.length > 0) setAttachedEvaluators(seed);
       setAttachedEvaluatorsInitialized(true);
       return;
     }
@@ -1608,6 +1651,8 @@ export function AddTestDialog({
     isEditing,
     isLoading,
     activeTab,
+    isEvaluatorTab,
+    buildDefaultAttachedForTab,
   ]);
 
   // Discard-guard baseline capture (paired with `baselineRef`).
@@ -1666,16 +1711,13 @@ export function AddTestDialog({
     if (prev === activeTab) return;
     if (isEditing) return;
     if (!isEvaluatorTab) return;
-    const wantedType =
-      activeTab === "conversation" ? CONVERSATION_EVALUATOR_TYPE : "llm";
-    setAttachedEvaluators((prevAttached) =>
-      prevAttached.filter(
-        (e) =>
-          availableLLMEvaluators.find((o) => o.uuid === e.evaluator_uuid)
-            ?.evaluator_type === wantedType,
-      ),
-    );
-  }, [activeTab, isEditing, isEvaluatorTab, availableLLMEvaluators]);
+    // The next-reply and conversation evaluator types are mutually exclusive,
+    // so nothing the user had for the old type carries over. Re-seed the
+    // agent's default evaluators for the newly selected type (this also drops
+    // the auto-seeded next-reply correctness evaluator when moving to the
+    // conversation tab, which the backend would otherwise reject).
+    setAttachedEvaluators(buildDefaultAttachedForTab(activeTab));
+  }, [activeTab, isEditing, isEvaluatorTab, buildDefaultAttachedForTab]);
 
   const updateEvaluatorVariableValue = (
     evaluatorUuid: string,
@@ -1721,6 +1763,21 @@ export function AddTestDialog({
       ];
     });
     closeEvaluatorPicker();
+  };
+
+  // A freshly-created evaluator (from the inline create flow): refetch the
+  // list so it carries its live-version variables, then auto-attach it to the
+  // test — but only if its type matches the current tab (an `llm` evaluator on
+  // a conversation test would be rejected by the backend).
+  const handleEvaluatorCreated = async (created: EvaluatorData) => {
+    setCreateEvaluatorOpen(false);
+    const list = await loadLLMEvaluators();
+    const option = list.find((o) => o.uuid === created.uuid);
+    const wantedType =
+      activeTab === "conversation" ? CONVERSATION_EVALUATOR_TYPE : "llm";
+    if (option && option.evaluator_type === wantedType) {
+      attachEvaluatorFromOption(option);
+    }
   };
 
   const addToolFromSelection = (tool: AvailableTool) => {
@@ -2987,48 +3044,73 @@ export function AddTestDialog({
                       <label className="text-base font-medium text-foreground">
                         Evaluators
                       </label>
-                      {!isLabelItem &&
-                        (() => {
-                          const remainingOptions =
-                            availableLLMEvaluators.filter(
-                              (o) =>
-                                !attachedEvaluators.some(
-                                  (a) => a.evaluator_uuid === o.uuid,
-                                ) &&
-                                (activeTab === "conversation"
-                                  ? o.evaluator_type ===
-                                    CONVERSATION_EVALUATOR_TYPE
-                                  : o.evaluator_type === "llm"),
-                            );
-                          const noOptionsLeft = remainingOptions.length === 0;
-                          return (
-                            <button
-                              onClick={() => {
-                                if (evaluatorPickerOpen) {
-                                  closeEvaluatorPicker();
-                                } else {
-                                  setEvaluatorPickerOpen(true);
+                      {!isLabelItem && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setCreateEvaluatorOpen(true)}
+                            disabled={isLoading}
+                            // Emerald tint to distinguish "create new" from the
+                            // violet "add existing" action next to it.
+                            className="px-3 py-1.5 text-sm font-medium rounded-lg border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
+                          >
+                            Create new
+                          </button>
+                          {(() => {
+                            const remainingOptions =
+                              availableLLMEvaluators.filter(
+                                (o) =>
+                                  !attachedEvaluators.some(
+                                    (a) => a.evaluator_uuid === o.uuid,
+                                  ) &&
+                                  (activeTab === "conversation"
+                                    ? o.evaluator_type ===
+                                      CONVERSATION_EVALUATOR_TYPE
+                                    : o.evaluator_type === "llm"),
+                              );
+                            const noOptionsLeft =
+                              remainingOptions.length === 0;
+                            return (
+                              <button
+                                onClick={() => {
+                                  if (evaluatorPickerOpen) {
+                                    closeEvaluatorPicker();
+                                  } else {
+                                    setEvaluatorPickerOpen(true);
+                                  }
+                                }}
+                                disabled={
+                                  evaluatorsLoading ||
+                                  isLoading ||
+                                  noOptionsLeft
                                 }
-                              }}
-                              disabled={
-                                evaluatorsLoading || isLoading || noOptionsLeft
-                              }
-                              // Tinted violet so the action stands out from
-                              // the neutral form chrome around it. Validation
-                              // error state overrides border/text to red.
-                              className={`px-3 py-1.5 text-sm font-medium rounded-lg border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-500/12 border-violet-500/45 text-violet-950 dark:text-violet-100 hover:bg-violet-500/22 dark:hover:bg-violet-500/18 ${
-                                localValidationAttempted &&
-                                isEvaluatorTab &&
-                                attachedEvaluators.length === 0
-                                  ? "!border-red-500 !text-red-500 !bg-red-500/10"
-                                  : ""
-                              }`}
-                            >
-                              Add evaluator
-                            </button>
-                          );
-                        })()}
+                                // Tinted violet so the action stands out from
+                                // the neutral form chrome around it. Validation
+                                // error state overrides border/text to red.
+                                className={`px-3 py-1.5 text-sm font-medium rounded-lg border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-500/12 border-violet-500/45 text-violet-950 dark:text-violet-100 hover:bg-violet-500/22 dark:hover:bg-violet-500/18 ${
+                                  localValidationAttempted &&
+                                  isEvaluatorTab &&
+                                  attachedEvaluators.length === 0
+                                    ? "!border-red-500 !text-red-500 !bg-red-500/10"
+                                    : ""
+                                }`}
+                              >
+                                Add evaluator
+                              </button>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </div>
+
+                    {/* Inline create-evaluator flow. On success the new
+                        evaluator is refetched and auto-attached to this test
+                        (when its type matches the tab). */}
+                    <CreateEvaluatorFlow
+                      open={createEvaluatorOpen}
+                      onClose={() => setCreateEvaluatorOpen(false)}
+                      existingEvaluators={availableLLMEvaluators}
+                      onCreated={handleEvaluatorCreated}
+                    />
 
                     {/* Evaluator picker dropdown */}
                     {evaluatorPickerOpen && (
