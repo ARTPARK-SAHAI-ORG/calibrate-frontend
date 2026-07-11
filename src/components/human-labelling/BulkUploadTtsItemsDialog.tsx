@@ -1,553 +1,630 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Papa from "papaparse";
+import { useEffect, useRef, useState } from "react";
+import { signOut } from "next-auth/react";
+import JSZip from "jszip";
 import { apiClient } from "@/lib/api";
+import { LIMITS, showLimitToast } from "@/constants/limits";
+import { useHideFloatingButton } from "@/components/AppLayout";
 import { LazyAudioPlayer } from "@/components/evaluations/LazyAudioPlayer";
+import { reportError } from "@/lib/reportError";
 import {
-  AnnotationOptIn,
-  BulkUploadDialogShell,
-  BulkUploadItemsPreviewShell,
-  type EvaluatorMeta,
-  type GuidelineColumn,
-  type GuidelineDoc,
-  type ParsedAnnotation,
-  buildItemAnnotationsPayload,
-  bulkUploadAnnotatedRowBgClass,
-  duplicateEvaluatorNames,
-  evaluatorReasoningColumn,
-  evaluatorValueColumn,
-  findHeaderKey,
-  parseAnnotationCell,
-  parseApiError,
-  sampleEvaluatorValue,
-  useAnnotatedItemsCheck,
-  useAnnotators,
-} from "./bulk-upload-shared";
+  DiscardChangesDialog,
+  useUnsavedCloseGuard,
+} from "./unsavedCloseGuard";
 
-const NAME_HEADERS = ["name", "title", "label", "item_name"];
-const TEXT_HEADERS = ["text", "prompt", "transcript", "reference", "input"];
-const AUDIO_HEADERS = ["audio_path", "audio_url", "audio", "url"];
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
-function csvEscape(s: string): string {
-  return `"${s.replace(/"/g, '""')}"`;
-}
+const getAudioDuration = (file: File): Promise<number> =>
+  new Promise((resolve, reject) => {
+    const audio = new Audio();
+    const url = URL.createObjectURL(file);
+    audio.src = url;
+    audio.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      resolve(audio.duration);
+    };
+    audio.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Failed to load audio"));
+    };
+  });
 
-const SAMPLE_TTS_BASE_ROWS: Array<{
-  name: string;
-  text: string;
-  audio: string;
-  reasoning: string;
-}> = [
-  {
-    name: "Greeting",
-    text: "Hello, how are you today?",
-    audio: "https://example.com/audio/greeting.wav",
-    reasoning: "Natural intonation and clear pronunciation.",
-  },
-  {
-    name: "Flight booking",
-    text: "I would like to book a flight.",
-    audio: "https://example.com/audio/flight.wav",
-    reasoning: "",
-  },
-  {
-    name: "Repeat request",
-    text: "Can you repeat that, please?",
-    audio: "https://example.com/audio/repeat.wav",
-    reasoning: "",
-  },
-];
+const fileStem = (name: string) => name.replace(/\.[^./]+$/, "");
 
-function buildSampleTtsCsv(
-  evaluators: EvaluatorMeta[],
-  includeAnnotations: boolean,
-): string {
-  const headerCells = [
-    "name",
-    "text",
-    "audio_path",
-    ...(includeAnnotations
-      ? evaluators.flatMap((e) => [
-          csvEscape(evaluatorValueColumn(e.name)),
-          csvEscape(evaluatorReasoningColumn(e.name)),
-        ])
-      : []),
-  ];
-  const lines = SAMPLE_TTS_BASE_ROWS.map((r) =>
-    [
-      csvEscape(r.name),
-      csvEscape(r.text),
-      csvEscape(r.audio),
-      ...(includeAnnotations
-        ? evaluators.flatMap((e) => [
-            csvEscape(sampleEvaluatorValue(e)),
-            csvEscape(r.reasoning),
-          ])
-        : []),
-    ].join(","),
-  );
-  return `${headerCells.join(",")}\n${lines.join("\n")}\n`;
-}
-
-type ParsedItem = {
-  name: string;
-  text: string;
-  audio_path: string;
-  annotations: ParsedAnnotation[];
+/** Parse one CSV line, honouring simple double-quote escaping. */
+const parseCsvLine = (line: string): string[] => {
+  const values: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (const char of line) {
+    if (char === '"') inQuotes = !inQuotes;
+    else if (char === "," && !inQuotes) {
+      values.push(current.trim());
+      current = "";
+    } else current += char;
+  }
+  values.push(current.trim());
+  return values;
 };
 
-export type TtsLinkedEvaluator = {
-  uuid: string;
+// 100 ms of real PCM silence — mirrors the STT dataset sample so the wavs
+// carry valid duration metadata and play in consumer players.
+const createSilentWav = (): Uint8Array => {
+  const sampleRate = 44_100;
+  const numChannels = 1;
+  const bitsPerSample = 16;
+  const bytesPerSample = bitsPerSample / 8;
+  const numSamples = 4410;
+  const dataBytes = numSamples * numChannels * bytesPerSample;
+  const blockAlign = numChannels * bytesPerSample;
+  const byteRate = sampleRate * blockAlign;
+  const fmtChunkPayload = 16;
+  const headerBytes = 12 + 8 + fmtChunkPayload + 8;
+  const fileSize = headerBytes + dataBytes;
+  const buffer = new ArrayBuffer(fileSize);
+  const view = new DataView(buffer);
+  let o = 0;
+  view.setUint32(o, 0x52494646, false);
+  o += 4;
+  view.setUint32(o, fileSize - 8, true);
+  o += 4;
+  view.setUint32(o, 0x57415645, false);
+  o += 4;
+  view.setUint32(o, 0x666d7420, false);
+  o += 4;
+  view.setUint32(o, fmtChunkPayload, true);
+  o += 4;
+  view.setUint16(o, 1, true);
+  o += 2;
+  view.setUint16(o, numChannels, true);
+  o += 2;
+  view.setUint32(o, sampleRate, true);
+  o += 4;
+  view.setUint32(o, byteRate, true);
+  o += 4;
+  view.setUint16(o, blockAlign, true);
+  o += 2;
+  view.setUint16(o, bitsPerSample, true);
+  o += 2;
+  view.setUint32(o, 0x64617461, false);
+  o += 4;
+  view.setUint32(o, dataBytes, true);
+  o += 4;
+  return new Uint8Array(buffer);
+};
+
+type ParsedRow = {
+  id: string;
   name: string;
-  output_type: "binary" | "rating" | null;
-  scale_min: number | null;
-  scale_max: number | null;
+  text: string;
+  audioFile: File;
+  audioUrl: string; // object URL for local preview
 };
 
 type BulkUploadTtsItemsDialogProps = {
   isOpen: boolean;
   accessToken: string;
   taskUuid: string;
-  linkedEvaluators?: TtsLinkedEvaluator[];
   onClose: () => void;
-  onSuccess: (count: number, withAnnotations: boolean) => void;
+  onSuccess: (count: number) => void;
 };
 
 export function BulkUploadTtsItemsDialog({
   isOpen,
   accessToken,
   taskUuid,
-  linkedEvaluators = [],
   onClose,
   onSuccess,
 }: BulkUploadTtsItemsDialogProps) {
-  const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
-  const [parseError, setParseError] = useState<string | null>(null);
+  useHideFloatingButton(isOpen);
+
+  const zipInputRef = useRef<HTMLInputElement | null>(null);
+  const [zipName, setZipName] = useState<string | null>(null);
+  const [rows, setRows] = useState<ParsedRow[]>([]);
+  const [isProcessingZip, setIsProcessingZip] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadAnnotations, setUploadAnnotations] = useState(false);
-  const [selectedAnnotatorId, setSelectedAnnotatorId] = useState<string | null>(
-    null,
-  );
-  const annotatorsState = useAnnotators(isOpen, accessToken);
-  const { annotatedCheck, annotatedCheckLoading } = useAnnotatedItemsCheck({
-    enabled:
-      uploadAnnotations && !!selectedAnnotatorId && parsedItems.length > 0,
-    taskUuid,
-    accessToken,
-    annotatorId: selectedAnnotatorId,
-    namedItems: parsedItems,
-  });
+  const [uploadedCount, setUploadedCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
-  const annotationEvaluatorsMeta: EvaluatorMeta[] = linkedEvaluators.map(
-    (e) => ({
-      uuid: e.uuid,
-      name: e.name,
-      output_type: e.output_type,
-      scale_min: e.scale_min,
-      scale_max: e.scale_max,
-    }),
-  );
-
-  // Evaluators without a usable output_type can't be annotated here —
-  // the parser would silently drop their column and produce a half-
-  // labelled batch. Block the annotation flow rather than failing later.
-  const evaluatorsMissingOutputType = annotationEvaluatorsMeta.filter(
-    (e) => e.output_type !== "binary" && e.output_type !== "rating",
-  );
-
-  // Two linked evaluators sharing a name produce duplicate CSV headers
-  // that PapaParse silently overwrites. Block the annotation flow until
-  // one is renamed.
-  const duplicateNames = duplicateEvaluatorNames(annotationEvaluatorsMeta);
+  // Object URLs from the parsed preview must be revoked so a re-parse or a
+  // close doesn't leak them.
+  const revokePreviewUrls = (list: ParsedRow[]) => {
+    list.forEach((r) => URL.revokeObjectURL(r.audioUrl));
+  };
 
   const reset = () => {
-    setCsvFile(null);
-    setParsedItems([]);
-    setParseError(null);
-    setUploadError(null);
-    setUploadAnnotations(false);
-    setSelectedAnnotatorId(null);
+    setRows((prev) => {
+      revokePreviewUrls(prev);
+      return [];
+    });
+    setZipName(null);
+    setError(null);
+    setUploadedCount(0);
+    if (zipInputRef.current) zipInputRef.current.value = "";
   };
 
   useEffect(() => {
     if (isOpen) reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  useEffect(() => {
-    setParsedItems([]);
-    setParseError(null);
-    setCsvFile(null);
-  }, [uploadAnnotations]);
+  // Revoke any lingering preview URLs on unmount.
+  useEffect(
+    () => () => {
+      setRows((prev) => {
+        revokePreviewUrls(prev);
+        return prev;
+      });
+    },
+    [],
+  );
 
-  const handleFile = (file: File | null) => {
-    setUploadError(null);
-    setParseError(null);
-    setParsedItems([]);
-    setCsvFile(file);
+  const isDirty = rows.length > 0 && !isUploading;
+  const { discardConfirmOpen, closeDiscardConfirm, doClose, attemptClose } =
+    useUnsavedCloseGuard({
+      isOpen,
+      isDirty,
+      isEdit: false,
+      submitting: isUploading || isProcessingZip,
+      onClose,
+      onBeforeClose: () => setError(null),
+    });
+
+  if (!isOpen) return null;
+
+  const handleDownloadSampleZip = async () => {
+    const zip = new JSZip();
+    const audios = zip.folder("audios");
+    const wavOpts = { compression: "STORE" as const };
+    audios?.file("sample_1.wav", createSilentWav(), wavOpts);
+    audios?.file("sample_2.wav", createSilentWav(), wavOpts);
+    audios?.file("sample_3.wav", createSilentWav(), wavOpts);
+    zip.file(
+      "data.csv",
+      "name,text,audio_file\n" +
+        "Greeting,Hello how are you today?,sample_1.wav\n" +
+        "Flight booking,I would like to book a flight.,sample_2.wav\n" +
+        "Repeat request,Can you repeat that please?,sample_3.wav",
+    );
+    const blob = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "sample_tts_items.zip";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleZipUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
-    Papa.parse<Record<string, string>>(file, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (h) => h.trim(),
-      complete: (results) => {
-        const headers = results.meta.fields ?? [];
-        const nameKey = findHeaderKey(headers, NAME_HEADERS);
-        const textKey = findHeaderKey(headers, TEXT_HEADERS);
-        const audioKey = findHeaderKey(headers, AUDIO_HEADERS);
-        if (!nameKey || !textKey || !audioKey) {
-          setParseError(
-            `CSV must include "name", "text" and "audio_path" columns. Found: ${headers.join(", ") || "(none)"}`,
+    setError(null);
+    setUploadedCount(0);
+    setIsProcessingZip(true);
+    // Clear any previously parsed rows (and their preview URLs).
+    setRows((prev) => {
+      revokePreviewUrls(prev);
+      return [];
+    });
+
+    try {
+      const zip = await JSZip.loadAsync(file);
+
+      let csvFile = zip.file("data.csv");
+      let basePath = "";
+      if (!csvFile) {
+        const folders = Object.keys(zip.files).filter(
+          (p) =>
+            p.endsWith("/") &&
+            p.split("/").length === 2 &&
+            !p.includes("__MACOSX") &&
+            !p.startsWith("._"),
+        );
+        for (const folder of folders) {
+          const candidate = zip.file(`${folder}data.csv`);
+          if (candidate) {
+            csvFile = candidate;
+            basePath = folder;
+            break;
+          }
+        }
+      }
+      if (!csvFile) {
+        setError("ZIP must contain a data.csv file.");
+        return;
+      }
+
+      let csvContent = await csvFile.async("string");
+      if (csvContent.charCodeAt(0) === 0xfeff) csvContent = csvContent.slice(1);
+      const lines = csvContent.split(/\r\n|\n|\r/).filter((l) => l.trim());
+      if (lines.length < 2) {
+        setError(
+          "data.csv must have a header and at least one data row.",
+        );
+        return;
+      }
+
+      const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+      const textIdx = headers.indexOf("text");
+      const audioIdx = headers.indexOf("audio_file");
+      const nameIdx = headers.indexOf("name");
+      if (textIdx === -1 || audioIdx === -1) {
+        setError('data.csv must have "text" and "audio_file" columns.');
+        return;
+      }
+
+      const built: ParsedRow[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = parseCsvLine(lines[i]);
+        const text = values[textIdx] ?? "";
+        const audioFileName = values[audioIdx] ?? "";
+        if (!text && !audioFileName) continue;
+        if (!text || !audioFileName) {
+          revokePreviewUrls(built);
+          setError(`Row ${i}: both "text" and "audio_file" are required.`);
+          return;
+        }
+        const name =
+          (nameIdx !== -1 ? values[nameIdx] : "") || fileStem(audioFileName);
+
+        const audioZip =
+          zip.file(`${basePath}audios/${audioFileName}`) ||
+          zip.file(`${basePath}${audioFileName}`);
+        if (!audioZip) {
+          revokePreviewUrls(built);
+          setError(`Row ${i}: audio file "${audioFileName}" not found in ZIP.`);
+          return;
+        }
+
+        const blob = await audioZip.async("blob");
+        const audioFile = new File([blob], audioFileName, {
+          type: "audio/wav",
+        });
+
+        const sizeMB = audioFile.size / (1024 * 1024);
+        if (sizeMB > LIMITS.STT_MAX_AUDIO_FILE_SIZE_MB) {
+          revokePreviewUrls(built);
+          showLimitToast(
+            `"${audioFileName}" exceeds ${LIMITS.STT_MAX_AUDIO_FILE_SIZE_MB} MB.`,
+          );
+          setError(
+            `"${audioFileName}" exceeds the ${LIMITS.STT_MAX_AUDIO_FILE_SIZE_MB} MB limit.`,
           );
           return;
         }
-        if (uploadAnnotations) {
-          if (evaluatorsMissingOutputType.length > 0) {
-            setParseError(
-              `Annotation upload is unavailable: evaluator(s) ${evaluatorsMissingOutputType
-                .map((e) => `"${e.name}"`)
-                .join(", ")} have no binary/rating output configured.`,
+        try {
+          const duration = await getAudioDuration(audioFile);
+          if (duration > LIMITS.STT_MAX_AUDIO_DURATION_SECONDS) {
+            revokePreviewUrls(built);
+            showLimitToast(
+              `"${audioFileName}" exceeds ${LIMITS.STT_MAX_AUDIO_DURATION_SECONDS}s.`,
+            );
+            setError(
+              `"${audioFileName}" exceeds the ${LIMITS.STT_MAX_AUDIO_DURATION_SECONDS}s limit.`,
             );
             return;
           }
-          const missing: string[] = [];
-          for (const meta of annotationEvaluatorsMeta) {
-            const valueHeader = evaluatorValueColumn(meta.name);
-            if (!headers.includes(valueHeader)) missing.push(valueHeader);
-          }
-          if (missing.length > 0) {
-            setParseError(
-              `CSV is missing annotation column(s): ${missing
-                .map((c) => `"${c}"`)
-                .join(", ")}.`,
-            );
-            return;
-          }
+        } catch {
+          // Duration probing is best-effort; don't block on a failed probe.
         }
-        const items: ParsedItem[] = [];
-        for (let i = 0; i < results.data.length; i++) {
-          const r = results.data[i];
-          const name = (r[nameKey] ?? "").trim();
-          const text = (r[textKey] ?? "").trim();
-          const audio_path = (r[audioKey] ?? "").trim();
-          if (!name && !text && !audio_path) continue;
-          if (!name) {
-            setParseError(`Row ${i + 1}: "name" is required.`);
-            return;
-          }
-          if (!text || !audio_path) {
-            setParseError(
-              `Row ${i + 1}: both "text" and "audio_path" are required.`,
-            );
-            return;
-          }
-          const annotations: ParsedAnnotation[] = [];
-          if (uploadAnnotations) {
-            for (const meta of annotationEvaluatorsMeta) {
-              if (
-                meta.output_type !== "binary" &&
-                meta.output_type !== "rating"
-              )
-                continue;
-              const valueHeader = evaluatorValueColumn(meta.name);
-              const reasoningHeader = evaluatorReasoningColumn(meta.name);
-              const rawValue = (r[valueHeader] ?? "").trim();
-              const rawReasoning = (r[reasoningHeader] ?? "").trim();
-              if (!rawValue) {
-                setParseError(
-                  `Row ${i + 1}: missing value for "${valueHeader}".`,
-                );
-                return;
-              }
-              const parsed = parseAnnotationCell(rawValue, meta);
-              if ("error" in parsed) {
-                setParseError(`Row ${i + 1}: ${parsed.error}.`);
-                return;
-              }
-              annotations.push({
-                evaluator_uuid: meta.uuid,
-                output_type: meta.output_type,
-                value: parsed.value,
-                reasoning: rawReasoning,
-              });
-            }
-          }
-          items.push({ name, text, audio_path, annotations });
-        }
-        if (items.length === 0) {
-          setParseError("No rows with content were found in the CSV.");
-          return;
-        }
-        setParsedItems(items);
-      },
-      error: (err) => setParseError(err.message || "Failed to parse CSV"),
-    });
+
+        built.push({
+          id: `${Date.now()}-${i}`,
+          name,
+          text,
+          audioFile,
+          audioUrl: URL.createObjectURL(audioFile),
+        });
+      }
+
+      if (built.length === 0) {
+        setError("No rows with content were found in data.csv.");
+        return;
+      }
+      setZipName(file.name);
+      setRows(built);
+    } catch (err) {
+      reportError("Failed to process TTS labelling ZIP", err);
+      setError("Failed to process the ZIP file.");
+    } finally {
+      setIsProcessingZip(false);
+      if (zipInputRef.current) zipInputRef.current.value = "";
+    }
+  };
+
+  // Upload one audio file to S3 via a backend-issued presigned URL; returns
+  // the stored s3 path, or null on failure.
+  const uploadFileToS3 = async (file: File): Promise<string | null> => {
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!backendUrl) return null;
+      const response = await fetch(`${backendUrl}/presigned-url`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          task_type: "tts",
+          content_type: file.type || "audio/wav",
+          extension: "wav",
+        }),
+      });
+      if (response.status === 401) {
+        await signOut({ callbackUrl: "/login" });
+        return null;
+      }
+      if (!response.ok) throw new Error("Failed to get presigned URL");
+      const data = await response.json();
+      const { presigned_url: presignedUrl, s3_path: s3Path } = data;
+      if (!presignedUrl || !s3Path) throw new Error("Missing URL/path");
+      const put = await fetch(presignedUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "audio/wav" },
+        body: file,
+      });
+      if (!put.ok) throw new Error("S3 upload failed");
+      return s3Path as string;
+    } catch (err) {
+      reportError("Failed to upload TTS audio to S3", err);
+      return null;
+    }
   };
 
   const handleUpload = async () => {
-    if (parsedItems.length === 0 || isUploading) return;
-    if (uploadAnnotations && !selectedAnnotatorId) {
-      setUploadError("Select an annotator before uploading.");
-      return;
-    }
-    if (uploadAnnotations && evaluatorsMissingOutputType.length > 0) {
-      setUploadError(
-        "One or more evaluators have no binary/rating output configured.",
-      );
-      return;
-    }
+    if (rows.length === 0 || isUploading) return;
     setIsUploading(true);
-    setUploadError(null);
+    setError(null);
+    setUploadedCount(0);
+
     try {
-      const itemsBody = parsedItems.map((p) => {
-        const annotationsObj = uploadAnnotations
-          ? buildItemAnnotationsPayload(p.annotations)
-          : undefined;
-        return {
-          payload: {
-            name: p.name,
-            text: p.text,
-            audio_path: p.audio_path,
-          },
-          ...(annotationsObj ? { annotations: annotationsObj } : {}),
-        };
-      });
-      const anyAnnotated = itemsBody.some((it) => "annotations" in it);
+      // Upload audio to S3 with bounded concurrency — a sequential loop is
+      // far too slow once there are more than a handful of clips.
+      const s3Paths = new Array<string | null>(rows.length).fill(null);
+      let cursor = 0;
+      const worker = async () => {
+        while (cursor < rows.length) {
+          const idx = cursor++;
+          const path = await uploadFileToS3(rows[idx].audioFile);
+          s3Paths[idx] = path;
+          if (path) setUploadedCount((c) => c + 1);
+        }
+      };
+      await Promise.all(
+        Array.from(
+          { length: Math.min(LIMITS.STT_UPLOAD_CONCURRENCY, rows.length) },
+          worker,
+        ),
+      );
+
+      const failed = s3Paths.filter((p) => !p).length;
+      if (failed > 0) {
+        setError(
+          `${failed} of ${rows.length} audio file(s) failed to upload. Nothing was saved — please retry.`,
+        );
+        return;
+      }
+
       await apiClient(`/annotation-tasks/${taskUuid}/items`, accessToken, {
         method: "POST",
         body: {
-          ...(anyAnnotated && selectedAnnotatorId
-            ? { annotator_id: selectedAnnotatorId }
-            : {}),
-          items: itemsBody,
+          items: rows.map((r, i) => ({
+            payload: {
+              name: r.name,
+              text: r.text,
+              audio_path: s3Paths[i],
+            },
+          })),
         },
       });
-      onSuccess(parsedItems.length, uploadAnnotations);
+      onSuccess(rows.length);
     } catch (err) {
-      setUploadError(parseApiError(err, "Failed to upload items"));
+      const message =
+        err instanceof Error ? err.message : "Failed to add items";
+      setError(message);
     } finally {
       setIsUploading(false);
     }
   };
 
-  const buildGuidelines = (): GuidelineDoc => {
-    const columns: GuidelineColumn[] = [
-      {
-        name: "name",
-        description: "Required. A unique name for the item.",
-      },
-      {
-        name: "text",
-        description: "The text the TTS model was asked to speak.",
-      },
-      {
-        name: "audio_path",
-        description: "A publicly fetchable URL to the generated audio clip.",
-      },
-    ];
-
-    if (uploadAnnotations && annotationEvaluatorsMeta.length > 0) {
-      for (const e of annotationEvaluatorsMeta) {
-        const range =
-          e.output_type === "binary"
-            ? "true/false"
-            : e.output_type === "rating" &&
-                typeof e.scale_min === "number" &&
-                typeof e.scale_max === "number"
-              ? `any value between ${e.scale_min}-${e.scale_max}`
-              : "value";
-        columns.push({
-          name: evaluatorValueColumn(e.name),
-          description: `Required. Value for the "${e.name}" evaluator (${range}).`,
-        });
-        columns.push({
-          name: evaluatorReasoningColumn(e.name),
-          description: `(optional) Reasoning for the value assigned to "${e.name}".`,
-        });
-      }
-    }
-
-    return {
-      title: "Bulk upload — TTS labelling items",
-      intro:
-        "Upload a CSV with the following columns. Each row creates one TTS annotation item.",
-      columns,
-    };
-  };
-
-  const annotationColumns =
-    uploadAnnotations && annotationEvaluatorsMeta.length > 0
-      ? annotationEvaluatorsMeta.flatMap((e) => [
-          {
-            evaluatorUuid: e.uuid,
-            kind: "value" as const,
-            header: evaluatorValueColumn(e.name),
-          },
-          {
-            evaluatorUuid: e.uuid,
-            kind: "reasoning" as const,
-            header: evaluatorReasoningColumn(e.name),
-          },
-        ])
-      : [];
-  const ttsGridStyle = {
-    gridTemplateColumns: [
-      "minmax(80px, 140px)",
-      "minmax(120px, 200px)",
-      "minmax(120px, 220px)",
-      ...annotationColumns.map((c) =>
-        c.kind === "value" ? "minmax(64px, 88px)" : "minmax(100px, 176px)",
-      ),
-    ].join(" "),
-  };
-
-  const itemsPreview = (
-    <BulkUploadItemsPreviewShell
-      itemCount={parsedItems.length}
-      annotatedCheckLoading={annotatedCheckLoading}
-      annotatedCheck={annotatedCheck}
-    >
-      <div
-        className="grid gap-2 px-3 py-2 border-b border-border bg-muted sticky top-0 z-10"
-        style={ttsGridStyle}
-      >
-        <div className="text-xs font-medium text-muted-foreground">Name</div>
-        <div className="text-xs font-medium text-muted-foreground">Text</div>
-        <div className="text-xs font-medium text-muted-foreground">Audio</div>
-        {annotationColumns.map((c) => (
-          <div
-            key={`ah-${c.evaluatorUuid}-${c.kind}`}
-            className="text-xs font-medium text-muted-foreground font-mono truncate"
-            title={c.header}
-          >
-            {c.header}
-          </div>
-        ))}
-      </div>
-      <div className="divide-y divide-border">
-        {parsedItems.slice(0, 50).map((p, idx) => (
-          <div
-            key={idx}
-            className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
-            style={ttsGridStyle}
-          >
-            <div className="truncate text-foreground" title={p.name}>
-              {p.name || <span className="text-muted-foreground">—</span>}
-            </div>
-            <div className="truncate text-foreground" title={p.text}>
-              {p.text}
-            </div>
-            <div className="min-w-0">
-              <LazyAudioPlayer src={p.audio_path} />
-            </div>
-            {annotationColumns.map((c) => {
-              const ann = p.annotations.find(
-                (a) => a.evaluator_uuid === c.evaluatorUuid,
-              );
-              const display =
-                c.kind === "value"
-                  ? ann
-                    ? typeof ann.value === "boolean"
-                      ? ann.value
-                        ? "true"
-                        : "false"
-                      : String(ann.value)
-                    : ""
-                  : (ann?.reasoning ?? "");
-              return (
-                <div
-                  key={`${idx}-a-${c.evaluatorUuid}-${c.kind}`}
-                  className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
-                >
-                  {display}
-                </div>
-              );
-            })}
-          </div>
-        ))}
-        {parsedItems.length > 50 && (
-          <div className="px-4 py-2 text-xs text-muted-foreground">
-            + {parsedItems.length - 50} more rows
-          </div>
-        )}
-      </div>
-    </BulkUploadItemsPreviewShell>
-  );
-
-  const annotationOptIn =
-    linkedEvaluators.length > 0 ? (
-      <div className="space-y-3">
-        <AnnotationOptIn
-          annotators={annotatorsState.annotators}
-          loading={annotatorsState.loading}
-          error={annotatorsState.error}
-          uploadAnnotations={uploadAnnotations}
-          onToggle={setUploadAnnotations}
-          selectedAnnotatorId={selectedAnnotatorId}
-          onSelectAnnotator={setSelectedAnnotatorId}
-        />
-        {uploadAnnotations && duplicateNames.length > 0 && (
-          <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
-            Two or more linked evaluators share the same name (
-            {duplicateNames.map((n) => `"${n}"`).join(", ")}). Rename one on the
-            evaluators page before uploading annotations.
-          </div>
-        )}
-        {uploadAnnotations && evaluatorsMissingOutputType.length > 0 && (
-          <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
-            Annotation upload isn&apos;t available — evaluator(s){" "}
-            {evaluatorsMissingOutputType.map((e) => `"${e.name}"`).join(", ")}{" "}
-            have no binary/rating output configured.
-          </div>
-        )}
-      </div>
-    ) : null;
-
-  const uploadBlocked =
-    uploadAnnotations &&
-    (annotatorsState.annotators.length === 0 ||
-      !selectedAnnotatorId ||
-      duplicateNames.length > 0 ||
-      evaluatorsMissingOutputType.length > 0);
+  const busy = isProcessingZip || isUploading;
 
   return (
-    <BulkUploadDialogShell
-      isOpen={isOpen}
-      title="Bulk upload items"
-      buildSampleCsv={() =>
-        buildSampleTtsCsv(annotationEvaluatorsMeta, uploadAnnotations)
-      }
-      sampleFilename={() =>
-        uploadAnnotations
-          ? "sample_tts_items_with_annotations.csv"
-          : "sample_tts_items.csv"
-      }
-      buildGuidelines={buildGuidelines}
-      guidelinesFilename={() =>
-        uploadAnnotations
-          ? "tts_items_csv_guidelines_with_annotations.pdf"
-          : "tts_items_csv_guidelines.pdf"
-      }
-      csvFile={csvFile}
-      onFile={handleFile}
-      onClear={reset}
-      parseError={parseError}
-      uploadError={uploadError}
-      isUploading={isUploading}
-      itemCount={parsedItems.length}
-      itemsPreview={itemsPreview}
-      onUpload={handleUpload}
-      onClose={onClose}
-      topContent={annotationOptIn}
-      uploadBlocked={uploadBlocked}
-      hideUploadSection={
-        uploadAnnotations &&
-        (!selectedAnnotatorId ||
-          duplicateNames.length > 0 ||
-          evaluatorsMissingOutputType.length > 0)
-      }
-    />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div
+        className="bg-background border border-border rounded-xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[90vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 px-5 md:px-6 py-4 border-b border-border">
+          <div>
+            <h2 className="text-base md:text-lg font-semibold text-foreground">
+              Bulk upload items
+            </h2>
+            <p className="text-xs md:text-sm text-muted-foreground mt-1">
+              Upload a ZIP with an <code>audios</code> folder of .wav files and
+              a <code>data.csv</code> mapping each clip to its text.
+            </p>
+          </div>
+          <button
+            onClick={attemptClose}
+            disabled={busy}
+            className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+          <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
+            <div className="text-sm text-muted-foreground">
+              <p className="font-medium text-foreground mb-1">
+                ZIP structure
+              </p>
+              <pre className="text-xs font-mono leading-relaxed">{`your-file.zip
+├── audios/
+│   ├── sample_1.wav
+│   └── sample_2.wav
+└── data.csv   (columns: name, text, audio_file)`}</pre>
+              <p className="mt-2">
+                <span className="font-medium text-foreground">name</span> is
+                optional — the audio filename is used when it&apos;s blank.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                ref={zipInputRef}
+                type="file"
+                accept=".zip"
+                onChange={handleZipUpload}
+                className="hidden"
+                id="tts-zip-upload"
+                disabled={busy}
+              />
+              <label
+                htmlFor="tts-zip-upload"
+                className={`h-9 px-3 rounded-md text-sm font-medium bg-foreground text-background flex items-center gap-1.5 transition-opacity ${
+                  busy
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:opacity-90 cursor-pointer"
+                }`}
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+                  />
+                </svg>
+                {zipName ? "Choose a different ZIP" : "Select ZIP file"}
+              </label>
+              <button
+                type="button"
+                onClick={handleDownloadSampleZip}
+                disabled={busy}
+                className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Download sample ZIP
+              </button>
+              {isProcessingZip && (
+                <span className="text-sm text-muted-foreground">
+                  Processing ZIP…
+                </span>
+              )}
+            </div>
+            {zipName && !isProcessingZip && (
+              <p className="text-xs text-muted-foreground">
+                Loaded <span className="font-medium">{zipName}</span> —{" "}
+                {rows.length} item{rows.length === 1 ? "" : "s"} ready.
+              </p>
+            )}
+          </div>
+
+          {error && (
+            <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-500">
+              {error}
+            </div>
+          )}
+
+          {rows.length > 0 && (
+            <div className="border border-border rounded-xl overflow-hidden">
+              <div className="grid grid-cols-[minmax(80px,140px)_minmax(120px,1fr)_minmax(140px,220px)] gap-3 px-3 py-2 border-b border-border bg-muted/30">
+                <div className="text-xs font-medium text-muted-foreground">
+                  Name
+                </div>
+                <div className="text-xs font-medium text-muted-foreground">
+                  Text
+                </div>
+                <div className="text-xs font-medium text-muted-foreground">
+                  Audio
+                </div>
+              </div>
+              <div className="divide-y divide-border max-h-[40vh] overflow-y-auto">
+                {rows.slice(0, 50).map((r) => (
+                  <div
+                    key={r.id}
+                    className="grid grid-cols-[minmax(80px,140px)_minmax(120px,1fr)_minmax(140px,220px)] gap-3 px-3 py-2 items-center"
+                  >
+                    <div
+                      className="text-xs text-foreground truncate"
+                      title={r.name}
+                    >
+                      {r.name}
+                    </div>
+                    <div
+                      className="text-xs text-foreground truncate"
+                      title={r.text}
+                    >
+                      {r.text}
+                    </div>
+                    <div className="min-w-0">
+                      <LazyAudioPlayer src={r.audioUrl} />
+                    </div>
+                  </div>
+                ))}
+                {rows.length > 50 && (
+                  <div className="px-3 py-2 text-xs text-muted-foreground">
+                    + {rows.length - 50} more items
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {isUploading && (
+            <p className="text-sm text-muted-foreground">
+              Uploading audio… {uploadedCount}/{rows.length}
+            </p>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 md:gap-3 px-5 md:px-6 py-4 border-t border-border">
+          <button
+            onClick={attemptClose}
+            disabled={busy}
+            className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleUpload}
+            disabled={rows.length === 0 || busy}
+            className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isUploading
+              ? "Uploading…"
+              : rows.length > 1
+                ? `Upload ${rows.length} items`
+                : "Upload item"}
+          </button>
+        </div>
+      </div>
+
+      <DiscardChangesDialog
+        open={discardConfirmOpen}
+        onKeepEditing={closeDiscardConfirm}
+        onDiscard={doClose}
+      />
+    </div>
   );
 }

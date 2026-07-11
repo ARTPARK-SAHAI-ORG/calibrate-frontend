@@ -4055,13 +4055,6 @@ function LabellingTaskPageInner() {
           isOpen={bulkUploadTtsOpen}
           accessToken={accessToken}
           taskUuid={uuid}
-          linkedEvaluators={(task?.evaluators ?? []).map((e) => ({
-            uuid: e.uuid,
-            name: e.name,
-            output_type: e.output_type ?? null,
-            scale_min: typeof e.scale_min === "number" ? e.scale_min : null,
-            scale_max: typeof e.scale_max === "number" ? e.scale_max : null,
-          }))}
           onClose={() => setBulkUploadTtsOpen(false)}
           onSuccess={async (count) => {
             setBulkUploadTtsOpen(false);
