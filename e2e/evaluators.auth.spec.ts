@@ -25,23 +25,21 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     await picker.getByText("Speech to Text", { exact: true }).click();
     await picker.getByRole("button", { name: "Continue" }).click();
 
-    // Step 2: create sidebar. Judge model + prompt are prefilled by the backend
-    // default-prompt call; wait for the sidebar, then set a unique Name.
+    // Step 2: create sidebar. The async default-prompt call prefills the Name,
+    // judge model, and judge prompt (all required). Wait for it to land FIRST —
+    // it also overwrites the Name field, so setting our unique name before the
+    // prefill would get clobbered (and clicking Create before the model is set
+    // just flags validation without creating). The model button reads "Select
+    // judge model" until the prefill resolves.
     await expect(
       page.getByRole("heading", { name: "Add evaluator" }),
     ).toBeVisible();
-    const nameInput = page.getByPlaceholder("e.g., Follows Refund Policy");
-    await expect(nameInput).toBeVisible();
-    await nameInput.fill(name);
-
-    // The judge model + prompt are required. They're prefilled by the async
-    // default-prompt call; the model button reads "Select judge model" until
-    // then. Clicking Create before prefill just flags validation errors without
-    // creating, so wait for the prefill to land first.
     await expect(page.getByText("Select judge model")).toHaveCount(0, {
       timeout: 20000,
     });
 
+    // Now override the prefilled name with a unique one and create.
+    await page.getByPlaceholder("e.g., Follows Refund Policy").fill(name);
     await page.getByRole("button", { name: "Create evaluator" }).click();
 
     // The new evaluator card appears on the "My evaluators" tab.

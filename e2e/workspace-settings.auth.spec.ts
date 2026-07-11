@@ -4,23 +4,16 @@
 // CreateApiKeyDialog, CreateWorkspaceDialog, and the settings tab layout. Run
 // with `npm run test:e2e:integration`.
 import { test, expect } from "./fixtures";
-import { waitForOrgReady } from "./helpers";
+import { openWorkspaceSettings, waitForOrgReady } from "./helpers";
 
 test.describe("Workspace settings (authenticated, real backend)", () => {
   test("renames the active workspace on the Admin tab", async ({ page }) => {
-    await page.goto("/workspace-settings?tab=admin");
-    await expect(
-      page.getByRole("heading", { name: "Workspace settings" }),
-    ).toBeVisible();
-    await waitForOrgReady(page);
+    await openWorkspaceSettings(page, "Admin");
 
     // The Admin "Name" input is pre-filled with the current name; Save enables
-    // once it differs. It's the only textbox on the tab, and only renders once
-    // the active workspace has loaded (org bootstrap), so allow time.
-    // The form sits behind a LoadingState until useOrganizations resolves the
-    // active org object, which can lag the localStorage uuid — allow generously.
+    // once it differs. It's the only textbox on the tab.
     const nameInput = page.getByRole("textbox").first();
-    await expect(nameInput).toBeVisible({ timeout: 30000 });
+    await expect(nameInput).toBeVisible({ timeout: 15000 });
     await nameInput.fill(`E2E WS ${Date.now()}`);
     await page.getByRole("button", { name: "Save", exact: true }).click();
 
@@ -32,10 +25,7 @@ test.describe("Workspace settings (authenticated, real backend)", () => {
 
   test("creates then revokes a workspace API key", async ({ page }) => {
     const keyName = `E2E Key ${Date.now()}`;
-    await page.goto("/workspace-settings");
-    await waitForOrgReady(page);
-    // Switch to the API keys tab explicitly; the keys list needs the org.
-    await page.getByRole("button", { name: "API keys", exact: true }).click();
+    await openWorkspaceSettings(page, "API keys");
 
     await page.getByRole("button", { name: "Create key" }).first().click();
     await expect(

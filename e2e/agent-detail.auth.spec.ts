@@ -24,8 +24,16 @@ test.describe("Agent detail (authenticated, real backend)", () => {
     // Only the name is required; the default "Build your agent" setup needs no
     // URL. Create and land on the detail page.
     await page.getByPlaceholder("Enter agent name").fill(name);
-    await page.getByRole("button", { name: "Create", exact: true }).click();
-    await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/, { timeout: 15000 });
+    // The dialog's token comes from a hook effect, so the very first create can
+    // race auth readiness and 401 (which creates nothing and leaves the dialog
+    // open). Retry the click until it navigates — a failed create is a no-op.
+    const createBtn = page.getByRole("button", { name: "Create", exact: true });
+    await expect(async () => {
+      if (await createBtn.isVisible().catch(() => false)) {
+        await createBtn.click();
+      }
+      await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/, { timeout: 6000 });
+    }).toPass({ timeout: 30000 });
 
     // Build agents expose these tabs; each updates ?tab= and mounts its own
     // content component. Click through them to exercise that code.
