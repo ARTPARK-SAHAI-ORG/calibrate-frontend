@@ -1,6 +1,6 @@
 # Calibrate Frontend
 
-[![CC BY-SA 4.0][cc-by-sa-shield]][cc-by-sa]
+[![component coverage][component-badge]][codecov] [![e2e coverage][e2e-badge]][codecov] [![CC BY-SA 4.0][cc-by-sa-shield]][cc-by-sa]
 
 Frontend for [Calibrate](https://calibrate.artpark.ai), a framework for evaluating AI agents which let you move from slow, manual testing to a fast, automated, and repeatable testing process for your entire agent stack.
 
@@ -64,3 +64,6 @@ This work is licensed under a
 [cc-by-sa]: http://creativecommons.org/licenses/by-sa/4.0/
 [cc-by-sa-image]: https://licensebuttons.net/l/by-sa/4.0/88x31.png
 [cc-by-sa-shield]: https://img.shields.io/badge/License-CC%20BY--SA%204.0-lightgrey.svg
+[codecov]: https://codecov.io/gh/ARTPARK-SAHAI-ORG/calibrate-frontend
+[component-badge]: https://codecov.io/gh/ARTPARK-SAHAI-ORG/calibrate-frontend/branch/main/graph/badge.svg?flag=component
+[e2e-badge]: https://codecov.io/gh/ARTPARK-SAHAI-ORG/calibrate-frontend/branch/main/graph/badge.svg?flag=e2e
