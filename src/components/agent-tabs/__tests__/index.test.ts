@@ -13,6 +13,8 @@ describe("agent-tabs barrel", () => {
       "DataExtractionTabContent",
       "EvaluationTabContent",
       "TestsTabContent",
+      "EvaluatorsTabContent",
+      "AddEvaluatorsDialog",
       "SettingsTabContent",
       "LLMSelectorModal",
       "AddToolDialog",

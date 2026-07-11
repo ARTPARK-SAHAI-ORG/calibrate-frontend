@@ -13,6 +13,9 @@ export type { EvaluationCriteriaData } from "./EvaluationTabContent";
 
 export { TestsTabContent } from "./TestsTabContent";
 
+export { EvaluatorsTabContent } from "./EvaluatorsTabContent";
+export { AddEvaluatorsDialog } from "./AddEvaluatorsDialog";
+
 export { SettingsTabContent } from "./SettingsTabContent";
 
 // Sub-components

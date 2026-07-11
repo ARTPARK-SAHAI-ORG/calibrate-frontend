@@ -13,6 +13,7 @@ import {
   ToolsTabContent,
   // DataExtractionTabContent, // TODO: temporarily disabled — extraction UI removed for now
   TestsTabContent,
+  EvaluatorsTabContent,
   SettingsTabContent,
 } from "@/components/agent-tabs";
 import type {
@@ -79,6 +80,7 @@ type TabType =
   | "tools"
   | "data-extraction"
   | "tests"
+  | "evaluators"
   | "settings";
 
 const tabLabels: Record<TabType, string> = {
@@ -87,6 +89,7 @@ const tabLabels: Record<TabType, string> = {
   tools: "Tools",
   "data-extraction": "Data extraction",
   tests: "Tests",
+  evaluators: "Evaluators",
   settings: "Settings",
 };
 
@@ -95,9 +98,15 @@ const calibrateTabs: TabType[] = [
   "tools",
   // "data-extraction", // TODO: temporarily disabled — extraction UI removed for now
   "tests",
+  "evaluators",
   "settings",
 ];
-const connectionTabs: TabType[] = ["connection", "tests", "settings"];
+const connectionTabs: TabType[] = [
+  "connection",
+  "tests",
+  "evaluators",
+  "settings",
+];
 
 export function AgentDetail({
   agentUuid,
@@ -1175,6 +1184,11 @@ export function AgentDetail({
                 : undefined
             }
           />
+        )}
+
+        {/* Evaluators Tab Content */}
+        {activeTab === "evaluators" && (
+          <EvaluatorsTabContent agentUuid={agentUuid} agentName={agent.name} />
         )}
 
         {/* Settings Tab Content - commented out to hide the tab */}
