@@ -26,6 +26,11 @@ import {
   type STTEvaluatorColumn,
 } from "@/components/eval-details";
 import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
+import {
+  AddRunToLabellingTaskDialog,
+  type SttLabellingRow,
+  type SourceEvaluatorRef,
+} from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useSidebarState } from "@/lib/sidebar";
 import { getDataset } from "@/lib/datasets";
 import { ShareButton } from "@/components/ShareButton";
@@ -566,6 +571,39 @@ export default function STTEvaluationDetailPage() {
     [aboutEvaluators, evaluationResult, defaultEvaluator, judgeLabel],
   );
 
+  // "Submit for labelling": flatten every provider's rows into STT annotation
+  // items (reference vs. predicted transcript). One item per (provider, row);
+  // names include the provider + row index + a run-id suffix so they stay
+  // unique within a task. The run's evaluators come from `evaluatorColumns`.
+  const [addToTaskOpen, setAddToTaskOpen] = useState(false);
+  const sttLabellingRows: SttLabellingRow[] = useMemo(() => {
+    const rows: SttLabellingRow[] = [];
+    const suffix = taskId.slice(0, 8);
+    for (const pr of evaluationResult?.provider_results ?? []) {
+      const providerLabel = getProviderLabel(pr.provider);
+      (pr.results ?? []).forEach((r, i) => {
+        if (!r.gt || r.gt.trim() === "") return;
+        rows.push({
+          name: `${providerLabel} #${i + 1} — ${suffix}`,
+          reference_transcript: r.gt,
+          predicted_transcript: r.pred ?? "",
+        });
+      });
+    }
+    return rows;
+  }, [evaluationResult, taskId]);
+  const sttLabellingEvaluators: SourceEvaluatorRef[] = useMemo(() => {
+    const seen = new Set<string>();
+    const evals: SourceEvaluatorRef[] = [];
+    for (const c of evaluatorColumns) {
+      if (c.evaluatorUuid && !seen.has(c.evaluatorUuid)) {
+        seen.add(c.evaluatorUuid);
+        evals.push({ uuid: c.evaluatorUuid, name: c.label });
+      }
+    }
+    return evals;
+  }, [evaluatorColumns]);
+
   const canShowLeaderboard =
     evaluationResult?.status === "done" &&
     !!evaluationResult.leaderboard_summary;
@@ -744,6 +782,19 @@ export default function STTEvaluationDetailPage() {
                   initialShareToken={evaluationResult.share_token ?? null}
                 />
               )}
+              {/* Send the per-row transcripts to a human-alignment (STT)
+                  task for labelling. Desktop-only, matching the labelling
+                  affordance in TestRunnerDialog. */}
+              {evaluationResult.status === "done" &&
+                sttLabellingRows.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setAddToTaskOpen(true)}
+                    className="hidden md:inline-flex items-center gap-2 h-8 px-3 rounded-lg text-[13px] font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
+                  >
+                    Submit for labelling
+                  </button>
+                )}
               {evaluationResult.status === "failed" &&
                 backendAccessToken &&
                 evaluationResult.dataset_id && (
@@ -901,6 +952,18 @@ export default function STTEvaluationDetailPage() {
           </div>
         )}
       </div>
+
+      <AddRunToLabellingTaskDialog
+        isOpen={addToTaskOpen}
+        onClose={() => setAddToTaskOpen(false)}
+        source={{
+          type: "stt_run",
+          runUuid: taskId,
+          runName: evaluationResult?.dataset_name ?? undefined,
+          rows: sttLabellingRows,
+          evaluators: sttLabellingEvaluators,
+        }}
+      />
     </AppLayout>
   );
 }

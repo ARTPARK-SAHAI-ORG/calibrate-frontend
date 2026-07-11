@@ -13,8 +13,43 @@ import type {
 } from "@/components/test-results/shared";
 import { Select } from "@/components/ui/Select";
 
-export const SUPPORTED_TARGET_TASK_TYPES = ["llm"] as const;
+// Each source kind maps to exactly one task type: llm tests/benchmarks → "llm",
+// STT runs → "stt", simulation runs → "conversation" (their transcript is a
+// conversation). The type is derived from the source (`targetTaskTypeForSource`),
+// never chosen by the user.
+export const SUPPORTED_TARGET_TASK_TYPES = [
+  "llm",
+  "stt",
+  "conversation",
+] as const;
 export type SupportedTaskType = (typeof SUPPORTED_TARGET_TASK_TYPES)[number];
+
+/** A run evaluator reference — only the uuid is used by this dialog. */
+export type SourceEvaluatorRef = { uuid: string; name?: string };
+
+/** A normalised STT result row, pre-mapped by the STT page. */
+export type SttLabellingRow = {
+  name: string;
+  reference_transcript: string;
+  predicted_transcript: string;
+};
+
+/**
+ * A normalised simulation result, pre-mapped by the simulation run page. The
+ * transcript shape is permissive (role is a free string) so raw simulation
+ * `TranscriptEntry[]` assigns directly; the conversation item pane normalises
+ * roles itself when rendering.
+ */
+export type ConversationLabellingResult = {
+  name: string;
+  transcript: Array<{
+    role: string;
+    content?: string;
+    tool_calls?: unknown;
+    tool_call_id?: string;
+    created_at?: string;
+  }>;
+};
 
 export type AddRunToLabellingTaskSource =
   | {
@@ -30,7 +65,50 @@ export type AddRunToLabellingTaskSource =
       benchmarkName?: string;
       modelResults: BenchmarkModelResult[];
       evaluators?: TestRunEvaluator[];
+    }
+  | {
+      type: "stt_run";
+      runUuid: string;
+      runName?: string;
+      rows: SttLabellingRow[];
+      evaluators?: SourceEvaluatorRef[];
+    }
+  | {
+      type: "simulation_run";
+      runUuid: string;
+      runName?: string;
+      results: ConversationLabellingResult[];
+      evaluators?: SourceEvaluatorRef[];
     };
+
+/** The single task type each source kind targets. */
+export function targetTaskTypeForSource(
+  source: AddRunToLabellingTaskSource,
+): SupportedTaskType {
+  switch (source.type) {
+    case "stt_run":
+      return "stt";
+    case "simulation_run":
+      return "conversation";
+    default:
+      return "llm";
+  }
+}
+
+/** Singular / plural noun for the items being submitted, per source kind. */
+export function itemNounForSource(source: AddRunToLabellingTaskSource): {
+  one: string;
+  many: string;
+} {
+  switch (source.type) {
+    case "stt_run":
+      return { one: "result", many: "results" };
+    case "simulation_run":
+      return { one: "conversation", many: "conversations" };
+    default:
+      return { one: "test", many: "tests" };
+  }
+}
 
 export type AddRunToLabellingTaskDialogProps = {
   isOpen: boolean;
@@ -53,13 +131,16 @@ type LabellingTask = {
   evaluators?: LabellingTaskEvaluatorRef[];
 };
 
+// `name` is required (unique within a task; used for conflict handling). The
+// rest of the payload shape depends on the task type: llm items carry
+// `chat_history` / `agent_response` / `evaluator_variables`, stt items carry
+// `reference_transcript` / `predicted_transcript`, conversation items carry
+// `transcript`.
 type BuiltItem = {
   payload: {
     name: string;
     description?: string;
-    chat_history: TestCaseHistory[];
-    agent_response: string;
-    evaluator_variables: Record<string, Record<string, string>>;
+    [key: string]: unknown;
   };
 };
 
@@ -185,14 +266,14 @@ function buildOneItem(
 
 export function buildItemsFromSource(
   source: AddRunToLabellingTaskSource,
-  taskType: SupportedTaskType,
 ): TransformResult {
   const items: BuiltItem[] = [];
   const evaluatorUuids = new Set<string>();
   let skippedCount = 0;
 
-  switch (taskType) {
-    case "llm": {
+  switch (source.type) {
+    case "test_run":
+    case "benchmark_run": {
       const runSuffix =
         source.type === "test_run"
           ? source.runUuid.slice(0, 8)
@@ -210,7 +291,7 @@ export function buildItemsFromSource(
           items.push(built.item);
           for (const id of built.evaluatorUuids) evaluatorUuids.add(id);
         }
-      } else if (source.type === "benchmark_run") {
+      } else {
         for (const mr of source.modelResults) {
           const testResults = mr.test_results ?? [];
           for (const r of testResults) {
@@ -243,6 +324,37 @@ export function buildItemsFromSource(
         for (const ev of source.evaluators ?? []) {
           if (ev?.uuid) evaluatorUuids.add(ev.uuid);
         }
+      }
+      return { items, skippedCount, evaluatorUuids };
+    }
+    case "stt_run": {
+      // STT results carry no per-row judge variable echoes, so the evaluator
+      // set comes wholesale from the run-level evaluators.
+      for (const row of source.rows) {
+        items.push({
+          payload: {
+            name: row.name,
+            reference_transcript: row.reference_transcript,
+            predicted_transcript: row.predicted_transcript,
+          },
+        });
+      }
+      for (const ev of source.evaluators ?? []) {
+        if (ev?.uuid) evaluatorUuids.add(ev.uuid);
+      }
+      return { items, skippedCount, evaluatorUuids };
+    }
+    case "simulation_run": {
+      for (const r of source.results) {
+        items.push({
+          payload: {
+            name: r.name,
+            transcript: r.transcript,
+          },
+        });
+      }
+      for (const ev of source.evaluators ?? []) {
+        if (ev?.uuid) evaluatorUuids.add(ev.uuid);
       }
       return { items, skippedCount, evaluatorUuids };
     }
@@ -282,10 +394,12 @@ export function AddRunToLabellingTaskDialog({
   } | null>(null);
   const onAddedFiredRef = useRef(false);
 
-  // Always pick the first supported task type for now ("llm"). Widening to more
-  // types means picking the right one from `SUPPORTED_TARGET_TASK_TYPES` based
-  // on source — that's a future change, the seam is `buildItemsFromSource`.
-  const targetTaskType: SupportedTaskType = SUPPORTED_TARGET_TASK_TYPES[0];
+  // Each source kind targets exactly one task type (llm / stt / conversation).
+  const targetTaskType: SupportedTaskType = useMemo(
+    () => targetTaskTypeForSource(source),
+    [source],
+  );
+  const noun = useMemo(() => itemNounForSource(source), [source]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -338,20 +452,15 @@ export function AddRunToLabellingTaskDialog({
   }, [isOpen, accessToken]);
 
   const transform = useMemo(
-    () => buildItemsFromSource(source, targetTaskType),
-    [source, targetTaskType],
+    () => buildItemsFromSource(source),
+    [source],
   );
   const { items, skippedCount, evaluatorUuids } = transform;
 
-  // First relevance gate: the task must be of a supported type.
+  // First relevance gate: the task must be of the type this source targets.
   const typeMatchedTasks = useMemo(
-    () =>
-      tasks.filter((t) =>
-        (SUPPORTED_TARGET_TASK_TYPES as readonly string[]).includes(
-          t.type ?? "",
-        ),
-      ),
-    [tasks],
+    () => tasks.filter((t) => t.type === targetTaskType),
+    [tasks, targetTaskType],
   );
 
   // Second relevance gate: the task must already carry (at least) every
@@ -491,8 +600,8 @@ export function AddRunToLabellingTaskDialog({
           if (!mountedRef.current) return;
           setSubmitError(
             items.length === 1
-              ? "This test is already in the task"
-              : `All ${items.length} tests are already in the task`,
+              ? `This ${noun.one} is already in the task`
+              : `All ${items.length} ${noun.many} are already in the task`,
           );
           setSubmitting(false);
           return;
@@ -578,7 +687,7 @@ export function AddRunToLabellingTaskDialog({
       <div className="w-full max-w-md rounded-xl bg-background border border-border p-6 shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-start justify-between gap-3 mb-4">
           <h2 className="text-base md:text-lg font-semibold text-foreground">
-            Submit {items.length} test{items.length === 1 ? "" : "s"} for
+            Submit {items.length} {items.length === 1 ? noun.one : noun.many} for
             labelling
           </h2>
           <button
@@ -606,12 +715,12 @@ export function AddRunToLabellingTaskDialog({
         {success ? (
           <div className="space-y-6">
             <p className="text-sm text-foreground">
-              Added {success.itemsCreated} test
-              {success.itemsCreated === 1 ? "" : "s"} to{" "}
+              Added {success.itemsCreated}{" "}
+              {success.itemsCreated === 1 ? noun.one : noun.many} to{" "}
               <span className="font-medium">{success.taskName}</span>.
               {success.itemsSkipped > 0
-                ? ` ${success.itemsSkipped} test${
-                    success.itemsSkipped === 1 ? "" : "s"
+                ? ` ${success.itemsSkipped} ${
+                    success.itemsSkipped === 1 ? noun.one : noun.many
                   } already in the task ${
                     success.itemsSkipped === 1 ? "was" : "were"
                   } skipped.`
@@ -711,7 +820,7 @@ export function AddRunToLabellingTaskDialog({
             ) : showExistingTaskPicker && mode === "existing" ? (
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Select the labelling task to add the tests to
+                  Select the labelling task to add the {noun.many} to
                 </label>
                 <Select
                   value={selectedTaskUuid}

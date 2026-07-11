@@ -59,7 +59,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
       ],
     };
 
-    const result = buildItemsFromSource(source, "llm");
+    const result = buildItemsFromSource(source);
     expect(result.items).toHaveLength(1);
     expect(result.skippedCount).toBe(1);
     expect(result.items[0].payload.name).toBe("Greeting — run-uuid");
@@ -91,7 +91,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
         } as unknown as import("@/components/TestRunnerDialog").TestCaseResult,
       ],
     };
-    const result = buildItemsFromSource(source, "llm");
+    const result = buildItemsFromSource(source);
     expect(result.items[0].payload.evaluator_variables).toEqual({
       "ev-2": { foo: "bar" },
     });
@@ -123,7 +123,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
         },
       ] as unknown as import("@/components/eval-details").BenchmarkModelResult[],
     };
-    const result = buildItemsFromSource(source, "llm");
+    const result = buildItemsFromSource(source);
     expect(result.items).toHaveLength(2);
     expect(result.items[0].payload.name).toBe("A — bench-uu — gpt-4");
     expect(result.items[1].payload.name).toBe("B — bench-uu — claude");
@@ -141,22 +141,64 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
       ],
       evaluators: [{ uuid: "run-level-ev", name: "RunLevel" }],
     };
-    const result = buildItemsFromSource(source, "llm");
+    const result = buildItemsFromSource(source);
     expect(result.evaluatorUuids.has("run-level-ev")).toBe(true);
   });
 
-  it("returns empty for unsupported task types", () => {
-    const source: AddRunToLabellingTaskSource = {
-      type: "test_run",
-      runUuid: "u",
-      results: [],
-    };
+  it("returns empty for an unknown source kind", () => {
     // Cast past the type system to exercise the default branch.
-    const result = buildItemsFromSource(
-      source,
-      "unsupported" as unknown as "llm",
-    );
+    const result = buildItemsFromSource({
+      type: "bogus",
+    } as unknown as AddRunToLabellingTaskSource);
     expect(result).toEqual({ items: [], skippedCount: 0, evaluatorUuids: new Set() });
+  });
+
+  it("builds stt items from an stt_run source", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "stt_run",
+      runUuid: "stt-run-abcdefgh",
+      rows: [
+        {
+          name: "Deepgram #1",
+          reference_transcript: "hello world",
+          predicted_transcript: "hello word",
+        },
+      ],
+      evaluators: [{ uuid: "stt-ev-1", name: "WER judge" }],
+    };
+    const result = buildItemsFromSource(source);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].payload).toEqual({
+      name: "Deepgram #1",
+      reference_transcript: "hello world",
+      predicted_transcript: "hello word",
+    });
+    expect(result.evaluatorUuids.has("stt-ev-1")).toBe(true);
+  });
+
+  it("builds conversation items from a simulation_run source", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "simulation_run",
+      runUuid: "sim-run-abcdefgh",
+      results: [
+        {
+          name: "Frustrated caller — sim-run",
+          transcript: [
+            { role: "assistant", content: "How can I help?" },
+            { role: "user", content: "I need a refund." },
+          ],
+        },
+      ],
+      evaluators: [{ uuid: "sim-ev-1", name: "Resolved" }],
+    };
+    const result = buildItemsFromSource(source);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].payload.name).toBe("Frustrated caller — sim-run");
+    expect(result.items[0].payload.transcript).toEqual([
+      { role: "assistant", content: "How can I help?" },
+      { role: "user", content: "I need a refund." },
+    ]);
+    expect(result.evaluatorUuids.has("sim-ev-1")).toBe(true);
   });
 });
 

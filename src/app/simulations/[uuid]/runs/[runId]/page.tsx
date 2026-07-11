@@ -20,6 +20,11 @@ import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useSidebarState } from "@/lib/sidebar";
 import { getVoiceSimulationAudioLayout, getVoiceSimulationAudioUrlForEntry } from "@/lib/simulationVoiceAudio";
 import { ShareButton } from "@/components/ShareButton";
+import {
+  AddRunToLabellingTaskDialog,
+  type ConversationLabellingResult,
+  type SourceEvaluatorRef,
+} from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 
 // `type`, `scale_min`, `scale_max` are present on newer runs (per the
 // evaluator migration). Older runs only carry `mean`/`std`/`values` — we
@@ -126,6 +131,7 @@ export default function SimulationRunPage() {
   const { errorCode, captureResponse } = usePageErrorState();
   const [isAborting, setIsAborting] = useState(false);
   const [transcriptDialogOpen, setTranscriptDialogOpen] = useState(false);
+  const [addToTaskOpen, setAddToTaskOpen] = useState(false);
 
   // Hide the floating "Talk to Us" button when the transcript dialog is open
   useHideFloatingButton(transcriptDialogOpen);
@@ -442,6 +448,39 @@ export default function SimulationRunPage() {
     }
     return map;
   }, [runData, simulationEvaluatorUuidByName]);
+
+  // "Submit for labelling": each completed simulation's transcript becomes a
+  // conversation annotation item. Aborted / transcript-less runs are skipped;
+  // the `end_reason` sentinel turn is dropped (matching the transcript
+  // dialog). Evaluators come from the run's resolved name→uuid map.
+  const conversationLabellingResults: ConversationLabellingResult[] = useMemo(() => {
+    const out: ConversationLabellingResult[] = [];
+    const suffix = runId.slice(0, 8);
+    for (const sim of runData?.simulation_results ?? []) {
+      if (sim.aborted) continue;
+      const transcript = (sim.transcript ?? []).filter(
+        (t) => t.role !== "end_reason",
+      );
+      if (transcript.length === 0) continue;
+      const baseName =
+        sim.simulation_name ||
+        [sim.persona?.label, sim.scenario?.name].filter(Boolean).join(" / ") ||
+        "Simulation";
+      out.push({ name: `${baseName} — ${suffix}`, transcript });
+    }
+    return out;
+  }, [runData, runId]);
+  const conversationLabellingEvaluators: SourceEvaluatorRef[] = useMemo(() => {
+    const seen = new Set<string>();
+    const evals: SourceEvaluatorRef[] = [];
+    for (const [name, uuid] of Object.entries(evaluatorUuidByName)) {
+      if (uuid && !seen.has(uuid)) {
+        seen.add(uuid);
+        evals.push({ uuid, name });
+      }
+    }
+    return evals;
+  }, [evaluatorUuidByName]);
 
   const evaluatorDescriptionByName = useMemo(() => {
     const map: Record<string, string> = {};
@@ -791,6 +830,19 @@ export default function SimulationRunPage() {
                   initialShareToken={runData.share_token ?? null}
                 />
               )}
+              {/* Send each simulation transcript to a human-alignment
+                  (conversation) task for labelling. Desktop-only, matching
+                  the labelling affordance in TestRunnerDialog. */}
+              {runData.status.toLowerCase() === "done" &&
+                conversationLabellingResults.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setAddToTaskOpen(true)}
+                    className="hidden md:inline-flex items-center gap-2 h-8 px-3 rounded-md text-xs font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
+                  >
+                    Submit for labelling
+                  </button>
+                )}
               {(runData.status.toLowerCase() === "in_progress" ||
                 runData.status.toLowerCase() === "queued") && (
                 <button
@@ -2089,6 +2141,18 @@ export default function SimulationRunPage() {
           </div>
         </div>
       )}
+
+      <AddRunToLabellingTaskDialog
+        isOpen={addToTaskOpen}
+        onClose={() => setAddToTaskOpen(false)}
+        source={{
+          type: "simulation_run",
+          runUuid: runId,
+          runName: runData?.name,
+          results: conversationLabellingResults,
+          evaluators: conversationLabellingEvaluators,
+        }}
+      />
     </AppLayout>
   );
 }
