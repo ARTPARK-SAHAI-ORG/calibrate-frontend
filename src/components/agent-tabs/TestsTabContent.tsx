@@ -19,6 +19,7 @@ import {
   EvaluatorVariableDef,
 } from "@/components/AddTestDialog";
 import { BulkUploadTestsModal } from "@/components/BulkUploadTestsModal";
+import { AgentDefaultsPromptDialog } from "@/components/agent-tabs/AgentDefaultsPromptDialog";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { showLimitToast } from "@/constants/limits";
 import { testTypeLabel, getUnitTestBreakdown } from "@/lib/testTypes";
@@ -38,7 +39,7 @@ import {
 import {
   type EvaluatorData,
   fetchAgentEvaluators,
-  setAgentEvaluators as putAgentEvaluators,
+  setAgentEvaluators as reconcileAgentEvaluators,
   fetchAllEvaluators,
 } from "@/lib/evaluatorApi";
 
@@ -230,6 +231,9 @@ export function TestsTabContent({
   const [agentDefaultsPrompt, setAgentDefaultsPrompt] = useState<
     { uuid: string; name: string }[] | null
   >(null);
+  const [agentDefaultsError, setAgentDefaultsError] = useState<string | null>(
+    null,
+  );
   const [isAttachingDefaults, setIsAttachingDefaults] = useState(false);
   // Agent tests state (tests attached to the agent)
   const [agentTests, setAgentTests] = useState<TestData[]>([]);
@@ -453,7 +457,14 @@ export function TestsTabContent({
     evaluators: EvaluatorRefPayload[],
   ): Promise<boolean> => {
     if (!backendAccessToken || evaluators.length === 0) return false;
-    const attached = new Set(agentEvaluators.map((e) => e.uuid));
+    let attached = new Set(agentEvaluators.map((e) => e.uuid));
+    try {
+      const fresh = await fetchAgentEvaluators(agentUuid, backendAccessToken);
+      attached = new Set(fresh.map((e) => e.uuid));
+      setAgentEvaluators(fresh);
+    } catch {
+      // Fall back to the cached list when the refresh fails.
+    }
     const newUuids = Array.from(
       new Set(evaluators.map((e) => e.evaluator_uuid)),
     ).filter((uuid) => !attached.has(uuid));
@@ -473,6 +484,7 @@ export function TestsTabContent({
         name: nameByUuid.get(uuid) ?? "Evaluator",
       })),
     );
+    setAgentDefaultsError(null);
     return true;
   };
 
@@ -979,6 +991,7 @@ export function TestsTabContent({
   const dismissAgentDefaultsPrompt = () => {
     if (isAttachingDefaults) return;
     setAgentDefaultsPrompt(null);
+    setAgentDefaultsError(null);
     closeTestDialogAfterSave();
   };
 
@@ -986,6 +999,7 @@ export function TestsTabContent({
     if (!agentDefaultsPrompt || !backendAccessToken) return;
     try {
       setIsAttachingDefaults(true);
+      setAgentDefaultsError(null);
       // Atomic PUT of the full desired set (current agent evaluators ∪ the
       // newly-referenced ones) rather than a POST per id.
       const desired = Array.from(
@@ -994,12 +1008,18 @@ export function TestsTabContent({
           ...agentDefaultsPrompt.map((e) => e.uuid),
         ]),
       );
-      await putAgentEvaluators(agentUuid, desired, backendAccessToken);
+      await reconcileAgentEvaluators(agentUuid, desired, backendAccessToken);
       await loadAgentEvaluators();
       setAgentDefaultsPrompt(null);
+      setAgentDefaultsError(null);
       closeTestDialogAfterSave();
     } catch (err) {
       reportError("Error adding evaluators to agent defaults:", err);
+      setAgentDefaultsError(
+        err instanceof Error
+          ? err.message
+          : "Failed to update default evaluators",
+      );
     } finally {
       setIsAttachingDefaults(false);
     }
@@ -2542,87 +2562,15 @@ export function TestsTabContent({
 
       {/* Shown on top of the still-open AddTestDialog after a successful save.
           The test is already persisted; this only asks about agent defaults. */}
-      {agentDefaultsPrompt &&
-        agentDefaultsPrompt.length > 0 &&
-        (() => {
-          const isOne = agentDefaultsPrompt.length === 1;
-          const evaluatorNoun = isOne
-            ? "evaluator is not"
-            : "evaluators are not";
-          const defaultPhrase = isOne ? "it a default" : "them defaults";
-          const pronoun = isOne ? "it" : "them";
-
-          return (
-            <div
-              className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-              onClick={dismissAgentDefaultsPrompt}
-            >
-              <div
-                className="bg-background border border-border rounded-xl p-6 md:p-8 max-w-lg w-full shadow-2xl"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-start justify-between gap-3 mb-1">
-                  <h2 className="text-lg md:text-xl font-semibold tracking-tight">
-                    Update the default evaluators?
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={dismissAgentDefaultsPrompt}
-                    disabled={isAttachingDefaults}
-                    className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                    aria-label="Close"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                </div>
-                <p className="text-sm md:text-[15px] text-muted-foreground mb-4">
-                  The following {evaluatorNoun} a default for this agent yet. If
-                  you don't make {defaultPhrase}, you will need to add {pronoun}{" "}
-                  manually every time you create a new test.
-                </p>
-                <ul className="mb-6 space-y-1.5 max-h-48 overflow-y-auto">
-                  {agentDefaultsPrompt.map((ev) => (
-                    <li
-                      key={ev.uuid}
-                      className="flex items-center gap-2 text-sm text-foreground"
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground flex-shrink-0" />
-                      {ev.name}
-                    </li>
-                  ))}
-                </ul>
-                <div className="flex items-center justify-end gap-3">
-                  <button
-                    onClick={dismissAgentDefaultsPrompt}
-                    disabled={isAttachingDefaults}
-                    className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Not now
-                  </button>
-                  <button
-                    onClick={confirmAddAgentDefaults}
-                    disabled={isAttachingDefaults}
-                    className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    {isAttachingDefaults ? "Saving..." : "Make default"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
+      {agentDefaultsPrompt && agentDefaultsPrompt.length > 0 && (
+        <AgentDefaultsPromptDialog
+          evaluators={agentDefaultsPrompt}
+          isSaving={isAttachingDefaults}
+          error={agentDefaultsError}
+          onDismiss={dismissAgentDefaultsPrompt}
+          onConfirm={confirmAddAgentDefaults}
+        />
+      )}
 
       {/* Bulk-upload modal locked to this agent. The agent picker is
           hidden and `agent_uuids: [agentUuid]` is sent with the upload. */}

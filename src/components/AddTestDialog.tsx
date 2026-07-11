@@ -1136,9 +1136,7 @@ export function AddTestDialog({
   const [scrollToEvaluatorUuid, setScrollToEvaluatorUuid] = useState<
     string | null
   >(null);
-  const evaluatorCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const evaluatorsContainerRef = useRef<HTMLDivElement>(null);
-  const evaluatorsListEndRef = useRef<HTMLDivElement>(null);
   // Inline "create evaluator" flow launched from the picker header.
   const [createEvaluatorOpen, setCreateEvaluatorOpen] = useState(false);
 
@@ -1809,20 +1807,26 @@ export function AddTestDialog({
 
   const attachEvaluatorsFromOptions = (options: LLMEvaluatorOption[]) => {
     if (options.length === 0) return;
-    const existing = new Set(attachedEvaluators.map((e) => e.evaluator_uuid));
-    const toAdd = options
-      .filter((option) => !existing.has(option.uuid))
-      .map((option) => ({
-        evaluator_uuid: option.uuid,
-        name: option.name,
-        description: option.description,
-        slug: option.slug,
-        variables: option.variables,
-        variable_values: buildInitialVariableValues(option.variables),
-      }));
-    if (toAdd.length === 0) return;
-    setAttachedEvaluators((prev) => [...prev, ...toAdd]);
-    setScrollToEvaluatorUuid(toAdd[toAdd.length - 1].evaluator_uuid);
+    let lastAddedUuid: string | null = null;
+    setAttachedEvaluators((prev) => {
+      const existing = new Set(prev.map((e) => e.evaluator_uuid));
+      const toAdd = options
+        .filter((option) => !existing.has(option.uuid))
+        .map((option) => ({
+          evaluator_uuid: option.uuid,
+          name: option.name,
+          description: option.description,
+          slug: option.slug,
+          variables: option.variables,
+          variable_values: buildInitialVariableValues(option.variables),
+        }));
+      if (toAdd.length === 0) return prev;
+      lastAddedUuid = toAdd[toAdd.length - 1].evaluator_uuid;
+      return [...prev, ...toAdd];
+    });
+    if (lastAddedUuid) {
+      setScrollToEvaluatorUuid(lastAddedUuid);
+    }
     closeEvaluatorPicker();
   };
 
@@ -3200,6 +3204,11 @@ export function AddTestDialog({
                       existingEvaluators={availableLLMEvaluators}
                       onCreated={handleEvaluatorCreated}
                       useCaseGroups={["conversation"]}
+                      useCaseTypes={
+                        activeTab === "conversation"
+                          ? [CONVERSATION_EVALUATOR_TYPE]
+                          : ["llm"]
+                      }
                     />
 
                     {/* Evaluator picker dropdown */}
@@ -3380,9 +3389,6 @@ export function AddTestDialog({
                       {attachedEvaluators.map((ev) => (
                         <div
                           key={ev.evaluator_uuid}
-                          ref={(el) => {
-                            evaluatorCardRefs.current[ev.evaluator_uuid] = el;
-                          }}
                           className="border border-border rounded-lg p-4 bg-background"
                         >
                           <div className="flex items-start justify-between gap-2 mb-3">
@@ -3475,7 +3481,6 @@ export function AddTestDialog({
                           )}
                         </div>
                       ))}
-                      <div ref={evaluatorsListEndRef} aria-hidden className="h-px" />
                     </div>
                   </div>
                 </div>

@@ -92,6 +92,8 @@ type CreateEvaluatorFlowProps = {
   onCreated: (evaluator: EvaluatorData) => void;
   /** Limit the use-case picker to these groups (e.g. conversation-only on agent detail). */
   useCaseGroups?: EvaluatorUseCaseOption["group"][];
+  /** Further narrow the picker to specific evaluator types (e.g. `llm` on next-reply tests). */
+  useCaseTypes?: EvaluatorType[];
 };
 
 /**
@@ -106,6 +108,7 @@ export function CreateEvaluatorFlow({
   existingEvaluators,
   onCreated,
   useCaseGroups,
+  useCaseTypes,
 }: CreateEvaluatorFlowProps) {
   const backendAccessToken = useAccessToken();
   const { providers: llmProviders } = useOpenRouterModels();
@@ -368,11 +371,18 @@ export function CreateEvaluatorFlow({
   const detectedPromptVariables = extractVariableNames(newEvaluatorSystemPrompt);
   const variablesSupported =
     newEvaluatorType === "llm" || newEvaluatorType === "llm-general";
-  const useCaseOptions = useCaseGroups
-    ? EVALUATOR_USE_CASE_OPTIONS.filter((option) =>
-        useCaseGroups.includes(option.group),
-      )
-    : EVALUATOR_USE_CASE_OPTIONS;
+  const useCaseOptions = (() => {
+    let options = useCaseGroups
+      ? EVALUATOR_USE_CASE_OPTIONS.filter((option) =>
+          useCaseGroups.includes(option.group),
+        )
+      : EVALUATOR_USE_CASE_OPTIONS;
+    if (useCaseTypes && useCaseTypes.length > 0) {
+      const allowed = new Set(useCaseTypes);
+      options = options.filter((option) => allowed.has(option.value));
+    }
+    return options;
+  })();
 
   if (!open) return null;
 
