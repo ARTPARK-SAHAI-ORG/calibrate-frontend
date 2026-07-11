@@ -85,10 +85,12 @@ export default defineConfig({
     // dependency of `authenticated`, so it runs first.
     { name: "setup", testMatch: /.*\.setup\.ts/ },
     // Backend-free specs (public routes, client-side behavior). This is what
-    // `npm run test:e2e` runs — no backend required.
+    // `npm run test:e2e` runs — no backend required. Any *.spec.ts that isn't a
+    // backend-backed *.auth.spec.ts is a public spec (login, signup, landing).
     {
       name: "public",
-      testMatch: /login\.spec\.ts/,
+      testMatch: /\.spec\.ts$/,
+      testIgnore: /\.auth\.spec\.ts$/,
       use: { ...devices["Desktop Chrome"] },
     },
     // Backend-backed specs. Loads the storage state from `setup` so tests

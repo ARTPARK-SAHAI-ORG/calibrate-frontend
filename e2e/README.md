@@ -45,8 +45,13 @@ Specs are split into two Playwright **projects** (see `playwright.config.ts`):
 
 | Project | Command | Backend | Specs |
 | --- | --- | --- | --- |
-| `public` | `npm run test:e2e` | none | `login.spec.ts` — public routes, client-side behavior |
-| `authenticated` | `npm run test:e2e:integration` | **required** | `*.auth.spec.ts` — logged-in flows against a real backend |
+| `public` | `npm run test:e2e` | none | `login.spec.ts`, `signup.spec.ts`, `landing.spec.ts` — public routes, client-side validation/behavior (any `*.spec.ts` that isn't `*.auth.spec.ts`) |
+| `authenticated` | `npm run test:e2e:integration` | **required** | `*.auth.spec.ts` — logged-in CRUD flows against a real backend (agents/agent detail, tools, evaluators, personas/scenarios, STT/TTS datasets, simulations, workspace settings, and cross-page navigation) |
+
+The authenticated specs all share **one** backend account (seeded once by
+`auth.setup.ts`) and mutate global workspace state, so `test:e2e:integration`
+runs them with `--workers=1`. The `public` specs are independent and run fully
+parallel.
 
 ### How authenticated specs log in (no login UI)
 

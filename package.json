@@ -15,8 +15,8 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:coverage": "E2E_COVERAGE=1 playwright test --project=public && node scripts/clean-e2e-lcov.mjs",
     "coverage": "npm run test:coverage && npm run test:e2e:coverage",
-    "test:e2e:integration": "playwright test --project=authenticated",
-    "test:e2e:integration:coverage": "E2E_COVERAGE=1 playwright test --project=authenticated && node scripts/clean-e2e-lcov.mjs"
+    "test:e2e:integration": "playwright test --project=authenticated --workers=1",
+    "test:e2e:integration:coverage": "E2E_COVERAGE=1 playwright test --project=authenticated --workers=1 && node scripts/clean-e2e-lcov.mjs"
   },
   "dependencies": {
     "@next/third-parties": "^16.1.4",
