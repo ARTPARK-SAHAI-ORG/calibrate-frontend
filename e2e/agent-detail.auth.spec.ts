@@ -4,6 +4,7 @@
 // with its Tools / Data extraction / Tests / Settings tab content), and agent
 // deletion. Run with `npm run test:e2e:integration`.
 import { test, expect } from "./fixtures";
+import { waitForOrgReady } from "./helpers";
 
 test.describe("Agent detail (authenticated, real backend)", () => {
   test("creates a Build agent, navigates its tabs, then deletes it", async ({
@@ -12,9 +13,9 @@ test.describe("Agent detail (authenticated, real backend)", () => {
     const name = `E2E Agent ${Date.now()}`;
 
     await page.goto("/agents");
-    // Let the OrganizationBootstrapper finish fetching /organizations so the
+    // Wait for the OrganizationBootstrapper to resolve the active org so the
     // X-Org-UUID header is set before we create (creating too early races it).
-    await page.waitForLoadState("networkidle");
+    await waitForOrgReady(page);
     await page.getByRole("button", { name: "New agent" }).first().click();
     await expect(
       page.getByRole("heading", { name: "New agent" }),

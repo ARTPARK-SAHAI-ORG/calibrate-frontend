@@ -32,6 +32,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
+  // CI runs against `npm run dev`, so the first hit to each route pays a cold
+  // Turbopack compile — give assertions and whole tests more headroom there.
+  timeout: process.env.CI ? 60_000 : 30_000,
+  expect: { timeout: process.env.CI ? 10_000 : 5_000 },
   reporter: COLLECT_COVERAGE
     ? [
         ["list"],

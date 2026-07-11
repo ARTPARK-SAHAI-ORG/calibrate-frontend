@@ -34,6 +34,14 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     await expect(nameInput).toBeVisible();
     await nameInput.fill(name);
 
+    // The judge model + prompt are required. They're prefilled by the async
+    // default-prompt call; the model button reads "Select judge model" until
+    // then. Clicking Create before prefill just flags validation errors without
+    // creating, so wait for the prefill to land first.
+    await expect(page.getByText("Select judge model")).toHaveCount(0, {
+      timeout: 20000,
+    });
+
     await page.getByRole("button", { name: "Create evaluator" }).click();
 
     // The new evaluator card appears on the "My evaluators" tab.

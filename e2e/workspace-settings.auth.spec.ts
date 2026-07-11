@@ -4,6 +4,7 @@
 // CreateApiKeyDialog, CreateWorkspaceDialog, and the settings tab layout. Run
 // with `npm run test:e2e:integration`.
 import { test, expect } from "./fixtures";
+import { waitForOrgReady } from "./helpers";
 
 test.describe("Workspace settings (authenticated, real backend)", () => {
   test("renames the active workspace on the Admin tab", async ({ page }) => {
@@ -11,12 +12,15 @@ test.describe("Workspace settings (authenticated, real backend)", () => {
     await expect(
       page.getByRole("heading", { name: "Workspace settings" }),
     ).toBeVisible();
+    await waitForOrgReady(page);
 
     // The Admin "Name" input is pre-filled with the current name; Save enables
     // once it differs. It's the only textbox on the tab, and only renders once
     // the active workspace has loaded (org bootstrap), so allow time.
+    // The form sits behind a LoadingState until useOrganizations resolves the
+    // active org object, which can lag the localStorage uuid — allow generously.
     const nameInput = page.getByRole("textbox").first();
-    await expect(nameInput).toBeVisible({ timeout: 20000 });
+    await expect(nameInput).toBeVisible({ timeout: 30000 });
     await nameInput.fill(`E2E WS ${Date.now()}`);
     await page.getByRole("button", { name: "Save", exact: true }).click();
 
@@ -29,10 +33,9 @@ test.describe("Workspace settings (authenticated, real backend)", () => {
   test("creates then revokes a workspace API key", async ({ page }) => {
     const keyName = `E2E Key ${Date.now()}`;
     await page.goto("/workspace-settings");
-    // Switch to the API keys tab explicitly and let the keys list (which needs
-    // the bootstrapped org) settle before acting.
+    await waitForOrgReady(page);
+    // Switch to the API keys tab explicitly; the keys list needs the org.
     await page.getByRole("button", { name: "API keys", exact: true }).click();
-    await page.waitForLoadState("networkidle");
 
     await page.getByRole("button", { name: "Create key" }).first().click();
     await expect(
@@ -67,8 +70,9 @@ test.describe("Workspace settings (authenticated, real backend)", () => {
     page,
   }) => {
     await page.goto("/agents");
+    await waitForOrgReady(page);
     await page.locator('button[aria-haspopup="menu"]').first().click();
-    await expect(page.getByText("Workspaces")).toBeVisible();
+    await expect(page.getByText("Workspaces")).toBeVisible({ timeout: 15000 });
 
     await page.getByRole("button", { name: "Create workspace" }).click();
     await expect(
