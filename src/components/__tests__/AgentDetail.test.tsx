@@ -215,7 +215,8 @@ describe("AgentDetail", () => {
     expect(screen.getByTestId("agent-tab-content")).toBeInTheDocument();
     expect(screen.getByText("Agent")).toBeInTheDocument();
     expect(screen.getByText("Tools")).toBeInTheDocument();
-    expect(screen.getByText("Data extraction")).toBeInTheDocument();
+    // Data extraction tab is temporarily hidden (extraction UI removed for now)
+    expect(screen.queryByText("Data extraction")).not.toBeInTheDocument();
     expect(screen.getByText("Tests")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
   });
@@ -244,9 +245,6 @@ describe("AgentDetail", () => {
 
     await user.click(screen.getByText("Tools"));
     expect(screen.getByTestId("tools-tab-content")).toBeInTheDocument();
-
-    await user.click(screen.getByText("Data extraction"));
-    expect(screen.getByTestId("data-extraction-tab-content")).toBeInTheDocument();
 
     await user.click(screen.getByText("Tests"));
     expect(screen.getByTestId("tests-tab-content")).toHaveTextContent(
