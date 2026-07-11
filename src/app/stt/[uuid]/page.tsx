@@ -205,17 +205,13 @@ export default function STTEvaluationDetailPage() {
   };
 
   const handleRetry = async () => {
-    if (!evaluationResult || !backendAccessToken || retrying) return;
+    if (!backendAccessToken || !taskId || retrying) return;
     setRetrying(true);
     setRetryError(null);
-    const result = await retryEvaluation(
-      "stt",
-      evaluationResult,
-      backendAccessToken,
-    );
+    const result = await retryEvaluation("stt", taskId, backendAccessToken);
     if (result.ok) {
       setRetryConfirmOpen(false);
-      router.push(`/stt/${result.taskId}`);
+      window.location.reload();
       return;
     }
     if (result.status === 401) {

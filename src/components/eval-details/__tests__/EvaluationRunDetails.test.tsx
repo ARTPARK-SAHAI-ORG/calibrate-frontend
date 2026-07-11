@@ -643,6 +643,24 @@ describe("STTEvaluationOutputs", () => {
     expect(screen.queryByTestId("stt-results-table")).not.toBeInTheDocument();
   });
 
+  it("shows error state when the task failed before the provider produced results", () => {
+    const providerResults: STTProviderResultForDetails[] = [
+      { provider: "openai", success: null, results: [] },
+    ];
+    render(
+      <STTEvaluationOutputs
+        {...baseProps}
+        status="failed"
+        providerResults={providerResults}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "There was an error running this provider. Please contact us by posting your issue to help us help you.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("shows error state when success is false", () => {
     const providerResults: STTProviderResultForDetails[] = [
       { provider: "openai", success: false },
@@ -939,6 +957,24 @@ describe("TTSEvaluationOutputs", () => {
       screen.queryByText("Select a provider to view details"),
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId("provider-metrics-card")).not.toBeInTheDocument();
+  });
+
+  it("shows error state when the task failed before the provider produced results", () => {
+    const providerResults: TTSProviderResultForDetails[] = [
+      { provider: "elevenlabs", success: null, results: [] },
+    ];
+    render(
+      <TTSEvaluationOutputs
+        {...baseProps}
+        status="failed"
+        providerResults={providerResults}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "There was an error running this provider. Please contact us by posting your issue to help us help you.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("shows error state when success is false", () => {

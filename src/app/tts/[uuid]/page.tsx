@@ -193,17 +193,13 @@ export default function TTSEvaluationDetailPage() {
   };
 
   const handleRetry = async () => {
-    if (!evaluationResult || !backendAccessToken || retrying) return;
+    if (!backendAccessToken || !taskId || retrying) return;
     setRetrying(true);
     setRetryError(null);
-    const result = await retryEvaluation(
-      "tts",
-      evaluationResult,
-      backendAccessToken,
-    );
+    const result = await retryEvaluation("tts", taskId, backendAccessToken);
     if (result.ok) {
       setRetryConfirmOpen(false);
-      router.push(`/tts/${result.taskId}`);
+      window.location.reload();
       return;
     }
     if (result.status === 401) {

@@ -372,7 +372,9 @@ export function STTEvaluationOutputs({
             pr.success === true && !hasSTTEmptyPredictions(pr)
               ? true
               : pr.success === null
-                ? null
+                ? status === "failed"
+                  ? false
+                  : null
                 : false,
         }))}
         activeKey={selectedProvider ?? null}
@@ -395,6 +397,9 @@ export function STTEvaluationOutputs({
             providerResult.success === null &&
             (!providerResult.results || providerResult.results.length === 0)
           ) {
+            if (status === "failed") {
+              return <ProviderErrorState />;
+            }
             return <ProviderLoadingState />;
           }
 
@@ -494,7 +499,14 @@ export function TTSEvaluationOutputs({
         items={providerResults.map((pr) => ({
           key: pr.provider,
           label: getProviderLabel(pr.provider),
-          success: pr.success,
+          success:
+            pr.success === true
+              ? true
+              : pr.success === false
+                ? false
+                : status === "failed"
+                  ? false
+                  : null,
         }))}
         activeKey={selectedProvider ?? null}
         onSelect={onProviderSelect}
@@ -516,6 +528,9 @@ export function TTSEvaluationOutputs({
             providerResult.success === null &&
             (!providerResult.results || providerResult.results.length === 0)
           ) {
+            if (status === "failed") {
+              return <ProviderErrorState />;
+            }
             return <ProviderLoadingState />;
           }
 
