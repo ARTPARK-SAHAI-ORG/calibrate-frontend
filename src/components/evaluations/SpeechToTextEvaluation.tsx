@@ -520,7 +520,7 @@ export function SpeechToTextEvaluation({
                       Model
                     </th>
                     <th className="px-4 py-2 text-left text-[12px] font-medium text-foreground">
-                      API type
+                      Mode
                     </th>
                     <th className="w-12 px-4 py-2 text-left text-[12px] font-medium text-foreground">
                       Website
