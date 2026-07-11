@@ -94,7 +94,7 @@ export function AgentTabContent({
                   onChange={(e) => setSttProvider(e.target.value)}
                   className="w-full h-9 md:h-10 px-3 md:px-4 pr-10 rounded-md text-sm md:text-base border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer appearance-none"
                 >
-                  {sttProviders.map((provider) => (
+                  {sttProviders.filter((provider) => !provider.benchmarkOnly).map((provider) => (
                     <option key={provider.value} value={provider.value}>
                       {provider.label}
                     </option>
@@ -138,7 +138,7 @@ export function AgentTabContent({
                   onChange={(e) => setTtsProvider(e.target.value)}
                   className="w-full h-9 md:h-10 px-3 md:px-4 pr-10 rounded-md text-sm md:text-base border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer appearance-none"
                 >
-                  {ttsProviders.map((provider) => (
+                  {ttsProviders.filter((provider) => !provider.benchmarkOnly).map((provider) => (
                     <option key={provider.value} value={provider.value}>
                       {provider.label}
                     </option>

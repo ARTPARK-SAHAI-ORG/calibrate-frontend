@@ -7,12 +7,17 @@ import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useAccessToken, useMaxRowsPerEval } from "@/hooks";
 import { toast } from "sonner";
-import { ttsProviders, TTSProvider } from "../agent-tabs/constants/providers";
+import {
+  ttsProviders,
+  TTSProvider,
+  getTtsApiType,
+} from "../agent-tabs/constants/providers";
 import { LIMITS, showLimitToast } from "@/constants/limits";
 import { listDatasets, Dataset } from "@/lib/datasets";
 import { DatasetPicker } from "./DatasetPicker";
 import { TTSDatasetEditor, TTSDatasetEditorHandle } from "./TTSDatasetEditor";
 import { MultiSelectPicker, PickerItem } from "../MultiSelectPicker";
+import { Tooltip } from "../Tooltip";
 
 type EvaluationResult = {
   task_id: string;
@@ -513,6 +518,29 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange, initia
                     <th className="px-4 py-2 text-left text-[12px] font-medium text-foreground">
                       Voice ID
                     </th>
+                    <th className="px-4 py-2 text-left text-[12px] font-medium text-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        Mode
+                        <Tooltip
+                          content="Streaming returns audio incrementally as it's generated; batch returns the full audio in a single response."
+                          className="inline-flex"
+                        >
+                          <svg
+                            className="w-3.5 h-3.5 text-muted-foreground cursor-help"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                            />
+                          </svg>
+                        </Tooltip>
+                      </span>
+                    </th>
                     <th className="w-12 px-4 py-2 text-left text-[12px] font-medium text-foreground">
                       Website
                     </th>
@@ -560,6 +588,14 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange, initia
                         </td>
                         <td className="px-4 py-2 text-[13px] text-muted-foreground font-mono">
                           {provider.voiceId}
+                        </td>
+                        <td className="px-4 py-2">
+                          <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize">
+                            {getTtsApiType(
+                              provider.value,
+                              languageDisplayName[language],
+                            )}
+                          </span>
                         </td>
                         <td className="w-12 px-4 py-2">
                           {provider.website && (
@@ -720,6 +756,12 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange, initia
                         <p className="text-[12px] text-muted-foreground font-mono truncate mt-0.5">
                           {provider.modelOverrides?.[languageDisplayName[language]] || provider.model}
                         </p>
+                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize mt-1">
+                          {getTtsApiType(
+                            provider.value,
+                            languageDisplayName[language],
+                          )}
+                        </span>
                       </div>
                     </div>
                   </div>

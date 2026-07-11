@@ -695,6 +695,9 @@ export type STTProvider = {
   website: string;
   supportedLanguages?: string[];
   modelOverrides?: Record<string, string>;
+  // Only offered for STT/TTS benchmarking on the eval pages — not selectable for
+  // live agent configuration. Filtered out in AgentTabContent.
+  benchmarkOnly?: boolean;
 };
 
 export type TTSProvider = {
@@ -705,6 +708,9 @@ export type TTSProvider = {
   website: string;
   supportedLanguages?: string[];
   modelOverrides?: Record<string, string>;
+  // Only offered for STT/TTS benchmarking on the eval pages — not selectable for
+  // live agent configuration. Filtered out in AgentTabContent.
+  benchmarkOnly?: boolean;
 };
 
 export const sttProviders: STTProvider[] = [
@@ -715,6 +721,9 @@ export const sttProviders: STTProvider[] = [
   // Temporarily hidden — re-enable when Groq STT is available again.
   // { label: "Groq", value: "groq", model: "whisper-large-v3-turbo", website: "https://groq.com", supportedLanguages: groqSTTSupportedLanguages },
   { label: "Google", value: "google", model: "chirp-3", website: "https://cloud.google.com/speech-to-text", supportedLanguages: googleSTTSupportedLanguages, modelOverrides: { "Sindhi": "chirp-2" } },
+  // Benchmarking only — Gemini has no dedicated STT endpoint; transcription runs
+  // through the Gemini multimodal model via the Gemini API. Not a live agent option.
+  { label: "Gemini", value: "gemini", model: "gemini-3.5-flash", website: "https://ai.google.dev", supportedLanguages: googleSTTSupportedLanguages, benchmarkOnly: true },
   { label: "Sarvam", value: "sarvam", model: "saarika-v3", website: "https://sarvam.ai", supportedLanguages: sarvamSTTSupportedLanguages },
   { label: "Smallest AI", value: "smallest", model: "pulse", website: "https://smallest.ai", supportedLanguages: smallestAiSTTSupportedLanguages },
 ];
@@ -729,9 +738,11 @@ export const sttProviders: STTProvider[] = [
 │ ElevenLabs  │ scribe-v2                │
 │ Groq        │ whisper-large-v3-turbo   │
 │ Google      │ chirp-3                  │
+│ Gemini*     │ gemini-3.5-flash         │
 │ Sarvam      │ saarika-v3               │
 │ Smallest    │ pulse                    │
 └─────────────┴──────────────────────────┘
+* Gemini is benchmarking-only (eval pages), not a live agent option.
 */
 
 export const ttsProviders: TTSProvider[] = [
@@ -740,6 +751,8 @@ export const ttsProviders: TTSProvider[] = [
   // Temporarily hidden — re-enable when Groq TTS is available again.
   // { label: "Groq", value: "groq", model: "orpheus", voiceId: "troy", website: "https://groq.com", supportedLanguages: groqTTSSupportedLanguages },
   { label: "Google", value: "google", model: "chirp_3", voiceId: "Charon", website: "https://cloud.google.com/text-to-speech", supportedLanguages: googleTTSSupportedLanguages, modelOverrides: { "Sindhi": "gemini" } },
+  // Benchmarking only — Gemini TTS via the Gemini API. Not a live agent option.
+  { label: "Gemini", value: "gemini", model: "gemini-3.1-flash-tts", voiceId: "Kore", website: "https://docs.cloud.google.com/text-to-speech/docs/gemini-tts", supportedLanguages: googleTTSSupportedLanguages, benchmarkOnly: true },
   { label: "ElevenLabs", value: "elevenlabs", model: "eleven_multilingual_v2", voiceId: "Krishna", website: "https://elevenlabs.io", supportedLanguages: elevenlabsTTSSupportedLanguages, modelOverrides: { "Sindhi": "eleven_v3" } },
   { label: "Sarvam", value: "sarvam", model: "bulbul:v3", voiceId: "aditya", website: "https://sarvam.ai", supportedLanguages: sarvamSTTSupportedLanguages },
   { label: "Smallest AI", value: "smallest", model: "lightning-v3.1", voiceId: "aditi", website: "https://smallest.ai", supportedLanguages: smallestAiSTTSupportedLanguages },
@@ -753,8 +766,35 @@ export const ttsProviders: TTSProvider[] = [
 │ OpenAI      │ gpt-4o-mini-tts          │ coral                                    │
 │ Groq        │ playai-tts               │ Arista-PlayAI                            │
 │ Google      │ chirp-3                  │ Aoede                                    │
+│ Gemini*     │ gemini-3.1-flash-tts     │ Kore                                     │
 │ ElevenLabs  │ eleven_multilingual_v2   │ IbEzPPGLXlYUvxNGhJQp                     │
 │ Sarvam      │ bulbul:v3                │ aditya                                    │
 │ Smallest    │ lightning-v3.1           │ emily                                    │
 └─────────────┴──────────────────────────┴──────────────────────────────────────────┘
+* Gemini is benchmarking-only (eval pages), not a live agent option.
 */
+
+// Whether a provider transcribes/synthesizes over a streaming API or a single
+// batch request. Shown as a column on the STT/TTS benchmarking eval pages.
+export type ApiType = "streaming" | "batch";
+
+// STT: everything streams except Groq and Gemini, which run batch.
+export function getSttApiType(providerValue: string): ApiType {
+  return providerValue === "groq" || providerValue === "gemini"
+    ? "batch"
+    : "streaming";
+}
+
+// TTS: everything streams except Groq (batch). Google TTS is batch only for
+// Sindhi (it falls back to the gemini model there) and streams otherwise.
+// `languageDisplayName` is the capitalized language (e.g. "Sindhi"), matching
+// the modelOverrides keys.
+export function getTtsApiType(
+  providerValue: string,
+  languageDisplayName: string,
+): ApiType {
+  if (providerValue === "groq") return "batch";
+  if (providerValue === "google" && languageDisplayName === "Sindhi")
+    return "batch";
+  return "streaming";
+}
