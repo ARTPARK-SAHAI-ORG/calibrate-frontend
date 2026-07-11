@@ -1,4 +1,4 @@
-import { render, screen } from "@/test-utils";
+import { render, screen, setupUser, waitFor } from "@/test-utils";
 import { AddEvaluatorsDialog } from "../AddEvaluatorsDialog";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
 
@@ -82,5 +82,102 @@ describe("AddEvaluatorsDialog", () => {
     expect(screen.getByText("Tone check")).toBeInTheDocument();
     expect(screen.queryByText("Default")).not.toBeInTheDocument();
     expect(screen.queryByText("My evaluators")).not.toBeInTheDocument();
+  });
+
+  it("unchecks a selected evaluator before adding", async () => {
+    const user = setupUser();
+    const onAdd = jest.fn();
+
+    render(
+      <AddEvaluatorsDialog
+        isOpen
+        onClose={jest.fn()}
+        onAdd={onAdd}
+        availableEvaluators={[
+          evaluator({ uuid: "ev-a", name: "Tone check" }),
+        ]}
+      />,
+    );
+
+    const checkbox = screen.getByRole("checkbox");
+    await user.click(checkbox);
+    expect(screen.getByRole("button", { name: "Add (1)" })).toBeEnabled();
+    await user.click(checkbox);
+    expect(screen.getByRole("button", { name: "Add" })).toBeDisabled();
+    expect(onAdd).not.toHaveBeenCalled();
+  });
+
+  it("filters evaluators by search and adds the selected ones", async () => {
+    const user = setupUser();
+    const onAdd = jest.fn().mockResolvedValue(undefined);
+    const onClose = jest.fn();
+
+    render(
+      <AddEvaluatorsDialog
+        isOpen
+        onClose={onClose}
+        onAdd={onAdd}
+        availableEvaluators={[
+          evaluator({
+            uuid: "ev-a",
+            name: "Tone check",
+            owner_user_id: "user-1",
+          }),
+          evaluator({
+            uuid: "ev-b",
+            name: "Policy fit",
+            owner_user_id: "user-1",
+          }),
+        ]}
+      />,
+    );
+
+    await user.type(screen.getByPlaceholderText("Search evaluators"), "tone");
+    expect(screen.getByText("Tone check")).toBeInTheDocument();
+    expect(screen.queryByText("Policy fit")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "Add (1)" }));
+
+    await waitFor(() =>
+      expect(onAdd).toHaveBeenCalledWith(["ev-a"]),
+    );
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("shows an empty-search message when nothing matches", async () => {
+    const user = setupUser();
+
+    render(
+      <AddEvaluatorsDialog
+        isOpen
+        onClose={jest.fn()}
+        onAdd={jest.fn()}
+        availableEvaluators={[
+          evaluator({ uuid: "ev-a", name: "Tone check" }),
+        ]}
+      />,
+    );
+
+    await user.type(
+      screen.getByPlaceholderText("Search evaluators"),
+      "missing",
+    );
+    expect(screen.getByText("No matching evaluators.")).toBeInTheDocument();
+  });
+
+  it("shows the all-added empty state when the library list is empty", () => {
+    render(
+      <AddEvaluatorsDialog
+        isOpen
+        onClose={jest.fn()}
+        onAdd={jest.fn()}
+        availableEvaluators={[]}
+      />,
+    );
+
+    expect(
+      screen.getByText("All evaluators are already added"),
+    ).toBeInTheDocument();
   });
 });

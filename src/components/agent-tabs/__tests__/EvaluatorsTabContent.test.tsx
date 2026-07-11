@@ -10,15 +10,33 @@ jest.mock("../../../hooks", () => ({
 // Stub the sub-flows so this test focuses on the tab's own behaviour (list,
 // empty state, header actions). Each stub renders a marker only when open.
 jest.mock("../AddEvaluatorsDialog", () => ({
-  AddEvaluatorsDialog: ({ isOpen }: { isOpen: boolean }) =>
-    isOpen ? <div data-testid="add-dialog" /> : null,
+  AddEvaluatorsDialog: ({
+    isOpen,
+    onAdd,
+  }: {
+    isOpen: boolean;
+    onAdd: (ids: string[]) => Promise<void> | void;
+  }) =>
+    isOpen ? (
+      <div data-testid="add-dialog">
+        <button type="button" onClick={() => onAdd(["ev-2"])}>
+          Confirm add
+        </button>
+      </div>
+    ) : null,
 }));
 jest.mock("../../evaluators/CreateEvaluatorFlow", () => ({
   CreateEvaluatorFlow: ({ open }: { open: boolean }) =>
     open ? <div data-testid="create-flow" /> : null,
 }));
 jest.mock("../../evaluators/DuplicateEvaluatorDialog", () => ({
-  DuplicateEvaluatorDialog: () => <div data-testid="duplicate-dialog" />,
+  DuplicateEvaluatorDialog: ({ onClose }: { onClose: () => void }) => (
+    <div data-testid="duplicate-dialog">
+      <button type="button" onClick={onClose}>
+        Close duplicate
+      </button>
+    </div>
+  ),
 }));
 
 const mockFetchAgentEvaluators = jest.fn();
@@ -172,5 +190,67 @@ describe("EvaluatorsTabContent", () => {
       expect(mockDelete).toHaveBeenCalledWith("ev-1", "test-token"),
     );
     expect(mockDetach).not.toHaveBeenCalled();
+  });
+
+  it("opens the create flow from the header", async () => {
+    mockFetchAgentEvaluators.mockResolvedValue([evaluator()]);
+    mockFetchAllEvaluators.mockResolvedValue([evaluator()]);
+    const user = setupUser();
+
+    render(<EvaluatorsTabContent agentUuid="agent-1" />);
+
+    await screen.findByText("Follows Refund Policy");
+    await user.click(screen.getByRole("button", { name: "Create evaluator" }));
+    expect(screen.getByTestId("create-flow")).toBeInTheDocument();
+  });
+
+  it("opens the duplicate dialog from a card action", async () => {
+    mockFetchAgentEvaluators.mockResolvedValue([evaluator()]);
+    mockFetchAllEvaluators.mockResolvedValue([evaluator()]);
+    const user = setupUser();
+
+    render(<EvaluatorsTabContent agentUuid="agent-1" />);
+
+    await screen.findByText("Follows Refund Policy");
+    await user.click(screen.getByRole("button", { name: "Duplicate" }));
+    expect(screen.getByTestId("duplicate-dialog")).toBeInTheDocument();
+  });
+
+  it("shows a load error with retry when fetching evaluators fails", async () => {
+    mockFetchAgentEvaluators.mockRejectedValue(new Error("Network down"));
+    mockFetchAllEvaluators.mockResolvedValue([]);
+
+    render(<EvaluatorsTabContent agentUuid="agent-1" />);
+
+    expect(await screen.findByText("Network down")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+  });
+
+  it("reconciles selected evaluators through setAgentEvaluators", async () => {
+    mockFetchAgentEvaluators.mockResolvedValue([evaluator({ uuid: "ev-1" })]);
+    mockFetchAllEvaluators.mockResolvedValue([
+      evaluator({ uuid: "ev-1" }),
+      evaluator({ uuid: "ev-2", name: "Tone check" }),
+    ]);
+    mockSetAgentEvaluators.mockResolvedValue({
+      evaluator_ids: ["ev-1", "ev-2"],
+      linked: ["ev-2"],
+      unlinked: [],
+    });
+
+    const user = setupUser();
+    render(<EvaluatorsTabContent agentUuid="agent-1" />);
+
+    await screen.findByText("Follows Refund Policy");
+    await user.click(screen.getByRole("button", { name: "Add evaluators" }));
+    await user.click(screen.getByRole("button", { name: "Confirm add" }));
+
+    await waitFor(() =>
+      expect(mockSetAgentEvaluators).toHaveBeenCalledWith(
+        "agent-1",
+        ["ev-1", "ev-2"],
+        "test-token",
+      ),
+    );
   });
 });

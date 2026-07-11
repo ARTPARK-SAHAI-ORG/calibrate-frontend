@@ -43,4 +43,57 @@ describe("AgentDefaultsPromptDialog", () => {
     expect(screen.getByRole("button", { name: "Update" })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
+
+  it("uses plural copy for multiple evaluators", () => {
+    render(
+      <AgentDefaultsPromptDialog
+        evaluators={[
+          { uuid: "ev-1", name: "Persona Adherence" },
+          { uuid: "ev-2", name: "Tone check" },
+        ]}
+        isSaving={false}
+        error={null}
+        onDismiss={jest.fn()}
+        onConfirm={jest.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText(/The following evaluators are not in this agent/),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Persona Adherence")).toBeInTheDocument();
+    expect(screen.getByText("Tone check")).toBeInTheDocument();
+  });
+
+  it("calls onDismiss from Not now and shows Updating while saving", async () => {
+    const user = setupUser();
+    const onDismiss = jest.fn();
+
+    const { rerender } = render(
+      <AgentDefaultsPromptDialog
+        evaluators={evaluators}
+        isSaving={false}
+        error={null}
+        onDismiss={onDismiss}
+        onConfirm={jest.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Not now" }));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <AgentDefaultsPromptDialog
+        evaluators={evaluators}
+        isSaving
+        error={null}
+        onDismiss={onDismiss}
+        onConfirm={jest.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Updating..." }),
+    ).toBeDisabled();
+  });
 });

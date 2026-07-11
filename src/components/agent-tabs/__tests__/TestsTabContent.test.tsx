@@ -262,6 +262,53 @@ function installFetch() {
     if (url.endsWith("/tests/bulk")) {
       return jsonResponse(state.createResult ?? {}, state.createInit);
     }
+    if (url.includes("/agents/") && url.endsWith("/evaluators")) {
+      if (method === "PUT") {
+        return jsonResponse(
+          state.setAgentEvaluatorsResult ?? {
+            evaluator_ids: [],
+            linked: [],
+            unlinked: [],
+          },
+        );
+      }
+      const items = state.agentEvaluators ?? [
+        {
+          uuid: "e1",
+          name: "Accuracy",
+          description: "d",
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+          is_default: true,
+          evaluator_type: "llm",
+        },
+      ];
+      return jsonResponse({
+        items,
+        total: items.length,
+        limit: 100,
+        offset: 0,
+      });
+    }
+    if (url.includes("/evaluators?include_defaults=true")) {
+      const items = state.allEvaluators ?? [
+        {
+          uuid: "e1",
+          name: "Accuracy",
+          description: "d",
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+          is_default: true,
+          evaluator_type: "llm",
+        },
+      ];
+      return jsonResponse({
+        items,
+        total: items.length,
+        limit: 100,
+        offset: 0,
+      });
+    }
     if (url.endsWith("/tests")) {
       return jsonResponse(state.allTests, state.allTestsInit);
     }
