@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Always start new work in a new worktree.** If the current checkout is on the `main` branch, do NOT make changes directly there — create a dedicated git worktree (e.g. `git worktree add -b claude/<short-task-name> .claude/worktrees/<short-task-name>`) and do all the work, commits, and verification inside it. Only work in the main checkout when the user explicitly asks you to. This keeps `main` clean and each task isolated.
+
 ## Project
 
 **Calibrate** (npm: `calibrate-frontend`) — a Next.js 16 / React 19 frontend for a voice-agent simulation and evaluation platform. Users create voice AI agents, unit-test STT/TTS providers, and run end-to-end simulated conversations with personas, scenarios, and custom evaluators.
