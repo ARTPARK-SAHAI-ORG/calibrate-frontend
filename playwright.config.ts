@@ -32,6 +32,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
+  // CI runs against `npm run dev`, so the first hit to each route pays a cold
+  // Turbopack compile — give assertions and whole tests more headroom there.
+  timeout: process.env.CI ? 60_000 : 30_000,
+  expect: { timeout: process.env.CI ? 10_000 : 5_000 },
   reporter: COLLECT_COVERAGE
     ? [
         ["list"],
@@ -85,10 +89,12 @@ export default defineConfig({
     // dependency of `authenticated`, so it runs first.
     { name: "setup", testMatch: /.*\.setup\.ts/ },
     // Backend-free specs (public routes, client-side behavior). This is what
-    // `npm run test:e2e` runs — no backend required.
+    // `npm run test:e2e` runs — no backend required. Any *.spec.ts that isn't a
+    // backend-backed *.auth.spec.ts is a public spec (login, signup, landing).
     {
       name: "public",
-      testMatch: /login\.spec\.ts/,
+      testMatch: /\.spec\.ts$/,
+      testIgnore: /\.auth\.spec\.ts$/,
       use: { ...devices["Desktop Chrome"] },
     },
     // Backend-backed specs. Loads the storage state from `setup` so tests
