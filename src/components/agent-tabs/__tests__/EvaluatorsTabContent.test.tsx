@@ -29,15 +29,6 @@ jest.mock("../../evaluators/CreateEvaluatorFlow", () => ({
   CreateEvaluatorFlow: ({ open }: { open: boolean }) =>
     open ? <div data-testid="create-flow" /> : null,
 }));
-jest.mock("../../evaluators/DuplicateEvaluatorDialog", () => ({
-  DuplicateEvaluatorDialog: ({ onClose }: { onClose: () => void }) => (
-    <div data-testid="duplicate-dialog">
-      <button type="button" onClick={onClose}>
-        Close duplicate
-      </button>
-    </div>
-  ),
-}));
 
 const mockFetchAgentEvaluators = jest.fn();
 const mockFetchAllEvaluators = jest.fn();
@@ -224,18 +215,6 @@ describe("EvaluatorsTabContent", () => {
     await screen.findByText("Follows Refund Policy");
     await user.click(screen.getByRole("button", { name: "Create evaluator" }));
     expect(screen.getByTestId("create-flow")).toBeInTheDocument();
-  });
-
-  it("opens the duplicate dialog from a card action", async () => {
-    mockFetchAgentEvaluators.mockResolvedValue([evaluator()]);
-    mockFetchAllEvaluators.mockResolvedValue([evaluator()]);
-    const user = setupUser();
-
-    render(<EvaluatorsTabContent agentUuid="agent-1" />);
-
-    await screen.findByText("Follows Refund Policy");
-    await user.click(screen.getByRole("button", { name: "Duplicate" }));
-    expect(screen.getByTestId("duplicate-dialog")).toBeInTheDocument();
   });
 
   it("shows a load error with retry when fetching evaluators fails", async () => {

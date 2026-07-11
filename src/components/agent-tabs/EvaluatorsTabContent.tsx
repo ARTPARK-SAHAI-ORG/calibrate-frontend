@@ -8,7 +8,6 @@ import { EvaluatorTypePill, OutputTypePill } from "@/components/EvaluatorPills";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { AddEvaluatorsDialog } from "@/components/agent-tabs/AddEvaluatorsDialog";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
-import { DuplicateEvaluatorDialog } from "@/components/evaluators/DuplicateEvaluatorDialog";
 import {
   type EvaluatorData,
   fetchAllEvaluators,
@@ -55,9 +54,6 @@ export function EvaluatorsTabContent({
   // Dialog / flow state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [createFlowOpen, setCreateFlowOpen] = useState(false);
-  const [duplicateTarget, setDuplicateTarget] = useState<EvaluatorData | null>(
-    null,
-  );
 
   // Shared destructive-confirmation dialog state.
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -142,18 +138,6 @@ export function EvaluatorsTabContent({
     },
     [agentUuid, backendAccessToken, loadAttached, loadLibrary],
   );
-
-  // A duplicate is owned but NOT auto-attached — just refresh the library so
-  // it shows up in the Add dialog and close.
-  const handleDuplicated = useCallback(async () => {
-    try {
-      await loadLibrary();
-    } catch (err) {
-      reportError("Error refreshing evaluators after duplicate:", err);
-    } finally {
-      setDuplicateTarget(null);
-    }
-  }, [loadLibrary]);
 
   const openRemoveDialog = (evaluator: EvaluatorData) => {
     setDeleteTarget(evaluator);
@@ -370,26 +354,6 @@ export function EvaluatorsTabContent({
                       View
                     </Link>
                     <button
-                      onClick={() => setDuplicateTarget(evaluator)}
-                      className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex items-center gap-1.5"
-                      title="Duplicate evaluator"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={1.5}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75"
-                        />
-                      </svg>
-                      Duplicate
-                    </button>
-                    <button
                       onClick={() => openRemoveDialog(evaluator)}
                       className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
                       title="Remove from agent"
@@ -420,17 +384,6 @@ export function EvaluatorsTabContent({
         onCreated={handleCreated}
         useCaseGroups={["conversation"]}
       />
-
-      {/* Duplicate an attached evaluator */}
-      {duplicateTarget && (
-        <DuplicateEvaluatorDialog
-          originalEvaluator={duplicateTarget}
-          existingEvaluators={allEvaluators}
-          onClose={() => setDuplicateTarget(null)}
-          onDuplicated={handleDuplicated}
-          backendAccessToken={backendAccessToken ?? undefined}
-        />
-      )}
 
       {/* Shared detach/delete confirmation */}
       <DeleteConfirmationDialog
