@@ -39,7 +39,7 @@ import {
 import {
   type EvaluatorData,
   fetchAgentEvaluators,
-  attachEvaluatorToAgent,
+  addEvaluatorsToAgent,
   fetchAllEvaluators,
 } from "@/lib/evaluatorApi";
 
@@ -1000,11 +1000,13 @@ export function TestsTabContent({
     try {
       setIsAttachingDefaults(true);
       setAgentDefaultsError(null);
-      // Add-only: POST each newly-referenced evaluator (the prompt already
-      // holds only the ones not on the agent), leaving existing links intact.
-      for (const ev of agentDefaultsPrompt) {
-        await attachEvaluatorToAgent(agentUuid, ev.uuid, backendAccessToken);
-      }
+      // Add-only, single call: the prompt already holds just the evaluators
+      // not yet on the agent; existing links are left intact.
+      await addEvaluatorsToAgent(
+        agentUuid,
+        agentDefaultsPrompt.map((ev) => ev.uuid),
+        backendAccessToken,
+      );
       await loadAgentEvaluators();
       setAgentDefaultsPrompt(null);
       setAgentDefaultsError(null);

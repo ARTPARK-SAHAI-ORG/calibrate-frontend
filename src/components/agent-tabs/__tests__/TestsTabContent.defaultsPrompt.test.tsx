@@ -87,7 +87,7 @@ jest.mock("../../../lib/evaluatorApi", () => ({
   fetchAgentEvaluators: (...args: unknown[]) =>
     mockFetchAgentEvaluators(...args),
   fetchAllEvaluators: (...args: unknown[]) => mockFetchAllEvaluators(...args),
-  attachEvaluatorToAgent: (...args: unknown[]) =>
+  addEvaluatorsToAgent: (...args: unknown[]) =>
     mockAttachEvaluatorToAgent(...args),
 }));
 
@@ -236,10 +236,10 @@ describe("TestsTabContent agent defaults prompt", () => {
     await user.click(screen.getByRole("button", { name: "Update" }));
 
     await waitFor(() => {
-      // Add-only: POST just the evaluator not already on the agent.
+      // Add-only: POST just the evaluators not already on the agent.
       expect(mockAttachEvaluatorToAgent).toHaveBeenCalledWith(
         AGENT_UUID,
-        "ev-new",
+        ["ev-new"],
         "test-token",
       );
     });

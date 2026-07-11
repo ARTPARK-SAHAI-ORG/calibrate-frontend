@@ -13,7 +13,7 @@ import {
   type EvaluatorData,
   fetchAllEvaluators,
   fetchAgentEvaluators,
-  attachEvaluatorToAgent,
+  addEvaluatorsToAgent,
   detachEvaluatorFromAgent,
   deleteEvaluator,
   isOwnedEvaluator,
@@ -103,16 +103,14 @@ export function EvaluatorsTabContent({
     };
   }, [agentUuid, backendAccessToken, loadAttached, loadLibrary]);
 
-  // Attach the newly-selected library evaluators to the agent (add-only, one
-  // POST each so other changes to the agent's list aren't disturbed), then
+  // Attach the newly-selected library evaluators to the agent in one add-only
+  // POST (validated up front; leaves the rest of the list untouched), then
   // refresh.
   const handleAddEvaluators = useCallback(
     async (selectedUuids: string[]) => {
       if (!backendAccessToken || selectedUuids.length === 0) return;
       try {
-        for (const uuid of selectedUuids) {
-          await attachEvaluatorToAgent(agentUuid, uuid, backendAccessToken);
-        }
+        await addEvaluatorsToAgent(agentUuid, selectedUuids, backendAccessToken);
         await loadAttached();
       } catch (err) {
         reportError("Error adding evaluators to agent:", err);
@@ -130,9 +128,9 @@ export function EvaluatorsTabContent({
     async (evaluator: EvaluatorData) => {
       if (!backendAccessToken) return;
       try {
-        await attachEvaluatorToAgent(
+        await addEvaluatorsToAgent(
           agentUuid,
-          evaluator.uuid,
+          [evaluator.uuid],
           backendAccessToken,
         );
         await Promise.all([loadAttached(), loadLibrary()]);

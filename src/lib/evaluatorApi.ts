@@ -102,12 +102,17 @@ export async function fetchAgentEvaluators(
   return unwrapList<EvaluatorData>(await response.json());
 }
 
-/** Attach a single evaluator to an agent (add-only; leaves the rest untouched). */
-export async function attachEvaluatorToAgent(
+/**
+ * Add one or more evaluators to an agent in a single call (add-only; never
+ * removes). The backend validates every id up front — a bad/foreign id fails
+ * the whole request and links nothing — and returns which ids were newly
+ * `linked` vs skipped as `already_linked`.
+ */
+export async function addEvaluatorsToAgent(
   agentUuid: string,
-  evaluatorId: string,
+  evaluatorIds: string[],
   accessToken: string,
-): Promise<void> {
+): Promise<{ linked: string[]; already_linked: string[] }> {
   const response = await fetch(
     `${getBackendUrl()}/agents/${agentUuid}/evaluators`,
     {
@@ -116,15 +121,18 @@ export async function attachEvaluatorToAgent(
         ...getDefaultHeaders(accessToken),
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ evaluator_id: evaluatorId }),
+      body: JSON.stringify({ evaluator_ids: evaluatorIds }),
     },
   );
-  if (await handledUnauthorized(response)) return;
+  if (await handledUnauthorized(response)) {
+    return { linked: [], already_linked: [] };
+  }
   if (!response.ok) {
     throw new Error(
-      await getEvaluatorErrorMessage(response, "Failed to add evaluator"),
+      await getEvaluatorErrorMessage(response, "Failed to add evaluators"),
     );
   }
+  return response.json();
 }
 
 /** Detach an evaluator from an agent (the evaluator itself is kept). */

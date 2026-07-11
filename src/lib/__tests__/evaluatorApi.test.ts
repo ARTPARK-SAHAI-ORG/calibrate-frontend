@@ -5,7 +5,7 @@ import {
   isEvaluatorNameConflict,
   fetchAllEvaluators,
   fetchAgentEvaluators,
-  attachEvaluatorToAgent,
+  addEvaluatorsToAgent,
   detachEvaluatorFromAgent,
   deleteEvaluator,
   type EvaluatorData,
@@ -175,28 +175,28 @@ describe("fetch helpers", () => {
     );
   });
 
-  it("attachEvaluatorToAgent signs out on 401", async () => {
+  it("addEvaluatorsToAgent signs out on 401", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(
       mockResponse({ ok: false, status: 401 }),
     );
 
-    await attachEvaluatorToAgent("agent-1", "ev-1", "token");
+    await addEvaluatorsToAgent("agent-1", ["ev-1"], "token");
     expect(signOut).toHaveBeenCalled();
   });
 
-  it("attachEvaluatorToAgent throws with backend detail on failure", async () => {
+  it("addEvaluatorsToAgent throws with backend detail on failure", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(
       mockResponse({
         ok: false,
-        status: 400,
+        status: 404,
         headers: { "content-type": "application/json" },
-        jsonBody: { detail: "Already attached" },
+        jsonBody: { detail: "Evaluator not found" },
       }),
     );
 
     await expect(
-      attachEvaluatorToAgent("agent-1", "ev-3", "token"),
-    ).rejects.toThrow("Already attached");
+      addEvaluatorsToAgent("agent-1", ["ev-3"], "token"),
+    ).rejects.toThrow("Evaluator not found");
   });
 
   it("detachEvaluatorFromAgent throws on failure", async () => {
@@ -245,16 +245,19 @@ describe("fetch helpers", () => {
     ]);
   });
 
-  it("attachEvaluatorToAgent POSTs a single evaluator id", async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(mockResponse());
+  it("addEvaluatorsToAgent POSTs the evaluator_ids array", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(
+      mockResponse({ jsonBody: { linked: ["ev-3"], already_linked: [] } }),
+    );
 
-    await attachEvaluatorToAgent("agent-1", "ev-3", "token");
+    const result = await addEvaluatorsToAgent("agent-1", ["ev-3"], "token");
 
+    expect(result.linked).toEqual(["ev-3"]);
     expect(global.fetch).toHaveBeenCalledWith(
       "http://test-backend/agents/agent-1/evaluators",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ evaluator_id: "ev-3" }),
+        body: JSON.stringify({ evaluator_ids: ["ev-3"] }),
       }),
     );
   });
@@ -287,8 +290,8 @@ describe("fetch helpers", () => {
     );
 
     await expect(
-      attachEvaluatorToAgent("agent-1", "ev-3", "token"),
-    ).resolves.toBeUndefined();
+      addEvaluatorsToAgent("agent-1", ["ev-3"], "token"),
+    ).resolves.toEqual({ linked: [], already_linked: [] });
     await expect(
       detachEvaluatorFromAgent("agent-1", "ev-3", "token"),
     ).resolves.toBeUndefined();
