@@ -40,6 +40,26 @@ npm run build
 npm start
 ```
 
+## Testing
+
+Coverage is measured in two independent layers, reported separately on Codecov
+(the `component` and `e2e` flags / badges above):
+
+- **Component / interaction tests** — Jest (jsdom) + React Testing Library, in
+  `src/**/__tests__/`. Fast, no backend.
+- **End-to-end tests** — Playwright, in `e2e/`. Split into `public` (no backend)
+  and `authenticated` (`*.auth.spec.ts`, needs the
+  [backend][calibrate-backend] on `:8000`). See [e2e/README.md](e2e/README.md).
+
+```bash
+npm test                               # component tests (Jest)
+npm run test:coverage                  # component coverage -> coverage/component/
+npm run test:e2e                       # public E2E (Playwright, no backend)
+npm run test:e2e:integration           # authenticated E2E (needs backend)
+npm run test:e2e:coverage              # public E2E coverage -> coverage/e2e/
+npm run coverage                       # component + public E2E coverage
+```
+
 ## Self-hosting
 
 To deploy your own instance of Calibrate's frontend, see [SELF_HOSTING.md](SELF_HOSTING.md).
