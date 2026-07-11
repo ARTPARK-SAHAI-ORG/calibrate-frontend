@@ -17,6 +17,9 @@ const config = {
     "!src/instrumentation*.ts",
     "!src/middleware.ts",
     "!src/**/__tests__/**",
+    // Pure type module (no runtime exports) — can't be executed, so it only
+    // ever shows as 0% and skews the denominator.
+    "!src/components/eval-details/ttsEvalTypes.ts",
   ],
   // Component-level coverage lands in coverage/component/ (kept separate from
   // the Playwright E2E coverage in coverage/e2e/). `lcov` also writes an HTML
