@@ -217,7 +217,7 @@ describe("ManageEvaluatorsDialog", () => {
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
   });
 
-  it("saves: adds first, then removes, and calls onSaved (no order PUT when adds+removes already produce the desired order)", async () => {
+  it("saves add + remove in a single PUT of the full desired set, then calls onSaved", async () => {
     const user = setupUser();
     mockApiClient.mockImplementation((url: string) => {
       if (url === "/evaluators?include_defaults=true") {
@@ -234,19 +234,19 @@ describe("ManageEvaluatorsDialog", () => {
 
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
+    // One reconciling call carries both the add (ev-2) and the removal
+    // of ev-1 — no per-evaluator POST/DELETE, no separate /order PUT.
     await waitFor(() =>
       expect(mockApiClient).toHaveBeenCalledWith(
         "/annotation-tasks/task-1/evaluators",
         "tok",
-        { method: "POST", body: { evaluator_id: "ev-2" } },
+        { method: "PUT", body: { evaluator_ids: ["ev-2"] } },
       ),
     );
-    await waitFor(() =>
-      expect(mockApiClient).toHaveBeenCalledWith(
-        "/annotation-tasks/task-1/evaluators/ev-1",
-        "tok",
-        { method: "DELETE" },
-      ),
+    expect(mockApiClient).not.toHaveBeenCalledWith(
+      "/annotation-tasks/task-1/evaluators/ev-1",
+      "tok",
+      { method: "DELETE" },
     );
     expect(mockApiClient).not.toHaveBeenCalledWith(
       "/annotation-tasks/task-1/evaluators/order",
@@ -256,7 +256,7 @@ describe("ManageEvaluatorsDialog", () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
   });
 
-  it("reorders via drag and drop and PUTs the new order on save (pure reorder, no add/remove)", async () => {
+  it("reorders via drag and drop and PUTs the new order as the full set on save (pure reorder, no add/remove)", async () => {
     const user = setupUser();
     mockApiClient.mockImplementation((url: string) => {
       if (url === "/evaluators?include_defaults=true") {
@@ -288,7 +288,7 @@ describe("ManageEvaluatorsDialog", () => {
     await user.click(saveBtn);
     await waitFor(() =>
       expect(mockApiClient).toHaveBeenCalledWith(
-        "/annotation-tasks/task-1/evaluators/order",
+        "/annotation-tasks/task-1/evaluators",
         "tok",
         { method: "PUT", body: { evaluator_ids: ["ev-2", "ev-1"] } },
       ),

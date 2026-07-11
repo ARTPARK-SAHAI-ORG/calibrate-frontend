@@ -154,53 +154,20 @@ export function ManageEvaluatorsDialog({
     setSaving(true);
     setSaveError(null);
     try {
-      // Adds before removes: the backend enforces a
-      // minimum-one-evaluator rule on a task, so a "replace one
-      // evaluator with another" save (1 in, 1 out, final count = 1)
-      // would fail if the DELETE arrived at the backend before the
-      // POST. Awaiting the adds first guarantees the link count never
-      // drops below the final count mid-save.
-      await Promise.all(
-        toAdd.map((evaluator_id) =>
-          apiClient<{ message: string }>(
-            `/annotation-tasks/${taskUuid}/evaluators`,
-            accessToken,
-            { method: "POST", body: { evaluator_id } },
-          ),
-        ),
+      // Single reconciling call: PUT the complete desired set in the
+      // desired order. The backend links what's new, unlinks what's
+      // missing, and uses list order as display position — replacing
+      // the old per-evaluator POST/DELETE + separate /order PUT. No
+      // ordering concern around the minimum-one-evaluator rule since
+      // the whole set lands atomically.
+      await apiClient<{ message: string }>(
+        `/annotation-tasks/${taskUuid}/evaluators`,
+        accessToken,
+        {
+          method: "PUT",
+          body: { evaluator_ids: orderedSelected },
+        },
       );
-      await Promise.all(
-        toRemove.map((evaluatorUuid) =>
-          apiClient<{ message: string }>(
-            `/annotation-tasks/${taskUuid}/evaluators/${evaluatorUuid}`,
-            accessToken,
-            { method: "DELETE" },
-          ),
-        ),
-      );
-
-      // After link mutations, the server's order is
-      // (kept-from-original) followed by (new adds, in append order).
-      // PUT only when the user's desired order differs from that — or
-      // when there were no link changes at all (pure reorder).
-      const removeSet = new Set(toRemove);
-      const serverOrderAfterLinkOps = [
-        ...currentEvaluatorIds.filter((id) => !removeSet.has(id)),
-        ...toAdd,
-      ];
-      const needsOrderPut =
-        serverOrderAfterLinkOps.length === orderedSelected.length &&
-        serverOrderAfterLinkOps.some((id, i) => id !== orderedSelected[i]);
-      if (needsOrderPut) {
-        await apiClient<{ message: string }>(
-          `/annotation-tasks/${taskUuid}/evaluators/order`,
-          accessToken,
-          {
-            method: "PUT",
-            body: { evaluator_ids: orderedSelected },
-          },
-        );
-      }
       onSaved();
     } catch (err) {
       setSaveError(parseApiError(err, "Failed to update evaluators"));
