@@ -180,4 +180,30 @@ describe("AddEvaluatorsDialog", () => {
       screen.getByText("All evaluators are already added"),
     ).toBeInTheDocument();
   });
+
+  it("keeps the dialog open and shows the error when adding fails", async () => {
+    const user = setupUser();
+    const onAdd = jest.fn().mockRejectedValue(new Error("Backend is down"));
+    const onClose = jest.fn();
+
+    render(
+      <AddEvaluatorsDialog
+        isOpen
+        onClose={onClose}
+        onAdd={onAdd}
+        availableEvaluators={[
+          evaluator({ uuid: "ev-a", name: "Tone check", owner_user_id: "u" }),
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "Add (1)" }));
+
+    // The failure is surfaced and the dialog stays open (onClose not called).
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Backend is down",
+    );
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });

@@ -63,6 +63,7 @@ export function EvaluatorsTabContent({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<EvaluatorData | null>(null);
   const [deleteMode, setDeleteMode] = useState<DeleteMode>("remove");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const loadAttached = useCallback(async () => {
@@ -115,6 +116,9 @@ export function EvaluatorsTabContent({
         await loadAttached();
       } catch (err) {
         reportError("Error adding evaluators to agent:", err);
+        // Re-throw so AddEvaluatorsDialog can surface the failure and stay open
+        // rather than closing as if the add succeeded.
+        throw err;
       }
     },
     [agentUuid, backendAccessToken, attachedEvaluators, loadAttached],
@@ -161,6 +165,7 @@ export function EvaluatorsTabContent({
   const openRemoveDialog = (evaluator: EvaluatorData) => {
     setDeleteTarget(evaluator);
     setDeleteMode("remove");
+    setDeleteError(null);
     setDeleteDialogOpen(true);
   };
 
@@ -169,6 +174,7 @@ export function EvaluatorsTabContent({
     setDeleteDialogOpen(false);
     setDeleteTarget(null);
     setDeleteMode("remove");
+    setDeleteError(null);
   };
 
   const handleConfirmDelete = async () => {
@@ -176,6 +182,7 @@ export function EvaluatorsTabContent({
     const { uuid } = deleteTarget;
     try {
       setIsDeleting(true);
+      setDeleteError(null);
       if (deleteMode === "permanent") {
         await deleteEvaluator(uuid, backendAccessToken);
         setAttachedEvaluators((prev) => prev.filter((e) => e.uuid !== uuid));
@@ -193,6 +200,14 @@ export function EvaluatorsTabContent({
           ? "Error deleting evaluator:"
           : "Error removing evaluator from agent:",
         err,
+      );
+      // Keep the dialog open and show the failure instead of closing silently.
+      setDeleteError(
+        err instanceof Error
+          ? err.message
+          : deleteMode === "permanent"
+            ? "Failed to delete evaluator"
+            : "Failed to remove evaluator from this agent",
       );
     } finally {
       setIsDeleting(false);
@@ -247,7 +262,7 @@ export function EvaluatorsTabContent({
               Evaluators
             </h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              LLM judges for evaluating the agent's responses
+              LLM judges for evaluating the agent&rsquo;s responses
             </p>
           </div>
           {renderHeaderButtons()}
@@ -304,7 +319,7 @@ export function EvaluatorsTabContent({
             No evaluators added yet
           </h3>
           <p className="text-sm md:text-base text-muted-foreground mb-3 md:mb-4 text-center max-w-md">
-            Choose the LLM judges to evaluate the agent's responses. Add an
+            Choose the LLM judges to evaluate the agent&rsquo;s responses. Add an
             existing one from your list of evaluators or create a new one.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
@@ -434,25 +449,33 @@ export function EvaluatorsTabContent({
         confirmText={deleteMode === "permanent" ? "Delete" : "Remove"}
         isDeleting={isDeleting}
         extraContent={
-          canPermanentlyDelete ? (
-            <label className="flex items-start gap-2.5 rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={deleteMode === "permanent"}
-                onChange={(e) =>
-                  setDeleteMode(e.target.checked ? "permanent" : "remove")
-                }
-                disabled={isDeleting}
-                className="mt-0.5 w-4 h-4 accent-red-600 cursor-pointer flex-shrink-0 disabled:cursor-not-allowed"
-              />
-              <span className="text-sm text-foreground">
-                Also delete this evaluator permanently from my evaluator library
-                <span className="block text-xs text-muted-foreground mt-0.5">
-                  Removes the evaluator from every agent that uses it
+          <div className="space-y-3">
+            {canPermanentlyDelete && (
+              <label className="flex items-start gap-2.5 rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={deleteMode === "permanent"}
+                  onChange={(e) =>
+                    setDeleteMode(e.target.checked ? "permanent" : "remove")
+                  }
+                  disabled={isDeleting}
+                  className="mt-0.5 w-4 h-4 accent-red-600 cursor-pointer flex-shrink-0 disabled:cursor-not-allowed"
+                />
+                <span className="text-sm text-foreground">
+                  Also delete this evaluator permanently from my evaluator
+                  library
+                  <span className="block text-xs text-muted-foreground mt-0.5">
+                    Removes the evaluator from every agent that uses it
+                  </span>
                 </span>
-              </span>
-            </label>
-          ) : null
+              </label>
+            )}
+            {deleteError && (
+              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                {deleteError}
+              </p>
+            )}
+          </div>
         }
       />
     </div>

@@ -146,6 +146,28 @@ describe("EvaluatorsTabContent", () => {
     expect(mockDelete).not.toHaveBeenCalled();
   });
 
+  it("keeps the remove dialog open and shows the error when detach fails", async () => {
+    mockFetchAgentEvaluators.mockResolvedValue([evaluator()]);
+    mockFetchAllEvaluators.mockResolvedValue([evaluator()]);
+    mockDetach.mockRejectedValue(new Error("Server unavailable"));
+    const user = setupUser();
+
+    render(<EvaluatorsTabContent agentUuid="agent-1" />);
+
+    await screen.findByText("Follows Refund Policy");
+    await user.click(screen.getByRole("button", { name: "Remove" }));
+    await screen.findByText("Remove evaluator");
+
+    const removeButtons = screen.getAllByRole("button", { name: "Remove" });
+    await user.click(removeButtons[removeButtons.length - 1]);
+
+    // Error is surfaced; the card is still present (dialog didn't close/apply).
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Server unavailable",
+    );
+    expect(screen.getByText("Follows Refund Policy")).toBeInTheDocument();
+  });
+
   it("does not offer permanent delete for default evaluators", async () => {
     mockFetchAgentEvaluators.mockResolvedValue([
       evaluator({ owner_user_id: null, is_default: true, name: "Correctness" }),

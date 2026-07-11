@@ -30,6 +30,7 @@ export function AddEvaluatorsDialog({
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Reset transient state each time the dialog opens so a re-open starts fresh.
   useEffect(() => {
@@ -37,6 +38,7 @@ export function AddEvaluatorsDialog({
       setSearch("");
       setSelectedIds(new Set());
       setSaving(false);
+      setError(null);
     }
   }, [isOpen]);
 
@@ -149,8 +151,15 @@ export function AddEvaluatorsDialog({
     if (selectedIds.size === 0 || saving) return;
     try {
       setSaving(true);
+      setError(null);
       await onAdd(Array.from(selectedIds));
       onClose();
+    } catch (err) {
+      // Keep the dialog open and surface the failure instead of closing as if
+      // the add succeeded.
+      setError(
+        err instanceof Error ? err.message : "Failed to add evaluators",
+      );
     } finally {
       setSaving(false);
     }
@@ -232,7 +241,16 @@ export function AddEvaluatorsDialog({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 md:gap-3 px-5 md:px-6 py-4 border-t border-border">
+        <div className="flex flex-col gap-2 px-5 md:px-6 py-4 border-t border-border">
+          {error && (
+            <p
+              role="alert"
+              className="text-sm text-red-600 dark:text-red-400 text-right"
+            >
+              {error}
+            </p>
+          )}
+          <div className="flex items-center justify-end gap-2 md:gap-3">
           <button
             onClick={handleClose}
             disabled={saving}
@@ -270,6 +288,7 @@ export function AddEvaluatorsDialog({
               ? "Adding..."
               : `Add${selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}`}
           </button>
+          </div>
         </div>
       </div>
     </div>
