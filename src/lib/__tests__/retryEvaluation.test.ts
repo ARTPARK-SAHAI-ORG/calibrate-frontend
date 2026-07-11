@@ -98,6 +98,78 @@ describe("retryEvaluation", () => {
     expect(init.headers.Authorization).toBe("Bearer token");
   });
 
+  it("recovers providers and evaluators from /jobs config when the failed run emitted no rows", async () => {
+    // A run that failed at the start has empty provider_results / evaluator_runs
+    // and no top-level evaluator_uuids — everything must come from /jobs.
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(
+        mockFetchResponse(200, {
+          jobs: [
+            {
+              uuid: "task-x",
+              details: {
+                providers: ["deepgram", "whisper", ""],
+                language: "hi",
+                evaluator_uuids: ["e1", "e2"],
+              },
+            },
+            { uuid: "other", details: { providers: ["nope"] } },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(mockFetchResponse(200, { task_id: "retry-1" }));
+
+    const evaluation: RetryableEvaluation = {
+      task_id: "task-x",
+      dataset_id: "d1",
+      provider_results: [],
+    };
+    const result = await retryEvaluation("stt", evaluation, "token");
+    expect(result).toEqual({ ok: true, taskId: "retry-1" });
+
+    const [jobsUrl] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(jobsUrl).toBe("http://backend.test/jobs?job_type=stt");
+    const [postUrl, init] = (global.fetch as jest.Mock).mock.calls[1];
+    expect(postUrl).toBe("http://backend.test/stt/evaluate");
+    const body = JSON.parse(init.body);
+    expect(body.providers).toEqual(["deepgram", "whisper"]);
+    expect(new Set(body.evaluator_uuids)).toEqual(new Set(["e1", "e2"]));
+    expect(body.language).toBe("hi");
+  });
+
+  it("does not call /jobs when result-time providers and evaluators are already present", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(
+      mockFetchResponse(200, { task_id: "t" }),
+    );
+    const evaluation: RetryableEvaluation = {
+      task_id: "task-x",
+      dataset_id: "d1",
+      evaluator_uuids: ["e1"],
+      provider_results: [{ provider: "deepgram" }],
+    };
+    const result = await retryEvaluation("stt", evaluation, "token");
+    expect(result.ok).toBe(true);
+    // Only the POST — no /jobs lookup.
+    expect((global.fetch as jest.Mock).mock.calls).toHaveLength(1);
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe(
+      "http://backend.test/stt/evaluate",
+    );
+  });
+
+  it("still errors when /jobs config can't fill the gap", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      mockFetchResponse(200, { jobs: [] }),
+    );
+    const evaluation: RetryableEvaluation = {
+      task_id: "task-x",
+      dataset_id: "d1",
+      provider_results: [],
+    };
+    const result = await retryEvaluation("stt", evaluation, "token");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/which providers/);
+  });
+
   it("filters out falsy providers", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(
       mockFetchResponse(200, { task_id: "t" }),

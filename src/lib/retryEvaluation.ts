@@ -4,6 +4,16 @@
  * (dataset_id, providers, language, evaluator uuids) and post to the
  * matching `/{kind}/evaluate` endpoint.
  *
+ * A run that fails *before emitting any rows* has empty `provider_results`
+ * and empty `evaluator_runs`, so those result-time artifacts can't tell us
+ * which providers/evaluators the run was configured with. When that happens
+ * we fall back to the run's persisted configuration on the `/jobs` list
+ * endpoint (`details.providers` / `details.language` / `details.evaluator_uuids`),
+ * which survives regardless of whether the run produced output. Without this
+ * fallback such runs can't be retried at all ("Couldn't determine which
+ * providers/evaluators to run" — or a backend "Evaluator … not found" when a
+ * stale/partial uuid slips through).
+ *
  * Returns either the new run's task id or a human-readable error string —
  * the caller is responsible for rendering the error and for
  * `router.push`ing to the new task.
@@ -27,6 +37,8 @@ export type EvaluationKind = "stt" | "tts";
  * narrow subset of fields, but both auth pages have the full type.
  */
 export type RetryableEvaluation = {
+  /** The run's own task id — used to look up its persisted config on `/jobs`. */
+  task_id?: string | null;
   dataset_id?: string | null;
   language?: string | null;
   evaluator_uuids?: string[] | null;
@@ -35,6 +47,62 @@ export type RetryableEvaluation = {
     evaluator_runs?: Array<{ evaluator_uuid?: string | null }> | null;
   }> | null;
 };
+
+/** The subset of a `/jobs` entry we read to recover a run's configuration. */
+type JobConfig = {
+  providers: string[];
+  evaluatorUuids: string[];
+  language?: string | null;
+};
+
+/**
+ * Recover a run's *configured* providers / evaluators / language from the
+ * `/jobs` list endpoint. Unlike the `/{kind}/evaluate/{id}` detail payload —
+ * which reconstructs providers from `provider_results` (empty on a run that
+ * failed before emitting rows) — `/jobs` persists the original config under
+ * `details`, so it survives such a failure. Returns null on any error so the
+ * caller can degrade gracefully.
+ */
+async function fetchJobConfig(
+  kind: EvaluationKind,
+  taskId: string,
+  backendUrl: string,
+  accessToken: string,
+): Promise<JobConfig | null> {
+  try {
+    const res = await fetch(`${backendUrl}/jobs?job_type=${kind}`, {
+      method: "GET",
+      headers: {
+        accept: "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    if (!res.ok) return null;
+    const data: {
+      jobs?: Array<{
+        uuid?: string;
+        details?: {
+          providers?: string[] | null;
+          language?: string | null;
+          evaluator_uuids?: string[] | null;
+        } | null;
+      }>;
+    } = await res.json();
+    const job = (data.jobs ?? []).find((j) => j.uuid === taskId);
+    if (!job?.details) return null;
+    return {
+      providers: (job.details.providers ?? []).filter(
+        (p): p is string => !!p,
+      ),
+      evaluatorUuids: (job.details.evaluator_uuids ?? []).filter(
+        (u): u is string => !!u,
+      ),
+      language: job.details.language,
+    };
+  } catch {
+    return null;
+  }
+}
 
 export type RetryResult =
   | { ok: true; taskId: string }
@@ -62,15 +130,6 @@ export async function retryEvaluation(
     .map((p) => p.provider)
     .filter((p): p is string => !!p);
 
-  if (providers.length === 0) {
-    // Pre-empt the backend's `At least one provider must be specified` 400.
-    return {
-      ok: false,
-      error:
-        "Couldn't determine which providers to run for the retry. Try re-creating the evaluation manually.",
-    };
-  }
-
   // Union the canonical new-format `evaluator_runs[].evaluator_uuid` with
   // the legacy top-level `evaluator_uuids`, so a payload that only carries
   // one of the two still produces a complete uuid set.
@@ -83,6 +142,38 @@ export async function retryEvaluation(
   for (const u of evaluation.evaluator_uuids ?? []) {
     if (u) evaluatorUuidsSet.add(u);
   }
+
+  let language = evaluation.language;
+
+  // A run that failed before emitting rows has no result-time providers or
+  // evaluator_runs to reconstruct from. Recover the run's original config from
+  // `/jobs` so the retry can proceed instead of dead-ending.
+  if (
+    (providers.length === 0 || evaluatorUuidsSet.size === 0) &&
+    evaluation.task_id
+  ) {
+    const cfg = await fetchJobConfig(
+      kind,
+      evaluation.task_id,
+      backendUrl,
+      accessToken,
+    );
+    if (cfg) {
+      if (providers.length === 0) providers.push(...cfg.providers);
+      for (const u of cfg.evaluatorUuids) evaluatorUuidsSet.add(u);
+      if (!language) language = cfg.language ?? null;
+    }
+  }
+
+  if (providers.length === 0) {
+    // Pre-empt the backend's `At least one provider must be specified` 400.
+    return {
+      ok: false,
+      error:
+        "Couldn't determine which providers to run for the retry. Try re-creating the evaluation manually.",
+    };
+  }
+
   const evaluatorUuids = Array.from(evaluatorUuidsSet);
 
   if (evaluatorUuids.length === 0) {
@@ -105,7 +196,7 @@ export async function retryEvaluation(
       body: JSON.stringify({
         dataset_id: datasetId,
         providers,
-        language: evaluation.language,
+        language,
         evaluator_uuids: evaluatorUuids,
       }),
     });
