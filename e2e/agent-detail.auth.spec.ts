@@ -1,7 +1,7 @@
 // Backend-backed agent lifecycle: create a Build agent (name-only → redirect to
 // its detail page), click through the detail tabs, then delete it from the
 // list. Exercises NewAgentDialog, the /agents/[uuid] tabbed detail (AgentDetail
-// with its Tools / Data extraction / Tests / Settings tab content), and agent
+// with its Tools / Tests / Settings tab content), and agent
 // deletion. Run with `npm run test:e2e:integration`.
 import { test, expect } from "./fixtures";
 import { waitForOrgReady } from "./helpers";
@@ -37,7 +37,8 @@ test.describe("Agent detail (authenticated, real backend)", () => {
 
     // Build agents expose these tabs; each updates ?tab= and mounts its own
     // content component. Click through them to exercise that code.
-    for (const tab of ["Tools", "Data extraction", "Tests", "Settings"]) {
+    // Data extraction tab is temporarily hidden (extraction UI removed for now).
+    for (const tab of ["Tools", "Tests", "Settings"]) {
       await page.getByRole("button", { name: tab, exact: true }).click();
       await expect(page).toHaveURL(
         new RegExp(`tab=${tab.toLowerCase().replace(" ", "[-_]?")}`),
