@@ -7,7 +7,11 @@ import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useAccessToken, useMaxRowsPerEval } from "@/hooks";
 import { toast } from "sonner";
-import { sttProviders, STTProvider } from "../agent-tabs/constants/providers";
+import {
+  sttProviders,
+  STTProvider,
+  getSttApiType,
+} from "../agent-tabs/constants/providers";
 import { listDatasets, Dataset } from "@/lib/datasets";
 import { DatasetPicker } from "./DatasetPicker";
 import { STTDatasetEditor, STTDatasetEditorHandle } from "./STTDatasetEditor";
@@ -515,6 +519,9 @@ export function SpeechToTextEvaluation({
                     <th className="px-4 py-2 text-left text-[12px] font-medium text-foreground">
                       Model
                     </th>
+                    <th className="px-4 py-2 text-left text-[12px] font-medium text-foreground">
+                      API type
+                    </th>
                     <th className="w-12 px-4 py-2 text-left text-[12px] font-medium text-foreground">
                       Website
                     </th>
@@ -563,6 +570,11 @@ export function SpeechToTextEvaluation({
                           {provider.modelOverrides?.[
                             languageDisplayName[language]
                           ] || provider.model}
+                        </td>
+                        <td className="px-4 py-2">
+                          <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize">
+                            {getSttApiType(provider.value)}
+                          </span>
                         </td>
                         <td className="w-12 px-4 py-2">
                           {provider.website && (
@@ -727,6 +739,9 @@ export function SpeechToTextEvaluation({
                             languageDisplayName[language]
                           ] || provider.model}
                         </p>
+                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize mt-1">
+                          {getSttApiType(provider.value)}
+                        </span>
                       </div>
                     </div>
                   </div>

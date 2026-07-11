@@ -773,3 +773,28 @@ export const ttsProviders: TTSProvider[] = [
 └─────────────┴──────────────────────────┴──────────────────────────────────────────┘
 * Gemini is benchmarking-only (eval pages), not a live agent option.
 */
+
+// Whether a provider transcribes/synthesizes over a streaming API or a single
+// batch request. Shown as a column on the STT/TTS benchmarking eval pages.
+export type ApiType = "streaming" | "batch";
+
+// STT: everything streams except Groq and Gemini, which run batch.
+export function getSttApiType(providerValue: string): ApiType {
+  return providerValue === "groq" || providerValue === "gemini"
+    ? "batch"
+    : "streaming";
+}
+
+// TTS: everything streams except Groq (batch). Google TTS is batch only for
+// Sindhi (it falls back to the gemini model there) and streams otherwise.
+// `languageDisplayName` is the capitalized language (e.g. "Sindhi"), matching
+// the modelOverrides keys.
+export function getTtsApiType(
+  providerValue: string,
+  languageDisplayName: string,
+): ApiType {
+  if (providerValue === "groq") return "batch";
+  if (providerValue === "google" && languageDisplayName === "Sindhi")
+    return "batch";
+  return "streaming";
+}

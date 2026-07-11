@@ -7,7 +7,11 @@ import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useAccessToken, useMaxRowsPerEval } from "@/hooks";
 import { toast } from "sonner";
-import { ttsProviders, TTSProvider } from "../agent-tabs/constants/providers";
+import {
+  ttsProviders,
+  TTSProvider,
+  getTtsApiType,
+} from "../agent-tabs/constants/providers";
 import { LIMITS, showLimitToast } from "@/constants/limits";
 import { listDatasets, Dataset } from "@/lib/datasets";
 import { DatasetPicker } from "./DatasetPicker";
@@ -513,6 +517,9 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange, initia
                     <th className="px-4 py-2 text-left text-[12px] font-medium text-foreground">
                       Voice ID
                     </th>
+                    <th className="px-4 py-2 text-left text-[12px] font-medium text-foreground">
+                      API type
+                    </th>
                     <th className="w-12 px-4 py-2 text-left text-[12px] font-medium text-foreground">
                       Website
                     </th>
@@ -560,6 +567,14 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange, initia
                         </td>
                         <td className="px-4 py-2 text-[13px] text-muted-foreground font-mono">
                           {provider.voiceId}
+                        </td>
+                        <td className="px-4 py-2">
+                          <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize">
+                            {getTtsApiType(
+                              provider.value,
+                              languageDisplayName[language],
+                            )}
+                          </span>
                         </td>
                         <td className="w-12 px-4 py-2">
                           {provider.website && (
@@ -720,6 +735,12 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange, initia
                         <p className="text-[12px] text-muted-foreground font-mono truncate mt-0.5">
                           {provider.modelOverrides?.[languageDisplayName[language]] || provider.model}
                         </p>
+                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize mt-1">
+                          {getTtsApiType(
+                            provider.value,
+                            languageDisplayName[language],
+                          )}
+                        </span>
                       </div>
                     </div>
                   </div>
