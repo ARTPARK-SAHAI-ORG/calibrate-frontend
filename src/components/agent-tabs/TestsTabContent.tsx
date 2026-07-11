@@ -225,6 +225,9 @@ export function TestsTabContent({
   // evaluators and to detect which of a saved test's evaluators are "new" to
   // the agent (so we can offer to add them to the agent's defaults).
   const [agentEvaluators, setAgentEvaluators] = useState<EvaluatorData[]>([]);
+  // False until the first load of the agent's evaluators settles. New-test
+  // seeding waits on this so it never seeds off an empty (not-yet-loaded) list.
+  const [agentEvaluatorsLoaded, setAgentEvaluatorsLoaded] = useState(false);
   // Post-save prompt: evaluators referenced by the just-saved test that aren't
   // yet attached to the agent. Shown on top of the still-open AddTestDialog
   // so the user can dismiss the prompt and continue reviewing the test.
@@ -442,6 +445,9 @@ export function TestsTabContent({
       );
     } catch (err) {
       reportError("Error fetching agent evaluators:", err);
+    } finally {
+      // Mark settled even on failure so seeding falls back rather than hanging.
+      setAgentEvaluatorsLoaded(true);
     }
   }, [agentUuid, backendAccessToken]);
 
@@ -2555,6 +2561,7 @@ export function TestsTabContent({
           initialConfig={initialConfig}
           initialEvaluators={initialEvaluators}
           agentEvaluatorUuids={agentEvaluators.map((e) => e.uuid)}
+          agentEvaluatorsPending={!agentEvaluatorsLoaded}
         />
       )}
 

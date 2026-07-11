@@ -735,6 +735,12 @@ type AddTestDialogProps = {
    */
   agentEvaluatorUuids?: string[];
   /**
+   * True while the parent is still loading `agentEvaluatorUuids`. When set, a
+   * new test's evaluator seeding waits for the list rather than seeding off an
+   * empty one. Callers with no agent context leave this unset.
+   */
+  agentEvaluatorsPending?: boolean;
+  /**
    * "test" (default) — original behaviour with Next reply / Tool invocation
    * tabs and "Test" labels.
    * "labelItem" — used by the human-alignment task page. Hides the tabs
@@ -775,6 +781,7 @@ export function AddTestDialog({
   initialConfig,
   initialEvaluators,
   agentEvaluatorUuids,
+  agentEvaluatorsPending,
   mode = "test",
   allowAgentLastMessage = false,
   requireAssistantLastMessage = false,
@@ -1669,6 +1676,16 @@ export function AddTestDialog({
       return;
     }
 
+    // New test seeding reads the agent's evaluator list. While the parent is
+    // still loading it (`agentEvaluatorsPending`), wait — don't mark
+    // initialized — so this effect re-runs once the list arrives rather than
+    // seeding off an empty list and locking in the wrong default. Callers with
+    // no agent context (standalone tests page, labelling) never set the flag,
+    // so they seed immediately as before.
+    if (!isEditing && isEvaluatorTab && agentEvaluatorsPending) {
+      return;
+    }
+
     // New test (or edit with no usable initial state): seed the agent's
     // connected evaluators of the matching type (falling back to the default
     // correctness evaluator on next-reply). Tool-invocation tests aren't an
@@ -1692,6 +1709,7 @@ export function AddTestDialog({
     isLoading,
     activeTab,
     isEvaluatorTab,
+    agentEvaluatorsPending,
     buildDefaultAttachedForTab,
   ]);
 
