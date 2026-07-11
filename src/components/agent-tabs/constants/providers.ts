@@ -752,7 +752,7 @@ export const ttsProviders: TTSProvider[] = [
   // { label: "Groq", value: "groq", model: "orpheus", voiceId: "troy", website: "https://groq.com", supportedLanguages: groqTTSSupportedLanguages },
   { label: "Google", value: "google", model: "chirp_3", voiceId: "Charon", website: "https://cloud.google.com/text-to-speech", supportedLanguages: googleTTSSupportedLanguages, modelOverrides: { "Sindhi": "gemini" } },
   // Benchmarking only — Gemini TTS via the Gemini API. Not a live agent option.
-  { label: "Gemini", value: "gemini", model: "gemini-3.1-flash-tts", voiceId: "Kore", website: "https://ai.google.dev", supportedLanguages: googleTTSSupportedLanguages, benchmarkOnly: true },
+  { label: "Gemini", value: "gemini", model: "gemini-3.1-flash-tts", voiceId: "Kore", website: "https://docs.cloud.google.com/text-to-speech/docs/gemini-tts", supportedLanguages: googleTTSSupportedLanguages, benchmarkOnly: true },
   { label: "ElevenLabs", value: "elevenlabs", model: "eleven_multilingual_v2", voiceId: "Krishna", website: "https://elevenlabs.io", supportedLanguages: elevenlabsTTSSupportedLanguages, modelOverrides: { "Sindhi": "eleven_v3" } },
   { label: "Sarvam", value: "sarvam", model: "bulbul:v3", voiceId: "aditya", website: "https://sarvam.ai", supportedLanguages: sarvamSTTSupportedLanguages },
   { label: "Smallest AI", value: "smallest", model: "lightning-v3.1", voiceId: "aditi", website: "https://smallest.ai", supportedLanguages: smallestAiSTTSupportedLanguages },
