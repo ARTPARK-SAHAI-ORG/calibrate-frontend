@@ -1130,6 +1130,15 @@ export function AddTestDialog({
   const [evaluatorsFetched, setEvaluatorsFetched] = useState(false);
   const [evaluatorPickerOpen, setEvaluatorPickerOpen] = useState(false);
   const [evaluatorPickerSearch, setEvaluatorPickerSearch] = useState("");
+  const [evaluatorPickerSelectedIds, setEvaluatorPickerSelectedIds] = useState<
+    Set<string>
+  >(new Set());
+  const [scrollToEvaluatorUuid, setScrollToEvaluatorUuid] = useState<
+    string | null
+  >(null);
+  const evaluatorCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const evaluatorsContainerRef = useRef<HTMLDivElement>(null);
+  const evaluatorsListEndRef = useRef<HTMLDivElement>(null);
   // Inline "create evaluator" flow launched from the picker header.
   const [createEvaluatorOpen, setCreateEvaluatorOpen] = useState(false);
 
@@ -1388,6 +1397,47 @@ export function AddTestDialog({
     chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     setPendingFocusId(null);
   }, [pendingFocusId, chatMessages]);
+
+  // After the user adds evaluator(s), scroll the evaluators list pane so the
+  // bottom-most new card is visible.
+  const scrollNewEvaluatorIntoView = useCallback(() => {
+    const container = evaluatorsContainerRef.current;
+    if (!container) return false;
+    container.scrollTop = container.scrollHeight;
+    return true;
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!scrollToEvaluatorUuid) return;
+    if (
+      !attachedEvaluators.some(
+        (e) => e.evaluator_uuid === scrollToEvaluatorUuid,
+      )
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    const attemptScroll = () => {
+      if (!cancelled) scrollNewEvaluatorIntoView();
+    };
+
+    attemptScroll();
+    const raf = requestAnimationFrame(attemptScroll);
+    const retry1 = window.setTimeout(attemptScroll, 100);
+    const retry2 = window.setTimeout(attemptScroll, 250);
+    const finish = window.setTimeout(() => {
+      if (!cancelled) setScrollToEvaluatorUuid(null);
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+      window.clearTimeout(retry1);
+      window.clearTimeout(retry2);
+      window.clearTimeout(finish);
+    };
+  }, [scrollToEvaluatorUuid, attachedEvaluators, scrollNewEvaluatorIntoView]);
 
   // Stable ref callback for auto-resizing textareas on mount. Inline
   // ref callbacks re-run on every parent re-render (toggling unrelated
@@ -1745,24 +1795,56 @@ export function AddTestDialog({
   const closeEvaluatorPicker = () => {
     setEvaluatorPickerOpen(false);
     setEvaluatorPickerSearch("");
+    setEvaluatorPickerSelectedIds(new Set());
+  };
+
+  const toggleEvaluatorPickerSelection = (uuid: string) => {
+    setEvaluatorPickerSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(uuid)) next.delete(uuid);
+      else next.add(uuid);
+      return next;
+    });
+  };
+
+  const attachEvaluatorsFromOptions = (options: LLMEvaluatorOption[]) => {
+    if (options.length === 0) return;
+    const existing = new Set(attachedEvaluators.map((e) => e.evaluator_uuid));
+    const toAdd = options
+      .filter((option) => !existing.has(option.uuid))
+      .map((option) => ({
+        evaluator_uuid: option.uuid,
+        name: option.name,
+        description: option.description,
+        slug: option.slug,
+        variables: option.variables,
+        variable_values: buildInitialVariableValues(option.variables),
+      }));
+    if (toAdd.length === 0) return;
+    setAttachedEvaluators((prev) => [...prev, ...toAdd]);
+    setScrollToEvaluatorUuid(toAdd[toAdd.length - 1].evaluator_uuid);
+    closeEvaluatorPicker();
   };
 
   const attachEvaluatorFromOption = (option: LLMEvaluatorOption) => {
-    setAttachedEvaluators((prev) => {
-      if (prev.some((e) => e.evaluator_uuid === option.uuid)) return prev;
-      return [
-        ...prev,
-        {
-          evaluator_uuid: option.uuid,
-          name: option.name,
-          description: option.description,
-          slug: option.slug,
-          variables: option.variables,
-          variable_values: buildInitialVariableValues(option.variables),
-        },
-      ];
+    attachEvaluatorsFromOptions([option]);
+  };
+
+  const getAvailablePickerEvaluators = (): LLMEvaluatorOption[] => {
+    const remaining = availableLLMEvaluators.filter(
+      (o) =>
+        !attachedEvaluators.some((a) => a.evaluator_uuid === o.uuid) &&
+        (activeTab === "conversation"
+          ? o.evaluator_type === CONVERSATION_EVALUATOR_TYPE
+          : o.evaluator_type === "llm"),
+    );
+    const query = evaluatorPickerSearch.trim().toLowerCase();
+    if (!query) return remaining;
+    return remaining.filter((o) => {
+      const name = o.name.toLowerCase();
+      const desc = (o.description ?? "").toLowerCase();
+      return name.includes(query) || desc.includes(query);
     });
-    closeEvaluatorPicker();
   };
 
   // A freshly-created evaluator (from the inline create flow): refetch the
@@ -2926,7 +3008,7 @@ export function AddTestDialog({
           }`}
         >
           {/* Left Column - Form */}
-          <div className="w-full md:w-1/2 flex flex-col border-b md:border-b-0 md:border-r border-border">
+          <div className="w-full md:w-1/2 flex flex-col min-h-0 border-b md:border-b-0 md:border-r border-border">
             {/* Tabs — hidden in labelItem mode (always next-reply). When
               editing an existing test the type is fixed (the backend no
               longer allows changing a test's type), so we show only the
@@ -2965,7 +3047,13 @@ export function AddTestDialog({
               ))}
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto overflow-x-visible p-4 md:p-6">
+            <div
+              className={`flex-1 min-h-0 overflow-x-visible p-4 md:p-6 ${
+                isEvaluatorTab && !isLoading
+                  ? "flex flex-col overflow-hidden"
+                  : "overflow-y-auto"
+              }`}
+            >
               {isLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <svg
@@ -2989,9 +3077,9 @@ export function AddTestDialog({
                   </svg>
                 </div>
               ) : isEvaluatorTab ? (
-                <div className="space-y-6">
+                <div className="flex flex-col flex-1 min-h-0 gap-6">
                   {/* Name */}
-                  <div>
+                  <div className="shrink-0">
                     <label className="block text-base font-medium text-foreground mb-2">
                       {ItemNoun} name
                     </label>
@@ -3024,7 +3112,7 @@ export function AddTestDialog({
 
                   {/* Description (labelling items only) */}
                   {isLabelItem && setItemDescription && (
-                    <div>
+                    <div className="shrink-0">
                       <label className="block text-base font-medium text-foreground mb-2">
                         Description
                       </label>
@@ -3039,8 +3127,8 @@ export function AddTestDialog({
                   )}
 
                   {/* Evaluators (next-reply tab only) */}
-                  <div className="relative">
-                    <div className="flex items-center justify-between mb-2">
+                  <div className="relative flex flex-col flex-1 min-h-0 min-w-0">
+                    <div className="flex items-center justify-between mb-2 shrink-0">
                       <label className="text-base font-medium text-foreground">
                         Evaluators
                       </label>
@@ -3075,6 +3163,7 @@ export function AddTestDialog({
                                   if (evaluatorPickerOpen) {
                                     closeEvaluatorPicker();
                                   } else {
+                                    setEvaluatorPickerSelectedIds(new Set());
                                     setEvaluatorPickerOpen(true);
                                   }
                                 }}
@@ -3110,6 +3199,7 @@ export function AddTestDialog({
                       onClose={() => setCreateEvaluatorOpen(false)}
                       existingEvaluators={availableLLMEvaluators}
                       onCreated={handleEvaluatorCreated}
+                      useCaseGroups={["conversation"]}
                     />
 
                     {/* Evaluator picker dropdown */}
@@ -3152,24 +3242,7 @@ export function AddTestDialog({
                                   </div>
                                 );
                               }
-                              // Case-insensitive substring match against both
-                              // name and description so users can search by
-                              // either label or rubric snippet.
-                              const query = evaluatorPickerSearch
-                                .trim()
-                                .toLowerCase();
-                              const matches = query
-                                ? remaining.filter((o) => {
-                                    const name = o.name.toLowerCase();
-                                    const desc = (
-                                      o.description ?? ""
-                                    ).toLowerCase();
-                                    return (
-                                      name.includes(query) ||
-                                      desc.includes(query)
-                                    );
-                                  })
-                                : remaining;
+                              const matches = getAvailablePickerEvaluators();
                               if (matches.length === 0) {
                                 return (
                                   <div className="px-4 py-6 text-sm text-muted-foreground text-center">
@@ -3184,43 +3257,77 @@ export function AddTestDialog({
                               const mine = matches.filter(
                                 (o) => o.owner_user_id !== null,
                               );
-                              const renderRow = (o: LLMEvaluatorOption) => (
-                                <button
-                                  key={o.uuid}
-                                  onClick={() => attachEvaluatorFromOption(o)}
-                                  className="w-full text-left px-4 py-2.5 hover:bg-muted transition-colors cursor-pointer"
-                                >
-                                  <div className="text-sm font-medium text-foreground">
-                                    {o.name}
-                                  </div>
-                                  {o.description && (
-                                    <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                                      {o.description}
+                              const showSections =
+                                defaults.length > 0 && mine.length > 0;
+                              const renderRow = (o: LLMEvaluatorOption) => {
+                                const checked = evaluatorPickerSelectedIds.has(
+                                  o.uuid,
+                                );
+                                return (
+                                  <label
+                                    key={o.uuid}
+                                    className="flex items-start gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={() =>
+                                        toggleEvaluatorPickerSelection(o.uuid)
+                                      }
+                                      className="mt-0.5 w-4 h-4 cursor-pointer accent-foreground"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                      <div className="text-sm font-medium text-foreground">
+                                        {o.name}
+                                      </div>
+                                      {o.description && (
+                                        <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                                          {o.description}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </label>
+                                );
+                              };
+                              const renderSection = (
+                                label: string,
+                                options: LLMEvaluatorOption[],
+                              ) => (
+                                <div>
+                                  {showSections && (
+                                    <div className="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                      {label}
                                     </div>
                                   )}
-                                </button>
+                                  {options.map(renderRow)}
+                                </div>
                               );
                               return (
                                 <>
-                                  {defaults.length > 0 && (
-                                    <div>
-                                      <div className="px-4 pt-3 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                                        Default
-                                      </div>
-                                      {defaults.map(renderRow)}
-                                    </div>
-                                  )}
-                                  {mine.length > 0 && (
-                                    <div>
-                                      <div className="px-4 pt-3 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                                        My evaluators
-                                      </div>
-                                      {mine.map(renderRow)}
-                                    </div>
-                                  )}
+                                  {mine.length > 0 &&
+                                    renderSection("My evaluators", mine)}
+                                  {defaults.length > 0 &&
+                                    renderSection("Default", defaults)}
                                 </>
                               );
                             })()}
+                          </div>
+                          <div className="flex items-center justify-end gap-2 border-t border-border p-2 bg-background">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const selected = getAvailablePickerEvaluators().filter(
+                                  (o) => evaluatorPickerSelectedIds.has(o.uuid),
+                                );
+                                attachEvaluatorsFromOptions(selected);
+                              }}
+                              disabled={evaluatorPickerSelectedIds.size === 0}
+                              className="h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {evaluatorPickerSelectedIds.size > 0
+                                ? `Add (${evaluatorPickerSelectedIds.size})`
+                                : "Add"}
+                            </button>
                           </div>
                         </div>
                       </>
@@ -3266,10 +3373,16 @@ export function AddTestDialog({
                     )}
 
                     {/* Attached evaluator cards */}
-                    <div className="space-y-4">
+                    <div
+                      ref={evaluatorsContainerRef}
+                      className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1"
+                    >
                       {attachedEvaluators.map((ev) => (
                         <div
                           key={ev.evaluator_uuid}
+                          ref={(el) => {
+                            evaluatorCardRefs.current[ev.evaluator_uuid] = el;
+                          }}
                           className="border border-border rounded-lg p-4 bg-background"
                         >
                           <div className="flex items-start justify-between gap-2 mb-3">
@@ -3362,6 +3475,7 @@ export function AddTestDialog({
                           )}
                         </div>
                       ))}
+                      <div ref={evaluatorsListEndRef} aria-hidden className="h-px" />
                     </div>
                   </div>
                 </div>
@@ -3756,7 +3870,7 @@ export function AddTestDialog({
           </div>
 
           {/* Right Column - Chat Messages */}
-          <div className="w-full md:w-1/2 flex flex-col bg-muted/30 overflow-visible">
+          <div className="w-full md:w-1/2 flex flex-col min-h-0 bg-muted/30 overflow-visible">
             {/* Info banner */}
             <div className="px-4 md:px-6 py-3 md:py-4 border-b border-border bg-blue-500/5">
               <div className="flex items-start gap-3">
@@ -3785,7 +3899,7 @@ export function AddTestDialog({
               </div>
             </div>
             {/* Chat Messages Area */}
-            <div className="flex-1 overflow-y-auto overflow-x-visible p-4 md:p-6">
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-visible p-4 md:p-6">
               {chatMessages.length === 0 ? (
                 /* Empty State Placeholder */
                 <div className="h-full flex flex-col items-center justify-center text-center px-8">

@@ -7,6 +7,7 @@ import {
   OutputTypePill,
 } from "@/components/EvaluatorPills";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
+import { isOwnedEvaluator } from "@/lib/evaluatorApi";
 
 type AddEvaluatorsDialogProps = {
   isOpen: boolean;
@@ -49,6 +50,84 @@ export function AddEvaluatorsDialog({
       (ev.description ?? "").toLowerCase().includes(q)
     );
   });
+  const defaultEvaluators = filteredEvaluators.filter(
+    (ev) => !isOwnedEvaluator(ev),
+  );
+  const customEvaluators = filteredEvaluators.filter((ev) =>
+    isOwnedEvaluator(ev),
+  );
+  const showSections =
+    defaultEvaluators.length > 0 && customEvaluators.length > 0;
+
+  const renderEvaluatorRow = (ev: EvaluatorData) => {
+    const checked = selectedIds.has(ev.uuid);
+    return (
+      <label
+        key={ev.uuid}
+        className="flex items-start gap-3 px-3 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer"
+      >
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={() => toggle(ev.uuid)}
+          className="mt-0.5 w-4 h-4 cursor-pointer accent-foreground"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium text-foreground">
+              {ev.name}
+            </span>
+            {ev.evaluator_type && (
+              <EvaluatorTypePill evaluatorType={ev.evaluator_type} />
+            )}
+            {ev.output_type && (
+              <OutputTypePill outputType={ev.output_type} />
+            )}
+          </div>
+          {ev.description && (
+            <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+              {ev.description}
+            </div>
+          )}
+        </div>
+      </label>
+    );
+  };
+
+  const renderEvaluatorList = () => {
+    if (filteredEvaluators.length === 0) {
+      return (
+        <div className="p-4 text-sm text-muted-foreground">
+          {q
+            ? "No matching evaluators."
+            : availableEvaluators.length === 0
+              ? "All evaluators are already added"
+              : "No evaluators yet."}
+        </div>
+      );
+    }
+
+    if (!showSections) {
+      return filteredEvaluators.map(renderEvaluatorRow);
+    }
+
+    return (
+      <>
+        <div>
+          <div className="px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            My evaluators
+          </div>
+          {customEvaluators.map(renderEvaluatorRow)}
+        </div>
+        <div>
+          <div className="px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Default
+          </div>
+          {defaultEvaluators.map(renderEvaluatorRow)}
+        </div>
+      </>
+    );
+  };
 
   const toggle = (uuid: string) => {
     setSelectedIds((prev) => {
@@ -148,52 +227,7 @@ export function AddEvaluatorsDialog({
 
           {/* Checkbox list */}
           <div className="border border-border rounded-md max-h-96 overflow-y-auto divide-y divide-border">
-            {filteredEvaluators.length === 0 ? (
-              <div className="p-4 text-sm text-muted-foreground">
-                {q
-                  ? "No matching evaluators."
-                  : availableEvaluators.length === 0
-                    ? "All evaluators are already added"
-                    : "No evaluators yet."}
-              </div>
-            ) : (
-              filteredEvaluators.map((ev) => {
-                const checked = selectedIds.has(ev.uuid);
-                return (
-                  <label
-                    key={ev.uuid}
-                    className="flex items-start gap-3 px-3 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggle(ev.uuid)}
-                      className="mt-0.5 w-4 h-4 cursor-pointer accent-foreground"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium text-foreground">
-                          {ev.name}
-                        </span>
-                        {ev.evaluator_type && (
-                          <EvaluatorTypePill
-                            evaluatorType={ev.evaluator_type}
-                          />
-                        )}
-                        {ev.output_type && (
-                          <OutputTypePill outputType={ev.output_type} />
-                        )}
-                      </div>
-                      {ev.description && (
-                        <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                          {ev.description}
-                        </div>
-                      )}
-                    </div>
-                  </label>
-                );
-              })
-            )}
+            {renderEvaluatorList()}
           </div>
         </div>
 

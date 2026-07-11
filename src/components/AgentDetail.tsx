@@ -97,14 +97,14 @@ const calibrateTabs: TabType[] = [
   "agent",
   "tools",
   // "data-extraction", // TODO: temporarily disabled — extraction UI removed for now
-  "tests",
   "evaluators",
+  "tests",
   "settings",
 ];
 const connectionTabs: TabType[] = [
   "connection",
-  "tests",
   "evaluators",
+  "tests",
   "settings",
 ];
 

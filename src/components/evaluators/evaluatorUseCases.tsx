@@ -94,21 +94,29 @@ type EvaluatorUseCaseCardsProps = {
 
 // Grouped grid of selectable use-case cards. Renders one section per
 // non-empty group (Conversation / Text / Audio), each as a 2-up grid.
+// Section headers are omitted when every option belongs to the same group.
 export function EvaluatorUseCaseCards({
   options,
   selected,
   onSelect,
 }: EvaluatorUseCaseCardsProps) {
+  const visibleGroups = GROUP_ORDER.filter(({ key }) =>
+    options.some((option) => option.group === key),
+  );
+  const showGroupHeaders = visibleGroups.length > 1;
+
   return (
     <div className="space-y-5">
-      {GROUP_ORDER.map(({ key, label }) => {
+      {visibleGroups.map(({ key, label }) => {
         const groupOptions = options.filter((o) => o.group === key);
         if (groupOptions.length === 0) return null;
         return (
           <div key={key}>
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2.5 px-0.5">
-              {label}
-            </div>
+            {showGroupHeaders && (
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2.5 px-0.5">
+                {label}
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {groupOptions.map((opt) => {
                 const active = selected === opt.value;

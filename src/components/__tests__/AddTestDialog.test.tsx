@@ -369,7 +369,8 @@ describe("AddTestDialog", () => {
 
       await user.clear(screen.getByPlaceholderText("Search evaluators"));
       await user.type(screen.getByPlaceholderText("Search evaluators"), "tone");
-      await user.click(screen.getByText("Tone check"));
+      await user.click(screen.getByRole("checkbox", { name: /Tone check/i }));
+      await user.click(screen.getByRole("button", { name: "Add (1)" }));
 
       // The picker closes and the evaluator is now attached (appears outside
       // the picker, as a card with its own remove control).
@@ -382,7 +383,8 @@ describe("AddTestDialog", () => {
       await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
 
       await user.click(screen.getByRole("button", { name: "Add evaluator" }));
-      await user.click(screen.getByText("Tone check"));
+      await user.click(screen.getByRole("checkbox", { name: /Tone check/i }));
+      await user.click(screen.getByRole("button", { name: "Add (1)" }));
       expect(screen.getByText("Tone check")).toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "Remove Tone check" }));

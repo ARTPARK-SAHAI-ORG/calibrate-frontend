@@ -24,6 +24,7 @@ jest.mock("../../evaluators/DuplicateEvaluatorDialog", () => ({
 const mockFetchAgentEvaluators = jest.fn();
 const mockFetchAllEvaluators = jest.fn();
 const mockDetach = jest.fn();
+const mockDelete = jest.fn();
 const mockSetAgentEvaluators = jest.fn();
 jest.mock("../../../lib/evaluatorApi", () => ({
   fetchAgentEvaluators: (...args: unknown[]) =>
@@ -31,7 +32,7 @@ jest.mock("../../../lib/evaluatorApi", () => ({
   fetchAllEvaluators: (...args: unknown[]) => mockFetchAllEvaluators(...args),
   setAgentEvaluators: (...args: unknown[]) => mockSetAgentEvaluators(...args),
   detachEvaluatorFromAgent: (...args: unknown[]) => mockDetach(...args),
-  deleteEvaluator: jest.fn(),
+  deleteEvaluator: (...args: unknown[]) => mockDelete(...args),
   // Mirror the real helper: owned unless flagged as a built-in default.
   isOwnedEvaluator: (e: EvaluatorData) =>
     typeof e.is_default === "boolean" ? !e.is_default : !!e.owner_user_id,
@@ -80,6 +81,10 @@ describe("EvaluatorsTabContent", () => {
     expect(
       await screen.findByText("Follows Refund Policy"),
     ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View" })).toHaveAttribute(
+      "href",
+      "/evaluators/ev-1",
+    );
     expect(
       screen.getByRole("button", { name: "Remove" }),
     ).toBeInTheDocument();
@@ -108,16 +113,64 @@ describe("EvaluatorsTabContent", () => {
     await screen.findByText("Follows Refund Policy");
     await user.click(screen.getByRole("button", { name: "Remove" }));
 
-    // Confirm dialog copy is detach-flavoured.
+    expect(await screen.findByText("Remove evaluator")).toBeInTheDocument();
     expect(
-      await screen.findByText("Remove evaluator from agent"),
+      screen.getByText(
+        /Also delete this evaluator permanently from my evaluator library/,
+      ),
     ).toBeInTheDocument();
-    // The card and the dialog confirm both read "Remove"; the confirm is last.
     const removeButtons = screen.getAllByRole("button", { name: "Remove" });
     await user.click(removeButtons[removeButtons.length - 1]);
 
     await waitFor(() =>
       expect(mockDetach).toHaveBeenCalledWith("agent-1", "ev-1", "test-token"),
     );
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it("does not offer permanent delete for default evaluators", async () => {
+    mockFetchAgentEvaluators.mockResolvedValue([
+      evaluator({ owner_user_id: null, is_default: true, name: "Correctness" }),
+    ]);
+    mockFetchAllEvaluators.mockResolvedValue([
+      evaluator({ owner_user_id: null, is_default: true, name: "Correctness" }),
+    ]);
+    const user = setupUser();
+
+    render(<EvaluatorsTabContent agentUuid="agent-1" />);
+
+    await screen.findByText("Correctness");
+    await user.click(screen.getByRole("button", { name: "Remove" }));
+
+    expect(await screen.findByText("Remove evaluator")).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        /Also delete this evaluator permanently from my evaluator library/,
+      ),
+    ).not.toBeInTheDocument();
+  });
+
+  it("permanently deletes an owned evaluator when the checkbox is checked", async () => {
+    mockFetchAgentEvaluators.mockResolvedValue([evaluator()]);
+    mockFetchAllEvaluators.mockResolvedValue([evaluator()]);
+    mockDelete.mockResolvedValue(undefined);
+    const user = setupUser();
+
+    render(<EvaluatorsTabContent agentUuid="agent-1" />);
+
+    await screen.findByText("Follows Refund Policy");
+    await user.click(screen.getByRole("button", { name: "Remove" }));
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: /Also delete this evaluator permanently from my evaluator library/,
+      }),
+    );
+    expect(await screen.findByText("Delete evaluator")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() =>
+      expect(mockDelete).toHaveBeenCalledWith("ev-1", "test-token"),
+    );
+    expect(mockDetach).not.toHaveBeenCalled();
   });
 });

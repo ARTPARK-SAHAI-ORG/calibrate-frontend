@@ -34,6 +34,30 @@ describe("UseCasePickerDialog", () => {
     }
   });
 
+  it("hides category headers when only one group is shown", () => {
+    const conversationOnly = EVALUATOR_USE_CASE_OPTIONS.filter(
+      (option) => option.group === "conversation",
+    );
+    render(
+      <UseCasePickerDialog
+        initialValue={null}
+        options={conversationOnly}
+        onCancel={jest.fn()}
+        onSelect={jest.fn()}
+      />,
+    );
+    expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
+    expect(screen.getByText("LLM reply")).toBeInTheDocument();
+    expect(screen.getByText("Full conversation")).toBeInTheDocument();
+  });
+
+  it("shows category headers when multiple groups are shown", () => {
+    setup();
+    expect(screen.getByText("Conversation")).toBeInTheDocument();
+    expect(screen.getByText("Text")).toBeInTheDocument();
+    expect(screen.getByText("Audio")).toBeInTheDocument();
+  });
+
   it("Continue button is disabled when nothing is selected", () => {
     setup();
     expect(screen.getByText("Continue")).toBeDisabled();

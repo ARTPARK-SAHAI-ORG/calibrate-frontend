@@ -1,12 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useAccessToken } from "@/hooks";
 import { reportError } from "@/lib/reportError";
-import {
-  EvaluatorTypePill,
-  OutputTypePill,
-} from "@/components/EvaluatorPills";
+import { EvaluatorTypePill, OutputTypePill } from "@/components/EvaluatorPills";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { AddEvaluatorsDialog } from "@/components/agent-tabs/AddEvaluatorsDialog";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
@@ -21,10 +19,10 @@ import {
   isOwnedEvaluator,
 } from "@/lib/evaluatorApi";
 
-// Two destructive flavours share one confirmation dialog:
-//   "detach"  → remove the evaluator from THIS agent only (the record is kept).
-//   "delete"  → permanently delete the evaluator record (owned evaluators only).
-type DeleteMode = "detach" | "delete";
+// Two remove flavours share one confirmation dialog:
+//   "remove"     → detach from this agent only (evaluator stays in library).
+//   "permanent"  → permanently delete the evaluator record (owned only).
+type DeleteMode = "remove" | "permanent";
 
 // Attach-existing action → indigo tint; Create → emerald tint. Mirrors the
 // fixed-tint convention used by the Tests tab header so the two "add" actions
@@ -33,6 +31,9 @@ const ADD_BUTTON_CLASS =
   "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-indigo-500/12 border-indigo-500/45 text-indigo-950 dark:text-indigo-100 hover:bg-indigo-500/22 dark:hover:bg-indigo-500/18";
 const CREATE_BUTTON_CLASS =
   "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18";
+
+// Agent tests only use next-reply (`llm`) and conversation evaluators.
+const AGENT_EVALUATOR_TYPES = new Set(["llm", "conversation"]);
 
 export function EvaluatorsTabContent({
   agentUuid,
@@ -61,7 +62,7 @@ export function EvaluatorsTabContent({
   // Shared destructive-confirmation dialog state.
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<EvaluatorData | null>(null);
-  const [deleteMode, setDeleteMode] = useState<DeleteMode>("detach");
+  const [deleteMode, setDeleteMode] = useState<DeleteMode>("remove");
   const [isDeleting, setIsDeleting] = useState(false);
 
   const loadAttached = useCallback(async () => {
@@ -108,10 +109,7 @@ export function EvaluatorsTabContent({
       if (!backendAccessToken || selectedUuids.length === 0) return;
       try {
         const desired = Array.from(
-          new Set([
-            ...attachedEvaluators.map((e) => e.uuid),
-            ...selectedUuids,
-          ]),
+          new Set([...attachedEvaluators.map((e) => e.uuid), ...selectedUuids]),
         );
         await setAgentEvaluators(agentUuid, desired, backendAccessToken);
         await loadAttached();
@@ -129,10 +127,7 @@ export function EvaluatorsTabContent({
       if (!backendAccessToken) return;
       try {
         const desired = Array.from(
-          new Set([
-            ...attachedEvaluators.map((e) => e.uuid),
-            evaluator.uuid,
-          ]),
+          new Set([...attachedEvaluators.map((e) => e.uuid), evaluator.uuid]),
         );
         await setAgentEvaluators(agentUuid, desired, backendAccessToken);
         await Promise.all([loadAttached(), loadLibrary()]);
@@ -163,15 +158,9 @@ export function EvaluatorsTabContent({
     }
   }, [loadLibrary]);
 
-  const openDetachDialog = (evaluator: EvaluatorData) => {
+  const openRemoveDialog = (evaluator: EvaluatorData) => {
     setDeleteTarget(evaluator);
-    setDeleteMode("detach");
-    setDeleteDialogOpen(true);
-  };
-
-  const openDeleteDialog = (evaluator: EvaluatorData) => {
-    setDeleteTarget(evaluator);
-    setDeleteMode("delete");
+    setDeleteMode("remove");
     setDeleteDialogOpen(true);
   };
 
@@ -179,7 +168,7 @@ export function EvaluatorsTabContent({
     if (isDeleting) return;
     setDeleteDialogOpen(false);
     setDeleteTarget(null);
-    setDeleteMode("detach");
+    setDeleteMode("remove");
   };
 
   const handleConfirmDelete = async () => {
@@ -187,7 +176,7 @@ export function EvaluatorsTabContent({
     const { uuid } = deleteTarget;
     try {
       setIsDeleting(true);
-      if (deleteMode === "delete") {
+      if (deleteMode === "permanent") {
         await deleteEvaluator(uuid, backendAccessToken);
         setAttachedEvaluators((prev) => prev.filter((e) => e.uuid !== uuid));
         setAllEvaluators((prev) => prev.filter((e) => e.uuid !== uuid));
@@ -197,10 +186,10 @@ export function EvaluatorsTabContent({
       }
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
-      setDeleteMode("detach");
+      setDeleteMode("remove");
     } catch (err) {
       reportError(
-        deleteMode === "delete"
+        deleteMode === "permanent"
           ? "Error deleting evaluator:"
           : "Error removing evaluator from agent:",
         err,
@@ -213,17 +202,19 @@ export function EvaluatorsTabContent({
   // Library minus already-attached — what the Add dialog can offer.
   const attachedUuids = new Set(attachedEvaluators.map((e) => e.uuid));
   const availableEvaluators = allEvaluators.filter(
-    (e) => !attachedUuids.has(e.uuid),
+    (e) =>
+      !attachedUuids.has(e.uuid) &&
+      e.evaluator_type != null &&
+      AGENT_EVALUATOR_TYPES.has(e.evaluator_type),
   );
 
   const deleteDialogTitle =
-    deleteMode === "delete"
-      ? "Delete evaluator"
-      : "Remove evaluator from agent";
+    deleteMode === "permanent" ? "Delete evaluator" : "Remove evaluator";
   const deleteDialogMessage =
-    deleteMode === "delete"
-      ? `Are you sure you want to permanently delete "${deleteTarget?.name ?? ""}"? This action cannot be undone and affects every agent that uses it.`
-      : `Remove "${deleteTarget?.name ?? ""}" from this agent? The evaluator itself is kept and stays available in your library.`;
+    deleteMode === "permanent"
+      ? `Permanently deleting "${deleteTarget?.name ?? ""}" will remove it from every agent that uses it and cannot be undone.`
+      : `Are you sure you want to remove "${deleteTarget?.name ?? ""}" from this agent? The evaluator will stay in your library and on any other agents that use it.`;
+  const canPermanentlyDelete = !!deleteTarget && isOwnedEvaluator(deleteTarget);
 
   const renderHeaderButtons = () => (
     <div className="flex flex-wrap items-center gap-2 md:gap-3">
@@ -256,7 +247,7 @@ export function EvaluatorsTabContent({
               Evaluators
             </h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Choose the evaluators that matter for this agent
+              LLM judges for evaluating the agent's responses
             </p>
           </div>
           {renderHeaderButtons()}
@@ -313,8 +304,8 @@ export function EvaluatorsTabContent({
             No evaluators added yet
           </h3>
           <p className="text-sm md:text-base text-muted-foreground mb-3 md:mb-4 text-center max-w-md">
-            Choose the evaluators that matter for this agent. Add an existing one
-            from your library or create a new one.
+            Choose the LLM judges to evaluate the agent's responses. Add an
+            existing one from your list of evaluators or create a new one.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
             <button
@@ -336,7 +327,6 @@ export function EvaluatorsTabContent({
       ) : (
         <div className="space-y-3">
           {attachedEvaluators.map((evaluator) => {
-            const isOwned = isOwnedEvaluator(evaluator);
             return (
               <div
                 key={evaluator.uuid}
@@ -364,6 +354,13 @@ export function EvaluatorsTabContent({
                     )}
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
+                    <Link
+                      href={`/evaluators/${evaluator.uuid}`}
+                      className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center"
+                      title="View evaluator"
+                    >
+                      View
+                    </Link>
                     <button
                       onClick={() => setDuplicateTarget(evaluator)}
                       className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex items-center gap-1.5"
@@ -385,33 +382,12 @@ export function EvaluatorsTabContent({
                       Duplicate
                     </button>
                     <button
-                      onClick={() => openDetachDialog(evaluator)}
+                      onClick={() => openRemoveDialog(evaluator)}
                       className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
                       title="Remove from agent"
                     >
                       Remove
                     </button>
-                    {isOwned && (
-                      <button
-                        onClick={() => openDeleteDialog(evaluator)}
-                        className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                        title="Delete evaluator permanently"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                          />
-                        </svg>
-                      </button>
-                    )}
                   </div>
                 </div>
               </div>
@@ -434,6 +410,7 @@ export function EvaluatorsTabContent({
         onClose={() => setCreateFlowOpen(false)}
         existingEvaluators={allEvaluators}
         onCreated={handleCreated}
+        useCaseGroups={["conversation"]}
       />
 
       {/* Duplicate an attached evaluator */}
@@ -454,8 +431,29 @@ export function EvaluatorsTabContent({
         onConfirm={handleConfirmDelete}
         title={deleteDialogTitle}
         message={deleteDialogMessage}
-        confirmText={deleteMode === "delete" ? "Delete" : "Remove"}
+        confirmText={deleteMode === "permanent" ? "Delete" : "Remove"}
         isDeleting={isDeleting}
+        extraContent={
+          canPermanentlyDelete ? (
+            <label className="flex items-start gap-2.5 rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={deleteMode === "permanent"}
+                onChange={(e) =>
+                  setDeleteMode(e.target.checked ? "permanent" : "remove")
+                }
+                disabled={isDeleting}
+                className="mt-0.5 w-4 h-4 accent-red-600 cursor-pointer flex-shrink-0 disabled:cursor-not-allowed"
+              />
+              <span className="text-sm text-foreground">
+                Also delete this evaluator permanently from my evaluator library
+                <span className="block text-xs text-muted-foreground mt-0.5">
+                  Removes the evaluator from every agent that uses it
+                </span>
+              </span>
+            </label>
+          ) : null
+        }
       />
     </div>
   );

@@ -24,6 +24,7 @@ import {
 } from "@/components/evaluators/BinaryScaleEditor";
 import { UseCasePickerDialog } from "@/components/evaluators/UseCasePickerDialog";
 import { EVALUATOR_USE_CASE_OPTIONS } from "@/components/evaluators/evaluatorUseCases";
+import type { EvaluatorUseCaseOption } from "@/components/evaluators/evaluatorUseCases";
 import { defaultBinaryLabel } from "@/lib/binaryLabels";
 import { extractVariableNames } from "@/lib/evaluatorVariables";
 import {
@@ -89,6 +90,8 @@ type CreateEvaluatorFlowProps = {
   existingEvaluators: Pick<EvaluatorData, "name">[];
   /** Called with the created evaluator after a successful POST. */
   onCreated: (evaluator: EvaluatorData) => void;
+  /** Limit the use-case picker to these groups (e.g. conversation-only on agent detail). */
+  useCaseGroups?: EvaluatorUseCaseOption["group"][];
 };
 
 /**
@@ -102,6 +105,7 @@ export function CreateEvaluatorFlow({
   onClose,
   existingEvaluators,
   onCreated,
+  useCaseGroups,
 }: CreateEvaluatorFlowProps) {
   const backendAccessToken = useAccessToken();
   const { providers: llmProviders } = useOpenRouterModels();
@@ -364,6 +368,11 @@ export function CreateEvaluatorFlow({
   const detectedPromptVariables = extractVariableNames(newEvaluatorSystemPrompt);
   const variablesSupported =
     newEvaluatorType === "llm" || newEvaluatorType === "llm-general";
+  const useCaseOptions = useCaseGroups
+    ? EVALUATOR_USE_CASE_OPTIONS.filter((option) =>
+        useCaseGroups.includes(option.group),
+      )
+    : EVALUATOR_USE_CASE_OPTIONS;
 
   if (!open) return null;
 
@@ -416,7 +425,7 @@ export function CreateEvaluatorFlow({
       {useCasePickerOpen && (
         <UseCasePickerDialog
           initialValue={newEvaluatorType}
-          options={EVALUATOR_USE_CASE_OPTIONS}
+          options={useCaseOptions}
           onCancel={() => {
             setUseCasePickerOpen(false);
             // Cancelling the picker with no sidebar behind it closes the flow.
