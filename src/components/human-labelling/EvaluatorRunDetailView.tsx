@@ -366,6 +366,7 @@ export function exportInputCols(
 ): string[] {
   if (taskType === "stt")
     return ["reference_transcript", "predicted_transcript"];
+  if (taskType === "tts") return ["text", "audio_path"];
   if (taskType === "llm") return ["conversation_history", "agent_response"];
   return ["transcript"];
 }
@@ -410,6 +411,12 @@ export function extractPayloadInputValues(
       typeof p.predicted_transcript === "string"
         ? p.predicted_transcript
         : "",
+    ];
+  }
+  if (taskType === "tts") {
+    return [
+      typeof p.text === "string" ? p.text : "",
+      typeof p.audio_path === "string" ? p.audio_path : "",
     ];
   }
   if (taskType === "llm") {
@@ -1707,6 +1714,7 @@ export function EvaluatorRunDetailView({
   if (
     !(
       task.type === "stt" ||
+      task.type === "tts" ||
       task.type === "llm" ||
       task.type === "llm-general" ||
       task.type === "conversation"

@@ -30,8 +30,10 @@ import { RefreshButton } from "@/components/RefreshButton";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { AddSttItemsDialog } from "@/components/human-labelling/AddSttItemsDialog";
+import { AddTtsItemsDialog } from "@/components/human-labelling/AddTtsItemsDialog";
 import { AddLlmGeneralItemsDialog } from "@/components/human-labelling/AddLlmGeneralItemsDialog";
 import { BulkUploadSttItemsDialog } from "@/components/human-labelling/BulkUploadSttItemsDialog";
+import { BulkUploadTtsItemsDialog } from "@/components/human-labelling/BulkUploadTtsItemsDialog";
 import { BulkUploadConversationItemsDialog } from "@/components/human-labelling/BulkUploadConversationItemsDialog";
 import { BulkUploadLlmItemsDialog } from "@/components/human-labelling/BulkUploadLlmItemsDialog";
 import { BulkUploadLlmGeneralItemsDialog } from "@/components/human-labelling/BulkUploadLlmGeneralItemsDialog";
@@ -127,7 +129,7 @@ type SummaryRow = {
 };
 type TaskSummaryResponse = {
   task_id: string;
-  task_type: "stt" | "llm" | "llm-general" | "conversation";
+  task_type: "stt" | "tts" | "llm" | "llm-general" | "conversation";
   evaluators: SummaryEvaluator[];
   annotators: SummaryAnnotator[];
   rows: SummaryRow[];
@@ -282,6 +284,9 @@ function previewItemPayload(payload: unknown, kind: TaskKind): string {
       typeof p.predicted_transcript === "string" ? p.predicted_transcript : "";
     if (ref || pred) return `${ref} → ${pred}`;
   }
+  if (kind === "tts") {
+    if (typeof p.text === "string" && p.text) return p.text;
+  }
   if (kind === "llm") {
     if (typeof p.agent_response === "string" && p.agent_response) {
       return p.agent_response;
@@ -361,7 +366,7 @@ function buildItemsCsv(
   };
 
   const columns: ExportColumn[] = [{ key: "name", header: "name" }];
-  if (taskType !== "stt") {
+  if (taskType !== "stt" && taskType !== "tts") {
     columns.push({ key: "description", header: "description" });
   }
   if (taskType === "conversation") {
@@ -378,6 +383,9 @@ function buildItemsCsv(
       key: "predicted_transcript",
       header: "predicted_transcript",
     });
+  } else if (taskType === "tts") {
+    columns.push({ key: "text", header: "text" });
+    columns.push({ key: "audio_path", header: "audio_path" });
   } else if (taskType === "llm") {
     columns.push({
       key: "conversation_history",
@@ -438,7 +446,7 @@ function buildItemsCsv(
     const out: Record<string, unknown> = {
       name: typeof p.name === "string" ? p.name : "",
     };
-    if (taskType !== "stt") {
+    if (taskType !== "stt" && taskType !== "tts") {
       out.description = typeof p.description === "string" ? p.description : "";
     }
     if (taskType === "conversation") {
@@ -454,6 +462,9 @@ function buildItemsCsv(
         typeof p.predicted_transcript === "string"
           ? p.predicted_transcript
           : "";
+    } else if (taskType === "tts") {
+      out.text = typeof p.text === "string" ? p.text : "";
+      out.audio_path = typeof p.audio_path === "string" ? p.audio_path : "";
     } else if (taskType === "llm") {
       out.conversation_history = Array.isArray(p.chat_history)
         ? JSON.stringify(p.chat_history)
@@ -1239,6 +1250,10 @@ function LabellingTaskPageInner() {
   const [editSttSingleItemUuid, setEditSttSingleItemUuid] = useState<
     string | null
   >(null);
+  const [editTtsItemsOpen, setEditTtsItemsOpen] = useState(false);
+  const [editTtsSingleItemUuid, setEditTtsSingleItemUuid] = useState<
+    string | null
+  >(null);
   const [editLlmItemUuid, setEditLlmItemUuid] = useState<string | null>(null);
   const [editLlmItemName, setEditLlmItemName] = useState("");
   const [editLlmItemDescription, setEditLlmItemDescription] = useState("");
@@ -1253,6 +1268,10 @@ function LabellingTaskPageInner() {
   // STT items use a separate dialog; this holds the row to seed it with.
   const [duplicateSttRows, setDuplicateSttRows] = useState<
     { uuid: string; name: string; actual: string; predicted: string }[] | null
+  >(null);
+  // TTS items use their own text/audio dialog; this seeds a duplicate.
+  const [duplicateTtsRows, setDuplicateTtsRows] = useState<
+    { uuid: string; name: string; text: string; audio: string }[] | null
   >(null);
   // llm-general items use their own input/output dialog (non-conversational).
   const [editLlmGeneralItemsOpen, setEditLlmGeneralItemsOpen] = useState(false);
@@ -1660,6 +1679,7 @@ function LabellingTaskPageInner() {
     taskType === "llm" ||
     taskType === "conversation" ||
     taskType === "stt" ||
+    taskType === "tts" ||
     taskType === "llm-general";
 
   /**
@@ -2274,8 +2294,10 @@ function LabellingTaskPageInner() {
   const [editOpen, setEditOpen] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [addSttItemsOpen, setAddSttItemsOpen] = useState(false);
+  const [addTtsItemsOpen, setAddTtsItemsOpen] = useState(false);
   const [addLlmGeneralItemsOpen, setAddLlmGeneralItemsOpen] = useState(false);
   const [bulkUploadSttOpen, setBulkUploadSttOpen] = useState(false);
+  const [bulkUploadTtsOpen, setBulkUploadTtsOpen] = useState(false);
   const [bulkUploadConversationOpen, setBulkUploadConversationOpen] =
     useState(false);
   const [bulkUploadLlmOpen, setBulkUploadLlmOpen] = useState(false);
@@ -2525,6 +2547,9 @@ function LabellingTaskPageInner() {
                   } else if (taskType === "stt") {
                     setDuplicateSttRows(null);
                     setAddSttItemsOpen(true);
+                  } else if (taskType === "tts") {
+                    setDuplicateTtsRows(null);
+                    setAddTtsItemsOpen(true);
                   } else if (taskType === "llm-general") {
                     setDuplicateLlmGeneralRows(null);
                     setAddLlmGeneralItemsOpen(true);
@@ -2551,7 +2576,9 @@ function LabellingTaskPageInner() {
                     d="M12 4.5v15m7.5-7.5h-15"
                   />
                 </svg>
-                {taskType === "stt" ? "Add items" : "Add item"}
+                {taskType === "stt" || taskType === "tts"
+                  ? "Add items"
+                  : "Add item"}
               </button>
               {(() => {
                 // LLM / LLM-response bulk upload references evaluators by
@@ -2567,6 +2594,8 @@ function LabellingTaskPageInner() {
                       if (llmNoEvaluators) return;
                       if (taskType === "stt") {
                         setBulkUploadSttOpen(true);
+                      } else if (taskType === "tts") {
+                        setBulkUploadTtsOpen(true);
                       } else if (taskType === "conversation") {
                         setBulkUploadConversationOpen(true);
                       } else if (taskType === "llm") {
@@ -3119,7 +3148,7 @@ function LabellingTaskPageInner() {
                     ? `No items match "${itemsSearch}".`
                     : "No items on this page."}
                 </div>
-              ) : taskType === "stt" ? (
+              ) : taskType === "stt" || taskType === "tts" ? (
                 <div className="border border-border rounded-xl overflow-hidden">
                   <div className="grid grid-cols-[40px_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-2 border-b border-border bg-muted/30 items-center">
                     <input
@@ -3224,8 +3253,13 @@ function LabellingTaskPageInner() {
                                 : undefined
                             }
                             onEdit={(uuid) => {
-                              setEditSttSingleItemUuid(uuid);
-                              setEditSttItemsOpen(true);
+                              if (taskType === "tts") {
+                                setEditTtsSingleItemUuid(uuid);
+                                setEditTtsItemsOpen(true);
+                              } else {
+                                setEditSttSingleItemUuid(uuid);
+                                setEditSttItemsOpen(true);
+                              }
                             }}
                             onDuplicate={(uuid) => {
                               const item = items.find((i) => i.uuid === uuid);
@@ -3238,21 +3272,39 @@ function LabellingTaskPageInner() {
                                 typeof p.name === "string"
                                   ? (p.name as string)
                                   : `Item ${item.id}`;
-                              setDuplicateSttRows([
-                                {
-                                  uuid: item.uuid,
-                                  name: `Copy of ${nm}`,
-                                  actual:
-                                    typeof p.reference_transcript === "string"
-                                      ? (p.reference_transcript as string)
-                                      : "",
-                                  predicted:
-                                    typeof p.predicted_transcript === "string"
-                                      ? (p.predicted_transcript as string)
-                                      : "",
-                                },
-                              ]);
-                              setAddSttItemsOpen(true);
+                              if (taskType === "tts") {
+                                setDuplicateTtsRows([
+                                  {
+                                    uuid: item.uuid,
+                                    name: `Copy of ${nm}`,
+                                    text:
+                                      typeof p.text === "string"
+                                        ? (p.text as string)
+                                        : "",
+                                    audio:
+                                      typeof p.audio_path === "string"
+                                        ? (p.audio_path as string)
+                                        : "",
+                                  },
+                                ]);
+                                setAddTtsItemsOpen(true);
+                              } else {
+                                setDuplicateSttRows([
+                                  {
+                                    uuid: item.uuid,
+                                    name: `Copy of ${nm}`,
+                                    actual:
+                                      typeof p.reference_transcript === "string"
+                                        ? (p.reference_transcript as string)
+                                        : "",
+                                    predicted:
+                                      typeof p.predicted_transcript === "string"
+                                        ? (p.predicted_transcript as string)
+                                        : "",
+                                  },
+                                ]);
+                                setAddSttItemsOpen(true);
+                              }
                             }}
                             onEvaluate={
                               selectedItemIds.size === 0 && !selectAllTotal
@@ -3999,6 +4051,28 @@ function LabellingTaskPageInner() {
       )}
 
       {accessToken && (
+        <BulkUploadTtsItemsDialog
+          isOpen={bulkUploadTtsOpen}
+          accessToken={accessToken}
+          taskUuid={uuid}
+          linkedEvaluators={(task?.evaluators ?? []).map((e) => ({
+            uuid: e.uuid,
+            name: e.name,
+            output_type: e.output_type ?? null,
+            scale_min: typeof e.scale_min === "number" ? e.scale_min : null,
+            scale_max: typeof e.scale_max === "number" ? e.scale_max : null,
+          }))}
+          onClose={() => setBulkUploadTtsOpen(false)}
+          onSuccess={async (count) => {
+            setBulkUploadTtsOpen(false);
+            handleTabChange("items");
+            await Promise.all([fetchTask(), fetchTaskSummary()]);
+            toast.success(`Added ${count} ${count === 1 ? "item" : "items"}`);
+          }}
+        />
+      )}
+
+      {accessToken && (
         <BulkUploadConversationItemsDialog
           isOpen={bulkUploadConversationOpen}
           accessToken={accessToken}
@@ -4124,6 +4198,85 @@ function LabellingTaskPageInner() {
           await Promise.all([fetchTask(), fetchTaskSummary()]);
           setEditSttItemsOpen(false);
           setEditSttSingleItemUuid(null);
+          setSelectedItemIds(new Set());
+          setSelectAllTotal(false);
+        }}
+      />
+
+      <AddTtsItemsDialog
+        isOpen={addTtsItemsOpen}
+        initialRows={duplicateTtsRows ?? undefined}
+        onClose={() => {
+          setAddTtsItemsOpen(false);
+          setDuplicateTtsRows(null);
+        }}
+        onSubmit={async (rows) => {
+          if (!accessToken) return;
+          await apiClient(`/annotation-tasks/${uuid}/items`, accessToken, {
+            method: "POST",
+            body: {
+              items: rows.map((r) => ({
+                payload: {
+                  ...(r.name ? { name: r.name } : {}),
+                  text: r.text,
+                  audio_path: r.audio_path,
+                },
+              })),
+            },
+          });
+          handleTabChange("items");
+          await Promise.all([fetchTask(), fetchTaskSummary()]);
+          setAddTtsItemsOpen(false);
+          setDuplicateTtsRows(null);
+        }}
+      />
+
+      <AddTtsItemsDialog
+        isOpen={editTtsItemsOpen}
+        mode="edit"
+        initialRows={items
+          .filter((it) =>
+            editTtsSingleItemUuid
+              ? it.uuid === editTtsSingleItemUuid
+              : selectedItemIds.has(it.uuid),
+          )
+          .map((it) => {
+            const p = (it.payload ?? {}) as Record<string, unknown>;
+            return {
+              uuid: it.uuid,
+              name: typeof p.name === "string" ? p.name : "",
+              text: typeof p.text === "string" ? p.text : "",
+              audio: typeof p.audio_path === "string" ? p.audio_path : "",
+            };
+          })}
+        onClose={() => {
+          setEditTtsItemsOpen(false);
+          setEditTtsSingleItemUuid(null);
+        }}
+        onSubmit={async (rows) => {
+          if (!accessToken) return;
+          await apiClient<{ updated_count: number }>(
+            `/annotation-tasks/${uuid}/items`,
+            accessToken,
+            {
+              method: "PUT",
+              body: {
+                updates: rows
+                  .filter((r) => !!r.uuid)
+                  .map((r) => ({
+                    uuid: r.uuid,
+                    payload: {
+                      ...(r.name ? { name: r.name } : {}),
+                      text: r.text,
+                      audio_path: r.audio_path,
+                    },
+                  })),
+              },
+            },
+          );
+          await Promise.all([fetchTask(), fetchTaskSummary()]);
+          setEditTtsItemsOpen(false);
+          setEditTtsSingleItemUuid(null);
           setSelectedItemIds(new Set());
           setSelectAllTotal(false);
         }}
@@ -4358,6 +4511,7 @@ function LabellingTaskPageInner() {
           (task.type === "llm" ||
             task.type === "llm-general" ||
             task.type === "stt" ||
+            task.type === "tts" ||
             task.type === "conversation")
             ? {
                 uuid: task.uuid,

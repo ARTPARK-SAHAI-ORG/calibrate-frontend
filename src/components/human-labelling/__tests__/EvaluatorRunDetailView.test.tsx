@@ -360,6 +360,9 @@ describe("exportInputCols", () => {
       "predicted_transcript",
     ]);
   });
+  it("returns tts cols", () => {
+    expect(exportInputCols("tts")).toEqual(["text", "audio_path"]);
+  });
   it("returns llm cols", () => {
     expect(exportInputCols("llm")).toEqual([
       "conversation_history",
@@ -410,6 +413,17 @@ describe("extractPayloadInputValues", () => {
   });
   it("defaults missing stt fields to empty strings", () => {
     expect(extractPayloadInputValues({}, "stt")).toEqual(["", ""]);
+  });
+  it("extracts tts text + audio path", () => {
+    expect(
+      extractPayloadInputValues(
+        { text: "say hi", audio_path: "https://x/a.wav" },
+        "tts",
+      ),
+    ).toEqual(["say hi", "https://x/a.wav"]);
+  });
+  it("defaults missing tts fields to empty strings", () => {
+    expect(extractPayloadInputValues({}, "tts")).toEqual(["", ""]);
   });
   it("extracts llm history + response", () => {
     const out = extractPayloadInputValues(
@@ -543,7 +557,7 @@ describe("EvaluatorRunDetailView", () => {
     const { container } = render(
       <EvaluatorRunDetailView
         job={makeJob()}
-        task={makeTask({ type: "tts" as never })}
+        task={makeTask({ type: "mystery" as never })}
         versionLabels={{}}
       />,
     );

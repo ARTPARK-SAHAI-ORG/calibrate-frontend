@@ -13,17 +13,15 @@ import {
 import { apiClient, unwrapList } from "@/lib/api";
 import { readNameConflictFromError } from "@/lib/parseBackendError";
 
-// Labelling tasks support every evaluator use case except text-to-speech.
+// Labelling tasks support every evaluator use case.
 type TaskType = Extract<
   EvaluatorType,
-  "llm" | "llm-general" | "stt" | "conversation"
+  "llm" | "llm-general" | "stt" | "tts" | "conversation"
 >;
 
-// Reuse the shared evaluator use-case cards, minus `tts` (no TTS labelling
-// tasks). Same grouping/copy as the new-evaluator picker.
-const TASK_TYPE_OPTIONS = EVALUATOR_USE_CASE_OPTIONS.filter(
-  (o) => o.value !== "tts",
-);
+// Reuse the shared evaluator use-case cards. Same grouping/copy as the
+// new-evaluator picker.
+const TASK_TYPE_OPTIONS = EVALUATOR_USE_CASE_OPTIONS;
 
 type EvaluatorListItem = {
   uuid: string;

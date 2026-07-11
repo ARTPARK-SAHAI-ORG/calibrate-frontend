@@ -546,6 +546,7 @@ export default function EvaluatorRunDetailPage() {
         {job &&
         task &&
         (task.type === "stt" ||
+          task.type === "tts" ||
           task.type === "llm" ||
           task.type === "llm-general" ||
           task.type === "conversation") ? (

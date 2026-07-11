@@ -571,11 +571,41 @@ describe("AnnotationJobView", () => {
     expect(screen.getByText("hello word")).toBeInTheDocument();
   });
 
-  it("falls back to a raw JSON payload dump for unknown task types", async () => {
+  it("renders the TTS item pane with text and an audio player", async () => {
     fetchMock.mockResolvedValue(
       jsonResponse(
         jobResponse({
           task: { uuid: "task-1", name: "TTS Task", type: "tts" },
+          items: [
+            {
+              id: 1,
+              uuid: "item-1",
+              task_id: "task-1",
+              payload: {
+                name: "Clip 1",
+                text: "hello world",
+                audio_path: "https://example.com/a.wav",
+              },
+              created_at: "2024-01-01",
+              deleted_at: null,
+            },
+          ],
+        }),
+      ),
+    );
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("hello world")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Generated audio")).toBeInTheDocument();
+    expect(screen.getByLabelText("Play")).toBeInTheDocument();
+  });
+
+  it("falls back to a raw JSON payload dump for unknown task types", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        jobResponse({
+          task: { uuid: "task-1", name: "Mystery Task", type: "mystery" },
           items: [
             {
               id: 1,

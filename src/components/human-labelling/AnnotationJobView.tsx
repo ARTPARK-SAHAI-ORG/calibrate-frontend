@@ -10,6 +10,7 @@ import { LlmGeneralItemPane } from "./item-panes/LlmGeneralItemPane";
 import { Section } from "./item-panes/shared";
 import { ConversationItemPane } from "./item-panes/ConversationItemPane";
 import { SttItemPane } from "./item-panes/SttItemPane";
+import { TtsItemPane } from "./item-panes/TtsItemPane";
 
 function fireConfetti() {
   if (typeof window === "undefined") return;
@@ -806,9 +807,10 @@ function AnnotateView({
             <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground w-full">
               No items in this job.
             </div>
-          ) : data.task.type === "stt" ? (
-            // STT shows two short transcripts side-by-side; keep a single
-            // outer scroll container so they stay vertically aligned.
+          ) : data.task.type === "stt" || data.task.type === "tts" ? (
+            // STT/TTS show compact inputs (short transcripts, or text +
+            // an audio clip) side-by-side with the evaluators; keep a
+            // single outer scroll container so they stay aligned.
             <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 w-full md:overflow-y-auto">
               <ItemPane item={currentItem} taskType={data.task.type} />
               <EvaluatorsPane
@@ -877,6 +879,7 @@ export function ItemPane({
 }) {
   const payload = (item.payload ?? {}) as Record<string, unknown>;
   if (taskType === "stt") return <SttItemPane payload={payload} />;
+  if (taskType === "tts") return <TtsItemPane payload={payload} />;
   if (taskType === "llm") return <LlmItemPane payload={payload} />;
   if (taskType === "llm-general")
     return <LlmGeneralItemPane payload={payload} />;

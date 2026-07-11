@@ -97,13 +97,13 @@ describe("CreateLabellingTaskDialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("filters task type options to exclude tts", async () => {
+  it("offers every task type option, including tts", async () => {
     const user = setupUser();
     renderDialog();
     await goToStep2(user);
     expect(screen.getByText("LLM reply")).toBeInTheDocument();
     expect(screen.getByText("Speech to Text")).toBeInTheDocument();
-    expect(screen.queryByText("Text to Speech (TTS)")).not.toBeInTheDocument();
+    expect(screen.getByText("Text to Speech (TTS)")).toBeInTheDocument();
   });
 
   it("shows loading state for evaluators, then lists them filtered by type and supports search", async () => {
