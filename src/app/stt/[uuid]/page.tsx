@@ -26,13 +26,16 @@ import {
   type STTEvaluatorColumn,
 } from "@/components/eval-details";
 import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
-import { toast } from "sonner";
 import {
   AddRunToLabellingTaskDialog,
   type SttLabellingRow,
   type SourceEvaluatorRef,
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useLabellingSelection } from "@/components/human-labelling/useLabellingSelection";
+import {
+  dedupeSourceEvaluators,
+  SubmitForLabellingButton,
+} from "@/components/human-labelling/labellingSubmit";
 import { useSidebarState } from "@/lib/sidebar";
 import { getDataset } from "@/lib/datasets";
 import { ShareButton } from "@/components/ShareButton";
@@ -613,17 +616,13 @@ export default function STTEvaluationDetailPage() {
     }
     return rows;
   }, [evaluationResult, taskId, sttLabellingSelected]);
-  const sttLabellingEvaluators: SourceEvaluatorRef[] = useMemo(() => {
-    const seen = new Set<string>();
-    const evals: SourceEvaluatorRef[] = [];
-    for (const c of evaluatorColumns) {
-      if (c.evaluatorUuid && !seen.has(c.evaluatorUuid)) {
-        seen.add(c.evaluatorUuid);
-        evals.push({ uuid: c.evaluatorUuid, name: c.label });
-      }
-    }
-    return evals;
-  }, [evaluatorColumns]);
+  const sttLabellingEvaluators: SourceEvaluatorRef[] = useMemo(
+    () =>
+      dedupeSourceEvaluators(
+        evaluatorColumns.map((c) => ({ uuid: c.evaluatorUuid, name: c.label })),
+      ),
+    [evaluatorColumns],
+  );
 
   const canShowLeaderboard =
     evaluationResult?.status === "done" &&
@@ -808,24 +807,11 @@ export default function STTEvaluationDetailPage() {
                   first. Desktop-only, matching TestRunnerDialog. */}
               {evaluationResult.status === "done" &&
                 sttLabellingEligibleCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (sttLabellingRows.length === 0) {
-                        toast.error(
-                          "Select one or more rows to submit for labelling",
-                        );
-                        return;
-                      }
-                      setAddToTaskOpen(true);
-                    }}
-                    className="hidden md:inline-flex items-center gap-2 h-8 px-3 rounded-lg text-[13px] font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
-                  >
-                    Submit for labelling
-                    {sttLabellingRows.length > 0
-                      ? ` (${sttLabellingRows.length})`
-                      : ""}
-                  </button>
+                  <SubmitForLabellingButton
+                    count={sttLabellingRows.length}
+                    emptyMessage="Select one or more rows to submit for labelling"
+                    onOpen={() => setAddToTaskOpen(true)}
+                  />
                 )}
               {evaluationResult.status === "failed" &&
                 backendAccessToken &&

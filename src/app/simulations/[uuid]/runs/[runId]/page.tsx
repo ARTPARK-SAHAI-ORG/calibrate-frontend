@@ -19,7 +19,6 @@ import { formatStatus, getStatusBadgeClass } from "@/lib/status";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useSidebarState } from "@/lib/sidebar";
 import { getVoiceSimulationAudioLayout, getVoiceSimulationAudioUrlForEntry } from "@/lib/simulationVoiceAudio";
-import { toast } from "sonner";
 import { ShareButton } from "@/components/ShareButton";
 import { LabellingRowCheckbox } from "@/components/test-results/shared";
 import {
@@ -28,6 +27,10 @@ import {
   type SourceEvaluatorRef,
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useLabellingSelection } from "@/components/human-labelling/useLabellingSelection";
+import {
+  dedupeSourceEvaluators,
+  SubmitForLabellingButton,
+} from "@/components/human-labelling/labellingSubmit";
 
 // `type`, `scale_min`, `scale_max` are present on newer runs (per the
 // evaluator migration). Older runs only carry `mean`/`std`/`values` — we
@@ -505,17 +508,16 @@ export default function SimulationRunPage() {
     isSimLabellingEligible,
     simLabellingKey,
   ]);
-  const conversationLabellingEvaluators: SourceEvaluatorRef[] = useMemo(() => {
-    const seen = new Set<string>();
-    const evals: SourceEvaluatorRef[] = [];
-    for (const [name, uuid] of Object.entries(evaluatorUuidByName)) {
-      if (uuid && !seen.has(uuid)) {
-        seen.add(uuid);
-        evals.push({ uuid, name });
-      }
-    }
-    return evals;
-  }, [evaluatorUuidByName]);
+  const conversationLabellingEvaluators: SourceEvaluatorRef[] = useMemo(
+    () =>
+      dedupeSourceEvaluators(
+        Object.entries(evaluatorUuidByName).map(([name, uuid]) => ({
+          uuid,
+          name,
+        })),
+      ),
+    [evaluatorUuidByName],
+  );
 
   const evaluatorDescriptionByName = useMemo(() => {
     const map: Record<string, string> = {};
@@ -871,24 +873,12 @@ export default function SimulationRunPage() {
                   TestRunnerDialog. */}
               {runData.status.toLowerCase() === "done" &&
                 eligibleSimKeys.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (conversationLabellingResults.length === 0) {
-                        toast.error(
-                          "Select one or more simulations to submit for labelling",
-                        );
-                        return;
-                      }
-                      setAddToTaskOpen(true);
-                    }}
+                  <SubmitForLabellingButton
+                    count={conversationLabellingResults.length}
+                    emptyMessage="Select one or more simulations to submit for labelling"
+                    onOpen={() => setAddToTaskOpen(true)}
                     className="hidden md:inline-flex items-center gap-2 h-8 px-3 rounded-md text-xs font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
-                  >
-                    Submit for labelling
-                    {conversationLabellingResults.length > 0
-                      ? ` (${conversationLabellingResults.length})`
-                      : ""}
-                  </button>
+                  />
                 )}
               {(runData.status.toLowerCase() === "in_progress" ||
                 runData.status.toLowerCase() === "queued") && (

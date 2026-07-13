@@ -7,6 +7,41 @@ import {
   readEvaluatorCell,
 } from "./EvaluatorScoreCell";
 
+// Single source for the per-row labelling checkbox button, used by both the
+// desktop table cell and the mobile card so the two can't drift. Disabled
+// (ineligible) rows show a greyed, unchecked box; `showTitle` adds the desktop
+// hover tooltip.
+function LabellingSelectButton({
+  eligible,
+  checked,
+  onToggle,
+  showTitle = false,
+}: {
+  eligible: boolean;
+  checked: boolean;
+  onToggle: () => void;
+  showTitle?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => eligible && onToggle()}
+      disabled={!eligible}
+      title={
+        showTitle
+          ? eligible
+            ? "Select for labelling"
+            : "Rows without ground truth can't be labelled"
+          : undefined
+      }
+      aria-label="Select for labelling"
+      className="cursor-pointer disabled:cursor-not-allowed"
+    >
+      <LabellingRowCheckbox checked={checked && eligible} disabled={!eligible} />
+    </button>
+  );
+}
+
 // Per-row results table for STT. Two modes:
 //
 // 1) Legacy single-evaluator mode (default): the row is expected to carry the
@@ -209,23 +244,15 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                     className={`border-b border-border last:border-b-0 ${isEmptyPrediction ? "bg-red-500/10" : ""}`}
                   >
                     {showCheckboxes && (() => {
-                      const eligible = rowEligible(result, index);
                       const key = labellingKeyForRow!(result, index);
                       return (
                         <td className="px-3 py-3">
-                          <button
-                            type="button"
-                            onClick={() => eligible && onToggleLabellingSelection!(key)}
-                            disabled={!eligible}
-                            title={eligible ? "Select for labelling" : "Rows without ground truth can't be labelled"}
-                            aria-label="Select for labelling"
-                            className="cursor-pointer disabled:cursor-not-allowed"
-                          >
-                            <LabellingRowCheckbox
-                              checked={(labellingSelection?.has(key) ?? false) && eligible}
-                              disabled={!eligible}
-                            />
-                          </button>
+                          <LabellingSelectButton
+                            eligible={rowEligible(result, index)}
+                            checked={labellingSelection?.has(key) ?? false}
+                            onToggle={() => onToggleLabellingSelection!(key)}
+                            showTitle
+                          />
                         </td>
                       );
                     })()}
@@ -307,21 +334,13 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {showCheckboxes && (() => {
-                    const eligible = rowEligible(result, index);
                     const key = labellingKeyForRow!(result, index);
                     return (
-                      <button
-                        type="button"
-                        onClick={() => eligible && onToggleLabellingSelection!(key)}
-                        disabled={!eligible}
-                        aria-label="Select for labelling"
-                        className="cursor-pointer disabled:cursor-not-allowed"
-                      >
-                        <LabellingRowCheckbox
-                          checked={(labellingSelection?.has(key) ?? false) && eligible}
-                          disabled={!eligible}
-                        />
-                      </button>
+                      <LabellingSelectButton
+                        eligible={rowEligible(result, index)}
+                        checked={labellingSelection?.has(key) ?? false}
+                        onToggle={() => onToggleLabellingSelection!(key)}
+                      />
                     );
                   })()}
                   <span className="text-[12px] text-muted-foreground font-medium">#{index + 1}</span>
