@@ -46,6 +46,21 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     const card = page.getByRole("link", { name: `Open ${name}` });
     await expect(card).toBeVisible({ timeout: 20000 });
 
+    // Open the evaluator detail / versioning page (its own route, otherwise
+    // never exercised by E2E), confirm it loaded, then return to the list to
+    // delete. The heading renders the evaluator's name once the fetch resolves.
+    await card.click();
+    await expect(page).toHaveURL(/\/evaluators\/[0-9a-f-]+$/, {
+      timeout: 20000,
+    });
+    await expect(
+      page.getByRole("button", { name: "Back to evaluators" }).first(),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(name).first()).toBeVisible({ timeout: 20000 });
+
+    await page.goto("/evaluators");
+    await expect(card).toBeVisible({ timeout: 20000 });
+
     // Delete via the card's titled delete button + confirmation dialog.
     await page
       .locator(`[aria-label="Open ${name}"]`)

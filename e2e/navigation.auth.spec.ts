@@ -21,6 +21,7 @@ const PAGES: ReadonlyArray<{ path: string; heading: string }> = [
   { path: "/tts", heading: "Text-to-Speech Evaluation" },
   { path: "/tests", heading: "LLM Tests" },
   { path: "/simulations", heading: "Simulations" },
+  { path: "/human-alignment", heading: "Human alignment" },
   { path: "/workspace-settings", heading: "Workspace settings" },
 ];
 
