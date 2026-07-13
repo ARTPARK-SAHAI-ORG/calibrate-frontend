@@ -1902,7 +1902,14 @@ export function TestsTabContent({
       )}
 
       {/* Tests List / Loading / Error / Empty State */}
-      {agentTestsLoading ? (
+      {/* Keep the spinner up not just while the agent's tests load, but also
+          — when the agent has no tests — until the `/tests` library prefetch
+          settles. The empty state's "Add test" affordance depends on that
+          prefetch (which only starts once we know the agent list is empty),
+          so showing the empty state before it resolves makes it briefly look
+          like there are no tests available to add. */}
+      {agentTestsLoading ||
+      (!agentTestsError && agentTests.length === 0 && !allTestsAttempted) ? (
         <div className="flex-1 border border-border rounded-xl p-6 md:p-12 flex flex-col items-center justify-center bg-muted/20">
           <div className="flex items-center gap-3">
             <svg

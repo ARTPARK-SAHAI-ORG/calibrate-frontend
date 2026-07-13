@@ -275,7 +275,10 @@ export function AgentDetail({
 
   // Tools linked to this agent
   const [agentTools, setAgentTools] = useState<ToolData[]>([]);
-  const [agentToolsLoading, setAgentToolsLoading] = useState(false);
+  // Start true so the Tools tab shows the loading spinner on first paint
+  // rather than briefly flashing the "No tools" empty state before the
+  // fetch effect below runs. The effect flips it back to false when done.
+  const [agentToolsLoading, setAgentToolsLoading] = useState(true);
   const [agentToolsError, setAgentToolsError] = useState<string | null>(null);
 
   // All available tools (for the add tool dialog)
