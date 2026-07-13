@@ -64,6 +64,11 @@ export default defineConfig({
                 "**/_next/**": false,
                 "**/node_modules/**": false,
                 "**/next/src/**": false,
+                // The Data Extraction agent tab is intentionally hidden (PR
+                // #230), so its content component is unreachable by any E2E
+                // flow. Exclude it so it doesn't drag down the denominator.
+                // (first match wins, so this must precede the components glob.)
+                "**/src/components/agent-tabs/DataExtractionTabContent.tsx": false,
                 "**/src/app/**": true,
                 "**/src/components/**": true,
                 "**/src/hooks/**": true,
