@@ -25,7 +25,7 @@ E2E coverage is **separate** from the Jest component coverage:
 
 ```bash
 npm run test:e2e:coverage              # public specs      -> coverage/e2e/
-npm run test:e2e:integration:coverage  # authenticated     -> coverage/e2e/ (needs backend)
+npm run test:e2e:integration:coverage  # authenticated     -> coverage/e2e/ (self-boots a fake-AI backend)
 npm run test:coverage                  # component (Jest)  -> coverage/component/
 npm run coverage                       # component + public e2e, into their own dirs
 ```
@@ -46,12 +46,13 @@ Specs are split into two Playwright **projects** (see `playwright.config.ts`):
 | Project | Command | Backend | Specs |
 | --- | --- | --- | --- |
 | `public` | `npm run test:e2e` | none | `login.spec.ts`, `signup.spec.ts`, `landing.spec.ts` — public routes, client-side validation/behavior (any `*.spec.ts` that isn't `*.auth.spec.ts`) |
-| `authenticated` | `npm run test:e2e:integration` | **required** | `*.auth.spec.ts` — logged-in CRUD flows against a real backend (agents/agent detail, tools, evaluators, personas/scenarios, STT/TTS datasets, simulations, workspace settings, and cross-page navigation) |
+| `authenticated` | `npm run test:e2e:integration` | self-booted (fake-AI) | `*.auth.spec.ts` — logged-in CRUD flows against a real backend (agents/agent detail, tools, evaluators, personas/scenarios, STT/TTS datasets, simulations, workspace settings, and cross-page navigation) |
 
-The authenticated specs all share **one** backend account (seeded once by
-`auth.setup.ts`) and mutate global workspace state, so `test:e2e:integration`
-runs them with `--workers=1`. The `public` specs are independent and run fully
-parallel.
+`test:e2e:integration` boots its own backend (see below); use
+`test:e2e:authenticated` to run against one you already have up. The
+authenticated specs all share **one** backend account (seeded once by
+`auth.setup.ts`) and mutate global workspace state, so they run with
+`--workers=1`. The `public` specs are independent and run fully parallel.
 
 ### How authenticated specs log in (no login UI)
 
@@ -76,29 +77,37 @@ DB_ROOT_DIR=/tmp/cal-db OBJECT_STORAGE_MODE=local MAX_CONCURRENT_JOBS=1 \
   CORS_ALLOWED_ORIGINS=http://localhost:3100 \
   uv run uvicorn main:app --port 8000
 
-# then, in this repo:
-NEXT_PUBLIC_BACKEND_URL=http://localhost:8000 npm run test:e2e:integration
+# then, in this repo (raw target — runs against the backend you just started):
+NEXT_PUBLIC_BACKEND_URL=http://localhost:8000 npm run test:e2e:authenticated
 ```
 
 Point `NEXT_PUBLIC_BACKEND_URL` at any backend (local or staging). CI does the
 same automatically in the `e2e-integration` job — it checks out the backend,
-boots it on `:8000`, and runs `test:e2e:integration:coverage`.
+boots it on `:8000` (with `FAKE_AI_PROVIDERS=1`), and runs
+`test:e2e:authenticated:coverage`. (For the usual local case where you don't
+already have a backend running, prefer `test:e2e:integration`, which boots one
+for you — see below.)
 
 > CORS: the E2E frontend runs on `:3100`, so the backend's
 > `CORS_ALLOWED_ORIGINS` must include `http://localhost:3100`.
 
-### Recommended: one command, fake-AI backend (`test:e2e:fake`)
+### `test:e2e:integration` self-boots a fake-AI backend
 
-Whenever you spin up the authenticated E2E suite, run it through the orchestrator
-so a **dedicated** backend is booted and verified healthy **before** any test
-starts, then torn down afterward:
+`npm run test:e2e:integration` runs the authenticated suite through the
+orchestrator, so a **dedicated** backend is booted and verified healthy
+**before** any test starts, then torn down afterward:
 
 ```bash
-npm run test:e2e:fake            # boot fake-AI backend -> run test:e2e:integration
-npm run test:e2e:fake:coverage   # same, with coverage -> coverage/e2e/
+npm run test:e2e:integration            # boot fake-AI backend -> run authenticated specs
+npm run test:e2e:integration:coverage   # same, with coverage -> coverage/e2e/
 ```
 
-`scripts/e2e-fake-backend.sh` enforces the ordering that matters:
+(Need to run against a backend you already have up? Use the raw
+`npm run test:e2e:authenticated[:coverage]` with `NEXT_PUBLIC_BACKEND_URL` set —
+that's what CI does, since the CI job boots its own FAKE_AI backend on `:8000`.)
+
+`scripts/e2e-fake-backend.sh` (which `test:e2e:integration` wraps) enforces the
+ordering that matters:
 
 1. **Backend first.** It starts calibrate-backend with `FAKE_AI_PROVIDERS=1` on a
    **random free port** far from `:8000` (20000–59999; pin with

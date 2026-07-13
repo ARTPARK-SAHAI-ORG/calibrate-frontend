@@ -90,14 +90,17 @@ cleanup() {
 trap cleanup EXIT
 
 # --- Wait until healthy BEFORE starting any test ------------------------------
-echo "==> Waiting for backend health on :${PORT} ..."
-for i in $(seq 1 60); do
+HEALTH_TIMEOUT="${FAKE_BACKEND_HEALTH_TIMEOUT:-90}"
+echo "==> Waiting for backend health on :${PORT} (up to ${HEALTH_TIMEOUT}s) ..."
+for i in $(seq 1 "${HEALTH_TIMEOUT}"); do
   if ! kill -0 "${BACKEND_PID}" 2>/dev/null; then
     echo "ERROR: backend exited before becoming healthy." >&2; exit 1
   fi
   code="$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${PORT}/" 2>/dev/null || echo 000)"
   if [[ "${code}" == "200" ]]; then echo "    backend healthy (HTTP 200)"; break; fi
-  if [[ "${i}" -eq 60 ]]; then echo "ERROR: backend not healthy after 60s." >&2; exit 1; fi
+  if [[ "${i}" -eq "${HEALTH_TIMEOUT}" ]]; then
+    echo "ERROR: backend not healthy after ${HEALTH_TIMEOUT}s." >&2; exit 1
+  fi
   sleep 1
 done
 
@@ -109,5 +112,8 @@ echo "==> Running E2E against ${NEXT_PUBLIC_BACKEND_URL} (E2E_FAKE_AI=1)"
 if [[ "$#" -gt 0 ]]; then
   "$@"
 else
-  npm run test:e2e:integration
+  # Default: run the authenticated specs against this backend. (Use the raw
+  # target, NOT test:e2e:integration — that one calls this script and would
+  # recurse.)
+  npm run test:e2e:authenticated
 fi
