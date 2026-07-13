@@ -1610,9 +1610,6 @@ export default function SimulationRunPage() {
                           const isWaiting = isSimulationWaiting(simulation);
                           const hasTranscript =
                             (simulation.transcript?.length ?? 0) > 0;
-                          const simEligible =
-                            isSimLabellingEligible(simulation);
-                          const simKey = simLabellingKey(simulation);
 
                           return (
                             <div
@@ -1620,21 +1617,10 @@ export default function SimulationRunPage() {
                               className="border border-border rounded-xl overflow-hidden bg-background"
                             >
                               <div className="p-5">
-                                {showSimCheckboxes && simEligible && (
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleSimLabelling(simKey)}
-                                    aria-label="Select for labelling"
-                                    className="flex items-center gap-2 mb-3 cursor-pointer"
-                                  >
-                                    <LabellingRowCheckbox
-                                      checked={simLabellingSelected.has(simKey)}
-                                    />
-                                    <span className="text-xs text-muted-foreground">
-                                      Select for labelling
-                                    </span>
-                                  </button>
-                                )}
+                                {/* Labelling checkboxes are desktop-only — the
+                                    "Submit for labelling" button is hidden on
+                                    mobile, so selecting here would be a dead
+                                    end. */}
                                 {/* Persona and Scenario with Labels */}
                                 <div className="space-y-3 mb-4 pb-4 border-b border-border/50">
                                   <div>

@@ -332,19 +332,10 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
               className={`border border-border rounded-xl p-4 space-y-3 ${isEmptyPrediction ? "bg-red-500/10" : ""}`}
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {showCheckboxes && (() => {
-                    const key = labellingKeyForRow!(result, index);
-                    return (
-                      <LabellingSelectButton
-                        eligible={rowEligible(result, index)}
-                        checked={labellingSelection?.has(key) ?? false}
-                        onToggle={() => onToggleLabellingSelection!(key)}
-                      />
-                    );
-                  })()}
-                  <span className="text-[12px] text-muted-foreground font-medium">#{index + 1}</span>
-                </div>
+                {/* Labelling checkboxes are desktop-only — the "Submit for
+                    labelling" button is hidden on mobile, so selecting here
+                    would be a dead end. */}
+                <span className="text-[12px] text-muted-foreground font-medium">#{index + 1}</span>
                 {showMetrics && !useDynamic && result.llm_judge_score && (
                   <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
                     legacyPassed
