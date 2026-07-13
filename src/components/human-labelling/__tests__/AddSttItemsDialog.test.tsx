@@ -85,39 +85,29 @@ describe("AddSttItemsDialog", () => {
     expect(addButton).not.toBeDisabled();
   });
 
-  it("adds and removes rows", async () => {
-    const user = setupUser();
+  it("is a single-item form: no add-another or remove controls", () => {
     renderDialog();
-    await user.click(screen.getByRole("button", { name: "Add another item" }));
-    expect(screen.getAllByPlaceholderText("e.g. Clip 1")).toHaveLength(2);
-
-    const removeButtons = screen.getAllByLabelText(/Remove item/);
-    await user.click(removeButtons[1]);
     expect(screen.getAllByPlaceholderText("e.g. Clip 1")).toHaveLength(1);
+    expect(
+      screen.queryByRole("button", { name: "Add another item" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Remove item/)).not.toBeInTheDocument();
   });
 
-  it("disables removing the last remaining row", async () => {
-    renderDialog();
-    const removeButton = screen.getByLabelText("Remove item 1");
-    expect(removeButton).toBeDisabled();
-  });
-
-  it("submits only valid (fully-filled) rows, trimmed", async () => {
+  it("submits the single filled row, trimmed", async () => {
     const user = setupUser();
     const onSubmit = jest.fn().mockResolvedValue(undefined);
     renderDialog({ onSubmit });
 
-    await user.click(screen.getByRole("button", { name: "Add another item" }));
-    const names = screen.getAllByPlaceholderText("e.g. Clip 1");
-    const actuals = screen.getAllByPlaceholderText("What was actually said");
-    const predicteds = screen.getAllByPlaceholderText(
-      "What the system transcribed",
+    await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "  Clip 1  ");
+    await user.type(
+      screen.getByPlaceholderText("What was actually said"),
+      "  hello  ",
     );
-
-    await user.type(names[0], "  Clip 1  ");
-    await user.type(actuals[0], "  hello  ");
-    await user.type(predicteds[0], "  helo  ");
-    // Second row left blank — should be filtered out.
+    await user.type(
+      screen.getByPlaceholderText("What the system transcribed"),
+      "  helo  ",
+    );
 
     await user.click(screen.getByRole("button", { name: "Add item" }));
 
@@ -130,27 +120,6 @@ describe("AddSttItemsDialog", () => {
         predicted_transcript: "helo",
       },
     ]);
-  });
-
-  it("shows 'Add N items' label and count once multiple rows are valid", async () => {
-    const user = setupUser();
-    renderDialog();
-    await user.click(screen.getByRole("button", { name: "Add another item" }));
-
-    const names = screen.getAllByPlaceholderText("e.g. Clip 1");
-    const actuals = screen.getAllByPlaceholderText("What was actually said");
-    const predicteds = screen.getAllByPlaceholderText(
-      "What the system transcribed",
-    );
-    for (let i = 0; i < 2; i++) {
-      await user.type(names[i], `Clip ${i}`);
-      await user.type(actuals[i], "a");
-      await user.type(predicteds[i], "p");
-    }
-
-    expect(
-      screen.getByRole("button", { name: "Add 2 items" }),
-    ).toBeInTheDocument();
   });
 
   it("shows an inline error parsed from a structured detail object", async () => {
@@ -472,26 +441,22 @@ describe("AddSttItemsDialog", () => {
     });
   });
 
-  it("uses crypto.randomUUID for new row ids when available", async () => {
+  it("uses crypto.randomUUID for the new blank row id when available", () => {
     const original = global.crypto;
     const randomUUID = jest.fn(() => "11111111-1111-1111-1111-111111111111");
     delete (global as { crypto?: Crypto }).crypto;
     (global as { crypto?: Partial<Crypto> }).crypto = { randomUUID };
-    const user = setupUser();
     renderDialog();
-    await user.click(screen.getByRole("button", { name: "Add another item" }));
-    expect(screen.getAllByPlaceholderText("e.g. Clip 1")).toHaveLength(2);
+    expect(screen.getAllByPlaceholderText("e.g. Clip 1")).toHaveLength(1);
     expect(randomUUID).toHaveBeenCalled();
     global.crypto = original;
   });
 
-  it("falls back to a random id for new rows when crypto.randomUUID is unavailable", async () => {
+  it("falls back to a random id for the new row when crypto.randomUUID is unavailable", () => {
     const original = global.crypto;
     delete (global as { crypto?: Crypto }).crypto;
-    const user = setupUser();
     renderDialog();
-    await user.click(screen.getByRole("button", { name: "Add another item" }));
-    expect(screen.getAllByPlaceholderText("e.g. Clip 1")).toHaveLength(2);
+    expect(screen.getAllByPlaceholderText("e.g. Clip 1")).toHaveLength(1);
     global.crypto = original;
   });
 });

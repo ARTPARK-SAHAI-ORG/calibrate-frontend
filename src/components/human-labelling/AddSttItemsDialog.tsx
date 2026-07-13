@@ -140,16 +140,6 @@ export function AddSttItemsDialog({
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   };
 
-  const removeRow = (id: string) => {
-    setRows((prev) =>
-      prev.length === 1 ? prev : prev.filter((r) => r.id !== id),
-    );
-  };
-
-  const addRow = () => {
-    setRows((prev) => [...prev, newRow()]);
-  };
-
   const validRows: SttItemRowSubmission[] = rows
     .map((r) => ({
       uuid: r.uuid,
@@ -216,166 +206,63 @@ export function AddSttItemsDialog({
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-2">
-          {isEdit ? (
-            // Edit mode: stack Name / Reference / Predicted vertically, one
-            // field per row, so long transcripts (incl. non-latin scripts)
-            // are fully readable instead of clipped in a narrow column.
-            rows.map((row, idx) => (
-              <div
-                key={row.id}
-                className={`space-y-3 ${idx > 0 ? "pt-4 mt-4 border-t border-border" : ""}`}
-              >
-                {rows.length > 1 && (
-                  <div className="text-xs font-semibold text-muted-foreground">
-                    Item {idx + 1}
-                  </div>
-                )}
-                <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    value={row.name}
-                    onChange={(e) =>
-                      updateRow(row.id, { name: e.target.value })
-                    }
-                    placeholder="e.g. Clip 1"
-                    disabled={submitting}
-                    className="w-full h-9 px-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-                    Reference transcript
-                  </label>
-                  <textarea
-                    value={row.actual}
-                    onChange={(e) =>
-                      updateRow(row.id, { actual: e.target.value })
-                    }
-                    placeholder="What was actually said"
-                    rows={3}
-                    disabled={submitting}
-                    className="w-full px-3 py-2 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 resize-y"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-                    Predicted transcript
-                  </label>
-                  <textarea
-                    value={row.predicted}
-                    onChange={(e) =>
-                      updateRow(row.id, { predicted: e.target.value })
-                    }
-                    placeholder="What the system transcribed"
-                    rows={3}
-                    disabled={submitting}
-                    className="w-full px-3 py-2 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 resize-y"
-                  />
-                </div>
-              </div>
-            ))
-          ) : (
-            <>
-              {/* Column headers (shown once) */}
-              <div className="grid grid-cols-[1fr_2fr_2fr_28px] gap-2 px-1 pb-1">
-                <div className="text-xs font-medium text-muted-foreground">
-                  Name
-                </div>
-                <div className="text-xs font-medium text-muted-foreground">
-                  Reference transcript
-                </div>
-                <div className="text-xs font-medium text-muted-foreground">
-                  Predicted transcript
-                </div>
-                <div />
-              </div>
-
-              {rows.map((row, idx) => (
-                <div
-                  key={row.id}
-                  className="grid grid-cols-[1fr_2fr_2fr_28px] gap-2 items-center"
-                >
-                  <input
-                    type="text"
-                    value={row.name}
-                    onChange={(e) =>
-                      updateRow(row.id, { name: e.target.value })
-                    }
-                    placeholder="e.g. Clip 1"
-                    disabled={submitting}
-                    className="w-full h-9 px-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
-                  />
-                  <input
-                    type="text"
-                    value={row.actual}
-                    onChange={(e) =>
-                      updateRow(row.id, { actual: e.target.value })
-                    }
-                    placeholder="What was actually said"
-                    disabled={submitting}
-                    className="w-full h-9 px-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
-                  />
-                  <input
-                    type="text"
-                    value={row.predicted}
-                    onChange={(e) =>
-                      updateRow(row.id, { predicted: e.target.value })
-                    }
-                    placeholder="What the system transcribed"
-                    disabled={submitting}
-                    className="w-full h-9 px-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
-                  />
-                  <button
-                    onClick={() => removeRow(row.id)}
-                    disabled={rows.length === 1 || submitting}
-                    className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                    aria-label={`Remove item ${idx + 1}`}
-                    title="Remove this item"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </>
-          )}
-
-          {!isEdit && (
-            <button
-              onClick={addRow}
-              disabled={submitting}
-              className="w-full h-10 rounded-md text-sm font-medium border border-dashed border-border bg-background hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+          {/* Name / Reference / Predicted stacked vertically, one field per
+              row, so long transcripts (incl. non-latin scripts) are fully
+              readable. Edit mode may seed multiple items; add mode is always a
+              single item. */}
+          {rows.map((row, idx) => (
+            <div
+              key={row.id}
+              className={`space-y-3 ${idx > 0 ? "pt-4 mt-4 border-t border-border" : ""}`}
             >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 4.5v15m7.5-7.5h-15"
+              {rows.length > 1 && (
+                <div className="text-xs font-semibold text-muted-foreground">
+                  Item {idx + 1}
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  value={row.name}
+                  onChange={(e) => updateRow(row.id, { name: e.target.value })}
+                  placeholder="e.g. Clip 1"
+                  disabled={submitting}
+                  className="w-full h-9 px-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
                 />
-              </svg>
-              Add another item
-            </button>
-          )}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  Reference transcript
+                </label>
+                <textarea
+                  value={row.actual}
+                  onChange={(e) => updateRow(row.id, { actual: e.target.value })}
+                  placeholder="What was actually said"
+                  rows={3}
+                  disabled={submitting}
+                  className="w-full px-3 py-2 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 resize-y"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  Predicted transcript
+                </label>
+                <textarea
+                  value={row.predicted}
+                  onChange={(e) =>
+                    updateRow(row.id, { predicted: e.target.value })
+                  }
+                  placeholder="What the system transcribed"
+                  rows={3}
+                  disabled={submitting}
+                  className="w-full px-3 py-2 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 resize-y"
+                />
+              </div>
+            </div>
+          ))}
 
           {error && (
             <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-500">
