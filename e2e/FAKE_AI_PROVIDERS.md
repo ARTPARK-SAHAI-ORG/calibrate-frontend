@@ -129,10 +129,17 @@ Args: `llm -c <input/test_config.json> [-m <model>...] [-p <provider>] -o <outpu
      For a **rating** evaluator use `{"reasoning": ..., "score": <scale_max>}` instead
      of `{"match": true}`. For **tool-call** tests, put the expected calls in
      `output.tool_calls` and keep `passed: true`.
-   - `metrics.json` — a JSON **dict**:
+   - `metrics.json` — a JSON **dict**. NOTE: `latency_ms` / `cost` /
+     `total_tokens` are **aggregate objects** `{mean, min, max, count}`, NOT
+     scalars — the response models (`TestRunStatusResponse`,
+     `BenchmarkModelResult`) type them as `Optional[Dict[str, Any]]`; writing a
+     scalar 500s the run-status endpoint with a pydantic `dict_type` error.
+     (Verified against calibrate-backend#139 during the joint E2E run.)
      ```json
-     {"total": <n_tests>, "passed": <n_tests>, "latency_ms": 100, "cost": 0.001,
-      "total_tokens": 42,
+     {"total": <n_tests>, "passed": <n_tests>,
+      "latency_ms": {"mean": 100, "min": 100, "max": 100, "count": <n_tests>},
+      "cost": {"mean": 0.001, "min": 0.001, "max": 0.001, "count": <n_tests>},
+      "total_tokens": {"mean": 42, "min": 42, "max": 42, "count": <n_tests>},
       "criteria": {
         "<evaluator_name>": {"type": "binary", "evaluator_id": "<uuid>",
                              "passed": <n_tests>, "total": <n_tests>, "pass_rate": 1.0}
@@ -227,6 +234,16 @@ CI backend boot changes.
   `completed` with `passed == total`. This proves the fake CLI + seam wire up.
 
 ---
+
+## Benchmark: also needs a fake model catalog (follow-up)
+
+The LLM test-run flow works end-to-end under this mode. **Benchmark does not
+yet**, because benchmarking a Build agent picks models from the OpenRouter model
+catalog, which `FAKE_AI_PROVIDERS` does not fake — in the CI/dev deployment the
+picker shows "OpenRouter models are not supported in this deployment", so there
+is nothing to select. `e2e/runs.auth.spec.ts` skips the benchmark test when the
+picker is empty. To activate it, the fake mode must also serve a small static
+model catalog for the model-list endpoint (separate from the run CLI).
 
 ## Verification (done later, jointly)
 

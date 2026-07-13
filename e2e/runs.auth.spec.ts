@@ -28,16 +28,22 @@ const FAKE_AI = process.env.E2E_FAKE_AI === "1";
 async function createBuildAgent(page: Page, name: string): Promise<void> {
   await page.goto("/agents");
   await waitForOrgReady(page);
-  await page.getByRole("button", { name: "New agent" }).first().click();
-  await expect(page.getByRole("heading", { name: "New agent" })).toBeVisible();
-  await page.getByPlaceholder("Enter agent name").fill(name);
 
+  const dialogHeading = page.getByRole("heading", { name: "New agent" });
   const createBtn = page.getByRole("button", { name: "Create", exact: true });
+
+  // The dialog's access token comes from a hook effect, so the very first
+  // create can race auth readiness and 401 (which closes the dialog). Retry the
+  // whole open → fill → create each iteration so a failed attempt re-opens the
+  // dialog and tries again once the token has hydrated.
   await expect(async () => {
-    if (await createBtn.isVisible().catch(() => false)) {
-      await createBtn.click();
+    if (!(await dialogHeading.isVisible().catch(() => false))) {
+      await page.getByRole("button", { name: "New agent" }).first().click();
+      await expect(dialogHeading).toBeVisible({ timeout: 5000 });
+      await page.getByPlaceholder("Enter agent name").fill(name);
     }
-    await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/, { timeout: 6000 });
+    await createBtn.click();
+    await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/, { timeout: 5000 });
   }).toPass({ timeout: 30000 });
 }
 
@@ -87,8 +93,19 @@ async function createNextReplyTestOnAgent(
     .fill("The agent answers the user's question clearly and politely.");
 
   await page.getByRole("button", { name: "Create", exact: true }).click();
-  // Back on the Tests tab, the new test is listed (dialog closed).
-  await expect(nameInput).toHaveCount(0, { timeout: 20000 });
+
+  // The new test seeds the default Correctness evaluator, which isn't on the
+  // agent yet, so TestsTabContent reliably pops an "Update default evaluators?"
+  // prompt. Wait for it and dismiss ("Not now") — it otherwise overlays the
+  // Run/Compare buttons. (isVisible() doesn't wait, so assert-then-click.)
+  const evalPrompt = page.getByRole("heading", {
+    name: "Update default evaluators?",
+  });
+  await expect(evalPrompt).toBeVisible({ timeout: 15000 });
+  await page.getByRole("button", { name: "Not now" }).click();
+  await expect(evalPrompt).toBeHidden({ timeout: 10000 });
+
+  // Success signal: the new test appears in the Tests-tab list.
   await expect(page.getByText(testName, { exact: true }).first()).toBeVisible({
     timeout: 20000,
   });
@@ -127,13 +144,10 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     });
     await expect(page.getByText("100%").first()).toBeVisible({ timeout: 15000 });
 
-    // The per-evaluator breakdown renders under an "Evaluators" heading.
-    await expect(
-      page.getByRole("heading", { name: "Evaluators" }).first(),
-    ).toBeVisible({ timeout: 15000 });
-
-    // A passing binary verdict shows a "Pass" pill somewhere in the results.
-    await expect(page.getByText("Pass", { exact: true }).first()).toBeVisible({
+    // Outputs tab: the per-test results group the passing test under a
+    // "Passed (n)" heading (test-results/shared StatusIcon + grouping).
+    await page.getByRole("button", { name: "Outputs", exact: true }).click();
+    await expect(page.getByText(/Passed \(\d+\)/).first()).toBeVisible({
       timeout: 15000,
     });
 
@@ -160,13 +174,26 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
       .getByRole("button", { name: "Select a model" })
       .first()
       .click();
-    // The selector modal is the overlay containing the "Search LLM" box; its
-    // model rows are buttons wrapping the model name.
-    const modelModal = page
-      .locator(".fixed")
-      .filter({ has: page.getByPlaceholder("Search LLM") });
-    await expect(modelModal).toBeVisible({ timeout: 15000 });
-    await modelModal.locator("button.w-full").first().click();
+    // The selector modal is the innermost overlay containing the "Search LLM"
+    // box (the outer BenchmarkDialog is also .fixed, so take the last match).
+    // Its model rows are full-width buttons wrapping the model name.
+    const searchBox = page.getByPlaceholder("Search LLM");
+    await expect(searchBox).toBeVisible({ timeout: 15000 });
+    const modelModal = page.locator(".fixed").filter({ has: searchBox }).last();
+
+    // Benchmarking a Build agent picks from the OpenRouter model catalog. The
+    // FAKE_AI backend fakes run EXECUTION but not the model-catalog endpoint, so
+    // in that deployment the picker is empty ("OpenRouter models are not
+    // supported"). Skip when there's nothing to select — this test activates
+    // once the fake backend also serves a model catalog.
+    const modelRows = modelModal.locator("button.w-full");
+    await page.waitForTimeout(1500);
+    const modelCount = await modelRows.count();
+    test.skip(
+      modelCount === 0,
+      "no benchmark model catalog in the FAKE_AI deployment",
+    );
+    await modelRows.first().click();
 
     // A model is selected → "Run comparison" is enabled. Run the benchmark.
     await page.getByRole("button", { name: "Run comparison" }).click();
