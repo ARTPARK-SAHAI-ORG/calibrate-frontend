@@ -835,7 +835,7 @@ function AnnotateView({
               <div
                 className={`${
                   isAdmin ? "md:flex-[6]" : "md:flex-[7]"
-                } md:min-h-0 md:overflow-y-auto md:border-r border-border p-4 md:p-6`}
+                } md:min-h-0 md:overflow-y-auto md:border-r border-border px-4 pb-4 md:px-6 md:pb-6`}
               >
                 <ItemPane item={currentItem} taskType={data.task.type} />
               </div>
