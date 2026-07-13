@@ -66,6 +66,10 @@ jobs:
       AUTH_SECRET: ci-placeholder-secret-not-used
       GOOGLE_CLIENT_ID: ci-placeholder
       GOOGLE_CLIENT_SECRET: ci-placeholder
+      # Enable the run→results specs (e2e/runs.auth.spec.ts). Requires the
+      # backend booted with FAKE_AI_PROVIDERS=1 (set on the boot step below) so
+      # runs return deterministic canned results — no AI keys or cost.
+      E2E_FAKE_AI: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -107,6 +111,10 @@ jobs:
           # E2E frontend runs on :3100 (see playwright.config.ts).
           CORS_ALLOWED_ORIGINS: http://localhost:3100
           DEFAULT_USER_EMAIL: seed@example.com
+          # Test mode: swap the calibrate-agent CLI for a deterministic fake so
+          # runs return canned results with no real AI keys/cost (paired with
+          # E2E_FAKE_AI on the job env). See e2e/FAKE_AI_PROVIDERS.md.
+          FAKE_AI_PROVIDERS: "1"
         run: |
           mkdir -p "$DB_ROOT_DIR"
           nohup uv run uvicorn main:app --host 0.0.0.0 --port 8000 > "$RUNNER_TEMP/backend.log" 2>&1 &
