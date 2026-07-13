@@ -120,11 +120,12 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
       page.getByRole("button", { name: "Summary", exact: true }),
     ).toBeVisible({ timeout: 30000 });
 
-    // Summary tab: a Pass rate card. Every fake verdict passes → 100%, "1/1".
+    // Summary tab: a Pass rate card. Every fake verdict passes → 100% pass rate
+    // (asserted on the percentage, which is robust to the test-case count).
     await expect(page.getByText("Pass rate").first()).toBeVisible({
       timeout: 15000,
     });
-    await expect(page.getByText("1/1").first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("100%").first()).toBeVisible({ timeout: 15000 });
 
     // The per-evaluator breakdown renders under an "Evaluators" heading.
     await expect(
@@ -150,19 +151,24 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     await createBuildAgent(page, agentName);
     await createNextReplyTestOnAgent(page, testName);
 
-    // "Compare models" opens BenchmarkDialog (model picker).
+    // "Compare models" opens BenchmarkDialog. It starts with one empty model
+    // slot (selectedModels=[null]) and "Run comparison" is disabled until a
+    // model is picked. Click the empty slot ("Select a model") to open the
+    // shared LLMSelectorModal, then choose the first model in the list.
     await page.getByRole("button", { name: /Compare models/ }).click();
+    await page
+      .getByRole("button", { name: "Select a model" })
+      .first()
+      .click();
+    // The selector modal is the overlay containing the "Search LLM" box; its
+    // model rows are buttons wrapping the model name.
+    const modelModal = page
+      .locator(".fixed")
+      .filter({ has: page.getByPlaceholder("Search LLM") });
+    await expect(modelModal).toBeVisible({ timeout: 15000 });
+    await modelModal.locator("button.w-full").first().click();
 
-    // Select at least one model to compare, then run. The model picker's exact
-    // control shape is verified post-merge against the fake backend; select the
-    // first available model option, then click "Run comparison".
-    // NOTE (verify): model-option selector below may need adjustment.
-    const modelOption = page
-      .locator('.fixed input[type="checkbox"]')
-      .first();
-    if (await modelOption.isVisible().catch(() => false)) {
-      await modelOption.check().catch(() => {});
-    }
+    // A model is selected → "Run comparison" is enabled. Run the benchmark.
     await page.getByRole("button", { name: "Run comparison" }).click();
 
     // BenchmarkResultsDialog polls GET /agent-tests/benchmark/{taskId}; the
