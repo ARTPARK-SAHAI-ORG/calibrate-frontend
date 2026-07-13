@@ -87,6 +87,35 @@ boots it on `:8000`, and runs `test:e2e:integration:coverage`.
 > CORS: the E2E frontend runs on `:3100`, so the backend's
 > `CORS_ALLOWED_ORIGINS` must include `http://localhost:3100`.
 
+### Recommended: one command, fake-AI backend (`test:e2e:fake`)
+
+Whenever you spin up the authenticated E2E suite, run it through the orchestrator
+so a **dedicated** backend is booted and verified healthy **before** any test
+starts, then torn down afterward:
+
+```bash
+npm run test:e2e:fake            # boot fake-AI backend -> run test:e2e:integration
+npm run test:e2e:fake:coverage   # same, with coverage -> coverage/e2e/
+```
+
+`scripts/e2e-fake-backend.sh` enforces the ordering that matters:
+
+1. **Backend first.** It starts calibrate-backend with `FAKE_AI_PROVIDERS=1` on a
+   **random free port** far from `:8000` (20000–59999; pin with
+   `FAKE_BACKEND_PORT`) with a throwaway `DB_ROOT_DIR`, so it never collides with
+   or touches another service you may have on `:8000`.
+2. **Wait for health.** It polls `GET /` until `200` (fails fast if the backend
+   dies) — tests are **only** started after that.
+3. **Run, then clean up.** It exports `E2E_FAKE_AI=1` +
+   `NEXT_PUBLIC_BACKEND_URL` pointed at that port and runs the suite; an `EXIT`
+   trap always stops the backend and deletes its temp DB.
+
+`FAKE_AI_PROVIDERS=1` makes the backend return deterministic canned AI results
+(no real keys/cost — see [`FAKE_AI_PROVIDERS.md`](FAKE_AI_PROVIDERS.md)), which is
+what the run-gated specs in `runs.auth.spec.ts` (skipped unless `E2E_FAKE_AI=1`)
+need. Point the script at your backend checkout with `CALIBRATE_BACKEND_DIR=...`
+if it isn't auto-detected.
+
 Prefer not to run a backend for a given spec? Mock at the network layer instead:
 `page.route("**/agents", route => route.fulfill({ json: [...] }))`.
 
