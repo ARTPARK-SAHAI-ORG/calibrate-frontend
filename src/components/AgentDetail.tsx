@@ -136,6 +136,24 @@ export function AgentDetail({
   const { errorCode, reset: resetErrorCode, captureResponse } =
     usePageErrorState();
   const [activeTab, setActiveTab] = useState<TabType>(getInitialTab);
+  // Keep-alive: track which tabs have been opened. Each tab is mounted the
+  // first time it's opened and then hidden (not unmounted) when switching
+  // away, so its fetched data and in-tab UI state (search, filters,
+  // selections) survive tab switches. A fresh fetch only happens on a full
+  // page/URL reload, when the whole component remounts.
+  const [visitedTabs, setVisitedTabs] = useState<Set<TabType>>(
+    () => new Set([getInitialTab()]),
+  );
+  useEffect(() => {
+    setVisitedTabs((prev) =>
+      prev.has(activeTab) ? prev : new Set(prev).add(activeTab),
+    );
+  }, [activeTab]);
+  // Render a tab if it's the active one (always, so a programmatic tab switch
+  // shows immediately without waiting for the effect above) or if it was
+  // opened earlier (kept mounted-but-hidden for keep-alive).
+  const shouldRenderTab = (tab: TabType) =>
+    activeTab === tab || visitedTabs.has(tab);
 
   // Name editing dialog state
   const [isEditNameDialogOpen, setIsEditNameDialogOpen] = useState(false);
@@ -1102,48 +1120,54 @@ export function AgentDetail({
           content (e.g. the connection format docs). */}
       <div className="pb-24">
         {/* Connection Tab Content */}
-        {activeTab === "connection" && agent.type === "connection" && (
-          <AgentConnectionTabContent
-            agentUuid={agentUuid}
-            agentUrl={connectionUrl}
-            onAgentUrlChange={setConnectionUrl}
-            agentHeaders={connectionHeaders}
-            onAgentHeadersChange={setConnectionHeaders}
-            connectionConfig={connectionConfig}
-            onConnectionConfigChange={setConnectionConfig}
-            onSave={() => saveRef.current()}
-            isSaving={isSaving}
-            onVerificationSuccess={handleConnectionVerifySuccess}
-          />
+        {agent.type === "connection" && shouldRenderTab("connection") && (
+          <div className={activeTab === "connection" ? undefined : "hidden"}>
+            <AgentConnectionTabContent
+              agentUuid={agentUuid}
+              agentUrl={connectionUrl}
+              onAgentUrlChange={setConnectionUrl}
+              agentHeaders={connectionHeaders}
+              onAgentHeadersChange={setConnectionHeaders}
+              connectionConfig={connectionConfig}
+              onConnectionConfigChange={setConnectionConfig}
+              onSave={() => saveRef.current()}
+              isSaving={isSaving}
+              onVerificationSuccess={handleConnectionVerifySuccess}
+            />
+          </div>
         )}
 
         {/* Agent Tab Content */}
-        {activeTab === "agent" && agent.type !== "connection" && (
-          <AgentTabContent
-            systemPrompt={systemPrompt}
-            setSystemPrompt={setSystemPrompt}
-            sttProvider={sttProvider}
-            setSttProvider={setSttProvider}
-            ttsProvider={ttsProvider}
-            setTtsProvider={setTtsProvider}
-            selectedLLM={selectedLLM}
-            setSelectedLLM={setSelectedLLM}
-          />
+        {agent.type !== "connection" && shouldRenderTab("agent") && (
+          <div className={activeTab === "agent" ? undefined : "hidden"}>
+            <AgentTabContent
+              systemPrompt={systemPrompt}
+              setSystemPrompt={setSystemPrompt}
+              sttProvider={sttProvider}
+              setSttProvider={setSttProvider}
+              ttsProvider={ttsProvider}
+              setTtsProvider={setTtsProvider}
+              selectedLLM={selectedLLM}
+              setSelectedLLM={setSelectedLLM}
+            />
+          </div>
         )}
 
         {/* Tools Tab Content */}
-        {activeTab === "tools" && (
-          <ToolsTabContent
-            agentUuid={agentUuid}
-            agentTools={agentTools}
-            setAgentTools={setAgentTools}
-            agentToolsLoading={agentToolsLoading}
-            agentToolsError={agentToolsError}
-            allTools={allTools}
-            allToolsLoading={allToolsLoading}
-            endConversationEnabled={endConversationEnabled}
-            setEndConversationEnabled={setEndConversationEnabled}
-          />
+        {shouldRenderTab("tools") && (
+          <div className={activeTab === "tools" ? undefined : "hidden"}>
+            <ToolsTabContent
+              agentUuid={agentUuid}
+              agentTools={agentTools}
+              setAgentTools={setAgentTools}
+              agentToolsLoading={agentToolsLoading}
+              agentToolsError={agentToolsError}
+              allTools={allTools}
+              allToolsLoading={allToolsLoading}
+              endConversationEnabled={endConversationEnabled}
+              setEndConversationEnabled={setEndConversationEnabled}
+            />
+          </div>
         )}
 
         {/* Data Extraction Tab Content */}
@@ -1161,47 +1185,53 @@ export function AgentDetail({
         */}
 
         {/* Tests Tab Content */}
-        {activeTab === "tests" && (
-          <TestsTabContent
-            agentUuid={agentUuid}
-            agentName={agent.name}
-            agentType={agent.type}
-            connectionVerified={
-              agent.type === "connection"
-                ? connectionConfig.connection_verified === true
-                : undefined
-            }
-            supportsBenchmark={
-              agent.type === "connection"
-                ? connectionConfig.supports_benchmark === true
-                : undefined
-            }
-            benchmarkModelsVerified={
-              agent.type === "connection"
-                ? connectionConfig.benchmark_models_verified
-                : undefined
-            }
-            benchmarkProvider={
-              agent.type === "connection"
-                ? connectionConfig.benchmark_provider
-                : undefined
-            }
-          />
+        {shouldRenderTab("tests") && (
+          <div className={activeTab === "tests" ? undefined : "hidden"}>
+            <TestsTabContent
+              agentUuid={agentUuid}
+              agentName={agent.name}
+              agentType={agent.type}
+              connectionVerified={
+                agent.type === "connection"
+                  ? connectionConfig.connection_verified === true
+                  : undefined
+              }
+              supportsBenchmark={
+                agent.type === "connection"
+                  ? connectionConfig.supports_benchmark === true
+                  : undefined
+              }
+              benchmarkModelsVerified={
+                agent.type === "connection"
+                  ? connectionConfig.benchmark_models_verified
+                  : undefined
+              }
+              benchmarkProvider={
+                agent.type === "connection"
+                  ? connectionConfig.benchmark_provider
+                  : undefined
+              }
+            />
+          </div>
         )}
 
         {/* Evaluators Tab Content */}
-        {activeTab === "evaluators" && (
-          <EvaluatorsTabContent agentUuid={agentUuid} agentName={agent.name} />
+        {shouldRenderTab("evaluators") && (
+          <div className={activeTab === "evaluators" ? undefined : "hidden"}>
+            <EvaluatorsTabContent agentUuid={agentUuid} agentName={agent.name} />
+          </div>
         )}
 
         {/* Settings Tab Content - commented out to hide the tab */}
-        {activeTab === "settings" && (
-          <SettingsTabContent
-            agentSpeaksFirst={agentSpeaksFirst}
-            setAgentSpeaksFirst={setAgentSpeaksFirst}
-            maxAssistantTurns={maxAssistantTurns}
-            setMaxAssistantTurns={setMaxAssistantTurns}
-          />
+        {shouldRenderTab("settings") && (
+          <div className={activeTab === "settings" ? undefined : "hidden"}>
+            <SettingsTabContent
+              agentSpeaksFirst={agentSpeaksFirst}
+              setAgentSpeaksFirst={setAgentSpeaksFirst}
+              maxAssistantTurns={maxAssistantTurns}
+              setMaxAssistantTurns={setMaxAssistantTurns}
+            />
+          </div>
         )}
       </div>
 
