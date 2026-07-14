@@ -33,14 +33,14 @@ const parseCsvLine = (line: string): string[] => {
   return values;
 };
 
-// 100 ms of real PCM silence — mirrors the STT dataset sample so the wavs
-// carry valid duration metadata and play in consumer players.
-const createSilentWav = (): Uint8Array => {
+// ~1s of an audible 440 Hz tone so the sample clips actually play (and show a
+// real duration) when a user tries them — a silent sample reads as "broken".
+const createSampleWav = (): Uint8Array => {
   const sampleRate = 44_100;
   const numChannels = 1;
   const bitsPerSample = 16;
   const bytesPerSample = bitsPerSample / 8;
-  const numSamples = 4410;
+  const numSamples = sampleRate; // 1 second
   const dataBytes = numSamples * numChannels * bytesPerSample;
   const blockAlign = numChannels * bytesPerSample;
   const byteRate = sampleRate * blockAlign;
@@ -76,6 +76,15 @@ const createSilentWav = (): Uint8Array => {
   o += 4;
   view.setUint32(o, dataBytes, true);
   o += 4;
+  // Fill the data chunk with a gently-faded 440 Hz sine tone.
+  const amplitude = 0.25 * 0x7fff;
+  for (let i = 0; i < numSamples; i++) {
+    const t = i / sampleRate;
+    const fade = Math.min(1, t / 0.02, (1 - t) / 0.02); // 20ms in/out fade
+    const s = Math.round(amplitude * fade * Math.sin(2 * Math.PI * 440 * t));
+    view.setInt16(o, s, true);
+    o += 2;
+  }
   return new Uint8Array(buffer);
 };
 
@@ -164,9 +173,9 @@ export function BulkUploadTtsItemsDialog({
     const zip = new JSZip();
     const audios = zip.folder("audios");
     const wavOpts = { compression: "STORE" as const };
-    audios?.file("sample_1.wav", createSilentWav(), wavOpts);
-    audios?.file("sample_2.wav", createSilentWav(), wavOpts);
-    audios?.file("sample_3.wav", createSilentWav(), wavOpts);
+    audios?.file("sample_1.wav", createSampleWav(), wavOpts);
+    audios?.file("sample_2.wav", createSampleWav(), wavOpts);
+    audios?.file("sample_3.wav", createSampleWav(), wavOpts);
     zip.file(
       "data.csv",
       "name,text,audio_file\n" +
@@ -571,7 +580,7 @@ export function BulkUploadTtsItemsDialog({
 
           {rows.length > 0 && (
             <div className="border border-border rounded-xl overflow-hidden">
-              <div className="grid grid-cols-[minmax(80px,140px)_minmax(120px,1fr)_minmax(140px,220px)] gap-3 px-3 py-2 border-b border-border bg-muted/30">
+              <div className="grid grid-cols-[minmax(90px,150px)_minmax(120px,1fr)_minmax(240px,360px)] gap-3 px-3 py-2 border-b border-border bg-muted/30">
                 <div className="text-xs font-medium text-muted-foreground">
                   Name
                 </div>
@@ -586,7 +595,7 @@ export function BulkUploadTtsItemsDialog({
                 {rows.slice(0, 50).map((r) => (
                   <div
                     key={r.id}
-                    className="grid grid-cols-[minmax(80px,140px)_minmax(120px,1fr)_minmax(140px,220px)] gap-3 px-3 py-2 items-center"
+                    className="grid grid-cols-[minmax(90px,150px)_minmax(120px,1fr)_minmax(240px,360px)] gap-3 px-3 py-2 items-center"
                   >
                     <div
                       className="text-xs text-foreground truncate"
@@ -601,7 +610,7 @@ export function BulkUploadTtsItemsDialog({
                       {r.text}
                     </div>
                     <div className="min-w-0">
-                      <LazyAudioPlayer src={r.audioUrl} />
+                      <LazyAudioPlayer src={r.audioUrl} className="w-full" />
                     </div>
                   </div>
                 ))}
