@@ -140,6 +140,14 @@ export function AddSttItemsDialog({
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   };
 
+  const removeRow = (id: string) => {
+    setRows((prev) =>
+      prev.length === 1 ? prev : prev.filter((r) => r.id !== id),
+    );
+  };
+
+  const addRow = () => setRows((prev) => [...prev, newRow()]);
+
   const validRows: SttItemRowSubmission[] = rows
     .map((r) => ({
       uuid: r.uuid,
@@ -205,23 +213,47 @@ export function AddSttItemsDialog({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-2">
-          {/* Name / Reference / Predicted stacked vertically, one field per
-              row, so long transcripts (incl. non-latin scripts) are fully
-              readable. Edit mode may seed multiple items; add mode is always a
-              single item. */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+          {/* One card per item, fields stacked vertically so long transcripts
+              (incl. non-latin scripts) are fully readable. Add mode can add /
+              remove cards; edit mode seeds a fixed set from the selection. */}
           {rows.map((row, idx) => (
             <div
               key={row.id}
-              className={`space-y-3 ${idx > 0 ? "pt-4 mt-4 border-t border-border" : ""}`}
+              className="border border-border rounded-xl bg-muted/10 p-4 space-y-3"
             >
-              {rows.length > 1 && (
-                <div className="text-xs font-semibold text-muted-foreground">
-                  Item {idx + 1}
+              {(!isEdit || rows.length > 1) && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Item {idx + 1}
+                  </span>
+                  {!isEdit && (
+                    <button
+                      onClick={() => removeRow(row.id)}
+                      disabled={rows.length === 1 || submitting}
+                      className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                      aria-label={`Remove item ${idx + 1}`}
+                      title="Remove this item"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               )}
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-muted-foreground">
                   Name
                 </label>
                 <input
@@ -233,8 +265,8 @@ export function AddSttItemsDialog({
                   className="w-full h-9 px-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-muted-foreground">
                   Reference transcript
                 </label>
                 <textarea
@@ -246,8 +278,8 @@ export function AddSttItemsDialog({
                   className="w-full px-3 py-2 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 resize-y"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-muted-foreground">
                   Predicted transcript
                 </label>
                 <textarea
@@ -263,6 +295,29 @@ export function AddSttItemsDialog({
               </div>
             </div>
           ))}
+
+          {!isEdit && (
+            <button
+              onClick={addRow}
+              disabled={submitting}
+              className="w-full h-10 rounded-md text-sm font-medium border border-dashed border-border bg-background hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 4.5v15m7.5-7.5h-15"
+                />
+              </svg>
+              Add another item
+            </button>
+          )}
 
           {error && (
             <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-500">

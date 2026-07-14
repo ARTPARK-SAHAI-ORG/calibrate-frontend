@@ -85,13 +85,38 @@ describe("AddSttItemsDialog", () => {
     expect(addButton).not.toBeDisabled();
   });
 
-  it("is a single-item form: no add-another or remove controls", () => {
+  it("starts with a single card and can add / remove more", async () => {
+    const user = setupUser();
     renderDialog();
     expect(screen.getAllByPlaceholderText("e.g. Clip 1")).toHaveLength(1);
-    expect(
-      screen.queryByRole("button", { name: "Add another item" }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/Remove item/)).not.toBeInTheDocument();
+    // Sole card's remove control is disabled.
+    expect(screen.getByLabelText("Remove item 1")).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Add another item" }));
+    expect(screen.getAllByPlaceholderText("e.g. Clip 1")).toHaveLength(2);
+
+    await user.click(screen.getAllByLabelText(/Remove item/)[1]);
+    expect(screen.getAllByPlaceholderText("e.g. Clip 1")).toHaveLength(1);
+  });
+
+  it("submits multiple filled cards with an 'Add N items' label", async () => {
+    const user = setupUser();
+    const onSubmit = jest.fn().mockResolvedValue(undefined);
+    renderDialog({ onSubmit });
+    await user.click(screen.getByRole("button", { name: "Add another item" }));
+
+    const names = screen.getAllByPlaceholderText("e.g. Clip 1");
+    const actuals = screen.getAllByPlaceholderText("What was actually said");
+    const preds = screen.getAllByPlaceholderText("What the system transcribed");
+    for (let i = 0; i < 2; i++) {
+      await user.type(names[i], `Clip ${i + 1}`);
+      await user.type(actuals[i], "a");
+      await user.type(preds[i], "p");
+    }
+
+    await user.click(screen.getByRole("button", { name: "Add 2 items" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0]).toHaveLength(2);
   });
 
   it("submits the single filled row, trimmed", async () => {
