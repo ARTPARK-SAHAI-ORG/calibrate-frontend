@@ -15,11 +15,34 @@ import {
   splitCsvLines,
 } from "@/components/evaluations/audioZip";
 import { reportError } from "@/lib/reportError";
+import { parseItemNameConflictFromError } from "./itemNameConflict";
 import { uploadTtsAudioToS3 } from "./ttsAudioUpload";
 import {
   DiscardChangesDialog,
   useUnsavedCloseGuard,
 } from "./unsavedCloseGuard";
+
+/** A readable upload error: friendly name-conflict copy, else the backend's
+ * detail string, else a generic fallback — never raw JSON. */
+function friendlyUploadError(err: unknown): string {
+  const conflict = parseItemNameConflictFromError(err);
+  if (conflict) return conflict.message;
+  if (err instanceof Error) {
+    const m = err.message.match(/Request failed: \d+ - ([\s\S]+)$/);
+    if (m) {
+      try {
+        const parsed = JSON.parse(m[1]);
+        if (typeof parsed?.detail === "string") return parsed.detail;
+        if (typeof parsed?.detail?.message === "string") {
+          return parsed.detail.message;
+        }
+      } catch {
+        /* not JSON — fall through */
+      }
+    }
+  }
+  return "Failed to upload items. Please try again.";
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -309,9 +332,8 @@ export function BulkUploadTtsItemsDialog({
       });
       onSuccess(rows.length);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to add items";
-      setError(message);
+      reportError("Failed to create TTS labelling items", err);
+      setError(friendlyUploadError(err));
     } finally {
       setIsUploading(false);
     }

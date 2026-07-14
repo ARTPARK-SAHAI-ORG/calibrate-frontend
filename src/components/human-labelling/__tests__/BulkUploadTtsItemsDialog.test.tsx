@@ -350,4 +350,34 @@ describe("BulkUploadTtsItemsDialog", () => {
     expect(onSuccess).not.toHaveBeenCalled();
     expect(apiClient).not.toHaveBeenCalled();
   });
+
+  it("shows a friendly message (not raw JSON) on a name conflict", async () => {
+    (apiClient as jest.Mock).mockRejectedValueOnce(
+      new Error(
+        'Request failed: 409 - {"detail":{"code":"ITEM_NAME_DUPLICATE_IN_REQUEST","conflicting_names":["Greeting"]}}',
+      ),
+    );
+    const { container, onSuccess } = renderDialog();
+    await uploadZip(
+      container,
+      await buildZip({
+        csv: "name,text,audio_file\nGreeting,Hello there,a.wav",
+        files: { "audios/a.wav": "RIFFfakeaudio" },
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText("Greeting")).toBeInTheDocument(),
+    );
+    await act(async () => {
+      screen.getByRole("button", { name: "Upload item" }).click();
+      for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0));
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByText('Duplicate name in your request: "Greeting"'),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/Request failed: 409/)).not.toBeInTheDocument();
+    expect(onSuccess).not.toHaveBeenCalled();
+  });
 });
