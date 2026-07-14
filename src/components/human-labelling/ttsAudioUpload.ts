@@ -1,28 +1,17 @@
 import { signOut } from "next-auth/react";
+import { getAudioDuration } from "@/components/evaluations/audioZip";
 import { LIMITS } from "@/constants/limits";
 import { reportError } from "@/lib/reportError";
 
 /**
- * Shared audio helpers for the TTS labelling dialogs (single-add + bulk ZIP).
- * Audio is never sent through the backend — each clip is PUT straight to S3
- * via a short-lived presigned URL, and the returned `s3_path` becomes the
- * item's `audio_path`. Mirrors the STT dataset upload flow.
+ * TTS-labelling audio upload helpers (single-add + bulk ZIP). Audio is never
+ * sent through the backend — each clip is PUT straight to S3 via a short-lived
+ * presigned URL, and the returned `s3_path` becomes the item's `audio_path`.
+ * Shared audio/ZIP primitives live in `@/components/evaluations/audioZip`.
  */
 
-export const getAudioDuration = (file: File): Promise<number> =>
-  new Promise((resolve, reject) => {
-    const audio = new Audio();
-    const url = URL.createObjectURL(file);
-    audio.src = url;
-    audio.onloadedmetadata = () => {
-      URL.revokeObjectURL(url);
-      resolve(audio.duration);
-    };
-    audio.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Failed to load audio"));
-    };
-  });
+// Re-exported so existing TTS-dialog imports keep a single entry point.
+export { getAudioDuration };
 
 /**
  * Validate an audio file against the size/duration caps. Returns a

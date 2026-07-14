@@ -6,8 +6,16 @@ import { apiClient } from "@/lib/api";
 import { LIMITS, showLimitToast } from "@/constants/limits";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { LazyAudioPlayer } from "@/components/evaluations/LazyAudioPlayer";
+import {
+  createToneWav,
+  findDataCsvInZip,
+  findZipAudioFile,
+  getAudioDuration,
+  parseCsvLine,
+  splitCsvLines,
+} from "@/components/evaluations/audioZip";
 import { reportError } from "@/lib/reportError";
-import { getAudioDuration, uploadTtsAudioToS3 } from "./ttsAudioUpload";
+import { uploadTtsAudioToS3 } from "./ttsAudioUpload";
 import {
   DiscardChangesDialog,
   useUnsavedCloseGuard,
@@ -16,77 +24,6 @@ import {
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 const fileStem = (name: string) => name.replace(/\.[^./]+$/, "");
-
-/** Parse one CSV line, honouring simple double-quote escaping. */
-const parseCsvLine = (line: string): string[] => {
-  const values: string[] = [];
-  let current = "";
-  let inQuotes = false;
-  for (const char of line) {
-    if (char === '"') inQuotes = !inQuotes;
-    else if (char === "," && !inQuotes) {
-      values.push(current.trim());
-      current = "";
-    } else current += char;
-  }
-  values.push(current.trim());
-  return values;
-};
-
-// ~1s of an audible 440 Hz tone so the sample clips actually play (and show a
-// real duration) when a user tries them — a silent sample reads as "broken".
-const createSampleWav = (): Uint8Array => {
-  const sampleRate = 44_100;
-  const numChannels = 1;
-  const bitsPerSample = 16;
-  const bytesPerSample = bitsPerSample / 8;
-  const numSamples = sampleRate; // 1 second
-  const dataBytes = numSamples * numChannels * bytesPerSample;
-  const blockAlign = numChannels * bytesPerSample;
-  const byteRate = sampleRate * blockAlign;
-  const fmtChunkPayload = 16;
-  const headerBytes = 12 + 8 + fmtChunkPayload + 8;
-  const fileSize = headerBytes + dataBytes;
-  const buffer = new ArrayBuffer(fileSize);
-  const view = new DataView(buffer);
-  let o = 0;
-  view.setUint32(o, 0x52494646, false);
-  o += 4;
-  view.setUint32(o, fileSize - 8, true);
-  o += 4;
-  view.setUint32(o, 0x57415645, false);
-  o += 4;
-  view.setUint32(o, 0x666d7420, false);
-  o += 4;
-  view.setUint32(o, fmtChunkPayload, true);
-  o += 4;
-  view.setUint16(o, 1, true);
-  o += 2;
-  view.setUint16(o, numChannels, true);
-  o += 2;
-  view.setUint32(o, sampleRate, true);
-  o += 4;
-  view.setUint32(o, byteRate, true);
-  o += 4;
-  view.setUint16(o, blockAlign, true);
-  o += 2;
-  view.setUint16(o, bitsPerSample, true);
-  o += 2;
-  view.setUint32(o, 0x64617461, false);
-  o += 4;
-  view.setUint32(o, dataBytes, true);
-  o += 4;
-  // Fill the data chunk with a gently-faded 440 Hz sine tone.
-  const amplitude = 0.25 * 0x7fff;
-  for (let i = 0; i < numSamples; i++) {
-    const t = i / sampleRate;
-    const fade = Math.min(1, t / 0.02, (1 - t) / 0.02); // 20ms in/out fade
-    const s = Math.round(amplitude * fade * Math.sin(2 * Math.PI * 440 * t));
-    view.setInt16(o, s, true);
-    o += 2;
-  }
-  return new Uint8Array(buffer);
-};
 
 type ParsedRow = {
   id: string;
@@ -173,9 +110,9 @@ export function BulkUploadTtsItemsDialog({
     const zip = new JSZip();
     const audios = zip.folder("audios");
     const wavOpts = { compression: "STORE" as const };
-    audios?.file("sample_1.wav", createSampleWav(), wavOpts);
-    audios?.file("sample_2.wav", createSampleWav(), wavOpts);
-    audios?.file("sample_3.wav", createSampleWav(), wavOpts);
+    audios?.file("sample_1.wav", createToneWav(), wavOpts);
+    audios?.file("sample_2.wav", createToneWav(), wavOpts);
+    audios?.file("sample_3.wav", createToneWav(), wavOpts);
     zip.file(
       "data.csv",
       "name,text,audio_file\n" +
@@ -209,33 +146,14 @@ export function BulkUploadTtsItemsDialog({
     try {
       const zip = await JSZip.loadAsync(file);
 
-      let csvFile = zip.file("data.csv");
-      let basePath = "";
-      if (!csvFile) {
-        const folders = Object.keys(zip.files).filter(
-          (p) =>
-            p.endsWith("/") &&
-            p.split("/").length === 2 &&
-            !p.includes("__MACOSX") &&
-            !p.startsWith("._"),
-        );
-        for (const folder of folders) {
-          const candidate = zip.file(`${folder}data.csv`);
-          if (candidate) {
-            csvFile = candidate;
-            basePath = folder;
-            break;
-          }
-        }
-      }
-      if (!csvFile) {
+      const csv = findDataCsvInZip(zip);
+      if (!csv) {
         setError("ZIP must contain a data.csv file.");
         return;
       }
+      const basePath = csv.basePath;
 
-      let csvContent = await csvFile.async("string");
-      if (csvContent.charCodeAt(0) === 0xfeff) csvContent = csvContent.slice(1);
-      const lines = csvContent.split(/\r\n|\n|\r/).filter((l) => l.trim());
+      const lines = splitCsvLines(await csv.file.async("string"));
       if (lines.length < 2) {
         setError("data.csv must have a header and at least one data row.");
         return;
@@ -264,9 +182,7 @@ export function BulkUploadTtsItemsDialog({
         const name =
           (nameIdx !== -1 ? values[nameIdx] : "") || fileStem(audioFileName);
 
-        const audioZip =
-          zip.file(`${basePath}audios/${audioFileName}`) ||
-          zip.file(`${basePath}${audioFileName}`);
+        const audioZip = findZipAudioFile(zip, basePath, audioFileName);
         if (!audioZip) {
           revokePreviewUrls(built);
           setError(`Row ${i}: audio file "${audioFileName}" not found in ZIP.`);
