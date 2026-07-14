@@ -176,6 +176,9 @@ export function AddSttItemsDialog({
       setValidationAttempted(true);
       return;
     }
+    // The freshly appended card starts clean — validation only re-triggers on
+    // the next submit, not carried over from an earlier failed submit.
+    setValidationAttempted(false);
     pendingScrollRef.current = true;
     setRows((prev) => [...prev, newRow()]);
   };

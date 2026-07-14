@@ -117,6 +117,18 @@ describe("AddSttItemsDialog", () => {
     ).toBeInTheDocument();
   });
 
+  it("clears prior validation errors when a new card is added", async () => {
+    const user = setupUser();
+    renderDialog();
+    // Trigger validation on the empty first card.
+    await user.click(screen.getByRole("button", { name: "Add item" }));
+    expect(screen.getByText("Name is required")).toBeInTheDocument();
+    // Fill it, then add another — the fresh card must start clean.
+    await fillRow(user, 0, { name: "Clip 1", actual: "a", pred: "p" });
+    await user.click(screen.getByRole("button", { name: "Add another item" }));
+    expect(screen.queryByText("Name is required")).not.toBeInTheDocument();
+  });
+
   it("starts with a single card and can add / remove more", async () => {
     const user = setupUser();
     renderDialog();

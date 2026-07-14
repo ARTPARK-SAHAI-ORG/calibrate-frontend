@@ -243,6 +243,28 @@ describe("AddTtsItemsDialog", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+  it("clears prior validation errors when a new card is added", async () => {
+    const user = setupUser();
+    const { container } = renderDialog();
+    // Trigger validation on the empty first card.
+    await user.click(screen.getByRole("button", { name: "Add item" }));
+    expect(screen.getByText("Name is required")).toBeInTheDocument();
+    // Complete it, then add another — the fresh card must start clean.
+    await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "Clip 1");
+    await user.type(
+      screen.getByPlaceholderText("The text that was spoken"),
+      "hello",
+    );
+    await pickFile(container, makeAudioFile());
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Add another item" }),
+      ).not.toBeDisabled(),
+    );
+    await user.click(screen.getByRole("button", { name: "Add another item" }));
+    expect(screen.queryByText("Name is required")).not.toBeInTheDocument();
+  });
+
   it("adds and removes rows once the first is complete", async () => {
     const user = setupUser();
     const { container } = renderDialog();
