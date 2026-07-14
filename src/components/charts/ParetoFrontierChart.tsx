@@ -153,9 +153,6 @@ export function ParetoFrontierChart({
 
   const hasDominated = dominatedData.length > 0;
   const showDominated = !frontierOnly;
-  // Points currently visible drive the axis domains so the view stays tight
-  // when the dominated models are hidden.
-  const visible = showDominated ? allData : frontierData;
 
   if (allData.length === 0) {
     return (
@@ -168,8 +165,11 @@ export function ParetoFrontierChart({
     );
   }
 
-  const costMax = Math.max(...visible.map((d) => d.cost));
-  const accVals = visible.map((d) => d.accuracy);
+  // Domains are derived from ALL models (not just the visible ones) so points
+  // keep their exact position when the "Frontier only" toggle hides dominated
+  // models — toggling filters points, it never rescales the axes.
+  const costMax = Math.max(...allData.map((d) => d.cost));
+  const accVals = allData.map((d) => d.accuracy);
   const accMin = Math.min(...accVals);
   const accMax = Math.max(...accVals);
   const accPad = Math.max(2, (accMax - accMin) * 0.15);
