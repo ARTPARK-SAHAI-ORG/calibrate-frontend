@@ -264,6 +264,50 @@ describe("AddTtsItemsDialog", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+  it("does not re-upload audio when retrying after a rejected save", async () => {
+    const user = setupUser();
+    const onSubmit = jest
+      .fn()
+      .mockRejectedValueOnce(
+        new Error(
+          'Request failed: 409 - {"detail":{"code":"ITEM_NAME_CONFLICT","conflicting_names":["Clip 1"]}}',
+        ),
+      )
+      .mockResolvedValue(undefined);
+    const { container } = renderDialog({ onSubmit });
+
+    await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "Clip 1");
+    await user.type(
+      screen.getByPlaceholderText("The reference text that was spoken"),
+      "hello",
+    );
+    await pickFile(container, makeAudioFile());
+    await waitFor(() =>
+      expect(screen.getByLabelText("Play")).toBeInTheDocument(),
+    );
+
+    // First save is rejected — audio uploads once here.
+    await act(async () => {
+      screen.getByRole("button", { name: "Add item" }).click();
+      for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
+    });
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+
+    // Retry succeeds — the file must NOT upload a second time.
+    await act(async () => {
+      screen.getByRole("button", { name: "Add item" }).click();
+      for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
+    });
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2));
+
+    const presignedCalls = (global.fetch as jest.Mock).mock.calls.filter(
+      ([u]) => typeof u === "string" && u.includes("/presigned-url"),
+    );
+    expect(presignedCalls).toHaveLength(1);
+    // The retry reused the stored key.
+    expect(onSubmit.mock.calls[1][0][0].audio_path).toBe("tts/media/clip.wav");
+  });
+
   it("clears prior validation errors when a new card is added", async () => {
     const user = setupUser();
     const { container } = renderDialog();

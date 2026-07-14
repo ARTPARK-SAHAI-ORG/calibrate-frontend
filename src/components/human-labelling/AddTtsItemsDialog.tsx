@@ -27,6 +27,8 @@ type TtsRowDraft = {
   previewUrl: string | null;
   /** Already-stored audio (edit/duplicate) kept when no new file is picked. */
   existingAudio: string | null;
+  /** s3 path from a successful upload, so a retry doesn't re-upload the file. */
+  uploadedPath: string | null;
 };
 
 export type TtsItemRowSubmission = {
@@ -81,6 +83,7 @@ const newRow = (): TtsRowDraft => ({
   audioFile: null,
   previewUrl: null,
   existingAudio: null,
+  uploadedPath: null,
 });
 
 const rowsFromInitial = (
@@ -95,6 +98,7 @@ const rowsFromInitial = (
         audioFile: null,
         previewUrl: null,
         existingAudio: r.audio || null,
+        uploadedPath: null,
       }))
     : [newRow()];
 
@@ -234,7 +238,13 @@ export function AddTtsItemsDialog({
       prev.map((r) => {
         if (r.id !== id) return r;
         if (r.previewUrl) URL.revokeObjectURL(r.previewUrl);
-        return { ...r, audioFile: file, previewUrl: URL.createObjectURL(file) };
+        // A newly-picked file invalidates any prior upload for this row.
+        return {
+          ...r,
+          audioFile: file,
+          previewUrl: URL.createObjectURL(file),
+          uploadedPath: null,
+        };
       }),
     );
   };
@@ -284,9 +294,14 @@ export function AddTtsItemsDialog({
     try {
       // Upload any newly-picked audio to S3, then map each row to its
       // resolved audio_path (new upload, or the kept existing audio).
-      const resolved: TtsItemRowSubmission[] = [];
+      // A successful upload is remembered on the row (`uploadedPath`) so a
+      // retry — e.g. after a name conflict — doesn't re-upload it.
+      const uploaded: Record<string, string> = {};
       for (const r of validRows) {
-        let audioPath = r.existingAudio ?? "";
+        if (r.uploadedPath) {
+          uploaded[r.id] = r.uploadedPath;
+          continue;
+        }
         if (r.audioFile) {
           const path = await uploadTtsAudioToS3(r.audioFile, accessToken);
           if (!path) {
@@ -295,15 +310,23 @@ export function AddTtsItemsDialog({
             );
             return;
           }
-          audioPath = path;
+          uploaded[r.id] = path;
         }
-        resolved.push({
-          uuid: r.uuid,
-          name: r.name.trim(),
-          text: r.text.trim(),
-          audio_path: audioPath,
-        });
       }
+      // Persist the uploaded keys before the save so a retry skips re-upload.
+      if (Object.keys(uploaded).length > 0) {
+        setRows((prev) =>
+          prev.map((r) =>
+            uploaded[r.id] ? { ...r, uploadedPath: uploaded[r.id] } : r,
+          ),
+        );
+      }
+      const resolved: TtsItemRowSubmission[] = validRows.map((r) => ({
+        uuid: r.uuid,
+        name: r.name.trim(),
+        text: r.text.trim(),
+        audio_path: uploaded[r.id] ?? r.existingAudio ?? "",
+      }));
       await onSubmit(resolved);
     } catch (err) {
       const conflict = parseItemNameConflictFromError(err);

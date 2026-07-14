@@ -85,6 +85,8 @@ type ParsedRow = {
   text: string;
   audioFile: File;
   audioUrl: string; // object URL for local preview
+  /** s3 path from a successful upload, so a retry doesn't re-upload it. */
+  uploadedPath?: string;
 };
 
 type BulkUploadTtsItemsDialogProps = {
@@ -328,12 +330,16 @@ export function BulkUploadTtsItemsDialog({
 
     try {
       // Upload audio to S3 with bounded concurrency — a sequential loop is
-      // far too slow once there are more than a handful of clips.
-      const s3Paths = new Array<string | null>(rows.length).fill(null);
+      // far too slow once there are more than a handful of clips. Clips that
+      // already uploaded on a prior attempt (`uploadedPath`) are reused so a
+      // retry doesn't re-upload the whole batch.
+      const s3Paths: (string | null)[] = rows.map((r) => r.uploadedPath ?? null);
+      setUploadedCount(s3Paths.filter(Boolean).length);
       let cursor = 0;
       const worker = async () => {
         while (cursor < rows.length) {
           const idx = cursor++;
+          if (s3Paths[idx]) continue;
           const path = await uploadTtsAudioToS3(rows[idx].audioFile, accessToken);
           s3Paths[idx] = path;
           if (path) setUploadedCount((c) => c + 1);
@@ -343,6 +349,13 @@ export function BulkUploadTtsItemsDialog({
         Array.from(
           { length: Math.min(LIMITS.STT_UPLOAD_CONCURRENCY, rows.length) },
           worker,
+        ),
+      );
+
+      // Remember successful uploads so a retry skips them.
+      setRows((prev) =>
+        prev.map((r, i) =>
+          s3Paths[i] ? { ...r, uploadedPath: s3Paths[i] as string } : r,
         ),
       );
 
