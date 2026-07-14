@@ -238,8 +238,8 @@ export function ParetoFrontierChart({
           <h3 className="text-[15px] font-semibold">{title}</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {hasLatency
-              ? "Each dot is a model. The higher it sits, the more tests it passes. The further left, the less it costs to run. The smaller it is, the faster it replies. So the best models sit toward the top-left. The dashed line marks the top picks: any model off the line is beaten by one on it, with no downside."
-              : "Each dot is a model. The higher it sits, the more tests it passes, and the further left, the less it costs to run. So the best models sit toward the top-left. The dashed line marks the top picks: any model off the line is beaten by one on it, with no downside."}
+              ? "Each dot is a model. The higher it sits, the more tests it passes. The further left, the less it costs to run. The smaller it is, the faster it replies. So the best models sit toward the top-left. Stick to the models on the dashed line: they are the best picks. For any model not on it, one that is will match or beat it on pass rate, cost, and speed, so there is no reason to choose it."
+              : "Each dot is a model. The higher it sits, the more tests it passes, and the further left, the less it costs to run. So the best models sit toward the top-left. Stick to the models on the dashed line: they are the best picks. For any model not on it, one that is will match or beat it on both pass rate and cost, so there is no reason to choose it."}
           </p>
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
