@@ -14,12 +14,13 @@ import type {
 import { Select } from "@/components/ui/Select";
 
 // Each source kind maps to exactly one task type: llm tests/benchmarks → "llm",
-// STT runs → "stt", simulation runs → "conversation" (their transcript is a
-// conversation). The type is derived from the source (`targetTaskTypeForSource`),
-// never chosen by the user.
+// STT runs → "stt", TTS runs → "tts", simulation runs → "conversation" (their
+// transcript is a conversation). The type is derived from the source
+// (`targetTaskTypeForSource`), never chosen by the user.
 export const SUPPORTED_TARGET_TASK_TYPES = [
   "llm",
   "stt",
+  "tts",
   "conversation",
 ] as const;
 export type SupportedTaskType = (typeof SUPPORTED_TARGET_TASK_TYPES)[number];
@@ -32,6 +33,17 @@ export type SttLabellingRow = {
   name: string;
   reference_transcript: string;
   predicted_transcript: string;
+};
+
+/**
+ * A normalised TTS result row, pre-mapped by the TTS page. The synthesized
+ * clip lives at `audio_path` (a fetchable URL on the results page); the
+ * `text` is the source string that was spoken — the inverse of an STT row.
+ */
+export type TtsLabellingRow = {
+  name: string;
+  text: string;
+  audio_path: string;
 };
 
 /**
@@ -74,6 +86,13 @@ export type AddRunToLabellingTaskSource =
       evaluators?: SourceEvaluatorRef[];
     }
   | {
+      type: "tts_run";
+      runUuid: string;
+      runName?: string;
+      rows: TtsLabellingRow[];
+      evaluators?: SourceEvaluatorRef[];
+    }
+  | {
       type: "simulation_run";
       runUuid: string;
       runName?: string;
@@ -88,6 +107,8 @@ export function targetTaskTypeForSource(
   switch (source.type) {
     case "stt_run":
       return "stt";
+    case "tts_run":
+      return "tts";
     case "simulation_run":
       return "conversation";
     default:
@@ -102,6 +123,7 @@ export function itemNounForSource(source: AddRunToLabellingTaskSource): {
 } {
   switch (source.type) {
     case "stt_run":
+    case "tts_run":
       return { one: "result", many: "results" };
     case "simulation_run":
       return { one: "conversation", many: "conversations" };
@@ -336,6 +358,24 @@ export function buildItemsFromSource(
             name: row.name,
             reference_transcript: row.reference_transcript,
             predicted_transcript: row.predicted_transcript,
+          },
+        });
+      }
+      for (const ev of source.evaluators ?? []) {
+        if (ev?.uuid) evaluatorUuids.add(ev.uuid);
+      }
+      return { items, skippedCount, evaluatorUuids };
+    }
+    case "tts_run": {
+      // TTS results carry no per-row judge variable echoes either, so the
+      // evaluator set comes wholesale from the run-level evaluators. Each
+      // item pairs the source `text` with the synthesized `audio_path`.
+      for (const row of source.rows) {
+        items.push({
+          payload: {
+            name: row.name,
+            text: row.text,
+            audio_path: row.audio_path,
           },
         });
       }

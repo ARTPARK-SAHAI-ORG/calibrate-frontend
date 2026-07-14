@@ -498,6 +498,9 @@ export function TTSEvaluationOutputs({
   evaluatorColumns,
   getProviderLabel,
   className = "flex flex-col md:flex-row border border-border rounded-xl overflow-hidden md:h-[calc(100vh-220px)]",
+  labellingSelection,
+  onToggleLabellingSelection,
+  onLabellingBulkToggle,
 }: {
   providerResults: TTSProviderResultForDetails[];
   activeProviderKey: string | null;
@@ -506,6 +509,12 @@ export function TTSEvaluationOutputs({
   evaluatorColumns: TTSEvaluatorColumn[];
   getProviderLabel: (value: string) => string;
   className?: string;
+  // Labelling selection (opt-in). Keys are scoped per provider — the active
+  // provider's key prefix is prepended so a row's identity is stable across
+  // provider switches (e.g. `openai:0`).
+  labellingSelection?: Set<string>;
+  onToggleLabellingSelection?: (key: string) => void;
+  onLabellingBulkToggle?: (keys: string[]) => void;
 }) {
   const selectedProvider = activeProviderKey || providerResults[0]?.provider;
   const providerResult = providerResults.find(
@@ -610,6 +619,16 @@ export function TTSEvaluationOutputs({
                   results={providerResult.results}
                   showMetrics={showMetrics}
                   evaluatorColumns={evaluatorColumns}
+                  labellingSelection={
+                    onToggleLabellingSelection ? labellingSelection : undefined
+                  }
+                  onToggleLabellingSelection={onToggleLabellingSelection}
+                  onLabellingBulkToggle={onLabellingBulkToggle}
+                  labellingKeyForRow={
+                    onToggleLabellingSelection
+                      ? (_row, i) => `${selectedProvider}:${i}`
+                      : undefined
+                  }
                 />
               )}
             </div>

@@ -176,6 +176,29 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     expect(result.evaluatorUuids.has("stt-ev-1")).toBe(true);
   });
 
+  it("builds tts items from a tts_run source", () => {
+    const source: AddRunToLabellingTaskSource = {
+      type: "tts_run",
+      runUuid: "tts-run-abcdefgh",
+      rows: [
+        {
+          name: "ElevenLabs #1",
+          text: "hello world",
+          audio_path: "https://example.com/a.wav",
+        },
+      ],
+      evaluators: [{ uuid: "tts-ev-1", name: "Naturalness" }],
+    };
+    const result = buildItemsFromSource(source);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].payload).toEqual({
+      name: "ElevenLabs #1",
+      text: "hello world",
+      audio_path: "https://example.com/a.wav",
+    });
+    expect(result.evaluatorUuids.has("tts-ev-1")).toBe(true);
+  });
+
   it("builds conversation items from a simulation_run source", () => {
     const source: AddRunToLabellingTaskSource = {
       type: "simulation_run",
