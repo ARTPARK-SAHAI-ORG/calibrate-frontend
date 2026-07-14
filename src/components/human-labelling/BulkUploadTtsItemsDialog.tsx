@@ -403,8 +403,8 @@ export function BulkUploadTtsItemsDialog({
               Bulk upload items
             </h2>
             <p className="text-xs md:text-sm text-muted-foreground mt-1">
-              Upload a ZIP with an <code>audios</code> folder of .wav files and
-              a <code>data.csv</code> mapping each clip to its reference text.
+              Add many items at once from a ZIP of audio clips and their
+              reference text.
             </p>
           </div>
           <button
