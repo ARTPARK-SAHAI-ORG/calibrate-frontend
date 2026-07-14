@@ -1417,6 +1417,7 @@ function HumanAgreementSummary({
   evaluatorNamesById,
   versionLabels,
   linkEvaluators,
+  headerActions,
 }: {
   jobStatus: EvaluatorRunJob["status"];
   agreement: HumanAgreement | undefined;
@@ -1428,6 +1429,9 @@ function HumanAgreementSummary({
   evaluatorNamesById: Record<string, string>;
   versionLabels: Record<string, string>;
   linkEvaluators: boolean;
+  /** Status pill + action buttons, rendered on the heading row when the
+   * agreement cards show (so they don't sit on their own line above). */
+  headerActions?: React.ReactNode;
 }) {
   if (jobStatus !== "completed") return null;
   if (!agreement || agreement.evaluators.length === 0) return null;
@@ -1465,12 +1469,15 @@ function HumanAgreementSummary({
 
   return (
     <div className="space-y-2">
-      <div>
-        <h2 className="text-sm font-semibold">Human agreement</h2>
-        <p className="text-xs text-muted-foreground max-w-2xl mt-1">
-          How closely each evaluator&apos;s outputs in this run match the human
-          annotations on the same items
-        </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-sm font-semibold">Human agreement</h2>
+          <p className="text-xs text-muted-foreground max-w-2xl mt-1">
+            How closely each evaluator&apos;s outputs in this run match the
+            human annotations on the same items
+          </p>
+        </div>
+        {headerActions}
       </div>
       <div className="flex items-stretch gap-3 overflow-x-auto pb-1">
         {evaluators.map((ev) => {
@@ -1723,44 +1730,46 @@ export function EvaluatorRunDetailView({
     return null;
   }
 
+  const ha = job.human_agreement;
+  // The agreement cards (rendered by HumanAgreementSummary) already name the
+  // evaluators. When they show, the status pill + action buttons move up onto
+  // the "Human agreement" heading row instead of sitting on their own line.
+  const cardsWillRender =
+    job.status === "completed" &&
+    !!ha &&
+    ha.evaluators.length > 0 &&
+    !(
+      ha.evaluators.every((e) => e.agreement === null) && ha.items.length === 0
+    );
+
+  const statusPill = !hideStatusPill ? (
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusPillClass(
+        job.status,
+      )}`}
+    >
+      {statusLabel(job.status)}
+    </span>
+  ) : null;
+
+  const headerActions =
+    statusPill || shareSlot || actionsSlot ? (
+      <div className="flex items-center gap-2 flex-wrap shrink-0">
+        {statusPill}
+        {shareSlot}
+        {actionsSlot}
+      </div>
+    ) : null;
+
   return (
     <>
-      {(() => {
-        const ha = job.human_agreement;
-        const cardsWillRender =
-          job.status === "completed" &&
-          !!ha &&
-          ha.evaluators.length > 0 &&
-          !(
-            ha.evaluators.every((e) => e.agreement === null) &&
-            ha.items.length === 0
-          );
-        // When agreement cards render they already name the evaluators —
-        // skip the standalone pills. Status sits with the action buttons
-        // (left of Re-run / Export / Share) so it doesn't orphan a whole row.
-        const showEvaluatorPills = !cardsWillRender;
-        const showHeader =
-          !hideStatusPill || shareSlot || actionsSlot || showEvaluatorPills;
-        if (!showHeader) return null;
-
-        const statusPill = !hideStatusPill ? (
-          <span
-            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusPillClass(
-              job.status,
-            )}`}
-          >
-            {statusLabel(job.status)}
-          </span>
-        ) : null;
-
-        return (
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2 flex-wrap min-w-0">
-              {showEvaluatorPills &&
-                (detailsEvaluators.length === 0 ? (
-                  <span className="text-sm text-muted-foreground">—</span>
-                ) : (
-                  detailsEvaluators.map((e) => {
+      {!cardsWillRender && (
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            {detailsEvaluators.length === 0 ? (
+              <span className="text-sm text-muted-foreground">—</span>
+            ) : (
+              detailsEvaluators.map((e) => {
                     const name = evaluatorDisplayName(e, evaluatorNamesById);
                     const label = e.evaluator_version_id
                       ? versionLabels[e.evaluator_version_id]
@@ -1800,18 +1809,11 @@ export function EvaluatorRunDetailView({
                       </span>
                     );
                   })
-                ))}
-            </div>
-            {(statusPill || shareSlot || actionsSlot) && (
-              <div className="flex items-center gap-2 flex-wrap shrink-0">
-                {statusPill}
-                {shareSlot}
-                {actionsSlot}
-              </div>
             )}
           </div>
-        );
-      })()}
+          {headerActions}
+        </div>
+      )}
       {topError && (
         <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-500">
           {topError}
@@ -1825,6 +1827,7 @@ export function EvaluatorRunDetailView({
         evaluatorNamesById={evaluatorNamesById}
         versionLabels={versionLabels}
         linkEvaluators={linkEvaluators}
+        headerActions={cardsWillRender ? headerActions : null}
       />
 
       <div className="border border-border rounded-xl [overflow:clip] flex flex-col flex-1 min-h-0">
