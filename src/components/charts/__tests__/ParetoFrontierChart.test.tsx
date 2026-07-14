@@ -18,16 +18,18 @@ function renderChart(pts: ParetoModelPoint[]) {
 }
 
 describe("ParetoFrontierChart", () => {
-  it("renders the title and mentions faster bubbles when latency is present", () => {
+  it("renders the title and mentions speed when latency is present", () => {
     renderChart(points);
-    expect(screen.getByText(/Pareto frontier/i)).toBeInTheDocument();
-    expect(screen.getByText(/smaller bubbles are faster/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Pass rate vs cost vs latency tradeoff/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/the faster it replies/i)).toBeInTheDocument();
   });
 
   it("omits the speed wording when latency is not reported", () => {
     renderChart(points.map((p) => ({ ...p, latency: undefined })));
-    expect(screen.queryByText(/faster/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/further left means lower cost/i)).toBeInTheDocument();
+    expect(screen.queryByText(/replies/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/the less it costs to run/i)).toBeInTheDocument();
   });
 
   it("shows the empty state when no model has cost + pass rate", () => {

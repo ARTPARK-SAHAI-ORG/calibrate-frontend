@@ -102,7 +102,7 @@ function ParetoTooltip({
 export function ParetoFrontierChart({
   points,
   colorMap,
-  title = "Pareto frontier",
+  title = "Pass rate vs cost vs latency tradeoff",
   passRateLabel = "Pass rate",
   filename = "pareto-frontier",
   height = 400,
@@ -238,8 +238,8 @@ export function ParetoFrontierChart({
           <h3 className="text-[15px] font-semibold">{title}</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {hasLatency
-              ? "Each bubble is a model. Higher up means a better pass rate, further left means lower cost, and smaller bubbles are faster. The dashed line connects the models that nothing else beats on cost, pass rate, and speed at once."
-              : "Each bubble is a model. Higher up means a better pass rate and further left means lower cost. The dashed line connects the models that nothing else beats on cost and pass rate."}
+              ? "Each dot is a model. The higher it sits, the more tests it passes. The further left, the less it costs to run. The smaller it is, the faster it replies. So the best models sit toward the top-left. The dashed line marks the top picks: any model off the line is beaten by one on it, with no downside."
+              : "Each dot is a model. The higher it sits, the more tests it passes, and the further left, the less it costs to run. So the best models sit toward the top-left. The dashed line marks the top picks: any model off the line is beaten by one on it, with no downside."}
           </p>
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
