@@ -308,6 +308,58 @@ describe("AddTtsItemsDialog", () => {
     expect(onSubmit.mock.calls[1][0][0].audio_path).toBe("tts/media/clip.wav");
   });
 
+  it("shows a banner for a generic (non-conflict) save error", async () => {
+    const user = setupUser();
+    const onSubmit = jest
+      .fn()
+      .mockRejectedValue(new Error("Request failed: 500 - Server exploded"));
+    const { container } = renderDialog({ onSubmit });
+    await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "Clip 1");
+    await user.type(
+      screen.getByPlaceholderText("The reference text that was spoken"),
+      "hi",
+    );
+    await pickFile(container, makeAudioFile());
+    await waitFor(() =>
+      expect(screen.getByLabelText("Play")).toBeInTheDocument(),
+    );
+    await act(async () => {
+      screen.getByRole("button", { name: "Add item" }).click();
+      for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(await screen.findByText("Server exploded")).toBeInTheDocument();
+  });
+
+  it("falls back to a banner when a name conflict matches no visible row", async () => {
+    const user = setupUser();
+    const onSubmit = jest
+      .fn()
+      .mockRejectedValue(
+        new Error(
+          'Request failed: 409 - {"detail":{"code":"ITEM_NAME_CONFLICT","conflicting_names":["Other"]}}',
+        ),
+      );
+    const { container } = renderDialog({ onSubmit });
+    await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "Clip 1");
+    await user.type(
+      screen.getByPlaceholderText("The reference text that was spoken"),
+      "hi",
+    );
+    await pickFile(container, makeAudioFile());
+    await waitFor(() =>
+      expect(screen.getByLabelText("Play")).toBeInTheDocument(),
+    );
+    await act(async () => {
+      screen.getByRole("button", { name: "Add item" }).click();
+      for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(
+      await screen.findByText(
+        'An item named "Other" already exists in this task',
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("clears prior validation errors when a new card is added", async () => {
     const user = setupUser();
     const { container } = renderDialog();

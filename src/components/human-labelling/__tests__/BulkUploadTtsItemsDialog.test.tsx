@@ -189,6 +189,77 @@ describe("BulkUploadTtsItemsDialog", () => {
     );
   });
 
+  it("finds data.csv nested inside a single top-level folder", async () => {
+    const { container } = renderDialog();
+    await uploadZip(
+      container,
+      await buildZip({
+        files: {
+          "batch/data.csv": "name,text,audio_file\nClip,Hi there,a.wav",
+          "batch/audios/a.wav": "RIFFfakeaudio",
+        },
+      }),
+    );
+    await waitFor(() => expect(screen.getByText("Clip")).toBeInTheDocument());
+    expect(screen.getByText("Hi there")).toBeInTheDocument();
+  });
+
+  it("rejects a data.csv with only a header row", async () => {
+    const { container } = renderDialog();
+    await uploadZip(container, await buildZip({ csv: "name,text,audio_file" }));
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "data.csv must have a header and at least one data row.",
+        ),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it("rejects a row missing its text or audio_file value", async () => {
+    const { container } = renderDialog();
+    await uploadZip(
+      container,
+      await buildZip({
+        csv: "name,text,audio_file\nClip,,a.wav",
+        files: { "audios/a.wav": "RIFFfakeaudio" },
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText('Row 1: both "text" and "audio_file" are required.'),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it("rejects an over-long audio clip", async () => {
+    mockDuration = 9999;
+    const { container } = renderDialog();
+    await uploadZip(
+      container,
+      await buildZip({
+        csv: "name,text,audio_file\nClip,Hi,a.wav",
+        files: { "audios/a.wav": "RIFFfakeaudio" },
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText(/exceeds the .* limit/)).toBeInTheDocument(),
+    );
+  });
+
+  it("rejects a data.csv whose rows are all blank", async () => {
+    const { container } = renderDialog();
+    await uploadZip(
+      container,
+      await buildZip({ csv: "name,text,audio_file\n,,\n,," }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText("No rows with content were found in data.csv."),
+      ).toBeInTheDocument(),
+    );
+  });
+
   it("parses a valid ZIP, previews rows, uploads audio to S3, and creates items", async () => {
     const { container, onSuccess } = renderDialog();
     await uploadZip(
