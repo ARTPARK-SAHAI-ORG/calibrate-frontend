@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { FieldError } from "@/components/ui/FieldError";
 import { LazyAudioPlayer } from "@/components/evaluations/LazyAudioPlayer";
 import { humaniseDetailObject } from "./bulk-upload-shared";
 import { uploadTtsAudioToS3, validateTtsAudioFile } from "./ttsAudioUpload";
@@ -111,6 +112,9 @@ export function AddTtsItemsDialog({
   const [error, setError] = useState<string | null>(null);
   // Per-row audio validation errors (too big / too long / unreadable).
   const [audioErrors, setAudioErrors] = useState<Record<string, string>>({});
+  // Flips true after a submit attempt with incomplete rows, revealing the
+  // per-field validation errors.
+  const [validationAttempted, setValidationAttempted] = useState(false);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   // Set when "Add another item" appends a card, so the effect below scrolls
@@ -134,6 +138,7 @@ export function AddTtsItemsDialog({
       });
       setError(null);
       setAudioErrors({});
+      setValidationAttempted(false);
     }
   }, [isOpen, initialRows]);
 
@@ -215,20 +220,31 @@ export function AddTtsItemsDialog({
     });
   };
 
-  const addRow = () => {
-    pendingScrollRef.current = true;
-    setRows((prev) => [...prev, newRow()]);
-  };
-
   const isRowValid = (r: TtsRowDraft) =>
     !!r.name.trim() &&
     !!r.text.trim() &&
     (!!r.audioFile || !!r.existingAudio);
 
   const validRows = rows.filter(isRowValid);
+  const allComplete = rows.every(isRowValid);
+
+  const addRow = () => {
+    // Don't append a fresh blank card until the existing ones are complete.
+    if (!allComplete) {
+      setValidationAttempted(true);
+      return;
+    }
+    pendingScrollRef.current = true;
+    setRows((prev) => [...prev, newRow()]);
+  };
 
   const handleSubmit = async () => {
-    if (validRows.length === 0 || submitting) return;
+    if (submitting) return;
+    // Surface per-field errors instead of silently dropping incomplete rows.
+    if (!allComplete) {
+      setValidationAttempted(true);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -272,11 +288,11 @@ export function AddTtsItemsDialog({
       ? "Saving..."
       : "Adding..."
     : isEdit
-      ? validRows.length > 1
-        ? `Save ${validRows.length} items`
+      ? rows.length > 1
+        ? `Save ${rows.length} items`
         : "Save item"
-      : validRows.length > 1
-        ? `Add ${validRows.length} items`
+      : rows.length > 1
+        ? `Add ${rows.length} items`
         : "Add item";
 
   return (
@@ -324,16 +340,20 @@ export function AddTtsItemsDialog({
           {rows.map((row, idx) => {
             const playSrc = row.previewUrl ?? row.existingAudio;
             const fileName = row.audioFile?.name;
+            const nameMissing = validationAttempted && !row.name.trim();
+            const textMissing = validationAttempted && !row.text.trim();
+            const audioMissing =
+              validationAttempted && !row.audioFile && !row.existingAudio;
             return (
               <div
                 key={row.id}
-                className="border border-border rounded-xl bg-muted/10 p-4 space-y-3"
+                className="border border-border rounded-xl bg-muted/50 p-5 space-y-4"
               >
                 {(!isEdit || rows.length > 1) && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground">
+                  <div className="flex items-center justify-between border-b border-border pb-3">
+                    <h3 className="text-sm font-semibold text-foreground">
                       Item {idx + 1}
-                    </span>
+                    </h3>
                     {!isEdit && (
                       <button
                         onClick={() => removeRow(row.id)}
@@ -363,7 +383,7 @@ export function AddTtsItemsDialog({
                 {/* Name */}
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-muted-foreground">
-                    Name
+                    Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -371,14 +391,15 @@ export function AddTtsItemsDialog({
                     onChange={(e) => updateRow(row.id, { name: e.target.value })}
                     placeholder="e.g. Clip 1"
                     disabled={submitting}
-                    className="w-full h-9 px-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
+                    className={`w-full h-9 px-3 rounded-md text-sm border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 ${nameMissing ? "border-red-500 ring-1 ring-red-500/30" : "border-border"}`}
                   />
+                  <FieldError show={nameMissing}>Name is required</FieldError>
                 </div>
 
                 {/* Text */}
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-muted-foreground">
-                    Text
+                    Text <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     value={row.text}
@@ -386,14 +407,15 @@ export function AddTtsItemsDialog({
                     placeholder="The text that was spoken"
                     disabled={submitting}
                     rows={2}
-                    className="w-full px-3 py-2 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 resize-y"
+                    className={`w-full px-3 py-2 rounded-md text-sm border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 resize-y ${textMissing ? "border-red-500 ring-1 ring-red-500/30" : "border-border"}`}
                   />
+                  <FieldError show={textMissing}>Text is required</FieldError>
                 </div>
 
                 {/* Audio */}
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-muted-foreground">
-                    Audio
+                    Audio <span className="text-red-500">*</span>
                   </label>
                   <input
                     ref={(el) => {
@@ -414,7 +436,7 @@ export function AddTtsItemsDialog({
                       type="button"
                       onClick={() => fileInputRefs.current[row.id]?.click()}
                       disabled={submitting}
-                      className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                      className={`h-9 px-3 rounded-md text-sm font-medium border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 ${audioMissing ? "border-red-500 ring-1 ring-red-500/30" : "border-border"}`}
                     >
                       <svg
                         className="w-4 h-4"
@@ -452,6 +474,9 @@ export function AddTtsItemsDialog({
                   {audioErrors[row.id] && (
                     <p className="text-xs text-red-500">{audioErrors[row.id]}</p>
                   )}
+                  <FieldError show={audioMissing && !audioErrors[row.id]}>
+                    Audio is required
+                  </FieldError>
                 </div>
               </div>
             );
@@ -460,7 +485,12 @@ export function AddTtsItemsDialog({
           {!isEdit && (
             <button
               onClick={addRow}
-              disabled={submitting}
+              disabled={submitting || !allComplete}
+              title={
+                !allComplete
+                  ? "Fill in all items before adding another"
+                  : undefined
+              }
               className="w-full h-10 rounded-md text-sm font-medium border border-dashed border-border bg-background hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
             >
               <svg
@@ -497,7 +527,7 @@ export function AddTtsItemsDialog({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={validRows.length === 0 || submitting}
+            disabled={submitting}
             className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitLabel}

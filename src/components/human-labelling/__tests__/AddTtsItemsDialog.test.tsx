@@ -135,24 +135,37 @@ describe("AddTtsItemsDialog", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps Add disabled until name, text and an audio file are all present", async () => {
+  it("disables 'Add another item' until name, text and audio are present", async () => {
     const user = setupUser();
     const { container } = renderDialog();
-    const addButton = screen.getByRole("button", { name: "Add item" });
-    expect(addButton).toBeDisabled();
+    const addAnother = screen.getByRole("button", {
+      name: "Add another item",
+    });
+    expect(addAnother).toBeDisabled();
 
     await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "Clip 1");
     await user.type(
       screen.getByPlaceholderText("The text that was spoken"),
       "hello",
     );
-    expect(addButton).toBeDisabled();
+    expect(addAnother).toBeDisabled();
 
     await pickFile(container, makeAudioFile());
     await waitFor(() =>
       expect(screen.getByLabelText("Play")).toBeInTheDocument(),
     );
-    expect(addButton).not.toBeDisabled();
+    expect(addAnother).not.toBeDisabled();
+  });
+
+  it("shows field validation errors when submitting with empty fields", async () => {
+    const user = setupUser();
+    const onSubmit = jest.fn();
+    renderDialog({ onSubmit });
+    await user.click(screen.getByRole("button", { name: "Add item" }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByText("Name is required")).toBeInTheDocument();
+    expect(screen.getByText("Text is required")).toBeInTheDocument();
+    expect(screen.getByText("Audio is required")).toBeInTheDocument();
   });
 
   it("rejects an over-sized audio file with an inline error", async () => {
@@ -162,7 +175,10 @@ describe("AddTtsItemsDialog", () => {
       expect(screen.getByText(/Audio must be under/)).toBeInTheDocument(),
     );
     expect(screen.queryByLabelText("Play")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add item" })).toBeDisabled();
+    // Add-another stays disabled — the row has no valid audio.
+    expect(
+      screen.getByRole("button", { name: "Add another item" }),
+    ).toBeDisabled();
   });
 
   it("uploads the picked audio to S3 and submits { name, text, audio_path }", async () => {
@@ -227,9 +243,22 @@ describe("AddTtsItemsDialog", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it("adds and removes rows", async () => {
+  it("adds and removes rows once the first is complete", async () => {
     const user = setupUser();
-    renderDialog();
+    const { container } = renderDialog();
+    // Complete the first card so "Add another item" enables.
+    await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "Clip 1");
+    await user.type(
+      screen.getByPlaceholderText("The text that was spoken"),
+      "hello",
+    );
+    await pickFile(container, makeAudioFile());
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Add another item" }),
+      ).not.toBeDisabled(),
+    );
+
     await user.click(screen.getByRole("button", { name: "Add another item" }));
     expect(screen.getAllByPlaceholderText("e.g. Clip 1")).toHaveLength(2);
     await user.click(screen.getAllByLabelText(/Remove item/)[1]);

@@ -44,6 +44,22 @@ function renderDialog(
   return { onClose, onSubmit, ...utils };
 }
 
+async function fillRow(
+  user: ReturnType<typeof setupUser>,
+  index: number,
+  { name, actual, pred }: { name: string; actual: string; pred: string },
+) {
+  await user.type(screen.getAllByPlaceholderText("e.g. Clip 1")[index], name);
+  await user.type(
+    screen.getAllByPlaceholderText("What was actually said")[index],
+    actual,
+  );
+  await user.type(
+    screen.getAllByPlaceholderText("What the system transcribed")[index],
+    pred,
+  );
+}
+
 describe("AddSttItemsDialog", () => {
   it("renders nothing when closed", () => {
     render(
@@ -63,26 +79,42 @@ describe("AddSttItemsDialog", () => {
     expect(screen.getByPlaceholderText("e.g. Clip 1")).toBeInTheDocument();
   });
 
-  it("keeps Add disabled until all fields in a row are filled", async () => {
+  it("disables 'Add another item' until the current item is complete", async () => {
     const user = setupUser();
     renderDialog();
-    const addButton = screen.getByRole("button", { name: "Add item" });
-    expect(addButton).toBeDisabled();
+    const addAnother = screen.getByRole("button", {
+      name: "Add another item",
+    });
+    expect(addAnother).toBeDisabled();
 
     await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "Clip 1");
-    expect(addButton).toBeDisabled();
-
+    expect(addAnother).toBeDisabled();
     await user.type(
       screen.getByPlaceholderText("What was actually said"),
       "hello",
     );
-    expect(addButton).toBeDisabled();
-
+    expect(addAnother).toBeDisabled();
     await user.type(
       screen.getByPlaceholderText("What the system transcribed"),
       "helo",
     );
-    expect(addButton).not.toBeDisabled();
+    expect(addAnother).not.toBeDisabled();
+  });
+
+  it("shows field validation errors when submitting with empty fields", async () => {
+    const user = setupUser();
+    const onSubmit = jest.fn();
+    renderDialog({ onSubmit });
+    // The submit button is clickable even when empty — it reveals errors.
+    await user.click(screen.getByRole("button", { name: "Add item" }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByText("Name is required")).toBeInTheDocument();
+    expect(
+      screen.getByText("Reference transcript is required"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Predicted transcript is required"),
+    ).toBeInTheDocument();
   });
 
   it("starts with a single card and can add / remove more", async () => {
@@ -92,6 +124,7 @@ describe("AddSttItemsDialog", () => {
     // Sole card's remove control is disabled.
     expect(screen.getByLabelText("Remove item 1")).toBeDisabled();
 
+    await fillRow(user, 0, { name: "Clip 1", actual: "a", pred: "p" });
     await user.click(screen.getByRole("button", { name: "Add another item" }));
     expect(screen.getAllByPlaceholderText("e.g. Clip 1")).toHaveLength(2);
 
@@ -108,6 +141,7 @@ describe("AddSttItemsDialog", () => {
     ).scrollTo = scrollTo;
     try {
       renderDialog();
+      await fillRow(user, 0, { name: "Clip 1", actual: "a", pred: "p" });
       await user.click(screen.getByRole("button", { name: "Add another item" }));
       expect(scrollTo).toHaveBeenCalled();
       expect(scrollTo.mock.calls[0][0]).toMatchObject({ behavior: "smooth" });
@@ -121,16 +155,9 @@ describe("AddSttItemsDialog", () => {
     const user = setupUser();
     const onSubmit = jest.fn().mockResolvedValue(undefined);
     renderDialog({ onSubmit });
+    await fillRow(user, 0, { name: "Clip 1", actual: "a", pred: "p" });
     await user.click(screen.getByRole("button", { name: "Add another item" }));
-
-    const names = screen.getAllByPlaceholderText("e.g. Clip 1");
-    const actuals = screen.getAllByPlaceholderText("What was actually said");
-    const preds = screen.getAllByPlaceholderText("What the system transcribed");
-    for (let i = 0; i < 2; i++) {
-      await user.type(names[i], `Clip ${i + 1}`);
-      await user.type(actuals[i], "a");
-      await user.type(preds[i], "p");
-    }
+    await fillRow(user, 1, { name: "Clip 2", actual: "a", pred: "p" });
 
     await user.click(screen.getByRole("button", { name: "Add 2 items" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
