@@ -1,11 +1,59 @@
 import type JSZip from "jszip";
+import { signOut } from "next-auth/react";
+import { reportError } from "@/lib/reportError";
 
 /**
  * Shared audio + ZIP helpers for the STT/TTS "upload a ZIP of audio clips +
  * a data.csv" flows (STT dataset editor and TTS labelling bulk upload). Keeps
- * the WAV encoding, duration probing, and ZIP/CSV navigation in one place so
- * the two flows can't drift.
+ * the WAV encoding, duration probing, ZIP/CSV navigation, and S3 upload in one
+ * place so the two flows can't drift.
  */
+
+/**
+ * Upload one audio file to S3 via a backend-issued presigned URL for the given
+ * task type ("stt" | "tts"). Returns the stored s3 path, or null on failure
+ * (reported to Sentry). Signs the caller out on a 401.
+ */
+export async function uploadAudioToS3(
+  file: File,
+  accessToken: string | null,
+  taskType: "stt" | "tts",
+): Promise<string | null> {
+  try {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl) return null;
+    const response = await fetch(`${backendUrl}/presigned-url`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        task_type: taskType,
+        content_type: file.type || "audio/wav",
+        extension: "wav",
+      }),
+    });
+    if (response.status === 401) {
+      await signOut({ callbackUrl: "/login" });
+      return null;
+    }
+    if (!response.ok) throw new Error("Failed to get presigned URL");
+    const data = await response.json();
+    const { presigned_url: presignedUrl, s3_path: s3Path } = data;
+    if (!presignedUrl || !s3Path) throw new Error("Missing URL/path");
+    const put = await fetch(presignedUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type || "audio/wav" },
+      body: file,
+    });
+    if (!put.ok) throw new Error("S3 upload failed");
+    return s3Path as string;
+  } catch (err) {
+    reportError(`Failed to upload ${taskType} audio to S3`, err);
+    return null;
+  }
+}
 
 /** Read a media file's duration (seconds) via a throwaway <audio> element. */
 export const getAudioDuration = (file: File): Promise<number> =>

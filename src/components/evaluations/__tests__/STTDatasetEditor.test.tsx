@@ -7,6 +7,8 @@ import type { DatasetItem } from "../../../lib/datasets";
 jest.mock("sonner", () => ({
   toast: { error: jest.fn(), success: jest.fn() },
 }));
+// Upload failures now funnel through the shared uploader's reportError.
+jest.mock("../../../lib/reportError", () => ({ reportError: jest.fn() }));
 import { toast } from "sonner";
 import { signOut } from "next-auth/react";
 

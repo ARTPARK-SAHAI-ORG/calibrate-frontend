@@ -7,7 +7,6 @@ import {
   forwardRef,
   useImperativeHandle,
 } from "react";
-import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 import JSZip from "jszip";
 import { LIMITS, showLimitToast } from "@/constants/limits";
@@ -21,6 +20,7 @@ import {
   getAudioDuration,
   parseCsvLine,
   splitCsvLines,
+  uploadAudioToS3,
 } from "./audioZip";
 import type { DatasetItem } from "@/lib/datasets";
 
@@ -159,46 +159,8 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
 
     // ── S3 upload ──────────────────────────────────────────────────────────
 
-    const uploadFileToS3 = async (file: File): Promise<string | null> => {
-      try {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-        if (!backendUrl) return null;
-
-        const response = await fetch(`${backendUrl}/presigned-url`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            task_type: "stt",
-            content_type: file.type || "audio/wav",
-            extension: "wav",
-          }),
-        });
-
-        if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
-          return null;
-        }
-        if (!response.ok) throw new Error("Failed to get presigned URL");
-
-        const data = await response.json();
-        const { presigned_url: presignedUrl, s3_path: s3Path } = data;
-        if (!presignedUrl || !s3Path) throw new Error("Missing URL/path");
-
-        const uploadResponse = await fetch(presignedUrl, {
-          method: "PUT",
-          headers: { "Content-Type": file.type || "audio/wav" },
-          body: file,
-        });
-        if (!uploadResponse.ok) throw new Error("S3 upload failed");
-
-        return s3Path;
-      } catch {
-        return null;
-      }
-    };
+    const uploadFileToS3 = (file: File): Promise<string | null> =>
+      uploadAudioToS3(file, accessToken, "stt");
 
     // ── Row management ────────────────────────────────────────────────────
 

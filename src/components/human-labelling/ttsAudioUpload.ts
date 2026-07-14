@@ -1,7 +1,8 @@
-import { signOut } from "next-auth/react";
-import { getAudioDuration } from "@/components/evaluations/audioZip";
+import {
+  getAudioDuration,
+  uploadAudioToS3,
+} from "@/components/evaluations/audioZip";
 import { LIMITS } from "@/constants/limits";
-import { reportError } from "@/lib/reportError";
 
 /**
  * TTS-labelling audio upload helpers (single-add + bulk ZIP). Audio is never
@@ -35,46 +36,11 @@ export async function validateTtsAudioFile(file: File): Promise<string | null> {
 }
 
 /**
- * Upload one audio file to S3 via a backend-issued presigned URL. Returns the
- * stored s3 path, or null on failure (which is reported to Sentry). Signs the
- * caller out on a 401.
+ * Upload one TTS-item audio file to S3 via a backend presigned URL. Returns
+ * the stored s3 path, or null on failure. Thin wrapper over the shared
+ * `uploadAudioToS3` with the "tts" task type.
  */
-export async function uploadTtsAudioToS3(
+export const uploadTtsAudioToS3 = (
   file: File,
   accessToken: string | null,
-): Promise<string | null> {
-  try {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!backendUrl) return null;
-    const response = await fetch(`${backendUrl}/presigned-url`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        task_type: "tts",
-        content_type: file.type || "audio/wav",
-        extension: "wav",
-      }),
-    });
-    if (response.status === 401) {
-      await signOut({ callbackUrl: "/login" });
-      return null;
-    }
-    if (!response.ok) throw new Error("Failed to get presigned URL");
-    const data = await response.json();
-    const { presigned_url: presignedUrl, s3_path: s3Path } = data;
-    if (!presignedUrl || !s3Path) throw new Error("Missing URL/path");
-    const put = await fetch(presignedUrl, {
-      method: "PUT",
-      headers: { "Content-Type": file.type || "audio/wav" },
-      body: file,
-    });
-    if (!put.ok) throw new Error("S3 upload failed");
-    return s3Path as string;
-  } catch (err) {
-    reportError("Failed to upload TTS audio to S3", err);
-    return null;
-  }
-}
+): Promise<string | null> => uploadAudioToS3(file, accessToken, "tts");
