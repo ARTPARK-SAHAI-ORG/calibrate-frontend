@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { humaniseDetailObject } from "./bulk-upload-shared";
 import {
@@ -88,6 +88,10 @@ export function AddSttItemsDialog({
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  // Set when "Add another item" appends a card, so the effect below scrolls
+  // it into view once it has rendered.
+  const pendingScrollRef = useRef(false);
 
   // Reset rows whenever the dialog opens (so a fresh edit starts from the
   // latest selected items, and a reopened add starts blank).
@@ -107,6 +111,17 @@ export function AddSttItemsDialog({
       setError(null);
     }
   }, [isOpen, initialRows]);
+
+  // After a card is appended, scroll the container to the bottom so the new
+  // card is visible. Guarded for jsdom, which lacks a real scrollTo.
+  useEffect(() => {
+    if (!pendingScrollRef.current) return;
+    pendingScrollRef.current = false;
+    const el = scrollContainerRef.current;
+    if (el && typeof el.scrollTo === "function") {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }
+  }, [rows.length]);
 
   // Unsaved-changes check. Add mode: any field has content. Edit mode: any
   // field differs from the item it was seeded with (rows align 1:1 with
@@ -146,7 +161,10 @@ export function AddSttItemsDialog({
     );
   };
 
-  const addRow = () => setRows((prev) => [...prev, newRow()]);
+  const addRow = () => {
+    pendingScrollRef.current = true;
+    setRows((prev) => [...prev, newRow()]);
+  };
 
   const validRows: SttItemRowSubmission[] = rows
     .map((r) => ({
@@ -213,7 +231,10 @@ export function AddSttItemsDialog({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4"
+        >
           {/* One card per item, fields stacked vertically so long transcripts
               (incl. non-latin scripts) are fully readable. Add mode can add /
               remove cards; edit mode seeds a fixed set from the selection. */}

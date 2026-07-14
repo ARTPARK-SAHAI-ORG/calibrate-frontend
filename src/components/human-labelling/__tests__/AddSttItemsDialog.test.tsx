@@ -99,6 +99,24 @@ describe("AddSttItemsDialog", () => {
     expect(screen.getAllByPlaceholderText("e.g. Clip 1")).toHaveLength(1);
   });
 
+  it("scrolls the new card into view when adding another item", async () => {
+    const user = setupUser();
+    const scrollTo = jest.fn();
+    // jsdom doesn't implement scrollTo; the dialog guards on its presence.
+    (
+      HTMLElement.prototype as unknown as { scrollTo: unknown }
+    ).scrollTo = scrollTo;
+    try {
+      renderDialog();
+      await user.click(screen.getByRole("button", { name: "Add another item" }));
+      expect(scrollTo).toHaveBeenCalled();
+      expect(scrollTo.mock.calls[0][0]).toMatchObject({ behavior: "smooth" });
+    } finally {
+      delete (HTMLElement.prototype as unknown as { scrollTo?: unknown })
+        .scrollTo;
+    }
+  });
+
   it("submits multiple filled cards with an 'Add N items' label", async () => {
     const user = setupUser();
     const onSubmit = jest.fn().mockResolvedValue(undefined);

@@ -112,6 +112,10 @@ export function AddTtsItemsDialog({
   // Per-row audio validation errors (too big / too long / unreadable).
   const [audioErrors, setAudioErrors] = useState<Record<string, string>>({});
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  // Set when "Add another item" appends a card, so the effect below scrolls
+  // it into view once it has rendered.
+  const pendingScrollRef = useRef(false);
 
   // Revoke any object URLs we created for previews.
   const revokePreviews = (list: TtsRowDraft[]) => {
@@ -142,6 +146,17 @@ export function AddTtsItemsDialog({
     },
     [],
   );
+
+  // After a card is appended, scroll the container to the bottom so the new
+  // card is visible. Guarded for jsdom, which lacks a real scrollTo.
+  useEffect(() => {
+    if (!pendingScrollRef.current) return;
+    pendingScrollRef.current = false;
+    const el = scrollContainerRef.current;
+    if (el && typeof el.scrollTo === "function") {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }
+  }, [rows.length]);
 
   const isDirty = isEdit
     ? rows.some((r, i) => {
@@ -200,7 +215,10 @@ export function AddTtsItemsDialog({
     });
   };
 
-  const addRow = () => setRows((prev) => [...prev, newRow()]);
+  const addRow = () => {
+    pendingScrollRef.current = true;
+    setRows((prev) => [...prev, newRow()]);
+  };
 
   const isRowValid = (r: TtsRowDraft) =>
     !!r.name.trim() &&
@@ -299,7 +317,10 @@ export function AddTtsItemsDialog({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4"
+        >
           {rows.map((row, idx) => {
             const playSrc = row.previewUrl ?? row.existingAudio;
             const fileName = row.audioFile?.name;
