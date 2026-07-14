@@ -66,6 +66,32 @@ describe("rowNameErrorsFromConflict", () => {
       ),
     ).toEqual({});
   });
+
+  it("attaches a name-less conflict to the sole row", () => {
+    expect(
+      rowNameErrorsFromConflict([{ id: "r1", name: "Only" }], {
+        code: "ITEM_NAME_CONFLICT",
+        conflictingNames: [],
+        message: "generic message",
+      }),
+    ).toEqual({ r1: "generic message" });
+  });
+
+  it("returns empty for a name-less conflict when there are multiple rows", () => {
+    expect(
+      rowNameErrorsFromConflict(
+        [
+          { id: "r1", name: "A" },
+          { id: "r2", name: "B" },
+        ],
+        {
+          code: "ITEM_NAME_CONFLICT",
+          conflictingNames: [],
+          message: "generic",
+        },
+      ),
+    ).toEqual({});
+  });
 });
 
 describe("perRowNameConflictMessage", () => {
@@ -77,5 +103,15 @@ describe("perRowNameConflictMessage", () => {
         message: "plural",
       }),
     ).toBe('An item named "Foo" already exists in this task');
+  });
+
+  it("uses a duplicate-in-request message for that code", () => {
+    expect(
+      perRowNameConflictMessage("Foo", {
+        code: "ITEM_NAME_DUPLICATE_IN_REQUEST",
+        conflictingNames: ["Foo"],
+        message: "x",
+      }),
+    ).toBe('Duplicate name in your request: "Foo"');
   });
 });

@@ -197,6 +197,25 @@ describe("AddSttItemsDialog", () => {
     expect(onSubmit.mock.calls[0][0]).toHaveLength(2);
   });
 
+  it("shows a name-conflict error under the offending row", async () => {
+    const user = setupUser();
+    const onSubmit = jest
+      .fn()
+      .mockRejectedValue(
+        new Error(
+          'Request failed: 409 - {"detail":{"code":"ITEM_NAME_CONFLICT","conflicting_names":["Clip 1"]}}',
+        ),
+      );
+    renderDialog({ onSubmit });
+    await fillRow(user, 0, { name: "Clip 1", actual: "a", pred: "p" });
+    await user.click(screen.getByRole("button", { name: "Add item" }));
+    expect(
+      await screen.findByText(
+        'An item named "Clip 1" already exists in this task',
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("submits the single filled row, trimmed", async () => {
     const user = setupUser();
     const onSubmit = jest.fn().mockResolvedValue(undefined);
