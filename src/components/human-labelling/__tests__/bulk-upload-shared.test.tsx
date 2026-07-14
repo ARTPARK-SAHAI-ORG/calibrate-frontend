@@ -322,7 +322,7 @@ describe("bulkUploadAnnotatedRowBgClass", () => {
 describe("humaniseDetailObject", () => {
   it("returns a generic ITEM_NAME_CONFLICT message with no names", () => {
     expect(humaniseDetailObject({ code: "ITEM_NAME_CONFLICT" })).toBe(
-      "One or more item names already exist in this task.",
+      "One or more item names already exist in this task",
     );
   });
 
@@ -332,7 +332,7 @@ describe("humaniseDetailObject", () => {
         code: "ITEM_NAME_CONFLICT",
         conflicting_names: ["Foo"],
       }),
-    ).toBe('An item named "Foo" already exists in this task.');
+    ).toBe('An item named "Foo" already exists in this task');
   });
 
   it("returns a plural ITEM_NAME_CONFLICT message for multiple names", () => {
@@ -342,14 +342,14 @@ describe("humaniseDetailObject", () => {
         conflicting_names: ["Foo", "Bar"],
       }),
     ).toBe(
-      'Items with these names already exist in this task: "Foo", "Bar".',
+      'Items with these names already exist in this task: "Foo", "Bar"',
     );
   });
 
   it("returns a generic ITEM_NAME_DUPLICATE_IN_REQUEST message with no names", () => {
     expect(
       humaniseDetailObject({ code: "ITEM_NAME_DUPLICATE_IN_REQUEST" }),
-    ).toBe("Your request contains duplicate item names.");
+    ).toBe("Your request contains duplicate item names");
   });
 
   it("returns a singular ITEM_NAME_DUPLICATE_IN_REQUEST message", () => {
@@ -358,7 +358,7 @@ describe("humaniseDetailObject", () => {
         code: "ITEM_NAME_DUPLICATE_IN_REQUEST",
         conflicting_names: ["Foo"],
       }),
-    ).toBe('Duplicate name in your request: "Foo".');
+    ).toBe('Duplicate name in your request: "Foo"');
   });
 
   it("returns a plural ITEM_NAME_DUPLICATE_IN_REQUEST message", () => {
@@ -367,7 +367,7 @@ describe("humaniseDetailObject", () => {
         code: "ITEM_NAME_DUPLICATE_IN_REQUEST",
         conflicting_names: ["Foo", "Bar"],
       }),
-    ).toBe('Duplicate names in your request: "Foo", "Bar".');
+    ).toBe('Duplicate names in your request: "Foo", "Bar"');
   });
 
   it("returns null for an unknown code", () => {
@@ -414,7 +414,7 @@ describe("parseApiError", () => {
       })}`,
     );
     expect(parseApiError(err, "fb")).toBe(
-      'An item named "X" already exists in this task.',
+      'An item named "X" already exists in this task',
     );
   });
 

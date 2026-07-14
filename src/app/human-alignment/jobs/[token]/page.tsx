@@ -110,15 +110,35 @@ export default function AdminAnnotateJobPage() {
 
         {meta && (
           <>
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <span
-                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${jobStatusPillClass(
-                  meta.jobStatus,
-                )}`}
-              >
-                {jobStatusLabel(meta.jobStatus)}
-              </span>
-              <div className="flex items-center gap-2">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex flex-wrap gap-3 min-w-0">
+                <FieldRow label="Status">
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${jobStatusPillClass(
+                      meta.jobStatus,
+                    )}`}
+                  >
+                    {jobStatusLabel(meta.jobStatus)}
+                  </span>
+                </FieldRow>
+                <FieldRow label="Labelling task">
+                  <Link
+                    href={`/human-alignment/tasks/${meta.task.uuid}`}
+                    className="text-sm font-medium text-foreground hover:underline underline-offset-2"
+                  >
+                    {meta.task.name}
+                  </Link>
+                </FieldRow>
+                <FieldRow label="Annotator">
+                  <Link
+                    href={`/human-alignment/annotators/${meta.annotator.uuid}`}
+                    className="text-sm font-medium text-foreground hover:underline underline-offset-2"
+                  >
+                    {meta.annotator.name}
+                  </Link>
+                </FieldRow>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={handleCopyJobLink}
@@ -176,44 +196,6 @@ export default function AdminAnnotateJobPage() {
                 )}
               </div>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <FieldRow label="Labelling task">
-                <Link
-                  href={`/human-alignment/tasks/${meta.task.uuid}`}
-                  className="text-sm font-medium text-foreground hover:underline underline-offset-2"
-                >
-                  {meta.task.name}
-                </Link>
-              </FieldRow>
-              <FieldRow label="Annotator">
-                <Link
-                  href={`/human-alignment/annotators/${meta.annotator.uuid}`}
-                  className="text-sm font-medium text-foreground hover:underline underline-offset-2"
-                >
-                  {meta.annotator.name}
-                </Link>
-              </FieldRow>
-            </div>
-
-            {meta.evaluators.length > 0 && (
-              <div className="space-y-2">
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                  Evaluators
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {meta.evaluators.map((ev) => (
-                    <Link
-                      key={ev.uuid}
-                      href={`/evaluators/${ev.uuid}`}
-                      title={`Open ${ev.name}`}
-                      className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer"
-                    >
-                      {ev.name}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
           </>
         )}
 

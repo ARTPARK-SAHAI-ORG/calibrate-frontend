@@ -391,7 +391,7 @@ export function BulkUploadTtsItemsDialog({
             </h2>
             <p className="text-xs md:text-sm text-muted-foreground mt-1">
               Upload a ZIP with an <code>audios</code> folder of .wav files and
-              a <code>data.csv</code> mapping each clip to its text.
+              a <code>data.csv</code> mapping each clip to its reference text.
             </p>
           </div>
           <button
@@ -499,7 +499,7 @@ export function BulkUploadTtsItemsDialog({
                   Name
                 </div>
                 <div className="text-xs font-medium text-muted-foreground">
-                  Text
+                  Reference text
                 </div>
                 <div className="text-xs font-medium text-muted-foreground">
                   Audio

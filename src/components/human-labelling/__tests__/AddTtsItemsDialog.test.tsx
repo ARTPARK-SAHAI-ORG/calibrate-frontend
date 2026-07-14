@@ -63,7 +63,7 @@ beforeEach(() => {
         ok: presignedOk,
         json: async () => ({
           presigned_url: "https://s3.test/put",
-          s3_path: "tts/audio.wav",
+          s3_path: "tts/media/clip.wav",
         }),
       });
     }
@@ -124,7 +124,7 @@ describe("AddTtsItemsDialog", () => {
     renderDialog();
     expect(screen.getByText("Add items")).toBeInTheDocument();
     expect(screen.getByText("Name")).toBeInTheDocument();
-    expect(screen.getByText("Text")).toBeInTheDocument();
+    expect(screen.getByText("Reference text")).toBeInTheDocument();
     expect(screen.getByText("Audio")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Upload audio" }),
@@ -145,7 +145,7 @@ describe("AddTtsItemsDialog", () => {
 
     await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "Clip 1");
     await user.type(
-      screen.getByPlaceholderText("The text that was spoken"),
+      screen.getByPlaceholderText("The reference text that was spoken"),
       "hello",
     );
     expect(addAnother).toBeDisabled();
@@ -164,8 +164,29 @@ describe("AddTtsItemsDialog", () => {
     await user.click(screen.getByRole("button", { name: "Add item" }));
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByText("Name is required")).toBeInTheDocument();
-    expect(screen.getByText("Text is required")).toBeInTheDocument();
+    expect(screen.getByText("Reference text is required")).toBeInTheDocument();
     expect(screen.getByText("Audio is required")).toBeInTheDocument();
+  });
+
+  it("scrolls the first invalid field into view on failed submit", async () => {
+    const user = setupUser();
+    const scrollIntoView = jest.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      renderDialog();
+      await user.click(screen.getByRole("button", { name: "Add item" }));
+      expect(screen.getByText("Name is required")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(scrollIntoView).toHaveBeenCalledWith(
+          expect.objectContaining({
+            behavior: "smooth",
+            block: "nearest",
+          }),
+        ),
+      );
+    } finally {
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    }
   });
 
   it("rejects an over-sized audio file with an inline error", async () => {
@@ -188,7 +209,7 @@ describe("AddTtsItemsDialog", () => {
 
     await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "Clip 1");
     await user.type(
-      screen.getByPlaceholderText("The text that was spoken"),
+      screen.getByPlaceholderText("The reference text that was spoken"),
       "hello",
     );
     await pickFile(container, makeAudioFile());
@@ -211,7 +232,7 @@ describe("AddTtsItemsDialog", () => {
         uuid: undefined,
         name: "Clip 1",
         text: "hello",
-        audio_path: "tts/audio.wav",
+        audio_path: "tts/media/clip.wav",
       },
     ]);
   });
@@ -224,7 +245,7 @@ describe("AddTtsItemsDialog", () => {
 
     await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "Clip 1");
     await user.type(
-      screen.getByPlaceholderText("The text that was spoken"),
+      screen.getByPlaceholderText("The reference text that was spoken"),
       "hello",
     );
     await pickFile(container, makeAudioFile());
@@ -252,7 +273,7 @@ describe("AddTtsItemsDialog", () => {
     // Complete it, then add another — the fresh card must start clean.
     await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "Clip 1");
     await user.type(
-      screen.getByPlaceholderText("The text that was spoken"),
+      screen.getByPlaceholderText("The reference text that was spoken"),
       "hello",
     );
     await pickFile(container, makeAudioFile());
@@ -271,7 +292,7 @@ describe("AddTtsItemsDialog", () => {
     // Complete the first card so "Add another item" enables.
     await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "Clip 1");
     await user.type(
-      screen.getByPlaceholderText("The text that was spoken"),
+      screen.getByPlaceholderText("The reference text that was spoken"),
       "hello",
     );
     await pickFile(container, makeAudioFile());
@@ -307,6 +328,7 @@ describe("AddTtsItemsDialog", () => {
       });
 
       await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+      // No new upload — existing audio_path preserved.
       const presignedCalls = (global.fetch as jest.Mock).mock.calls.filter(
         ([u]) => typeof u === "string" && u.includes("/presigned-url"),
       );

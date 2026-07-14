@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { FieldError } from "@/components/ui/FieldError";
 import { humaniseDetailObject } from "./bulk-upload-shared";
+import { parseItemNameConflictFromError } from "./itemNameConflict";
 import {
   DiscardChangesDialog,
   useUnsavedCloseGuard,
@@ -107,6 +109,7 @@ export function AddLlmGeneralItemsDialog({
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   // Reset whenever the dialog opens so a fresh edit/add starts from the
   // current seed item.
@@ -120,6 +123,7 @@ export function AddLlmGeneralItemsDialog({
       setOutput(s?.output ?? "");
       setVarValues(seedVarValues(s?.varValues));
       setError(null);
+      setNameError(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialRows]);
@@ -152,7 +156,10 @@ export function AddLlmGeneralItemsDialog({
     isEdit,
     submitting,
     onClose,
-    onBeforeClose: () => setError(null),
+    onBeforeClose: () => {
+      setError(null);
+      setNameError(null);
+    },
   });
 
   if (!isOpen) return null;
@@ -183,6 +190,7 @@ export function AddLlmGeneralItemsDialog({
     }
     setSubmitting(true);
     setError(null);
+    setNameError(null);
     try {
       await onSubmit([
         {
@@ -195,12 +203,17 @@ export function AddLlmGeneralItemsDialog({
         },
       ]);
     } catch (err) {
-      setError(
-        extractApiError(
-          err,
-          isEdit ? "Failed to save item" : "Failed to add item",
-        ),
-      );
+      const conflict = parseItemNameConflictFromError(err);
+      if (conflict) {
+        setNameError(conflict.message);
+      } else {
+        setError(
+          extractApiError(
+            err,
+            isEdit ? "Failed to save item" : "Failed to add item",
+          ),
+        );
+      }
     } finally {
       setSubmitting(false);
     }
@@ -258,11 +271,19 @@ export function AddLlmGeneralItemsDialog({
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (nameError) setNameError(null);
+                }}
                 placeholder="Your item name"
                 disabled={submitting}
-                className="w-full h-11 px-4 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
+                className={`w-full h-11 px-4 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 ${
+                  nameError
+                    ? "border-red-500 ring-1 ring-red-500/30"
+                    : "border-border"
+                }`}
               />
+              <FieldError show={!!nameError}>{nameError}</FieldError>
             </div>
 
             <div>

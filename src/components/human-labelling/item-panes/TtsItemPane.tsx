@@ -6,8 +6,7 @@ export function TtsItemPane({
 }: {
   payload: Record<string, unknown>;
 }) {
-  const name =
-    typeof payload.name === "string" ? (payload.name as string) : "";
+  // Name is shown by the surrounding dialog / job header — don't repeat it.
   const text =
     typeof payload.text === "string" ? (payload.text as string) : "";
   const audioPath =
@@ -16,10 +15,10 @@ export function TtsItemPane({
       : "";
   return (
     <div className="space-y-4">
-      {name && (
-        <p className="text-sm font-semibold text-foreground">{name}</p>
-      )}
-      <Section title="Text" subtitle="The text the TTS model was asked to speak">
+      <Section
+        title="Reference text"
+        subtitle="What the TTS model was asked to speak"
+      >
         <p className="text-sm whitespace-pre-wrap break-words">
           {text || "—"}
         </p>

@@ -509,16 +509,16 @@ export function humaniseDetailObject(detail: {
   if (detail.code === "ITEM_NAME_CONFLICT") {
     return fmt
       ? names.length === 1
-        ? `An item named ${fmt} already exists in this task.`
-        : `Items with these names already exist in this task: ${fmt}.`
-      : "One or more item names already exist in this task.";
+        ? `An item named ${fmt} already exists in this task`
+        : `Items with these names already exist in this task: ${fmt}`
+      : "One or more item names already exist in this task";
   }
   if (detail.code === "ITEM_NAME_DUPLICATE_IN_REQUEST") {
     return fmt
       ? names.length === 1
-        ? `Duplicate name in your request: ${fmt}.`
-        : `Duplicate names in your request: ${fmt}.`
-      : "Your request contains duplicate item names.";
+        ? `Duplicate name in your request: ${fmt}`
+        : `Duplicate names in your request: ${fmt}`
+      : "Your request contains duplicate item names";
   }
   return null;
 }

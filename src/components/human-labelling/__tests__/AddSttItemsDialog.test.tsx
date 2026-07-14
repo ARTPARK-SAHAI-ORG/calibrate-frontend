@@ -20,9 +20,9 @@ jest.mock("../bulk-upload-shared", () => ({
     if (detail.code === "ITEM_NAME_CONFLICT") {
       return fmt
         ? names.length === 1
-          ? `An item named ${fmt} already exists in this task.`
-          : `Items with these names already exist in this task: ${fmt}.`
-        : "One or more item names already exist in this task.";
+          ? `An item named ${fmt} already exists in this task`
+          : `Items with these names already exist in this task: ${fmt}`
+        : "One or more item names already exist in this task";
     }
     return null;
   },
@@ -117,6 +117,27 @@ describe("AddSttItemsDialog", () => {
     ).toBeInTheDocument();
   });
 
+  it("scrolls the first invalid field into view on failed submit", async () => {
+    const user = setupUser();
+    const scrollIntoView = jest.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      renderDialog();
+      await user.click(screen.getByRole("button", { name: "Add item" }));
+      expect(screen.getByText("Name is required")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(scrollIntoView).toHaveBeenCalledWith(
+          expect.objectContaining({
+            behavior: "smooth",
+            block: "nearest",
+          }),
+        ),
+      );
+    } finally {
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    }
+  });
+
   it("clears prior validation errors when a new card is added", async () => {
     const user = setupUser();
     renderDialog();
@@ -204,7 +225,7 @@ describe("AddSttItemsDialog", () => {
     ]);
   });
 
-  it("shows an inline error parsed from a structured detail object", async () => {
+  it("shows a name-conflict error under the Name field", async () => {
     const user = setupUser();
     const onSubmit = jest
       .fn()
@@ -226,11 +247,14 @@ describe("AddSttItemsDialog", () => {
     );
     await user.click(screen.getByRole("button", { name: "Add item" }));
 
-    expect(
-      await screen.findByText(
-        'An item named "Clip 1" already exists in this task.',
-      ),
-    ).toBeInTheDocument();
+    const msg = await screen.findByText(
+      'An item named "Clip 1" already exists in this task',
+    );
+    expect(msg.tagName).toBe("P");
+    expect(msg).toHaveClass("text-sm", "text-red-500");
+    expect(screen.getByPlaceholderText("e.g. Clip 1")).toHaveClass(
+      "border-red-500",
+    );
   });
 
   it("shows the raw detail string when the error body isn't a structured object", async () => {

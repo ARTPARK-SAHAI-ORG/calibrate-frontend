@@ -1381,7 +1381,7 @@ export function ItemDetailPane({
 
   return (
     <div className="flex flex-col md:flex-row min-h-0 flex-1 md:overflow-hidden">
-      <div className="md:flex-[5] md:min-h-0 md:overflow-y-auto px-4 pb-4 md:px-6 md:pb-6 md:border-r border-border">
+      <div className="md:flex-[5] md:min-h-0 md:overflow-y-auto p-4 md:p-6 md:border-r border-border">
         <ItemPane item={item} taskType={taskType} />
       </div>
       <div className="md:flex-[3] md:min-h-0 md:overflow-y-auto p-4 md:p-6">
@@ -1528,9 +1528,9 @@ export interface EvaluatorRunDetailViewProps {
   versionLabels: Record<string, string>;
   /** When true, evaluator names link out to /evaluators/{id}. Auth pages enable this; public pages disable it. */
   linkEvaluators?: boolean;
-  /** Slot rendered next to the status pill (typically a ShareButton in auth view). */
+  /** Slot rendered next to the status pill on the right (typically unused now that Share lives in `actionsSlot`). */
   shareSlot?: React.ReactNode;
-  /** Slot rendered right-aligned on the header row (typically an Export button in auth view). */
+  /** Slot rendered right-aligned after the status pill (Re-run / Export / Share). */
   actionsSlot?: React.ReactNode;
   /** Optional banner shown above the body (e.g. caller's export error). */
   topError?: string | null;
@@ -1725,28 +1725,6 @@ export function EvaluatorRunDetailView({
 
   return (
     <>
-      {(!hideStatusPill || shareSlot || actionsSlot) && (
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap">
-            {!hideStatusPill && (
-              <span
-                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusPillClass(
-                  job.status,
-                )}`}
-              >
-                {statusLabel(job.status)}
-              </span>
-            )}
-            {shareSlot}
-          </div>
-          {actionsSlot}
-        </div>
-      )}
-      {topError && (
-        <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-500">
-          {topError}
-        </div>
-      )}
       {(() => {
         const ha = job.human_agreement;
         const cardsWillRender =
@@ -1757,56 +1735,88 @@ export function EvaluatorRunDetailView({
             ha.evaluators.every((e) => e.agreement === null) &&
             ha.items.length === 0
           );
-        if (cardsWillRender) return null;
+        // When agreement cards render they already name the evaluators —
+        // skip the standalone pills. Status sits with the action buttons
+        // (left of Re-run / Export / Share) so it doesn't orphan a whole row.
+        const showEvaluatorPills = !cardsWillRender;
+        const showHeader =
+          !hideStatusPill || shareSlot || actionsSlot || showEvaluatorPills;
+        if (!showHeader) return null;
+
+        const statusPill = !hideStatusPill ? (
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusPillClass(
+              job.status,
+            )}`}
+          >
+            {statusLabel(job.status)}
+          </span>
+        ) : null;
+
         return (
-          <div className="flex items-center gap-2 flex-wrap min-w-0">
-            {detailsEvaluators.length === 0 ? (
-              <span className="text-sm text-muted-foreground">—</span>
-            ) : (
-              detailsEvaluators.map((e) => {
-                const name = evaluatorDisplayName(e, evaluatorNamesById);
-                const label = e.evaluator_version_id
-                  ? versionLabels[e.evaluator_version_id]
-                  : null;
-                const pillClass =
-                  "inline-flex items-center gap-1 flex-wrap px-2 py-0.5 rounded-md text-sm font-semibold border border-border bg-muted/40 text-foreground shrink-0 text-left";
-                const inner = (
-                  <>
-                    <span className="break-words whitespace-normal">
-                      {name}
-                    </span>
-                    {label && (
-                      <span className="font-mono text-[11px] text-muted-foreground">
-                        {label}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              {showEvaluatorPills &&
+                (detailsEvaluators.length === 0 ? (
+                  <span className="text-sm text-muted-foreground">—</span>
+                ) : (
+                  detailsEvaluators.map((e) => {
+                    const name = evaluatorDisplayName(e, evaluatorNamesById);
+                    const label = e.evaluator_version_id
+                      ? versionLabels[e.evaluator_version_id]
+                      : null;
+                    const pillClass =
+                      "inline-flex items-center gap-1 flex-wrap px-2 py-0.5 rounded-md text-sm font-semibold border border-border bg-muted/40 text-foreground shrink-0 text-left";
+                    const inner = (
+                      <>
+                        <span className="break-words whitespace-normal">
+                          {name}
+                        </span>
+                        {label && (
+                          <span className="font-mono text-[11px] text-muted-foreground">
+                            {label}
+                          </span>
+                        )}
+                      </>
+                    );
+                    if (linkEvaluators) {
+                      return (
+                        <Link
+                          key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
+                          href={`/evaluators/${e.evaluator_id}`}
+                          title={`Open ${name}`}
+                          className={`${pillClass} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
+                        >
+                          {inner}
+                        </Link>
+                      );
+                    }
+                    return (
+                      <span
+                        key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
+                        className={pillClass}
+                      >
+                        {inner}
                       </span>
-                    )}
-                  </>
-                );
-                if (linkEvaluators) {
-                  return (
-                    <Link
-                      key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
-                      href={`/evaluators/${e.evaluator_id}`}
-                      title={`Open ${name}`}
-                      className={`${pillClass} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
-                    >
-                      {inner}
-                    </Link>
-                  );
-                }
-                return (
-                  <span
-                    key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
-                    className={pillClass}
-                  >
-                    {inner}
-                  </span>
-                );
-              })
+                    );
+                  })
+                ))}
+            </div>
+            {(statusPill || shareSlot || actionsSlot) && (
+              <div className="flex items-center gap-2 flex-wrap shrink-0">
+                {statusPill}
+                {shareSlot}
+                {actionsSlot}
+              </div>
             )}
           </div>
         );
       })()}
+      {topError && (
+        <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-500">
+          {topError}
+        </div>
+      )}
 
       <HumanAgreementSummary
         jobStatus={job.status}

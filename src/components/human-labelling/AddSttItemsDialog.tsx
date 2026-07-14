@@ -5,6 +5,11 @@ import { useHideFloatingButton } from "@/components/AppLayout";
 import { FieldError } from "@/components/ui/FieldError";
 import { humaniseDetailObject } from "./bulk-upload-shared";
 import {
+  parseItemNameConflictFromError,
+  rowNameErrorsFromConflict,
+} from "./itemNameConflict";
+import { scheduleScrollToFirstFieldError } from "./scrollToFieldError";
+import {
   DiscardChangesDialog,
   useUnsavedCloseGuard,
 } from "./unsavedCloseGuard";
@@ -89,9 +94,13 @@ export function AddSttItemsDialog({
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // API name conflicts (ITEM_NAME_*), keyed by row id — shown under Name.
+  const [nameErrors, setNameErrors] = useState<Record<string, string>>({});
   // Flips true after a submit attempt with incomplete rows, revealing the
   // per-field validation errors.
   const [validationAttempted, setValidationAttempted] = useState(false);
+  // Bumped when we surface field errors so we can scroll to the first one.
+  const [errorScrollTick, setErrorScrollTick] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   // Set when "Add another item" appends a card, so the effect below scrolls
   // it into view once it has rendered.
@@ -113,7 +122,9 @@ export function AddSttItemsDialog({
           : [newRow()],
       );
       setError(null);
+      setNameErrors({});
       setValidationAttempted(false);
+      setErrorScrollTick(0);
     }
   }, [isOpen, initialRows]);
 
@@ -127,6 +138,13 @@ export function AddSttItemsDialog({
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     }
   }, [rows.length]);
+
+  // After a failed submit (or blocked "add another"), scroll the first
+  // invalid field into view if it isn't already visible.
+  useEffect(() => {
+    if (errorScrollTick === 0) return;
+    return scheduleScrollToFirstFieldError(scrollContainerRef.current);
+  }, [errorScrollTick]);
 
   // Unsaved-changes check. Add mode: any field has content. Edit mode: any
   // field differs from the item it was seeded with (rows align 1:1 with
@@ -151,13 +169,23 @@ export function AddSttItemsDialog({
     isEdit,
     submitting,
     onClose,
-    onBeforeClose: () => setError(null),
+    onBeforeClose: () => {
+      setError(null);
+      setNameErrors({});
+    },
   });
 
   if (!isOpen) return null;
 
   const updateRow = (id: string, patch: Partial<SttRowDraft>) => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+    if (patch.name !== undefined && nameErrors[id]) {
+      setNameErrors((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }
   };
 
   const removeRow = (id: string) => {
@@ -174,6 +202,7 @@ export function AddSttItemsDialog({
     // Don't append a fresh blank card until the existing ones are complete.
     if (!allComplete) {
       setValidationAttempted(true);
+      setErrorScrollTick((n) => n + 1);
       return;
     }
     // The freshly appended card starts clean — validation only re-triggers on
@@ -197,19 +226,32 @@ export function AddSttItemsDialog({
     // Surface per-field errors instead of silently dropping incomplete rows.
     if (!allComplete) {
       setValidationAttempted(true);
+      setErrorScrollTick((n) => n + 1);
       return;
     }
     setSubmitting(true);
     setError(null);
+    setNameErrors({});
     try {
       await onSubmit(validRows);
     } catch (err) {
-      setError(
-        extractApiError(
-          err,
-          isEdit ? "Failed to save items" : "Failed to add items",
-        ),
-      );
+      const conflict = parseItemNameConflictFromError(err);
+      if (conflict) {
+        const byRow = rowNameErrorsFromConflict(rows, conflict);
+        if (Object.keys(byRow).length > 0) {
+          setNameErrors(byRow);
+          setErrorScrollTick((n) => n + 1);
+        } else {
+          setError(conflict.message);
+        }
+      } else {
+        setError(
+          extractApiError(
+            err,
+            isEdit ? "Failed to save items" : "Failed to add items",
+          ),
+        );
+      }
     } finally {
       setSubmitting(false);
     }
@@ -262,6 +304,8 @@ export function AddSttItemsDialog({
               remove cards; edit mode seeds a fixed set from the selection. */}
           {rows.map((row, idx) => {
             const nameMissing = validationAttempted && !row.name.trim();
+            const nameConflict = nameErrors[row.id];
+            const nameInvalid = nameMissing || !!nameConflict;
             const actualMissing = validationAttempted && !row.actual.trim();
             const predictedMissing =
               validationAttempted && !row.predicted.trim();
@@ -312,9 +356,12 @@ export function AddSttItemsDialog({
                     onChange={(e) => updateRow(row.id, { name: e.target.value })}
                     placeholder="e.g. Clip 1"
                     disabled={submitting}
-                    className={`${inputBase} h-9 ${nameMissing ? "border-red-500 ring-1 ring-red-500/30" : "border-border"}`}
+                    className={`${inputBase} h-9 ${nameInvalid ? "border-red-500 ring-1 ring-red-500/30" : "border-border"}`}
                   />
                   <FieldError show={nameMissing}>Name is required</FieldError>
+                  <FieldError show={!!nameConflict && !nameMissing}>
+                    {nameConflict}
+                  </FieldError>
                 </div>
                 <div className="space-y-1">
                   <label className="block text-xs font-medium text-muted-foreground">

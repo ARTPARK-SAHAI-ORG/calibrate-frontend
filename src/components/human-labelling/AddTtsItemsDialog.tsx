@@ -5,6 +5,11 @@ import { useHideFloatingButton } from "@/components/AppLayout";
 import { FieldError } from "@/components/ui/FieldError";
 import { LazyAudioPlayer } from "@/components/evaluations/LazyAudioPlayer";
 import { humaniseDetailObject } from "./bulk-upload-shared";
+import {
+  parseItemNameConflictFromError,
+  rowNameErrorsFromConflict,
+} from "./itemNameConflict";
+import { scheduleScrollToFirstFieldError } from "./scrollToFieldError";
 import { uploadTtsAudioToS3, validateTtsAudioFile } from "./ttsAudioUpload";
 import {
   DiscardChangesDialog,
@@ -110,11 +115,15 @@ export function AddTtsItemsDialog({
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // API name conflicts (ITEM_NAME_*), keyed by row id — shown under Name.
+  const [nameErrors, setNameErrors] = useState<Record<string, string>>({});
   // Per-row audio validation errors (too big / too long / unreadable).
   const [audioErrors, setAudioErrors] = useState<Record<string, string>>({});
   // Flips true after a submit attempt with incomplete rows, revealing the
   // per-field validation errors.
   const [validationAttempted, setValidationAttempted] = useState(false);
+  // Bumped when we surface field errors so we can scroll to the first one.
+  const [errorScrollTick, setErrorScrollTick] = useState(0);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   // Set when "Add another item" appends a card, so the effect below scrolls
@@ -137,8 +146,10 @@ export function AddTtsItemsDialog({
         return rowsFromInitial(initialRows);
       });
       setError(null);
+      setNameErrors({});
       setAudioErrors({});
       setValidationAttempted(false);
+      setErrorScrollTick(0);
     }
   }, [isOpen, initialRows]);
 
@@ -163,6 +174,13 @@ export function AddTtsItemsDialog({
     }
   }, [rows.length]);
 
+  // After a failed submit (or blocked "add another"), scroll the first
+  // invalid field into view if it isn't already visible.
+  useEffect(() => {
+    if (errorScrollTick === 0) return;
+    return scheduleScrollToFirstFieldError(scrollContainerRef.current);
+  }, [errorScrollTick]);
+
   const isDirty = isEdit
     ? rows.some((r, i) => {
         const init = initialRows?.[i];
@@ -181,13 +199,23 @@ export function AddTtsItemsDialog({
       isEdit,
       submitting,
       onClose,
-      onBeforeClose: () => setError(null),
+      onBeforeClose: () => {
+        setError(null);
+        setNameErrors({});
+      },
     });
 
   if (!isOpen) return null;
 
   const updateRow = (id: string, patch: Partial<TtsRowDraft>) => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+    if (patch.name !== undefined && nameErrors[id]) {
+      setNameErrors((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }
   };
 
   const handleFilePicked = async (id: string, file: File | null) => {
@@ -232,6 +260,7 @@ export function AddTtsItemsDialog({
     // Don't append a fresh blank card until the existing ones are complete.
     if (!allComplete) {
       setValidationAttempted(true);
+      setErrorScrollTick((n) => n + 1);
       return;
     }
     // The freshly appended card starts clean — validation only re-triggers on
@@ -246,10 +275,12 @@ export function AddTtsItemsDialog({
     // Surface per-field errors instead of silently dropping incomplete rows.
     if (!allComplete) {
       setValidationAttempted(true);
+      setErrorScrollTick((n) => n + 1);
       return;
     }
     setSubmitting(true);
     setError(null);
+    setNameErrors({});
     try {
       // Upload any newly-picked audio to S3, then map each row to its
       // resolved audio_path (new upload, or the kept existing audio).
@@ -275,12 +306,23 @@ export function AddTtsItemsDialog({
       }
       await onSubmit(resolved);
     } catch (err) {
-      setError(
-        extractApiError(
-          err,
-          isEdit ? "Failed to save items" : "Failed to add items",
-        ),
-      );
+      const conflict = parseItemNameConflictFromError(err);
+      if (conflict) {
+        const byRow = rowNameErrorsFromConflict(rows, conflict);
+        if (Object.keys(byRow).length > 0) {
+          setNameErrors(byRow);
+          setErrorScrollTick((n) => n + 1);
+        } else {
+          setError(conflict.message);
+        }
+      } else {
+        setError(
+          extractApiError(
+            err,
+            isEdit ? "Failed to save items" : "Failed to add items",
+          ),
+        );
+      }
     } finally {
       setSubmitting(false);
     }
@@ -311,7 +353,7 @@ export function AddTtsItemsDialog({
             </h2>
             <p className="text-xs md:text-sm text-muted-foreground mt-1">
               {isEdit
-                ? "Update the name, text, and audio for each item"
+                ? "Update the name, reference text, and audio for each item"
                 : "Annotators will listen to the audio and judge its quality"}
             </p>
           </div>
@@ -344,6 +386,8 @@ export function AddTtsItemsDialog({
             const playSrc = row.previewUrl ?? row.existingAudio;
             const fileName = row.audioFile?.name;
             const nameMissing = validationAttempted && !row.name.trim();
+            const nameConflict = nameErrors[row.id];
+            const nameInvalid = nameMissing || !!nameConflict;
             const textMissing = validationAttempted && !row.text.trim();
             const audioMissing =
               validationAttempted && !row.audioFile && !row.existingAudio;
@@ -394,25 +438,30 @@ export function AddTtsItemsDialog({
                     onChange={(e) => updateRow(row.id, { name: e.target.value })}
                     placeholder="e.g. Clip 1"
                     disabled={submitting}
-                    className={`w-full h-9 px-3 rounded-md text-sm border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 ${nameMissing ? "border-red-500 ring-1 ring-red-500/30" : "border-border"}`}
+                    className={`w-full h-9 px-3 rounded-md text-sm border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 ${nameInvalid ? "border-red-500 ring-1 ring-red-500/30" : "border-border"}`}
                   />
                   <FieldError show={nameMissing}>Name is required</FieldError>
+                  <FieldError show={!!nameConflict && !nameMissing}>
+                    {nameConflict}
+                  </FieldError>
                 </div>
 
-                {/* Text */}
+                {/* Reference text */}
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-muted-foreground">
-                    Text <span className="text-red-500">*</span>
+                    Reference text <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     value={row.text}
                     onChange={(e) => updateRow(row.id, { text: e.target.value })}
-                    placeholder="The text that was spoken"
+                    placeholder="The reference text that was spoken"
                     disabled={submitting}
                     rows={2}
                     className={`w-full px-3 py-2 rounded-md text-sm border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 resize-y ${textMissing ? "border-red-500 ring-1 ring-red-500/30" : "border-border"}`}
                   />
-                  <FieldError show={textMissing}>Text is required</FieldError>
+                  <FieldError show={textMissing}>
+                    Reference text is required
+                  </FieldError>
                 </div>
 
                 {/* Audio */}

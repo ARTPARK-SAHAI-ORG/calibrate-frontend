@@ -66,7 +66,7 @@ beforeEach(() => {
         ok: presignedOk,
         json: async () => ({
           presigned_url: "https://s3.test/put",
-          s3_path: "tts/audio.wav",
+          s3_path: "tts/media/clip.wav",
         }),
       });
     }
@@ -231,7 +231,7 @@ describe("BulkUploadTtsItemsDialog", () => {
               payload: {
                 name: "Greeting",
                 text: "Hello there",
-                audio_path: "tts/audio.wav",
+                audio_path: "tts/media/clip.wav",
               },
             },
           ],

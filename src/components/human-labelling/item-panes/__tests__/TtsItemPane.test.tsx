@@ -3,7 +3,7 @@ import { render, screen } from "@/test-utils";
 import { TtsItemPane } from "../TtsItemPane";
 
 describe("TtsItemPane", () => {
-  it("renders name, text, and an audio player when all present", () => {
+  it("renders reference text and an audio player when present", () => {
     render(
       <TtsItemPane
         payload={{
@@ -11,24 +11,16 @@ describe("TtsItemPane", () => {
           text: "Hello world",
           audio_path: "https://example.com/a.wav",
         }}
-      />
+      />,
     );
 
-    expect(screen.getByText("Clip 1")).toBeInTheDocument();
+    // Name belongs in the surrounding dialog/job header, not here.
+    expect(screen.queryByText("Clip 1")).not.toBeInTheDocument();
     expect(screen.getByText("Hello world")).toBeInTheDocument();
-    expect(screen.getByText("Text")).toBeInTheDocument();
+    expect(screen.getByText("Reference text")).toBeInTheDocument();
     expect(screen.getByText("Generated audio")).toBeInTheDocument();
     // LazyAudioPlayer renders a Play button until the user starts playback.
     expect(screen.getByLabelText("Play")).toBeInTheDocument();
-  });
-
-  it("omits the name paragraph when name is not a string", () => {
-    const { container } = render(
-      <TtsItemPane
-        payload={{ name: 42, text: "Hi", audio_path: "https://x/a.wav" }}
-      />
-    );
-    expect(container.querySelector("p.font-semibold")).not.toBeInTheDocument();
   });
 
   it("shows an em-dash when text is missing or non-string", () => {
