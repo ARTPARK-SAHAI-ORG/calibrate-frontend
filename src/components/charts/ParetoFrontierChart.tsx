@@ -167,6 +167,7 @@ export function ParetoFrontierChart({
   // keep their exact position when the "Frontier only" toggle hides dominated
   // models — toggling filters points, it never rescales the axes.
   const costMax = Math.max(...allData.map((d) => d.cost));
+  const xDomainMax = costMax * 1.1;
   const prVals = allData.map((d) => d.passRate);
   const prMin = Math.min(...prVals);
   const prMax = Math.max(...prVals);
@@ -192,8 +193,9 @@ export function ParetoFrontierChart({
     return R_MIN + t * (R_MAX - R_MIN);
   };
 
-  // Custom point renderer: reads `hoveredModel` so the hovered dot pops (grows,
-  // full opacity, dark ring) while the others dim — the "in focus" affordance.
+  // Custom point renderer: the bubble plus its always-on model-name label. Reads
+  // `hoveredModel` so the hovered dot pops (grows, full opacity, dark ring) while
+  // the others dim — the "in focus" affordance.
   const renderDot = (props: { cx?: number; cy?: number; payload?: ChartDatum }) => {
     const { cx, cy, payload } = props;
     if (cx == null || cy == null || !payload) return <g />;
@@ -212,22 +214,51 @@ export function ParetoFrontierChart({
           : 0.4;
     const stroke = isHovered || d.onFrontier ? "#0f172a" : "#94a3b8";
     const strokeWidth = isHovered ? 2.5 : d.onFrontier ? 1.5 : 1;
+
+    // Label sits to the right of the dot, or to the left when the dot is near
+    // the right edge so the text never runs off the chart.
+    const labelLeft = xDomainMax > 0 && d.cost / xDomainMax > 0.68;
+    const labelX = labelLeft ? cx - r - 5 : cx + r + 5;
+    const labelOpacity = isHovered ? 1 : someHovered ? 0.25 : 0.85;
+
     return (
-      <circle
-        cx={cx}
-        cy={cy}
-        r={r}
-        fill={colorMap.get(d.model) || "#A8D5E2"}
-        fillOpacity={fillOpacity}
-        stroke={stroke}
-        strokeWidth={strokeWidth}
-        style={{
-          cursor: "pointer",
-          transition: "r 120ms ease, fill-opacity 120ms ease, stroke-width 120ms ease",
-        }}
+      <g
         onMouseEnter={() => setHoveredModel(d.model)}
         onMouseLeave={() => setHoveredModel(null)}
-      />
+        style={{ cursor: "pointer" }}
+      >
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill={colorMap.get(d.model) || "#A8D5E2"}
+          fillOpacity={fillOpacity}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          style={{
+            transition:
+              "r 120ms ease, fill-opacity 120ms ease, stroke-width 120ms ease",
+          }}
+        />
+        <text
+          x={labelX}
+          y={cy}
+          textAnchor={labelLeft ? "end" : "start"}
+          dominantBaseline="central"
+          fontSize={11}
+          fontWeight={isHovered ? 600 : 500}
+          fill="currentColor"
+          fillOpacity={labelOpacity}
+          style={{
+            paintOrder: "stroke",
+            stroke: "var(--background)",
+            strokeWidth: 3,
+            strokeLinejoin: "round",
+          }}
+        >
+          {d.label}
+        </text>
+      </g>
     );
   };
 
@@ -293,7 +324,7 @@ export function ParetoFrontierChart({
               type="number"
               dataKey="cost"
               name="Cost"
-              domain={[0, costMax * 1.1 || "auto"]}
+              domain={[0, xDomainMax || "auto"]}
               tick={{ fontSize: 12 }}
               tickFormatter={(v) => formatCostUsd(v)}
               label={{
