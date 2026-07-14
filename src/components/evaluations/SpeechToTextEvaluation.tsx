@@ -5,7 +5,12 @@ import { unwrapList } from "@/lib/api";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { useAccessToken, useMaxRowsPerEval } from "@/hooks";
+import {
+  useAccessToken,
+  useMaxRowsPerEval,
+  useEnabledProviders,
+  isProviderEnabled,
+} from "@/hooks";
 import { toast } from "sonner";
 import {
   sttProviders,
@@ -57,13 +62,18 @@ const languageDisplayName: Record<LanguageOption, string> = {
   gujarati: "Gujarati",
 };
 
-// Filter providers based on selected language
-const getFilteredProviders = (language: LanguageOption): STTProvider[] => {
+// Filter providers based on selected language and, when known, the set of
+// providers whose API keys are configured in this environment (GET /providers).
+const getFilteredProviders = (
+  language: LanguageOption,
+  enabled: Set<string> | null,
+): STTProvider[] => {
   const langName = languageDisplayName[language];
   return sttProviders.filter(
     (provider) =>
-      !provider.supportedLanguages ||
-      provider.supportedLanguages.includes(langName),
+      (!provider.supportedLanguages ||
+        provider.supportedLanguages.includes(langName)) &&
+      isProviderEnabled(enabled, provider.value),
   );
 };
 
@@ -89,25 +99,33 @@ export function SpeechToTextEvaluation({
     new Set(),
   );
   const [language, setLanguage] = useState<LanguageOption>("english");
+  const enabledProviders = useEnabledProviders();
 
-  // Get filtered providers based on selected language
-  const filteredProviders = getFilteredProviders(language);
+  // Get filtered providers based on selected language + enabled API keys
+  const filteredProviders = getFilteredProviders(language, enabledProviders);
   const providerLabels = filteredProviders.map((p) => p.label);
 
   useEffect(() => {
-    const only = getFilteredProviders(language);
+    const only = getFilteredProviders(language, enabledProviders);
     if (only.length === 1) {
       const onlyLabel = only[0].label;
       setSelectedProviders((prev) =>
         prev.size === 1 && prev.has(onlyLabel) ? prev : new Set([onlyLabel]),
       );
+      return;
     }
-  }, [language]);
+    // Drop any selection that became invalid once the enabled set resolved.
+    const allowed = new Set(only.map((p) => p.label));
+    setSelectedProviders((prev) => {
+      if ([...prev].every((label) => allowed.has(label))) return prev;
+      return new Set([...prev].filter((label) => allowed.has(label)));
+    });
+  }, [language, enabledProviders]);
 
   // Handle language change - clear providers that don't support the new language
   const handleLanguageChange = (newLanguage: LanguageOption) => {
     setLanguage(newLanguage);
-    const newFilteredProviders = getFilteredProviders(newLanguage);
+    const newFilteredProviders = getFilteredProviders(newLanguage, enabledProviders);
     const supportedLabels = new Set(newFilteredProviders.map((p) => p.label));
     setSelectedProviders((prev) => {
       if (newFilteredProviders.length === 1) {

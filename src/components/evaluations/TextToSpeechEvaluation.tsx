@@ -5,7 +5,12 @@ import { unwrapList } from "@/lib/api";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { useAccessToken, useMaxRowsPerEval } from "@/hooks";
+import {
+  useAccessToken,
+  useMaxRowsPerEval,
+  useEnabledProviders,
+  isProviderEnabled,
+} from "@/hooks";
 import { toast } from "sonner";
 import {
   ttsProviders,
@@ -56,13 +61,18 @@ const languageDisplayName: Record<LanguageOption, string> = {
   sindhi: "Sindhi",
 };
 
-// Filter providers based on selected language
-const getFilteredProviders = (language: LanguageOption): TTSProvider[] => {
+// Filter providers based on selected language and, when known, the set of
+// providers whose API keys are configured in this environment (GET /providers).
+const getFilteredProviders = (
+  language: LanguageOption,
+  enabled: Set<string> | null,
+): TTSProvider[] => {
   const langName = languageDisplayName[language];
   return ttsProviders.filter(
     (provider) =>
-      !provider.supportedLanguages ||
-      provider.supportedLanguages.includes(langName)
+      (!provider.supportedLanguages ||
+        provider.supportedLanguages.includes(langName)) &&
+      isProviderEnabled(enabled, provider.value)
   );
 };
 
@@ -75,6 +85,7 @@ type TextToSpeechEvaluationProps = {
 export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange, initialDatasetId }: TextToSpeechEvaluationProps = {}) {
   const router = useRouter();
   const backendAccessToken = useAccessToken();
+  const enabledProviders = useEnabledProviders();
   const [activeTab, setActiveTab] = useState<TabType>(
     initialDatasetId ? "settings" : "input"
   );
@@ -214,14 +225,25 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange, initia
     }
   });
 
-  // Get filtered providers based on selected language
-  const filteredProviders = getFilteredProviders(language);
+  // Get filtered providers based on selected language + enabled API keys
+  const filteredProviders = getFilteredProviders(language, enabledProviders);
   const providerLabels = filteredProviders.map((p) => p.label);
+
+  // Drop any selection that became invalid once the enabled set resolved.
+  useEffect(() => {
+    const allowed = new Set(
+      getFilteredProviders(language, enabledProviders).map((p) => p.label),
+    );
+    setSelectedProviders((prev) => {
+      if ([...prev].every((label) => allowed.has(label))) return prev;
+      return new Set([...prev].filter((label) => allowed.has(label)));
+    });
+  }, [language, enabledProviders]);
 
   // Handle language change - clear providers that don't support the new language
   const handleLanguageChange = (newLanguage: LanguageOption) => {
     setLanguage(newLanguage);
-    const newFilteredProviders = getFilteredProviders(newLanguage);
+    const newFilteredProviders = getFilteredProviders(newLanguage, enabledProviders);
     const supportedLabels = new Set(newFilteredProviders.map((p) => p.label));
     setSelectedProviders((prev) => {
       const newSet = new Set<string>();

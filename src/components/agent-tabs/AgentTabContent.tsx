@@ -7,6 +7,7 @@ import {
   type LLMModel,
 } from "./constants/providers";
 import { LLMSelectorModal } from "./LLMSelectorModal";
+import { useEnabledProviders, isProviderEnabled } from "@/hooks";
 
 export type { LLMModel };
 
@@ -32,6 +33,23 @@ export function AgentTabContent({
   setSelectedLLM,
 }: AgentTabContentProps) {
   const [llmModalOpen, setLlmModalOpen] = useState(false);
+  const enabledProviders = useEnabledProviders();
+
+  // Live agent picker: hide providers whose API keys aren't configured
+  // (GET /providers) and benchmark-only providers, but always keep the
+  // currently-saved value so an existing selection is never silently dropped.
+  const availableSttProviders = sttProviders.filter(
+    (provider) =>
+      !provider.benchmarkOnly &&
+      (isProviderEnabled(enabledProviders, provider.value) ||
+        provider.value === sttProvider),
+  );
+  const availableTtsProviders = ttsProviders.filter(
+    (provider) =>
+      !provider.benchmarkOnly &&
+      (isProviderEnabled(enabledProviders, provider.value) ||
+        provider.value === ttsProvider),
+  );
 
   return (
     <>
@@ -94,7 +112,7 @@ export function AgentTabContent({
                   onChange={(e) => setSttProvider(e.target.value)}
                   className="w-full h-9 md:h-10 px-3 md:px-4 pr-10 rounded-md text-sm md:text-base border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer appearance-none"
                 >
-                  {sttProviders.filter((provider) => !provider.benchmarkOnly).map((provider) => (
+                  {availableSttProviders.map((provider) => (
                     <option key={provider.value} value={provider.value}>
                       {provider.label}
                     </option>
@@ -138,7 +156,7 @@ export function AgentTabContent({
                   onChange={(e) => setTtsProvider(e.target.value)}
                   className="w-full h-9 md:h-10 px-3 md:px-4 pr-10 rounded-md text-sm md:text-base border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer appearance-none"
                 >
-                  {ttsProviders.filter((provider) => !provider.benchmarkOnly).map((provider) => (
+                  {availableTtsProviders.map((provider) => (
                     <option key={provider.value} value={provider.value}>
                       {provider.label}
                     </option>
