@@ -45,6 +45,7 @@ export type STTResultRow = {
   gt: string;
   pred: string;
   wer: string;
+  cer?: string;
   string_similarity?: string;
   llm_judge_score?: string;
   llm_judge_reasoning?: string;
@@ -111,6 +112,7 @@ const STT_COL_WIDTHS = {
   audio: 180,
   text: 280,
   wer: 80,
+  cer: 80,
   similarity: 110,
   evaluator: 130,
   llmJudge: 110,
@@ -149,6 +151,7 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
     if (hasAudio) total += STT_COL_WIDTHS.audio;
     if (showMetrics) {
       total += STT_COL_WIDTHS.wer;
+      total += STT_COL_WIDTHS.cer;
       if (showSimilarity) total += STT_COL_WIDTHS.similarity;
       if (useDynamic) total += evaluatorColumns!.length * STT_COL_WIDTHS.evaluator;
       else total += STT_COL_WIDTHS.llmJudge;
@@ -180,6 +183,7 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                 {showMetrics && (
                   <>
                     <th style={{ width: STT_COL_WIDTHS.wer }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">WER</th>
+                    <th style={{ width: STT_COL_WIDTHS.cer }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">CER</th>
                     {showSimilarity && (
                       <th style={{ width: STT_COL_WIDTHS.similarity }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">Similarity</th>
                     )}
@@ -238,6 +242,9 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                       <>
                         <td className="px-4 py-3 text-[13px] text-foreground">
                           {result.wer != null ? parseFloat(parseFloat(result.wer).toFixed(4)) : "-"}
+                        </td>
+                        <td className="px-4 py-3 text-[13px] text-foreground">
+                          {result.cer != null ? parseFloat(parseFloat(result.cer).toFixed(4)) : "-"}
                         </td>
                         {showSimilarity && (
                           <td className="px-4 py-3 text-[13px] text-foreground">
@@ -332,6 +339,10 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                     <div>
                       <span className="text-[11px] text-muted-foreground uppercase tracking-wide">WER</span>
                       <p className="text-[13px] text-foreground">{result.wer != null ? parseFloat(parseFloat(result.wer).toFixed(4)) : "-"}</p>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-muted-foreground uppercase tracking-wide">CER</span>
+                      <p className="text-[13px] text-foreground">{result.cer != null ? parseFloat(parseFloat(result.cer).toFixed(4)) : "-"}</p>
                     </div>
                     {showSimilarity && (
                       <div>

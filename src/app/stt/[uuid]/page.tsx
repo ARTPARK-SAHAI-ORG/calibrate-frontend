@@ -96,6 +96,7 @@ type EvaluatorRun = {
 
 type ProviderMetrics = {
   wer?: number;
+  cer?: number;
   string_similarity?: number;
   llm_judge_score?: number;
   [k: string]:
@@ -110,6 +111,7 @@ type ProviderResultRow = {
   gt: string;
   pred: string;
   wer: string;
+  cer?: string;
   string_similarity?: string;
   llm_judge_score?: string;
   llm_judge_reasoning?: string;
@@ -130,6 +132,7 @@ type LeaderboardSummary = {
   run: string;
   count: number;
   wer?: number;
+  cer?: number;
   string_similarity?: number;
   llm_judge_score?: number;
   [k: string]: string | number | undefined;
@@ -742,6 +745,7 @@ export default function STTEvaluationDetailPage() {
                         { key: "reference_text", header: "Reference text" },
                         { key: "predicted_text", header: "Predicted text" },
                         { key: "wer", header: "WER" },
+                        { key: "cer", header: "CER" },
                         ...evaluatorColumns.map((c) => ({
                           key: c.key,
                           header: c.label,
@@ -756,6 +760,7 @@ export default function STTEvaluationDetailPage() {
                             reference_text: r.gt,
                             predicted_text: r.pred,
                             wer: r.wer,
+                            cer: r.cer,
                           };
                           // Read via `readEvaluatorCell` so the refreshed
                           // `evaluator_outputs[<uuid>]` shape is preferred

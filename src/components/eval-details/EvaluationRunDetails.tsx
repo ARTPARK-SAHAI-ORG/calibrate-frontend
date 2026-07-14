@@ -96,7 +96,7 @@ type ProviderResultLike = {
 };
 
 export type STTProviderResultForDetails = ProviderResultLike & {
-  metrics?: (Record<string, unknown> & { wer?: number }) | null;
+  metrics?: (Record<string, unknown> & { wer?: number; cer?: number }) | null;
   results?: STTResultRow[] | null;
 };
 
@@ -124,6 +124,14 @@ export const WER_ABOUT_METRIC: MetricDescription = {
   metric: "WER (Word Error Rate)",
   description:
     "Word error rate measures the percentage of words that differ between the reference transcription and the predicted transcription.",
+  preference: "Lower is better",
+  range: "0 - \u221E",
+};
+
+export const CER_ABOUT_METRIC: MetricDescription = {
+  metric: "CER (Character Error Rate)",
+  description:
+    "Character error rate measures the percentage of characters that differ between the reference transcription and the predicted transcription.",
   preference: "Lower is better",
   range: "0 - \u221E",
 };
@@ -241,6 +249,7 @@ export function STTEvaluationAbout({
     <AboutMetricsTable
       metrics={[
         WER_ABOUT_METRIC,
+        CER_ABOUT_METRIC,
         ...evaluatorRowsToMetricDescriptions(evaluatorRows),
       ]}
     />
@@ -275,6 +284,7 @@ export function STTEvaluationLeaderboard({
 }) {
   const allCharts: ChartConfig[] = [
     { title: "WER", dataKey: "wer" },
+    { title: "CER", dataKey: "cer" },
     ...evaluatorChartConfigs(evaluatorColumns),
   ];
   const chartRows = chunkChartRows(allCharts);
@@ -285,6 +295,7 @@ export function STTEvaluationLeaderboard({
       columns={[
         { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
         { key: "wer", header: "WER" },
+        { key: "cer", header: "CER" },
         ...evaluatorLeaderboardColumns(evaluatorColumns),
       ]}
       data={leaderboardSummary}
@@ -450,6 +461,13 @@ export function STTEvaluationOutputs({
                       value:
                         providerResult.metrics.wer != null
                           ? parseFloat(providerResult.metrics.wer.toFixed(4))
+                          : "-",
+                    },
+                    {
+                      label: "CER",
+                      value:
+                        providerResult.metrics.cer != null
+                          ? parseFloat(providerResult.metrics.cer.toFixed(4))
                           : "-",
                     },
                     ...evaluatorColumns.map((col) => ({
