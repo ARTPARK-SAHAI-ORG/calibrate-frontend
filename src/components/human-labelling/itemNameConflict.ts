@@ -15,7 +15,7 @@ function formatNames(names: string[]): string | null {
   return names.map((n) => `"${n}"`).join(", ");
 }
 
-function humaniseNameConflictDetail(detail: {
+export function humaniseNameConflictDetail(detail: {
   code?: string;
   conflicting_names?: string[];
 }): ItemNameConflict | null {

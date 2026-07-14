@@ -6,6 +6,7 @@ import { jsPDF } from "jspdf";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 import { apiClient } from "@/lib/api";
+import { humaniseNameConflictDetail } from "./itemNameConflict";
 
 // ─── Shared types ─────────────────────────────────────────────────────────
 
@@ -498,29 +499,8 @@ export function humaniseDetailObject(detail: {
   code?: string;
   conflicting_names?: string[];
 }): string | null {
-  const names = detail.conflicting_names ?? [];
-  const fmt =
-    names.length === 0
-      ? null
-      : names.length === 1
-        ? `"${names[0]}"`
-        : names.map((n) => `"${n}"`).join(", ");
-
-  if (detail.code === "ITEM_NAME_CONFLICT") {
-    return fmt
-      ? names.length === 1
-        ? `An item named ${fmt} already exists in this task`
-        : `Items with these names already exist in this task: ${fmt}`
-      : "One or more item names already exist in this task";
-  }
-  if (detail.code === "ITEM_NAME_DUPLICATE_IN_REQUEST") {
-    return fmt
-      ? names.length === 1
-        ? `Duplicate name in your request: ${fmt}`
-        : `Duplicate names in your request: ${fmt}`
-      : "Your request contains duplicate item names";
-  }
-  return null;
+  // Single source of truth for the ITEM_NAME_* copy lives in itemNameConflict.
+  return humaniseNameConflictDetail(detail)?.message ?? null;
 }
 
 export function parseApiError(err: unknown, fallback: string): string {
