@@ -47,9 +47,20 @@ const R_MAX = 18;
 const R_FIXED = 9;
 // Hovered bubbles grow by this factor for focus.
 const HOVER_SCALE = 1.25;
+// Minimum vertical spacing (px) between two model labels before we nudge them
+// apart in the de-overlap pass.
+const LABEL_GAP = 15;
+// Extra horizontal margin so model-name labels beside edge bubbles aren't clipped.
+const LABEL_GUTTER = 72;
 // Chart margins must clear the largest (hovered) bubble so points sitting on an
 // axis edge (e.g. a model at 100%) aren't clipped.
 const EDGE_PAD = Math.ceil(R_MAX * HOVER_SCALE) + 8;
+const MARGIN = {
+  top: EDGE_PAD,
+  right: EDGE_PAD + LABEL_GUTTER,
+  bottom: 44,
+  left: 12 + Math.floor(LABEL_GUTTER / 2),
+};
 
 type ChartDatum = ParetoModelPoint & { onFrontier: boolean };
 
@@ -193,9 +204,56 @@ export function ParetoFrontierChart({
     return R_MIN + t * (R_MAX - R_MIN);
   };
 
-  // Custom point renderer: the bubble plus its always-on model-name label. Reads
-  // `hoveredModel` so the hovered dot pops (grows, full opacity, dark ring) while
-  // the others dim — the "in focus" affordance.
+  // Precompute label side + vertical nudge so nearby bubbles don't stack their
+  // names on top of each other. Positions are estimated from the known chart
+  // height and cost/pass-rate fractions (avoids depending on recharts internals).
+  const visiblePoints = showDominated ? allData : frontierData;
+  const labelLayout = new Map<string, { side: "left" | "right"; dy: number }>();
+  {
+    const plotTop = MARGIN.top;
+    const plotBottom = height - MARGIN.bottom;
+    const plotH = Math.max(1, plotBottom - plotTop);
+    const ySpan = Math.max(1e-9, yDomain[1] - yDomain[0]);
+
+    type Entry = {
+      model: string;
+      py: number;
+      side: "left" | "right";
+      ly: number;
+    };
+    const entries: Entry[] = visiblePoints.map((d) => {
+      const t = (d.passRate - yDomain[0]) / ySpan;
+      const py = plotTop + (1 - t) * plotH;
+      const side: "left" | "right" =
+        xDomainMax > 0 && d.cost / xDomainMax > 0.68 ? "left" : "right";
+      return { model: d.model, py, side, ly: py };
+    });
+
+    for (const side of ["left", "right"] as const) {
+      const grp = entries.filter((e) => e.side === side).sort((a, b) => a.py - b.py);
+      for (let i = 1; i < grp.length; i++) {
+        grp[i].ly = Math.max(grp[i].py, grp[i - 1].ly + LABEL_GAP);
+      }
+      if (grp.length) {
+        const last = grp[grp.length - 1];
+        if (last.ly > plotBottom - 6) {
+          last.ly = plotBottom - 6;
+          for (let i = grp.length - 2; i >= 0; i--) {
+            grp[i].ly = Math.min(grp[i].ly, grp[i + 1].ly - LABEL_GAP);
+          }
+        }
+        for (const e of grp) e.ly = Math.max(e.ly, plotTop + 6);
+      }
+    }
+
+    for (const e of entries) {
+      labelLayout.set(e.model, { side: e.side, dy: e.ly - e.py });
+    }
+  }
+
+  // Custom point renderer: bubble + model-name label (with leader line when the
+  // de-overlap pass nudged the label). Reads `hoveredModel` so the hovered dot
+  // pops (grows, full opacity, dark ring) while the others dim.
   const renderDot = (props: { cx?: number; cy?: number; payload?: ChartDatum }) => {
     const { cx, cy, payload } = props;
     if (cx == null || cy == null || !payload) return <g />;
@@ -215,10 +273,10 @@ export function ParetoFrontierChart({
     const stroke = isHovered || d.onFrontier ? "#0f172a" : "#94a3b8";
     const strokeWidth = isHovered ? 2.5 : d.onFrontier ? 1.5 : 1;
 
-    // Label sits to the right of the dot, or to the left when the dot is near
-    // the right edge so the text never runs off the chart.
-    const labelLeft = xDomainMax > 0 && d.cost / xDomainMax > 0.68;
-    const labelX = labelLeft ? cx - r - 5 : cx + r + 5;
+    const layout = labelLayout.get(d.model) ?? { side: "right" as const, dy: 0 };
+    const labelX = layout.side === "left" ? cx - r - 5 : cx + r + 5;
+    const labelY = cy + layout.dy;
+    const edgeX = layout.side === "left" ? cx - r : cx + r;
     const labelOpacity = isHovered ? 1 : someHovered ? 0.25 : 0.85;
 
     return (
@@ -240,10 +298,21 @@ export function ParetoFrontierChart({
               "r 120ms ease, fill-opacity 120ms ease, stroke-width 120ms ease",
           }}
         />
+        {Math.abs(layout.dy) > 1 && (
+          <line
+            x1={edgeX}
+            y1={cy}
+            x2={labelX}
+            y2={labelY}
+            stroke="#94a3b8"
+            strokeWidth={1}
+            strokeOpacity={labelOpacity * 0.6}
+          />
+        )}
         <text
           x={labelX}
-          y={cy}
-          textAnchor={labelLeft ? "end" : "start"}
+          y={labelY}
+          textAnchor={layout.side === "left" ? "end" : "start"}
           dominantBaseline="central"
           fontSize={11}
           fontWeight={isHovered ? 600 : 500}
@@ -270,17 +339,31 @@ export function ParetoFrontierChart({
     : "Each dot is a model. The higher it sits, the more tests it passes, and the further left, the less it costs to run. So the best models sit toward the top-left.";
   const axesList = hasLatency ? "pass rate, cost, and speed" : "both pass rate and cost";
   const hasFrontierLine = frontierData.length >= 2;
-  const resultSentence = hasFrontierLine
-    ? `Stick to the models on the dashed line: they are the best picks. For any model not on it, one that is will match or beat it on ${axesList}, so there is no reason to choose it.`
-    : `One model comes out on top (the darker-ringed dot): it matches or beats every other model on ${axesList}, so it is the clear pick.`;
-  const caption = `${axisSentence} ${resultSentence}`;
+  const winnerLabel = frontierData[0]?.label;
+  const resultSentence = hasFrontierLine ? (
+    <>
+      Stick to the models on the dashed line: they are the best picks. For any
+      model not on it, one that is will match or beat it on {axesList}, so there
+      is no reason to choose it.
+    </>
+  ) : (
+    <>
+      <strong className="font-semibold text-foreground">
+        {winnerLabel ?? "One model"}
+      </strong>{" "}
+      comes out on top: it matches or beats every other model on {axesList}, so
+      it is the clear pick.
+    </>
+  );
 
   return (
     <div>
       <div className="flex items-start justify-between mb-2 gap-3">
         <div>
           <h3 className="text-[15px] font-semibold">{title}</h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">{caption}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {axisSentence} {resultSentence}
+          </p>
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
           {hasDominated && (
@@ -320,14 +403,7 @@ export function ParetoFrontierChart({
       </div>
       <div ref={chartRef}>
         <ResponsiveContainer width="100%" height={height}>
-          <ScatterChart
-            margin={{
-              top: EDGE_PAD,
-              right: EDGE_PAD,
-              bottom: 44,
-              left: 12,
-            }}
-          >
+          <ScatterChart margin={MARGIN}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               type="number"

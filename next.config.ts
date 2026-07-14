@@ -1,8 +1,14 @@
+import path from "path";
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Pin to this package so worktrees don't inherit the parent checkout's
+  // lockfile as Turbopack root (that made cold compiles extremely slow).
+  // Requires a local node_modules in this worktree (`npm install`).
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
 };
 
 export default withSentryConfig(nextConfig, {
