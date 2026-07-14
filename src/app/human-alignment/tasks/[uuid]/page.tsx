@@ -4198,6 +4198,7 @@ function LabellingTaskPageInner() {
 
       <AddTtsItemsDialog
         isOpen={addTtsItemsOpen}
+        accessToken={accessToken}
         initialRows={duplicateTtsRows ?? undefined}
         onClose={() => {
           setAddTtsItemsOpen(false);
@@ -4227,6 +4228,7 @@ function LabellingTaskPageInner() {
       <AddTtsItemsDialog
         isOpen={editTtsItemsOpen}
         mode="edit"
+        accessToken={accessToken}
         initialRows={items
           .filter((it) =>
             editTtsSingleItemUuid

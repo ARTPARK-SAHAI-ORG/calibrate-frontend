@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { LazyAudioPlayer } from "@/components/evaluations/LazyAudioPlayer";
 import { humaniseDetailObject } from "./bulk-upload-shared";
+import { uploadTtsAudioToS3, validateTtsAudioFile } from "./ttsAudioUpload";
 import {
   DiscardChangesDialog,
   useUnsavedCloseGuard,
@@ -14,7 +15,12 @@ type TtsRowDraft = {
   uuid?: string; // present in edit mode; undefined for new rows
   name: string;
   text: string;
-  audio: string;
+  /** A newly-picked local file to upload on submit. */
+  audioFile: File | null;
+  /** Object URL for previewing the picked file. */
+  previewUrl: string | null;
+  /** Already-stored audio (edit/duplicate) kept when no new file is picked. */
+  existingAudio: string | null;
 };
 
 export type TtsItemRowSubmission = {
@@ -27,10 +33,12 @@ export type TtsItemRowSubmission = {
 type AddTtsItemsDialogProps = {
   isOpen: boolean;
   mode?: "add" | "edit";
+  accessToken: string | null;
   initialRows?: {
     uuid: string;
     name: string;
     text: string;
+    /** Existing stored audio (s3 path / signed URL). */
     audio: string;
   }[];
   onClose: () => void;
@@ -55,19 +63,39 @@ function extractApiError(err: unknown, fallback: string): string {
   return err.message || fallback;
 }
 
+const newId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
 const newRow = (): TtsRowDraft => ({
-  id:
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  id: newId(),
   name: "",
   text: "",
-  audio: "",
+  audioFile: null,
+  previewUrl: null,
+  existingAudio: null,
 });
+
+const rowsFromInitial = (
+  initialRows: AddTtsItemsDialogProps["initialRows"],
+): TtsRowDraft[] =>
+  initialRows && initialRows.length > 0
+    ? initialRows.map((r) => ({
+        id: r.uuid,
+        uuid: r.uuid,
+        name: r.name,
+        text: r.text,
+        audioFile: null,
+        previewUrl: null,
+        existingAudio: r.audio || null,
+      }))
+    : [newRow()];
 
 export function AddTtsItemsDialog({
   isOpen,
   mode = "add",
+  accessToken,
   initialRows,
   onClose,
   onSubmit,
@@ -77,54 +105,55 @@ export function AddTtsItemsDialog({
   const isEdit = mode === "edit";
 
   const [rows, setRows] = useState<TtsRowDraft[]>(() =>
-    initialRows && initialRows.length > 0
-      ? initialRows.map((r) => ({
-          id: r.uuid,
-          uuid: r.uuid,
-          name: r.name,
-          text: r.text,
-          audio: r.audio,
-        }))
-      : [newRow()],
+    rowsFromInitial(initialRows),
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Per-row audio validation errors (too big / too long / unreadable).
+  const [audioErrors, setAudioErrors] = useState<Record<string, string>>({});
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  // Reset rows whenever the dialog opens (so a fresh edit starts from the
-  // latest selected items, and a reopened add starts blank).
+  // Revoke any object URLs we created for previews.
+  const revokePreviews = (list: TtsRowDraft[]) => {
+    list.forEach((r) => {
+      if (r.previewUrl) URL.revokeObjectURL(r.previewUrl);
+    });
+  };
+
+  // Reset whenever the dialog opens (fresh edit from latest selection, or a
+  // blank add). Revoke previous previews first.
   useEffect(() => {
     if (isOpen) {
-      setRows(
-        initialRows && initialRows.length > 0
-          ? initialRows.map((r) => ({
-              id: r.uuid,
-              uuid: r.uuid,
-              name: r.name,
-              text: r.text,
-              audio: r.audio,
-            }))
-          : [newRow()],
-      );
+      setRows((prev) => {
+        revokePreviews(prev);
+        return rowsFromInitial(initialRows);
+      });
       setError(null);
+      setAudioErrors({});
     }
   }, [isOpen, initialRows]);
 
-  // Unsaved-changes check. Add mode: any field has content. Edit mode: any
-  // field differs from the item it was seeded with (rows align 1:1 with
-  // initialRows since edit mode can't add/remove rows).
+  useEffect(
+    () => () => {
+      setRows((prev) => {
+        revokePreviews(prev);
+        return prev;
+      });
+    },
+    [],
+  );
+
   const isDirty = isEdit
     ? rows.some((r, i) => {
         const init = initialRows?.[i];
         return (
           r.name.trim() !== (init?.name ?? "").trim() ||
           r.text.trim() !== (init?.text ?? "").trim() ||
-          r.audio.trim() !== (init?.audio ?? "").trim()
+          !!r.audioFile // any replacement audio counts as an edit
         );
       })
-    : rows.some((r) => r.name.trim() || r.text.trim() || r.audio.trim());
+    : rows.some((r) => r.name.trim() || r.text.trim() || r.audioFile);
 
-  // Note: this dialog intentionally has no backdrop-click close, so
-  // `handleBackdropClick` is not used here.
   const { discardConfirmOpen, closeDiscardConfirm, doClose, attemptClose } =
     useUnsavedCloseGuard({
       isOpen,
@@ -141,31 +170,73 @@ export function AddTtsItemsDialog({
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   };
 
-  const removeRow = (id: string) => {
+  const handleFilePicked = async (id: string, file: File | null) => {
+    if (!file) return;
+    setAudioErrors((prev) => {
+      const n = { ...prev };
+      delete n[id];
+      return n;
+    });
+    const validationError = await validateTtsAudioFile(file);
+    if (validationError) {
+      setAudioErrors((prev) => ({ ...prev, [id]: validationError }));
+      return;
+    }
     setRows((prev) =>
-      prev.length === 1 ? prev : prev.filter((r) => r.id !== id),
+      prev.map((r) => {
+        if (r.id !== id) return r;
+        if (r.previewUrl) URL.revokeObjectURL(r.previewUrl);
+        return { ...r, audioFile: file, previewUrl: URL.createObjectURL(file) };
+      }),
     );
   };
 
-  const addRow = () => {
-    setRows((prev) => [...prev, newRow()]);
+  const removeRow = (id: string) => {
+    setRows((prev) => {
+      if (prev.length === 1) return prev;
+      const target = prev.find((r) => r.id === id);
+      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((r) => r.id !== id);
+    });
   };
 
-  const validRows: TtsItemRowSubmission[] = rows
-    .map((r) => ({
-      uuid: r.uuid,
-      name: r.name.trim(),
-      text: r.text.trim(),
-      audio_path: r.audio.trim(),
-    }))
-    .filter((r) => r.name && r.text && r.audio_path);
+  const addRow = () => setRows((prev) => [...prev, newRow()]);
+
+  const isRowValid = (r: TtsRowDraft) =>
+    !!r.name.trim() &&
+    !!r.text.trim() &&
+    (!!r.audioFile || !!r.existingAudio);
+
+  const validRows = rows.filter(isRowValid);
 
   const handleSubmit = async () => {
     if (validRows.length === 0 || submitting) return;
     setSubmitting(true);
     setError(null);
     try {
-      await onSubmit(validRows);
+      // Upload any newly-picked audio to S3, then map each row to its
+      // resolved audio_path (new upload, or the kept existing audio).
+      const resolved: TtsItemRowSubmission[] = [];
+      for (const r of validRows) {
+        let audioPath = r.existingAudio ?? "";
+        if (r.audioFile) {
+          const path = await uploadTtsAudioToS3(r.audioFile, accessToken);
+          if (!path) {
+            setError(
+              `Failed to upload audio for "${r.name.trim() || "an item"}". Nothing was saved — please retry.`,
+            );
+            return;
+          }
+          audioPath = path;
+        }
+        resolved.push({
+          uuid: r.uuid,
+          name: r.name.trim(),
+          text: r.text.trim(),
+          audio_path: audioPath,
+        });
+      }
+      await onSubmit(resolved);
     } catch (err) {
       setError(
         extractApiError(
@@ -178,10 +249,22 @@ export function AddTtsItemsDialog({
     }
   };
 
+  const submitLabel = submitting
+    ? isEdit
+      ? "Saving..."
+      : "Adding..."
+    : isEdit
+      ? validRows.length > 1
+        ? `Save ${validRows.length} items`
+        : "Save item"
+      : validRows.length > 1
+        ? `Add ${validRows.length} items`
+        : "Add item";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div
-        className="bg-background border border-border rounded-xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh]"
+        className="bg-background border border-border rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 px-5 md:px-6 py-4 border-b border-border">
@@ -191,8 +274,8 @@ export function AddTtsItemsDialog({
             </h2>
             <p className="text-xs md:text-sm text-muted-foreground mt-1">
               {isEdit
-                ? "Update the name, text, and audio URL for each row"
-                : "Annotators will listen to the generated audio and judge its quality"}
+                ? "Update the name, text, and audio for each item"
+                : "Annotators will listen to the audio and judge its quality"}
             </p>
           </div>
           <button
@@ -216,81 +299,142 @@ export function AddTtsItemsDialog({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-2">
-          {/* Column headers (shown once) */}
-          <div className="grid grid-cols-[1fr_2fr_2fr_28px] gap-2 px-1 pb-1">
-            <div className="text-xs font-medium text-muted-foreground">
-              Name
-            </div>
-            <div className="text-xs font-medium text-muted-foreground">
-              Text
-            </div>
-            <div className="text-xs font-medium text-muted-foreground">
-              Audio URL
-            </div>
-            <div />
-          </div>
-
-          {rows.map((row, idx) => (
-            <div key={row.id} className="space-y-1">
-              <div className="grid grid-cols-[1fr_2fr_2fr_28px] gap-2 items-center">
-                <input
-                  type="text"
-                  value={row.name}
-                  onChange={(e) => updateRow(row.id, { name: e.target.value })}
-                  placeholder="e.g. Clip 1"
-                  disabled={submitting}
-                  className="w-full h-9 px-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
-                />
-                <input
-                  type="text"
-                  value={row.text}
-                  onChange={(e) => updateRow(row.id, { text: e.target.value })}
-                  placeholder="The text that was spoken"
-                  disabled={submitting}
-                  className="w-full h-9 px-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
-                />
-                <input
-                  type="text"
-                  value={row.audio}
-                  onChange={(e) => updateRow(row.id, { audio: e.target.value })}
-                  placeholder="https://.../audio.wav"
-                  disabled={submitting}
-                  className="w-full h-9 px-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
-                />
-                {isEdit ? (
-                  <div />
-                ) : (
-                  <button
-                    onClick={() => removeRow(row.id)}
-                    disabled={rows.length === 1 || submitting}
-                    className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                    aria-label={`Remove item ${idx + 1}`}
-                    title="Remove this item"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+          {rows.map((row, idx) => {
+            const playSrc = row.previewUrl ?? row.existingAudio;
+            const fileName = row.audioFile?.name;
+            return (
+              <div
+                key={row.id}
+                className="border border-border rounded-xl bg-muted/10 p-4 space-y-3"
+              >
+                {(!isEdit || rows.length > 1) && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Item {idx + 1}
+                    </span>
+                    {!isEdit && (
+                      <button
+                        onClick={() => removeRow(row.id)}
+                        disabled={rows.length === 1 || submitting}
+                        className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                        aria-label={`Remove item ${idx + 1}`}
+                        title="Remove this item"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 )}
-              </div>
-              {row.audio.trim() && (
-                <div className="pl-1">
-                  <LazyAudioPlayer src={row.audio.trim()} />
+
+                {/* Name */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    value={row.name}
+                    onChange={(e) => updateRow(row.id, { name: e.target.value })}
+                    placeholder="e.g. Clip 1"
+                    disabled={submitting}
+                    className="w-full h-9 px-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
+                  />
                 </div>
-              )}
-            </div>
-          ))}
+
+                {/* Text */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Text
+                  </label>
+                  <textarea
+                    value={row.text}
+                    onChange={(e) => updateRow(row.id, { text: e.target.value })}
+                    placeholder="The text that was spoken"
+                    disabled={submitting}
+                    rows={2}
+                    className="w-full px-3 py-2 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 resize-y"
+                  />
+                </div>
+
+                {/* Audio */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Audio
+                  </label>
+                  <input
+                    ref={(el) => {
+                      fileInputRefs.current[row.id] = el;
+                    }}
+                    type="file"
+                    accept=".wav,audio/wav,audio/x-wav,audio/mpeg,audio/*"
+                    className="hidden"
+                    disabled={submitting}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
+                      void handleFilePicked(row.id, f);
+                      e.target.value = "";
+                    }}
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRefs.current[row.id]?.click()}
+                      disabled={submitting}
+                      className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={1.8}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+                        />
+                      </svg>
+                      {playSrc ? "Replace audio" : "Upload audio"}
+                    </button>
+                    {fileName ? (
+                      <span
+                        className="text-xs text-muted-foreground truncate max-w-[200px]"
+                        title={fileName}
+                      >
+                        {fileName}
+                      </span>
+                    ) : row.existingAudio && !row.previewUrl ? (
+                      <span className="text-xs text-muted-foreground">
+                        Current audio
+                      </span>
+                    ) : null}
+                  </div>
+                  {playSrc && (
+                    <div className="pt-1">
+                      <LazyAudioPlayer src={playSrc} />
+                    </div>
+                  )}
+                  {audioErrors[row.id] && (
+                    <p className="text-xs text-red-500">{audioErrors[row.id]}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
 
           {!isEdit && (
             <button
@@ -323,32 +467,20 @@ export function AddTtsItemsDialog({
         </div>
 
         <div className="flex items-center justify-end gap-2 md:gap-3 px-5 md:px-6 py-4 border-t border-border">
-          <div className="flex items-center gap-2 md:gap-3">
-            <button
-              onClick={attemptClose}
-              disabled={submitting}
-              className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={validRows.length === 0 || submitting}
-              className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {submitting
-                ? isEdit
-                  ? "Saving..."
-                  : "Adding..."
-                : isEdit
-                  ? validRows.length > 1
-                    ? `Save ${validRows.length} items`
-                    : "Save item"
-                  : validRows.length > 1
-                    ? `Add ${validRows.length} items`
-                    : "Add item"}
-            </button>
-          </div>
+          <button
+            onClick={attemptClose}
+            disabled={submitting}
+            className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={validRows.length === 0 || submitting}
+            className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {submitLabel}
+          </button>
         </div>
       </div>
 

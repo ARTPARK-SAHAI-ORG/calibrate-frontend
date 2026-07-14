@@ -1,34 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { signOut } from "next-auth/react";
 import JSZip from "jszip";
 import { apiClient } from "@/lib/api";
 import { LIMITS, showLimitToast } from "@/constants/limits";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { LazyAudioPlayer } from "@/components/evaluations/LazyAudioPlayer";
 import { reportError } from "@/lib/reportError";
+import { getAudioDuration, uploadTtsAudioToS3 } from "./ttsAudioUpload";
 import {
   DiscardChangesDialog,
   useUnsavedCloseGuard,
 } from "./unsavedCloseGuard";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
-const getAudioDuration = (file: File): Promise<number> =>
-  new Promise((resolve, reject) => {
-    const audio = new Audio();
-    const url = URL.createObjectURL(file);
-    audio.src = url;
-    audio.onloadedmetadata = () => {
-      URL.revokeObjectURL(url);
-      resolve(audio.duration);
-    };
-    audio.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Failed to load audio"));
-    };
-  });
 
 const fileStem = (name: string) => name.replace(/\.[^./]+$/, "");
 
@@ -335,45 +320,6 @@ export function BulkUploadTtsItemsDialog({
     }
   };
 
-  // Upload one audio file to S3 via a backend-issued presigned URL; returns
-  // the stored s3 path, or null on failure.
-  const uploadFileToS3 = async (file: File): Promise<string | null> => {
-    try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-      if (!backendUrl) return null;
-      const response = await fetch(`${backendUrl}/presigned-url`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          task_type: "tts",
-          content_type: file.type || "audio/wav",
-          extension: "wav",
-        }),
-      });
-      if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
-        return null;
-      }
-      if (!response.ok) throw new Error("Failed to get presigned URL");
-      const data = await response.json();
-      const { presigned_url: presignedUrl, s3_path: s3Path } = data;
-      if (!presignedUrl || !s3Path) throw new Error("Missing URL/path");
-      const put = await fetch(presignedUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type || "audio/wav" },
-        body: file,
-      });
-      if (!put.ok) throw new Error("S3 upload failed");
-      return s3Path as string;
-    } catch (err) {
-      reportError("Failed to upload TTS audio to S3", err);
-      return null;
-    }
-  };
-
   const handleUpload = async () => {
     if (rows.length === 0 || isUploading) return;
     setIsUploading(true);
@@ -388,7 +334,7 @@ export function BulkUploadTtsItemsDialog({
       const worker = async () => {
         while (cursor < rows.length) {
           const idx = cursor++;
-          const path = await uploadFileToS3(rows[idx].audioFile);
+          const path = await uploadTtsAudioToS3(rows[idx].audioFile, accessToken);
           s3Paths[idx] = path;
           if (path) setUploadedCount((c) => c + 1);
         }
