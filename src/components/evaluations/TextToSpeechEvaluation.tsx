@@ -23,6 +23,7 @@ import { DatasetPicker } from "./DatasetPicker";
 import { TTSDatasetEditor, TTSDatasetEditorHandle } from "./TTSDatasetEditor";
 import { MultiSelectPicker, PickerItem } from "../MultiSelectPicker";
 import { Tooltip } from "../Tooltip";
+import { pruneSelectionToAllowed } from "./providerSelection";
 
 type EvaluationResult = {
   task_id: string;
@@ -234,10 +235,7 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange, initia
     const allowed = new Set(
       getFilteredProviders(language, enabledProviders).map((p) => p.label),
     );
-    setSelectedProviders((prev) => {
-      if ([...prev].every((label) => allowed.has(label))) return prev;
-      return new Set([...prev].filter((label) => allowed.has(label)));
-    });
+    setSelectedProviders((prev) => pruneSelectionToAllowed(prev, allowed));
   }, [language, enabledProviders]);
 
   // Handle language change - clear providers that don't support the new language

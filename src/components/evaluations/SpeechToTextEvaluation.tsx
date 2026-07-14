@@ -22,6 +22,7 @@ import { DatasetPicker } from "./DatasetPicker";
 import { STTDatasetEditor, STTDatasetEditorHandle } from "./STTDatasetEditor";
 import { MultiSelectPicker, PickerItem } from "../MultiSelectPicker";
 import { Tooltip } from "../Tooltip";
+import { pruneSelectionToAllowed } from "./providerSelection";
 
 type EvaluationResult = {
   task_id: string;
@@ -116,10 +117,7 @@ export function SpeechToTextEvaluation({
     }
     // Drop any selection that became invalid once the enabled set resolved.
     const allowed = new Set(only.map((p) => p.label));
-    setSelectedProviders((prev) => {
-      if ([...prev].every((label) => allowed.has(label))) return prev;
-      return new Set([...prev].filter((label) => allowed.has(label)));
-    });
+    setSelectedProviders((prev) => pruneSelectionToAllowed(prev, allowed));
   }, [language, enabledProviders]);
 
   // Handle language change - clear providers that don't support the new language
