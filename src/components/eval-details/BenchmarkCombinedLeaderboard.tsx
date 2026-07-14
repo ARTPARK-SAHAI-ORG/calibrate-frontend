@@ -175,7 +175,7 @@ export function BenchmarkCombinedLeaderboard({
       model: String(row.model),
       label: formatModelName(String(row.model)),
       cost: row.avg_cost as number,
-      accuracy: row.pass_rate as number,
+      passRate: row.pass_rate as number,
       latency: row.avg_latency_ms as number | undefined,
     }));
   }, [payload, formatModelName]);
@@ -209,7 +209,7 @@ export function BenchmarkCombinedLeaderboard({
           <ParetoFrontierChart
             points={paretoPoints}
             colorMap={paretoColorMap}
-            accuracyLabel={benchmarkScoreLabel.replace(/\s*\(%\)\s*$/, "")}
+            passRateLabel={benchmarkScoreLabel.replace(/\s*\(%\)\s*$/, "")}
             filename={`${filename}-pareto`}
           />
         ) : undefined

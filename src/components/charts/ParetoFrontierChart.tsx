@@ -27,9 +27,9 @@ export type ParetoModelPoint = {
   label: string;
   /** Cost objective (USD, per test) — X axis, lower is better. */
   cost: number;
-  /** Accuracy objective (0–100 pass rate) — Y axis, higher is better. */
-  accuracy: number;
-  /** Latency (ms) — mapped to bubble size. Optional. */
+  /** Pass-rate objective (0–100) — Y axis, higher is better. */
+  passRate: number;
+  /** Latency (ms) — bubble size AND third frontier objective (lower is better). Optional. */
   latency?: number;
 };
 
@@ -37,7 +37,7 @@ type ParetoFrontierChartProps = {
   points: ParetoModelPoint[];
   colorMap: Map<string, string>;
   title?: string;
-  accuracyLabel?: string;
+  passRateLabel?: string;
   filename?: string;
   height?: number;
 };
@@ -56,11 +56,11 @@ type ChartDatum = ParetoModelPoint & { z: number; onFrontier: boolean };
 function ParetoTooltip({
   active,
   payload,
-  accuracyLabel,
+  passRateLabel,
 }: {
   active?: boolean;
   payload?: Array<{ payload: ChartDatum }>;
-  accuracyLabel: string;
+  passRateLabel: string;
 }) {
   if (!active || !payload || payload.length === 0) return null;
   const d = payload[0].payload;
@@ -75,7 +75,7 @@ function ParetoTooltip({
         )}
       </div>
       <div className="text-muted-foreground">
-        {accuracyLabel}: <span className="text-foreground">{formatPercent(d.accuracy)}</span>
+        {passRateLabel}: <span className="text-foreground">{formatPercent(d.passRate)}</span>
       </div>
       <div className="text-muted-foreground">
         Cost: <span className="text-foreground">{formatCostUsd(d.cost)}</span>
@@ -91,17 +91,19 @@ function ParetoTooltip({
 
 /**
  * Pareto-frontier scatter of the benchmarked models: cost on X (lower better),
- * accuracy on Y (higher better), latency as bubble size. The dashed line traces
- * the non-dominated frontier — the models where you can't get cheaper without
- * giving up accuracy. Dominated models are faded (and can be hidden entirely
- * via the "Frontier only" toggle). Renders nothing when fewer than one model
- * has both a finite cost and accuracy.
+ * pass rate on Y (higher better), latency as bubble size. The frontier itself is
+ * computed across all three objectives (cost, pass rate AND latency), so a model
+ * that looks dominated on the 2-D cost/pass-rate plane can still be on the
+ * frontier by being the fastest. The dashed line connects the frontier models in
+ * cost order. Dominated models are faded (and can be hidden entirely via the
+ * "Frontier only" toggle). Renders nothing when no model has a finite cost and
+ * pass rate.
  */
 export function ParetoFrontierChart({
   points,
   colorMap,
-  title = "Cost vs accuracy (Pareto frontier)",
-  accuracyLabel = "Accuracy",
+  title = "Cost vs pass rate (Pareto frontier)",
+  passRateLabel = "Pass rate",
   filename = "pareto-frontier",
   height = 400,
 }: ParetoFrontierChartProps) {
@@ -110,12 +112,13 @@ export function ParetoFrontierChart({
 
   const { allData, frontierData, dominatedData, hasLatency } = useMemo(() => {
     const valid = points.filter(
-      (p) => Number.isFinite(p.cost) && Number.isFinite(p.accuracy),
+      (p) => Number.isFinite(p.cost) && Number.isFinite(p.passRate),
     );
     const paretoInput: ParetoPoint[] = valid.map((p) => ({
       model: p.model,
       cost: p.cost,
-      accuracy: p.accuracy,
+      passRate: p.passRate,
+      latency: p.latency,
     }));
     const frontier = computeParetoFrontier(paretoInput);
     const anyLatency = valid.some(
@@ -159,7 +162,7 @@ export function ParetoFrontierChart({
       <div className="flex flex-col min-h-[160px]">
         <h3 className="text-[15px] font-semibold mb-2">{title}</h3>
         <p className="text-xs text-muted-foreground mt-auto mb-auto text-center py-8">
-          No chart data (models are missing cost or accuracy values).
+          No chart data (models are missing cost or pass-rate values).
         </p>
       </div>
     );
@@ -169,13 +172,13 @@ export function ParetoFrontierChart({
   // keep their exact position when the "Frontier only" toggle hides dominated
   // models — toggling filters points, it never rescales the axes.
   const costMax = Math.max(...allData.map((d) => d.cost));
-  const accVals = allData.map((d) => d.accuracy);
-  const accMin = Math.min(...accVals);
-  const accMax = Math.max(...accVals);
-  const accPad = Math.max(2, (accMax - accMin) * 0.15);
+  const prVals = allData.map((d) => d.passRate);
+  const prMin = Math.min(...prVals);
+  const prMax = Math.max(...prVals);
+  const prPad = Math.max(2, (prMax - prMin) * 0.15);
   const yDomain: [number, number] = [
-    Math.max(0, Math.floor(accMin - accPad)),
-    Math.min(100, Math.ceil(accMax + accPad)),
+    Math.max(0, Math.floor(prMin - prPad)),
+    Math.min(100, Math.ceil(prMax + prPad)),
   ];
 
   const cellProps = (d: ChartDatum) => ({
@@ -191,9 +194,10 @@ export function ParetoFrontierChart({
         <div>
           <h3 className="text-[15px] font-semibold">{title}</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Up and to the left is better. Bubble size ={" "}
-            {hasLatency ? "latency (larger = slower)" : "latency (not reported)"}. The
-            dashed line marks the non-dominated frontier.
+            Up and to the left is better; bubble size ={" "}
+            {hasLatency ? "latency (smaller = faster)" : "latency (not reported)"}. The
+            dashed line marks the frontier — models not dominated on cost, pass rate{" "}
+            {hasLatency ? "and latency" : ""} together.
           </p>
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
@@ -259,13 +263,13 @@ export function ParetoFrontierChart({
             />
             <YAxis
               type="number"
-              dataKey="accuracy"
-              name={accuracyLabel}
+              dataKey="passRate"
+              name={passRateLabel}
               domain={yDomain}
               tick={{ fontSize: 12 }}
               tickFormatter={(v) => `${v}%`}
               label={{
-                value: `${accuracyLabel} (%)`,
+                value: `${passRateLabel} (%)`,
                 angle: -90,
                 position: "insideLeft",
                 style: { fontSize: 12, fill: "currentColor", textAnchor: "middle" },
@@ -279,7 +283,7 @@ export function ParetoFrontierChart({
             />
             <Tooltip
               cursor={{ strokeDasharray: "3 3" }}
-              content={<ParetoTooltip accuracyLabel={accuracyLabel} />}
+              content={<ParetoTooltip passRateLabel={passRateLabel} />}
             />
             {/* Frontier line drawn through non-dominated points, sorted by cost. */}
             <Scatter

@@ -1,14 +1,18 @@
 /**
  * Pareto-frontier helper for the benchmark leaderboard scatter chart.
  *
- * Models are compared on two objectives: **cost** (lower is better) and
- * **accuracy** (higher is better). A model A *dominates* model B when A is no
- * worse on both objectives and strictly better on at least one — i.e. A is at
- * least as cheap AND at least as accurate as B, and beats it on price or score.
- * The Pareto frontier is the set of models that no other model dominates: the
- * "efficient" choices where you can't get cheaper without losing accuracy (or
- * more accurate without paying more). Latency is intentionally NOT part of the
- * dominance test — it's carried through only for the bubble-size dimension.
+ * Models are compared on three objectives: **cost** (lower is better), **pass
+ * rate** (higher is better) and **latency** (lower is better). A model A
+ * *dominates* model B when A is no worse than B on every objective and strictly
+ * better on at least one — i.e. A is at least as cheap, at least as accurate AND
+ * at least as fast as B, while beating it on price, score or speed. The Pareto
+ * frontier is the set of models that no other model dominates: the "efficient"
+ * choices where any improvement on one axis costs you on another.
+ *
+ * Latency is optional. When either model in a pairwise comparison is missing a
+ * finite latency, the latency axis is dropped for that pair and dominance falls
+ * back to cost vs pass rate — so a run with no latency data behaves exactly like
+ * the two-objective frontier.
  */
 
 export type ParetoPoint = {
@@ -16,26 +20,38 @@ export type ParetoPoint = {
   model: string;
   /** Cost objective — lower is better (USD). */
   cost: number;
-  /** Accuracy objective — higher is better (0–100 pass rate). */
-  accuracy: number;
+  /** Pass-rate objective — higher is better (0–100). */
+  passRate: number;
+  /** Latency objective — lower is better (ms). Optional. */
+  latency?: number;
 };
 
-/** True when `a` dominates `b` (no worse on both axes, strictly better on one). */
+/** True when `a` dominates `b`: no worse on every objective, strictly better on one. */
 function dominates(a: ParetoPoint, b: ParetoPoint): boolean {
-  const noWorse = a.cost <= b.cost && a.accuracy >= b.accuracy;
-  const strictlyBetter = a.cost < b.cost || a.accuracy > b.accuracy;
+  const bothLatency =
+    Number.isFinite(a.latency) && Number.isFinite(b.latency);
+
+  const noWorse =
+    a.cost <= b.cost &&
+    a.passRate >= b.passRate &&
+    (!bothLatency || (a.latency as number) <= (b.latency as number));
+
+  const strictlyBetter =
+    a.cost < b.cost ||
+    a.passRate > b.passRate ||
+    (bothLatency && (a.latency as number) < (b.latency as number));
+
   return noWorse && strictlyBetter;
 }
 
 /**
- * Return the set of model ids that lie on the Pareto frontier (cost vs
- * accuracy). Points with a non-finite cost or accuracy are ignored. Ties —
- * models with identical cost and accuracy — are all kept, since neither
- * strictly dominates the other.
+ * Return the set of model ids that lie on the Pareto frontier across cost, pass
+ * rate and latency. Points with a non-finite cost or pass rate are ignored
+ * (latency may be absent). Ties — models dominated by no one — are all kept.
  */
 export function computeParetoFrontier(points: ParetoPoint[]): Set<string> {
   const valid = points.filter(
-    (p) => Number.isFinite(p.cost) && Number.isFinite(p.accuracy),
+    (p) => Number.isFinite(p.cost) && Number.isFinite(p.passRate),
   );
   const frontier = new Set<string>();
   for (const p of valid) {
@@ -46,7 +62,7 @@ export function computeParetoFrontier(points: ParetoPoint[]): Set<string> {
 }
 
 /**
- * Order the frontier's model ids by ascending cost (then descending accuracy
+ * Order the frontier's model ids by ascending cost (then descending pass rate
  * for equal cost) so a connecting line can be drawn through them left-to-right.
  */
 export function orderFrontierByCost(
@@ -55,5 +71,5 @@ export function orderFrontierByCost(
 ): ParetoPoint[] {
   return points
     .filter((p) => frontier.has(p.model))
-    .sort((a, b) => a.cost - b.cost || b.accuracy - a.accuracy);
+    .sort((a, b) => a.cost - b.cost || b.passRate - a.passRate);
 }

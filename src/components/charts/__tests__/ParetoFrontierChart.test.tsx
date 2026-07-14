@@ -6,9 +6,9 @@ import {
 import { getColorMap } from "@/components/charts/LeaderboardBarChart";
 
 const points: ParetoModelPoint[] = [
-  { model: "cheap", label: "Cheap", cost: 0.005, accuracy: 70, latency: 400 },
-  { model: "mid", label: "Mid", cost: 0.01, accuracy: 85, latency: 900 },
-  { model: "premium", label: "Premium", cost: 0.05, accuracy: 95, latency: 1500 },
+  { model: "cheap", label: "Cheap", cost: 0.005, passRate: 70, latency: 400 },
+  { model: "mid", label: "Mid", cost: 0.01, passRate: 85, latency: 900 },
+  { model: "premium", label: "Premium", cost: 0.05, passRate: 95, latency: 1500 },
 ];
 
 function renderChart(pts: ParetoModelPoint[]) {
@@ -21,9 +21,9 @@ describe("ParetoFrontierChart", () => {
   it("renders the title and latency-as-bubble-size legend", () => {
     renderChart(points);
     expect(
-      screen.getByText(/Cost vs accuracy \(Pareto frontier\)/i),
+      screen.getByText(/Cost vs pass rate \(Pareto frontier\)/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/larger = slower/i)).toBeInTheDocument();
+    expect(screen.getByText(/smaller = faster/i)).toBeInTheDocument();
   });
 
   it("notes when latency is not reported", () => {
@@ -31,10 +31,10 @@ describe("ParetoFrontierChart", () => {
     expect(screen.getByText(/latency \(not reported\)/i)).toBeInTheDocument();
   });
 
-  it("shows the empty state when no model has cost + accuracy", () => {
-    renderChart([{ model: "x", label: "X", cost: NaN, accuracy: NaN }]);
+  it("shows the empty state when no model has cost + pass rate", () => {
+    renderChart([{ model: "x", label: "X", cost: NaN, passRate: NaN }]);
     expect(
-      screen.getByText(/missing cost or accuracy values/i),
+      screen.getByText(/missing cost or pass-rate values/i),
     ).toBeInTheDocument();
   });
 });
