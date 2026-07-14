@@ -2,6 +2,11 @@
 
 import React, { useMemo } from "react";
 import { LeaderboardTab, type LeaderboardColumn } from "./LeaderboardTab";
+import { getColorMap } from "@/components/charts/LeaderboardBarChart";
+import {
+  ParetoFrontierChart,
+  type ParetoModelPoint,
+} from "@/components/charts/ParetoFrontierChart";
 import {
   benchmarkRatingEvaluatorCaption,
   buildBenchmarkCombinedLeaderboardPayload,
@@ -162,6 +167,24 @@ export function BenchmarkCombinedLeaderboard({
     [payload, formatModelName, benchmarkScoreLabel],
   );
 
+  // Pareto points (cost vs accuracy, latency as bubble size). Only meaningful
+  // when both a cost and an overall pass rate are available for the run.
+  const paretoPoints = useMemo<ParetoModelPoint[]>(() => {
+    if (!payload) return [];
+    return payload.rows.map((row) => ({
+      model: String(row.model),
+      label: formatModelName(String(row.model)),
+      cost: row.avg_cost as number,
+      accuracy: row.pass_rate as number,
+      latency: row.avg_latency_ms as number | undefined,
+    }));
+  }, [payload, formatModelName]);
+
+  const paretoColorMap = useMemo(
+    () => getColorMap(paretoPoints.map((p) => p.model)),
+    [paretoPoints],
+  );
+
   if (!payload || payload.rows.length === 0) {
     return (
       <div className="text-center py-12">
@@ -170,15 +193,27 @@ export function BenchmarkCombinedLeaderboard({
     );
   }
 
+  const showPareto = payload.plan.showCost && payload.plan.showOverallPassRate;
+
   return (
-    <LeaderboardTab
-      className={className}
-      columns={columns}
-      data={payload.rows}
-      charts={payload.chartRows}
-      filename={filename}
-      getLabel={(key) => formatModelName(key)}
-      nameKey="model"
-    />
+    <div className={`space-y-4 md:space-y-6 ${className || ""}`}>
+      <LeaderboardTab
+        columns={columns}
+        data={payload.rows}
+        charts={payload.chartRows}
+        filename={filename}
+        getLabel={(key) => formatModelName(key)}
+        nameKey="model"
+      />
+
+      {showPareto && (
+        <ParetoFrontierChart
+          points={paretoPoints}
+          colorMap={paretoColorMap}
+          accuracyLabel={benchmarkScoreLabel.replace(/\s*\(%\)\s*$/, "")}
+          filename={`${filename}-pareto`}
+        />
+      )}
+    </div>
   );
 }
