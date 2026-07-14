@@ -237,9 +237,7 @@ export function BulkUploadTtsItemsDialog({
       if (csvContent.charCodeAt(0) === 0xfeff) csvContent = csvContent.slice(1);
       const lines = csvContent.split(/\r\n|\n|\r/).filter((l) => l.trim());
       if (lines.length < 2) {
-        setError(
-          "data.csv must have a header and at least one data row.",
-        );
+        setError("data.csv must have a header and at least one data row.");
         return;
       }
 
@@ -342,14 +340,19 @@ export function BulkUploadTtsItemsDialog({
       // far too slow once there are more than a handful of clips. Clips that
       // already uploaded on a prior attempt (`uploadedPath`) are reused so a
       // retry doesn't re-upload the whole batch.
-      const s3Paths: (string | null)[] = rows.map((r) => r.uploadedPath ?? null);
+      const s3Paths: (string | null)[] = rows.map(
+        (r) => r.uploadedPath ?? null,
+      );
       setUploadedCount(s3Paths.filter(Boolean).length);
       let cursor = 0;
       const worker = async () => {
         while (cursor < rows.length) {
           const idx = cursor++;
           if (s3Paths[idx]) continue;
-          const path = await uploadTtsAudioToS3(rows[idx].audioFile, accessToken);
+          const path = await uploadTtsAudioToS3(
+            rows[idx].audioFile,
+            accessToken,
+          );
           s3Paths[idx] = path;
           if (path) setUploadedCount((c) => c + 1);
         }
@@ -413,7 +416,7 @@ export function BulkUploadTtsItemsDialog({
             </h2>
             <p className="text-xs md:text-sm text-muted-foreground mt-1">
               Add many items at once from a ZIP of audio clips and their
-              reference text.
+              reference texts
             </p>
           </div>
           <button
@@ -562,12 +565,6 @@ export function BulkUploadTtsItemsDialog({
                     Download sample ZIP
                   </button>
                 </div>
-                {zipName && !isProcessingZip && (
-                  <p className="mt-3 text-[13px] text-muted-foreground">
-                    Loaded <span className="font-medium">{zipName}</span> —{" "}
-                    {rows.length} item{rows.length === 1 ? "" : "s"} ready.
-                  </p>
-                )}
               </div>
             </div>
           </div>
@@ -579,24 +576,29 @@ export function BulkUploadTtsItemsDialog({
           )}
 
           {rows.length > 0 && (
-            <div className="border border-border rounded-xl overflow-hidden">
-              <div className="grid grid-cols-[minmax(90px,150px)_minmax(120px,1fr)_minmax(240px,360px)] gap-3 px-3 py-2 border-b border-border bg-muted/30">
-                <div className="text-xs font-medium text-muted-foreground">
-                  Name
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground">
+                {rows.length} {rows.length === 1 ? "item" : "items"} ready to
+                upload
+              </p>
+              <div className="border border-border rounded-xl overflow-hidden">
+                <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_minmax(220px,2fr)] gap-4 px-4 py-2.5 border-b border-border bg-muted/30">
+                  <div className="text-xs font-medium text-muted-foreground">
+                    Name
+                  </div>
+                  <div className="text-xs font-medium text-muted-foreground">
+                    Reference text
+                  </div>
+                  <div className="text-xs font-medium text-muted-foreground">
+                    Audio
+                  </div>
                 </div>
-                <div className="text-xs font-medium text-muted-foreground">
-                  Reference text
-                </div>
-                <div className="text-xs font-medium text-muted-foreground">
-                  Audio
-                </div>
-              </div>
-              <div className="divide-y divide-border max-h-[40vh] overflow-y-auto">
-                {rows.slice(0, 50).map((r) => (
-                  <div
-                    key={r.id}
-                    className="grid grid-cols-[minmax(90px,150px)_minmax(120px,1fr)_minmax(240px,360px)] gap-3 px-3 py-2 items-center"
-                  >
+                <div className="divide-y divide-border max-h-[40vh] overflow-y-auto">
+                  {rows.slice(0, 50).map((r) => (
+                    <div
+                      key={r.id}
+                      className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_minmax(220px,2fr)] gap-4 px-4 py-2.5 items-center"
+                    >
                     <div
                       className="text-xs text-foreground truncate"
                       title={r.name}
@@ -615,10 +617,11 @@ export function BulkUploadTtsItemsDialog({
                   </div>
                 ))}
                 {rows.length > 50 && (
-                  <div className="px-3 py-2 text-xs text-muted-foreground">
+                  <div className="px-4 py-2.5 text-xs text-muted-foreground">
                     + {rows.length - 50} more items
                   </div>
                 )}
+                </div>
               </div>
             </div>
           )}
