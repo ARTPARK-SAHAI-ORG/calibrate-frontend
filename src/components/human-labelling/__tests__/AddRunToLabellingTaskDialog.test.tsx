@@ -443,6 +443,92 @@ describe("AddRunToLabellingTaskDialog", () => {
     });
   });
 
+  it("creates a tts task and posts text/audio_path item payloads", async () => {
+    const user = setupUser();
+    const ttsSource: AddRunToLabellingTaskSource = {
+      type: "tts_run",
+      runUuid: "tts-run-abcdefgh",
+      runName: "greetings dataset",
+      rows: [
+        {
+          name: "ElevenLabs #1 — tts-run-",
+          text: "hello world",
+          audio_path: "https://example.com/a.wav",
+        },
+      ],
+      evaluators: [{ uuid: "tts-ev-1", name: "Naturalness" }],
+    };
+    const postedItemsBodies: unknown[] = [];
+    apiClientMock.mockImplementation(
+      (
+        path: string,
+        _token: string,
+        opts?: { method?: string; body?: unknown },
+      ) => {
+        if (path === "/annotation-tasks" && (!opts || !opts.method)) {
+          return Promise.resolve({ items: [] });
+        }
+        if (path === "/annotation-tasks" && opts?.method === "POST") {
+          return Promise.resolve({ uuid: "tts-task-uuid" });
+        }
+        if (path === "/annotation-tasks/tts-task-uuid/items") {
+          postedItemsBodies.push(opts?.body);
+          return Promise.resolve({});
+        }
+        return Promise.reject(new Error(`unexpected call ${path}`));
+      },
+    );
+    unwrapListMock.mockReturnValue([]);
+
+    render(
+      <AddRunToLabellingTaskDialog
+        isOpen
+        onClose={jest.fn()}
+        source={ttsSource}
+      />,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByPlaceholderText(/e.g. Copilot review/),
+      ).toBeInTheDocument(),
+    );
+    // Header uses the "result(s)" noun for tts sources.
+    expect(
+      screen.getByText(/Submit 1 result for labelling/),
+    ).toBeInTheDocument();
+    await user.type(
+      screen.getByPlaceholderText(/e.g. Copilot review/),
+      "TTS batch",
+    );
+    await user.click(screen.getByRole("button", { name: /Create task & add/ }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Added 1 result/)).toBeInTheDocument(),
+    );
+
+    const postCall = apiClientMock.mock.calls.find(
+      (c) => c[0] === "/annotation-tasks" && c[2]?.method === "POST",
+    );
+    expect(postCall[2].body).toMatchObject({
+      name: "TTS batch",
+      type: "tts",
+      evaluator_ids: ["tts-ev-1"],
+    });
+    expect(postedItemsBodies).toEqual([
+      {
+        items: [
+          {
+            payload: {
+              name: "ElevenLabs #1 — tts-run-",
+              text: "hello world",
+              audio_path: "https://example.com/a.wav",
+            },
+          },
+        ],
+      },
+    ]);
+  });
+
   // NOTE: the `toAttach` evaluator-attachment branch inside handleSubmit's
   // "existing" mode (lines ~442-465 of the source) is unreachable through the
   // UI: `supportedTasks` (the second relevance gate) already filters out any
