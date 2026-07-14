@@ -26,6 +26,11 @@ export type ParetoPoint = {
   latency?: number;
 };
 
+/** True when cost and pass rate are finite (latency may still be absent). */
+export function isValidParetoPoint(p: Pick<ParetoPoint, "cost" | "passRate">): boolean {
+  return Number.isFinite(p.cost) && Number.isFinite(p.passRate);
+}
+
 /** True when `a` dominates `b`: no worse on every objective, strictly better on one. */
 function dominates(a: ParetoPoint, b: ParetoPoint): boolean {
   const bothLatency =
@@ -50,9 +55,7 @@ function dominates(a: ParetoPoint, b: ParetoPoint): boolean {
  * (latency may be absent). Ties — models dominated by no one — are all kept.
  */
 export function computeParetoFrontier(points: ParetoPoint[]): Set<string> {
-  const valid = points.filter(
-    (p) => Number.isFinite(p.cost) && Number.isFinite(p.passRate),
-  );
+  const valid = points.filter(isValidParetoPoint);
   const frontier = new Set<string>();
   for (const p of valid) {
     const isDominated = valid.some((other) => dominates(other, p));

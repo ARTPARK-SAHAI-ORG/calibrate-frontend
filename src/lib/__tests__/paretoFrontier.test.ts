@@ -1,8 +1,17 @@
 import {
   computeParetoFrontier,
+  isValidParetoPoint,
   orderFrontierByCost,
   type ParetoPoint,
 } from "@/lib/paretoFrontier";
+
+describe("isValidParetoPoint", () => {
+  it("requires finite cost and pass rate", () => {
+    expect(isValidParetoPoint({ cost: 0.01, passRate: 90 })).toBe(true);
+    expect(isValidParetoPoint({ cost: NaN, passRate: 90 })).toBe(false);
+    expect(isValidParetoPoint({ cost: 0.01, passRate: Infinity })).toBe(false);
+  });
+});
 
 describe("computeParetoFrontier", () => {
   it("keeps a clearly non-dominated point and drops a dominated one", () => {

@@ -167,7 +167,7 @@ export function BenchmarkCombinedLeaderboard({
     [payload, formatModelName, benchmarkScoreLabel],
   );
 
-  // Pareto points (cost vs accuracy, latency as bubble size). Only meaningful
+  // Pareto points (cost vs pass rate, latency as bubble size). Only meaningful
   // when both a cost and an overall pass rate are available for the run.
   const paretoPoints = useMemo<ParetoModelPoint[]>(() => {
     if (!payload) return [];

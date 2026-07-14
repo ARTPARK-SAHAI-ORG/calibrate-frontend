@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ScatterChart,
   Scatter,
@@ -12,9 +12,11 @@ import {
 } from "recharts";
 import {
   computeParetoFrontier,
+  isValidParetoPoint,
   orderFrontierByCost,
   type ParetoPoint,
 } from "@/lib/paretoFrontier";
+import { layoutParetoLabels } from "@/lib/paretoLabelLayout";
 import { formatCostUsd, formatLatencyMs, formatPercent } from "@/lib/llmMetrics";
 import { downloadChartPng } from "./downloadChart";
 
@@ -52,6 +54,8 @@ const HOVER_SCALE = 1.25;
 const LABEL_GAP = 15;
 // Extra horizontal margin so model-name labels beside edge bubbles aren't clipped.
 const LABEL_GUTTER = 72;
+// Fallback plot width before the container has been measured (jsdom / first paint).
+const DEFAULT_CHART_WIDTH = 640;
 // Chart margins must clear the largest (hovered) bubble so points sitting on an
 // axis edge (e.g. a model at 100%) aren't clipped.
 const EDGE_PAD = Math.ceil(R_MAX * HOVER_SCALE) + 8;
@@ -121,11 +125,10 @@ export function ParetoFrontierChart({
   const chartRef = useRef<HTMLDivElement>(null);
   const [frontierOnly, setFrontierOnly] = useState(false);
   const [hoveredModel, setHoveredModel] = useState<string | null>(null);
+  const [chartWidth, setChartWidth] = useState(DEFAULT_CHART_WIDTH);
 
   const { allData, frontierData, dominatedData, hasLatency } = useMemo(() => {
-    const valid = points.filter(
-      (p) => Number.isFinite(p.cost) && Number.isFinite(p.passRate),
-    );
+    const valid = points.filter(isValidParetoPoint);
     const paretoInput: ParetoPoint[] = valid.map((p) => ({
       model: p.model,
       cost: p.cost,
@@ -155,6 +158,18 @@ export function ParetoFrontierChart({
       dominatedData: all.filter((d) => !d.onFrontier),
     };
   }, [points]);
+
+  useEffect(() => {
+    const el = chartRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (typeof w === "number" && w > 0) setChartWidth(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+    // Re-bind when the chart surface mounts (empty state has no ref target).
+  }, [allData.length]);
 
   const download = useCallback(() => {
     downloadChartPng(chartRef.current, title, filename);
@@ -204,52 +219,26 @@ export function ParetoFrontierChart({
     return R_MIN + t * (R_MAX - R_MIN);
   };
 
-  // Precompute label side + vertical nudge so nearby bubbles don't stack their
-  // names on top of each other. Positions are estimated from the known chart
-  // height and cost/pass-rate fractions (avoids depending on recharts internals).
+  // Precompute label side + vertical nudge (with horizontal AABB resolution for
+  // long names like openai/gpt-4.1 that would otherwise paint over each other).
   const visiblePoints = showDominated ? allData : frontierData;
-  const labelLayout = new Map<string, { side: "left" | "right"; dy: number }>();
-  {
-    const plotTop = MARGIN.top;
-    const plotBottom = height - MARGIN.bottom;
-    const plotH = Math.max(1, plotBottom - plotTop);
-    const ySpan = Math.max(1e-9, yDomain[1] - yDomain[0]);
-
-    type Entry = {
-      model: string;
-      py: number;
-      side: "left" | "right";
-      ly: number;
-    };
-    const entries: Entry[] = visiblePoints.map((d) => {
-      const t = (d.passRate - yDomain[0]) / ySpan;
-      const py = plotTop + (1 - t) * plotH;
-      const side: "left" | "right" =
-        xDomainMax > 0 && d.cost / xDomainMax > 0.68 ? "left" : "right";
-      return { model: d.model, py, side, ly: py };
-    });
-
-    for (const side of ["left", "right"] as const) {
-      const grp = entries.filter((e) => e.side === side).sort((a, b) => a.py - b.py);
-      for (let i = 1; i < grp.length; i++) {
-        grp[i].ly = Math.max(grp[i].py, grp[i - 1].ly + LABEL_GAP);
-      }
-      if (grp.length) {
-        const last = grp[grp.length - 1];
-        if (last.ly > plotBottom - 6) {
-          last.ly = plotBottom - 6;
-          for (let i = grp.length - 2; i >= 0; i--) {
-            grp[i].ly = Math.min(grp[i].ly, grp[i + 1].ly - LABEL_GAP);
-          }
-        }
-        for (const e of grp) e.ly = Math.max(e.ly, plotTop + 6);
-      }
-    }
-
-    for (const e of entries) {
-      labelLayout.set(e.model, { side: e.side, dy: e.ly - e.py });
-    }
-  }
+  const labelLayout = layoutParetoLabels(
+    visiblePoints.map((d) => ({
+      model: d.model,
+      label: d.label,
+      cost: d.cost,
+      passRate: d.passRate,
+      radius: radiusFor(d),
+    })),
+    {
+      width: chartWidth,
+      height,
+      margin: MARGIN,
+      xDomainMax: xDomainMax || 1,
+      yDomain,
+      labelGap: LABEL_GAP,
+    },
+  );
 
   // Custom point renderer: bubble + model-name label (with leader line when the
   // de-overlap pass nudged the label). Reads `hoveredModel` so the hovered dot

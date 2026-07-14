@@ -76,22 +76,31 @@ export async function downloadChartPng(
   const ctx = canvas.getContext("2d");
   const img = new Image();
 
-  img.onload = () => {
-    canvas.width = w * 2;
-    canvas.height = totalH * 2;
-    ctx?.scale(2, 2);
-    ctx?.drawImage(img, 0, 0);
-    URL.revokeObjectURL(svgUrl);
+  const revoke = () => URL.revokeObjectURL(svgUrl);
 
-    const pngUrl = canvas.toDataURL("image/png");
-    const downloadLink = document.createElement("a");
-    downloadLink.href = pngUrl;
-    downloadLink.download = `${
-      filename || title.toLowerCase().replace(/\s+/g, "-")
-    }.png`;
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
+  img.onload = () => {
+    try {
+      canvas.width = w * 2;
+      canvas.height = totalH * 2;
+      ctx?.scale(2, 2);
+      ctx?.drawImage(img, 0, 0);
+
+      const pngUrl = canvas.toDataURL("image/png");
+      const downloadLink = document.createElement("a");
+      downloadLink.href = pngUrl;
+      downloadLink.download = `${
+        filename || title.toLowerCase().replace(/\s+/g, "-")
+      }.png`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+    } finally {
+      revoke();
+    }
+  };
+
+  img.onerror = () => {
+    revoke();
   };
 
   img.src = svgUrl;
