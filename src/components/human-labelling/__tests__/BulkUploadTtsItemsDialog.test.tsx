@@ -136,7 +136,7 @@ describe("BulkUploadTtsItemsDialog", () => {
   it("renders the ZIP instructions and a disabled upload button initially", () => {
     renderDialog();
     expect(screen.getByText("Bulk upload items")).toBeInTheDocument();
-    expect(screen.getByText("Select ZIP file")).toBeInTheDocument();
+    expect(screen.getByText("Choose ZIP file")).toBeInTheDocument();
     expect(screen.getByText("Download sample ZIP")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Upload item" })).toBeDisabled();
   });

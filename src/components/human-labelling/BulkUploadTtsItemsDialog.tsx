@@ -429,74 +429,138 @@ export function BulkUploadTtsItemsDialog({
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
-          <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
-            <div className="text-sm text-muted-foreground">
-              <p className="font-medium text-foreground mb-1">
-                ZIP structure
-              </p>
-              <pre className="text-xs font-mono leading-relaxed">{`your-file.zip
-├── audios/
-│   ├── sample_1.wav
-│   └── sample_2.wav
-└── data.csv   (columns: name, text, audio_file)`}</pre>
-              <p className="mt-2">
-                <span className="font-medium text-foreground">name</span> is
-                optional — the audio filename is used when it&apos;s blank.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                ref={zipInputRef}
-                type="file"
-                accept=".zip"
-                onChange={handleZipUpload}
-                className="hidden"
-                id="tts-zip-upload"
-                disabled={busy}
-              />
-              <label
-                htmlFor="tts-zip-upload"
-                className={`h-9 px-3 rounded-md text-sm font-medium bg-foreground text-background flex items-center gap-1.5 transition-opacity ${
-                  busy
-                    ? "opacity-50 cursor-not-allowed"
-                    : "hover:opacity-90 cursor-pointer"
-                }`}
-              >
+          <div className="border border-border rounded-xl p-4 md:p-6 bg-muted/10">
+            <div className="flex items-start gap-3 md:gap-4">
+              <div className="flex-shrink-0 w-9 h-9 md:w-10 md:h-10 rounded-full bg-muted flex items-center justify-center">
                 <svg
-                  className="w-4 h-4"
+                  className="w-5 h-5 text-muted-foreground"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
-                  strokeWidth={2}
+                  strokeWidth={1.5}
                 >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+                    d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"
                   />
                 </svg>
-                {zipName ? "Choose a different ZIP" : "Select ZIP file"}
-              </label>
-              <button
-                type="button"
-                onClick={handleDownloadSampleZip}
-                disabled={busy}
-                className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Download sample ZIP
-              </button>
-              {isProcessingZip && (
-                <span className="text-sm text-muted-foreground">
-                  Processing ZIP…
-                </span>
-              )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-[14px] font-medium text-foreground mb-1">
+                  Upload ZIP
+                </h3>
+                <p className="text-[13px] text-muted-foreground mb-4">
+                  Upload a ZIP file containing an{" "}
+                  <code className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-[12px]">
+                    audios
+                  </code>{" "}
+                  folder with .wav files and a{" "}
+                  <code className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-[12px]">
+                    data.csv
+                  </code>{" "}
+                  file with columns{" "}
+                  <code className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-[12px]">
+                    name
+                  </code>{" "}
+                  (optional),{" "}
+                  <code className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-[12px]">
+                    text
+                  </code>{" "}
+                  and{" "}
+                  <code className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-[12px]">
+                    audio_file
+                  </code>
+                  .
+                </p>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+                  <input
+                    ref={zipInputRef}
+                    type="file"
+                    accept=".zip"
+                    onChange={handleZipUpload}
+                    className="hidden"
+                    id="tts-zip-upload"
+                    disabled={busy}
+                  />
+                  <label
+                    htmlFor="tts-zip-upload"
+                    className={`h-9 px-4 rounded-md text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity flex items-center gap-2 ${
+                      busy ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                    }`}
+                  >
+                    {isProcessingZip ? (
+                      <>
+                        <svg
+                          className="w-4 h-4 animate-spin"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={1.5}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+                          />
+                        </svg>
+                        {zipName ? "Choose a different ZIP" : "Choose ZIP file"}
+                      </>
+                    )}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleDownloadSampleZip}
+                    disabled={busy}
+                    className="h-9 px-4 rounded-md text-[13px] font-medium border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={1.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                      />
+                    </svg>
+                    Download sample ZIP
+                  </button>
+                </div>
+                {zipName && !isProcessingZip && (
+                  <p className="mt-3 text-[13px] text-muted-foreground">
+                    Loaded <span className="font-medium">{zipName}</span> —{" "}
+                    {rows.length} item{rows.length === 1 ? "" : "s"} ready.
+                  </p>
+                )}
+              </div>
             </div>
-            {zipName && !isProcessingZip && (
-              <p className="text-xs text-muted-foreground">
-                Loaded <span className="font-medium">{zipName}</span> —{" "}
-                {rows.length} item{rows.length === 1 ? "" : "s"} ready.
-              </p>
-            )}
           </div>
 
           {error && (
