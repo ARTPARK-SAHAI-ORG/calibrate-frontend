@@ -26,6 +26,8 @@ type LeaderboardTabProps = {
   getLabel: (key: string) => string;
   nameKey?: string;
   className?: string;
+  /** Optional content rendered between the table and the chart grid. */
+  afterTable?: React.ReactNode;
 };
 
 export function LeaderboardTab({
@@ -36,6 +38,7 @@ export function LeaderboardTab({
   getLabel,
   nameKey = "run",
   className,
+  afterTable,
 }: LeaderboardTabProps) {
   if (!data || data.length === 0) return null;
 
@@ -45,6 +48,8 @@ export function LeaderboardTab({
   return (
     <div className={`space-y-4 md:space-y-6 ${className || ""}`}>
       <DownloadableTable columns={columns} data={data} filename={filename} />
+
+      {afterTable}
 
       {charts.map((row, rowIndex) => (
         <div key={rowIndex} className={`grid grid-cols-1 ${row.length >= 2 ? "md:grid-cols-2" : ""} gap-4 md:gap-6`}>

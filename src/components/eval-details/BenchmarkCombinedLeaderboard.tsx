@@ -196,24 +196,24 @@ export function BenchmarkCombinedLeaderboard({
   const showPareto = payload.plan.showCost && payload.plan.showOverallPassRate;
 
   return (
-    <div className={`space-y-4 md:space-y-6 ${className || ""}`}>
-      <LeaderboardTab
-        columns={columns}
-        data={payload.rows}
-        charts={payload.chartRows}
-        filename={filename}
-        getLabel={(key) => formatModelName(key)}
-        nameKey="model"
-      />
-
-      {showPareto && (
-        <ParetoFrontierChart
-          points={paretoPoints}
-          colorMap={paretoColorMap}
-          accuracyLabel={benchmarkScoreLabel.replace(/\s*\(%\)\s*$/, "")}
-          filename={`${filename}-pareto`}
-        />
-      )}
-    </div>
+    <LeaderboardTab
+      className={className}
+      columns={columns}
+      data={payload.rows}
+      charts={payload.chartRows}
+      filename={filename}
+      getLabel={(key) => formatModelName(key)}
+      nameKey="model"
+      afterTable={
+        showPareto ? (
+          <ParetoFrontierChart
+            points={paretoPoints}
+            colorMap={paretoColorMap}
+            accuracyLabel={benchmarkScoreLabel.replace(/\s*\(%\)\s*$/, "")}
+            filename={`${filename}-pareto`}
+          />
+        ) : undefined
+      }
+    />
   );
 }

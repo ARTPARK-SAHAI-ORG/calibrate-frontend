@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ScatterChart,
   Scatter,
@@ -46,6 +46,10 @@ type ParetoFrontierChartProps = {
 const BUBBLE_RANGE: [number, number] = [120, 900];
 // Fixed bubble area when no model reported a latency.
 const FIXED_BUBBLE: [number, number] = [260, 260];
+// Largest bubble radius ≈ sqrt(maxArea / π). Chart margins must clear it so
+// bubbles sitting on the axis edges (e.g. a model at 100%) aren't clipped.
+const MAX_BUBBLE_RADIUS = Math.ceil(Math.sqrt(BUBBLE_RANGE[1] / Math.PI)); // ~17
+const EDGE_PAD = MAX_BUBBLE_RADIUS + 8;
 
 type ChartDatum = ParetoModelPoint & { z: number; onFrontier: boolean };
 
@@ -89,8 +93,9 @@ function ParetoTooltip({
  * Pareto-frontier scatter of the benchmarked models: cost on X (lower better),
  * accuracy on Y (higher better), latency as bubble size. The dashed line traces
  * the non-dominated frontier — the models where you can't get cheaper without
- * giving up accuracy. Dominated models are faded. Renders nothing when fewer
- * than one model has both a finite cost and accuracy.
+ * giving up accuracy. Dominated models are faded (and can be hidden entirely
+ * via the "Frontier only" toggle). Renders nothing when fewer than one model
+ * has both a finite cost and accuracy.
  */
 export function ParetoFrontierChart({
   points,
@@ -98,11 +103,12 @@ export function ParetoFrontierChart({
   title = "Cost vs accuracy (Pareto frontier)",
   accuracyLabel = "Accuracy",
   filename = "pareto-frontier",
-  height = 380,
+  height = 400,
 }: ParetoFrontierChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
+  const [frontierOnly, setFrontierOnly] = useState(false);
 
-  const { data, frontierData, dominatedData, hasLatency } = useMemo(() => {
+  const { allData, frontierData, dominatedData, hasLatency } = useMemo(() => {
     const valid = points.filter(
       (p) => Number.isFinite(p.cost) && Number.isFinite(p.accuracy),
     );
@@ -119,7 +125,7 @@ export function ParetoFrontierChart({
     const enrich = (p: ParetoModelPoint): ChartDatum => ({
       ...p,
       // ZAxis needs a finite z on every point; models missing a latency fall
-      // back to the mid of the range so their bubble is a neutral size.
+      // back to 0 so their bubble sits at the small end of the range.
       z:
         typeof p.latency === "number" && Number.isFinite(p.latency)
           ? p.latency
@@ -132,7 +138,7 @@ export function ParetoFrontierChart({
     const byModel = new Map(all.map((d) => [d.model, d]));
 
     return {
-      data: all,
+      allData: all,
       hasLatency: anyLatency,
       frontierData: orderedFrontier
         .map((p) => byModel.get(p.model))
@@ -145,9 +151,15 @@ export function ParetoFrontierChart({
     downloadChartPng(chartRef.current, title, filename);
   }, [title, filename]);
 
-  if (data.length === 0) {
+  const hasDominated = dominatedData.length > 0;
+  const showDominated = !frontierOnly;
+  // Points currently visible drive the axis domains so the view stays tight
+  // when the dominated models are hidden.
+  const visible = showDominated ? allData : frontierData;
+
+  if (allData.length === 0) {
     return (
-      <div className="border rounded-xl p-4 bg-muted/10 flex flex-col min-h-[200px]">
+      <div className="flex flex-col min-h-[160px]">
         <h3 className="text-[15px] font-semibold mb-2">{title}</h3>
         <p className="text-xs text-muted-foreground mt-auto mb-auto text-center py-8">
           No chart data (models are missing cost or accuracy values).
@@ -156,8 +168,8 @@ export function ParetoFrontierChart({
     );
   }
 
-  const costMax = Math.max(...data.map((d) => d.cost));
-  const accVals = data.map((d) => d.accuracy);
+  const costMax = Math.max(...visible.map((d) => d.cost));
+  const accVals = visible.map((d) => d.accuracy);
   const accMin = Math.min(...accVals);
   const accMax = Math.max(...accVals);
   const accPad = Math.max(2, (accMax - accMin) * 0.15);
@@ -174,8 +186,8 @@ export function ParetoFrontierChart({
   });
 
   return (
-    <div className="border rounded-xl p-4 bg-muted/10">
-      <div className="flex items-start justify-between mb-1 gap-2">
+    <div>
+      <div className="flex items-start justify-between mb-2 gap-3">
         <div>
           <h3 className="text-[15px] font-semibold">{title}</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -184,30 +196,52 @@ export function ParetoFrontierChart({
             dashed line marks the non-dominated frontier.
           </p>
         </div>
-        <button
-          onClick={download}
-          className="flex flex-shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground cursor-pointer"
-          title="Download as PNG"
-        >
-          <svg
-            className="w-3.5 h-3.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
+        <div className="flex flex-shrink-0 items-center gap-2">
+          {hasDominated && (
+            <button
+              onClick={() => setFrontierOnly((v) => !v)}
+              className={`rounded-md border px-2 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                frontierOnly
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              }`}
+              title="Show only the models on the Pareto frontier"
+            >
+              Frontier only
+            </button>
+          )}
+          <button
+            onClick={download}
+            className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground cursor-pointer"
+            title="Download as PNG"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-            />
-          </svg>
-          PNG
-        </button>
+            <svg
+              className="w-3.5 h-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+              />
+            </svg>
+            PNG
+          </button>
+        </div>
       </div>
       <div ref={chartRef}>
         <ResponsiveContainer width="100%" height={height}>
-          <ScatterChart margin={{ top: 16, right: 24, bottom: 40, left: 8 }}>
+          <ScatterChart
+            margin={{
+              top: EDGE_PAD,
+              right: EDGE_PAD,
+              bottom: 44,
+              left: 12,
+            }}
+          >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               type="number"
@@ -219,7 +253,7 @@ export function ParetoFrontierChart({
               label={{
                 value: "Average cost (USD) →  cheaper is better",
                 position: "insideBottom",
-                offset: -20,
+                offset: -24,
                 style: { fontSize: 12, fill: "currentColor" },
               }}
             />
@@ -258,12 +292,14 @@ export function ParetoFrontierChart({
                 <Cell key={`f-${d.model}`} {...cellProps(d)} />
               ))}
             </Scatter>
-            {/* Dominated points (no connecting line). */}
-            <Scatter data={dominatedData} isAnimationActive={false}>
-              {dominatedData.map((d) => (
-                <Cell key={`d-${d.model}`} {...cellProps(d)} />
-              ))}
-            </Scatter>
+            {/* Dominated points (no connecting line) — hidden in "Frontier only". */}
+            {showDominated && (
+              <Scatter data={dominatedData} isAnimationActive={false}>
+                {dominatedData.map((d) => (
+                  <Cell key={`d-${d.model}`} {...cellProps(d)} />
+                ))}
+              </Scatter>
+            )}
           </ScatterChart>
         </ResponsiveContainer>
       </div>
