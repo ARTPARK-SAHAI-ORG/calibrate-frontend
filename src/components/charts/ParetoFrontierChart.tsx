@@ -262,16 +262,25 @@ export function ParetoFrontierChart({
     );
   };
 
+  // Caption is assembled from three parts so it stays honest: what the axes and
+  // bubble size mean, then how to read the result. The result sentence differs
+  // when only one model is on the frontier (no dashed line is drawn) vs. several.
+  const axisSentence = hasLatency
+    ? "Each dot is a model. The higher it sits, the more tests it passes. The further left, the less it costs to run. The smaller it is, the faster it replies. So the best models sit toward the top-left."
+    : "Each dot is a model. The higher it sits, the more tests it passes, and the further left, the less it costs to run. So the best models sit toward the top-left.";
+  const axesList = hasLatency ? "pass rate, cost, and speed" : "both pass rate and cost";
+  const hasFrontierLine = frontierData.length >= 2;
+  const resultSentence = hasFrontierLine
+    ? `Stick to the models on the dashed line: they are the best picks. For any model not on it, one that is will match or beat it on ${axesList}, so there is no reason to choose it.`
+    : `One model comes out on top (the darker-ringed dot): it matches or beats every other model on ${axesList}, so it is the clear pick.`;
+  const caption = `${axisSentence} ${resultSentence}`;
+
   return (
     <div>
       <div className="flex items-start justify-between mb-2 gap-3">
         <div>
           <h3 className="text-[15px] font-semibold">{title}</h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {hasLatency
-              ? "Each dot is a model. The higher it sits, the more tests it passes. The further left, the less it costs to run. The smaller it is, the faster it replies. So the best models sit toward the top-left. Stick to the models on the dashed line: they are the best picks. For any model not on it, one that is will match or beat it on pass rate, cost, and speed, so there is no reason to choose it."
-              : "Each dot is a model. The higher it sits, the more tests it passes, and the further left, the less it costs to run. So the best models sit toward the top-left. Stick to the models on the dashed line: they are the best picks. For any model not on it, one that is will match or beat it on both pass rate and cost, so there is no reason to choose it."}
-          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{caption}</p>
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
           {hasDominated && (

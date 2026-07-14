@@ -32,6 +32,17 @@ describe("ParetoFrontierChart", () => {
     expect(screen.getByText(/the less it costs to run/i)).toBeInTheDocument();
   });
 
+  it("drops the dashed-line wording when only one model is on the frontier", () => {
+    // "champion" dominates all others (cheapest, best pass rate, fastest), so it
+    // is the sole frontier model and no line is drawn.
+    renderChart([
+      { model: "champion", label: "champion", cost: 0.001, passRate: 96, latency: 300 },
+      { model: "weak", label: "weak", cost: 0.02, passRate: 88, latency: 1400 },
+    ]);
+    expect(screen.queryByText(/dashed line/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/it is the clear pick/i)).toBeInTheDocument();
+  });
+
   it("shows the empty state when no model has cost + pass rate", () => {
     renderChart([{ model: "x", label: "X", cost: NaN, passRate: NaN }]);
     expect(
