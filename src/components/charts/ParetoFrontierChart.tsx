@@ -321,10 +321,15 @@ export function ParetoFrontierChart({
               cursor={{ strokeDasharray: "3 3" }}
               content={<ParetoTooltip passRateLabel={passRateLabel} />}
             />
-            {/* Frontier line drawn through non-dominated points, sorted by cost. */}
+            {/* Frontier points, connected by a dashed line in cost order — but
+                only when there are 2+ of them (a single point has no line). */}
             <Scatter
               data={frontierData}
-              line={{ stroke: "#64748b", strokeWidth: 2, strokeDasharray: "6 4" }}
+              line={
+                frontierData.length >= 2
+                  ? { stroke: "#64748b", strokeWidth: 2, strokeDasharray: "6 4" }
+                  : false
+              }
               lineType="joint"
               isAnimationActive={false}
               shape={renderDot}
