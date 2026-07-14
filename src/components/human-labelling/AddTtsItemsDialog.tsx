@@ -468,7 +468,7 @@ export function AddTtsItemsDialog({
                   </div>
                   {playSrc && (
                     <div className="pt-1">
-                      <LazyAudioPlayer src={playSrc} />
+                      <LazyAudioPlayer src={playSrc} className="w-full" />
                     </div>
                   )}
                   {audioErrors[row.id] && (

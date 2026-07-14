@@ -29,7 +29,7 @@ export function TtsItemPane({
         subtitle="What the TTS model produced — listen and judge its quality"
       >
         {audioPath ? (
-          <LazyAudioPlayer src={audioPath} />
+          <LazyAudioPlayer src={audioPath} className="w-full" />
         ) : (
           <p className="text-sm text-muted-foreground">No audio provided</p>
         )}
