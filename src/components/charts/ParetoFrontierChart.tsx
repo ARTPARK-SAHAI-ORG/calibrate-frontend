@@ -6,11 +6,9 @@ import {
   Scatter,
   XAxis,
   YAxis,
-  ZAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell,
 } from "recharts";
 import {
   computeParetoFrontier,
@@ -42,16 +40,18 @@ type ParetoFrontierChartProps = {
   height?: number;
 };
 
-// Bubble area range (px²) passed to recharts ZAxis for the latency dimension.
-const BUBBLE_RANGE: [number, number] = [120, 900];
-// Fixed bubble area when no model reported a latency.
-const FIXED_BUBBLE: [number, number] = [260, 260];
-// Largest bubble radius ≈ sqrt(maxArea / π). Chart margins must clear it so
-// bubbles sitting on the axis edges (e.g. a model at 100%) aren't clipped.
-const MAX_BUBBLE_RADIUS = Math.ceil(Math.sqrt(BUBBLE_RANGE[1] / Math.PI)); // ~17
-const EDGE_PAD = MAX_BUBBLE_RADIUS + 8;
+// Bubble radius range (px) mapped from latency (min latency → small, max → big).
+const R_MIN = 7;
+const R_MAX = 18;
+// Radius when a model has no latency (uniform mid-size bubble).
+const R_FIXED = 9;
+// Hovered bubbles grow by this factor for focus.
+const HOVER_SCALE = 1.25;
+// Chart margins must clear the largest (hovered) bubble so points sitting on an
+// axis edge (e.g. a model at 100%) aren't clipped.
+const EDGE_PAD = Math.ceil(R_MAX * HOVER_SCALE) + 8;
 
-type ChartDatum = ParetoModelPoint & { z: number; onFrontier: boolean };
+type ChartDatum = ParetoModelPoint & { onFrontier: boolean };
 
 function ParetoTooltip({
   active,
@@ -109,6 +109,7 @@ export function ParetoFrontierChart({
 }: ParetoFrontierChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [frontierOnly, setFrontierOnly] = useState(false);
+  const [hoveredModel, setHoveredModel] = useState<string | null>(null);
 
   const { allData, frontierData, dominatedData, hasLatency } = useMemo(() => {
     const valid = points.filter(
@@ -127,12 +128,6 @@ export function ParetoFrontierChart({
 
     const enrich = (p: ParetoModelPoint): ChartDatum => ({
       ...p,
-      // ZAxis needs a finite z on every point; models missing a latency fall
-      // back to 0 so their bubble sits at the small end of the range.
-      z:
-        typeof p.latency === "number" && Number.isFinite(p.latency)
-          ? p.latency
-          : 0,
       onFrontier: frontier.has(p.model),
     });
 
@@ -181,12 +176,60 @@ export function ParetoFrontierChart({
     Math.min(100, Math.ceil(prMax + prPad)),
   ];
 
-  const cellProps = (d: ChartDatum) => ({
-    fill: colorMap.get(d.model) || "#A8D5E2",
-    fillOpacity: d.onFrontier ? 0.9 : 0.4,
-    stroke: d.onFrontier ? "#0f172a" : "#94a3b8",
-    strokeWidth: d.onFrontier ? 1.5 : 1,
-  });
+  // Map latency → bubble radius ourselves (independent of recharts internals) so
+  // the custom dot shape can size and grow bubbles deterministically.
+  const latencies = allData
+    .map((d) => d.latency)
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  const zMin = latencies.length ? Math.min(...latencies) : 0;
+  const zMax = latencies.length ? Math.max(...latencies) : 0;
+  const radiusFor = (d: ChartDatum): number => {
+    if (!hasLatency || typeof d.latency !== "number" || !Number.isFinite(d.latency)) {
+      return R_FIXED;
+    }
+    if (zMax === zMin) return (R_MIN + R_MAX) / 2;
+    const t = (d.latency - zMin) / (zMax - zMin);
+    return R_MIN + t * (R_MAX - R_MIN);
+  };
+
+  // Custom point renderer: reads `hoveredModel` so the hovered dot pops (grows,
+  // full opacity, dark ring) while the others dim — the "in focus" affordance.
+  const renderDot = (props: { cx?: number; cy?: number; payload?: ChartDatum }) => {
+    const { cx, cy, payload } = props;
+    if (cx == null || cy == null || !payload) return <g />;
+    const d = payload;
+    const isHovered = hoveredModel === d.model;
+    const someHovered = hoveredModel !== null;
+    const r = radiusFor(d) * (isHovered ? HOVER_SCALE : 1);
+    const fillOpacity = isHovered
+      ? 1
+      : someHovered
+        ? d.onFrontier
+          ? 0.45
+          : 0.15
+        : d.onFrontier
+          ? 0.9
+          : 0.4;
+    const stroke = isHovered || d.onFrontier ? "#0f172a" : "#94a3b8";
+    const strokeWidth = isHovered ? 2.5 : d.onFrontier ? 1.5 : 1;
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={r}
+        fill={colorMap.get(d.model) || "#A8D5E2"}
+        fillOpacity={fillOpacity}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        style={{
+          cursor: "pointer",
+          transition: "r 120ms ease, fill-opacity 120ms ease, stroke-width 120ms ease",
+        }}
+        onMouseEnter={() => setHoveredModel(d.model)}
+        onMouseLeave={() => setHoveredModel(null)}
+      />
+    );
+  };
 
   return (
     <div>
@@ -275,12 +318,6 @@ export function ParetoFrontierChart({
                 style: { fontSize: 12, fill: "currentColor", textAnchor: "middle" },
               }}
             />
-            <ZAxis
-              type="number"
-              dataKey="z"
-              range={hasLatency ? BUBBLE_RANGE : FIXED_BUBBLE}
-              name="Latency"
-            />
             <Tooltip
               cursor={{ strokeDasharray: "3 3" }}
               content={<ParetoTooltip passRateLabel={passRateLabel} />}
@@ -291,18 +328,15 @@ export function ParetoFrontierChart({
               line={{ stroke: "#64748b", strokeWidth: 2, strokeDasharray: "6 4" }}
               lineType="joint"
               isAnimationActive={false}
-            >
-              {frontierData.map((d) => (
-                <Cell key={`f-${d.model}`} {...cellProps(d)} />
-              ))}
-            </Scatter>
+              shape={renderDot}
+            />
             {/* Dominated points (no connecting line) — hidden in "Frontier only". */}
             {showDominated && (
-              <Scatter data={dominatedData} isAnimationActive={false}>
-                {dominatedData.map((d) => (
-                  <Cell key={`d-${d.model}`} {...cellProps(d)} />
-                ))}
-              </Scatter>
+              <Scatter
+                data={dominatedData}
+                isAnimationActive={false}
+                shape={renderDot}
+              />
             )}
           </ScatterChart>
         </ResponsiveContainer>
