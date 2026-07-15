@@ -168,6 +168,8 @@ describe("STTResultsTable", () => {
             sarvam_intent_score: 1,
             sarvam_entity_score: 0.8333,
             sarvam_llm_wer_reasoning: '[{"segment":"foo","verdict":"equivalent"}]',
+            sarvam_intent_reasoning: "Meaning preserved.",
+            sarvam_entity_reasoning: "One entity slightly off.",
           },
         ]}
       />,
@@ -179,9 +181,16 @@ describe("STTResultsTable", () => {
     expect(screen.getAllByText("0.05").length).toBeGreaterThan(0);
     expect(screen.getAllByText("0.0321").length).toBeGreaterThan(0);
     expect(screen.getAllByText("0.8333").length).toBeGreaterThan(0);
-    // Reasoning surfaces a tooltip trigger on the LLM-WER cell.
+    // Reasoning surfaces a per-metric tooltip trigger on LLM-WER, Intent, and
+    // Entity (LLM-CER has no reasoning).
     expect(
       screen.getAllByLabelText("View LLM-WER reasoning").length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByLabelText("View Intent reasoning").length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByLabelText("View Entity reasoning").length,
     ).toBeGreaterThan(0);
   });
 

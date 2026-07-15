@@ -49,12 +49,15 @@ export type STTResultRow = {
   cer?: string;
   string_similarity?: string;
   // Sarvam LLM-judge metrics — present only when the run used Sarvam LLM
-  // judges. `sarvam_llm_wer_reasoning` is a JSON string of the judged segments.
+  // judges. `sarvam_llm_wer_reasoning` is a JSON string of the judged segments;
+  // intent / entity reasoning are plain-text explanations.
   sarvam_llm_wer?: number | string;
   sarvam_llm_cer?: number | string;
   sarvam_intent_score?: number | string;
   sarvam_entity_score?: number | string;
   sarvam_llm_wer_reasoning?: string;
+  sarvam_intent_reasoning?: string;
+  sarvam_entity_reasoning?: string;
   llm_judge_score?: string;
   llm_judge_reasoning?: string;
   // Dynamic per-evaluator fields. In the new format the score column is
@@ -145,14 +148,17 @@ function formatSarvamReasoning(raw: string | undefined): string | undefined {
   }
 }
 
-// A metric cell that shows a forgiving LLM score plus an optional reasoning
-// tooltip (used for LLM-WER, which carries `sarvam_llm_wer_reasoning`).
+// A metric cell that shows a Sarvam LLM score plus an optional reasoning
+// tooltip (LLM-WER's judged segments, or Intent / Entity's explanation).
 function SarvamMetricCell({
   value,
   reasoning,
+  label,
 }: {
   value: number | string | undefined;
   reasoning?: string;
+  /** Metric label, used for the reasoning button's accessible name. */
+  label: string;
 }) {
   const text = fmtMetric(value);
   const tip = formatSarvamReasoning(reasoning);
@@ -164,7 +170,7 @@ function SarvamMetricCell({
         <button
           type="button"
           className="p-0.5 rounded hover:bg-muted transition-colors cursor-pointer"
-          aria-label="View LLM-WER reasoning"
+          aria-label={`View ${label} reasoning`}
         >
           <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -183,14 +189,16 @@ function readSarvamValue(
   return row[key] as number | string | undefined;
 }
 
-// Render a single Sarvam metric value — the reasoning-tooltip cell for the
-// field that carries a `reasoningKey` (LLM-WER), plain formatted text otherwise.
+// Render a single Sarvam metric value — the reasoning-tooltip cell for fields
+// that carry a `reasoningKey` (LLM-WER, Intent, Entity), plain formatted text
+// otherwise (LLM-CER).
 function renderSarvamValue(field: SarvamMetricField, row: STTResultRow) {
   const value = readSarvamValue(row, field.key);
   return field.reasoningKey ? (
     <SarvamMetricCell
       value={value}
       reasoning={row[field.reasoningKey] as string | undefined}
+      label={field.label}
     />
   ) : (
     <>{fmtMetric(value)}</>

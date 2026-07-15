@@ -10,7 +10,12 @@ describe("STT_RESERVED_METRIC_KEYS / TTS_RESERVED_METRIC_KEYS", () => {
   it("contains the expected STT keys", () => {
     expect([...STT_RESERVED_METRIC_KEYS]).toEqual([
       "wer",
+      "cer",
       "string_similarity",
+      "sarvam_llm_wer",
+      "sarvam_llm_cer",
+      "sarvam_intent_score",
+      "sarvam_entity_score",
       "llm_judge_score",
     ]);
   });

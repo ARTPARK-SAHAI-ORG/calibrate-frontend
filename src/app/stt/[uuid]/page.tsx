@@ -130,6 +130,8 @@ type ProviderResultRow = {
   sarvam_intent_score?: number | string;
   sarvam_entity_score?: number | string;
   sarvam_llm_wer_reasoning?: string;
+  sarvam_intent_reasoning?: string;
+  sarvam_entity_reasoning?: string;
   [k: string]: unknown;
 };
 
