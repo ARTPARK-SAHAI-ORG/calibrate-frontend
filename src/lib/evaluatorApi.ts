@@ -15,9 +15,9 @@ export type EvaluatorData = {
   created_at: string;
   updated_at: string;
   /**
-   * Set for EVERY evaluator now — org defaults are forked per org, so both
-   * defaults and customs carry an owner. It can no longer distinguish default
-   * from custom; use `is_default` for that. Kept only where the raw id matters.
+   * Returned by the list API but no longer meaningful for categorization: it's
+   * set on EVERY evaluator now (defaults are per-org forks that carry an owner),
+   * so it can't distinguish default from custom — use `is_default` for that.
    */
   owner_user_id?: string | null;
   /** True for org default (forked seed) evaluators. The ONLY default marker. */

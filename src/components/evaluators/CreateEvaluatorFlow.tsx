@@ -348,7 +348,6 @@ export function CreateEvaluatorFlow({
         description: created.description ?? evaluatorDescription.trim(),
         created_at: created.created_at ?? now,
         updated_at: created.updated_at ?? now,
-        owner_user_id: created.owner_user_id ?? null,
         // A freshly created evaluator is always custom, never an org default.
         is_default: created.is_default ?? false,
         data_type:

@@ -703,7 +703,6 @@ type LLMEvaluatorOption = {
   source_default_slug?: string | null;
   /** True for org default (forked seed) evaluators — the default/custom marker. */
   is_default?: boolean;
-  owner_user_id: string | null;
   variables: EvaluatorVariableDef[];
   /** "llm" for next-reply tab, "conversation" for conversation tab. */
   evaluator_type?: string;
@@ -1532,7 +1531,6 @@ export function AddTestDialog({
         slug: string | null;
         source_default_slug?: string | null;
         is_default?: boolean;
-        owner_user_id: string | null;
         evaluator_type?: string;
         live_version?: { variables?: EvaluatorVariableDef[] | null } | null;
       }>(await response.json());
@@ -1550,7 +1548,6 @@ export function AddTestDialog({
           slug: e.slug,
           source_default_slug: e.source_default_slug,
           is_default: e.is_default,
-          owner_user_id: e.owner_user_id,
           evaluator_type: e.evaluator_type,
           variables: Array.isArray(e.live_version?.variables)
             ? (e.live_version!.variables as EvaluatorVariableDef[])
