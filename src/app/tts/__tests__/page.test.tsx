@@ -17,6 +17,7 @@ jest.mock("../../../components/AppLayout", () => ({
 
 // Provide a token so fetchJobs runs, and neutral dataset-tab state.
 jest.mock("../../../hooks", () => ({
+  ...jest.requireActual("../../../hooks"),
   useAccessToken: () => "test-token",
   useDatasetManagement: () => ({
     datasets: [],

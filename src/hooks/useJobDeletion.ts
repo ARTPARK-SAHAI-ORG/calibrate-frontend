@@ -165,7 +165,7 @@ export function useJobDeletion<T extends JobLike>({
         if (detail?.not_found?.length) reasons.push("no longer available");
         setDeleteError(
           reasons.length
-            ? `Nothing was deleted — some evaluations are ${reasons.join(
+            ? `Nothing was deleted. Some evaluations are ${reasons.join(
                 " or ",
               )}. Refresh and try again with finished evaluations only.`
             : (detail?.message ?? "Nothing was deleted."),

@@ -7,16 +7,21 @@
  * dataset-management hook are stubbed so the test exercises only the list rows.
  */
 import React from "react";
-import { render, screen, waitFor } from "@/test-utils";
+import { render, screen, waitFor, setupUser } from "@/test-utils";
 import STTPage from "../page";
 
 // The page chrome isn't under test — render children straight through.
+// `useHideFloatingButton` is re-exported from here and used by the delete
+// dialog, so stub it too.
 jest.mock("../../../components/AppLayout", () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useHideFloatingButton: () => {},
 }));
 
-// Provide a token so fetchJobs runs, and neutral dataset-tab state.
+// Provide a token so fetchJobs runs, and neutral dataset-tab state. Keep the
+// real useJobDeletion (selection + delete logic) so the list rows render.
 jest.mock("../../../hooks", () => ({
+  ...jest.requireActual("../../../hooks"),
   useAccessToken: () => "test-token",
   useDatasetManagement: () => ({
     datasets: [],
@@ -131,6 +136,37 @@ describe("STT evaluations list", () => {
 
     await waitFor(() =>
       expect(screen.getByText("Failed to fetch STT jobs")).toBeInTheDocument(),
+    );
+  });
+
+  it("deletes a finished evaluation via its row action and removes the row", async () => {
+    const user = setupUser();
+    mockJobsResponse([
+      {
+        uuid: "job-1",
+        type: "stt-eval",
+        status: "done",
+        providers: ["openai"],
+        language: "english",
+        sample_count: 1,
+        dataset_id: null,
+        dataset_name: null,
+        created_at: "2026-07-15 10:00:00",
+        updated_at: "2026-07-15 10:00:00",
+      },
+    ]);
+
+    render(<STTPage />);
+    // Row is present (desktop + mobile both render the provider pill).
+    expect(await screen.findAllByText("OpenAI")).not.toHaveLength(0);
+
+    // Trash icon → confirmation dialog → confirm. The mocked fetch answers the
+    // DELETE with ok:true, so onDeleted prunes the row.
+    await user.click(screen.getAllByRole("button", { name: "Delete evaluation" })[0]);
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+
+    await waitFor(() =>
+      expect(screen.queryByText("OpenAI")).not.toBeInTheDocument(),
     );
   });
 });
