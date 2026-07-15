@@ -95,11 +95,12 @@ test.describe("Onboarding flagship tour (authenticated, fake-AI backend)", () =>
     // 2) Create an agent (spotlights "New agent"; action opens + names the form).
     await step(page, "Create an agent");
 
-    // 3) Name your agent: the filled name field is showing; Next submits.
-    await expect(popoverTitle(page)).toContainText("Name your agent", {
+    // 3) Build or connect: the dialog shows both options (name prefilled);
+    //    Next creates the agent.
+    await expect(popoverTitle(page)).toContainText("Build or connect", {
       timeout: 30000,
     });
-    await expect(page.locator('[data-tour="agent-name-input"]')).toBeVisible({
+    await expect(page.locator('[data-tour="agent-type-options"]')).toBeVisible({
       timeout: 15000,
     });
     await nextButton(page).click();

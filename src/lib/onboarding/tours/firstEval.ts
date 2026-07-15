@@ -67,6 +67,7 @@ export const A = {
   evaluatorsAdd: '[data-tour="evaluators-add"]',
   addEvaluatorsDialog: '[data-tour="add-evaluators-dialog"]',
   evaluatorsAddConfirm: '[data-tour="evaluators-add-confirm"]',
+  agentTypeOptions: '[data-tour="agent-type-options"]',
   tabTests: '[data-tour="agent-tab-tests"]',
   testRowFirst: '[data-tour="test-row-first"]',
   testConversation: '[data-tour="test-conversation"]',
@@ -161,8 +162,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     {
       anchor: A.newAgent,
       title: "Create an agent",
-      description:
-        "An agent is the assistant you want to test. Already have one? You can connect it later. For now, let's spin up a quick one right here.",
+      description: "First, let's create an agent to test.",
       side: "bottom",
       align: "end",
       actionLabel: "Next",
@@ -172,11 +172,14 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       },
     },
     {
-      anchor: A.agentNameInput,
-      title: "Name your agent",
-      description: `We've named it "${DEMO_AGENT_NAME}" for you. You can rename it later.`,
-      side: "bottom",
+      anchor: A.agentTypeOptions,
+      title: "Build or connect",
+      description:
+        "An agent is the assistant you want to test. You can connect one you already have, or build one here. We've set up a build agent and named it, so let's create it.",
+      side: "right",
+      align: "center",
       actionLabel: "Create",
+      timeout: 10000,
       action: async () => {
         await clickElement(A.agentCreateSubmit);
         // The app navigates to /agents/[uuid]; later steps wait for that page.

@@ -819,7 +819,7 @@ function NewAgentDialog({
         </div>
 
         {/* Agent Kind Selection */}
-        <div className="mb-5 space-y-2">
+        <div data-tour="agent-type-options" className="mb-5 space-y-2">
           <label className="block text-[13px] font-medium text-foreground mb-2">
             Setup
           </label>
