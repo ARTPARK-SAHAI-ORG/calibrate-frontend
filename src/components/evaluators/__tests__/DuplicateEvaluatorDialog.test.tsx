@@ -123,6 +123,7 @@ describe("DuplicateEvaluatorDialog", () => {
     expect(onDuplicated.mock.calls[0][0]).toMatchObject({
       uuid: "ev-copy",
       name: "Tone copy",
+      is_default: false,
     });
     expect(onClose).toHaveBeenCalled();
     expect(global.fetch).toHaveBeenCalledWith(
@@ -132,6 +133,45 @@ describe("DuplicateEvaluatorDialog", () => {
         body: JSON.stringify({ name: "Tone copy" }),
       }),
     );
+  });
+
+  it("preserves is_default from the duplicate response when the backend sends it", async () => {
+    const user = setupUser();
+    const onDuplicated = jest.fn();
+
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        uuid: "ev-copy",
+        description: "Checks tone",
+        created_at: "2026-01-02T00:00:00Z",
+        updated_at: "2026-01-02T00:00:00Z",
+        is_default: true,
+        evaluator_type: "llm",
+        output_type: "binary",
+      }),
+    });
+
+    render(
+      <DuplicateEvaluatorDialog
+        originalEvaluator={original}
+        existingEvaluators={existing}
+        onClose={jest.fn()}
+        onDuplicated={onDuplicated}
+        backendAccessToken="token"
+      />,
+    );
+
+    const input = screen.getByPlaceholderText("Enter evaluator name");
+    await user.clear(input);
+    await user.type(input, "Tone copy");
+    await user.click(screen.getByRole("button", { name: "Duplicate" }));
+
+    await waitFor(() => expect(onDuplicated).toHaveBeenCalledTimes(1));
+    expect(onDuplicated.mock.calls[0][0]).toMatchObject({
+      is_default: true,
+    });
   });
 
   it("shows a name error on a 409 conflict", async () => {

@@ -97,7 +97,7 @@ const CORRECTNESS_EVALUATOR = {
   name: "Correctness",
   description: "Checks correctness",
   slug: "default-llm-next-reply",
-  owner_user_id: null,
+  is_default: true,
   evaluator_type: "llm",
   live_version: { variables: [{ name: "criteria" }] },
 };
@@ -107,7 +107,7 @@ const CONVERSATION_EVALUATOR = {
   name: "Conversation quality",
   description: "Checks the whole conversation",
   slug: null,
-  owner_user_id: "user-1",
+  is_default: false,
   evaluator_type: "conversation",
   live_version: { variables: [] },
 };
@@ -117,7 +117,7 @@ const TONE_EVALUATOR = {
   name: "Tone check",
   description: "Checks the reply's tone",
   slug: null,
-  owner_user_id: "user-1",
+  is_default: false,
   evaluator_type: "llm",
   live_version: { variables: [] },
 };

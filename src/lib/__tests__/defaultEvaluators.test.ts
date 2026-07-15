@@ -17,6 +17,7 @@ describe("defaultOriginSlug", () => {
     expect(defaultOriginSlug({ slug: "seed", source_default_slug: null })).toBe(
       "seed",
     );
+    expect(defaultOriginSlug({ slug: "seed-only" })).toBe("seed-only");
   });
 
   it("returns null when neither is present", () => {

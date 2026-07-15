@@ -62,7 +62,7 @@ const CORRECTNESS_EVALUATOR = {
   name: "Correctness",
   description: "Checks correctness",
   slug: "default-llm-next-reply",
-  owner_user_id: null,
+  is_default: true,
   evaluator_type: "llm",
   live_version: { variables: [{ name: "criteria" }] },
 };
@@ -72,7 +72,7 @@ const CONVERSATION_EVALUATOR = {
   name: "Conversation quality",
   description: "Checks the whole conversation",
   slug: null,
-  owner_user_id: "user-1",
+  is_default: false,
   evaluator_type: "conversation",
   live_version: { variables: [] },
 };
@@ -82,7 +82,7 @@ const TONE_EVALUATOR = {
   name: "Tone check",
   description: "Checks the reply's tone",
   slug: null,
-  owner_user_id: "user-1",
+  is_default: false,
   evaluator_type: "llm",
   live_version: { variables: [] },
 };
@@ -273,6 +273,51 @@ describe("AddTestDialog", () => {
     it("auto-attaches the default correctness evaluator once evaluators load", async () => {
       render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
       await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+    });
+
+    it("auto-attaches the org default correctness fork via source_default_slug", async () => {
+      const forkCorrectness = {
+        uuid: "eval-correctness-fork",
+        name: "Correctness",
+        description: "Checks correctness",
+        slug: null,
+        source_default_slug: "default-llm-next-reply",
+        is_default: true,
+        evaluator_type: "llm",
+        live_version: { variables: [{ name: "criteria" }] },
+      };
+      global.fetch = mockFetchImpl(
+        [WEATHER_TOOL],
+        [forkCorrectness, TONE_EVALUATOR, CONVERSATION_EVALUATOR],
+      );
+      render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
+      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+    });
+
+    it("splits the evaluator picker into Default and My evaluators sections", async () => {
+      const defaultTone = {
+        uuid: "eval-default-tone",
+        name: "Default tone",
+        description: "Built-in tone check",
+        slug: null,
+        source_default_slug: "default-tone",
+        is_default: true,
+        evaluator_type: "llm",
+        live_version: { variables: [] },
+      };
+      global.fetch = mockFetchImpl(
+        [WEATHER_TOOL],
+        [CORRECTNESS_EVALUATOR, defaultTone, TONE_EVALUATOR, CONVERSATION_EVALUATOR],
+      );
+      const user = setupUser();
+      render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
+      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+
+      await user.click(screen.getByRole("button", { name: "Add evaluator" }));
+      expect(screen.getByText("Default")).toBeInTheDocument();
+      expect(screen.getByText("My evaluators")).toBeInTheDocument();
+      expect(screen.getByText("Default tone")).toBeInTheDocument();
+      expect(screen.getByText("Tone check")).toBeInTheDocument();
     });
 
     it("blocks submission and shows validation errors when name/messages/criteria are empty", async () => {

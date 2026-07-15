@@ -119,7 +119,7 @@ const mockEvaluatorsResponse = (
     uuid: string;
     name: string;
     evaluator_type: string;
-    owner_user_id?: string | null;
+    is_default?: boolean;
   }[]
 ) => ({
   ok: true,
@@ -136,9 +136,9 @@ beforeEach(() => {
   };
   (global as unknown as { fetch: jest.Mock }).fetch = jest.fn().mockResolvedValue(
     mockEvaluatorsResponse([
-      { uuid: "e1", name: "Default Eval", evaluator_type: "stt", owner_user_id: null },
-      { uuid: "e2", name: "Custom Eval", evaluator_type: "stt", owner_user_id: "u1" },
-      { uuid: "e3", name: "TTS Eval", evaluator_type: "tts", owner_user_id: null },
+      { uuid: "e1", name: "Default Eval", evaluator_type: "stt", is_default: true },
+      { uuid: "e2", name: "Custom Eval", evaluator_type: "stt", is_default: false },
+      { uuid: "e3", name: "TTS Eval", evaluator_type: "tts", is_default: false },
     ])
   );
   process.env.NEXT_PUBLIC_BACKEND_URL = "http://backend.test";
@@ -366,7 +366,7 @@ describe("SpeechToTextEvaluation", () => {
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce(
         mockEvaluatorsResponse([
-          { uuid: "e1", name: "Default Eval", evaluator_type: "stt", owner_user_id: null },
+          { uuid: "e1", name: "Default Eval", evaluator_type: "stt", is_default: true },
         ])
       )
       .mockResolvedValueOnce({
@@ -412,7 +412,7 @@ describe("SpeechToTextEvaluation", () => {
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce(
         mockEvaluatorsResponse([
-          { uuid: "e1", name: "Default Eval", evaluator_type: "stt", owner_user_id: null },
+          { uuid: "e1", name: "Default Eval", evaluator_type: "stt", is_default: true },
         ])
       )
       .mockResolvedValueOnce({
@@ -448,7 +448,7 @@ describe("SpeechToTextEvaluation", () => {
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce(
         mockEvaluatorsResponse([
-          { uuid: "e1", name: "Default Eval", evaluator_type: "stt", owner_user_id: null },
+          { uuid: "e1", name: "Default Eval", evaluator_type: "stt", is_default: true },
         ])
       )
       .mockResolvedValueOnce({ status: 401, ok: false, json: async () => ({}) });
@@ -477,7 +477,7 @@ describe("SpeechToTextEvaluation", () => {
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce(
         mockEvaluatorsResponse([
-          { uuid: "e1", name: "Default Eval", evaluator_type: "stt", owner_user_id: null },
+          { uuid: "e1", name: "Default Eval", evaluator_type: "stt", is_default: true },
         ])
       )
       .mockResolvedValueOnce({ status: 500, ok: false, json: async () => ({}) });
