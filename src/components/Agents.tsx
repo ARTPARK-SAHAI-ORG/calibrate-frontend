@@ -187,6 +187,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
           Agents
         </h2>
         <button
+          data-tour="new-agent"
           onClick={() => setDialogOpen(true)}
           className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
         >
@@ -784,6 +785,7 @@ function NewAgentDialog({
           <div className="relative">
             <input
               type="text"
+              data-tour="agent-name-input"
               value={agentName}
               onChange={(e) => {
                 if (e.target.value.length <= maxLength) {
@@ -908,6 +910,7 @@ function NewAgentDialog({
             Cancel
           </button>
           <button
+            data-tour="agent-create-submit"
             onClick={handleCreate}
             disabled={!agentName.trim() || isCreating}
             className="h-9 px-4 rounded-md text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"

@@ -1146,7 +1146,7 @@ export function TestRunnerDialog({
             )}
 
             {runStatus === "done" && activeTab === "summary" ? (
-              <div className="flex-1 overflow-hidden">
+              <div className="flex-1 overflow-hidden" data-tour="test-run-summary">
                 <TestRunSummary
                   passed={passedTests.length}
                   total={passedTests.length + failedTests.length}

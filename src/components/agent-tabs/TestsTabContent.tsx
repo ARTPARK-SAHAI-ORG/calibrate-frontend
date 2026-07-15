@@ -435,6 +435,16 @@ export function TestsTabContent({
     }
   }, [agentUuid, backendAccessToken, fetchAgentTests]);
 
+  // Let the onboarding tour refresh the list after it seeds demo tests via API.
+  useEffect(() => {
+    const handler = () => {
+      void fetchAgentTests();
+    };
+    window.addEventListener("calibrate:agent-tests-updated", handler);
+    return () =>
+      window.removeEventListener("calibrate:agent-tests-updated", handler);
+  }, [fetchAgentTests]);
+
   // Load the agent's attached evaluators (best-effort; failure just means new
   // tests fall back to the default seed and the post-save prompt is skipped).
   const loadAgentEvaluators = useCallback(async () => {
@@ -1492,6 +1502,7 @@ export function TestsTabContent({
     <>
       <button
         type="button"
+        data-tour="tests-create"
         onClick={() => {
           setNewTestName("");
           setValidationAttempted(false);
@@ -1832,6 +1843,7 @@ export function TestsTabContent({
             {/* Run all tests — sky tint, "play" semantic. */}
             <div className="relative group/runall">
               <button
+                data-tour="tests-run-all"
                 onClick={() => {
                   if (isConnectionUnverified) return;
                   if (agentTests.length > maxRowsPerEval) {

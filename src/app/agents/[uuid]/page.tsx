@@ -111,6 +111,7 @@ export default function AgentDetailPage() {
           </div>
         )}
         <button
+          data-tour="agent-save"
           onClick={() => headerState.onSave()}
           disabled={headerState.isSaving}
           className="h-8 px-3 md:px-4 rounded-md text-xs md:text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"

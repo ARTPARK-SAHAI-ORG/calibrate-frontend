@@ -27,6 +27,7 @@
     "@types/jszip": "^3.4.0",
     "@vercel/analytics": "^1.6.1",
     "canvas-confetti": "^1.9.4",
+    "driver.js": "^1.7.0",
     "exceljs": "^4.4.0",
     "jspdf": "^4.2.1",
     "jszip": "^3.10.1",
