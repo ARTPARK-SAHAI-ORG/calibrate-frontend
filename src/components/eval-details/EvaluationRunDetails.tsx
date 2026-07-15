@@ -369,11 +369,20 @@ export function STTEvaluationLeaderboard({
     leaderboardSummary.some((row) => row[field.key] != null),
   );
 
+  // Drop evaluator columns/charts that no run carries a value for — an
+  // all-"-" column (e.g. an evaluator that didn't run) is just noise.
+  // Mirrors the Sarvam filtering above.
+  const visibleEvaluatorColumns = evaluatorColumns.filter((col) =>
+    leaderboardSummary.some(
+      (row) => row[col.scoreField ?? `${col.key}_score`] != null,
+    ),
+  );
+
   const allCharts: ChartConfig[] = [
     { title: "WER", dataKey: "wer" },
     { title: "CER", dataKey: "cer" },
     ...sarvamFields.map((field) => ({ title: field.label, dataKey: field.key })),
-    ...evaluatorChartConfigs(evaluatorColumns),
+    ...evaluatorChartConfigs(visibleEvaluatorColumns),
   ];
   const chartRows = chunkChartRows(allCharts);
 
@@ -385,7 +394,7 @@ export function STTEvaluationLeaderboard({
         { key: "wer", header: "WER" },
         { key: "cer", header: "CER" },
         ...sarvamFields.map((field) => ({ key: field.key, header: field.label })),
-        ...evaluatorLeaderboardColumns(evaluatorColumns),
+        ...evaluatorLeaderboardColumns(visibleEvaluatorColumns),
       ]}
       data={leaderboardSummary}
       charts={chartRows}
@@ -569,14 +578,25 @@ export function STTEvaluationOutputs({
                         ? [{ label: field.label, value: parseFloat(value.toFixed(4)) }]
                         : [];
                     }),
-                    ...evaluatorColumns.map((col) => ({
-                      label: col.label,
-                      value: formatEvaluatorAggregate(
-                        readProviderEvaluatorMean(col, providerResult),
-                        col.outputType,
-                        col.scaleMax,
-                      ),
-                    })),
+                    // Evaluator tiles — shown only when this provider actually
+                    // has a value for the evaluator (mirrors the Sarvam tiles),
+                    // so e.g. a "Semantic match" tile is hidden when it didn't
+                    // run rather than rendering "-".
+                    ...evaluatorColumns.flatMap((col) => {
+                      const mean = readProviderEvaluatorMean(col, providerResult);
+                      return mean != null
+                        ? [
+                            {
+                              label: col.label,
+                              value: formatEvaluatorAggregate(
+                                mean,
+                                col.outputType,
+                                col.scaleMax,
+                              ),
+                            },
+                          ]
+                        : [];
+                    }),
                   ]}
                 />
               )}

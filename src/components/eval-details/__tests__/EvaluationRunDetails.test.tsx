@@ -436,7 +436,9 @@ describe("STTEvaluationLeaderboard", () => {
   it("builds WER + CER charts plus one chart per evaluator column, chunked into rows of two", () => {
     render(
       <STTEvaluationLeaderboard
-        leaderboardSummary={[{ run: "openai", wer: 0.1, cer: 0.05 }]}
+        leaderboardSummary={[
+          { run: "openai", wer: 0.1, cer: 0.05, a: 1, b: 3, c: 0 },
+        ]}
         evaluatorColumns={
           [
             { key: "a", label: "A", outputType: "binary", scoreField: "a" },
@@ -541,6 +543,40 @@ describe("STTEvaluationLeaderboard", () => {
       "cer",
     ]);
   });
+
+  it("omits evaluator leaderboard columns/charts when no run carries a value", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "openai", wer: 0.1, cer: 0.05 }]}
+        evaluatorColumns={
+          [
+            {
+              key: "sem",
+              label: "Semantic match",
+              outputType: "binary",
+              scoreField: "sem",
+            },
+          ] satisfies STTEvaluatorColumn[]
+        }
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns.map((c: { key: string }) => c.key)).toEqual([
+      "run",
+      "wer",
+      "cer",
+    ]);
+    const charts = JSON.parse(
+      screen.getByTestId("leaderboard-charts").textContent ?? "[]",
+    ).flat();
+    expect(charts.map((c: { dataKey: string }) => c.dataKey)).toEqual([
+      "wer",
+      "cer",
+    ]);
+  });
 });
 
 describe("TTSEvaluationLeaderboard", () => {
@@ -637,7 +673,9 @@ describe("TTSEvaluationLeaderboard", () => {
   it("builds chart yDomain/formatters for binary and rating (with/without scaleMax) evaluator columns", () => {
     render(
       <STTEvaluationLeaderboard
-        leaderboardSummary={[{ run: "openai" }]}
+        leaderboardSummary={[
+          { run: "openai", bin: 1, rate_scale: 3, rate_noscale: 2 },
+        ]}
         evaluatorColumns={
           [
             { key: "bin", label: "Bin", outputType: "binary", scoreField: "bin" },
@@ -793,6 +831,24 @@ describe("STTEvaluationOutputs", () => {
     expect(screen.getByTestId("metric-WER").textContent).toBe("0.1235");
     expect(screen.getByTestId("metric-CER").textContent).toBe("0.0568");
     expect(screen.getByTestId("metric-Clarity").textContent).toBe("0.8");
+  });
+
+  it("hides an evaluator metric tile when the provider has no value for it", () => {
+    const providerResults: STTProviderResultForDetails[] = [
+      {
+        provider: "openai",
+        success: true,
+        metrics: { wer: 0.1, cer: 0.05 },
+        evaluator_runs: [],
+        results: [],
+      },
+    ];
+    render(
+      <STTEvaluationOutputs {...baseProps} providerResults={providerResults} />,
+    );
+    expect(screen.getByTestId("metric-WER")).toBeInTheDocument();
+    // No clarity value for this provider → the tile is dropped, not shown as "-".
+    expect(screen.queryByTestId("metric-Clarity")).not.toBeInTheDocument();
   });
 
   it("adds LLM-WER / LLM-CER / Intent / Entity metric cards when the run carries Sarvam metrics", () => {
