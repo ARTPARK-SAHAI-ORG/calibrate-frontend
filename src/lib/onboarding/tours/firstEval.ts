@@ -145,10 +145,12 @@ async function openCreateTestEditor(
 /** Submit the open Create Test editor and dismiss the "add to defaults" prompt. */
 async function submitCreateTest(): Promise<void> {
   await clickByText("Create", { timeout: 8000 });
-  // A newly-referenced evaluator prompts "Update default evaluators?"; keep the
-  // agent's set as-is.
-  await clickByText("Not now", { timeout: 5000 });
-  await delay(400);
+  // "Update default evaluators?" only appears when the test references an
+  // evaluator not already on the agent — the tour's isn't, so this usually
+  // doesn't show. Use a short timeout so we dismiss it if present without
+  // stalling the tour when it never appears.
+  await clickByText("Not now", { timeout: 1200 });
+  await delay(300);
 }
 
 /** Create one demo test end to end through the real dialog. */
