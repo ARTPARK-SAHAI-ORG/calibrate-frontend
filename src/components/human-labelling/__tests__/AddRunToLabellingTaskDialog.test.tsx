@@ -269,7 +269,7 @@ describe("AddRunToLabellingTaskDialog", () => {
       expect(screen.queryByText("Loading tasks")).not.toBeInTheDocument(),
     );
     expect(
-      screen.getByText(/No existing tasks were found that include all 1 evaluator/),
+      screen.getByText(/No existing tasks were found that include the evaluator in the selected tests/),
     ).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/e.g. Copilot review/)).toBeInTheDocument();
   });
@@ -336,7 +336,7 @@ describe("AddRunToLabellingTaskDialog", () => {
     );
     await waitFor(() =>
       expect(
-        screen.getByText(/No existing tasks were found that include all 1 evaluator/),
+        screen.getByText(/No existing tasks were found that include the evaluator in the selected tests/),
       ).toBeInTheDocument(),
     );
   });

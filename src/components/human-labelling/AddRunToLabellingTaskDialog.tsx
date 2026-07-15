@@ -680,9 +680,16 @@ export function AddRunToLabellingTaskDialog({
   const actionLabel =
     effectiveMode === "new" ? "Create task & add" : "Add to task";
 
+  // "the evaluator" for one, "all N evaluators" for many — avoids the awkward
+  // "all 1 evaluator" phrasing on single-evaluator runs.
+  const evaluatorPhrase =
+    evaluatorUuids.size === 1
+      ? "the evaluator"
+      : `all ${evaluatorUuids.size} evaluators`;
+
   const noExistingTasksMessage =
     evaluatorUuids.size > 0
-      ? `No existing tasks were found that include all ${evaluatorUuids.size} evaluator${evaluatorUuids.size === 1 ? "" : "s"} in the selected tests.`
+      ? `No existing tasks were found that include ${evaluatorPhrase} in the selected ${noun.many}.`
       : "No existing labelling tasks were found.";
 
   const newTaskForm = (
@@ -880,10 +887,8 @@ export function AddRunToLabellingTaskDialog({
                 </Select>
                 {evaluatorUuids.size > 0 && (
                   <p className="mt-1.5 text-xs text-muted-foreground">
-                    Only tasks that already include all {evaluatorUuids.size}{" "}
-                    evaluator
-                    {evaluatorUuids.size === 1 ? "" : "s"} used by this run are
-                    shown
+                    Only tasks that already include {evaluatorPhrase} used by
+                    this run are shown
                   </p>
                 )}
               </div>
