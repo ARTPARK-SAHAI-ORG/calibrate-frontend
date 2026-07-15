@@ -823,8 +823,12 @@ export function SpeechToTextEvaluation({
                 <span className="font-medium text-foreground">
                   WER (Word Error Rate)
                 </span>{" "}
-                is always computed for every STT run. Any evaluators you select
-                here run in addition to it.
+                and{" "}
+                <span className="font-medium text-foreground">
+                  CER (Character Error Rate)
+                </span>{" "}
+                are always computed for every STT run. Any evaluators you select
+                here run in addition to them.
               </span>
             </div>
             <MultiSelectPicker
