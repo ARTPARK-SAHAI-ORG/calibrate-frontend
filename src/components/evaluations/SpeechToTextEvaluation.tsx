@@ -151,8 +151,8 @@ export function SpeechToTextEvaluation({
   const [datasetName, setDatasetName] = useState("");
   const [datasetNameInvalid, setDatasetNameInvalid] = useState(false);
 
-  // Evaluators (filtered to STT purpose). Defaults (`owner_user_id == null`)
-  // are pre-selected on first load — see /evaluators page for the same
+  // Evaluators (filtered to STT purpose). Org defaults (`is_default`) are
+  // pre-selected on first load — see /evaluators page for the same
   // default vs my-evaluators distinction.
   const [availableEvaluators, setAvailableEvaluators] = useState<PickerItem[]>([]);
   const [selectedEvaluators, setSelectedEvaluators] = useState<PickerItem[]>([]);
@@ -213,7 +213,7 @@ export function SpeechToTextEvaluation({
             uuid: string;
             name: string;
             description?: string;
-            owner_user_id?: string | null;
+            is_default?: boolean;
             evaluator_type?: string;
           }>(data)
             .filter((m) => m.evaluator_type === "stt")
@@ -221,7 +221,9 @@ export function SpeechToTextEvaluation({
               uuid: m.uuid,
               name: m.name,
               description: m.description,
-              isDefault: !m.owner_user_id,
+              // Org defaults are forks carrying the org's owner_user_id, so
+              // detect them via `is_default`, not the absence of an owner.
+              isDefault: !!m.is_default,
             }));
 
         setAvailableEvaluators(

@@ -19,6 +19,7 @@ import {
   type EvaluatorData,
   fetchAllEvaluators,
   deleteEvaluator as deleteEvaluatorRequest,
+  isOwnedEvaluator,
 } from "@/lib/evaluatorApi";
 import { EVALUATOR_USE_CASE_OPTIONS } from "@/components/evaluators/evaluatorUseCases";
 import { Select } from "@/components/ui/Select";
@@ -159,9 +160,12 @@ function MetricsPageInner() {
     router.push(`/evaluators/${newEvaluator.uuid}`);
   };
 
-  // Partition into default vs user-owned evaluators
-  const defaultEvaluators = evaluators.filter((e) => !e.owner_user_id);
-  const myEvaluators = evaluators.filter((e) => !!e.owner_user_id);
+  // Partition into org defaults vs custom evaluators. Keyed on `is_default`,
+  // not `owner_user_id`: default seeds are now forked per org, so a fork
+  // carries the org's `owner_user_id` AND `is_default: true`. Splitting on
+  // ownership would misfile every fork under "My evaluators".
+  const defaultEvaluators = evaluators.filter((e) => !isOwnedEvaluator(e));
+  const myEvaluators = evaluators.filter((e) => isOwnedEvaluator(e));
 
   const activeList = activeTab === "default" ? defaultEvaluators : myEvaluators;
 
