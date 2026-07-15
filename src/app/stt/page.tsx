@@ -13,6 +13,8 @@ import { useSidebarState } from "@/lib/sidebar";
 import { Dataset, getDataset } from "@/lib/datasets";
 import { unwrapList } from "@/lib/api";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
+import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
+import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
 import { useDatasetManagement } from "@/hooks";
 
 type STTJob = {
@@ -50,6 +52,15 @@ function STTPageInner() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
+  // Job selection + delete state
+  const [selectedJobUuids, setSelectedJobUuids] = useState<Set<string>>(
+    new Set(),
+  );
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [jobToDelete, setJobToDelete] = useState<STTJob | null>(null);
+  const [jobsToDeleteBulk, setJobsToDeleteBulk] = useState<string[]>([]);
+  const [isJobDeleting, setIsJobDeleting] = useState(false);
 
   // Datasets state
   const {
@@ -193,6 +204,92 @@ function STTPageInner() {
     return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
   });
 
+  const toggleJobSelection = (uuid: string) => {
+    setSelectedJobUuids((prev) => {
+      const next = new Set(prev);
+      if (next.has(uuid)) {
+        next.delete(uuid);
+      } else {
+        next.add(uuid);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedJobUuids.size === sortedJobs.length) {
+      setSelectedJobUuids(new Set());
+    } else {
+      setSelectedJobUuids(new Set(sortedJobs.map((j) => j.uuid)));
+    }
+  };
+
+  const openDeleteDialog = (job: STTJob) => {
+    setJobToDelete(job);
+    setJobsToDeleteBulk([]);
+    setDeleteDialogOpen(true);
+  };
+
+  const openBulkDeleteDialog = () => {
+    if (selectedJobUuids.size === 0) return;
+    setJobToDelete(null);
+    setJobsToDeleteBulk(Array.from(selectedJobUuids));
+    setDeleteDialogOpen(true);
+  };
+
+  const closeDeleteDialog = () => {
+    if (isJobDeleting) return;
+    setDeleteDialogOpen(false);
+    setJobToDelete(null);
+    setJobsToDeleteBulk([]);
+  };
+
+  const deleteJobs = async () => {
+    const uuidsToDelete =
+      jobsToDeleteBulk.length > 0
+        ? jobsToDeleteBulk
+        : jobToDelete
+          ? [jobToDelete.uuid]
+          : [];
+    if (uuidsToDelete.length === 0) return;
+
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl) return;
+
+    setIsJobDeleting(true);
+    try {
+      for (const uuid of uuidsToDelete) {
+        const response = await fetch(`${backendUrl}/jobs/${uuid}`, {
+          method: "DELETE",
+          headers: {
+            accept: "application/json",
+            Authorization: `Bearer ${backendAccessToken}`,
+          },
+        });
+
+        if (response.status === 401) {
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error("Failed to delete evaluation");
+        }
+      }
+
+      const deletedSet = new Set(uuidsToDelete);
+      setJobs((prev) => prev.filter((job) => !deletedSet.has(job.uuid)));
+      setSelectedJobUuids(new Set());
+      setDeleteDialogOpen(false);
+      setJobToDelete(null);
+      setJobsToDeleteBulk([]);
+    } catch (err) {
+      reportError("Error deleting evaluations:", err);
+    } finally {
+      setIsJobDeleting(false);
+    }
+  };
+
   return (
     <AppLayout
       activeItem="stt"
@@ -327,10 +424,20 @@ function STTPageInner() {
               </div>
             ) : (
               <>
-                <p className="text-sm text-muted-foreground mb-3">
-                  {jobs.length}{" "}
-                  {jobs.length === 1 ? "evaluation" : "evaluations"}
-                </p>
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <p className="text-sm text-muted-foreground">
+                    {jobs.length}{" "}
+                    {jobs.length === 1 ? "evaluation" : "evaluations"}
+                  </p>
+                  {selectedJobUuids.size > 0 && (
+                    <button
+                      onClick={openBulkDeleteDialog}
+                      className="h-9 px-4 rounded-md text-sm font-medium border border-red-500 text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer flex-shrink-0"
+                    >
+                      Delete selected ({selectedJobUuids.size})
+                    </button>
+                  )}
+                </div>
                 {/* Mobile Sort Button */}
                 <div className="flex justify-end md:hidden mb-3">
                   <button
@@ -359,7 +466,17 @@ function STTPageInner() {
                 {/* Desktop Table View */}
                 <div className="hidden md:block border border-border rounded-xl overflow-hidden">
                   {/* Table Header */}
-                  <div className="grid grid-cols-[2fr_1fr_100px_100px_80px_1fr] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+                  <div className="grid grid-cols-[40px_2fr_1fr_100px_100px_80px_1fr_48px] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+                    <div className="flex items-center">
+                      <SelectCheckbox
+                        checked={
+                          selectedJobUuids.size === sortedJobs.length &&
+                          sortedJobs.length > 0
+                        }
+                        onToggle={toggleSelectAll}
+                        title="Select all"
+                      />
+                    </div>
                     <div className="text-sm font-medium text-muted-foreground">
                       Providers
                     </div>
@@ -398,14 +515,23 @@ function STTPageInner() {
                         </svg>
                       </button>
                     </div>
+                    <div />
                   </div>
                   {/* Table Rows */}
                   {sortedJobs.map((job) => (
                     <div
                       key={job.uuid}
                       onClick={() => router.push(`/stt/${job.uuid}`)}
-                      className="grid grid-cols-[2fr_1fr_100px_100px_80px_1fr] gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors items-center cursor-pointer"
+                      className="grid grid-cols-[40px_2fr_1fr_100px_100px_80px_1fr_48px] gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors items-center cursor-pointer"
                     >
+                      {/* Selection checkbox */}
+                      <div className="flex items-center">
+                        <SelectCheckbox
+                          checked={selectedJobUuids.has(job.uuid)}
+                          onToggle={() => toggleJobSelection(job.uuid)}
+                          title="Select evaluation"
+                        />
+                      </div>
                       {/* Providers as pills */}
                       <div className="flex flex-wrap gap-1.5">
                         {job.providers?.map((provider) => (
@@ -476,6 +602,13 @@ function STTPageInner() {
                       <p className="text-sm text-muted-foreground">
                         {job.created_at ? formatDate(job.created_at) : "—"}
                       </p>
+                      {/* Delete */}
+                      <div className="flex items-center justify-end">
+                        <DeleteIconButton
+                          onClick={() => openDeleteDialog(job)}
+                          title="Delete evaluation"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -489,6 +622,18 @@ function STTPageInner() {
                       className="block border border-border rounded-xl overflow-hidden bg-background hover:shadow-lg hover:border-foreground/20 transition-all duration-200 cursor-pointer"
                     >
                       <div className="p-5">
+                        {/* Selection + delete controls */}
+                        <div className="flex items-center justify-between mb-4">
+                          <SelectCheckbox
+                            checked={selectedJobUuids.has(job.uuid)}
+                            onToggle={() => toggleJobSelection(job.uuid)}
+                            title="Select evaluation"
+                          />
+                          <DeleteIconButton
+                            onClick={() => openDeleteDialog(job)}
+                            title="Delete evaluation"
+                          />
+                        </div>
                         {/* Header with Providers */}
                         <div className="flex flex-wrap gap-2 mb-4">
                           {job.providers?.map((provider) => (
@@ -784,6 +929,27 @@ function STTPageInner() {
           </>
         )}
       </div>
+
+      {/* Delete Evaluation Confirmation */}
+      {deleteDialogOpen && (
+        <DeleteConfirmationDialog
+          isOpen={true}
+          onClose={closeDeleteDialog}
+          onConfirm={deleteJobs}
+          title={
+            jobsToDeleteBulk.length > 0
+              ? "Delete evaluations"
+              : "Delete evaluation"
+          }
+          message={
+            jobsToDeleteBulk.length > 0
+              ? `Are you sure you want to delete ${jobsToDeleteBulk.length} evaluation${jobsToDeleteBulk.length > 1 ? "s" : ""}? This action cannot be undone.`
+              : "Are you sure you want to delete this evaluation? This action cannot be undone."
+          }
+          confirmText="Delete"
+          isDeleting={isJobDeleting}
+        />
+      )}
 
       {/* Delete Dataset Confirmation */}
       {deleteDatasetId && (

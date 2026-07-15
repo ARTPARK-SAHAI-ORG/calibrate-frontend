@@ -1,0 +1,61 @@
+"use client";
+
+import React from "react";
+
+type SelectCheckboxProps = {
+  /** Whether the box is currently ticked. */
+  checked: boolean;
+  /** Invoked when the box is toggled. Click propagation is stopped first,
+   *  so this is safe to use inside clickable rows. */
+  onToggle: () => void;
+  /** Tooltip / accessible label. */
+  title: string;
+  /** Extra classes appended to the base styling. */
+  className?: string;
+};
+
+/**
+ * Shared square checkbox used for row selection (select-all headers and
+ * per-row checkboxes) across list pages with bulk actions. Renders a filled
+ * box with a checkmark when checked, mirroring the tests-page selection UI.
+ */
+export function SelectCheckbox({
+  checked,
+  onToggle,
+  title,
+  className = "",
+}: SelectCheckboxProps) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      title={title}
+      aria-label={title}
+      aria-pressed={checked}
+      className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
+        checked
+          ? "bg-foreground border-foreground"
+          : "border-border hover:border-muted-foreground"
+      } ${className}`}
+    >
+      {checked && (
+        <svg
+          className="w-3 h-3 text-background"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={3}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M4.5 12.75l6 6 9-13.5"
+          />
+        </svg>
+      )}
+    </button>
+  );
+}
