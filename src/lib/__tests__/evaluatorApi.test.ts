@@ -1,5 +1,6 @@
 import { signOut } from "next-auth/react";
 import {
+  isDefaultEvaluator,
   isOwnedEvaluator,
   getEvaluatorErrorMessage,
   isEvaluatorNameConflict,
@@ -45,6 +46,24 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_BACKEND_URL = "http://test-backend";
   (signOut as jest.Mock).mockClear();
   global.fetch = jest.fn();
+});
+
+describe("isDefaultEvaluator", () => {
+  it("is true only when is_default is true, regardless of owner_user_id", () => {
+    expect(
+      isDefaultEvaluator({ is_default: true, owner_user_id: "org-1" }),
+    ).toBe(true);
+    expect(
+      isDefaultEvaluator({ is_default: false, owner_user_id: "org-1" }),
+    ).toBe(false);
+    expect(isDefaultEvaluator({})).toBe(false);
+  });
+
+  it("is the exact inverse of isOwnedEvaluator", () => {
+    for (const e of [{ is_default: true }, { is_default: false }, {}]) {
+      expect(isDefaultEvaluator(e)).toBe(!isOwnedEvaluator(e));
+    }
+  });
 });
 
 describe("isOwnedEvaluator", () => {

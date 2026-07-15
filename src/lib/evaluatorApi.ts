@@ -29,16 +29,26 @@ export type EvaluatorData = {
 };
 
 /**
- * Whether this is a user-created (custom) evaluator rather than an org default.
- * `is_default` is the sole discriminator: `owner_user_id` is now set on every
- * evaluator (defaults are per-org forks) so it can't be used here.
+ * Whether this is an org default (a forked seed). `is_default` is the sole
+ * discriminator — `owner_user_id` is now set on every evaluator (defaults are
+ * per-org forks) so it can't be used. This is the ONE place the default vs
+ * custom test lives; every list/picker/pre-select site must call this (or its
+ * inverse `isOwnedEvaluator`) rather than re-reading `is_default` inline, so a
+ * future change to the marker is a single edit here.
  *
- * This is a *categorization* helper only — it drives the Default vs Custom
- * split in the list/picker UIs. It is NOT a permissions check: org defaults are
- * now editable/deletable forks, so edit/delete/new-version are allowed on both.
+ * Accepts any object exposing `is_default` so the STT/TTS/test pickers can pass
+ * their trimmed row shapes, not just the full `EvaluatorData`.
+ *
+ * NOTE: categorization only — NOT a permissions check. Org defaults are
+ * editable/deletable forks, so edit/delete/new-version are allowed on both.
  */
-export function isOwnedEvaluator(e: EvaluatorData): boolean {
-  return !e.is_default;
+export function isDefaultEvaluator(e: { is_default?: boolean | null }): boolean {
+  return !!e.is_default;
+}
+
+/** Whether this is a user-created (custom) evaluator — the inverse of default. */
+export function isOwnedEvaluator(e: { is_default?: boolean | null }): boolean {
+  return !isDefaultEvaluator(e);
 }
 
 /**

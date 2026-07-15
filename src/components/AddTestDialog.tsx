@@ -13,6 +13,7 @@ import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { isDefaultLLMNextReplyEvaluator } from "@/lib/defaultEvaluators";
+import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
 import { NestedContainer } from "@/components/ui/NestedContainer";
 import {
@@ -3249,12 +3250,8 @@ export function AddTestDialog({
                                   </div>
                                 );
                               }
-                              const defaults = matches.filter(
-                                (o) => o.is_default,
-                              );
-                              const mine = matches.filter(
-                                (o) => !o.is_default,
-                              );
+                              const defaults = matches.filter(isDefaultEvaluator);
+                              const mine = matches.filter(isOwnedEvaluator);
                               const showSections =
                                 defaults.length > 0 && mine.length > 0;
                               const renderRow = (o: LLMEvaluatorOption) => {

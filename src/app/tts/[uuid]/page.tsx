@@ -1,6 +1,7 @@
 "use client";
 import { reportError } from "@/lib/reportError";
 import { unwrapList } from "@/lib/api";
+import { isDefaultEvaluator } from "@/lib/evaluatorApi";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -275,9 +276,7 @@ export default function TTSEvaluationDetailPage() {
             uuid: m.uuid,
             name: m.name,
             description: m.description ?? null,
-            // Org defaults are forks that also carry an owner_user_id, so the
-            // only reliable default marker is `is_default`.
-            isDefault: !!m.is_default,
+            isDefault: isDefaultEvaluator(m),
           }));
         setTtsEvaluators(items);
       } catch (err) {

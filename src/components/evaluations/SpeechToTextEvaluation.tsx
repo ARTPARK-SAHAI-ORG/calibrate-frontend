@@ -1,6 +1,7 @@
 "use client";
 import { reportError } from "@/lib/reportError";
 import { unwrapList } from "@/lib/api";
+import { isDefaultEvaluator } from "@/lib/evaluatorApi";
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -221,9 +222,7 @@ export function SpeechToTextEvaluation({
               uuid: m.uuid,
               name: m.name,
               description: m.description,
-              // Org defaults are forks carrying the org's owner_user_id, so
-              // detect them via `is_default`, not the absence of an owner.
-              isDefault: !!m.is_default,
+              isDefault: isDefaultEvaluator(m),
             }));
 
         setAvailableEvaluators(
