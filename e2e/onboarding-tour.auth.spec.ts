@@ -80,8 +80,16 @@ test.describe("Onboarding flagship tour (authenticated, fake-AI backend)", () =>
       START_EVENT,
     );
 
-    // 1) Welcome -> 2) Create an agent (spotlights "New agent").
-    await step(page, "Welcome to Calibrate");
+    // 1) Welcome: also assert the "X of N" progress counter renders.
+    await expect(popoverTitle(page)).toContainText("Welcome to Calibrate", {
+      timeout: 30000,
+    });
+    await expect(page.locator(".driver-popover-progress-text")).toContainText(
+      /1 of \d+/,
+    );
+    await nextButton(page).click();
+
+    // 2) Create an agent (spotlights "New agent").
     await step(page, "Create an agent");
 
     // 3) Name it: the action opens the dialog; assert it, then let the step

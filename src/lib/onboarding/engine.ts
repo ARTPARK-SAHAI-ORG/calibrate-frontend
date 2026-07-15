@@ -70,6 +70,26 @@ export async function runTour(tour: Tour, startIndex = 0): Promise<void> {
     stagePadding: 6,
     stageRadius: 8,
     popoverClass: "calibrate-tour",
+    showProgress: true,
+    // We advance steps manually via highlight(), so driver can't compute the
+    // "X of N" itself. Inject it from our own step state on each render, and
+    // create the progress node if driver didn't render one for a single
+    // highlight (so the counter always appears, left of the footer buttons).
+    onPopoverRender: (popover) => {
+      if (!active) return;
+      const text = `${active.index + 1} of ${active.tour.steps.length}`;
+      if (popover.progress) {
+        popover.progress.textContent = text;
+        return;
+      }
+      const footer = popover.footer;
+      if (footer && !footer.querySelector(".driver-popover-progress-text")) {
+        const span = document.createElement("span");
+        span.className = "driver-popover-progress-text";
+        span.textContent = text;
+        footer.insertBefore(span, footer.firstChild);
+      }
+    },
     onDestroyStarted: () => {
       // Fires on user close (X / overlay / Esc). Our finish path sets `ending`.
       if (active && !active.ending) {
