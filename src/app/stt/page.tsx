@@ -15,7 +15,11 @@ import { unwrapList } from "@/lib/api";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
-import { useDatasetManagement, useJobDeletion } from "@/hooks";
+import {
+  useDatasetManagement,
+  useJobDeletion,
+  BULK_DELETE_DISABLED_HINT,
+} from "@/hooks";
 
 type STTJob = {
   uuid: string;
@@ -198,11 +202,14 @@ function STTPageInner() {
   const {
     selectedJobUuids,
     allSelected,
+    hasBulkDeletableJobs,
+    isBulkDeletable,
     toggleJobSelection,
     toggleSelectAll,
     deleteDialogOpen,
     jobsToDeleteBulk,
     isJobDeleting,
+    deleteError,
     openDeleteDialog,
     openBulkDeleteDialog,
     closeDeleteDialog,
@@ -397,7 +404,12 @@ function STTPageInner() {
                       <SelectCheckbox
                         checked={allSelected}
                         onToggle={toggleSelectAll}
-                        title="Select all"
+                        disabled={!hasBulkDeletableJobs}
+                        title={
+                          hasBulkDeletableJobs
+                            ? "Select all finished evaluations"
+                            : "No finished evaluations to select"
+                        }
                       />
                     </div>
                     <div className="text-sm font-medium text-muted-foreground">
@@ -452,7 +464,12 @@ function STTPageInner() {
                         <SelectCheckbox
                           checked={selectedJobUuids.has(job.uuid)}
                           onToggle={() => toggleJobSelection(job.uuid)}
-                          title="Select evaluation"
+                          disabled={!isBulkDeletable(job)}
+                          title={
+                            isBulkDeletable(job)
+                              ? "Select evaluation"
+                              : BULK_DELETE_DISABLED_HINT
+                          }
                         />
                       </div>
                       {/* Providers as pills */}
@@ -550,7 +567,12 @@ function STTPageInner() {
                           <SelectCheckbox
                             checked={selectedJobUuids.has(job.uuid)}
                             onToggle={() => toggleJobSelection(job.uuid)}
-                            title="Select evaluation"
+                            disabled={!isBulkDeletable(job)}
+                            title={
+                              isBulkDeletable(job)
+                                ? "Select evaluation"
+                                : BULK_DELETE_DISABLED_HINT
+                            }
                           />
                           <DeleteIconButton
                             onClick={() => openDeleteDialog(job)}
@@ -871,6 +893,11 @@ function STTPageInner() {
           }
           confirmText="Delete"
           isDeleting={isJobDeleting}
+          extraContent={
+            deleteError ? (
+              <p className="text-sm text-red-500">{deleteError}</p>
+            ) : undefined
+          }
         />
       )}
 

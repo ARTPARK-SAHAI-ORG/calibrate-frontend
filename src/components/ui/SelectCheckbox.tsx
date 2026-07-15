@@ -8,8 +8,11 @@ type SelectCheckboxProps = {
   /** Invoked when the box is toggled. Click propagation is stopped first,
    *  so this is safe to use inside clickable rows. */
   onToggle: () => void;
-  /** Tooltip / accessible label. */
+  /** Tooltip / accessible label. Shown on hover even when disabled. */
   title: string;
+  /** When true, the box can't be toggled (still swallows the row click).
+   *  Use `title` to explain why. */
+  disabled?: boolean;
   /** Extra classes appended to the base styling. */
   className?: string;
 };
@@ -23,25 +26,33 @@ export function SelectCheckbox({
   checked,
   onToggle,
   title,
+  disabled = false,
   className = "",
 }: SelectCheckboxProps) {
   return (
     <button
       type="button"
+      // Not the native `disabled` attribute: a disabled button suppresses the
+      // hover title in most browsers, and we want the "why" tooltip to show.
+      // Instead we swallow the click (so the row doesn't navigate) and no-op.
       onClick={(e) => {
         e.stopPropagation();
+        if (disabled) return;
         onToggle();
       }}
       title={title}
       aria-label={title}
       aria-pressed={checked}
-      className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
-        checked
-          ? "bg-foreground border-foreground"
-          : "border-border hover:border-muted-foreground"
+      aria-disabled={disabled}
+      className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
+        disabled
+          ? "cursor-not-allowed opacity-40 border-border"
+          : checked
+            ? "bg-foreground border-foreground cursor-pointer"
+            : "border-border hover:border-muted-foreground cursor-pointer"
       } ${className}`}
     >
-      {checked && (
+      {checked && !disabled && (
         <svg
           className="w-3 h-3 text-background"
           fill="none"
