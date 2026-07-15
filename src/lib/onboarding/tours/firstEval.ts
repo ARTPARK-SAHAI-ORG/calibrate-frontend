@@ -7,7 +7,7 @@
  *   seed two sample tests → run → read the results.
  *
  * It creates a real, clearly-labelled "Demo agent" the user can delete later.
- * Every step degrades gracefully — if an injected action fails (e.g. offline),
+ * Every step degrades gracefully: if an injected action fails (e.g. offline),
  * the popover still explains the step and the user can do it by hand.
  */
 
@@ -33,12 +33,12 @@ function welcomeDescription(): string {
     .filter(Boolean)
     .join(" &nbsp;·&nbsp; ");
   return (
-    "Calibrate is where you build voice AI agents and prove they work — " +
-    "automated tests, LLM-judge evaluators, model benchmarks, and human " +
-    "labelling, all in one place." +
+    "Calibrate is an open-source evaluation platform for AI agents, text or " +
+    "voice. Testing agents manually is slow and inconsistent, so Calibrate helps " +
+    "you continuously improve your agent, ensure a bug never repeats itself, and " +
+    "deploy with confidence." +
     "<br><br>New here? Let's run your first evaluation together. I'll spin up a " +
-    'sample "Demo agent" and run it end to end — just click through, and delete ' +
-    "the demo after." +
+    'sample "Demo agent" and run it end to end, then you can delete it.' +
     `<br><br><span style="font-size:0.8rem;">${links}</span>`
   );
 }
@@ -163,7 +163,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.systemPrompt,
       title: "Give it a system prompt",
       description:
-        "This is the agent's instructions. I'll paste a sample customer-support prompt — this is what your tests will hold the agent accountable to.",
+        "This is the agent's instructions. I'll paste a sample customer-support prompt. This is what your tests will hold the agent accountable to.",
       side: "top",
       actionLabel: "Paste sample",
       timeout: 15000,
@@ -186,7 +186,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.tabEvaluators,
       title: "Evaluators score conversations",
       description:
-        "The Evaluators tab is where you pick which judges matter for this agent — e.g. a Correctness check. New tests inherit these automatically.",
+        "The Evaluators tab is where you pick which judges matter for this agent, like a Correctness check. New tests inherit these automatically.",
       side: "bottom",
       actionLabel: "Show me",
       action: async () => {
@@ -217,7 +217,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.testsRunAll,
       title: "Run the evaluation",
       description:
-        "Two sample tests are ready. I'll run them against your agent — Calibrate replays each case and grades the reply.",
+        "Two sample tests are ready. I'll run them against your agent. Calibrate replays each case and grades the reply.",
       side: "bottom",
       align: "end",
       actionLabel: "Run tests",
@@ -230,7 +230,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.runSummary,
       title: "Read the results",
       description:
-        "Here's your first result — pass rate up top, plus latency, cost, tokens, and a score per evaluator. Open any case to see the judge's reasoning. That's the core loop! Delete the Demo agent whenever you're done.",
+        "Here's your first result: pass rate up top, plus latency, cost, tokens, and a score per evaluator. Open any case to see the judge's reasoning. That's the core loop! Delete the Demo agent whenever you're done.",
       side: "top",
       actionLabel: "Finish",
       timeout: 90000,
