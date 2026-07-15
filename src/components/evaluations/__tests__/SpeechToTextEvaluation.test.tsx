@@ -401,6 +401,61 @@ describe("SpeechToTextEvaluation", () => {
       expect(router.push).toHaveBeenCalledWith("/stt/task-123");
     });
     expect(onEvaluatingChange).toHaveBeenCalledWith(true);
+
+    // Sarvam LLM judges default to on — the evaluate body carries the flag.
+    const evalCall = (global.fetch as jest.Mock).mock.calls.find(([url]) =>
+      String(url).endsWith("/stt/evaluate"),
+    );
+    expect(evalCall).toBeDefined();
+    expect(JSON.parse(evalCall![1].body)).toMatchObject({
+      sarvam_judges: true,
+    });
+  });
+
+  it("sends sarvam_judges=false when the toggle is turned off", async () => {
+    const user = setupUser();
+    const evaluateRef = { current: null as (() => void) | null };
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(
+        mockEvaluatorsResponse([
+          { uuid: "e1", name: "Default Eval", evaluator_type: "stt", is_default: true },
+        ])
+      )
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ task_id: "task-789", status: "queued" }),
+      });
+
+    render(<SpeechToTextEvaluation evaluateRef={evaluateRef} />);
+    await user.click(screen.getByText("Settings"));
+    await waitFor(() => screen.getByTestId("evaluator-e1"));
+    await selectProvider(user, "Deepgram");
+
+    await user.click(
+      screen.getByRole("switch", { name: "Toggle built-in LLM-based evaluation metrics" }),
+    );
+
+    const nameInput = screen.getByPlaceholderText("e.g. English customer calls");
+    await user.type(nameInput, "My dataset");
+    editorHandleMock.getNewRows.mockReturnValue([
+      { audio_path: "s3://bucket/a.wav", text: "hello world" },
+    ]);
+
+    await act(async () => {
+      evaluateRef.current?.();
+    });
+
+    await waitFor(() => {
+      const router = useRouter();
+      expect(router.push).toHaveBeenCalledWith("/stt/task-789");
+    });
+    const evalCall = (global.fetch as jest.Mock).mock.calls.find(([url]) =>
+      String(url).endsWith("/stt/evaluate"),
+    );
+    expect(JSON.parse(evalCall![1].body)).toMatchObject({
+      sarvam_judges: false,
+    });
   });
 
   it("submits a dataset-mode evaluation successfully", async () => {

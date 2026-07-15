@@ -376,6 +376,40 @@ describe("STTEvaluationAbout", () => {
       range: "1 - 10",
     });
   });
+
+  it("omits the Sarvam metric rows by default", () => {
+    render(<STTEvaluationAbout evaluatorRows={[binaryRow]} />);
+    const metrics = JSON.parse(
+      screen.getByTestId("about-metrics-table").textContent ?? "",
+    );
+    expect(metrics.map((m: { key?: string }) => m.key)).not.toContain(
+      "sarvam_llm_wer",
+    );
+  });
+
+  it("inserts the four Sarvam metric rows after WER/CER when showSarvamMetrics is set", () => {
+    render(
+      <STTEvaluationAbout evaluatorRows={[binaryRow]} showSarvamMetrics />,
+    );
+    const metrics = JSON.parse(
+      screen.getByTestId("about-metrics-table").textContent ?? "",
+    );
+    // WER + CER first, then the four Sarvam rows, then the mapped evaluator row.
+    expect(metrics[0]).toEqual(WER_ABOUT_METRIC);
+    expect(metrics[1]).toEqual(CER_ABOUT_METRIC);
+    expect(metrics.slice(2, 6).map((m: { key?: string }) => m.key)).toEqual([
+      "sarvam_llm_wer",
+      "sarvam_llm_cer",
+      "sarvam_intent",
+      "sarvam_entity",
+    ]);
+    expect(metrics[2]).toMatchObject({ preference: "Lower is better" });
+    expect(metrics[4]).toMatchObject({
+      preference: "Higher is better",
+      range: "Pass / Fail",
+    });
+    expect(metrics[6]).toMatchObject({ key: "pass_fail" });
+  });
 });
 
 describe("TTSEvaluationAbout", () => {
@@ -445,6 +479,67 @@ describe("STTEvaluationLeaderboard", () => {
     expect(screen.getByTestId("leaderboard-filename").textContent).toBe(
       "stt-evaluation-leaderboard",
     );
+  });
+
+  it("inserts Sarvam charts/columns after CER when the rows carry them", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[
+          {
+            run: "openai",
+            wer: 0.1,
+            cer: 0.05,
+            sarvam_llm_wer: 0.03,
+            sarvam_llm_cer: 0.02,
+            sarvam_intent_score: 0.9,
+            sarvam_entity_score: 0.95,
+          },
+        ]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns).toEqual([
+      { key: "run", header: "Run" },
+      { key: "wer", header: "WER" },
+      { key: "cer", header: "CER" },
+      { key: "sarvam_llm_wer", header: "LLM-WER" },
+      { key: "sarvam_llm_cer", header: "LLM-CER" },
+      { key: "sarvam_intent_score", header: "Intent" },
+      { key: "sarvam_entity_score", header: "Entity" },
+    ]);
+    const charts = JSON.parse(
+      screen.getByTestId("leaderboard-charts").textContent ?? "[]",
+    ).flat();
+    expect(charts.map((c: { dataKey: string }) => c.dataKey)).toEqual([
+      "wer",
+      "cer",
+      "sarvam_llm_wer",
+      "sarvam_llm_cer",
+      "sarvam_intent_score",
+      "sarvam_entity_score",
+    ]);
+  });
+
+  it("omits Sarvam leaderboard charts/columns when the rows lack them", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "openai", wer: 0.1, cer: 0.05 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns.map((c: { key: string }) => c.key)).toEqual([
+      "run",
+      "wer",
+      "cer",
+    ]);
   });
 });
 
@@ -698,6 +793,42 @@ describe("STTEvaluationOutputs", () => {
     expect(screen.getByTestId("metric-WER").textContent).toBe("0.1235");
     expect(screen.getByTestId("metric-CER").textContent).toBe("0.0568");
     expect(screen.getByTestId("metric-Clarity").textContent).toBe("0.8");
+  });
+
+  it("adds LLM-WER / LLM-CER / Intent / Entity metric cards when the run carries Sarvam metrics", () => {
+    const providerResults: STTProviderResultForDetails[] = [
+      {
+        provider: "openai",
+        success: true,
+        metrics: {
+          wer: 0.15,
+          cer: 0.17,
+          sarvam_llm_wer: 0.076923,
+          sarvam_llm_cer: 0.071428,
+          sarvam_intent_score: 0.666666,
+          sarvam_entity_score: 0.833333,
+        },
+        results: [],
+      },
+    ];
+    render(
+      <STTEvaluationOutputs {...baseProps} providerResults={providerResults} />,
+    );
+    expect(screen.getByTestId("metric-LLM-WER").textContent).toBe("0.0769");
+    expect(screen.getByTestId("metric-LLM-CER").textContent).toBe("0.0714");
+    expect(screen.getByTestId("metric-Intent").textContent).toBe("0.6667");
+    expect(screen.getByTestId("metric-Entity").textContent).toBe("0.8333");
+  });
+
+  it("omits Sarvam metric cards when those metrics are absent", () => {
+    const providerResults: STTProviderResultForDetails[] = [
+      { provider: "openai", success: true, metrics: { wer: 0.1, cer: 0.05 }, results: [] },
+    ];
+    render(
+      <STTEvaluationOutputs {...baseProps} providerResults={providerResults} />,
+    );
+    expect(screen.queryByTestId("metric-LLM-WER")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("metric-Intent")).not.toBeInTheDocument();
   });
 
   it("renders '-' for WER and CER when their metrics are null", () => {

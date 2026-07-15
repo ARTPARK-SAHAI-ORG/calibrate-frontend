@@ -27,6 +27,7 @@ import {
   type STTEvaluatorColumn,
 } from "@/components/eval-details";
 import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
+import { SARVAM_METRIC_FIELDS } from "@/components/eval-details/sarvamMetrics";
 import {
   AddRunToLabellingTaskDialog,
   type SttLabellingRow,
@@ -99,6 +100,13 @@ type ProviderMetrics = {
   cer?: number;
   string_similarity?: number;
   llm_judge_score?: number;
+  // Present only when the run used Sarvam LLM judges. LLM-WER/CER share the
+  // `wer`/`cer` scale; intent/entity are 0-1 (higher is better). Older runs /
+  // judges-off runs omit them.
+  sarvam_llm_wer?: number;
+  sarvam_llm_cer?: number;
+  sarvam_intent_score?: number;
+  sarvam_entity_score?: number;
   [k: string]:
     | number
     | { type?: string; mean?: number; scale_min?: number; scale_max?: number }
@@ -115,6 +123,13 @@ type ProviderResultRow = {
   string_similarity?: string;
   llm_judge_score?: string;
   llm_judge_reasoning?: string;
+  // Present only when the run used Sarvam LLM judges. `*_reasoning` is a JSON
+  // string of the judged segments.
+  sarvam_llm_wer?: number | string;
+  sarvam_llm_cer?: number | string;
+  sarvam_intent_score?: number | string;
+  sarvam_entity_score?: number | string;
+  sarvam_llm_wer_reasoning?: string;
   [k: string]: unknown;
 };
 
@@ -135,6 +150,11 @@ type LeaderboardSummary = {
   cer?: number;
   string_similarity?: number;
   llm_judge_score?: number;
+  // Present only when the run used Sarvam LLM judges.
+  sarvam_llm_wer?: number;
+  sarvam_llm_cer?: number;
+  sarvam_intent_score?: number;
+  sarvam_entity_score?: number;
   [k: string]: string | number | undefined;
 };
 
@@ -580,6 +600,19 @@ export default function STTEvaluationDetailPage() {
     [aboutEvaluators, evaluationResult, defaultEvaluator, judgeLabel],
   );
 
+  // Whether this run computed Sarvam's LLM judges — drives the extra About-tab
+  // metric rows. Detected from the presence of the aggregate metric keys on
+  // any provider (absent on judges-off and pre-feature runs).
+  const hasSarvamMetrics = useMemo(
+    () =>
+      (evaluationResult?.provider_results ?? []).some(
+        (pr) =>
+          pr.metrics?.sarvam_llm_wer != null ||
+          pr.metrics?.sarvam_llm_cer != null,
+      ),
+    [evaluationResult],
+  );
+
   // "Submit for labelling": pick individual result rows (per provider) and
   // send them to an STT annotation task. Rows are keyed `${provider}:${index}`
   // — the same keys `STTResultsTable` toggles — so selection is stable across
@@ -746,6 +779,13 @@ export default function STTEvaluationDetailPage() {
                         { key: "predicted_text", header: "Predicted text" },
                         { key: "wer", header: "WER" },
                         { key: "cer", header: "CER" },
+                        // Sarvam LLM metrics, only when the run computed them.
+                        ...(hasSarvamMetrics
+                          ? SARVAM_METRIC_FIELDS.map((f) => ({
+                              key: f.csvKey,
+                              header: f.label,
+                            }))
+                          : []),
                         ...evaluatorColumns.map((c) => ({
                           key: c.key,
                           header: c.label,
@@ -761,6 +801,14 @@ export default function STTEvaluationDetailPage() {
                             predicted_text: r.pred,
                             wer: r.wer,
                             cer: r.cer,
+                            ...(hasSarvamMetrics
+                              ? Object.fromEntries(
+                                  SARVAM_METRIC_FIELDS.map((f) => [
+                                    f.csvKey,
+                                    r[f.key] ?? "",
+                                  ]),
+                                )
+                              : {}),
                           };
                           // Read via `readEvaluatorCell` so the refreshed
                           // `evaluator_outputs[<uuid>]` shape is preferred
@@ -897,6 +945,7 @@ export default function STTEvaluationDetailPage() {
                   {/* About Tab */}
                   {displayedActiveTab === "about" && canShowLeaderboard && (
                     <STTEvaluationAbout
+                      showSarvamMetrics={hasSarvamMetrics}
                       evaluatorRows={aboutEvaluators.map((e) => ({
                         key: e.uuid,
                         metric: (

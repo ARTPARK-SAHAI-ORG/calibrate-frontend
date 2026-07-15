@@ -157,6 +157,66 @@ describe("STTResultsTable", () => {
     expect(screen.getAllByText("Ev2").length).toBeGreaterThan(0);
   });
 
+  it("renders LLM-WER / LLM-CER / Intent / Entity columns and formatted values when the row carries Sarvam metrics", () => {
+    render(
+      <STTResultsTable
+        results={[
+          {
+            ...baseRow,
+            sarvam_llm_wer: 0.05,
+            sarvam_llm_cer: 0.0321,
+            sarvam_intent_score: 1,
+            sarvam_entity_score: 0.8333,
+            sarvam_llm_wer_reasoning: '[{"segment":"foo","verdict":"equivalent"}]',
+          },
+        ]}
+      />,
+    );
+    expect(screen.getAllByText("LLM-WER").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("LLM-CER").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Intent").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Entity").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("0.05").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("0.0321").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("0.8333").length).toBeGreaterThan(0);
+    // Reasoning surfaces a tooltip trigger on the LLM-WER cell.
+    expect(
+      screen.getAllByLabelText("View LLM-WER reasoning").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("hides the Sarvam columns when no row carries them", () => {
+    render(<STTResultsTable results={[baseRow]} />);
+    expect(screen.queryByText("LLM-WER")).not.toBeInTheDocument();
+    expect(screen.queryByText("LLM-CER")).not.toBeInTheDocument();
+    expect(screen.queryByText("Intent")).not.toBeInTheDocument();
+    expect(screen.queryByText("Entity")).not.toBeInTheDocument();
+  });
+
+  it("renders only the Sarvam columns that are present (intent/entity without llm-wer/cer)", () => {
+    render(
+      <STTResultsTable
+        results={[{ ...baseRow, sarvam_intent_score: 0.5, sarvam_entity_score: 1 }]}
+      />,
+    );
+    expect(screen.getAllByText("Intent").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Entity").length).toBeGreaterThan(0);
+    expect(screen.queryByText("LLM-WER")).not.toBeInTheDocument();
+  });
+
+  it("accepts Sarvam metrics as stringified numbers", () => {
+    render(
+      <STTResultsTable
+        results={[{ ...baseRow, sarvam_llm_wer: "0.5" }]}
+      />,
+    );
+    expect(screen.getAllByText("LLM-WER").length).toBeGreaterThan(0);
+    // No reasoning provided → no tooltip trigger.
+    expect(
+      screen.queryByLabelText("View LLM-WER reasoning"),
+    ).not.toBeInTheDocument();
+  });
+
   it("attaches tableRef to the desktop table wrapper", () => {
     const ref = React.createRef<HTMLDivElement>();
     render(<STTResultsTable results={[baseRow]} tableRef={ref} />);

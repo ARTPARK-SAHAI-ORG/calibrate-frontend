@@ -11,6 +11,7 @@ import {
   EvaluatorScoreCell,
   readEvaluatorCell,
 } from "./EvaluatorScoreCell";
+import { SARVAM_METRIC_FIELDS, type SarvamMetricField } from "./sarvamMetrics";
 
 // Per-row results table for STT. Two modes:
 //
@@ -47,6 +48,13 @@ export type STTResultRow = {
   wer: string;
   cer?: string;
   string_similarity?: string;
+  // Sarvam LLM-judge metrics — present only when the run used Sarvam LLM
+  // judges. `sarvam_llm_wer_reasoning` is a JSON string of the judged segments.
+  sarvam_llm_wer?: number | string;
+  sarvam_llm_cer?: number | string;
+  sarvam_intent_score?: number | string;
+  sarvam_entity_score?: number | string;
+  sarvam_llm_wer_reasoning?: string;
   llm_judge_score?: string;
   llm_judge_reasoning?: string;
   // Dynamic per-evaluator fields. In the new format the score column is
@@ -118,8 +126,87 @@ const STT_COL_WIDTHS = {
   llmJudge: 110,
 } as const;
 
+// Format a numeric metric that may arrive as a number or a stringified number
+// (STT rows historically carry `wer` as a string). Returns "-" when absent.
+function fmtMetric(v: number | string | undefined | null): string {
+  if (v == null || v === "") return "-";
+  const n = typeof v === "number" ? v : parseFloat(v);
+  return Number.isNaN(n) ? "-" : String(parseFloat(n.toFixed(4)));
+}
+
+// The Sarvam LLM-WER reasoning is a JSON string of the judged segments.
+// Pretty-print it for the tooltip, falling back to the raw string.
+function formatSarvamReasoning(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch {
+    return raw;
+  }
+}
+
+// A metric cell that shows a forgiving LLM score plus an optional reasoning
+// tooltip (used for LLM-WER, which carries `sarvam_llm_wer_reasoning`).
+function SarvamMetricCell({
+  value,
+  reasoning,
+}: {
+  value: number | string | undefined;
+  reasoning?: string;
+}) {
+  const text = fmtMetric(value);
+  const tip = formatSarvamReasoning(reasoning);
+  if (!tip) return <>{text}</>;
+  return (
+    <span className="inline-flex items-center gap-1">
+      {text}
+      <Tooltip content={tip}>
+        <button
+          type="button"
+          className="p-0.5 rounded hover:bg-muted transition-colors cursor-pointer"
+          aria-label="View LLM-WER reasoning"
+        >
+          <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </button>
+      </Tooltip>
+    </span>
+  );
+}
+
+// Read a Sarvam metric off a row (open-ended `[k: string]: unknown` shape).
+function readSarvamValue(
+  row: STTResultRow,
+  key: string,
+): number | string | undefined {
+  return row[key] as number | string | undefined;
+}
+
+// Render a single Sarvam metric value — the reasoning-tooltip cell for the
+// field that carries a `reasoningKey` (LLM-WER), plain formatted text otherwise.
+function renderSarvamValue(field: SarvamMetricField, row: STTResultRow) {
+  const value = readSarvamValue(row, field.key);
+  return field.reasoningKey ? (
+    <SarvamMetricCell
+      value={value}
+      reasoning={row[field.reasoningKey] as string | undefined}
+    />
+  ) : (
+    <>{fmtMetric(value)}</>
+  );
+}
+
 export function STTResultsTable({ results, showMetrics = true, showSimilarity = true, judgeLabel = "Evaluator", evaluatorColumns, tableRef, labellingSelection, onToggleLabellingSelection, onLabellingBulkToggle, labellingKeyForRow, labellingRowEligible }: STTResultsTableProps) {
   const hasAudio = results.some((r) => !!r.audio_url);
+  // Sarvam LLM-judge columns render only for the metrics the run actually
+  // carries (Sarvam judges were on). Older runs / judges-off runs show none.
+  const sarvamFields = SARVAM_METRIC_FIELDS.filter((f) =>
+    results.some((r) => {
+      const v = readSarvamValue(r, f.key);
+      return v != null && v !== "";
+    }),
+  );
   // When `evaluatorColumns` is provided, each evaluator gets its own column;
   // the legacy `llm_judge_*` rendering branch is skipped.
   const useDynamic = Array.isArray(evaluatorColumns) && evaluatorColumns.length > 0;
@@ -152,6 +239,7 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
     if (showMetrics) {
       total += STT_COL_WIDTHS.wer;
       total += STT_COL_WIDTHS.cer;
+      total += sarvamFields.reduce((sum, f) => sum + f.width, 0);
       if (showSimilarity) total += STT_COL_WIDTHS.similarity;
       if (useDynamic) total += evaluatorColumns!.length * STT_COL_WIDTHS.evaluator;
       else total += STT_COL_WIDTHS.llmJudge;
@@ -184,6 +272,9 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                   <>
                     <th style={{ width: STT_COL_WIDTHS.wer }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">WER</th>
                     <th style={{ width: STT_COL_WIDTHS.cer }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">CER</th>
+                    {sarvamFields.map((f) => (
+                      <th key={f.key} style={{ width: f.width }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">{f.label}</th>
+                    ))}
                     {showSimilarity && (
                       <th style={{ width: STT_COL_WIDTHS.similarity }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">Similarity</th>
                     )}
@@ -246,6 +337,11 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                         <td className="px-4 py-3 text-[13px] text-foreground">
                           {result.cer != null ? parseFloat(parseFloat(result.cer).toFixed(4)) : "-"}
                         </td>
+                        {sarvamFields.map((f) => (
+                          <td key={f.key} className="px-4 py-3 text-[13px] text-foreground">
+                            {renderSarvamValue(f, result)}
+                          </td>
+                        ))}
                         {showSimilarity && (
                           <td className="px-4 py-3 text-[13px] text-foreground">
                             {result.string_similarity != null ? parseFloat(parseFloat(result.string_similarity).toFixed(4)) : "-"}
@@ -335,7 +431,7 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
               </div>
               {showMetrics && (
                 <div className="space-y-2 pt-1 border-t border-border">
-                  <div className="flex gap-4">
+                  <div className="flex gap-4 flex-wrap">
                     <div>
                       <span className="text-[11px] text-muted-foreground uppercase tracking-wide">WER</span>
                       <p className="text-[13px] text-foreground">{result.wer != null ? parseFloat(parseFloat(result.wer).toFixed(4)) : "-"}</p>
@@ -344,6 +440,14 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                       <span className="text-[11px] text-muted-foreground uppercase tracking-wide">CER</span>
                       <p className="text-[13px] text-foreground">{result.cer != null ? parseFloat(parseFloat(result.cer).toFixed(4)) : "-"}</p>
                     </div>
+                    {sarvamFields.map((f) => (
+                      <div key={f.key}>
+                        <span className="text-[11px] text-muted-foreground uppercase tracking-wide">{f.label}</span>
+                        {/* div (not p) — the LLM-WER tooltip renders a block
+                            wrapper, which can't nest inside a <p>. */}
+                        <div className="text-[13px] text-foreground">{renderSarvamValue(f, result)}</div>
+                      </div>
+                    ))}
                     {showSimilarity && (
                       <div>
                         <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Similarity</span>

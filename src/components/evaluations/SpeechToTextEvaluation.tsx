@@ -24,6 +24,7 @@ import { STTDatasetEditor, STTDatasetEditorHandle } from "./STTDatasetEditor";
 import { MultiSelectPicker, PickerItem } from "../MultiSelectPicker";
 import { Tooltip } from "../Tooltip";
 import { pruneSelectionToAllowed } from "./providerSelection";
+import { SARVAM_ASR_BLOG_URL } from "@/constants/links";
 
 type EvaluationResult = {
   task_id: string;
@@ -101,6 +102,10 @@ export function SpeechToTextEvaluation({
     new Set(),
   );
   const [language, setLanguage] = useState<LanguageOption>("english");
+  // Sarvam LLM judges — when on (default), the run computes Sarvam's forgiving
+  // LLM-WER/CER (+ intent/entity) on top of the always-present WER/CER. It's a
+  // single on/off for the whole bundle; enabling it adds an LLM call per row.
+  const [sarvamJudges, setSarvamJudges] = useState(true);
   const enabledProviders = useEnabledProviders();
 
   // Get filtered providers based on selected language + enabled API keys
@@ -342,6 +347,7 @@ export function SpeechToTextEvaluation({
           providers,
           language,
           evaluator_uuids: evaluatorUuids,
+          sarvam_judges: sarvamJudges,
         };
       } else {
         const newRows = editorRef.current?.getNewRows() ?? [];
@@ -351,6 +357,7 @@ export function SpeechToTextEvaluation({
           providers,
           language,
           evaluator_uuids: evaluatorUuids,
+          sarvam_judges: sarvamJudges,
           ...(datasetName.trim() ? { dataset_name: datasetName.trim() } : {}),
         };
       }
@@ -843,6 +850,48 @@ export function SpeechToTextEvaluation({
                 are always computed for every STT run. Any evaluators you select
                 here run in addition to them.
               </span>
+            </div>
+            {/* Built-in LLM-based metrics toggle — computes Sarvam's LLM-judged
+                LLM-WER / LLM-CER (plus intent & entity scores) on top of
+                WER/CER. One switch for the whole bundle; on by default. */}
+            <div className="flex items-start gap-3 rounded-md border border-border p-3">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={sarvamJudges}
+                aria-label="Toggle built-in LLM-based evaluation metrics"
+                onClick={() => setSarvamJudges((v) => !v)}
+                className={`relative mt-0.5 inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors cursor-pointer ${
+                  sarvamJudges ? "bg-foreground" : "bg-muted-foreground/40"
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
+                    sarvamJudges ? "translate-x-4" : "translate-x-1"
+                  }`}
+                />
+              </button>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[13px] font-medium text-foreground">
+                    Use built-in LLM-based evaluation metrics
+                  </span>
+                  <a
+                    href={SARVAM_ASR_BLOG_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-[12px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                  >
+                    Learn more
+                  </a>
+                </div>
+                <p className="mt-0.5 text-[12px] text-muted-foreground">
+                  Evaluate transcripts on meaning, not just exact word and
+                  character matches, using built-in LLM judges. This is more
+                  reliable than WER/CER for Indian-language speech.
+                </p>
+              </div>
             </div>
             <MultiSelectPicker
               items={availableEvaluators}

@@ -18,6 +18,8 @@ import {
   type TTSResultRow,
 } from "./TTSResultsTable";
 import type { LatencyMetric } from "./ttsEvalTypes";
+import { SARVAM_ASR_BLOG_URL } from "@/constants/links";
+import { SARVAM_METRIC_FIELDS } from "./sarvamMetrics";
 
 type EvaluationStatus = "queued" | "in_progress" | "done" | "failed";
 type EvaluatorOutputType = "binary" | "rating";
@@ -96,9 +98,30 @@ type ProviderResultLike = {
 };
 
 export type STTProviderResultForDetails = ProviderResultLike & {
-  metrics?: (Record<string, unknown> & { wer?: number; cer?: number }) | null;
+  metrics?:
+    | (Record<string, unknown> & {
+        wer?: number;
+        cer?: number;
+        // Present only when the run used Sarvam LLM judges. LLM-WER/CER share
+        // the `sarvam_llm_*` keys; intent/entity use the `_score` suffix.
+        sarvam_llm_wer?: number;
+        sarvam_llm_cer?: number;
+        sarvam_intent_score?: number;
+        sarvam_entity_score?: number;
+      })
+    | null;
   results?: STTResultRow[] | null;
 };
+
+/** Read a metric that should be numeric, tolerating string/undefined. */
+function readNumericMetric(v: unknown): number | null {
+  if (typeof v === "number") return Number.isNaN(v) ? null : v;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = parseFloat(v);
+    return Number.isNaN(n) ? null : n;
+  }
+  return null;
+}
 
 export type TTSProviderResultForDetails = ProviderResultLike & {
   // `ttfb` now reports percentiles (`p50` headline + `p95` / `p99`); legacy
@@ -135,6 +158,60 @@ export const CER_ABOUT_METRIC: MetricDescription = {
   preference: "Lower is better",
   range: "0 - \u221E",
 };
+
+// Sarvam's LLM-based ASR metrics (see the "Evaluating Indian Language ASR"
+// blog). Rendered on the STT About tab only when a run used Sarvam judges.
+// Each metric name links out to the blog in a new tab. LLM-WER / LLM-CER are
+// the two we surface as score columns; Intent / Entity ride along in the same
+// server-side bundle and are described here for context.
+function sarvamMetricLink(label: string): React.ReactNode {
+  return (
+    <a
+      href={SARVAM_ASR_BLOG_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-foreground underline-offset-2 hover:underline"
+      title="Learn more on the Sarvam ASR evaluation blog"
+    >
+      {label}
+    </a>
+  );
+}
+
+export const SARVAM_ABOUT_METRICS: MetricDescription[] = [
+  {
+    key: "sarvam_llm_wer",
+    metric: sarvamMetricLink("LLM-WER"),
+    description:
+      "Word Error Rate re-scored by an LLM judge: segments that are semantically or phonetically equivalent (colloquial variants, script differences, normalised numbers) no longer count as errors. Same scale as WER, so the gap versus WER is the “forgiveness” effect.",
+    preference: "Lower is better",
+    range: "0 - ∞",
+  },
+  {
+    key: "sarvam_llm_cer",
+    metric: sarvamMetricLink("LLM-CER"),
+    description:
+      "Character Error Rate re-scored by the same LLM judge — the character-level counterpart of LLM-WER, useful for agglutinative languages where a minor suffix change over-penalises a long token.",
+    preference: "Lower is better",
+    range: "0 - ∞",
+  },
+  {
+    key: "sarvam_intent",
+    metric: sarvamMetricLink("Intent Score"),
+    description:
+      "A binary LLM judgment of whether the core meaning of the utterance is preserved. Passes on minor spelling / phrasing / synonym differences; fails when the subject, object, or action changes or a statement flips to a question.",
+    preference: "Higher is better",
+    range: "Pass / Fail",
+  },
+  {
+    key: "sarvam_entity",
+    metric: sarvamMetricLink("Entity Preservation Score"),
+    description:
+      "The fraction of key named entities (names, places, dates, times, numbers) from the reference that are transcribed correctly, penalising missing and substituted entities. Automatically 1.0 when the reference has no entities.",
+    preference: "Higher is better",
+    range: "0 - 1",
+  },
+];
 
 export const TTFB_ABOUT_METRIC: MetricDescription = {
   metric: "Latency",
@@ -242,14 +319,18 @@ function chunkChartRows(charts: ChartConfig[]): ChartConfig[][] {
 
 export function STTEvaluationAbout({
   evaluatorRows,
+  showSarvamMetrics = false,
 }: {
   evaluatorRows: EvaluatorAboutMetricRow[];
+  /** Include the Sarvam LLM-judge metric rows — set when the run used them. */
+  showSarvamMetrics?: boolean;
 }) {
   return (
     <AboutMetricsTable
       metrics={[
         WER_ABOUT_METRIC,
         CER_ABOUT_METRIC,
+        ...(showSarvamMetrics ? SARVAM_ABOUT_METRICS : []),
         ...evaluatorRowsToMetricDescriptions(evaluatorRows),
       ]}
     />
@@ -282,9 +363,16 @@ export function STTEvaluationLeaderboard({
   getProviderLabel: (value: string) => string;
   className?: string;
 }) {
+  // Sarvam metrics only appear as leaderboard charts/columns when the
+  // leaderboard rows actually carry them (Sarvam judges were on for the run).
+  const sarvamFields = SARVAM_METRIC_FIELDS.filter((field) =>
+    leaderboardSummary.some((row) => row[field.key] != null),
+  );
+
   const allCharts: ChartConfig[] = [
     { title: "WER", dataKey: "wer" },
     { title: "CER", dataKey: "cer" },
+    ...sarvamFields.map((field) => ({ title: field.label, dataKey: field.key })),
     ...evaluatorChartConfigs(evaluatorColumns),
   ];
   const chartRows = chunkChartRows(allCharts);
@@ -296,6 +384,7 @@ export function STTEvaluationLeaderboard({
         { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
         { key: "wer", header: "WER" },
         { key: "cer", header: "CER" },
+        ...sarvamFields.map((field) => ({ key: field.key, header: field.label })),
         ...evaluatorLeaderboardColumns(evaluatorColumns),
       ]}
       data={leaderboardSummary}
@@ -470,6 +559,16 @@ export function STTEvaluationOutputs({
                           ? parseFloat(providerResult.metrics.cer.toFixed(4))
                           : "-",
                     },
+                    // Sarvam LLM-judge metrics (LLM-WER/CER, Intent, Entity) —
+                    // each shown only when the run computed it.
+                    ...SARVAM_METRIC_FIELDS.flatMap((field) => {
+                      const value = readNumericMetric(
+                        providerResult.metrics?.[field.key],
+                      );
+                      return value != null
+                        ? [{ label: field.label, value: parseFloat(value.toFixed(4)) }]
+                        : [];
+                    }),
                     ...evaluatorColumns.map((col) => ({
                       label: col.label,
                       value: formatEvaluatorAggregate(

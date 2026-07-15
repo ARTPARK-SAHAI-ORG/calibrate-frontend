@@ -197,11 +197,18 @@ export function deriveEvaluatorColumns({
   ];
 }
 
-/** STT-specific reserved keys — neither WER, string-similarity, nor the legacy
- * llm_judge_score column should be treated as an evaluator metric. */
+/** STT-specific reserved keys — neither WER, string-similarity, the Sarvam
+ * LLM-judge metrics, nor the legacy llm_judge_score column should be treated
+ * as an evaluator metric. `sarvam_llm_wer` / `sarvam_llm_cer` are built-in STT
+ * metrics (surfaced next to WER), not user evaluators. */
 export const STT_RESERVED_METRIC_KEYS: ReadonlySet<string> = new Set([
   "wer",
+  "cer",
   "string_similarity",
+  "sarvam_llm_wer",
+  "sarvam_llm_cer",
+  "sarvam_intent_score",
+  "sarvam_entity_score",
   "llm_judge_score",
 ]);
 
