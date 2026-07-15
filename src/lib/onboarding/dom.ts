@@ -99,3 +99,74 @@ export async function clickElement(selector: string, opts?: { timeout?: number }
 export function delay(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
+
+/** Fill the first visible input/textarea with the given placeholder. */
+export async function fillByPlaceholder(
+  placeholder: string,
+  value: string,
+  opts?: { timeout?: number },
+): Promise<boolean> {
+  const sel = `input[placeholder="${placeholder}"], textarea[placeholder="${placeholder}"]`;
+  return fillInput(sel, value, opts);
+}
+
+/** Fill every visible input/textarea whose placeholder starts with `prefix`. */
+export function fillAllByPlaceholderPrefix(prefix: string, value: string): number {
+  const nodes = document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+    "input, textarea",
+  );
+  let n = 0;
+  nodes.forEach((el) => {
+    if (el.placeholder?.startsWith(prefix) && isVisible(el)) {
+      el.focus();
+      setNativeValue(el, value);
+      n += 1;
+    }
+  });
+  return n;
+}
+
+/**
+ * Wait for a clickable element (button/link) whose trimmed text equals `text`,
+ * then click it. Returns success. Used to drive dialogs that lack stable
+ * selectors (matching what the E2E specs target by role/name).
+ */
+export async function clickByText(
+  text: string,
+  opts?: { timeout?: number },
+): Promise<boolean> {
+  const timeout = opts?.timeout ?? DEFAULT_TIMEOUT;
+  const deadline = Date.now() + timeout;
+  const find = (): HTMLElement | null => {
+    const candidates = Array.from(
+      document.querySelectorAll<HTMLElement>('button, a, [role="button"]'),
+    ).filter((el) => isVisible(el));
+    // Exact first (e.g. "Create", "Not now"); then starts-with, so an option
+    // card whose text is a title + description ("Next reply test Evaluate …")
+    // still matches on the title.
+    return (
+      candidates.find((el) => (el.textContent ?? "").trim() === text) ??
+      candidates.find((el) => (el.textContent ?? "").trim().startsWith(text)) ??
+      null
+    );
+  };
+  return new Promise((resolve) => {
+    const el = find();
+    if (el) {
+      el.click();
+      resolve(true);
+      return;
+    }
+    const interval = window.setInterval(() => {
+      const found = find();
+      if (found) {
+        window.clearInterval(interval);
+        found.click();
+        resolve(true);
+      } else if (Date.now() > deadline) {
+        window.clearInterval(interval);
+        resolve(false);
+      }
+    }, POLL_MS);
+  });
+}

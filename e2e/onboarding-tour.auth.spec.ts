@@ -128,19 +128,24 @@ test.describe("Onboarding flagship tour (authenticated, fake-AI backend)", () =>
     });
     await step(page, "Choose what to check");
 
-    // 8) Meet your tests: the two seeded tests appear in the list.
-    await expect(popoverTitle(page)).toContainText("Meet your tests", {
-      timeout: 30000,
+    // 8) Meet your tests: Next opens the real Create Test dialog.
+    await step(page, "Meet your tests");
+    await expect(page.locator('[data-tour="test-conversation"]')).toBeVisible({
+      timeout: 15000,
     });
+
+    // 9) Scenario -> 10) success criteria: creates the first test via the dialog.
+    await step(page, "The scenario");
+    await step(page, "The success criteria");
     await expect(page.getByText("Demo · shipping time").first()).toBeVisible({
       timeout: 20000,
     });
-    await nextButton(page).click();
 
-    // 9) Open a test -> 10) its message -> 11) its evaluator (closes the editor).
-    await step(page, "Your two sample tests");
-    await step(page, "The customer's message");
-    await step(page, "How it is graded");
+    // 11) Add one more: creates the second test the same way.
+    await step(page, "Add one more");
+    await expect(page.getByText("Demo · return policy").first()).toBeVisible({
+      timeout: 20000,
+    });
 
     // 12) Run: clicks "Run all tests" and opens TestRunnerDialog.
     await step(page, "Run your tests");

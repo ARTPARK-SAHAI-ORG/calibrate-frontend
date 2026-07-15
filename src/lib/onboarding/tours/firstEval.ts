@@ -14,10 +14,16 @@
  */
 
 import { getBackendUrl, getDefaultHeaders, unwrapList } from "@/lib/api";
-import { fetchAgentEvaluators } from "@/lib/evaluatorApi";
-import { reportError } from "@/lib/reportError";
 import { WHATSAPP_INVITE_URL } from "@/constants/links";
-import { clickElement, delay, fillInput, waitForElement } from "../dom";
+import {
+  clickByText,
+  clickElement,
+  delay,
+  fillAllByPlaceholderPrefix,
+  fillByPlaceholder,
+  fillInput,
+  waitForElement,
+} from "../dom";
 import type { Tour, TourStep } from "../engine";
 
 export const FIRST_EVAL_TOUR_ID = "first-eval";
@@ -52,9 +58,26 @@ const DEMO_SYSTEM_PROMPT =
   "Answer questions about orders, shipping, and returns concisely and politely. " +
   "If you do not know an answer, offer to connect the customer to a human.";
 
-const DEMO_TESTS: { name: string; userMessage: string }[] = [
-  { name: "Demo · shipping time", userMessage: "How long does standard shipping take?" },
-  { name: "Demo · return policy", userMessage: "Can I return a book I already opened?" },
+type DemoTest = {
+  name: string;
+  userMessage: string;
+  agentMessage: string;
+  criteria: string;
+};
+
+const DEMO_TESTS: DemoTest[] = [
+  {
+    name: "Demo · shipping time",
+    userMessage: "How long does standard shipping take?",
+    agentMessage: "Standard shipping usually takes 3 to 5 business days.",
+    criteria: "States the standard shipping time clearly and politely.",
+  },
+  {
+    name: "Demo · return policy",
+    userMessage: "Can I return a book I already opened?",
+    agentMessage: "Yes, you can return an opened book within 30 days for a refund.",
+    criteria: "Explains the return policy for opened books accurately.",
+  },
 ];
 
 // Anchors (kept here so component `data-tour` attributes and steps stay in sync).
@@ -70,6 +93,7 @@ export const A = {
   evaluatorsAddConfirm: '[data-tour="evaluators-add-confirm"]',
   agentTypeOptions: '[data-tour="agent-type-options"]',
   tabTests: '[data-tour="agent-tab-tests"]',
+  testsCreate: '[data-tour="tests-create"]',
   testRowFirst: '[data-tour="test-row-first"]',
   testConversation: '[data-tour="test-conversation"]',
   testEvaluatorsArea: '[data-tour="test-evaluators-area"]',
@@ -90,51 +114,48 @@ export type FirstEvalDeps = {
   getAccessToken: () => string | null;
 };
 
-// Kept in sync with AGENT_TESTS_UPDATED_EVENT in ../index (inlined to avoid a
-// circular import back into the registry).
-const AGENT_TESTS_UPDATED_EVENT = "calibrate:agent-tests-updated";
+/**
+ * Fill the sample scenario (conversation) into the already-open Create Test
+ * editor: every seeded user turn gets the customer's question, every agent turn
+ * a sample reply.
+ */
+function fillTestScenario(test: DemoTest): void {
+  fillAllByPlaceholderPrefix("Enter user message", test.userMessage);
+  fillAllByPlaceholderPrefix("Enter agent message", test.agentMessage);
+}
 
 /**
- * Seed two sample response-type tests for the demo agent via `POST /tests/bulk`,
- * grading them with the evaluator already attached to the agent (step 7). Using
- * the agent's evaluator (the org's own copy) avoids referencing a global
- * default the workspace cannot use, which the backend rejects with 403.
+ * Open the Create Test dialog and pick "Next reply", which seeds a conversation
+ * and the default evaluator. Leaves the editor open for the scenario/criteria
+ * to be filled in.
  */
-async function seedDemoTests(agentUuid: string, deps: FirstEvalDeps): Promise<void> {
-  const backendUrl = getBackendUrl();
-  const accessToken = deps.getAccessToken();
+async function openCreateTestEditor(name: string): Promise<void> {
+  await clickElement(A.testsCreate, { timeout: 10000 });
+  await clickByText("Next reply test", { timeout: 8000 });
+  await delay(300);
+  await fillByPlaceholder("Your test name", name, { timeout: 8000 });
+}
 
-  let evaluatorRefs: { evaluator_uuid: string }[] = [];
-  if (accessToken) {
-    try {
-      const agentEvaluators = await fetchAgentEvaluators(agentUuid, accessToken);
-      const grader =
-        agentEvaluators.find((e) => e.evaluator_type === "llm") ??
-        agentEvaluators[0];
-      if (grader) evaluatorRefs = [{ evaluator_uuid: grader.uuid }];
-    } catch (err) {
-      reportError("Demo test seeding: could not load agent evaluators", err);
-    }
-  }
+/** Submit the open Create Test editor and dismiss the "add to defaults" prompt. */
+async function submitCreateTest(): Promise<void> {
+  await clickByText("Create", { timeout: 8000 });
+  // A newly-referenced evaluator prompts "Update default evaluators?"; keep the
+  // agent's set as-is.
+  await clickByText("Not now", { timeout: 5000 });
+  await delay(400);
+}
 
-  const res = await fetch(`${backendUrl}/tests/bulk`, {
-    method: "POST",
-    headers: {
-      ...getDefaultHeaders(accessToken),
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      type: "response",
-      agent_uuids: [agentUuid],
-      tests: DEMO_TESTS.map((t) => ({
-        name: t.name,
-        conversation_history: [{ role: "user", content: t.userMessage }],
-        evaluators: evaluatorRefs,
-      })),
-    }),
-  });
-  if (!res.ok) throw new Error(`Seeding demo tests failed (${res.status})`);
-  window.dispatchEvent(new Event(AGENT_TESTS_UPDATED_EVENT));
+/** Create one demo test end to end through the real dialog. */
+async function createOneTest(test: DemoTest): Promise<void> {
+  await openCreateTestEditor(test.name);
+  fillTestScenario(test);
+  await fillByPlaceholder(
+    "Criteria that the agent's response should satisfy",
+    test.criteria,
+    { timeout: 8000 },
+  );
+  await delay(150);
+  await submitCreateTest();
 }
 
 /**
@@ -164,12 +185,6 @@ async function resolveDemoAgentName(accessToken: string | null): Promise<string>
   } catch {
     return DEMO_AGENT_NAME;
   }
-}
-
-/** Read the current agent uuid from the `/agents/[uuid]` route, if we are on it. */
-function currentAgentUuid(): string | null {
-  const m = window.location.pathname.match(/\/agents\/([0-9a-fA-F-]{8,})/);
-  return m ? m[1] : null;
 }
 
 /** Tick the Correctness evaluator in the picker and confirm. */
@@ -271,52 +286,57 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.tabTests,
       title: "Meet your tests",
       description:
-        "This is where the real work happens. A test contains a <strong>scenario</strong> your agent can face in <strong>production</strong> and the <strong>success criteria</strong> for a good response. Let us add a couple to see.",
+        "This is where the real work happens. A test contains a <strong>scenario</strong> your agent can face in <strong>production</strong> and the <strong>success criteria</strong> for a good response. Let us build one together.",
       side: "bottom",
-      actionLabel: "Next",
+      actionLabel: "Add a test",
       prepare: async () => {
         await clickElement(A.tabTests);
-        const uuid = currentAgentUuid();
-        if (uuid) {
-          try {
-            await seedDemoTests(uuid, deps);
-            await delay(400);
-          } catch (err) {
-            reportError("Onboarding: demo test seeding failed", err);
-          }
-        }
       },
-    },
-    {
-      anchor: A.testRowFirst,
-      title: "Your two sample tests",
-      description:
-        "Here they are: one asks about shipping, the other about returns. Let us <strong>open one up and look inside</strong>.",
-      side: "bottom",
-      actionLabel: "Open one",
-      timeout: 12000,
       action: async () => {
-        await clickElement(A.testRowFirst);
+        await openCreateTestEditor(DEMO_TESTS[0].name);
       },
     },
     {
       anchor: A.testConversation,
-      title: "The customer's message",
+      title: "The scenario",
       description:
-        "This is <strong>what the customer says</strong>. When you run the test, your agent will reply to exactly this.",
+        "The <strong>scenario</strong> is the conversation your agent has to handle. Here a customer is asking about shipping.",
       side: "right",
       actionLabel: "Next",
       timeout: 15000,
+      prepare: () => {
+        fillTestScenario(DEMO_TESTS[0]);
+      },
     },
     {
       anchor: A.testEvaluatorsArea,
-      title: "How it is graded",
+      title: "The success criteria",
       description:
-        "And here is <strong>the evaluator doing the grading</strong>, our Correctness judge from earlier. It decides whether the reply was right.",
+        "This is <strong>what a good answer must do</strong>. Your evaluator scores the reply against it. Let us save this test.",
       side: "left",
-      actionLabel: "Got it",
+      actionLabel: "Create test",
+      timeout: 12000,
+      prepare: async () => {
+        await fillByPlaceholder(
+          "Criteria that the agent's response should satisfy",
+          DEMO_TESTS[0].criteria,
+          { timeout: 8000 },
+        );
+      },
       action: async () => {
-        await clickElement(A.testEditorClose);
+        await submitCreateTest();
+      },
+    },
+    {
+      anchor: A.testRowFirst,
+      title: "Add one more",
+      description:
+        "That is one test. Let us <strong>add a second</strong> the same way, so your agent has a couple to handle.",
+      side: "bottom",
+      actionLabel: "Add it",
+      timeout: 12000,
+      action: async () => {
+        await createOneTest(DEMO_TESTS[1]);
       },
     },
     {
