@@ -90,6 +90,10 @@ test.describe("Onboarding flagship tour (authenticated, fake-AI backend)", () =>
       /1 of \d+/,
     );
     await expect(page.locator(".calibrate-tour-skip")).toBeVisible();
+    // Clicking the backdrop (top-left corner, away from the popover) must NOT
+    // end the tour — only the X and "Skip tour" buttons do.
+    await page.mouse.click(5, 5);
+    await expect(popoverTitle(page)).toContainText("Welcome to Calibrate");
     await nextButton(page).click();
 
     // 2) Create an agent (spotlights "New agent"; action opens + names the form).
@@ -114,10 +118,13 @@ test.describe("Onboarding flagship tour (authenticated, fake-AI backend)", () =>
       /customer-support/i,
       { timeout: 15000 },
     );
+    // Exactly one popover — no orphan left over from the create-navigation.
+    await expect(page.locator(".driver-popover")).toHaveCount(1);
     await nextButton(page).click();
 
     // 5) Save -> 6) Add an evaluator (opens the picker) -> 7) pick Correctness.
     await step(page, "Save your work");
+    await expect(page.locator(".driver-popover")).toHaveCount(1);
     await step(page, "Add an evaluator");
     await expect(page.locator('[data-tour="add-evaluators-dialog"]')).toBeVisible({
       timeout: 15000,
@@ -136,7 +143,7 @@ test.describe("Onboarding flagship tour (authenticated, fake-AI backend)", () =>
     // 9) Open a test -> 10) its message -> 11) its evaluator (closes the editor).
     await step(page, "Your two sample tests");
     await step(page, "The customer's message");
-    await step(page, "How it's graded");
+    await step(page, "How it is graded");
 
     // 12) Run: clicks "Run all tests" and opens TestRunnerDialog.
     await step(page, "Run your tests");

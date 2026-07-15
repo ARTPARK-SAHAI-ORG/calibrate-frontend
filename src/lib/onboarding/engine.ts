@@ -82,6 +82,20 @@ export async function runTour(tour: Tour, startIndex = 0): Promise<void> {
     showProgress: true,
     onPopoverRender: (popover) => {
       if (!active) return;
+      // Guarantee a single popover on screen. Because the tour drives across the
+      // app's route changes (which remount the layer that hosts it), driver can
+      // leave the previous popover/overlay orphaned in the DOM — remove any that
+      // aren't the one currently rendering.
+      const wrapper = popover.wrapper;
+      if (wrapper) {
+        document.querySelectorAll(".driver-popover").forEach((el) => {
+          if (el !== wrapper) el.remove();
+        });
+        const overlays = document.querySelectorAll(".driver-overlay");
+        overlays.forEach((el, i) => {
+          if (i < overlays.length - 1) el.remove();
+        });
+      }
       // We advance steps manually via highlight(), so driver can't compute the
       // "X of N" itself — inject it from our own step state (creating the node
       // if driver didn't render one for a single highlight).
@@ -110,12 +124,11 @@ export async function runTour(tour: Tour, startIndex = 0): Promise<void> {
         nav.insertBefore(skip, nav.firstChild);
       }
     },
-    onDestroyStarted: () => {
-      // Fires on user close (X / overlay / Esc). Our finish path sets `ending`.
-      if (active && !active.ending) {
-        finish("skipped");
-      }
-    },
+    // Fires when driver requests a close from a backdrop click or Esc. The X
+    // and "Skip tour" buttons close through their own handlers (which call
+    // finish() → destroy() directly), so do nothing here: the tour ends only
+    // via those explicit controls, never by clicking away.
+    onDestroyStarted: () => {},
   });
 
   active = { tour, index: startIndex, driverObj, ending: false };

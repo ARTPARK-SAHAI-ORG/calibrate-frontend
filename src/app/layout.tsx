@@ -4,6 +4,7 @@ import "./globals.css";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { FloatingButtonProvider } from "@/components/providers/FloatingButtonProvider";
 import { OrganizationBootstrapper } from "@/components/OrganizationBootstrapper";
+import { OnboardingTour } from "@/components/OnboardingTour";
 import { Analytics } from "@vercel/analytics/next";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { Toaster } from "sonner";
@@ -49,6 +50,7 @@ export default function RootLayout({
       >
         <SessionProvider>
           <OrganizationBootstrapper />
+          <OnboardingTour />
           <FloatingButtonProvider>{children}</FloatingButtonProvider>
         </SessionProvider>
         <Toaster richColors position="top-right" closeButton />

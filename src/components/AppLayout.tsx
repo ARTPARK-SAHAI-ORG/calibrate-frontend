@@ -10,7 +10,6 @@ import {
   useFloatingButtonHideCount,
 } from "@/components/providers/FloatingButtonProvider";
 import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
-import { OnboardingTour } from "@/components/OnboardingTour";
 import { requestTour, TOUR_IDS } from "@/lib/onboarding";
 import { clearOrgsCache } from "@/hooks";
 
@@ -422,7 +421,6 @@ export function AppLayout({
 
   return (
     <div className="flex h-screen bg-background">
-      <OnboardingTour />
       {/* Sidebar - Hidden on mobile, overlay on tablet, fixed on desktop */}
       <aside
         className={`${
