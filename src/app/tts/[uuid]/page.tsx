@@ -36,6 +36,11 @@ import {
   dedupeSourceEvaluators,
   SubmitForLabellingButton,
 } from "@/components/human-labelling/labellingSubmit";
+import {
+  ttsRowAudioKey,
+  countTtsLabellingEligible,
+  buildTtsLabellingRows,
+} from "@/components/human-labelling/ttsLabellingSource";
 import { useSidebarState } from "@/lib/sidebar";
 import { getDataset } from "@/lib/datasets";
 import { ShareButton } from "@/components/ShareButton";
@@ -588,39 +593,24 @@ export default function TTSEvaluationDetailPage() {
     bulkToggle: bulkToggleTtsLabelling,
   } = useLabellingSelection();
   // Labelling items must carry the audio STORAGE KEY (`audio_s3_path`), not the
-  // playback URL — the evaluator rejects playback/download URLs. A row is only
-  // eligible when it has a key, so we never submit an un-evaluatable item.
-  const ttsRowAudioKey = (r: Record<string, unknown>): string =>
-    typeof r.audio_s3_path === "string" ? r.audio_s3_path.trim() : "";
-  // Total rows eligible to be labelled (have a synthesized clip with a storage
-  // key), used to decide whether to show the "Submit for labelling" button.
-  const ttsLabellingEligibleCount = useMemo(() => {
-    let count = 0;
-    for (const pr of evaluationResult?.provider_results ?? []) {
-      for (const r of pr.results ?? []) {
-        if (ttsRowAudioKey(r) !== "") count += 1;
-      }
-    }
-    return count;
-  }, [evaluationResult]);
-  const ttsLabellingRows: TtsLabellingRow[] = useMemo(() => {
-    const rows: TtsLabellingRow[] = [];
-    const suffix = taskId.slice(0, 8);
-    for (const pr of evaluationResult?.provider_results ?? []) {
-      const providerLabel = getProviderLabel(pr.provider);
-      (pr.results ?? []).forEach((r, i) => {
-        const audioKey = ttsRowAudioKey(r);
-        if (audioKey === "") return;
-        if (!ttsLabellingSelected.has(`${pr.provider}:${i}`)) return;
-        rows.push({
-          name: `${providerLabel} #${i + 1} — ${suffix}`,
-          text: r.text ?? "",
-          audio_path: audioKey,
-        });
-      });
-    }
-    return rows;
-  }, [evaluationResult, taskId, ttsLabellingSelected]);
+  // playback URL — the evaluator rejects playback/download URLs. Eligibility
+  // and row-building live in `ttsLabellingSource` (pure + unit tested); a row
+  // is only eligible when it has a key, so we never submit an unevaluatable
+  // item. Total eligible count decides whether the button shows at all.
+  const ttsLabellingEligibleCount = useMemo(
+    () => countTtsLabellingEligible(evaluationResult?.provider_results ?? []),
+    [evaluationResult],
+  );
+  const ttsLabellingRows: TtsLabellingRow[] = useMemo(
+    () =>
+      buildTtsLabellingRows(
+        evaluationResult?.provider_results ?? [],
+        ttsLabellingSelected,
+        taskId.slice(0, 8),
+        getProviderLabel,
+      ),
+    [evaluationResult, taskId, ttsLabellingSelected],
+  );
   const ttsLabellingEvaluators: SourceEvaluatorRef[] = useMemo(
     () =>
       dedupeSourceEvaluators(
