@@ -27,16 +27,16 @@ export const SARVAM_METRIC_FIELDS: readonly SarvamMetricField[] = [
   { key: "sarvam_llm_cer", label: "LLM-CER", csvKey: "llm_cer", width: 110 },
   {
     key: "sarvam_intent_score",
-    label: "Intent",
+    label: "Intent Score",
     csvKey: "intent",
     reasoningKey: "sarvam_intent_reasoning",
-    width: 90,
+    width: 110,
   },
   {
     key: "sarvam_entity_score",
-    label: "Entity",
+    label: "Entity Score",
     csvKey: "entity",
     reasoningKey: "sarvam_entity_reasoning",
-    width: 90,
+    width: 110,
   },
 ];

@@ -176,8 +176,8 @@ describe("STTResultsTable", () => {
     );
     expect(screen.getAllByText("LLM-WER").length).toBeGreaterThan(0);
     expect(screen.getAllByText("LLM-CER").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Intent").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Entity").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Intent Score").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Entity Score").length).toBeGreaterThan(0);
     expect(screen.getAllByText("0.05").length).toBeGreaterThan(0);
     expect(screen.getAllByText("0.0321").length).toBeGreaterThan(0);
     expect(screen.getAllByText("0.8333").length).toBeGreaterThan(0);
@@ -187,10 +187,10 @@ describe("STTResultsTable", () => {
       screen.getAllByLabelText("View LLM-WER reasoning").length,
     ).toBeGreaterThan(0);
     expect(
-      screen.getAllByLabelText("View Intent reasoning").length,
+      screen.getAllByLabelText("View Intent Score reasoning").length,
     ).toBeGreaterThan(0);
     expect(
-      screen.getAllByLabelText("View Entity reasoning").length,
+      screen.getAllByLabelText("View Entity Score reasoning").length,
     ).toBeGreaterThan(0);
   });
 
@@ -198,8 +198,8 @@ describe("STTResultsTable", () => {
     render(<STTResultsTable results={[baseRow]} />);
     expect(screen.queryByText("LLM-WER")).not.toBeInTheDocument();
     expect(screen.queryByText("LLM-CER")).not.toBeInTheDocument();
-    expect(screen.queryByText("Intent")).not.toBeInTheDocument();
-    expect(screen.queryByText("Entity")).not.toBeInTheDocument();
+    expect(screen.queryByText("Intent Score")).not.toBeInTheDocument();
+    expect(screen.queryByText("Entity Score")).not.toBeInTheDocument();
   });
 
   it("renders only the Sarvam columns that are present (intent/entity without llm-wer/cer)", () => {
@@ -208,8 +208,8 @@ describe("STTResultsTable", () => {
         results={[{ ...baseRow, sarvam_intent_score: 0.5, sarvam_entity_score: 1 }]}
       />,
     );
-    expect(screen.getAllByText("Intent").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Entity").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Intent Score").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Entity Score").length).toBeGreaterThan(0);
     expect(screen.queryByText("LLM-WER")).not.toBeInTheDocument();
   });
 

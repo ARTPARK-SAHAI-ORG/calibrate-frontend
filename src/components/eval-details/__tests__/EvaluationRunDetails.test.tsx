@@ -508,8 +508,8 @@ describe("STTEvaluationLeaderboard", () => {
       { key: "cer", header: "CER" },
       { key: "sarvam_llm_wer", header: "LLM-WER" },
       { key: "sarvam_llm_cer", header: "LLM-CER" },
-      { key: "sarvam_intent_score", header: "Intent" },
-      { key: "sarvam_entity_score", header: "Entity" },
+      { key: "sarvam_intent_score", header: "Intent Score" },
+      { key: "sarvam_entity_score", header: "Entity Score" },
     ]);
     const charts = JSON.parse(
       screen.getByTestId("leaderboard-charts").textContent ?? "[]",
@@ -816,8 +816,8 @@ describe("STTEvaluationOutputs", () => {
     );
     expect(screen.getByTestId("metric-LLM-WER").textContent).toBe("0.0769");
     expect(screen.getByTestId("metric-LLM-CER").textContent).toBe("0.0714");
-    expect(screen.getByTestId("metric-Intent").textContent).toBe("0.6667");
-    expect(screen.getByTestId("metric-Entity").textContent).toBe("0.8333");
+    expect(screen.getByTestId("metric-Intent Score").textContent).toBe("0.6667");
+    expect(screen.getByTestId("metric-Entity Score").textContent).toBe("0.8333");
   });
 
   it("omits Sarvam metric cards when those metrics are absent", () => {
@@ -828,7 +828,7 @@ describe("STTEvaluationOutputs", () => {
       <STTEvaluationOutputs {...baseProps} providerResults={providerResults} />,
     );
     expect(screen.queryByTestId("metric-LLM-WER")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("metric-Intent")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("metric-Intent Score")).not.toBeInTheDocument();
   });
 
   it("renders '-' for WER and CER when their metrics are null", () => {
