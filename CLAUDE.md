@@ -4,6 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > **Always start new work in a new worktree.** If the current checkout is on the `main` branch, do NOT make changes directly there — create a dedicated git worktree (e.g. `git worktree add -b claude/<short-task-name> .claude/worktrees/<short-task-name>`) and do all the work, commits, and verification inside it. Only work in the main checkout when the user explicitly asks you to. This keeps `main` clean and each task isolated.
 
+> **Abstract every fix; never patch just the one instance.** When the user points at a problem, don't fix only the exact line they quoted. Work out the underlying rule and apply it consistently to *every* place it's relevant across your changes and the surrounding code. Then verify the whole set (grep/audit), don't eyeball one case. A fix that isn't generalized is incomplete and will read as sloppy, naive logic.
+
 ## Project
 
 **Calibrate** (npm: `calibrate-frontend`) — a Next.js 16 / React 19 frontend for a voice-agent simulation and evaluation platform. Users create voice AI agents, unit-test STT/TTS providers, and run end-to-end simulated conversations with personas, scenarios, and custom evaluators.
@@ -145,6 +147,7 @@ Whenever making a change, adding a new feature, or modifying anything, always do
 3. **Identify reuse** — call out which parts of the existing code can be reused directly or repackaged/extracted into reusable functions or components to support what needs to be built, rather than duplicating logic.
 4. **Prefer reliable libraries** — if the needed functionality is well-covered by a well-known, reliable library, bias toward using it instead of re-implementing it here, unless the requirements genuinely demand a custom solution.
 5. **Share the plan and surface choices** — present the plan and explicitly raise any decisions to be made, along with their tradeoffs, and ask the user instead of making assumptions.
+6. **Abstract the fix, apply it everywhere** — when fixing or changing something (especially from user feedback), derive the general rule and apply it to *every* place it's relevant, not only the instance the user quoted. Then audit the whole set (grep, a small script, a checklist) to confirm consistency — don't eyeball a single case. Naive, one-spot patches are treated as incomplete work.
 
 ## Parallel execution (default)
 For any multi-step or multi-file task, first write a short plan that splits the work
@@ -156,5 +159,6 @@ at once. Keep dependent subtasks sequential. Show the plan before launching. See
 ## Workflow
 
 - **Write tests before you call it done — non-negotiable.** Any change that adds or modifies runtime code MUST come with tests that cover the changed lines, and you MUST run them (`npm test`, plus `npm run test:coverage` to confirm the changed files aren't leaving diff lines uncovered) and see them pass BEFORE you say the work is complete or commit. "It builds and typechecks" is NOT done — CI's `codecov/patch` gate will fail a PR whose new code is untested even when the build is green. Do not report a task as finished, and do not commit, until the new behavior is exercised by passing tests. If a change seems untestable, that's a signal to extract the logic into a hook/component/util that can be unit-tested (see `useJobDeletion` and `src/components/eval-jobs/JobDeleteControls.tsx`).
+- **Abstract the fix; apply it to every relevant place**: when the user reports a problem or asks for a change, treat the quoted instance as an *example*, not the whole job. Extract the underlying rule and apply it across all the code and copy it touches, then audit the full set (grep / a quick script) to prove consistency instead of checking one case. Shipping a naive one-spot patch and leaving siblings inconsistent is a recurring failure — do not repeat it.
 - **Auto-commit when done**: once all changes for the user's request are complete and verified (including tests written and passing), create a git commit without waiting for the user to ask. Use a clear, scoped commit message that explains the why. Do not push unless the user asks.
 - **Keep CLAUDE.md in sync with reality**: after making changes, check whether any high-level understanding of the app has shifted — new routes, new top-level concepts, renamed nav items, changed auth flow, new architectural patterns, new conventions, retired features, etc. If yes, update CLAUDE.md in the same commit so this file stays an accurate map of the codebase. Skip updates for low-level details (individual component tweaks, copy changes, bug fixes that don't change architecture).
