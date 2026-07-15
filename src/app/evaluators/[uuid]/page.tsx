@@ -18,7 +18,6 @@ import { AppLayout } from "@/components/AppLayout";
 import { NotFoundState } from "@/components/ui";
 import { useSidebarState } from "@/lib/sidebar";
 import {
-  DefaultPill,
   EvaluatorTypePill,
   OutputTypePill,
   type EvaluatorType,
@@ -178,8 +177,11 @@ function EvaluatorDetailPageInner() {
   const [evaluator, setEvaluator] = useState<EvaluatorDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { errorCode, reset: resetErrorCode, captureResponse } =
-    usePageErrorState();
+  const {
+    errorCode,
+    reset: resetErrorCode,
+    captureResponse,
+  } = usePageErrorState();
   const [settingLiveUuid, setSettingLiveUuid] = useState<string | null>(null);
   const [activeTab, setActiveTab] =
     useState<EvaluatorPageTab>(resolvedInitialTab);
@@ -276,8 +278,6 @@ function EvaluatorDetailPageInner() {
     fetchEvaluator();
   }, [backendAccessToken, uuid, resetErrorCode, captureResponse]);
 
-  const isDefault = !evaluator?.owner_user_id;
-
   const versions = useMemo(() => {
     if (!evaluator) return [] as EvaluatorVersion[];
     const all = evaluator.versions?.length
@@ -286,12 +286,7 @@ function EvaluatorDetailPageInner() {
           const live = liveVersionOf(evaluator);
           return live ? [live] : [];
         })();
-    const sorted = all.sort((a, b) => b.version_number - a.version_number);
-    // Default evaluators always show only the most recent version of the prompt.
-    if (!evaluator.owner_user_id) {
-      return sorted.slice(0, 1);
-    }
-    return sorted;
+    return all.sort((a, b) => b.version_number - a.version_number);
   }, [evaluator]);
 
   const setVersionLive = async (versionUuid: string) => {
@@ -747,7 +742,6 @@ function EvaluatorDetailPageInner() {
                   <h1 className="text-xl md:text-2xl font-semibold text-foreground">
                     {evaluator.name}
                   </h1>
-                  {isDefault && <DefaultPill />}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap mt-2">
                   {evaluator.evaluator_type && (
@@ -763,48 +757,46 @@ function EvaluatorDetailPageInner() {
                   </p>
                 )}
               </div>
-              {!isDefault && (
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <button
-                    className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                    onClick={openEditDialog}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                  onClick={openEditDialog}
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.75}
                   >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={1.75}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.862 4.487zm0 0L19.5 7.125"
-                      />
-                    </svg>
-                    Edit
-                  </button>
-                  <button
-                    className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer inline-flex items-center gap-1.5"
-                    onClick={openNewVersionDialog}
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.862 4.487zm0 0L19.5 7.125"
+                    />
+                  </svg>
+                  Edit
+                </button>
+                <button
+                  className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer inline-flex items-center gap-1.5"
+                  onClick={openNewVersionDialog}
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
                   >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    New version
-                  </button>
-                </div>
-              )}
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  New version
+                </button>
+              </div>
             </div>
 
             {/* Tabs */}
@@ -817,7 +809,7 @@ function EvaluatorDetailPageInner() {
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {isDefault ? "Prompt" : "Prompts"}
+                Prompts
               </button>
               <button
                 onClick={() => handleTabChange("agreement")}
@@ -840,7 +832,7 @@ function EvaluatorDetailPageInner() {
                       key={v.uuid}
                       version={v}
                       outputType={evaluator.output_type}
-                      isDefault={isDefault}
+                      isDefault={false}
                       isLive={v.uuid === evaluator.live_version_id}
                       isSettingLive={settingLiveUuid === v.uuid}
                       onSetLive={setVersionLive}

@@ -15,12 +15,11 @@ import {
   addEvaluatorsToAgent,
   detachEvaluatorFromAgent,
   deleteEvaluator,
-  isOwnedEvaluator,
 } from "@/lib/evaluatorApi";
 
 // Two remove flavours share one confirmation dialog:
 //   "remove"     → detach from this agent only (evaluator stays in library).
-//   "permanent"  → permanently delete the evaluator record (owned only).
+//   "permanent"  → permanently delete the evaluator record.
 type DeleteMode = "remove" | "permanent";
 
 // Attach-existing action → indigo tint; Create → emerald tint. Mirrors the
@@ -106,7 +105,11 @@ export function EvaluatorsTabContent({
     async (selectedUuids: string[]) => {
       if (!backendAccessToken || selectedUuids.length === 0) return;
       try {
-        await addEvaluatorsToAgent(agentUuid, selectedUuids, backendAccessToken);
+        await addEvaluatorsToAgent(
+          agentUuid,
+          selectedUuids,
+          backendAccessToken,
+        );
         await loadAttached();
       } catch (err) {
         reportError("Error adding evaluators to agent:", err);
@@ -206,7 +209,10 @@ export function EvaluatorsTabContent({
     deleteMode === "permanent"
       ? `Permanently deleting "${deleteTarget?.name ?? ""}" will remove it from every agent that uses it and cannot be undone.`
       : `Are you sure you want to remove "${deleteTarget?.name ?? ""}" from this agent? The evaluator will stay in your library and on any other agents that use it.`;
-  const canPermanentlyDelete = !!deleteTarget && isOwnedEvaluator(deleteTarget);
+  // Every evaluator is now permanently deletable — org-scoped default forks
+  // included (the backend permits DELETE on them, only true seed templates 403,
+  // and those are never returned to an org).
+  const canPermanentlyDelete = !!deleteTarget;
 
   const renderHeaderButtons = () => (
     <div className="flex flex-wrap items-center gap-2 md:gap-3">
@@ -296,8 +302,8 @@ export function EvaluatorsTabContent({
             No evaluators added yet
           </h3>
           <p className="text-sm md:text-base text-muted-foreground mb-3 md:mb-4 text-center max-w-md">
-            Choose the LLM judges to evaluate the agent&rsquo;s responses. Add an
-            existing one from your list of evaluators or create a new one.
+            Choose the LLM judges to evaluate the agent&rsquo;s responses. Add
+            an existing one from your list of evaluators or create a new one.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
             <button
@@ -417,7 +423,10 @@ export function EvaluatorsTabContent({
               </label>
             )}
             {deleteError && (
-              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+              <p
+                role="alert"
+                className="text-sm text-red-600 dark:text-red-400"
+              >
                 {deleteError}
               </p>
             )}

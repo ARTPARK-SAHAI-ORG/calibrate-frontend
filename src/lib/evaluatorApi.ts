@@ -29,9 +29,13 @@ export type EvaluatorData = {
 };
 
 /**
- * Whether the current user owns this evaluator (i.e. can delete/edit it),
+ * Whether this is a user-created (custom) evaluator rather than an org default,
  * tolerating both list shapes: the agent list exposes `is_default`, the
- * top-level `/evaluators` list exposes `owner_user_id` (null = built-in).
+ * top-level `/evaluators` list exposes `owner_user_id` (null = org default).
+ *
+ * This is a *categorization* helper only — it drives the Default vs Custom
+ * split in the list/picker UIs. It is NOT a permissions check: org defaults are
+ * now editable/deletable forks, so edit/delete/new-version are allowed on both.
  */
 export function isOwnedEvaluator(e: EvaluatorData): boolean {
   if (typeof e.is_default === "boolean") return !e.is_default;

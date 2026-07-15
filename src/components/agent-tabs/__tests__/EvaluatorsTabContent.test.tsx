@@ -159,7 +159,9 @@ describe("EvaluatorsTabContent", () => {
     expect(screen.getByText("Follows Refund Policy")).toBeInTheDocument();
   });
 
-  it("does not offer permanent delete for default evaluators", async () => {
+  it("offers permanent delete for default (forked) evaluators", async () => {
+    // Org defaults are now editable/deletable forks, so the permanent-delete
+    // option must be available on them too.
     mockFetchAgentEvaluators.mockResolvedValue([
       evaluator({ owner_user_id: null, is_default: true, name: "Correctness" }),
     ]);
@@ -175,10 +177,10 @@ describe("EvaluatorsTabContent", () => {
 
     expect(await screen.findByText("Remove evaluator")).toBeInTheDocument();
     expect(
-      screen.queryByText(
+      screen.getByText(
         /Also delete this evaluator permanently from my evaluator library/,
       ),
-    ).not.toBeInTheDocument();
+    ).toBeInTheDocument();
   });
 
   it("permanently deletes an owned evaluator when the checkbox is checked", async () => {
