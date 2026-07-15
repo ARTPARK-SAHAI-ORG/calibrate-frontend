@@ -167,7 +167,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     {
       anchor: A.newAgent,
       title: "Create an agent",
-      description: "First, let's create an agent to test.",
+      description: "First, let's create an agent to test",
       side: "bottom",
       align: "end",
       actionLabel: "Next",
@@ -205,7 +205,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     {
       anchor: A.save,
       title: "Save your work",
-      description: "Whenever you make changes, save them here.",
+      description: "Whenever you make changes, save them here",
       side: "bottom",
       align: "end",
       actionLabel: "Save",
@@ -229,7 +229,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.addEvaluatorsDialog,
       title: "Choose what to check",
       description:
-        "We'll start with Correctness, which simply checks whether your agent got the answer right.",
+        "We'll start with Correctness, which simply checks whether your agent got the answer right",
       side: "left",
       actionLabel: "Add it",
       action: async () => {
