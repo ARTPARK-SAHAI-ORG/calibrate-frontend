@@ -149,12 +149,30 @@ describe("STTResultsTable", () => {
     expect(screen.getAllByText("Error").length).toBeGreaterThan(0);
   });
 
-  it("omits dynamic evaluator mobile block entirely when no score/reasoning/error", () => {
+  it("omits an evaluator column entirely when no row has a value for it", () => {
     const cols: STTEvaluatorColumn[] = [
       { key: "ev2", label: "Ev2", outputType: "binary" },
     ];
     render(<STTResultsTable results={[baseRow]} evaluatorColumns={cols} />);
-    expect(screen.getAllByText("Ev2").length).toBeGreaterThan(0);
+    // No row carries a value for this evaluator, so neither its header nor any
+    // cell should render — an all-"-" column is dropped.
+    expect(screen.queryByText("Ev2")).not.toBeInTheDocument();
+  });
+
+  it("keeps evaluator columns that have a value in at least one row", () => {
+    const cols: STTEvaluatorColumn[] = [
+      { key: "ev3", label: "Ev3", outputType: "binary", scoreField: "ev3_score" },
+      { key: "ev4", label: "Ev4", outputType: "binary", scoreField: "ev4_score" },
+    ];
+    render(
+      <STTResultsTable
+        results={[{ ...baseRow, ev3_score: "true" }]}
+        evaluatorColumns={cols}
+      />,
+    );
+    // Ev3 has a value → shown; Ev4 is empty in every row → dropped.
+    expect(screen.getAllByText("Ev3").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Ev4")).not.toBeInTheDocument();
   });
 
   it("renders LLM-WER / LLM-CER / Intent / Entity columns and formatted values when the row carries Sarvam metrics", () => {

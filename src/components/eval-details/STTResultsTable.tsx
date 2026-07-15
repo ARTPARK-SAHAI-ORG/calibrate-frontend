@@ -219,6 +219,21 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
   // the legacy `llm_judge_*` rendering branch is skipped.
   const useDynamic = Array.isArray(evaluatorColumns) && evaluatorColumns.length > 0;
 
+  // Drop evaluator columns that no row has a value for. STT evaluations can now
+  // run with no evaluators, and older payloads may carry an evaluator with only
+  // empty cells — an all-"-" column is just noise. Mirrors the Sarvam-metric
+  // filtering above; reads via `readEvaluatorCell` so both the canonical
+  // `evaluator_outputs[uuid]` shape and the legacy flat fields count, and keeps
+  // a column that errored (the evaluator ran but couldn't grade).
+  const visibleEvaluatorColumns = useDynamic
+    ? evaluatorColumns!.filter((col) =>
+        results.some((r) => {
+          const { score, error } = readEvaluatorCell(r, col);
+          return error || (score != null && score !== "");
+        }),
+      )
+    : [];
+
   // Labelling checkbox column (opt-in). Eligibility defaults to "row has
   // ground truth". The shared hook owns the derived state so this table and
   // TTSResultsTable can't drift.
@@ -249,7 +264,7 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
       total += STT_COL_WIDTHS.cer;
       total += sarvamFields.reduce((sum, f) => sum + f.width, 0);
       if (showSimilarity) total += STT_COL_WIDTHS.similarity;
-      if (useDynamic) total += evaluatorColumns!.length * STT_COL_WIDTHS.evaluator;
+      if (useDynamic) total += visibleEvaluatorColumns.length * STT_COL_WIDTHS.evaluator;
       else total += STT_COL_WIDTHS.llmJudge;
     }
     return total;
@@ -287,7 +302,7 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                       <th style={{ width: STT_COL_WIDTHS.similarity }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">Similarity</th>
                     )}
                     {useDynamic
-                      ? evaluatorColumns!.map((col) => (
+                      ? visibleEvaluatorColumns.map((col) => (
                           <th key={col.key} style={{ width: STT_COL_WIDTHS.evaluator }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">
                             {col.label}
                           </th>
@@ -356,7 +371,7 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                           </td>
                         )}
                         {useDynamic ? (
-                          evaluatorColumns!.map((col) => (
+                          visibleEvaluatorColumns.map((col) => (
                             <td key={col.key} className="px-4 py-3">
                               {(() => {
                                 const cell = readEvaluatorCell(result, col);
@@ -464,7 +479,7 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                     )}
                   </div>
                   {useDynamic
-                    ? evaluatorColumns!.map((col) => {
+                    ? visibleEvaluatorColumns.map((col) => {
                         const { score, reasoning, error } = readEvaluatorCell(result, col);
                         if (!score && !reasoning && !error) return null;
                         return (
