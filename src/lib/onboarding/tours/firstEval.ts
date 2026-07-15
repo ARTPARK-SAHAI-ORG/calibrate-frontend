@@ -180,7 +180,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.agentTypeOptions,
       title: "Build or connect",
       description:
-        "An agent is the assistant you want to test. You can connect one you already have, or build one here. We've set up a build agent and named it, so let's create it.",
+        "You can build a new agent right here, or connect one you already run. We'll build one for this demo",
       side: "right",
       align: "center",
       actionLabel: "Create",
