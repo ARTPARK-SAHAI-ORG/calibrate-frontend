@@ -108,7 +108,13 @@ type ProviderMetrics = {
 type ProviderResultRow = {
   id: string;
   text: string;
+  // Playback/download URL for the synthesized clip — used by the on-page
+  // audio player. NOT accepted by the evaluator (see `audio_s3_path`).
   audio_path: string;
+  // S3 storage key for the same clip (the value returned by
+  // `POST /presigned-url`). This is what "Run evaluators" / labelling items
+  // require, so it — not `audio_path` — is what we submit for labelling.
+  audio_s3_path?: string | null;
   llm_judge_score?: string;
   llm_judge_reasoning?: string;
   [k: string]: unknown;
@@ -573,21 +579,26 @@ export default function TTSEvaluationDetailPage() {
   // send them to a TTS annotation task. Rows are keyed `${provider}:${index}`
   // — the same keys `TTSResultsTable` toggles — so selection is stable across
   // provider switches. Only the SELECTED rows become items (source text +
-  // synthesized audio path); names include provider + index + a run-id suffix
-  // so they stay unique within a task. Evaluators come from `evaluatorColumns`.
+  // audio STORAGE KEY); names include provider + index + a run-id suffix so
+  // they stay unique within a task. Evaluators come from `evaluatorColumns`.
   const [addToTaskOpen, setAddToTaskOpen] = useState(false);
   const {
     selected: ttsLabellingSelected,
     toggle: toggleTtsLabelling,
     bulkToggle: bulkToggleTtsLabelling,
   } = useLabellingSelection();
-  // Total rows eligible to be labelled (have a synthesized clip), used to
-  // decide whether to show the "Submit for labelling" button at all.
+  // Labelling items must carry the audio STORAGE KEY (`audio_s3_path`), not the
+  // playback URL — the evaluator rejects playback/download URLs. A row is only
+  // eligible when it has a key, so we never submit an un-evaluatable item.
+  const ttsRowAudioKey = (r: Record<string, unknown>): string =>
+    typeof r.audio_s3_path === "string" ? r.audio_s3_path.trim() : "";
+  // Total rows eligible to be labelled (have a synthesized clip with a storage
+  // key), used to decide whether to show the "Submit for labelling" button.
   const ttsLabellingEligibleCount = useMemo(() => {
     let count = 0;
     for (const pr of evaluationResult?.provider_results ?? []) {
       for (const r of pr.results ?? []) {
-        if (r.audio_path && r.audio_path.trim() !== "") count += 1;
+        if (ttsRowAudioKey(r) !== "") count += 1;
       }
     }
     return count;
@@ -598,12 +609,13 @@ export default function TTSEvaluationDetailPage() {
     for (const pr of evaluationResult?.provider_results ?? []) {
       const providerLabel = getProviderLabel(pr.provider);
       (pr.results ?? []).forEach((r, i) => {
-        if (!r.audio_path || r.audio_path.trim() === "") return;
+        const audioKey = ttsRowAudioKey(r);
+        if (audioKey === "") return;
         if (!ttsLabellingSelected.has(`${pr.provider}:${i}`)) return;
         rows.push({
           name: `${providerLabel} #${i + 1} — ${suffix}`,
           text: r.text ?? "",
-          audio_path: r.audio_path,
+          audio_path: audioKey,
         });
       });
     }
@@ -978,6 +990,11 @@ export default function TTSEvaluationDetailPage() {
                       onLabellingBulkToggle={
                         evaluationResult.status === "done"
                           ? bulkToggleTtsLabelling
+                          : undefined
+                      }
+                      labellingRowEligible={
+                        evaluationResult.status === "done"
+                          ? (r) => ttsRowAudioKey(r) !== ""
                           : undefined
                       }
                     />

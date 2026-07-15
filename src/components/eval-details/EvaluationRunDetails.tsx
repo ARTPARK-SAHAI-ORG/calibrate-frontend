@@ -501,6 +501,7 @@ export function TTSEvaluationOutputs({
   labellingSelection,
   onToggleLabellingSelection,
   onLabellingBulkToggle,
+  labellingRowEligible,
 }: {
   providerResults: TTSProviderResultForDetails[];
   activeProviderKey: string | null;
@@ -515,6 +516,10 @@ export function TTSEvaluationOutputs({
   labellingSelection?: Set<string>;
   onToggleLabellingSelection?: (key: string) => void;
   onLabellingBulkToggle?: (keys: string[]) => void;
+  // Which rows can be selected. The TTS page gates on the audio storage key
+  // (only rows the evaluator can actually run on), so it passes this rather
+  // than relying on the table's default "has a playback URL" rule.
+  labellingRowEligible?: (row: TTSResultRow, index: number) => boolean;
 }) {
   const selectedProvider = activeProviderKey || providerResults[0]?.provider;
   const providerResult = providerResults.find(
@@ -629,6 +634,7 @@ export function TTSEvaluationOutputs({
                       ? (_row, i) => `${selectedProvider}:${i}`
                       : undefined
                   }
+                  labellingRowEligible={labellingRowEligible}
                 />
               )}
             </div>
