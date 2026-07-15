@@ -34,11 +34,12 @@ function welcomeDescription(): string {
     link(docsUrl, "Read the docs"),
   ].join(" &nbsp;·&nbsp; ");
   return (
-    "<div>Calibrate helps you check that your AI agent actually does its job, " +
+    "<div>Calibrate helps you <strong>check that your AI agent actually does its job</strong>, " +
     "whether it types or talks. Testing by hand is tedious and easy to get " +
     "wrong, so we do it for you.</div>" +
     '<div style="margin-top:0.6em;">Want to see how it works? Let us build a ' +
-    "quick demo agent and put it through its paces together. Takes about a " +
+    "<strong>quick demo agent</strong> and put it through its paces together. " +
+    "Takes about a " +
     "minute, and you can delete it after.</div>" +
     `<div style="margin-top:0.6em;font-size:0.8rem;">${links}</div>`
   );
@@ -196,7 +197,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     {
       anchor: A.newAgent,
       title: "Create an agent",
-      description: "First, let us create an agent to test",
+      description: "First, let us <strong>create an agent</strong> to test",
       side: "bottom",
       align: "end",
       actionLabel: "Next",
@@ -210,7 +211,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.agentTypeOptions,
       title: "Build or connect",
       description:
-        "You can build a new agent right here, or connect one you already run. We will build one for this demo.",
+        "You can <strong>build a new agent</strong> right here, or <strong>connect one you already run</strong>. We will build one for this demo.",
       side: "right",
       align: "center",
       actionLabel: "Create",
@@ -224,7 +225,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.systemPrompt,
       title: "Give it instructions",
       description:
-        "This is where you tell your agent how to behave. We have popped in a sample for a customer-support assistant so you can see the idea.",
+        "This is where you <strong>tell your agent how to behave</strong>. We have popped in a sample for a customer-support assistant so you can see the idea.",
       side: "top",
       actionLabel: "Next",
       timeout: 15000,
@@ -235,7 +236,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     {
       anchor: A.save,
       title: "Save your work",
-      description: "Whenever you make changes, save them here",
+      description: "Whenever you make changes, <strong>save them here</strong>",
       side: "bottom",
       align: "end",
       actionLabel: "Save",
@@ -247,7 +248,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.tabEvaluators,
       title: "Add an evaluator",
       description:
-        "To grade your agent automatically, Calibrate uses a strong LLM as a judge, called an evaluator. It scores each answer against a criteria you set, for example whether the answer is correct or stays polite. Let us add one.",
+        "To grade your agent automatically, Calibrate uses <strong>a strong LLM as a judge, called an evaluator</strong>. It <strong>scores each answer against a criteria</strong> you set, for example whether the answer is correct or stays polite. Let us add one.",
       side: "bottom",
       actionLabel: "Next",
       action: async () => {
@@ -259,7 +260,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.addEvaluatorsDialog,
       title: "Choose what to check",
       description:
-        "We will start with Correctness, which simply checks whether your agent got the answer right",
+        "We will start with <strong>Correctness</strong>, which simply checks whether your agent got the answer right",
       side: "left",
       actionLabel: "Add it",
       action: async () => {
@@ -270,7 +271,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.tabTests,
       title: "Meet your tests",
       description:
-        "This is where the real work happens. A test is simply a situation you want your agent to handle well, paired with a check on whether it nailed it. Let us add a couple to see.",
+        "This is where the real work happens. A test is simply <strong>a situation you want your agent to handle well</strong>, paired with a check on whether it nailed it. Let us add a couple to see.",
       side: "bottom",
       actionLabel: "Next",
       prepare: async () => {
@@ -290,7 +291,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.testRowFirst,
       title: "Your two sample tests",
       description:
-        "Here they are: one asks about shipping, the other about returns. Let us open one up and look inside.",
+        "Here they are: one asks about shipping, the other about returns. Let us <strong>open one up and look inside</strong>.",
       side: "bottom",
       actionLabel: "Open one",
       timeout: 12000,
@@ -302,7 +303,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.testConversation,
       title: "The customer's message",
       description:
-        "This is what the customer says. When you run the test, your agent will reply to exactly this.",
+        "This is <strong>what the customer says</strong>. When you run the test, your agent will reply to exactly this.",
       side: "right",
       actionLabel: "Next",
       timeout: 15000,
@@ -311,7 +312,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.testEvaluatorsArea,
       title: "How it is graded",
       description:
-        "And here is the evaluator doing the grading, our Correctness judge from earlier. It decides whether the reply was right.",
+        "And here is <strong>the evaluator doing the grading</strong>, our Correctness judge from earlier. It decides whether the reply was right.",
       side: "left",
       actionLabel: "Got it",
       action: async () => {
@@ -322,7 +323,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.testsRunAll,
       title: "Run your tests",
       description:
-        "That is a test: a situation in, a graded answer out. You have two ready, so let us run them and see how your agent does.",
+        "That is a test: <strong>a situation in, a graded answer out</strong>. You have two ready, so let us run them and see how your agent does.",
       side: "bottom",
       align: "end",
       actionLabel: "Run",
@@ -335,7 +336,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.runSummary,
       title: "Your results",
       description:
-        "And there it is, your first evaluation! Up top is your pass rate, plus speed, cost, and a score from each evaluator.",
+        "And there it is, your first evaluation! Up top is your <strong>pass rate</strong>, plus speed, cost, and a score from each evaluator.",
       side: "top",
       actionLabel: "Next",
       timeout: 90000,
@@ -344,7 +345,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.runTabOutputs,
       title: "See every answer",
       description:
-        "The Summary is the big picture. The Outputs tab shows each test your agent ran, one by one.",
+        "The Summary is the big picture. The Outputs tab shows <strong>each test your agent ran</strong>, one by one.",
       side: "bottom",
       align: "start",
       actionLabel: "Next",
@@ -356,7 +357,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.runOutputsList,
       title: "Passed and failed",
       description:
-        "Your tests are grouped by whether they passed. Both of ours passed. Let us open one and look closer.",
+        "Your tests are <strong>grouped by whether they passed</strong>. Both of ours passed. Let us open one and look closer.",
       side: "right",
       align: "start",
       actionLabel: "Open one",
@@ -369,7 +370,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.runResultDetail,
       title: "Your agent's answer",
       description:
-        "This is exactly what your agent replied. It is generated fresh each time the test runs.",
+        "This is exactly <strong>what your agent replied</strong>. It is generated fresh each time the test runs.",
       side: "left",
       actionLabel: "Next",
       timeout: 10000,
@@ -378,7 +379,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.runResultVerdict,
       title: "The evaluator's verdict",
       description:
-        "And here is the evaluator's call: pass or fail, with the reason why. That reasoning is how you spot problems and keep improving your agent. The demo agent is yours to delete anytime.",
+        "And here is the evaluator's call: <strong>pass or fail, with the reason why</strong>. That reasoning is how you spot problems and keep improving your agent. The demo agent is yours to delete anytime.",
       side: "left",
       actionLabel: "Done",
       timeout: 10000,
