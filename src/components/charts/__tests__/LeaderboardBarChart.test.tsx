@@ -123,8 +123,10 @@ describe("LeaderboardBarChart", () => {
       />
     );
     activateTooltip(container);
-    // defaultTooltipFormatter: parseFloat((10.123456).toFixed(5)).toString()
-    expect(screen.getByText("10.12346")).toBeInTheDocument();
+    // defaultTooltipFormatter: parseFloat((10.123456).toFixed(5)).toString().
+    // The same formatter drives the on-bar value label, so the string can
+    // appear both as the label and (once active) the tooltip.
+    expect(screen.getAllByText("10.12346").length).toBeGreaterThan(0);
   });
 
   it("formats tooltip values with a custom formatTooltip when active", () => {

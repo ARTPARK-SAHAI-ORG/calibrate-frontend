@@ -10,6 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  LabelList,
 } from "recharts";
 import { downloadChartPng } from "./downloadChart";
 
@@ -72,6 +73,14 @@ export function LeaderboardBarChart({
   const defaultTooltipFormatter = (value: number) =>
     parseFloat(value.toFixed(5)).toString();
 
+  // Value labels reuse the tooltip formatter so 0 (a perfect error rate) and
+  // small differences stay readable even when the bars are tiny or identical —
+  // a zero bar would otherwise draw nothing and the chart would look empty.
+  const formatBarLabel = (value: unknown) =>
+    typeof value === "number"
+      ? (formatTooltip || defaultTooltipFormatter)(value)
+      : "";
+
   const downloadChart = useCallback(() => {
     downloadChartPng(chartRef.current, title, filename);
   }, [title, filename]);
@@ -109,7 +118,7 @@ export function LeaderboardBarChart({
               value: d.value,
             }))}
             margin={{
-              top: 5,
+              top: 24,
               right: 30,
               left: 20,
               bottom: 40,
@@ -135,7 +144,16 @@ export function LeaderboardBarChart({
                   : value
               }
             />
-            <Bar dataKey="value">
+            {/* `minPointSize` keeps a thin sliver visible for zero / near-zero
+                values (e.g. a perfect 0 error rate) so the chart never looks
+                empty; the label prints the exact value above each bar. */}
+            <Bar dataKey="value" minPointSize={3}>
+              <LabelList
+                dataKey="value"
+                position="top"
+                formatter={formatBarLabel}
+                style={{ fontSize: 11, fill: "currentColor" }}
+              />
               {data.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
