@@ -70,7 +70,6 @@ export async function runTour(tour: Tour, startIndex = 0): Promise<void> {
     stagePadding: 6,
     stageRadius: 8,
     popoverClass: "calibrate-tour",
-    onPopoverRender: undefined,
     onDestroyStarted: () => {
       // Fires on user close (X / overlay / Esc). Our finish path sets `ending`.
       if (active && !active.ending) {
