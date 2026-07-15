@@ -13,7 +13,7 @@
  * user can act by hand.
  */
 
-import { getBackendUrl, getDefaultHeaders } from "@/lib/api";
+import { getBackendUrl, getDefaultHeaders, unwrapList } from "@/lib/api";
 import { fetchAgentEvaluators } from "@/lib/evaluatorApi";
 import { reportError } from "@/lib/reportError";
 import { WHATSAPP_INVITE_URL } from "@/constants/links";
@@ -136,6 +136,35 @@ async function seedDemoTests(agentUuid: string, deps: FirstEvalDeps): Promise<vo
   window.dispatchEvent(new Event(AGENT_TESTS_UPDATED_EVENT));
 }
 
+/**
+ * Pick a demo agent name that is not already taken, so re-running the tour
+ * doesn't hit "Agent name already exists": "Demo agent", then "Demo agent (2)",
+ * "Demo agent (3)", and so on.
+ */
+async function resolveDemoAgentName(accessToken: string | null): Promise<string> {
+  if (!accessToken) return DEMO_AGENT_NAME;
+  try {
+    const res = await fetch(`${getBackendUrl()}/agents`, {
+      method: "GET",
+      headers: getDefaultHeaders(accessToken),
+    });
+    if (!res.ok) return DEMO_AGENT_NAME;
+    const taken = new Set(
+      unwrapList<{ name?: string }>(await res.json()).map((a) =>
+        (a.name ?? "").trim().toLowerCase(),
+      ),
+    );
+    if (!taken.has(DEMO_AGENT_NAME.toLowerCase())) return DEMO_AGENT_NAME;
+    for (let i = 2; i < 1000; i++) {
+      const candidate = `${DEMO_AGENT_NAME} (${i})`;
+      if (!taken.has(candidate.toLowerCase())) return candidate;
+    }
+    return DEMO_AGENT_NAME;
+  } catch {
+    return DEMO_AGENT_NAME;
+  }
+}
+
 /** Read the current agent uuid from the `/agents/[uuid]` route, if we are on it. */
 function currentAgentUuid(): string | null {
   const m = window.location.pathname.match(/\/agents\/([0-9a-fA-F-]{8,})/);
@@ -173,7 +202,8 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       actionLabel: "Next",
       action: async () => {
         await clickElement(A.newAgent);
-        await fillInput(A.agentNameInput, DEMO_AGENT_NAME, { timeout: 8000 });
+        const name = await resolveDemoAgentName(deps.getAccessToken());
+        await fillInput(A.agentNameInput, name, { timeout: 8000 });
       },
     },
     {
