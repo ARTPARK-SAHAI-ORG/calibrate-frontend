@@ -1,21 +1,23 @@
 /**
  * Flagship onboarding tour: "Run your first evaluation".
  *
- * Auto-drives the real app end to end, injecting sample values at each step so a
- * brand-new user watches a genuine evaluation get built and run:
- *   new agent → sample system prompt → save → Evaluators tab → Tests tab →
- *   seed two sample tests → run → read the results.
+ * Auto-drives the real app end to end so a brand-new user watches a genuine
+ * evaluation get built and run, in plain language:
+ *   welcome → create a demo agent → give it instructions → save → add an
+ *   evaluator → add + inspect two sample tests → run → read the results.
  *
- * It creates a real, clearly-labelled "Demo agent" the user can delete later.
- * Every step degrades gracefully: if an injected action fails (e.g. offline),
- * the popover still explains the step and the user can do it by hand.
+ * Actions inject sample values and click the app's real controls silently; the
+ * copy explains what the user sees rather than narrating the mechanics. It
+ * creates a real, clearly-labelled "Demo agent" the user can delete later, and
+ * degrades gracefully: if an anchor is missing the popover still shows and the
+ * user can act by hand.
  */
 
 import { getBackendUrl, getDefaultHeaders } from "@/lib/api";
-import { fetchAllEvaluators } from "@/lib/evaluatorApi";
+import { fetchAgentEvaluators } from "@/lib/evaluatorApi";
 import { reportError } from "@/lib/reportError";
 import { WHATSAPP_INVITE_URL } from "@/constants/links";
-import { clickElement, delay, fillInput } from "../dom";
+import { clickElement, delay, fillInput, waitForElement } from "../dom";
 import type { Tour, TourStep } from "../engine";
 
 export const FIRST_EVAL_TOUR_ID = "first-eval";
@@ -32,12 +34,12 @@ function welcomeDescription(): string {
     link(docsUrl, "Read the docs"),
   ].join(" &nbsp;·&nbsp; ");
   return (
-    "Calibrate is an open-source evaluation platform for AI agents, text or " +
-    "voice. Testing agents manually is slow and inconsistent, so Calibrate helps " +
-    "you continuously improve your agent, ensure a bug never repeats itself, and " +
-    "deploy with confidence." +
-    "<br><br>New here? Let's run your first evaluation together. I'll spin up a " +
-    'sample "Demo agent" and run it end to end, then you can delete it.' +
+    "Calibrate helps you check that your AI agent actually does its job, whether " +
+    "it types or talks. Testing by hand is tedious and easy to get wrong, so we " +
+    "do it for you." +
+    "<br><br>Want to see how it works? Let's build a quick demo agent and put it " +
+    "through its paces together. Takes about a minute, and you can delete it " +
+    "after." +
     `<br><br><span style="font-size:0.8rem;">${links}</span>`
   );
 }
@@ -62,14 +64,23 @@ export const A = {
   systemPrompt: '[data-tour="agent-system-prompt"]',
   save: '[data-tour="agent-save"]',
   tabEvaluators: '[data-tour="agent-tab-evaluators"]',
+  evaluatorsAdd: '[data-tour="evaluators-add"]',
+  addEvaluatorsDialog: '[data-tour="add-evaluators-dialog"]',
+  evaluatorsAddConfirm: '[data-tour="evaluators-add-confirm"]',
   tabTests: '[data-tour="agent-tab-tests"]',
-  testsCreate: '[data-tour="tests-create"]',
+  testRowFirst: '[data-tour="test-row-first"]',
+  testConversation: '[data-tour="test-conversation"]',
+  testEvaluatorsArea: '[data-tour="test-evaluators-area"]',
+  testEditorClose: '[data-tour="test-editor-close"]',
   testsRunAll: '[data-tour="tests-run-all"]',
   runSummary: '[data-tour="test-run-summary"]',
 } as const;
 
 export type FirstEvalDeps = {
-  accessToken: string | null;
+  // A getter, not a snapshot: the tour is built once but its API calls fire
+  // seconds later, so it must read the token fresh (it may still be hydrating
+  // when the tour starts).
+  getAccessToken: () => string | null;
 };
 
 // Kept in sync with AGENT_TESTS_UPDATED_EVENT in ../index (inlined to avoid a
@@ -78,32 +89,31 @@ const AGENT_TESTS_UPDATED_EVENT = "calibrate:agent-tests-updated";
 
 /**
  * Seed two sample response-type tests for the demo agent via `POST /tests/bulk`,
- * attaching the default "Correctness" next-reply evaluator when available.
+ * grading them with the evaluator already attached to the agent (step 7). Using
+ * the agent's evaluator (the org's own copy) avoids referencing a global
+ * default the workspace can't use, which the backend rejects with 403.
  */
 async function seedDemoTests(agentUuid: string, deps: FirstEvalDeps): Promise<void> {
   const backendUrl = getBackendUrl();
+  const accessToken = deps.getAccessToken();
 
   let evaluatorRefs: { evaluator_uuid: string }[] = [];
-  if (deps.accessToken) {
+  if (accessToken) {
     try {
-      const evaluators = await fetchAllEvaluators(deps.accessToken);
-      // Prefer a built-in "Correctness" next-reply judge; fall back to any
-      // built-in LLM evaluator so the sample tests are always graded.
-      const builtInLlm = evaluators.filter(
-        (e) => e.evaluator_type === "llm" && !e.owner_user_id,
-      );
-      const correctness =
-        builtInLlm.find((e) => /correct/i.test(e.name)) ?? builtInLlm[0];
-      if (correctness) evaluatorRefs = [{ evaluator_uuid: correctness.uuid }];
+      const agentEvaluators = await fetchAgentEvaluators(agentUuid, accessToken);
+      const grader =
+        agentEvaluators.find((e) => e.evaluator_type === "llm") ??
+        agentEvaluators[0];
+      if (grader) evaluatorRefs = [{ evaluator_uuid: grader.uuid }];
     } catch (err) {
-      reportError("Demo test seeding: could not load evaluators", err);
+      reportError("Demo test seeding: could not load agent evaluators", err);
     }
   }
 
   const res = await fetch(`${backendUrl}/tests/bulk`, {
     method: "POST",
     headers: {
-      ...getDefaultHeaders(deps.accessToken),
+      ...getDefaultHeaders(accessToken),
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -126,6 +136,21 @@ function currentAgentUuid(): string | null {
   return m ? m[1] : null;
 }
 
+/** Tick the Correctness evaluator in the picker and confirm. */
+async function selectAndAddCorrectness(): Promise<void> {
+  const dialog = await waitForElement(A.addEvaluatorsDialog, { timeout: 10000 });
+  if (!dialog) return;
+  const rows = Array.from(dialog.querySelectorAll<HTMLLabelElement>("label"));
+  const target =
+    rows.find((r) => /correct/i.test(r.textContent ?? "")) ?? rows[0];
+  const checkbox = target?.querySelector<HTMLInputElement>(
+    'input[type="checkbox"]',
+  );
+  if (checkbox && !checkbox.checked) checkbox.click();
+  await delay(200);
+  await clickElement(A.evaluatorsAddConfirm);
+}
+
 export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
   const steps: TourStep[] = [
     {
@@ -136,43 +161,43 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     {
       anchor: A.newAgent,
       title: "Create an agent",
-      description: "An agent is the assistant you want to test. Let's make one.",
+      description:
+        "An agent is the assistant you want to test. Already have one? You can connect it later. For now, let's spin up a quick one right here.",
       side: "bottom",
       align: "end",
-      actionLabel: "New agent",
+      actionLabel: "Next",
       action: async () => {
         await clickElement(A.newAgent);
+        await fillInput(A.agentNameInput, DEMO_AGENT_NAME, { timeout: 8000 });
       },
     },
     {
       anchor: A.agentNameInput,
-      title: "Name it",
-      description: `I'll name it "${DEMO_AGENT_NAME}" and create it.`,
+      title: "Name your agent",
+      description: `We've gone with "${DEMO_AGENT_NAME}" here. In your own workspace, you'd use your assistant's real name.`,
       side: "bottom",
-      actionLabel: "Create agent",
+      actionLabel: "Create",
       action: async () => {
-        await fillInput(A.agentNameInput, DEMO_AGENT_NAME);
-        await delay(150);
         await clickElement(A.agentCreateSubmit);
         // The app navigates to /agents/[uuid]; later steps wait for that page.
       },
     },
     {
       anchor: A.systemPrompt,
-      title: "Give it a system prompt",
+      title: "Give it instructions",
       description:
-        "The system prompt tells your agent how to behave. I'll add a sample one.",
+        "This is where you tell your agent how to behave. We've popped in a sample for a customer-support assistant so you can see the idea.",
       side: "top",
-      actionLabel: "Add prompt",
+      actionLabel: "Next",
       timeout: 15000,
-      action: async () => {
+      prepare: async () => {
         await fillInput(A.systemPrompt, DEMO_SYSTEM_PROMPT, { timeout: 15000 });
       },
     },
     {
       anchor: A.save,
-      title: "Save the agent",
-      description: "Now let's save your agent.",
+      title: "Save your work",
+      description: "Whenever you tweak your agent, save it here.",
       side: "bottom",
       align: "end",
       actionLabel: "Save",
@@ -182,23 +207,35 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     },
     {
       anchor: A.tabEvaluators,
-      title: "Evaluators score conversations",
+      title: "Add an evaluator",
       description:
-        "Evaluators are the judges that score each reply. Your tests use them automatically.",
+        "Evaluators are your automatic judges. They score each answer on things like whether it's correct or polite. Let's give your agent one.",
       side: "bottom",
       actionLabel: "Next",
       action: async () => {
         await clickElement(A.tabEvaluators);
+        await clickElement(A.evaluatorsAdd, { timeout: 8000 });
+      },
+    },
+    {
+      anchor: A.addEvaluatorsDialog,
+      title: "Choose what to check",
+      description:
+        "We'll start with Correctness, which simply checks whether your agent got the answer right.",
+      side: "left",
+      actionLabel: "Add it",
+      action: async () => {
+        await selectAndAddCorrectness();
       },
     },
     {
       anchor: A.tabTests,
-      title: "Now let's add tests",
+      title: "Meet your tests",
       description:
-        "Tests are the situations your agent should handle. I'll add two samples.",
+        "This is where the real work happens. A test is simply a situation you want your agent to handle well, paired with a check on whether it nailed it. Let's add a couple to see.",
       side: "bottom",
-      actionLabel: "Add tests",
-      action: async () => {
+      actionLabel: "Next",
+      prepare: async () => {
         await clickElement(A.tabTests);
         const uuid = currentAgentUuid();
         if (uuid) {
@@ -212,12 +249,45 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       },
     },
     {
+      anchor: A.testRowFirst,
+      title: "Your two sample tests",
+      description:
+        "Here they are: one asks about shipping, the other about returns. Let's open one up and look inside.",
+      side: "bottom",
+      actionLabel: "Open one",
+      timeout: 12000,
+      action: async () => {
+        await clickElement(A.testRowFirst);
+      },
+    },
+    {
+      anchor: A.testConversation,
+      title: "The customer's message",
+      description:
+        "This is what the customer says. When you run the test, your agent will reply to exactly this.",
+      side: "right",
+      actionLabel: "Next",
+      timeout: 15000,
+    },
+    {
+      anchor: A.testEvaluatorsArea,
+      title: "How it's graded",
+      description:
+        "And here's the evaluator doing the grading, our Correctness judge from earlier. It decides whether the reply was right.",
+      side: "left",
+      actionLabel: "Got it",
+      action: async () => {
+        await clickElement(A.testEditorClose);
+      },
+    },
+    {
       anchor: A.testsRunAll,
-      title: "Run the evaluation",
-      description: "Now let's run them and see how your agent does.",
+      title: "Run your tests",
+      description:
+        "That's a test: a situation in, a graded answer out. You've got two ready, so let's run them and see how your agent does.",
       side: "bottom",
       align: "end",
-      actionLabel: "Run tests",
+      actionLabel: "Run",
       timeout: 12000,
       action: async () => {
         await clickElement(A.testsRunAll);
@@ -225,9 +295,9 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     },
     {
       anchor: A.runSummary,
-      title: "Read the results",
+      title: "Your results",
       description:
-        "Here's how your agent did: the pass rate, plus speed, cost, and a score from each evaluator. Open any test to see why it passed or failed. You can delete the demo agent anytime.",
+        "And there it is, your first evaluation! You get the pass rate up top, plus speed, cost, and a score from each judge. Click any test to see exactly what happened. Done exploring? The demo agent's yours to delete anytime.",
       side: "top",
       actionLabel: "Done",
       timeout: 90000,

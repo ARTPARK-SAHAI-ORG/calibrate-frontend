@@ -184,6 +184,22 @@ body {
   font-size: 0.75rem;
 }
 
+/* "Skip tour" affordance injected into the footer nav group. */
+.driver-popover.calibrate-tour .calibrate-tour-skip {
+  all: unset;
+  box-sizing: border-box;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.4375rem 0.5rem;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.driver-popover.calibrate-tour .calibrate-tour-skip:hover {
+  color: var(--foreground);
+  text-decoration: underline;
+}
+
 /* All footer buttons: quiet secondary style by default. */
 .driver-popover.calibrate-tour .driver-popover-footer-btn {
   box-sizing: border-box !important;

@@ -30,6 +30,12 @@ export type TourStep = {
   align?: "start" | "center" | "end";
   /** Label for the advance button (defaults to "Next" / "Finish" on the last). */
   actionLabel?: string;
+  /**
+   * Runs after the anchor is found but before the popover is shown — use it to
+   * put the app into the state this card describes (e.g. fill a sample value)
+   * so the card explains something the user can already see.
+   */
+  prepare?: () => Promise<void> | void;
   /** Runs when the user clicks the advance button, before moving on. */
   action?: () => Promise<void> | void;
   /** How long to wait for this step's anchor before showing it centered. */
@@ -66,28 +72,42 @@ export async function runTour(tour: Tour, startIndex = 0): Promise<void> {
 
   const driverObj = driver({
     allowClose: true,
+    // No cross-fade between steps: since we drive via highlight(), the fade can
+    // briefly show the old and new popover at once (looks like two popovers).
+    animate: false,
     overlayColor: "rgba(10, 10, 12, 0.6)",
     stagePadding: 6,
     stageRadius: 8,
     popoverClass: "calibrate-tour",
     showProgress: true,
-    // We advance steps manually via highlight(), so driver can't compute the
-    // "X of N" itself. Inject it from our own step state on each render, and
-    // create the progress node if driver didn't render one for a single
-    // highlight (so the counter always appears, left of the footer buttons).
     onPopoverRender: (popover) => {
       if (!active) return;
+      // We advance steps manually via highlight(), so driver can't compute the
+      // "X of N" itself — inject it from our own step state (creating the node
+      // if driver didn't render one for a single highlight).
       const text = `${active.index + 1} of ${active.tour.steps.length}`;
+      const footer = popover.footer;
       if (popover.progress) {
         popover.progress.textContent = text;
-        return;
-      }
-      const footer = popover.footer;
-      if (footer && !footer.querySelector(".driver-popover-progress-text")) {
+      } else if (footer && !footer.querySelector(".driver-popover-progress-text")) {
         const span = document.createElement("span");
         span.className = "driver-popover-progress-text";
         span.textContent = text;
         footer.insertBefore(span, footer.firstChild);
+      }
+      // A visible "Skip tour" affordance so the guide can be ended any time,
+      // placed just left of the advance button.
+      const nav = footer?.querySelector(".driver-popover-navigation-btns");
+      if (nav && !nav.querySelector(".calibrate-tour-skip")) {
+        const skip = document.createElement("button");
+        skip.type = "button";
+        skip.className = "calibrate-tour-skip";
+        skip.textContent = "Skip tour";
+        skip.addEventListener("click", (e) => {
+          e.preventDefault();
+          finish("skipped");
+        });
+        nav.insertBefore(skip, nav.firstChild);
       }
     },
     onDestroyStarted: () => {
@@ -117,6 +137,16 @@ async function showStep(): Promise<void> {
     ? (await waitForElement(step.anchor, { timeout: step.timeout }))
     : null;
   if (!active) return; // torn down while waiting
+
+  // Put the app into the state this card describes before showing the popover.
+  if (step.prepare) {
+    try {
+      await step.prepare();
+    } catch (err) {
+      reportError("Onboarding tour step prepare failed", err);
+    }
+    if (!active) return;
+  }
 
   const isLast = index === tour.steps.length - 1;
 

@@ -80,8 +80,8 @@ test.describe("Onboarding flagship tour (authenticated, fake-AI backend)", () =>
       START_EVENT,
     );
 
-    // 1) Welcome: assert the theme class lands (so the app styling applies) and
-    //    the "X of N" progress counter renders.
+    // 1) Welcome: assert the theme class lands (so the app styling applies),
+    //    the "X of N" progress counter, and the always-present Skip affordance.
     await expect(popoverTitle(page)).toContainText("Welcome to Calibrate", {
       timeout: 30000,
     });
@@ -89,43 +89,60 @@ test.describe("Onboarding flagship tour (authenticated, fake-AI backend)", () =>
     await expect(page.locator(".driver-popover-progress-text")).toContainText(
       /1 of \d+/,
     );
+    await expect(page.locator(".calibrate-tour-skip")).toBeVisible();
     await nextButton(page).click();
 
-    // 2) Create an agent (spotlights "New agent").
+    // 2) Create an agent (spotlights "New agent"; action opens + names the form).
     await step(page, "Create an agent");
 
-    // 3) Name it: the action opens the dialog; assert it, then let the step
-    //    fill "Demo agent" and submit, which navigates to the detail page.
-    await expect(popoverTitle(page)).toContainText("Name it", { timeout: 30000 });
+    // 3) Name your agent: the filled name field is showing; Next submits.
+    await expect(popoverTitle(page)).toContainText("Name your agent", {
+      timeout: 30000,
+    });
     await expect(page.locator('[data-tour="agent-name-input"]')).toBeVisible({
       timeout: 15000,
     });
     await nextButton(page).click();
 
-    // 4) System prompt: land on the detail page, then the step pastes a sample.
+    // 4) Instructions: land on the detail page; the sample prompt is prefilled.
     await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/, { timeout: 20000 });
-    await step(page, "Give it a system prompt");
+    await expect(popoverTitle(page)).toContainText("Give it instructions", {
+      timeout: 30000,
+    });
     await expect(page.locator('[data-tour="agent-system-prompt"]')).toHaveValue(
       /customer-support/i,
       { timeout: 15000 },
     );
+    await nextButton(page).click();
 
-    // 5) Save -> 6) Evaluators tab -> 7) Tests tab (seeds two demo tests).
-    await step(page, "Save the agent");
-    await step(page, "Evaluators score conversations");
-    await step(page, "Now let's add tests");
+    // 5) Save -> 6) Add an evaluator (opens the picker) -> 7) pick Correctness.
+    await step(page, "Save your work");
+    await step(page, "Add an evaluator");
+    await expect(page.locator('[data-tour="add-evaluators-dialog"]')).toBeVisible({
+      timeout: 15000,
+    });
+    await step(page, "Choose what to check");
 
-    // The seeded demo tests should appear in the Tests tab list.
+    // 8) Meet your tests: the two seeded tests appear in the list.
+    await expect(popoverTitle(page)).toContainText("Meet your tests", {
+      timeout: 30000,
+    });
     await expect(page.getByText("Demo · shipping time").first()).toBeVisible({
       timeout: 20000,
     });
+    await nextButton(page).click();
 
-    // 8) Run: the action clicks "Run all tests" and opens TestRunnerDialog.
-    await step(page, "Run the evaluation");
+    // 9) Open a test -> 10) its message -> 11) its evaluator (closes the editor).
+    await step(page, "Your two sample tests");
+    await step(page, "The customer's message");
+    await step(page, "How it's graded");
 
-    // 9) Results: the summary anchor renders once the run completes. The fake
-    //    backend passes every case -> 100% pass rate.
-    await expect(popoverTitle(page)).toContainText("Read the results", {
+    // 12) Run: clicks "Run all tests" and opens TestRunnerDialog.
+    await step(page, "Run your tests");
+
+    // 13) Results: the summary renders once the run completes. The fake backend
+    //     passes every case -> 100% pass rate.
+    await expect(popoverTitle(page)).toContainText("Your results", {
       timeout: 90000,
     });
     await expect(page.locator('[data-tour="test-run-summary"]')).toBeVisible({

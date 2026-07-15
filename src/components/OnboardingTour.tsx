@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import "driver.js/dist/driver.css";
 import { useAccessToken } from "@/hooks";
@@ -31,9 +31,18 @@ export function OnboardingTour() {
   const pathname = usePathname();
   const accessToken = useAccessToken();
 
+  // The tour is built once but its API calls fire seconds later, so hand it a
+  // getter over a ref that always holds the latest token (it may still be
+  // hydrating when the tour starts).
+  const tokenRef = useRef<string | null>(accessToken);
+  tokenRef.current = accessToken;
+
   const startTour = (tourId: TourId, fromStep = 0) => {
     if (tourId === TOUR_IDS.firstEval) {
-      void runTour(buildFirstEvalTour({ accessToken }), fromStep);
+      void runTour(
+        buildFirstEvalTour({ getAccessToken: () => tokenRef.current }),
+        fromStep,
+      );
     }
   };
 

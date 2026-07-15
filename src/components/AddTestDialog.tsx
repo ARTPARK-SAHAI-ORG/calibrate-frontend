@@ -2941,6 +2941,7 @@ export function AddTestDialog({
               Create a test
             </h2>
             <button
+              data-tour="test-editor-close"
               onClick={onClose}
               className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
               aria-label="Close"
@@ -3367,6 +3368,7 @@ export function AddTestDialog({
                     {/* Attached evaluator cards */}
                     <div
                       ref={evaluatorsContainerRef}
+                      data-tour="test-evaluators-area"
                       className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1"
                     >
                       {attachedEvaluators.map((ev) => (
@@ -3887,7 +3889,10 @@ export function AddTestDialog({
               </div>
             </div>
             {/* Chat Messages Area */}
-            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-visible p-4 md:p-6">
+            <div
+              data-tour="test-conversation"
+              className="flex-1 min-h-0 overflow-y-auto overflow-x-visible p-4 md:p-6"
+            >
               {chatMessages.length === 0 ? (
                 /* Empty State Placeholder */
                 <div className="h-full flex flex-col items-center justify-center text-center px-8">

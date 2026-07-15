@@ -2237,9 +2237,10 @@ export function TestsTabContent({
                       <div className="w-8"></div>
                     </div>
                     {/* Table Body */}
-                    {filteredAgentTests.map((test) => (
+                    {filteredAgentTests.map((test, i) => (
                       <div
                         key={test.uuid}
+                        data-tour={i === 0 ? "test-row-first" : undefined}
                         onClick={() => openEditTest(test.uuid)}
                         className="grid grid-cols-[40px_minmax(0,1fr)_120px_auto_auto_auto] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                       >
