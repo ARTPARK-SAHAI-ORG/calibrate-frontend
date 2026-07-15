@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect, useRef } from "react";
 import { WHATSAPP_INVITE_URL } from "@/constants/links";
@@ -233,6 +234,25 @@ const navSections: NavSection[] = [
     title: "Resources",
     items: [
       {
+        id: "guided-tour",
+        label: "Start tour",
+        icon: (
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z"
+            />
+          </svg>
+        ),
+      },
+      {
         id: "docs",
         label: "Documentation",
         icon: (
@@ -285,6 +305,15 @@ export function AppLayout({
   headerActions,
 }: AppLayoutProps) {
   const { data: session } = useSession();
+  const router = useRouter();
+
+  // Launch the guided walkthrough: it auto-drives from the Agents page, so land
+  // there first, then start the tour.
+  const handleStartGuidedTour = () => {
+    if (window.innerWidth < 768 && sidebarOpen) onSidebarToggle();
+    router.push("/agents");
+    requestTour(TOUR_IDS.firstEval);
+  };
   const [localUser, setLocalUser] = useState<LocalUser | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [talkToUsOpen, setTalkToUsOpen] = useState(false);
@@ -493,18 +522,26 @@ export function AppLayout({
         {/* Navigation - Expanded */}
         {sidebarOpen && (
           <>
-            <nav className="flex-1 overflow-y-auto py-4 px-3">
+            <nav className="flex-1 overflow-y-auto py-3 px-3">
               {navSections.map((section, index) => (
-                <div key={section.title || index} className="mb-6">
+                <div key={section.title || index} className="mb-4">
                   {section.title && (
-                    <h3 className="px-2 mb-2 text-sm font-medium uppercase tracking-wider text-muted-foreground">
+                    <h3 className="px-2 mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       {section.title}
                     </h3>
                   )}
                   <ul className="space-y-0.5">
                     {section.items.map((item) => (
                       <li key={item.id}>
-                        {item.id === "docs" ? (
+                        {item.id === "guided-tour" ? (
+                          <button
+                            onClick={handleStartGuidedTour}
+                            className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                          >
+                            {item.icon}
+                            {item.label}
+                          </button>
+                        ) : item.id === "docs" ? (
                           <a
                             href={process.env.NEXT_PUBLIC_DOCS_URL}
                             target="_blank"
@@ -515,7 +552,7 @@ export function AppLayout({
                                 onSidebarToggle();
                               }
                             }}
-                            className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-base font-medium transition-colors cursor-pointer text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                            className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer text-muted-foreground hover:bg-accent/50 hover:text-foreground"
                           >
                             {item.icon}
                             {item.label}
@@ -542,7 +579,7 @@ export function AppLayout({
                                 onSidebarToggle();
                               }
                             }}
-                            className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-base font-medium transition-colors cursor-pointer ${
+                            className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer ${
                               activeItem === item.id
                                 ? "bg-accent text-accent-foreground"
                                 : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
@@ -573,7 +610,15 @@ export function AppLayout({
                 <ul className="space-y-1">
                   {section.items.map((item) => (
                     <li key={item.id} className="relative group/tip">
-                      {item.id === "docs" ? (
+                      {item.id === "guided-tour" ? (
+                        <button
+                          onClick={handleStartGuidedTour}
+                          aria-label={item.label}
+                          className="w-10 h-10 flex items-center justify-center rounded-md transition-colors cursor-pointer text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                        >
+                          {item.icon}
+                        </button>
+                      ) : item.id === "docs" ? (
                         <a
                           href={process.env.NEXT_PUBLIC_DOCS_URL}
                           target="_blank"
