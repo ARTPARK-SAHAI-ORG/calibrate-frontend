@@ -34,13 +34,13 @@ function welcomeDescription(): string {
     link(docsUrl, "Read the docs"),
   ].join(" &nbsp;·&nbsp; ");
   return (
-    "Calibrate helps you check that your AI agent actually does its job, whether " +
-    "it types or talks. Testing by hand is tedious and easy to get wrong, so we " +
-    "do it for you." +
-    "<br><br>Want to see how it works? Let's build a quick demo agent and put it " +
-    "through its paces together. Takes about a minute, and you can delete it " +
-    "after." +
-    `<br><br><span style="font-size:0.8rem;">${links}</span>`
+    "<div>Calibrate helps you check that your AI agent actually does its job, " +
+    "whether it types or talks. Testing by hand is tedious and easy to get " +
+    "wrong, so we do it for you.</div>" +
+    '<div style="margin-top:0.6em;">Want to see how it works? Let\'s build a ' +
+    "quick demo agent and put it through its paces together. Takes about a " +
+    "minute, and you can delete it after.</div>" +
+    `<div style="margin-top:0.6em;font-size:0.8rem;">${links}</div>`
   );
 }
 
