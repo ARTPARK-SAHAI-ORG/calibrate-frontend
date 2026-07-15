@@ -52,7 +52,7 @@ export function LeaderboardTab({
       {afterTable}
 
       {charts.map((row, rowIndex) => (
-        <div key={rowIndex} className={`grid grid-cols-1 ${row.length >= 2 ? "md:grid-cols-2" : ""} gap-4 md:gap-6`}>
+        <div key={rowIndex} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
           {row.map((chart) => {
             const chartData = data
               .map((s) => ({

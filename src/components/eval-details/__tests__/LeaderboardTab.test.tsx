@@ -81,7 +81,7 @@ describe("LeaderboardTab", () => {
     ).toBeInTheDocument();
   });
 
-  it("lays out two-chart rows in a grid and single-chart rows without the md:grid-cols-2 class", () => {
+  it("lays out every chart row as a two-column grid so a lone chart keeps half width", () => {
     const data = [{ run: "run-a", score: 90 }];
     const charts: ChartConfig[][] = [
       [
@@ -101,7 +101,7 @@ describe("LeaderboardTab", () => {
     );
     const rows = container.querySelectorAll(":scope > div > div.grid");
     expect(rows[0].className).toContain("md:grid-cols-2");
-    expect(rows[1].className).not.toContain("md:grid-cols-2");
+    expect(rows[1].className).toContain("md:grid-cols-2");
   });
 
   it("uses a custom nameKey to derive colors and labels", () => {
