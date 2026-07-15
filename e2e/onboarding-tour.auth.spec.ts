@@ -80,10 +80,12 @@ test.describe("Onboarding flagship tour (authenticated, fake-AI backend)", () =>
       START_EVENT,
     );
 
-    // 1) Welcome: also assert the "X of N" progress counter renders.
+    // 1) Welcome: assert the theme class lands (so the app styling applies) and
+    //    the "X of N" progress counter renders.
     await expect(popoverTitle(page)).toContainText("Welcome to Calibrate", {
       timeout: 30000,
     });
+    await expect(page.locator(".driver-popover")).toHaveClass(/calibrate-tour/);
     await expect(page.locator(".driver-popover-progress-text")).toContainText(
       /1 of \d+/,
     );

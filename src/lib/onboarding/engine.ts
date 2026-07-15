@@ -123,6 +123,9 @@ async function showStep(): Promise<void> {
   driverObj.highlight({
     element: element ?? undefined,
     popover: {
+      // Set per-step too: the global popoverClass isn't reliably applied on the
+      // highlight() path, so the theme class must ride on each step's popover.
+      popoverClass: "calibrate-tour",
       title: step.title,
       description: step.description,
       side: step.side ?? "bottom",

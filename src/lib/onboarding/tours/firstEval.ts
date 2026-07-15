@@ -21,17 +21,16 @@ import type { Tour, TourStep } from "../engine";
 export const FIRST_EVAL_TOUR_ID = "first-eval";
 
 // The welcome card's help links (driver.js renders the description as HTML).
-// The docs link only appears when a docs URL is configured.
 function welcomeDescription(): string {
-  const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL;
+  const docsUrl =
+    process.env.NEXT_PUBLIC_DOCS_URL || "https://calibrate.artpark.ai/docs";
+  // No underline (modern link style); the accent color + weight signal it.
   const link = (href: string, text: string) =>
-    `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:var(--foreground);text-decoration:underline;font-weight:500;">${text}</a>`;
+    `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:var(--tour-link, #6366f1);font-weight:500;text-decoration:none;">${text}</a>`;
   const links = [
     link(WHATSAPP_INVITE_URL, "Talk to us"),
-    docsUrl ? link(docsUrl, "Read the docs") : null,
-  ]
-    .filter(Boolean)
-    .join(" &nbsp;·&nbsp; ");
+    link(docsUrl, "Read the docs"),
+  ].join(" &nbsp;·&nbsp; ");
   return (
     "Calibrate is an open-source evaluation platform for AI agents, text or " +
     "voice. Testing agents manually is slow and inconsistent, so Calibrate helps " +
@@ -137,11 +136,10 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     {
       anchor: A.newAgent,
       title: "Create an agent",
-      description:
-        "Everything you evaluate hangs off an agent. I'll open the create dialog for you.",
+      description: "An agent is the assistant you want to test. Let's make one.",
       side: "bottom",
       align: "end",
-      actionLabel: "Open",
+      actionLabel: "New agent",
       action: async () => {
         await clickElement(A.newAgent);
       },
@@ -149,9 +147,9 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     {
       anchor: A.agentNameInput,
       title: "Name it",
-      description: `I'll call it "${DEMO_AGENT_NAME}" and create it. You'd normally name it after your real assistant.`,
+      description: `I'll name it "${DEMO_AGENT_NAME}" and create it.`,
       side: "bottom",
-      actionLabel: "Fill & create",
+      actionLabel: "Create agent",
       action: async () => {
         await fillInput(A.agentNameInput, DEMO_AGENT_NAME);
         await delay(150);
@@ -163,9 +161,9 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.systemPrompt,
       title: "Give it a system prompt",
       description:
-        "This is the agent's instructions. I'll paste a sample customer-support prompt. This is what your tests will hold the agent accountable to.",
+        "The system prompt tells your agent how to behave. I'll add a sample one.",
       side: "top",
-      actionLabel: "Paste sample",
+      actionLabel: "Add prompt",
       timeout: 15000,
       action: async () => {
         await fillInput(A.systemPrompt, DEMO_SYSTEM_PROMPT, { timeout: 15000 });
@@ -174,7 +172,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     {
       anchor: A.save,
       title: "Save the agent",
-      description: "The Save button lives up here in the header. I'll save your changes.",
+      description: "Now let's save your agent.",
       side: "bottom",
       align: "end",
       actionLabel: "Save",
@@ -186,9 +184,9 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.tabEvaluators,
       title: "Evaluators score conversations",
       description:
-        "The Evaluators tab is where you pick which judges matter for this agent, like a Correctness check. New tests inherit these automatically.",
+        "Evaluators are the judges that score each reply. Your tests use them automatically.",
       side: "bottom",
-      actionLabel: "Show me",
+      actionLabel: "Next",
       action: async () => {
         await clickElement(A.tabEvaluators);
       },
@@ -197,9 +195,9 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.tabTests,
       title: "Now let's add tests",
       description:
-        "Tests are the cases your agent must handle. I'll switch to the Tests tab and add two sample tests for you.",
+        "Tests are the situations your agent should handle. I'll add two samples.",
       side: "bottom",
-      actionLabel: "Add sample tests",
+      actionLabel: "Add tests",
       action: async () => {
         await clickElement(A.tabTests);
         const uuid = currentAgentUuid();
@@ -216,8 +214,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     {
       anchor: A.testsRunAll,
       title: "Run the evaluation",
-      description:
-        "Two sample tests are ready. I'll run them against your agent. Calibrate replays each case and grades the reply.",
+      description: "Now let's run them and see how your agent does.",
       side: "bottom",
       align: "end",
       actionLabel: "Run tests",
@@ -230,9 +227,9 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.runSummary,
       title: "Read the results",
       description:
-        "Here's your first result: pass rate up top, plus latency, cost, tokens, and a score per evaluator. Open any case to see the judge's reasoning. That's the core loop! Delete the Demo agent whenever you're done.",
+        "Here's how your agent did: the pass rate, plus speed, cost, and a score from each evaluator. Open any test to see why it passed or failed. You can delete the demo agent anytime.",
       side: "top",
-      actionLabel: "Finish",
+      actionLabel: "Done",
       timeout: 90000,
     },
   ];
