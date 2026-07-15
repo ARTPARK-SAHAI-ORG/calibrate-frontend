@@ -14,6 +14,7 @@ import {
   STTEvaluationOutputs,
   TTSEvaluationOutputs,
   WER_ABOUT_METRIC,
+  CER_ABOUT_METRIC,
   TTFB_ABOUT_METRIC,
   type EvaluatorAboutMetricRow,
   type STTProviderResultForDetails,
@@ -350,7 +351,7 @@ const explicitRangeRow: EvaluatorAboutMetricRow = {
 };
 
 describe("STTEvaluationAbout", () => {
-  it("prepends WER_ABOUT_METRIC and maps rows with correct preference/range", () => {
+  it("prepends WER_ABOUT_METRIC and CER_ABOUT_METRIC, then maps rows with correct preference/range", () => {
     render(
       <STTEvaluationAbout evaluatorRows={[binaryRow, ratingRow, explicitRangeRow]} />,
     );
@@ -358,17 +359,18 @@ describe("STTEvaluationAbout", () => {
     const metrics = JSON.parse(text);
 
     expect(metrics[0]).toEqual(WER_ABOUT_METRIC);
-    expect(metrics[1]).toMatchObject({
+    expect(metrics[1]).toEqual(CER_ABOUT_METRIC);
+    expect(metrics[2]).toMatchObject({
       key: "pass_fail",
       preference: "Pass is better",
       range: "Pass / Fail",
     });
-    expect(metrics[2]).toMatchObject({
+    expect(metrics[3]).toMatchObject({
       key: "clarity",
       preference: "Higher is better",
       range: "-",
     });
-    expect(metrics[3]).toMatchObject({
+    expect(metrics[4]).toMatchObject({
       key: "custom",
       preference: "Higher is better",
       range: "1 - 10",
@@ -397,10 +399,10 @@ describe("TTSEvaluationAbout", () => {
 const getProviderLabel = (v: string) => `Provider ${v}`;
 
 describe("STTEvaluationLeaderboard", () => {
-  it("builds a WER chart plus one chart per evaluator column, chunked into rows of two", () => {
+  it("builds WER + CER charts plus one chart per evaluator column, chunked into rows of two", () => {
     render(
       <STTEvaluationLeaderboard
-        leaderboardSummary={[{ run: "openai", wer: 0.1 }]}
+        leaderboardSummary={[{ run: "openai", wer: 0.1, cer: 0.05 }]}
         evaluatorColumns={
           [
             { key: "a", label: "A", outputType: "binary", scoreField: "a" },
@@ -415,16 +417,17 @@ describe("STTEvaluationLeaderboard", () => {
     const charts = JSON.parse(
       screen.getByTestId("leaderboard-charts").textContent ?? "[]",
     );
-    // 4 charts total (WER + A + B + C) chunked into rows of 2 => 2 rows
+    // 5 charts total (WER + CER + A + B + C) chunked into rows of 2 => 3 rows
     expect(charts).toEqual([
       [
         { title: "WER", dataKey: "wer" },
-        { title: "A", dataKey: "a" },
+        { title: "CER", dataKey: "cer" },
       ],
       [
+        { title: "A", dataKey: "a" },
         { title: "B", dataKey: "b" },
-        { title: "C", dataKey: "c" },
       ],
+      [{ title: "C", dataKey: "c" }],
     ]);
 
     const columns = JSON.parse(
@@ -433,6 +436,7 @@ describe("STTEvaluationLeaderboard", () => {
     expect(columns).toEqual([
       { key: "run", header: "Run" },
       { key: "wer", header: "WER" },
+      { key: "cer", header: "CER" },
       { key: "a", header: "A" },
       { key: "b", header: "B" },
       { key: "c", header: "C" },
@@ -675,12 +679,12 @@ describe("STTEvaluationOutputs", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders metrics card with WER and evaluator columns when success is true and metrics present", () => {
+  it("renders metrics card with WER, CER and evaluator columns when success is true and metrics present", () => {
     const providerResults: STTProviderResultForDetails[] = [
       {
         provider: "openai",
         success: true,
-        metrics: { wer: 0.123456 },
+        metrics: { wer: 0.123456, cer: 0.056789 },
         evaluator_runs: [
           { metric_key: "clarity", aggregate: { mean: 0.8 } },
         ],
@@ -692,15 +696,16 @@ describe("STTEvaluationOutputs", () => {
     );
     expect(screen.getByTestId("provider-metrics-card")).toBeInTheDocument();
     expect(screen.getByTestId("metric-WER").textContent).toBe("0.1235");
+    expect(screen.getByTestId("metric-CER").textContent).toBe("0.0568");
     expect(screen.getByTestId("metric-Clarity").textContent).toBe("0.8");
   });
 
-  it("renders '-' for WER when metrics.wer is null", () => {
+  it("renders '-' for WER and CER when their metrics are null", () => {
     const providerResults: STTProviderResultForDetails[] = [
       {
         provider: "openai",
         success: true,
-        metrics: { wer: null as unknown as number },
+        metrics: { wer: null as unknown as number, cer: null as unknown as number },
         results: [],
       },
     ];
@@ -708,6 +713,7 @@ describe("STTEvaluationOutputs", () => {
       <STTEvaluationOutputs {...baseProps} providerResults={providerResults} />,
     );
     expect(screen.getByTestId("metric-WER").textContent).toBe("-");
+    expect(screen.getByTestId("metric-CER").textContent).toBe("-");
   });
 
   it("renders the results table when results is non-empty", () => {

@@ -7,6 +7,7 @@ const baseRow: STTResultRow = {
   gt: "hello world",
   pred: "hello world",
   wer: "0.1234",
+  cer: "0.0567",
   string_similarity: "0.9876",
   llm_judge_score: "true",
   llm_judge_reasoning: "Matches well",
@@ -18,10 +19,12 @@ describe("STTResultsTable", () => {
     expect(screen.getAllByText("Ground Truth").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Prediction").length).toBeGreaterThan(0);
     expect(screen.getAllByText("WER").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("CER").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Similarity").length).toBeGreaterThan(0);
     expect(screen.queryByText("Audio")).not.toBeInTheDocument();
-    // WER/similarity formatted values (appear in both desktop+mobile)
+    // WER/CER/similarity formatted values (appear in both desktop+mobile)
     expect(screen.getAllByText("0.1234").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("0.0567").length).toBeGreaterThan(0);
     expect(screen.getAllByText("0.9876").length).toBeGreaterThan(0);
     // Pass badge (from legacy llm_judge_score true)
     expect(screen.getAllByText("Pass").length).toBeGreaterThan(0);
@@ -73,8 +76,22 @@ describe("STTResultsTable", () => {
   it("hides metrics columns entirely when showMetrics=false", () => {
     render(<STTResultsTable results={[baseRow]} showMetrics={false} />);
     expect(screen.queryByText("WER")).not.toBeInTheDocument();
+    expect(screen.queryByText("CER")).not.toBeInTheDocument();
     expect(screen.queryByText("Similarity")).not.toBeInTheDocument();
     expect(screen.queryByText("Evaluator")).not.toBeInTheDocument();
+  });
+
+  it("renders CER column even when similarity is hidden (auth STT page config)", () => {
+    render(<STTResultsTable results={[baseRow]} showSimilarity={false} />);
+    expect(screen.getAllByText("CER").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("0.0567").length).toBeGreaterThan(0);
+  });
+
+  it("renders dash for a row with no cer value", () => {
+    render(<STTResultsTable results={[{ ...baseRow, cer: undefined }]} />);
+    // CER header still shown, cell falls back to '-'
+    expect(screen.getAllByText("CER").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("-").length).toBeGreaterThan(0);
   });
 
   it("hides similarity column when showSimilarity=false", () => {
