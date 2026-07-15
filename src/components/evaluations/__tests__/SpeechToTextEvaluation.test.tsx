@@ -169,15 +169,18 @@ describe("SpeechToTextEvaluation", () => {
     await waitFor(() => expect(screen.getByTestId("evaluator-e1")).toBeInTheDocument());
   });
 
-  it("fetches and splits evaluators into available + pre-selected defaults", async () => {
+  it("lists STT evaluators (excluding other types) with none pre-selected", async () => {
     const user = setupUser();
     render(<SpeechToTextEvaluation />);
     await user.click(screen.getByText("Settings"));
     await waitFor(() => {
       expect(screen.getByTestId("evaluator-e1")).toBeInTheDocument();
     });
+    // Non-STT evaluators are filtered out.
     expect(screen.queryByTestId("evaluator-e3")).not.toBeInTheDocument();
-    expect(screen.getByTestId("evaluator-e1")).toHaveAttribute("aria-pressed", "true");
+    // Nothing is pre-selected — adding an evaluator is entirely opt-in, so even
+    // an org-default evaluator starts unchecked.
+    expect(screen.getByTestId("evaluator-e1")).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByTestId("evaluator-e2")).toHaveAttribute("aria-pressed", "false");
   });
 

@@ -1,7 +1,6 @@
 "use client";
 import { reportError } from "@/lib/reportError";
 import { unwrapList } from "@/lib/api";
-import { isDefaultEvaluator } from "@/lib/evaluatorApi";
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -157,9 +156,9 @@ export function SpeechToTextEvaluation({
   const [datasetName, setDatasetName] = useState("");
   const [datasetNameInvalid, setDatasetNameInvalid] = useState(false);
 
-  // Evaluators (filtered to STT purpose). Org defaults (`is_default`) are
-  // pre-selected on first load — see /evaluators page for the same
-  // default vs my-evaluators distinction.
+  // Evaluators (filtered to STT purpose). None are pre-selected — the user
+  // chooses which (if any) to add, since STT evaluations no longer require an
+  // evaluator.
   const [availableEvaluators, setAvailableEvaluators] = useState<PickerItem[]>([]);
   const [selectedEvaluators, setSelectedEvaluators] = useState<PickerItem[]>([]);
   const [evaluatorsLoading, setEvaluatorsLoading] = useState(false);
@@ -212,38 +211,22 @@ export function SpeechToTextEvaluation({
         }
 
         const data = await response.json();
-        const sttEvaluators: (PickerItem & { isDefault: boolean })[] =
-          unwrapList<{
-            uuid: string;
-            name: string;
-            description?: string;
-            is_default?: boolean;
-            evaluator_type?: string;
-          }>(data)
-            .filter((m) => m.evaluator_type === "stt")
-            .map((m) => ({
-              uuid: m.uuid,
-              name: m.name,
-              description: m.description,
-              isDefault: isDefaultEvaluator(m),
-            }));
+        const sttEvaluators: PickerItem[] = unwrapList<{
+          uuid: string;
+          name: string;
+          description?: string;
+          evaluator_type?: string;
+        }>(data)
+          .filter((m) => m.evaluator_type === "stt")
+          .map((m) => ({
+            uuid: m.uuid,
+            name: m.name,
+            description: m.description,
+          }));
 
-        setAvailableEvaluators(
-          sttEvaluators.map(({ uuid, name, description }) => ({
-            uuid,
-            name,
-            description,
-          })),
-        );
-        setSelectedEvaluators(
-          sttEvaluators
-            .filter((e) => e.isDefault)
-            .map(({ uuid, name, description }) => ({
-              uuid,
-              name,
-              description,
-            })),
-        );
+        // Show every STT evaluator but pre-select none — adding an evaluator
+        // is entirely opt-in.
+        setAvailableEvaluators(sttEvaluators);
       } catch (err) {
         reportError("Error fetching evaluators:", err);
       } finally {
