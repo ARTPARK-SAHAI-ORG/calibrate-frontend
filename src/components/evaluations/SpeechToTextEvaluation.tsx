@@ -30,7 +30,7 @@ type EvaluationResult = {
   status: "queued" | "in_progress" | "done";
 };
 
-type TabType = "settings" | "input";
+type TabType = "input" | "models" | "settings";
 
 type LanguageOption =
   | "english"
@@ -93,7 +93,7 @@ export function SpeechToTextEvaluation({
 }: SpeechToTextEvaluationProps = {}) {
   const router = useRouter();
   const backendAccessToken = useAccessToken();
-  const [activeTab, setActiveTab] = useState<TabType>(initialDatasetId ? "settings" : "input");
+  const [activeTab, setActiveTab] = useState<TabType>(initialDatasetId ? "models" : "input");
   const editorRef = useRef<STTDatasetEditorHandle | null>(null);
   const maxRowsPerEval = useMaxRowsPerEval();
   const [providersInvalid, setProvidersInvalid] = useState(false);
@@ -283,7 +283,7 @@ export function SpeechToTextEvaluation({
     // Validate providers first
     if (selectedProviders.size === 0) {
       setProvidersInvalid(true);
-      setActiveTab("settings");
+      setActiveTab("models");
       return;
     }
 
@@ -399,7 +399,17 @@ export function SpeechToTextEvaluation({
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          Dataset
+          Datasets
+        </button>
+        <button
+          onClick={() => setActiveTab("models")}
+          className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer ${
+            activeTab === "models"
+              ? "text-foreground border-b-2 border-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Models
         </button>
         <button
           onClick={() => setActiveTab("settings")}
@@ -413,8 +423,8 @@ export function SpeechToTextEvaluation({
         </button>
       </div>
 
-      {/* Settings Tab Content */}
-      <div className={activeTab === "settings" ? "space-y-8" : "hidden"}>
+      {/* Models Tab Content */}
+      <div className={activeTab === "models" ? "space-y-8" : "hidden"}>
           {/* Language Selection */}
           <div className="space-y-3">
             <div className="flex items-center">
@@ -787,7 +797,10 @@ export function SpeechToTextEvaluation({
               })}
             </div>
           </div>
+        </div>
 
+      {/* Settings Tab Content */}
+      <div className={activeTab === "settings" ? "space-y-8" : "hidden"}>
           {/* Evaluator Selection */}
           <div
             className={`space-y-3 p-4 -m-4 rounded-lg transition-colors ${

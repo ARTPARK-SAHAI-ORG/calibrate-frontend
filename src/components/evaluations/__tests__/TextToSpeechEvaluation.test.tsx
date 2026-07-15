@@ -169,7 +169,7 @@ afterEach(() => {
 describe("TextToSpeechEvaluation", () => {
   it("renders with the input tab active by default", async () => {
     render(<TextToSpeechEvaluation />);
-    expect(screen.getByText("Dataset")).toBeInTheDocument();
+    expect(screen.getByText("Datasets")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
     expect(screen.getByTestId("tts-editor")).toBeInTheDocument();
     await waitFor(() => expect(mockListDatasets).toHaveBeenCalledWith("test-token", "tts"));
@@ -214,7 +214,7 @@ describe("TextToSpeechEvaluation", () => {
     render(<TextToSpeechEvaluation />);
     await user.click(screen.getByText("Settings"));
     expect(screen.getByText("Language")).toBeInTheDocument();
-    await user.click(screen.getByText("Dataset"));
+    await user.click(screen.getByText("Datasets"));
     expect(screen.getByTestId("tts-editor")).toBeInTheDocument();
   });
 
@@ -297,7 +297,7 @@ describe("TextToSpeechEvaluation", () => {
     const cartesiaRow = screen.getAllByText("Cartesia")[0].closest("tr")!;
     await user.click(cartesiaRow);
 
-    await user.click(screen.getByText("Dataset"));
+    await user.click(screen.getByText("Datasets"));
     await user.click(screen.getByText("Use existing dataset"));
     await waitFor(() => screen.getByTestId("dataset-picker"));
 
@@ -457,7 +457,7 @@ describe("TextToSpeechEvaluation", () => {
     const cartesiaRow = screen.getAllByText("Cartesia")[0].closest("tr")!;
     await user.click(cartesiaRow);
 
-    await user.click(screen.getByText("Dataset"));
+    await user.click(screen.getByText("Datasets"));
     await user.click(screen.getByText("Use existing dataset"));
     await waitFor(() => screen.getByTestId("pick-ds-1"));
     await user.click(screen.getByTestId("pick-ds-1"));
