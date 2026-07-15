@@ -690,6 +690,9 @@ function NewAgentDialog({
   const handleCreate = async () => {
     if (!agentName.trim()) return;
 
+    // Keep the dialog open (spinner up) through navigation so the agents list
+    // never flashes between "Create" and the new agent's page loading.
+    let navigating = false;
     try {
       setIsCreating(true);
       setError(null);
@@ -747,14 +750,15 @@ function NewAgentDialog({
       const agentUuid = data.uuid;
 
       if (agentUuid && onCreateAgent) {
-        onClose();
+        navigating = true;
         onCreateAgent(agentUuid);
       }
     } catch (err) {
       reportError("Error creating agent:", err);
       setError(err instanceof Error ? err.message : "Failed to create agent");
     } finally {
-      setIsCreating(false);
+      // Leave the spinner up while navigating; the dialog unmounts with the page.
+      if (!navigating) setIsCreating(false);
     }
   };
 
