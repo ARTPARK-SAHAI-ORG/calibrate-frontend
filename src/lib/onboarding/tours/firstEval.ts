@@ -174,7 +174,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     {
       anchor: A.agentNameInput,
       title: "Name your agent",
-      description: `We've gone with "${DEMO_AGENT_NAME}" here. In your own workspace, you'd use your assistant's real name.`,
+      description: `We've named it "${DEMO_AGENT_NAME}" for you. You can rename it later.`,
       side: "bottom",
       actionLabel: "Create",
       action: async () => {
