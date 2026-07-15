@@ -54,9 +54,10 @@ function welcomeDescription(): string {
 const DEMO_AGENT_NAME = "Demo agent";
 
 const DEMO_SYSTEM_PROMPT =
-  "You are a friendly customer-support assistant for an online bookstore. " +
-  "Answer questions about orders, shipping, and returns concisely and politely. " +
-  "If you do not know an answer, offer to connect the customer to a human.";
+  "You are a friendly helpline assistant for a non-profit that runs free " +
+  "community health clinics. Answer questions about clinic hours, services, and " +
+  "appointments concisely and kindly. If you do not know an answer, offer to " +
+  "connect the person to a staff member.";
 
 type DemoTest = {
   name: string;
@@ -67,16 +68,16 @@ type DemoTest = {
 
 const DEMO_TESTS: DemoTest[] = [
   {
-    name: "Demo · shipping time",
-    userMessage: "How long does standard shipping take?",
-    agentMessage: "Standard shipping usually takes 3 to 5 business days.",
-    criteria: "States the standard shipping time clearly and politely.",
+    name: "Demo · clinic hours",
+    userMessage: "What time does the clinic open?",
+    agentMessage: "Our clinic is open from 9 am to 5 pm, Monday to Saturday.",
+    criteria: "States the clinic's opening hours clearly and kindly.",
   },
   {
-    name: "Demo · return policy",
-    userMessage: "Can I return a book I already opened?",
-    agentMessage: "Yes, you can return an opened book within 30 days for a refund.",
-    criteria: "Explains the return policy for opened books accurately.",
+    name: "Demo · appointment needed",
+    userMessage: "Do I need an appointment to visit?",
+    agentMessage: "No appointment is needed. You can walk in anytime during opening hours.",
+    criteria: "Explains the walk-in and appointment policy accurately.",
   },
 ];
 
@@ -116,7 +117,7 @@ export type FirstEvalDeps = {
 
 /**
  * Fill the sample scenario (conversation) into the already-open Create Test
- * editor: every seeded user turn gets the customer's question, every agent turn
+ * editor: every seeded user turn gets the person's question, every agent turn
  * a sample reply.
  */
 function fillTestScenario(test: DemoTest): void {
@@ -129,10 +130,15 @@ function fillTestScenario(test: DemoTest): void {
  * and the default evaluator. Leaves the editor open for the scenario/criteria
  * to be filled in.
  */
-async function openCreateTestEditor(name: string): Promise<void> {
+async function openCreateTestEditor(
+  baseName: string,
+  deps: FirstEvalDeps,
+): Promise<void> {
   await clickElement(A.testsCreate, { timeout: 10000 });
   await clickByText("Next reply test", { timeout: 8000 });
   await delay(300);
+  // Avoid "A test with this name already exists" on re-runs.
+  const name = await resolveFreeName(baseName, "/tests", deps.getAccessToken());
   await fillByPlaceholder("Your test name", name, { timeout: 8000 });
 }
 
@@ -146,8 +152,8 @@ async function submitCreateTest(): Promise<void> {
 }
 
 /** Create one demo test end to end through the real dialog. */
-async function createOneTest(test: DemoTest): Promise<void> {
-  await openCreateTestEditor(test.name);
+async function createOneTest(test: DemoTest, deps: FirstEvalDeps): Promise<void> {
+  await openCreateTestEditor(test.name, deps);
   fillTestScenario(test);
   await fillByPlaceholder(
     "Criteria that the agent's response should satisfy",
@@ -158,32 +164,41 @@ async function createOneTest(test: DemoTest): Promise<void> {
   await submitCreateTest();
 }
 
+/** Return `base`, or the first free "base (N)" variant not in `taken`. */
+function pickFreeName(base: string, taken: Set<string>): string {
+  if (!taken.has(base.toLowerCase())) return base;
+  for (let i = 2; i < 1000; i++) {
+    const candidate = `${base} (${i})`;
+    if (!taken.has(candidate.toLowerCase())) return candidate;
+  }
+  return base;
+}
+
 /**
- * Pick a demo agent name that is not already taken, so re-running the tour
- * doesn't hit "Agent name already exists": "Demo agent", then "Demo agent (2)",
- * "Demo agent (3)", and so on.
+ * Pick a name not already taken by items at `listEndpoint` (a `{ name }` list),
+ * so re-running the tour never hits "already exists": "Demo …", then
+ * "Demo … (2)", "(3)", and so on. Falls back to `base` if the lookup fails.
  */
-async function resolveDemoAgentName(accessToken: string | null): Promise<string> {
-  if (!accessToken) return DEMO_AGENT_NAME;
+async function resolveFreeName(
+  base: string,
+  listEndpoint: string,
+  accessToken: string | null,
+): Promise<string> {
+  if (!accessToken) return base;
   try {
-    const res = await fetch(`${getBackendUrl()}/agents`, {
+    const res = await fetch(`${getBackendUrl()}${listEndpoint}`, {
       method: "GET",
       headers: getDefaultHeaders(accessToken),
     });
-    if (!res.ok) return DEMO_AGENT_NAME;
+    if (!res.ok) return base;
     const taken = new Set(
-      unwrapList<{ name?: string }>(await res.json()).map((a) =>
-        (a.name ?? "").trim().toLowerCase(),
+      unwrapList<{ name?: string }>(await res.json()).map((x) =>
+        (x.name ?? "").trim().toLowerCase(),
       ),
     );
-    if (!taken.has(DEMO_AGENT_NAME.toLowerCase())) return DEMO_AGENT_NAME;
-    for (let i = 2; i < 1000; i++) {
-      const candidate = `${DEMO_AGENT_NAME} (${i})`;
-      if (!taken.has(candidate.toLowerCase())) return candidate;
-    }
-    return DEMO_AGENT_NAME;
+    return pickFreeName(base, taken);
   } catch {
-    return DEMO_AGENT_NAME;
+    return base;
   }
 }
 
@@ -218,7 +233,11 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       actionLabel: "Next",
       action: async () => {
         await clickElement(A.newAgent);
-        const name = await resolveDemoAgentName(deps.getAccessToken());
+        const name = await resolveFreeName(
+          DEMO_AGENT_NAME,
+          "/agents",
+          deps.getAccessToken(),
+        );
         await fillInput(A.agentNameInput, name, { timeout: 8000 });
       },
     },
@@ -240,7 +259,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.systemPrompt,
       title: "Give it instructions",
       description:
-        "This is where you <strong>tell your agent how to behave</strong>. We have popped in a sample for a customer-support assistant so you can see the idea.",
+        "This is where you <strong>tell your agent how to behave</strong>. We have popped in a sample for a community health helpline so you can see the idea.",
       side: "top",
       actionLabel: "Next",
       timeout: 15000,
@@ -293,14 +312,14 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
         await clickElement(A.tabTests);
       },
       action: async () => {
-        await openCreateTestEditor(DEMO_TESTS[0].name);
+        await openCreateTestEditor(DEMO_TESTS[0].name, deps);
       },
     },
     {
       anchor: A.testConversation,
       title: "The scenario",
       description:
-        "The <strong>scenario</strong> is the conversation your agent has to handle. Here a customer is asking about shipping.",
+        "The <strong>scenario</strong> is the conversation your agent has to handle. Here someone is asking when the clinic opens.",
       side: "right",
       actionLabel: "Next",
       timeout: 15000,
@@ -336,7 +355,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       actionLabel: "Add it",
       timeout: 12000,
       action: async () => {
-        await createOneTest(DEMO_TESTS[1]);
+        await createOneTest(DEMO_TESTS[1], deps);
       },
     },
     {

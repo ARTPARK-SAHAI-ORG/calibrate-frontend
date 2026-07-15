@@ -137,13 +137,13 @@ test.describe("Onboarding flagship tour (authenticated, fake-AI backend)", () =>
     // 9) Scenario -> 10) success criteria: creates the first test via the dialog.
     await step(page, "The scenario");
     await step(page, "The success criteria");
-    await expect(page.getByText("Demo · shipping time").first()).toBeVisible({
+    await expect(page.getByText("Demo · clinic hours").first()).toBeVisible({
       timeout: 20000,
     });
 
     // 11) Add one more: creates the second test the same way.
     await step(page, "Add one more");
-    await expect(page.getByText("Demo · return policy").first()).toBeVisible({
+    await expect(page.getByText("Demo · appointment needed").first()).toBeVisible({
       timeout: 20000,
     });
 
