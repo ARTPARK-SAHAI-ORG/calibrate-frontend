@@ -163,11 +163,9 @@ export function SpeechToTextEvaluation({
   const [availableEvaluators, setAvailableEvaluators] = useState<PickerItem[]>([]);
   const [selectedEvaluators, setSelectedEvaluators] = useState<PickerItem[]>([]);
   const [evaluatorsLoading, setEvaluatorsLoading] = useState(false);
-  const [evaluatorsInvalid, setEvaluatorsInvalid] = useState(false);
 
   const handleEvaluatorsChange = (items: PickerItem[]) => {
     setSelectedEvaluators(items);
-    if (items.length > 0) setEvaluatorsInvalid(false);
   };
 
   useEffect(() => {
@@ -292,13 +290,6 @@ export function SpeechToTextEvaluation({
       return;
     }
 
-    // Validate evaluators
-    if (selectedEvaluators.length === 0) {
-      setEvaluatorsInvalid(true);
-      setActiveTab("settings");
-      return;
-    }
-
     if (inputMode === "dataset") {
       if (!selectedDatasetId) {
         setActiveTab("input");
@@ -321,7 +312,6 @@ export function SpeechToTextEvaluation({
     }
 
     setProvidersInvalid(false);
-    setEvaluatorsInvalid(false);
     setIsEvaluating(true);
 
     try {
@@ -809,17 +799,13 @@ export function SpeechToTextEvaluation({
       {/* Settings Tab Content */}
       <div className={activeTab === "settings" ? "space-y-8" : "hidden"}>
           {/* Evaluator Selection */}
-          <div
-            className={`space-y-3 p-4 -m-4 rounded-lg transition-colors ${
-              evaluatorsInvalid ? "bg-red-500/10 border border-red-500" : ""
-            }`}
-          >
+          <div className="space-y-3">
             <div className="flex items-center gap-2">
               <h3 className="text-[13px] font-medium text-foreground">
                 Select evaluators
               </h3>
               <span className="text-[12px] text-muted-foreground">
-                ({selectedEvaluators.length} selected)
+                (optional · {selectedEvaluators.length} selected)
               </span>
             </div>
             {/* WER is a built-in STT metric computed on every run regardless of

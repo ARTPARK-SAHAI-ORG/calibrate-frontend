@@ -263,7 +263,7 @@ describe("SpeechToTextEvaluation", () => {
     expect(screen.getByText("Language")).toBeInTheDocument();
   });
 
-  it("validates evaluators are selected before proceeding", async () => {
+  it("allows evaluate to proceed with no evaluators selected (evaluators are optional)", async () => {
     const user = setupUser();
     const evaluateRef = { current: null as (() => void) | null };
     render(<SpeechToTextEvaluation evaluateRef={evaluateRef} />);
@@ -277,7 +277,10 @@ describe("SpeechToTextEvaluation", () => {
       evaluateRef.current?.();
     });
 
-    expect(screen.getByText("Language")).toBeInTheDocument();
+    // Evaluators no longer gate the flow — it advances past them to the
+    // dataset-name validation (inline mode), turning the name field red.
+    const input = screen.getByPlaceholderText("e.g. English customer calls");
+    expect(input.className).toMatch(/border-red-500/);
   });
 
   it("shows a toast and blocks evaluate when dataset mode has no dataset selected", async () => {
