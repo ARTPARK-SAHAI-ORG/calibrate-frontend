@@ -102,7 +102,9 @@ export function DuplicateEvaluatorDialog({
         description: data.description || originalEvaluator.description,
         created_at: data.created_at || new Date().toISOString(),
         updated_at: data.updated_at || new Date().toISOString(),
-        owner_user_id: data.owner_user_id ?? "self",
+        owner_user_id: data.owner_user_id ?? null,
+        // A duplicate is always a new custom evaluator, never an org default.
+        is_default: data.is_default ?? false,
         evaluator_type: data.evaluator_type ?? originalEvaluator.evaluator_type,
         output_type: data.output_type ?? originalEvaluator.output_type,
         data_type: data.data_type ?? originalEvaluator.data_type,

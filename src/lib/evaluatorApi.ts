@@ -15,12 +15,12 @@ export type EvaluatorData = {
   created_at: string;
   updated_at: string;
   /**
-   * Present on the top-level `/evaluators` list (null for built-in defaults).
-   * NOT returned by `GET /agents/{uuid}/evaluators`, which sends `is_default`
-   * instead — use `isOwnedEvaluator()` to decide ownership across both shapes.
+   * Set for EVERY evaluator now — org defaults are forked per org, so both
+   * defaults and customs carry an owner. It can no longer distinguish default
+   * from custom; use `is_default` for that. Kept only where the raw id matters.
    */
   owner_user_id?: string | null;
-  /** True for built-in default evaluators. Returned by the agent list. */
+  /** True for org default (forked seed) evaluators. The ONLY default marker. */
   is_default?: boolean;
   data_type?: "text" | "audio";
   kind?: "single" | "side_by_side";
@@ -29,17 +29,16 @@ export type EvaluatorData = {
 };
 
 /**
- * Whether this is a user-created (custom) evaluator rather than an org default,
- * tolerating both list shapes: the agent list exposes `is_default`, the
- * top-level `/evaluators` list exposes `owner_user_id` (null = org default).
+ * Whether this is a user-created (custom) evaluator rather than an org default.
+ * `is_default` is the sole discriminator: `owner_user_id` is now set on every
+ * evaluator (defaults are per-org forks) so it can't be used here.
  *
  * This is a *categorization* helper only — it drives the Default vs Custom
  * split in the list/picker UIs. It is NOT a permissions check: org defaults are
  * now editable/deletable forks, so edit/delete/new-version are allowed on both.
  */
 export function isOwnedEvaluator(e: EvaluatorData): boolean {
-  if (typeof e.is_default === "boolean") return !e.is_default;
-  return !!e.owner_user_id;
+  return !e.is_default;
 }
 
 /**

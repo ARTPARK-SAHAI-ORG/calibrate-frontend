@@ -9,6 +9,8 @@ const evaluator = (over: Partial<EvaluatorData> = {}): EvaluatorData => ({
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:00Z",
   owner_user_id: over.owner_user_id ?? "user-1",
+  // Defaults are distinguished by is_default only (every evaluator has an owner).
+  is_default: over.is_default ?? false,
   output_type: "binary",
   evaluator_type: "llm",
   ...over,
@@ -25,7 +27,7 @@ describe("AddEvaluatorsDialog", () => {
           evaluator({
             uuid: "ev-default",
             name: "Correctness",
-            owner_user_id: null,
+            is_default: true,
           }),
           evaluator({
             uuid: "ev-custom",
@@ -52,7 +54,7 @@ describe("AddEvaluatorsDialog", () => {
           evaluator({
             uuid: "ev-default",
             name: "Correctness",
-            owner_user_id: null,
+            is_default: true,
           }),
         ]}
       />,

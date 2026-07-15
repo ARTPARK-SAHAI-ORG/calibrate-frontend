@@ -267,7 +267,7 @@ export default function STTEvaluationDetailPage() {
           uuid: string;
           name: string;
           description?: string | null;
-          owner_user_id?: string | null;
+          is_default?: boolean;
           evaluator_type?: string;
         }>(data)
           .filter((m) => m.evaluator_type === "stt")
@@ -275,7 +275,9 @@ export default function STTEvaluationDetailPage() {
             uuid: m.uuid,
             name: m.name,
             description: m.description ?? null,
-            isDefault: !m.owner_user_id,
+            // Org defaults are forks that also carry an owner_user_id, so the
+            // only reliable default marker is `is_default`.
+            isDefault: !!m.is_default,
           }));
         setSttEvaluators(items);
       } catch (err) {

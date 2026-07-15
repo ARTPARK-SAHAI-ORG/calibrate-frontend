@@ -54,19 +54,23 @@ describe("isOwnedEvaluator", () => {
     );
   });
 
-  it("returns true for non-default agent-list evaluators via is_default", () => {
+  it("returns true for non-default evaluators via is_default", () => {
     expect(isOwnedEvaluator({ is_default: false } as EvaluatorData)).toBe(true);
   });
 
-  it("returns false when owner_user_id is null on library list items", () => {
+  it("ignores owner_user_id — a fork with an owner is still a default", () => {
+    // Every evaluator now carries an owner_user_id, so only is_default counts.
     expect(
-      isOwnedEvaluator({ owner_user_id: null } as EvaluatorData),
+      isOwnedEvaluator({
+        is_default: true,
+        owner_user_id: "org-1",
+      } as EvaluatorData),
     ).toBe(false);
-  });
-
-  it("returns true when owner_user_id is set on library list items", () => {
     expect(
-      isOwnedEvaluator({ owner_user_id: "user-1" } as EvaluatorData),
+      isOwnedEvaluator({
+        is_default: false,
+        owner_user_id: "org-1",
+      } as EvaluatorData),
     ).toBe(true);
   });
 });

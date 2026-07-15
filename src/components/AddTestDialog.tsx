@@ -700,6 +700,8 @@ type LLMEvaluatorOption = {
   slug: string | null;
   /** Origin slug of a per-org default fork (forks null out `slug`). */
   source_default_slug?: string | null;
+  /** True for org default (forked seed) evaluators — the default/custom marker. */
+  is_default?: boolean;
   owner_user_id: string | null;
   variables: EvaluatorVariableDef[];
   /** "llm" for next-reply tab, "conversation" for conversation tab. */
@@ -1528,6 +1530,7 @@ export function AddTestDialog({
         description?: string;
         slug: string | null;
         source_default_slug?: string | null;
+        is_default?: boolean;
         owner_user_id: string | null;
         evaluator_type?: string;
         live_version?: { variables?: EvaluatorVariableDef[] | null } | null;
@@ -1545,6 +1548,7 @@ export function AddTestDialog({
           description: e.description,
           slug: e.slug,
           source_default_slug: e.source_default_slug,
+          is_default: e.is_default,
           owner_user_id: e.owner_user_id,
           evaluator_type: e.evaluator_type,
           variables: Array.isArray(e.live_version?.variables)
@@ -3246,10 +3250,10 @@ export function AddTestDialog({
                                 );
                               }
                               const defaults = matches.filter(
-                                (o) => o.owner_user_id === null,
+                                (o) => o.is_default,
                               );
                               const mine = matches.filter(
-                                (o) => o.owner_user_id !== null,
+                                (o) => !o.is_default,
                               );
                               const showSections =
                                 defaults.length > 0 && mine.length > 0;
