@@ -73,6 +73,10 @@ describe("unwrapList", () => {
     expect(unwrapList({ runs: [1, 2] })).toEqual([1, 2]);
   });
 
+  it("unwraps a legacy { jobs } payload", () => {
+    expect(unwrapList({ jobs: [1, 2] })).toEqual([1, 2]);
+  });
+
   it("returns [] for null", () => {
     expect(unwrapList(null)).toEqual([]);
   });
