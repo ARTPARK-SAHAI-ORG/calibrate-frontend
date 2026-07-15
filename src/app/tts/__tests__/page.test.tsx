@@ -15,12 +15,17 @@ jest.mock("../../../components/AppLayout", () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+// The datasets list the page validates job links against. Populated per test;
+// the page reads it straight from useDatasetManagement (already fetched on
+// mount), so no per-dataset GET /datasets/{id} is issued.
+let mockDatasets: { uuid: string; name: string }[] = [];
+
 // Provide a token so fetchJobs runs, and neutral dataset-tab state.
 jest.mock("../../../hooks", () => ({
   ...jest.requireActual("../../../hooks"),
   useAccessToken: () => "test-token",
   useDatasetManagement: () => ({
-    datasets: [],
+    datasets: mockDatasets,
     datasetsLoading: false,
     datasetsError: null,
     showCreateModal: false,
@@ -37,17 +42,11 @@ jest.mock("../../../hooks", () => ({
   }),
 }));
 
-// Dataset validation resolves so linked datasets stay visible.
-jest.mock("../../../lib/datasets", () => ({
-  getDataset: jest
-    .fn()
-    .mockResolvedValue({ uuid: "ds-1", name: "Announcements" }),
-}));
-
 const originalFetch = global.fetch;
 
 beforeEach(() => {
   process.env.NEXT_PUBLIC_BACKEND_URL = "http://localhost:8000";
+  mockDatasets = [{ uuid: "ds-1", name: "Announcements" }];
 });
 
 afterEach(() => {
@@ -113,6 +112,60 @@ describe("TTS evaluations list", () => {
     expect(await screen.findAllByText("—")).not.toHaveLength(0);
     // Missing sample_count -> 0.
     expect(screen.getAllByText("0").length).toBeGreaterThan(0);
+  });
+
+  it("strips the dataset link when the job points at a since-deleted dataset", async () => {
+    // The job references ds-gone, which is NOT in the loaded datasets list.
+    mockDatasets = [{ uuid: "ds-1", name: "Announcements" }];
+    mockJobsResponse([
+      {
+        uuid: "job-3",
+        type: "tts-eval",
+        status: "done",
+        providers: ["cartesia"],
+        language: "english",
+        sample_count: 2,
+        dataset_id: "ds-gone",
+        dataset_name: "Deleted set",
+        created_at: "2026-07-15 10:00:00",
+        updated_at: "2026-07-15 10:00:00",
+      },
+    ]);
+
+    render(<TTSPage />);
+
+    // Row renders, but the stale dataset name is nulled out.
+    expect(await screen.findAllByText("Cartesia")).not.toHaveLength(0);
+    expect(screen.queryByText("Deleted set")).not.toBeInTheDocument();
+  });
+
+  it("validates datasets in memory without any per-dataset fetch", async () => {
+    mockDatasets = [{ uuid: "ds-1", name: "Announcements" }];
+    mockJobsResponse([
+      {
+        uuid: "job-1",
+        type: "tts-eval",
+        status: "done",
+        providers: ["cartesia"],
+        language: "english",
+        sample_count: 1,
+        dataset_id: "ds-1",
+        dataset_name: "Announcements",
+        created_at: "2026-07-15 10:00:00",
+        updated_at: "2026-07-15 10:00:00",
+      },
+    ]);
+
+    render(<TTSPage />);
+
+    // Linked dataset stays visible because ds-1 is in the loaded list.
+    expect(await screen.findAllByText("Announcements")).not.toHaveLength(0);
+    // Only the single /jobs list call is made — no GET /datasets/{id} probes.
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://localhost:8000/jobs?job_type=tts",
+      expect.anything(),
+    );
   });
 
   it("shows the empty state when no jobs come back", async () => {

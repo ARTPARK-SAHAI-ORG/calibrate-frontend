@@ -1,7 +1,7 @@
 "use client";
 import { reportError } from "@/lib/reportError";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
@@ -10,7 +10,6 @@ import { AppLayout } from "@/components/AppLayout";
 import { ttsProviders } from "@/components/agent-tabs/constants/providers";
 import { formatStatus, getStatusBadgeClass } from "@/lib/status";
 import { useSidebarState } from "@/lib/sidebar";
-import { Dataset, getDataset } from "@/lib/datasets";
 import { unwrapList } from "@/lib/api";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import {
@@ -127,30 +126,7 @@ function TTSPageInner() {
         const data = await response.json();
         const fetchedJobs: TTSJob[] = unwrapList<TTSJob>(data);
 
-        const datasetIds = [
-          ...new Set(
-            fetchedJobs.filter((j) => j.dataset_id).map((j) => j.dataset_id!),
-          ),
-        ];
-        const validDatasetIds = new Set<string>();
-        await Promise.all(
-          datasetIds.map(async (id) => {
-            try {
-              await getDataset(backendAccessToken, id);
-              validDatasetIds.add(id);
-            } catch {
-              // Dataset no longer exists
-            }
-          }),
-        );
-        const validatedJobs = fetchedJobs.map((job) => {
-          if (job.dataset_id && !validDatasetIds.has(job.dataset_id)) {
-            return { ...job, dataset_id: null, dataset_name: null };
-          }
-          return job;
-        });
-
-        setJobs(validatedJobs);
+        setJobs(fetchedJobs);
       } catch (err) {
         reportError("Error fetching TTS jobs:", err);
         setError(
@@ -189,8 +165,21 @@ function TTSPageInner() {
     setSortOrder(sortOrder === "asc" ? "desc" : "asc");
   };
 
+  // Null out dataset links that point at a since-deleted dataset. The datasets
+  // list is already fetched on mount by useDatasetManagement, so validate
+  // against it in memory instead of a per-dataset GET /datasets/{id} probe.
+  const validatedJobs = useMemo(() => {
+    if (datasetsLoading) return jobs;
+    const validDatasetIds = new Set(datasets.map((d) => d.uuid));
+    return jobs.map((job) =>
+      job.dataset_id && !validDatasetIds.has(job.dataset_id)
+        ? { ...job, dataset_id: null, dataset_name: null }
+        : job,
+    );
+  }, [jobs, datasets, datasetsLoading]);
+
   // Sort jobs by created_at
-  const sortedJobs = [...jobs].sort((a, b) => {
+  const sortedJobs = [...validatedJobs].sort((a, b) => {
     const dateA = new Date((a.created_at || "").replace(" ", "T")).getTime();
     const dateB = new Date((b.created_at || "").replace(" ", "T")).getTime();
     if (isNaN(dateA) || isNaN(dateB)) {
