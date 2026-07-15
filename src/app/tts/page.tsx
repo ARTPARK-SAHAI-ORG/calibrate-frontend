@@ -15,7 +15,7 @@ import { unwrapList } from "@/lib/api";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
-import { useDatasetManagement } from "@/hooks";
+import { useDatasetManagement, useJobDeletion } from "@/hooks";
 
 type TTSJob = {
   uuid: string;
@@ -52,15 +52,6 @@ function TTSPageInner() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-
-  // Job selection + delete state
-  const [selectedJobUuids, setSelectedJobUuids] = useState<Set<string>>(
-    new Set(),
-  );
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [jobToDelete, setJobToDelete] = useState<TTSJob | null>(null);
-  const [jobsToDeleteBulk, setJobsToDeleteBulk] = useState<string[]>([]);
-  const [isJobDeleting, setIsJobDeleting] = useState(false);
 
   // Datasets state
   const {
@@ -204,91 +195,26 @@ function TTSPageInner() {
     return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
   });
 
-  const toggleJobSelection = (uuid: string) => {
-    setSelectedJobUuids((prev) => {
-      const next = new Set(prev);
-      if (next.has(uuid)) {
-        next.delete(uuid);
-      } else {
-        next.add(uuid);
-      }
-      return next;
-    });
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedJobUuids.size === sortedJobs.length) {
-      setSelectedJobUuids(new Set());
-    } else {
-      setSelectedJobUuids(new Set(sortedJobs.map((j) => j.uuid)));
-    }
-  };
-
-  const openDeleteDialog = (job: TTSJob) => {
-    setJobToDelete(job);
-    setJobsToDeleteBulk([]);
-    setDeleteDialogOpen(true);
-  };
-
-  const openBulkDeleteDialog = () => {
-    if (selectedJobUuids.size === 0) return;
-    setJobToDelete(null);
-    setJobsToDeleteBulk(Array.from(selectedJobUuids));
-    setDeleteDialogOpen(true);
-  };
-
-  const closeDeleteDialog = () => {
-    if (isJobDeleting) return;
-    setDeleteDialogOpen(false);
-    setJobToDelete(null);
-    setJobsToDeleteBulk([]);
-  };
-
-  const deleteJobs = async () => {
-    const uuidsToDelete =
-      jobsToDeleteBulk.length > 0
-        ? jobsToDeleteBulk
-        : jobToDelete
-          ? [jobToDelete.uuid]
-          : [];
-    if (uuidsToDelete.length === 0) return;
-
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!backendUrl) return;
-
-    setIsJobDeleting(true);
-    try {
-      for (const uuid of uuidsToDelete) {
-        const response = await fetch(`${backendUrl}/jobs/${uuid}`, {
-          method: "DELETE",
-          headers: {
-            accept: "application/json",
-            Authorization: `Bearer ${backendAccessToken}`,
-          },
-        });
-
-        if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error("Failed to delete evaluation");
-        }
-      }
-
-      const deletedSet = new Set(uuidsToDelete);
+  const {
+    selectedJobUuids,
+    allSelected,
+    toggleJobSelection,
+    toggleSelectAll,
+    deleteDialogOpen,
+    jobsToDeleteBulk,
+    isJobDeleting,
+    openDeleteDialog,
+    openBulkDeleteDialog,
+    closeDeleteDialog,
+    deleteJobs,
+  } = useJobDeletion<TTSJob>({
+    jobs: sortedJobs,
+    accessToken: backendAccessToken,
+    onDeleted: (uuids) => {
+      const deletedSet = new Set(uuids);
       setJobs((prev) => prev.filter((job) => !deletedSet.has(job.uuid)));
-      setSelectedJobUuids(new Set());
-      setDeleteDialogOpen(false);
-      setJobToDelete(null);
-      setJobsToDeleteBulk([]);
-    } catch (err) {
-      reportError("Error deleting evaluations:", err);
-    } finally {
-      setIsJobDeleting(false);
-    }
-  };
+    },
+  });
 
   return (
     <AppLayout
@@ -469,10 +395,7 @@ function TTSPageInner() {
                   <div className="grid grid-cols-[40px_2fr_1fr_100px_100px_80px_1fr_48px] gap-4 px-4 py-2 border-b border-border bg-muted/30">
                     <div className="flex items-center">
                       <SelectCheckbox
-                        checked={
-                          selectedJobUuids.size === sortedJobs.length &&
-                          sortedJobs.length > 0
-                        }
+                        checked={allSelected}
                         onToggle={toggleSelectAll}
                         title="Select all"
                       />
