@@ -222,7 +222,11 @@ export function TestRunOutputsPanel({
             </button>
           )}
         </div>
-        <div ref={listContainerRef} className="flex-1 overflow-y-auto">
+        <div
+          ref={listContainerRef}
+          data-tour="run-outputs-list"
+          className="flex-1 overflow-y-auto"
+        >
           {groups.length === 0 && query && (
             <div className="p-4 text-sm text-muted-foreground">
               No tests match &ldquo;{searchQuery}&rdquo;
@@ -305,6 +309,7 @@ export function TestRunOutputsPanel({
                       )}
                       <button
                         type="button"
+                        data-tour="run-result-row"
                         onClick={() => onSelect(result.id)}
                         className="flex-1 flex items-center gap-2 min-w-0 cursor-pointer text-left"
                       >
@@ -323,6 +328,7 @@ export function TestRunOutputsPanel({
 
       {/* Middle Panel - Test Details */}
       <div
+        data-tour="run-result-detail"
         className={`flex-1 ${selectedId ? "flex" : "hidden md:flex"} flex-col overflow-hidden`}
       >
         {selectedResult ? (
@@ -358,7 +364,10 @@ export function TestRunOutputsPanel({
       {/* Right Panel - Evaluators / Expected Tool Calls (desktop only).
           On mobile this content is rendered inline by `TestDetailView`. */}
       {selectedResult && !isErrored(selectedResult) && (selectedResult.status === "passed" || selectedResult.status === "failed") && (
-        <div className="hidden md:flex w-[32rem] border-l border-border flex-col overflow-hidden">
+        <div
+          data-tour="run-result-verdict"
+          className="hidden md:flex w-[32rem] border-l border-border flex-col overflow-hidden"
+        >
           <div className="flex-1 overflow-y-auto">
             <EvaluationCriteriaPanel
               testName={selectedResult.name}

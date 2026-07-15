@@ -141,7 +141,7 @@ test.describe("Onboarding flagship tour (authenticated, fake-AI backend)", () =>
     // 12) Run: clicks "Run all tests" and opens TestRunnerDialog.
     await step(page, "Run your tests");
 
-    // 13) Results: the summary renders once the run completes. The fake backend
+    // 13) Summary results: renders once the run completes. The fake backend
     //     passes every case -> 100% pass rate.
     await expect(popoverTitle(page)).toContainText("Your results", {
       timeout: 90000,
@@ -151,6 +151,18 @@ test.describe("Onboarding flagship tour (authenticated, fake-AI backend)", () =>
     });
     await expect(page.getByText("Pass rate").first()).toBeVisible({ timeout: 15000 });
     await expect(page.getByText("100%").first()).toBeVisible({ timeout: 15000 });
+    await nextButton(page).click();
+
+    // 14) Outputs tab -> 15) open a result -> 16) the answer -> 17) the verdict.
+    await step(page, "See every answer");
+    await step(page, "Passed and failed");
+    await step(page, "Your agent's answer");
+    await expect(popoverTitle(page)).toContainText("The evaluator's verdict", {
+      timeout: 15000,
+    });
+    await expect(page.locator('[data-tour="run-result-verdict"]')).toBeVisible({
+      timeout: 10000,
+    });
 
     // Finish the tour; the popover should disappear.
     await nextButton(page).click();

@@ -75,6 +75,11 @@ export const A = {
   testEditorClose: '[data-tour="test-editor-close"]',
   testsRunAll: '[data-tour="tests-run-all"]',
   runSummary: '[data-tour="test-run-summary"]',
+  runTabOutputs: '[data-tour="run-tab-outputs"]',
+  runOutputsList: '[data-tour="run-outputs-list"]',
+  runResultRow: '[data-tour="run-result-row"]',
+  runResultDetail: '[data-tour="run-result-detail"]',
+  runResultVerdict: '[data-tour="run-result-verdict"]',
 } as const;
 
 export type FirstEvalDeps = {
@@ -200,7 +205,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     {
       anchor: A.save,
       title: "Save your work",
-      description: "Whenever you tweak your agent, save it here.",
+      description: "Whenever you make changes, save them here.",
       side: "bottom",
       align: "end",
       actionLabel: "Save",
@@ -212,7 +217,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.tabEvaluators,
       title: "Add an evaluator",
       description:
-        "Evaluators are your automatic judges. They score each answer on things like whether it's correct or polite. Let's give your agent one.",
+        "To grade your agent automatically, Calibrate uses a strong LLM as a judge, called an evaluator. It scores each answer against a criteria you set, for example whether the answer is correct or stays polite. Let's add one.",
       side: "bottom",
       actionLabel: "Next",
       action: async () => {
@@ -300,10 +305,53 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.runSummary,
       title: "Your results",
       description:
-        "And there it is, your first evaluation! You get the pass rate up top, plus speed, cost, and a score from each judge. Click any test to see exactly what happened. Done exploring? The demo agent's yours to delete anytime.",
+        "And there it is, your first evaluation! Up top is your pass rate, plus speed, cost, and a score from each evaluator.",
       side: "top",
-      actionLabel: "Done",
+      actionLabel: "Next",
       timeout: 90000,
+    },
+    {
+      anchor: A.runTabOutputs,
+      title: "See every answer",
+      description:
+        "The Summary is the big picture. The Outputs tab shows each test your agent ran, one by one.",
+      side: "bottom",
+      align: "start",
+      actionLabel: "Next",
+      action: async () => {
+        await clickElement(A.runTabOutputs);
+      },
+    },
+    {
+      anchor: A.runOutputsList,
+      title: "Passed and failed",
+      description:
+        "Your tests are grouped by whether they passed. Both of ours passed. Let's open one and look closer.",
+      side: "right",
+      align: "start",
+      actionLabel: "Open one",
+      timeout: 10000,
+      action: async () => {
+        await clickElement(A.runResultRow);
+      },
+    },
+    {
+      anchor: A.runResultDetail,
+      title: "Your agent's answer",
+      description:
+        "This is exactly what your agent replied. It's generated fresh each time the test runs.",
+      side: "left",
+      actionLabel: "Next",
+      timeout: 10000,
+    },
+    {
+      anchor: A.runResultVerdict,
+      title: "The evaluator's verdict",
+      description:
+        "And here's the evaluator's call: pass or fail, with the reason why. That reasoning is how you spot problems and keep improving your agent. The demo agent's yours to delete anytime.",
+      side: "left",
+      actionLabel: "Done",
+      timeout: 10000,
     },
   ];
 

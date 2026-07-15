@@ -1122,6 +1122,7 @@ export function TestRunnerDialog({
               <div className="border-b border-border px-4 md:px-6 pt-2 overflow-x-auto hide-scrollbar shrink-0">
                 <div className="flex gap-3 md:gap-4 lg:gap-6">
                   <button
+                    data-tour="run-tab-summary"
                     onClick={() => setActiveTab("summary")}
                     className={`pb-3 px-1 text-sm md:text-base font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
                       activeTab === "summary"
@@ -1132,6 +1133,7 @@ export function TestRunnerDialog({
                     Summary
                   </button>
                   <button
+                    data-tour="run-tab-outputs"
                     onClick={() => setActiveTab("outputs")}
                     className={`pb-3 px-1 text-sm md:text-base font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
                       activeTab === "outputs"
