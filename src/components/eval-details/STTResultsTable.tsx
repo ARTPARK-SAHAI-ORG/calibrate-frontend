@@ -1,46 +1,16 @@
 import React from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { LazyAudioPlayer } from "@/components/evaluations/LazyAudioPlayer";
-import { LabellingRowCheckbox } from "@/components/test-results/shared";
+import {
+  useLabellingColumn,
+  LabellingHeaderCheckbox,
+  LabellingSelectCell,
+  LABELLING_CHECKBOX_COL_WIDTH,
+} from "./labellingSelectionColumn";
 import {
   EvaluatorScoreCell,
   readEvaluatorCell,
 } from "./EvaluatorScoreCell";
-
-// Single source for the per-row labelling checkbox button, used by both the
-// desktop table cell and the mobile card so the two can't drift. Disabled
-// (ineligible) rows show a greyed, unchecked box; `showTitle` adds the desktop
-// hover tooltip.
-function LabellingSelectButton({
-  eligible,
-  checked,
-  onToggle,
-  showTitle = false,
-}: {
-  eligible: boolean;
-  checked: boolean;
-  onToggle: () => void;
-  showTitle?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => eligible && onToggle()}
-      disabled={!eligible}
-      title={
-        showTitle
-          ? eligible
-            ? "Select for labelling"
-            : "Rows without ground truth can't be labelled"
-          : undefined
-      }
-      aria-label="Select for labelling"
-      className="cursor-pointer disabled:cursor-not-allowed"
-    >
-      <LabellingRowCheckbox checked={checked && eligible} disabled={!eligible} />
-    </button>
-  );
-}
 
 // Per-row results table for STT. Two modes:
 //
@@ -152,22 +122,21 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
   // the legacy `llm_judge_*` rendering branch is skipped.
   const useDynamic = Array.isArray(evaluatorColumns) && evaluatorColumns.length > 0;
 
-  // Labelling checkbox column is shown only when the caller wires a toggle +
-  // key mapper. Eligibility defaults to "row has ground truth".
-  const showCheckboxes = !!onToggleLabellingSelection && !!labellingKeyForRow;
-  const rowEligible = (r: STTResultRow, i: number) =>
-    labellingRowEligible ? labellingRowEligible(r, i) : !!r.gt && r.gt.trim() !== "";
-  // Keys of every selectable row, computed against the original row index so
-  // they line up with the per-row rendering below.
-  const allSelectableKeys = showCheckboxes
-    ? results.reduce<string[]>((acc, r, i) => {
-        if (rowEligible(r, i)) acc.push(labellingKeyForRow!(r, i));
-        return acc;
-      }, [])
-    : [];
-  const allSelected =
-    allSelectableKeys.length > 0 &&
-    allSelectableKeys.every((k) => labellingSelection?.has(k));
+  // Labelling checkbox column (opt-in). Eligibility defaults to "row has
+  // ground truth". The shared hook owns the derived state so this table and
+  // TTSResultsTable can't drift.
+  const { showCheckboxes, rowEligible, allSelectableKeys, allSelected } =
+    useLabellingColumn(
+      results,
+      {
+        labellingSelection,
+        onToggleLabellingSelection,
+        onLabellingBulkToggle,
+        labellingKeyForRow,
+        labellingRowEligible,
+      },
+      (r) => !!r.gt && r.gt.trim() !== "",
+    );
 
   // Compute the table's minimum pixel width from the column widths above so
   // the inner `overflow-x-auto` wrapper can scroll once we run out of room.
@@ -176,7 +145,7 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
   // are several evaluators.
   const tableMinWidth = (() => {
     let total = STT_COL_WIDTHS.id + STT_COL_WIDTHS.text * 2; // ID + GT + Pred
-    if (showCheckboxes) total += 44;
+    if (showCheckboxes) total += LABELLING_CHECKBOX_COL_WIDTH;
     if (hasAudio) total += STT_COL_WIDTHS.audio;
     if (showMetrics) {
       total += STT_COL_WIDTHS.wer;
@@ -196,18 +165,11 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
             <thead className="bg-muted/50 border-b border-border">
               <tr>
                 {showCheckboxes && (
-                  <th style={{ width: 44 }} className="px-3 py-3 text-left">
-                    <button
-                      type="button"
-                      onClick={() => onLabellingBulkToggle?.(allSelectableKeys)}
-                      disabled={allSelectableKeys.length === 0}
-                      title={allSelected ? "Deselect all" : "Select all"}
-                      aria-label={allSelected ? "Deselect all" : "Select all"}
-                      className="cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <LabellingRowCheckbox checked={allSelected} disabled={allSelectableKeys.length === 0} />
-                    </button>
-                  </th>
+                  <LabellingHeaderCheckbox
+                    allSelectableKeys={allSelectableKeys}
+                    allSelected={allSelected}
+                    onBulkToggle={onLabellingBulkToggle}
+                  />
                 )}
                 <th style={{ width: STT_COL_WIDTHS.id }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">ID</th>
                 {hasAudio && (
@@ -246,14 +208,12 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                     {showCheckboxes && (() => {
                       const key = labellingKeyForRow!(result, index);
                       return (
-                        <td className="px-3 py-3">
-                          <LabellingSelectButton
-                            eligible={rowEligible(result, index)}
-                            checked={labellingSelection?.has(key) ?? false}
-                            onToggle={() => onToggleLabellingSelection!(key)}
-                            showTitle
-                          />
-                        </td>
+                        <LabellingSelectCell
+                          eligible={rowEligible(result, index)}
+                          checked={labellingSelection?.has(key) ?? false}
+                          onToggle={() => onToggleLabellingSelection!(key)}
+                          disabledTitle="Rows without ground truth can't be labelled"
+                        />
                       );
                     })()}
                     <td className="px-3 py-3 text-[13px] text-foreground">{index + 1}</td>

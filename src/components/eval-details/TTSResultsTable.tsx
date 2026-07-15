@@ -1,46 +1,16 @@
 import React from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { LazyAudioPlayer } from "@/components/evaluations/LazyAudioPlayer";
-import { LabellingRowCheckbox } from "@/components/test-results/shared";
+import {
+  useLabellingColumn,
+  LabellingHeaderCheckbox,
+  LabellingSelectCell,
+  LABELLING_CHECKBOX_COL_WIDTH,
+} from "./labellingSelectionColumn";
 import {
   EvaluatorScoreCell,
   readEvaluatorCell,
 } from "./EvaluatorScoreCell";
-
-// Single source for the per-row labelling checkbox button, used by both the
-// desktop table cell and the mobile card so the two can't drift. Disabled
-// (ineligible) rows show a greyed, unchecked box; `showTitle` adds the desktop
-// hover tooltip.
-function LabellingSelectButton({
-  eligible,
-  checked,
-  onToggle,
-  showTitle = false,
-}: {
-  eligible: boolean;
-  checked: boolean;
-  onToggle: () => void;
-  showTitle?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => eligible && onToggle()}
-      disabled={!eligible}
-      title={
-        showTitle
-          ? eligible
-            ? "Select for labelling"
-            : "Rows without synthesized audio can't be labelled"
-          : undefined
-      }
-      aria-label="Select for labelling"
-      className="cursor-pointer disabled:cursor-not-allowed"
-    >
-      <LabellingRowCheckbox checked={checked && eligible} disabled={!eligible} />
-    </button>
-  );
-}
 
 // Per-row results table for TTS. Two modes:
 //
@@ -141,24 +111,21 @@ export function TTSResultsTable({ results, showMetrics = true, judgeLabel = "Eva
   // the legacy `llm_judge_*` rendering branch is skipped.
   const useDynamic = Array.isArray(evaluatorColumns) && evaluatorColumns.length > 0;
 
-  // Labelling checkbox column is shown only when the caller wires a toggle +
-  // key mapper. Eligibility defaults to "row has a synthesized clip".
-  const showCheckboxes = !!onToggleLabellingSelection && !!labellingKeyForRow;
-  const rowEligible = (r: TTSResultRow, i: number) =>
-    labellingRowEligible
-      ? labellingRowEligible(r, i)
-      : !!r.audio_path && r.audio_path.trim() !== "";
-  // Keys of every selectable row, computed against the original row index so
-  // they line up with the per-row rendering below.
-  const allSelectableKeys = showCheckboxes
-    ? results.reduce<string[]>((acc, r, i) => {
-        if (rowEligible(r, i)) acc.push(labellingKeyForRow!(r, i));
-        return acc;
-      }, [])
-    : [];
-  const allSelected =
-    allSelectableKeys.length > 0 &&
-    allSelectableKeys.every((k) => labellingSelection?.has(k));
+  // Labelling checkbox column (opt-in). Eligibility defaults to "row has a
+  // synthesized clip". The shared hook owns the derived state so this table
+  // and STTResultsTable can't drift.
+  const { showCheckboxes, rowEligible, allSelectableKeys, allSelected } =
+    useLabellingColumn(
+      results,
+      {
+        labellingSelection,
+        onToggleLabellingSelection,
+        onLabellingBulkToggle,
+        labellingKeyForRow,
+        labellingRowEligible,
+      },
+      (r) => !!r.audio_path && r.audio_path.trim() !== "",
+    );
 
   // Compute the table's minimum pixel width from the column widths above so
   // the inner `overflow-x-auto` wrapper can scroll once we run out of room.
@@ -167,7 +134,7 @@ export function TTSResultsTable({ results, showMetrics = true, judgeLabel = "Eva
   // are several evaluators.
   const evaluatorColCount = showMetrics ? (useDynamic ? evaluatorColumns!.length : 1) : 0;
   const tableMinWidth =
-    (showCheckboxes ? 44 : 0) +
+    (showCheckboxes ? LABELLING_CHECKBOX_COL_WIDTH : 0) +
     TTS_COL_WIDTHS.id +
     TTS_COL_WIDTHS.text +
     TTS_COL_WIDTHS.audio +
@@ -182,18 +149,11 @@ export function TTSResultsTable({ results, showMetrics = true, judgeLabel = "Eva
             <thead className="bg-muted/50 border-b border-border">
               <tr>
                 {showCheckboxes && (
-                  <th style={{ width: 44 }} className="px-3 py-3 text-left">
-                    <button
-                      type="button"
-                      onClick={() => onLabellingBulkToggle?.(allSelectableKeys)}
-                      disabled={allSelectableKeys.length === 0}
-                      title={allSelected ? "Deselect all" : "Select all"}
-                      aria-label={allSelected ? "Deselect all" : "Select all"}
-                      className="cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <LabellingRowCheckbox checked={allSelected} disabled={allSelectableKeys.length === 0} />
-                    </button>
-                  </th>
+                  <LabellingHeaderCheckbox
+                    allSelectableKeys={allSelectableKeys}
+                    allSelected={allSelected}
+                    onBulkToggle={onLabellingBulkToggle}
+                  />
                 )}
                 <th style={{ width: TTS_COL_WIDTHS.id }} className="px-4 py-3 text-left text-[12px] font-medium text-foreground">ID</th>
                 <th style={{ width: TTS_COL_WIDTHS.text }} className="px-4 py-3 text-left text-[12px] font-medium text-foreground">Text</th>
@@ -217,14 +177,12 @@ export function TTSResultsTable({ results, showMetrics = true, judgeLabel = "Eva
                   {showCheckboxes && (() => {
                     const key = labellingKeyForRow!(result, index);
                     return (
-                      <td className="px-3 py-3">
-                        <LabellingSelectButton
-                          eligible={rowEligible(result, index)}
-                          checked={labellingSelection?.has(key) ?? false}
-                          onToggle={() => onToggleLabellingSelection!(key)}
-                          showTitle
-                        />
-                      </td>
+                      <LabellingSelectCell
+                        eligible={rowEligible(result, index)}
+                        checked={labellingSelection?.has(key) ?? false}
+                        onToggle={() => onToggleLabellingSelection!(key)}
+                        disabledTitle="Rows without synthesized audio can't be labelled"
+                      />
                     );
                   })()}
                   <td className="px-4 py-3 text-[13px] text-foreground">{index + 1}</td>
