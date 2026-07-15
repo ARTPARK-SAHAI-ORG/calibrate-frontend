@@ -401,7 +401,7 @@ export function TextToSpeechEvaluation({ evaluateRef, onEvaluatingChange, initia
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          Datasets
+          Dataset
         </button>
         <button
           onClick={() => setActiveTab("models")}

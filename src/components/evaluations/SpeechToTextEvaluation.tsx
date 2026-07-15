@@ -399,7 +399,7 @@ export function SpeechToTextEvaluation({
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          Datasets
+          Dataset
         </button>
         <button
           onClick={() => setActiveTab("models")}

@@ -156,7 +156,7 @@ async function selectProvider(user: ReturnType<typeof setupUser>, label: string)
 describe("SpeechToTextEvaluation", () => {
   it("renders with the input tab active by default", async () => {
     render(<SpeechToTextEvaluation />);
-    expect(screen.getByText("Datasets")).toBeInTheDocument();
+    expect(screen.getByText("Dataset")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
     expect(screen.getByTestId("stt-editor")).toBeInTheDocument();
     await waitFor(() => expect(mockListDatasets).toHaveBeenCalledWith("test-token", "stt"));
@@ -199,7 +199,7 @@ describe("SpeechToTextEvaluation", () => {
     render(<SpeechToTextEvaluation />);
     await user.click(screen.getByText("Settings"));
     expect(screen.getByText("Language")).toBeInTheDocument();
-    await user.click(screen.getByText("Datasets"));
+    await user.click(screen.getByText("Dataset"));
     expect(screen.getByTestId("stt-editor")).toBeInTheDocument();
   });
 
@@ -292,7 +292,7 @@ describe("SpeechToTextEvaluation", () => {
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     await selectProvider(user, "Deepgram");
 
-    await user.click(screen.getByText("Datasets"));
+    await user.click(screen.getByText("Dataset"));
     await user.click(screen.getByText("Use existing dataset"));
     await waitFor(() => screen.getByTestId("dataset-picker"));
 
@@ -356,7 +356,7 @@ describe("SpeechToTextEvaluation", () => {
     // Should remain blocked - evaluate not triggered (no fetch to /stt/evaluate)
     const calledUrls = (global.fetch as jest.Mock).mock.calls.map((c) => c[0]);
     expect(calledUrls.some((u: string) => u.includes("/stt/evaluate"))).toBe(false);
-    expect(screen.getByText("Datasets")).toBeInTheDocument();
+    expect(screen.getByText("Dataset")).toBeInTheDocument();
   });
 
   it("submits an inline evaluation successfully and navigates to the result page", async () => {
@@ -426,7 +426,7 @@ describe("SpeechToTextEvaluation", () => {
     await waitFor(() => screen.getByTestId("evaluator-e1"));
     await selectProvider(user, "Deepgram");
 
-    await user.click(screen.getByText("Datasets"));
+    await user.click(screen.getByText("Dataset"));
     await user.click(screen.getByText("Use existing dataset"));
     await waitFor(() => screen.getByTestId("pick-ds-1"));
     await user.click(screen.getByTestId("pick-ds-1"));
