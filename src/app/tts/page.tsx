@@ -11,6 +11,7 @@ import { ttsProviders } from "@/components/agent-tabs/constants/providers";
 import { formatStatus, getStatusBadgeClass } from "@/lib/status";
 import { useSidebarState } from "@/lib/sidebar";
 import { Dataset, getDataset } from "@/lib/datasets";
+import { unwrapList } from "@/lib/api";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { useDatasetManagement } from "@/hooks";
 
@@ -18,11 +19,9 @@ type TTSJob = {
   uuid: string;
   type: string;
   status: "queued" | "in_progress" | "done" | "failed";
-  details: {
-    texts: string[];
-    providers: string[];
-    language: string;
-  };
+  providers: string[];
+  language: string;
+  sample_count: number;
   dataset_id?: string | null;
   dataset_name?: string | null;
   created_at: string;
@@ -118,7 +117,7 @@ function TTSPageInner() {
         }
 
         const data = await response.json();
-        const fetchedJobs: TTSJob[] = data.jobs || [];
+        const fetchedJobs: TTSJob[] = unwrapList<TTSJob>(data);
 
         const datasetIds = [
           ...new Set(
@@ -409,7 +408,7 @@ function TTSPageInner() {
                     >
                       {/* Providers as pills */}
                       <div className="flex flex-wrap gap-1.5">
-                        {job.details?.providers?.map((provider) => (
+                        {job.providers?.map((provider) => (
                           <span
                             key={provider}
                             className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-foreground"
@@ -454,9 +453,7 @@ function TTSPageInner() {
                       {/* Language */}
                       <div>
                         <span className="text-sm text-foreground">
-                          {job.details?.language
-                            ? formatLanguage(job.details.language)
-                            : "—"}
+                          {job.language ? formatLanguage(job.language) : "—"}
                         </span>
                       </div>
                       {/* Status */}
@@ -472,7 +469,7 @@ function TTSPageInner() {
                       {/* Samples count */}
                       <div>
                         <span className="text-sm text-foreground">
-                          {job.details?.texts?.length || 0}
+                          {job.sample_count ?? 0}
                         </span>
                       </div>
                       {/* Created At */}
@@ -494,7 +491,7 @@ function TTSPageInner() {
                       <div className="p-5">
                         {/* Header with Providers */}
                         <div className="flex flex-wrap gap-2 mb-4">
-                          {job.details?.providers?.map((provider) => (
+                          {job.providers?.map((provider) => (
                             <span
                               key={provider}
                               className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold bg-foreground/5 text-foreground border border-foreground/10"
@@ -575,9 +572,7 @@ function TTSPageInner() {
                                 Language
                               </p>
                               <p className="text-sm font-medium text-foreground">
-                                {job.details?.language
-                                  ? formatLanguage(job.details.language)
-                                  : "—"}
+                                {job.language ? formatLanguage(job.language) : "—"}
                               </p>
                             </div>
                           </div>
@@ -603,7 +598,7 @@ function TTSPageInner() {
                                 Samples
                               </p>
                               <p className="text-sm font-medium text-foreground">
-                                {job.details?.texts?.length || 0}
+                                {job.sample_count ?? 0}
                               </p>
                             </div>
                           </div>
