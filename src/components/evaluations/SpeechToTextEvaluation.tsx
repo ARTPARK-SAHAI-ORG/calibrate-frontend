@@ -388,7 +388,7 @@ export function SpeechToTextEvaluation({
   handleEvaluateRef.current = handleEvaluate;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pt-2 md:pt-4">
       {/* Tabs Navigation */}
       <div className="flex items-center gap-4 md:gap-6 border-b border-border">
         <button
