@@ -761,10 +761,10 @@ export function AppLayout({
 
       {/* Talk to Us Floating Action Button - Hidden when dialogs are open */}
       {floatingButtonHideCount === 0 && (
-        <div className="fixed bottom-6 right-6 z-50" ref={talkToUsRef}>
+        <div className="fixed bottom-6 left-6 z-50" ref={talkToUsRef}>
           {/* Popup */}
           {talkToUsOpen && (
-            <div className="absolute bottom-14 right-0 w-56 bg-background border border-border rounded-xl shadow-lg overflow-hidden mb-2">
+            <div className="absolute bottom-14 left-0 w-56 bg-background border border-border rounded-xl shadow-lg overflow-hidden mb-2">
               <div className="p-2">
                 <a
                   href={WHATSAPP_INVITE_URL}
