@@ -79,7 +79,8 @@ export async function runTour(tour: Tour, startIndex = 0): Promise<void> {
     stagePadding: 6,
     stageRadius: 8,
     popoverClass: "calibrate-tour",
-    showProgress: true,
+    // No "X of N" counter — it reads as a long checklist and intimidates.
+    showProgress: false,
     onPopoverRender: (popover) => {
       if (!active) return;
       // Guarantee a single popover on screen. Because the tour drives across the
@@ -96,19 +97,7 @@ export async function runTour(tour: Tour, startIndex = 0): Promise<void> {
           if (i < overlays.length - 1) el.remove();
         });
       }
-      // We advance steps manually via highlight(), so driver can't compute the
-      // "X of N" itself — inject it from our own step state (creating the node
-      // if driver didn't render one for a single highlight).
-      const text = `${active.index + 1} of ${active.tour.steps.length}`;
       const footer = popover.footer;
-      if (popover.progress) {
-        popover.progress.textContent = text;
-      } else if (footer && !footer.querySelector(".driver-popover-progress-text")) {
-        const span = document.createElement("span");
-        span.className = "driver-popover-progress-text";
-        span.textContent = text;
-        footer.insertBefore(span, footer.firstChild);
-      }
       // A visible "Skip tour" affordance so the guide can be ended any time,
       // placed just left of the advance button.
       const nav = footer?.querySelector(".driver-popover-navigation-btns");

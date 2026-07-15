@@ -248,7 +248,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.tabEvaluators,
       title: "Add an evaluator",
       description:
-        "To grade your agent automatically, Calibrate uses <strong>a strong LLM as a judge, called an evaluator</strong>. It <strong>scores each answer against a criteria</strong> you set, for example whether the answer is correct or stays polite. Let us add one.",
+        "To <strong>grade</strong> your agent automatically, Calibrate uses <strong>a strong LLM as a judge</strong>, called an evaluator. It <strong>scores each answer against a criteria</strong> you set, for example whether the answer is correct or stays polite. Let us add one.",
       side: "bottom",
       actionLabel: "Next",
       action: async () => {
@@ -271,7 +271,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.tabTests,
       title: "Meet your tests",
       description:
-        "This is where the real work happens. A test is simply <strong>a situation you want your agent to handle well</strong>, paired with a check on whether it nailed it. Let us add a couple to see.",
+        "This is where the real work happens. A test contains a <strong>scenario</strong> your agent can face in <strong>production</strong> and the <strong>success criteria</strong> for a good response. Let us add a couple to see.",
       side: "bottom",
       actionLabel: "Next",
       prepare: async () => {

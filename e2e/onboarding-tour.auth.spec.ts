@@ -86,9 +86,6 @@ test.describe("Onboarding flagship tour (authenticated, fake-AI backend)", () =>
       timeout: 30000,
     });
     await expect(page.locator(".driver-popover")).toHaveClass(/calibrate-tour/);
-    await expect(page.locator(".driver-popover-progress-text")).toContainText(
-      /1 of \d+/,
-    );
     await expect(page.locator(".calibrate-tour-skip")).toBeVisible();
     // Clicking the backdrop (top-left corner, away from the popover) must NOT
     // end the tour — only the X and "Skip tour" buttons do.
