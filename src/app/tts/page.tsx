@@ -400,9 +400,10 @@ function TTSPageInner() {
                         checked={allSelected}
                         onToggle={toggleSelectAll}
                         disabled={!hasBulkDeletableJobs}
-                        title={
+                        label="Select all finished evaluations"
+                        tooltip={
                           hasBulkDeletableJobs
-                            ? "Select all finished evaluations"
+                            ? undefined
                             : "No finished evaluations to select"
                         }
                       />

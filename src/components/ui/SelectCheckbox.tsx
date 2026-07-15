@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { Tooltip } from "@/components/Tooltip";
 
 type SelectCheckboxProps = {
   /** Whether the box is currently ticked. */
@@ -8,10 +9,12 @@ type SelectCheckboxProps = {
   /** Invoked when the box is toggled. Click propagation is stopped first,
    *  so this is safe to use inside clickable rows. */
   onToggle: () => void;
-  /** Tooltip / accessible label. Shown on hover even when disabled. */
-  title: string;
-  /** When true, the box can't be toggled (still swallows the row click).
-   *  Use `title` to explain why. */
+  /** Accessible label for screen readers. */
+  label: string;
+  /** Optional hover tooltip text, rendered via the shared Tooltip component
+   *  (not the native `title`). Use it to explain a disabled box. */
+  tooltip?: string;
+  /** When true, the box can't be toggled (still swallows the row click). */
   disabled?: boolean;
   /** Extra classes appended to the base styling. */
   className?: string;
@@ -25,23 +28,20 @@ type SelectCheckboxProps = {
 export function SelectCheckbox({
   checked,
   onToggle,
-  title,
+  label,
+  tooltip,
   disabled = false,
   className = "",
 }: SelectCheckboxProps) {
-  return (
+  const button = (
     <button
       type="button"
-      // Not the native `disabled` attribute: a disabled button suppresses the
-      // hover title in most browsers, and we want the "why" tooltip to show.
-      // Instead we swallow the click (so the row doesn't navigate) and no-op.
       onClick={(e) => {
         e.stopPropagation();
         if (disabled) return;
         onToggle();
       }}
-      title={title}
-      aria-label={title}
+      aria-label={label}
       aria-pressed={checked}
       aria-disabled={disabled}
       className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
@@ -69,4 +69,6 @@ export function SelectCheckbox({
       )}
     </button>
   );
+
+  return tooltip ? <Tooltip content={tooltip}>{button}</Tooltip> : button;
 }

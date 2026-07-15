@@ -9,9 +9,12 @@ type JobLike = { uuid: string; status: string };
 /** Only finished jobs can be removed via the single-shot bulk endpoint. */
 const BULK_DELETABLE_STATUSES = new Set(["done", "failed"]);
 
-/** Hover hint shown on the checkbox of a job that can't be bulk-deleted. */
-const BULK_DELETE_DISABLED_HINT =
-  "Queued or in-progress evaluations can't be bulk-deleted — use the delete icon to remove this one.";
+/** Hover hint for a checkbox whose job can't be bulk-deleted, phrased for the
+ *  job's actual status (queued vs in progress). */
+const bulkDeleteBlockedHint = (status: string) => {
+  const state = status === "queued" ? "Queued" : "In-progress";
+  return `${state} evaluations can't be bulk deleted. Use the delete icon to remove this one.`;
+};
 
 type UseJobDeletionArgs<T extends JobLike> = {
   /** The currently visible (sorted) jobs — drives the "select all" toggle. */
@@ -61,7 +64,8 @@ export function useJobDeletion<T extends JobLike>({
       checked: selectedJobUuids.has(job.uuid),
       onToggle: () => toggleJobSelection(job.uuid),
       disabled: !deletable,
-      title: deletable ? "Select evaluation" : BULK_DELETE_DISABLED_HINT,
+      label: "Select evaluation",
+      tooltip: deletable ? undefined : bulkDeleteBlockedHint(job.status),
     };
   };
 
