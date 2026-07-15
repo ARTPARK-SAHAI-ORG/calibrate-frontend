@@ -14,10 +14,34 @@
 import { getBackendUrl, getDefaultHeaders } from "@/lib/api";
 import { fetchAllEvaluators } from "@/lib/evaluatorApi";
 import { reportError } from "@/lib/reportError";
+import { WHATSAPP_INVITE_URL } from "@/constants/links";
 import { clickElement, delay, fillInput } from "../dom";
 import type { Tour, TourStep } from "../engine";
 
 export const FIRST_EVAL_TOUR_ID = "first-eval";
+
+// The welcome card's help links (driver.js renders the description as HTML).
+// The docs link only appears when a docs URL is configured.
+function welcomeDescription(): string {
+  const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL;
+  const link = (href: string, text: string) =>
+    `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:var(--foreground);text-decoration:underline;font-weight:500;">${text}</a>`;
+  const links = [
+    link(WHATSAPP_INVITE_URL, "Talk to us"),
+    docsUrl ? link(docsUrl, "Read the docs") : null,
+  ]
+    .filter(Boolean)
+    .join(" &nbsp;·&nbsp; ");
+  return (
+    "Calibrate is where you build voice AI agents and prove they work — " +
+    "automated tests, LLM-judge evaluators, model benchmarks, and human " +
+    "labelling, all in one place." +
+    "<br><br>New here? Let's run your first evaluation together. I'll spin up a " +
+    'sample "Demo agent" and run it end to end — just click through, and delete ' +
+    "the demo after." +
+    `<br><br><span style="font-size:0.8rem;">${links}</span>`
+  );
+}
 
 const DEMO_AGENT_NAME = "Demo agent";
 
@@ -106,9 +130,8 @@ function currentAgentUuid(): string | null {
 export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
   const steps: TourStep[] = [
     {
-      title: "Run your first evaluation 👋",
-      description:
-        "Calibrate tests voice AI agents. I'll build a sample \"Demo agent\" and run a real evaluation with you — just click through. You can delete the demo afterwards.",
+      title: "Welcome to Calibrate 👋",
+      description: welcomeDescription(),
       actionLabel: "Start",
     },
     {

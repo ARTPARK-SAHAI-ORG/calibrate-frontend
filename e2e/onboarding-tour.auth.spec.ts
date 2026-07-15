@@ -81,7 +81,7 @@ test.describe("Onboarding flagship tour (authenticated, fake-AI backend)", () =>
     );
 
     // 1) Welcome -> 2) Create an agent (spotlights "New agent").
-    await step(page, "Run your first evaluation");
+    await step(page, "Welcome to Calibrate");
     await step(page, "Create an agent");
 
     // 3) Name it: the action opens the dialog; assert it, then let the step
