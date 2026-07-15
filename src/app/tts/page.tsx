@@ -15,11 +15,7 @@ import { unwrapList } from "@/lib/api";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
-import {
-  useDatasetManagement,
-  useJobDeletion,
-  BULK_DELETE_DISABLED_HINT,
-} from "@/hooks";
+import { useDatasetManagement, useJobDeletion } from "@/hooks";
 
 type TTSJob = {
   uuid: string;
@@ -203,8 +199,7 @@ function TTSPageInner() {
     selectedJobUuids,
     allSelected,
     hasBulkDeletableJobs,
-    isBulkDeletable,
-    toggleJobSelection,
+    jobCheckboxProps,
     toggleSelectAll,
     deleteDialogOpen,
     jobsToDeleteBulk,
@@ -461,16 +456,7 @@ function TTSPageInner() {
                     >
                       {/* Selection checkbox */}
                       <div className="flex items-center">
-                        <SelectCheckbox
-                          checked={selectedJobUuids.has(job.uuid)}
-                          onToggle={() => toggleJobSelection(job.uuid)}
-                          disabled={!isBulkDeletable(job)}
-                          title={
-                            isBulkDeletable(job)
-                              ? "Select evaluation"
-                              : BULK_DELETE_DISABLED_HINT
-                          }
-                        />
+                        <SelectCheckbox {...jobCheckboxProps(job)} />
                       </div>
                       {/* Providers as pills */}
                       <div className="flex flex-wrap gap-1.5">
@@ -564,16 +550,7 @@ function TTSPageInner() {
                       <div className="p-5">
                         {/* Selection + delete controls */}
                         <div className="flex items-center justify-between mb-4">
-                          <SelectCheckbox
-                            checked={selectedJobUuids.has(job.uuid)}
-                            onToggle={() => toggleJobSelection(job.uuid)}
-                            disabled={!isBulkDeletable(job)}
-                            title={
-                              isBulkDeletable(job)
-                                ? "Select evaluation"
-                                : BULK_DELETE_DISABLED_HINT
-                            }
-                          />
+                          <SelectCheckbox {...jobCheckboxProps(job)} />
                           <DeleteIconButton
                             onClick={() => openDeleteDialog(job)}
                             title="Delete evaluation"

@@ -10,7 +10,7 @@ type JobLike = { uuid: string; status: string };
 const BULK_DELETABLE_STATUSES = new Set(["done", "failed"]);
 
 /** Hover hint shown on the checkbox of a job that can't be bulk-deleted. */
-export const BULK_DELETE_DISABLED_HINT =
+const BULK_DELETE_DISABLED_HINT =
   "Queued or in-progress evaluations can't be bulk-deleted — use the delete icon to remove this one.";
 
 type UseJobDeletionArgs<T extends JobLike> = {
@@ -52,6 +52,18 @@ export function useJobDeletion<T extends JobLike>({
   const isBulkDeletable = (job: T) => BULK_DELETABLE_STATUSES.has(job.status);
   const eligibleJobs = jobs.filter(isBulkDeletable);
   const hasBulkDeletableJobs = eligibleJobs.length > 0;
+
+  /** Props for a per-row selection checkbox — folds the eligibility/tooltip
+   *  logic here so the call sites stay a single `{...spread}`. */
+  const jobCheckboxProps = (job: T) => {
+    const deletable = isBulkDeletable(job);
+    return {
+      checked: selectedJobUuids.has(job.uuid),
+      onToggle: () => toggleJobSelection(job.uuid),
+      disabled: !deletable,
+      title: deletable ? "Select evaluation" : BULK_DELETE_DISABLED_HINT,
+    };
+  };
 
   const toggleJobSelection = (uuid: string) => {
     const job = jobs.find((j) => j.uuid === uuid);
@@ -178,8 +190,7 @@ export function useJobDeletion<T extends JobLike>({
     selectedJobUuids,
     allSelected,
     hasBulkDeletableJobs,
-    isBulkDeletable,
-    toggleJobSelection,
+    jobCheckboxProps,
     toggleSelectAll,
     deleteDialogOpen,
     jobsToDeleteBulk,
