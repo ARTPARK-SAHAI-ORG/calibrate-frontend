@@ -13,8 +13,14 @@ import { useSidebarState } from "@/lib/sidebar";
 import { Dataset, getDataset } from "@/lib/datasets";
 import { unwrapList } from "@/lib/api";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
-import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
-import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
+import {
+  JobBulkDeleteBar,
+  JobSelectAllCell,
+  JobRowSelectCell,
+  JobRowDeleteCell,
+  JobMobileSelectDelete,
+  JobDeleteDialog,
+} from "@/components/eval-jobs/JobDeleteControls";
 import { useDatasetManagement, useJobDeletion } from "@/hooks";
 
 type TTSJob = {
@@ -352,20 +358,11 @@ function TTSPageInner() {
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <p className="text-sm text-muted-foreground">
-                    {jobs.length}{" "}
-                    {jobs.length === 1 ? "evaluation" : "evaluations"}
-                  </p>
-                  {selectedJobUuids.size > 0 && (
-                    <button
-                      onClick={openBulkDeleteDialog}
-                      className="h-9 px-4 rounded-md text-sm font-medium border border-red-500 text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer flex-shrink-0"
-                    >
-                      Delete selected ({selectedJobUuids.size})
-                    </button>
-                  )}
-                </div>
+                <JobBulkDeleteBar
+                  count={jobs.length}
+                  selectedCount={selectedJobUuids.size}
+                  onBulkDelete={openBulkDeleteDialog}
+                />
                 {/* Mobile Sort Button */}
                 <div className="flex justify-end md:hidden mb-3">
                   <button
@@ -395,19 +392,11 @@ function TTSPageInner() {
                 <div className="hidden md:block border border-border rounded-xl overflow-hidden">
                   {/* Table Header */}
                   <div className="grid grid-cols-[40px_2fr_1fr_100px_100px_80px_1fr_48px] gap-4 px-4 py-2 border-b border-border bg-muted/30">
-                    <div className="flex items-center">
-                      <SelectCheckbox
-                        checked={allSelected}
-                        onToggle={toggleSelectAll}
-                        disabled={!hasBulkDeletableJobs}
-                        label="Select all finished evaluations"
-                        tooltip={
-                          hasBulkDeletableJobs
-                            ? undefined
-                            : "No finished evaluations to select"
-                        }
-                      />
-                    </div>
+                    <JobSelectAllCell
+                      allSelected={allSelected}
+                      hasBulkDeletableJobs={hasBulkDeletableJobs}
+                      onToggle={toggleSelectAll}
+                    />
                     <div className="text-sm font-medium text-muted-foreground">
                       Providers
                     </div>
@@ -456,9 +445,7 @@ function TTSPageInner() {
                       className="grid grid-cols-[40px_2fr_1fr_100px_100px_80px_1fr_48px] gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors items-center cursor-pointer"
                     >
                       {/* Selection checkbox */}
-                      <div className="flex items-center">
-                        <SelectCheckbox {...jobCheckboxProps(job)} />
-                      </div>
+                      <JobRowSelectCell checkboxProps={jobCheckboxProps(job)} />
                       {/* Providers as pills */}
                       <div className="flex flex-wrap gap-1.5">
                         {job.providers?.map((provider) => (
@@ -530,12 +517,7 @@ function TTSPageInner() {
                         {job.created_at ? formatDate(job.created_at) : "—"}
                       </p>
                       {/* Delete */}
-                      <div className="flex items-center justify-end">
-                        <DeleteIconButton
-                          onClick={() => openDeleteDialog(job)}
-                          title="Delete evaluation"
-                        />
-                      </div>
+                      <JobRowDeleteCell onDelete={() => openDeleteDialog(job)} />
                     </div>
                   ))}
                 </div>
@@ -550,13 +532,10 @@ function TTSPageInner() {
                     >
                       <div className="p-5">
                         {/* Selection + delete controls */}
-                        <div className="flex items-center justify-between mb-4">
-                          <SelectCheckbox {...jobCheckboxProps(job)} />
-                          <DeleteIconButton
-                            onClick={() => openDeleteDialog(job)}
-                            title="Delete evaluation"
-                          />
-                        </div>
+                        <JobMobileSelectDelete
+                          checkboxProps={jobCheckboxProps(job)}
+                          onDelete={() => openDeleteDialog(job)}
+                        />
                         {/* Header with Providers */}
                         <div className="flex flex-wrap gap-2 mb-4">
                           {job.providers?.map((provider) => (
@@ -852,30 +831,14 @@ function TTSPageInner() {
       </div>
 
       {/* Delete Evaluation Confirmation */}
-      {deleteDialogOpen && (
-        <DeleteConfirmationDialog
-          isOpen={true}
-          onClose={closeDeleteDialog}
-          onConfirm={deleteJobs}
-          title={
-            jobsToDeleteBulk.length > 0
-              ? "Delete evaluations"
-              : "Delete evaluation"
-          }
-          message={
-            jobsToDeleteBulk.length > 0
-              ? `Are you sure you want to delete ${jobsToDeleteBulk.length} evaluation${jobsToDeleteBulk.length > 1 ? "s" : ""}? This action cannot be undone.`
-              : "Are you sure you want to delete this evaluation? This action cannot be undone."
-          }
-          confirmText="Delete"
-          isDeleting={isJobDeleting}
-          extraContent={
-            deleteError ? (
-              <p className="text-sm text-red-500">{deleteError}</p>
-            ) : undefined
-          }
-        />
-      )}
+      <JobDeleteDialog
+        open={deleteDialogOpen}
+        bulkCount={jobsToDeleteBulk.length}
+        isDeleting={isJobDeleting}
+        error={deleteError}
+        onClose={closeDeleteDialog}
+        onConfirm={deleteJobs}
+      />
 
       {/* Delete Dataset Confirmation */}
       {deleteDatasetId && (
