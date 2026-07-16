@@ -289,7 +289,8 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
         <>
           <div className="flex items-center justify-between gap-3 mb-3">
             <p className="text-sm text-muted-foreground">
-              {agents.length} {agents.length === 1 ? "agent" : "agents"}
+              {sortedAgents.length}{" "}
+              {sortedAgents.length === 1 ? "agent" : "agents"}
             </p>
             {selectedAgentUuids.size > 0 && (
               <button

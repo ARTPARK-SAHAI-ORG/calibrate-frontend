@@ -147,6 +147,9 @@ describe("Agents", () => {
     await user.type(screen.getByPlaceholderText("Search agents"), "Connect");
     expect(screen.queryAllByText("Support Bot")).toHaveLength(0);
     expect(screen.getAllByText("Connect Bot")[0]).toBeInTheDocument();
+    // The count reflects the filtered list, not the full set.
+    expect(screen.getByText("1 agent")).toBeInTheDocument();
+    expect(screen.queryByText("2 agents")).not.toBeInTheDocument();
   });
 
   it("toggles sort order when clicking the sort button", async () => {
