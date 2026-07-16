@@ -17,6 +17,7 @@ describe("STT_RESERVED_METRIC_KEYS / TTS_RESERVED_METRIC_KEYS", () => {
       "sarvam_intent_score",
       "sarvam_entity_score",
       "llm_judge_score",
+      "cost",
     ]);
   });
 
@@ -28,6 +29,7 @@ describe("STT_RESERVED_METRIC_KEYS / TTS_RESERVED_METRIC_KEYS", () => {
       "ttfb_p95",
       "ttfb_p99",
       "processing_time",
+      "cost",
     ]);
   });
 });

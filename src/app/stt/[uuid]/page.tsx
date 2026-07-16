@@ -47,6 +47,7 @@ import {
   deriveEvaluatorColumns,
   STT_RESERVED_METRIC_KEYS,
 } from "@/lib/evaluatorColumns";
+import type { AudioCostBreakdown } from "@/lib/audioCost";
 
 // The STT evaluate API response now carries per-attached-evaluator data in
 // three formats we need to support side-by-side:
@@ -110,8 +111,12 @@ type ProviderMetrics = {
   sarvam_llm_cer?: number;
   sarvam_intent_score?: number;
   sarvam_entity_score?: number;
+  // Per-provider cost block (per-minute USD pricing × audio duration). Present
+  // only when the run computed cost.
+  cost?: AudioCostBreakdown;
   [k: string]:
     | number
+    | AudioCostBreakdown
     | { type?: string; mean?: number; scale_min?: number; scale_max?: number }
     | undefined;
 };
@@ -163,6 +168,9 @@ type LeaderboardSummary = {
   sarvam_llm_cer?: number;
   sarvam_intent_score?: number;
   sarvam_entity_score?: number;
+  // Per-minute USD cost, flattened onto the leaderboard row when the run
+  // computed cost.
+  cost_per_minute_usd?: number;
   [k: string]: string | number | undefined;
 };
 
@@ -986,6 +994,7 @@ export default function STTEvaluationDetailPage() {
                         }
                         evaluatorColumns={evaluatorColumns}
                         getProviderLabel={getProviderLabel}
+                        providerResults={evaluationResult.provider_results}
                       />
                     )}
 

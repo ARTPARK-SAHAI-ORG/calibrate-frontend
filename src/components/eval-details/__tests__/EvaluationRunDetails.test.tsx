@@ -1535,3 +1535,242 @@ describe("TTSEvaluationOutputs", () => {
     ).toBe("false");
   });
 });
+
+// ---- Cost (USD/min) ------------------------------------------------------
+
+describe("STTEvaluationLeaderboard cost column", () => {
+  it("joins per-minute cost from providerResults into the row, column and chart", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "cartesia", wer: 0.1, cer: 0.05 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          {
+            provider: "cartesia",
+            metrics: { cost: { cost_per_minute_usd: 0.0021666667 } },
+          },
+        ]}
+      />,
+    );
+
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns).toContainEqual({
+      key: "cost_per_minute_usd",
+      header: "Cost (USD/min)",
+    });
+
+    const charts = JSON.parse(
+      screen.getByTestId("leaderboard-charts").textContent ?? "[]",
+    ).flat();
+    expect(charts).toContainEqual({
+      title: "Cost (USD/min)",
+      dataKey: "cost_per_minute_usd",
+    });
+
+    const data = JSON.parse(
+      screen.getByTestId("leaderboard-data").textContent ?? "[]",
+    );
+    expect(data[0].cost_per_minute_usd).toBeCloseTo(0.0021666667);
+  });
+
+  it("reads cost flattened on the leaderboard row when providerResults is absent", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[
+          { run: "openai", wer: 0.1, cer: 0.05, cost_per_minute_usd: 0.004 },
+        ]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns.map((c: { key: string }) => c.key)).toContain(
+      "cost_per_minute_usd",
+    );
+  });
+
+  it("omits the cost column/chart when no run computed cost", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "openai", wer: 0.1, cer: 0.05 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[{ provider: "openai", metrics: { wer: 0.1 } }]}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns.map((c: { key: string }) => c.key)).not.toContain(
+      "cost_per_minute_usd",
+    );
+  });
+
+  it("formats the cost column via formatCostUsd", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[
+          { run: "openai", wer: 0.1, cost_per_minute_usd: 0.0021666667 },
+        ]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const columns = (
+      mockLeaderboardCapture.props as unknown as Record<string, unknown>
+    ).columns as Array<{ key: string; render?: (v: unknown) => unknown }>;
+    const costColumn = columns.find((c) => c.key === "cost_per_minute_usd");
+    expect(costColumn?.render?.(0.0021666667)).toBe("$0.002167");
+    expect(costColumn?.render?.(undefined)).toBe("-");
+  });
+});
+
+describe("TTSEvaluationLeaderboard cost column", () => {
+  it("appends the cost column/chart after Latency when providerResults carry cost", () => {
+    render(
+      <TTSEvaluationLeaderboard
+        leaderboardSummary={[{ run: "cartesia", ttfb_p50: 0.5 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          { provider: "cartesia", metrics: { cost: { cost_per_minute_usd: 0.003 } } },
+        ]}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns.map((c: { key: string }) => c.key)).toEqual([
+      "run",
+      "ttfb_p50",
+      "cost_per_minute_usd",
+    ]);
+    const charts = JSON.parse(
+      screen.getByTestId("leaderboard-charts").textContent ?? "[]",
+    ).flat();
+    expect(charts.map((c: { dataKey: string }) => c.dataKey)).toEqual([
+      "ttfb_p50",
+      "cost_per_minute_usd",
+    ]);
+  });
+
+  it("omits the cost column when no cost is present", () => {
+    render(
+      <TTSEvaluationLeaderboard
+        leaderboardSummary={[{ run: "openai", ttfb_p50: 0.5 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns.map((c: { key: string }) => c.key)).not.toContain(
+      "cost_per_minute_usd",
+    );
+  });
+});
+
+describe("STTEvaluationOutputs cost tile", () => {
+  const baseProps = {
+    activeProviderKey: null as string | null,
+    onProviderSelect: jest.fn(),
+    status: "done" as const,
+    evaluatorColumns: [],
+    getProviderLabel,
+  };
+
+  it("shows a cost tile from the nested cost block", () => {
+    render(
+      <STTEvaluationOutputs
+        {...baseProps}
+        providerResults={[
+          {
+            provider: "cartesia",
+            success: true,
+            metrics: {
+              wer: 0.1,
+              cer: 0.05,
+              cost: { cost_per_minute_usd: 0.0021666667 },
+            },
+            results: [],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("metric-Cost (USD/min)").textContent).toBe(
+      "$0.002167",
+    );
+  });
+
+  it("omits the cost tile when no cost was computed", () => {
+    render(
+      <STTEvaluationOutputs
+        {...baseProps}
+        providerResults={[
+          { provider: "openai", success: true, metrics: { wer: 0.1 }, results: [] },
+        ]}
+      />,
+    );
+    expect(
+      screen.queryByTestId("metric-Cost (USD/min)"),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("TTSEvaluationOutputs cost tile", () => {
+  const baseProps = {
+    activeProviderKey: null as string | null,
+    onProviderSelect: jest.fn(),
+    status: "done" as const,
+    evaluatorColumns: [],
+    getProviderLabel,
+  };
+
+  it("shows a cost tile alongside latency", () => {
+    render(
+      <TTSEvaluationOutputs
+        {...baseProps}
+        providerResults={[
+          {
+            provider: "cartesia",
+            success: true,
+            metrics: {
+              ttfb: { p50: 0.5 },
+              cost: { cost_per_minute_usd: 0.003 },
+            },
+            results: [],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("metric-Latency (s)").textContent).toBe("0.5");
+    expect(screen.getByTestId("metric-Cost (USD/min)").textContent).toBe(
+      "$0.003",
+    );
+  });
+
+  it("omits the cost tile when no cost was computed", () => {
+    render(
+      <TTSEvaluationOutputs
+        {...baseProps}
+        providerResults={[
+          {
+            provider: "openai",
+            success: true,
+            metrics: { ttfb: { p50: 0.5 } },
+            results: [],
+          },
+        ]}
+      />,
+    );
+    expect(
+      screen.queryByTestId("metric-Cost (USD/min)"),
+    ).not.toBeInTheDocument();
+  });
+});

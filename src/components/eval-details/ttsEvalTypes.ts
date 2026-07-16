@@ -35,5 +35,8 @@ export type TTSLeaderboardSummary = {
   ttfb_p99?: number;
   ttfb?: number;
   processing_time?: number;
+  // Per-minute USD cost, flattened onto the leaderboard row when the run
+  // computed cost.
+  cost_per_minute_usd?: number;
   [k: string]: string | number | undefined;
 };

@@ -20,6 +20,14 @@ import {
 import type { LatencyMetric } from "./ttsEvalTypes";
 import { PIPECAT_SEMANTIC_WER_URL, SARVAM_ASR_BLOG_URL } from "@/constants/links";
 import { SARVAM_METRIC_FIELDS } from "./sarvamMetrics";
+import { formatCostUsd } from "@/lib/llmMetrics";
+import {
+  type AudioCostBreakdown,
+  COST_PER_MINUTE_KEY,
+  COST_PER_MINUTE_LABEL,
+  costByRunFromProviders,
+  readCostPerMinuteUsd,
+} from "@/lib/audioCost";
 
 type EvaluationStatus = "queued" | "in_progress" | "done" | "failed";
 type EvaluatorOutputType = "binary" | "rating";
@@ -112,6 +120,9 @@ export type STTProviderResultForDetails = ProviderResultLike & {
         sarvam_llm_cer?: number;
         sarvam_intent_score?: number;
         sarvam_entity_score?: number;
+        // Per-provider cost block (per-minute USD pricing × audio duration).
+        // Present only when the run computed cost.
+        cost?: AudioCostBreakdown;
       })
     | null;
   results?: STTResultRow[] | null;
@@ -130,7 +141,13 @@ function readNumericMetric(v: unknown): number | null {
 export type TTSProviderResultForDetails = ProviderResultLike & {
   // `ttfb` now reports percentiles (`p50` headline + `p95` / `p99`); legacy
   // runs still carry `mean`. Read `p50 ?? mean`.
-  metrics?: (Record<string, unknown> & { ttfb?: LatencyMetric }) | null;
+  metrics?:
+    | (Record<string, unknown> & {
+        ttfb?: LatencyMetric;
+        // Per-provider cost block. Present only when the run computed cost.
+        cost?: AudioCostBreakdown;
+      })
+    | null;
   results?: TTSResultRow[] | null;
 };
 
@@ -345,6 +362,44 @@ function evaluatorLeaderboardColumns(
   }));
 }
 
+/** Leaderboard column for per-minute cost (shared by STT and TTS). */
+const costLeaderboardColumn = {
+  key: COST_PER_MINUTE_KEY,
+  header: COST_PER_MINUTE_LABEL,
+  render: (v: unknown) => (typeof v === "number" ? formatCostUsd(v) : "-"),
+};
+
+/** Leaderboard chart for per-minute cost (shared by STT and TTS). */
+const costChartConfig: ChartConfig = {
+  title: COST_PER_MINUTE_LABEL,
+  dataKey: COST_PER_MINUTE_KEY,
+  formatTooltip: (v: number) => formatCostUsd(v),
+};
+
+/**
+ * Joins per-minute USD cost onto leaderboard rows. Reads the cost off the row
+ * itself when the summary carries it, otherwise off the matching provider
+ * result. Exposes it under the flat `COST_PER_MINUTE_KEY` the cost column /
+ * chart read, and reports whether any row ended up with a cost.
+ */
+function withCostPerMinute(
+  leaderboardSummary: LeaderboardSummaryForDetails[],
+  providerResults?: Array<{
+    provider: string;
+    metrics?: Record<string, unknown> | null;
+  }>,
+): { rows: LeaderboardSummaryForDetails[]; showCost: boolean } {
+  const costByRun = costByRunFromProviders(providerResults);
+  let showCost = false;
+  const rows = leaderboardSummary.map((row) => {
+    const cpm = costByRun[row.run] ?? readCostPerMinuteUsd(row);
+    if (cpm == null) return row;
+    showCost = true;
+    return { ...row, [COST_PER_MINUTE_KEY]: cpm };
+  });
+  return { rows, showCost };
+}
+
 /** Pairs charts into rows of two for the LeaderboardTab grid. */
 function chunkChartRows(charts: ChartConfig[]): ChartConfig[][] {
   const rows: ChartConfig[][] = [];
@@ -397,11 +452,18 @@ export function STTEvaluationLeaderboard({
   leaderboardSummary,
   evaluatorColumns,
   getProviderLabel,
+  providerResults,
   className,
 }: {
   leaderboardSummary: LeaderboardSummaryForDetails[];
   evaluatorColumns: STTEvaluatorColumn[];
   getProviderLabel: (value: string) => string;
+  // Provider-level results, used to join per-minute cost onto leaderboard rows
+  // when the leaderboard summary doesn't carry it directly.
+  providerResults?: Array<{
+    provider: string;
+    metrics?: Record<string, unknown> | null;
+  }>;
   className?: string;
 }) {
   // Sarvam metrics only appear as leaderboard charts/columns when the
@@ -415,6 +477,10 @@ export function STTEvaluationLeaderboard({
   const showSemanticWer = leaderboardSummary.some(
     (row) => row.semantic_wer != null,
   );
+
+  // Join per-minute cost onto each row (from the row itself or the matching
+  // provider result) and expose it under a flat key the column/chart read.
+  const { rows, showCost } = withCostPerMinute(leaderboardSummary, providerResults);
 
   // Drop evaluator columns/charts that no run carries a value for — an
   // all-"-" column (e.g. an evaluator that didn't run) is just noise.
@@ -433,6 +499,7 @@ export function STTEvaluationLeaderboard({
       : []),
     ...sarvamFields.map((field) => ({ title: field.label, dataKey: field.key })),
     ...evaluatorChartConfigs(visibleEvaluatorColumns),
+    ...(showCost ? [costChartConfig] : []),
   ];
   const chartRows = chunkChartRows(allCharts);
 
@@ -448,8 +515,9 @@ export function STTEvaluationLeaderboard({
           : []),
         ...sarvamFields.map((field) => ({ key: field.key, header: field.label })),
         ...evaluatorLeaderboardColumns(visibleEvaluatorColumns),
+        ...(showCost ? [costLeaderboardColumn] : []),
       ]}
-      data={leaderboardSummary}
+      data={rows}
       charts={chartRows}
       filename="stt-evaluation-leaderboard"
       getLabel={getProviderLabel}
@@ -461,11 +529,18 @@ export function TTSEvaluationLeaderboard({
   leaderboardSummary,
   evaluatorColumns,
   getProviderLabel,
+  providerResults,
   className,
 }: {
   leaderboardSummary: LeaderboardSummaryForDetails[];
   evaluatorColumns: TTSEvaluatorColumn[];
   getProviderLabel: (value: string) => string;
+  // Provider-level results, used to join per-minute cost onto leaderboard rows
+  // when the leaderboard summary doesn't carry it directly.
+  providerResults?: Array<{
+    provider: string;
+    metrics?: Record<string, unknown> | null;
+  }>;
   className?: string;
 }) {
   // Latency (TTFB) is reported as the median (p50) under `ttfb_p50`. Runs from
@@ -478,9 +553,14 @@ export function TTSEvaluationLeaderboard({
   const renderTtfb = (v: string | number | undefined) =>
     v != null ? parseFloat(Number(v).toFixed(4)) : "-";
 
+  // Join per-minute cost onto each row (from the row itself or the matching
+  // provider result) and expose it under a flat key the column/chart read.
+  const { rows, showCost } = withCostPerMinute(leaderboardSummary, providerResults);
+
   const allCharts: ChartConfig[] = [
     ...evaluatorChartConfigs(evaluatorColumns),
     { title: "Latency (s)", dataKey: ttfbKey },
+    ...(showCost ? [costChartConfig] : []),
   ];
   const chartRows = chunkChartRows(allCharts);
 
@@ -491,8 +571,9 @@ export function TTSEvaluationLeaderboard({
         { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
         ...evaluatorLeaderboardColumns(evaluatorColumns),
         { key: ttfbKey, header: "Latency (s)", render: renderTtfb },
+        ...(showCost ? [costLeaderboardColumn] : []),
       ]}
-      data={leaderboardSummary}
+      data={rows}
       charts={chartRows}
       filename="tts-evaluation-leaderboard"
       getLabel={getProviderLabel}
@@ -642,6 +723,17 @@ export function STTEvaluationOutputs({
                         ? [{ label: field.label, value: parseFloat(value.toFixed(4)) }]
                         : [];
                     }),
+                    // Cost tile — shown only when the run computed cost.
+                    ...(readCostPerMinuteUsd(providerResult.metrics) != null
+                      ? [
+                          {
+                            label: COST_PER_MINUTE_LABEL,
+                            value: formatCostUsd(
+                              readCostPerMinuteUsd(providerResult.metrics),
+                            ),
+                          },
+                        ]
+                      : []),
                     // Evaluator tiles — shown only when this provider actually
                     // has a value for the evaluator (mirrors the Sarvam tiles),
                     // so e.g. a "Semantic match" tile is hidden when it didn't
@@ -817,6 +909,17 @@ export function TTSEvaluationOutputs({
                       ),
                     })),
                     { label: "Latency (s)", value: ttfbValue },
+                    // Cost tile — shown only when the run computed cost.
+                    ...(readCostPerMinuteUsd(providerResult.metrics) != null
+                      ? [
+                          {
+                            label: COST_PER_MINUTE_LABEL,
+                            value: formatCostUsd(
+                              readCostPerMinuteUsd(providerResult.metrics),
+                            ),
+                          },
+                        ]
+                      : []),
                   ]}
                 />
               )}

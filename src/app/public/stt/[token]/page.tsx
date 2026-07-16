@@ -16,6 +16,7 @@ import {
   type STTEvaluatorColumn,
 } from "@/components/eval-details";
 import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
+import type { AudioCostBreakdown } from "@/lib/audioCost";
 import {
   ExportResultsButton,
   type ExportColumn,
@@ -52,8 +53,11 @@ type ProviderMetrics = {
   cer?: number;
   string_similarity?: number;
   llm_judge_score?: number;
+  // Per-provider cost block. Present only when the run computed cost.
+  cost?: AudioCostBreakdown;
   [k: string]:
     | number
+    | AudioCostBreakdown
     | { type?: string; mean?: number; scale_min?: number; scale_max?: number }
     | undefined;
 };
@@ -84,6 +88,8 @@ type LeaderboardSummary = {
   cer?: number;
   string_similarity?: number;
   llm_judge_score?: number;
+  // Per-minute USD cost, flattened onto the leaderboard row when computed.
+  cost_per_minute_usd?: number;
   [k: string]: string | number | undefined;
 };
 
@@ -278,6 +284,7 @@ export default function PublicSTTPage() {
                 leaderboardSummary={data.leaderboard_summary}
                 evaluatorColumns={evaluatorColumns}
                 getProviderLabel={getProviderLabel}
+                providerResults={data.provider_results}
               />
             )}
 
