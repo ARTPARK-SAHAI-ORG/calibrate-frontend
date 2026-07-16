@@ -82,6 +82,27 @@ describe("selection", () => {
     expect(result.current.allSelected).toBe(false);
   });
 
+  it("drops selected agents that are no longer visible after the list narrows", () => {
+    const { result, rerender } = renderHook(
+      ({ list }) =>
+        useAgentDeletion<Agent>({
+          agents: list,
+          onDeleted: jest.fn(),
+          accessToken: "tok",
+        }),
+      { initialProps: { list: agents } },
+    );
+
+    act(() => result.current.toggleSelectAll());
+    expect(result.current.selectedAgentUuids.size).toBe(2);
+
+    // Simulate a search filtering the list down to just "Connect Bot".
+    rerender({ list: [agents[1]] });
+    expect(result.current.selectedAgentUuids.has("a1")).toBe(false);
+    expect(result.current.selectedAgentUuids.has("a2")).toBe(true);
+    expect(result.current.selectedAgentUuids.size).toBe(1);
+  });
+
   it("opens and closes the delete dialog, clearing any error", () => {
     const { result } = setup();
 

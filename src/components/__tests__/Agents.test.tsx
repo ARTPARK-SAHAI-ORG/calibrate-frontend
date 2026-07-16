@@ -426,6 +426,35 @@ describe("Agents", () => {
     });
   });
 
+  it("drops selection for agents hidden by a search so they aren't bulk-deleted", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse(agentsPayload),
+    );
+    const user = setupUser();
+    render(<Agents />);
+    await waitFor(() =>
+      expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
+    );
+
+    // Select every agent, then narrow the search to hide "Support Bot".
+    await user.click(screen.getByLabelText("Select all agents"));
+    expect(
+      screen.getByRole("button", { name: /Delete selected \(2\)/ }),
+    ).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText("Search agents"), "Connect");
+
+    // The hidden agent is dropped from the selection, so only 1 remains.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /Delete selected \(1\)/ }),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole("button", { name: /Delete selected \(2\)/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it("surfaces a 404 all-or-nothing rejection during bulk delete", async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(
       jsonResponse(agentsPayload),

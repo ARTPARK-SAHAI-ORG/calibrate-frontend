@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
 import { reportError } from "@/lib/reportError";
 
@@ -66,6 +66,25 @@ export function useBulkDeletion<T extends { uuid: string }>({
 
   const eligibleItems = items.filter(isEligible);
   const hasSelectableItems = eligibleItems.length > 0;
+
+  // Keep the selection scoped to what's currently visible: when a search (or
+  // any change to the list) hides a selected item, drop it so it can never be
+  // deleted off-screen. `eligibleKey` is a primitive so this only runs when the
+  // visible eligible set actually changes, not on every render.
+  const eligibleKey = eligibleItems.map((i) => i.uuid).join(",");
+  useEffect(() => {
+    const visible = new Set(eligibleItems.map((i) => i.uuid));
+    setSelectedUuids((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      prev.forEach((uuid) => {
+        if (visible.has(uuid)) next.add(uuid);
+        else changed = true;
+      });
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eligibleKey]);
 
   const toggleSelection = (uuid: string) => {
     const item = items.find((i) => i.uuid === uuid);
