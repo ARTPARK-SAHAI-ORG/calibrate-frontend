@@ -24,6 +24,7 @@ import {
   ratingRange,
   hasSTTEmptyPredictions,
   getFirstSTTEmptyPredictionIndex,
+  hasSemanticWerMetric,
   type STTEvaluatorColumn,
 } from "@/components/eval-details";
 import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
@@ -605,10 +606,7 @@ export default function STTEvaluationDetailPage() {
   // Whether this run computed Semantic WER — drives the extra About-tab row and
   // the CSV column. Detected from the aggregate metric on any provider.
   const hasSemanticWer = useMemo(
-    () =>
-      (evaluationResult?.provider_results ?? []).some(
-        (pr) => pr.metrics?.semantic_wer != null,
-      ),
+    () => hasSemanticWerMetric(evaluationResult?.provider_results),
     [evaluationResult],
   );
 

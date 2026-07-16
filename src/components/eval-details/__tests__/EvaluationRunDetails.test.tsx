@@ -7,6 +7,7 @@ import {
   ratingRange,
   hasSTTEmptyPredictions,
   getFirstSTTEmptyPredictionIndex,
+  hasSemanticWerMetric,
   STTEvaluationAbout,
   TTSEvaluationAbout,
   STTEvaluationLeaderboard,
@@ -350,6 +351,34 @@ const explicitRangeRow: EvaluatorAboutMetricRow = {
   outputType: "rating",
   range: "1 - 10",
 };
+
+describe("hasSemanticWerMetric", () => {
+  it("returns true when any provider carries the aggregate metric", () => {
+    expect(
+      hasSemanticWerMetric([
+        { metrics: { wer: 0.1 } },
+        { metrics: { semantic_wer: 0.02 } },
+      ]),
+    ).toBe(true);
+  });
+
+  it("treats a zero value as present", () => {
+    expect(hasSemanticWerMetric([{ metrics: { semantic_wer: 0 } }])).toBe(true);
+  });
+
+  it("returns false when no provider carries it", () => {
+    expect(hasSemanticWerMetric([{ metrics: { wer: 0.1, cer: 0.05 } }])).toBe(
+      false,
+    );
+  });
+
+  it("returns false for null/undefined/empty input", () => {
+    expect(hasSemanticWerMetric(null)).toBe(false);
+    expect(hasSemanticWerMetric(undefined)).toBe(false);
+    expect(hasSemanticWerMetric([])).toBe(false);
+    expect(hasSemanticWerMetric([{ metrics: null }])).toBe(false);
+  });
+});
 
 describe("STTEvaluationAbout", () => {
   it("prepends WER_ABOUT_METRIC and CER_ABOUT_METRIC, then maps rows with correct preference/range", () => {

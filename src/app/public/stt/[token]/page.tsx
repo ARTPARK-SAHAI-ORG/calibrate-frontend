@@ -11,6 +11,7 @@ import {
   findFirstEvaluatorRuns,
   evaluatorColumnsFromRuns,
   evaluatorDescriptionMapFromRuns,
+  hasSemanticWerMetric,
   ratingRange,
   type STTEvaluatorColumn,
 } from "@/components/eval-details";
@@ -311,9 +312,7 @@ export default function PublicSTTPage() {
                         ? "Pass / Fail"
                         : "-",
                 }))}
-                showSemanticWer={(data.provider_results ?? []).some(
-                  (pr) => pr.metrics?.semantic_wer != null,
-                )}
+                showSemanticWer={hasSemanticWerMetric(data.provider_results)}
               />
             )}
           </>

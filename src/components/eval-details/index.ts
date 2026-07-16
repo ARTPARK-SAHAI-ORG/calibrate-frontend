@@ -28,6 +28,7 @@ export {
   ratingRange,
   hasSTTEmptyPredictions,
   getFirstSTTEmptyPredictionIndex,
+  hasSemanticWerMetric,
   findFirstEvaluatorRuns,
   evaluatorColumnsFromRuns,
   evaluatorDescriptionMapFromRuns,
