@@ -17,6 +17,10 @@ import { STORAGE_STATE } from "./storage-state";
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
+// Same key as src/lib/onboarding/state.ts — mark the flagship tour seen so the
+// first-visit auto-start on /agents does not overlay other authenticated specs.
+const ONBOARDING_SEEN_KEY = "calibrate:onboarding:v1:first-eval";
+
 setup("create account and save auth state", async ({ page, request, baseURL }) => {
   // Unique email per run so re-runs don't collide with an existing account.
   const email = `e2e+${Date.now()}@test.local`;
@@ -39,11 +43,12 @@ setup("create account and save auth state", async ({ page, request, baseURL }) =
   // Seed the token the way a real login would, on the app origin.
   await page.goto("/login");
   await page.evaluate(
-    ([token, serializedUser]) => {
+    ([token, serializedUser, tourSeenKey]) => {
       localStorage.setItem("access_token", token);
       localStorage.setItem("user", serializedUser);
+      localStorage.setItem(tourSeenKey, "completed");
     },
-    [access_token, JSON.stringify(user)] as const,
+    [access_token, JSON.stringify(user), ONBOARDING_SEEN_KEY] as const,
   );
   await page
     .context()
