@@ -83,10 +83,12 @@ export function useCrudResource<T extends { uuid: string }>({
         setIsCreating(true);
         setCreateError(null);
         const newItem = await apiPost<T>(endpoint, accessToken, data);
-        
-        // Refetch to get updated list
-        await fetchItems();
-        
+
+        // Merge the returned item into local state instead of refetching the
+        // whole list — the POST already returns the created record. Mirrors
+        // the optimistic local update in `remove`.
+        setItems((prev) => [...prev, newItem]);
+
         return newItem;
       } catch (err) {
         reportError(`Error creating ${endpoint}:`, err);
@@ -96,7 +98,7 @@ export function useCrudResource<T extends { uuid: string }>({
         setIsCreating(false);
       }
     },
-    [endpoint, accessToken, fetchItems]
+    [endpoint, accessToken]
   );
 
   // Update existing item
@@ -108,10 +110,13 @@ export function useCrudResource<T extends { uuid: string }>({
         setIsUpdating(true);
         setCreateError(null);
         const updatedItem = await apiPut<T>(`${endpoint}/${id}`, accessToken, data);
-        
-        // Refetch to get updated list
-        await fetchItems();
-        
+
+        // Replace the item in local state instead of refetching the whole
+        // list — the PUT already returns the updated record.
+        setItems((prev) =>
+          prev.map((item) => (item.uuid === id ? updatedItem : item)),
+        );
+
         return updatedItem;
       } catch (err) {
         reportError(`Error updating ${endpoint}/${id}:`, err);
@@ -121,7 +126,7 @@ export function useCrudResource<T extends { uuid: string }>({
         setIsUpdating(false);
       }
     },
-    [endpoint, accessToken, fetchItems]
+    [endpoint, accessToken]
   );
 
   // Delete item
