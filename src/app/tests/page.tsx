@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
+import { bulkDeleteTests } from "@/lib/testsApi";
 import { AppLayout } from "@/components/AppLayout";
 import {
   ToolPicker,
@@ -520,20 +521,18 @@ function LLMPageInner() {
         throw new Error("BACKEND_URL environment variable is not set");
       }
 
-      for (const uuid of uuidsToDelete) {
-        const response = await fetch(`${backendUrl}/tests/${uuid}`, {
-          method: "DELETE",
-          headers: getDefaultHeaders(backendAccessToken),
-        });
+      // Single bulk call instead of a per-uuid DELETE fan-out. Ids outside the
+      // org (or already deleted) are skipped server-side; since those are gone
+      // either way, we drop the full requested set from the list optimistically.
+      const { unauthorized } = await bulkDeleteTests(
+        backendUrl,
+        backendAccessToken,
+        uuidsToDelete,
+      );
 
-        if (response.status === 401) {
-          await signOut({ callbackUrl: "/login" });
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error("Failed to delete test");
-        }
+      if (unauthorized) {
+        await signOut({ callbackUrl: "/login" });
+        return;
       }
 
       const deletedSet = new Set(uuidsToDelete);
