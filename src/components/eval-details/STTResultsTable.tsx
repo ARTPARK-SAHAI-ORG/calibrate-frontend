@@ -149,7 +149,15 @@ function fmtMetric(v: number | string | undefined | null): string {
 function formatReasoningTooltip(raw: string | undefined): string | undefined {
   if (!raw) return undefined;
   try {
-    return JSON.stringify(JSON.parse(raw), null, 2);
+    const parsed = JSON.parse(raw);
+    // An empty judged-segments list (or empty object) carries no reasoning —
+    // don't surface an info tooltip that just shows "[]".
+    const isEmpty =
+      (Array.isArray(parsed) && parsed.length === 0) ||
+      (parsed != null &&
+        typeof parsed === "object" &&
+        Object.keys(parsed).length === 0);
+    return isEmpty ? undefined : JSON.stringify(parsed, null, 2);
   } catch {
     return raw;
   }

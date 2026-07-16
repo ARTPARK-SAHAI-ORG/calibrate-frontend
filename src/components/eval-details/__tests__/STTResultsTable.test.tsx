@@ -212,6 +212,22 @@ describe("STTResultsTable", () => {
     ).toBeGreaterThan(0);
   });
 
+  it("omits the LLM-WER reasoning tooltip when the judged-segments list is empty", () => {
+    render(
+      <STTResultsTable
+        results={[
+          { ...baseRow, sarvam_llm_wer: 0, sarvam_llm_wer_reasoning: "[]" },
+        ]}
+      />,
+    );
+    // The column and value still show, but the info trigger is dropped since
+    // "[]" carries no reasoning.
+    expect(screen.getAllByText("LLM-WER").length).toBeGreaterThan(0);
+    expect(
+      screen.queryByLabelText("View LLM-WER reasoning"),
+    ).not.toBeInTheDocument();
+  });
+
   it("hides the Sarvam columns when no row carries them", () => {
     render(<STTResultsTable results={[baseRow]} />);
     expect(screen.queryByText("LLM-WER")).not.toBeInTheDocument();
