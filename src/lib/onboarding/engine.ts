@@ -56,12 +56,6 @@ type ActiveTour = {
   driverObj: Driver;
   /** Guards user-initiated close vs. our own destroy on finish. */
   ending: boolean;
-  /**
-   * Steps below this index auto-advance (run their prepare/action without
-   * waiting for a click), then the tour pauses for manual control. Used to
-   * fast-forward the setup while testing a later step; 0 = no auto-advance.
-   */
-  autoAdvanceUntil: number;
   /** Interval that recenters the card if its anchored element is removed. */
   anchorWatch?: number;
 };
@@ -95,16 +89,10 @@ function clearAnchorWatch(): void {
 }
 
 /**
- * Start (or resume) `tour` at `startIndex`. Only one tour runs at a time.
- * `autoAdvanceUntil` fast-forwards the steps before it (running their
- * prepare/action automatically), then pauses for manual control — a testing aid
- * for iterating on a later step without clicking through the setup each time.
+ * Start `tour` from its first step. Only one tour runs at a time; starting a new
+ * one tears down any previous run without recording a skip.
  */
-export async function runTour(
-  tour: Tour,
-  startIndex = 0,
-  autoAdvanceUntil = 0,
-): Promise<void> {
+export async function runTour(tour: Tour): Promise<void> {
   // Tear down any previous run without recording a skip.
   if (active) {
     active.ending = true;
@@ -180,7 +168,7 @@ export async function runTour(
     onDestroyStarted: () => {},
   });
 
-  active = { tour, index: startIndex, driverObj, ending: false, autoAdvanceUntil };
+  active = { tour, index: 0, driverObj, ending: false };
   await showStep();
 }
 
@@ -253,15 +241,6 @@ async function showStep(): Promise<void> {
         driverObj.highlight({ popover });
       }
     }, 400);
-  }
-
-  // Testing fast-forward: auto-run this step and move on without a click.
-  if (active.index < active.autoAdvanceUntil) {
-    const at = active.index;
-    window.setTimeout(() => {
-      if (active && active.index === at && !active.ending) void advance();
-    }, 250);
-    return;
   }
 
   // Auto-advance card: run its action (the wait) and move on when it settles,
