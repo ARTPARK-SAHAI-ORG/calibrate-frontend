@@ -3,6 +3,14 @@ import { reportError } from "@/lib/reportError";
 
 import { useState, useEffect, useCallback } from "react";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
+import { createRequestCache } from "@/lib/requestCache";
+
+// In-flight dedup for the list fetch, keyed by `${accessToken}:${endpoint}`.
+// Dedup-only (no persisted result): several components could mount the same
+// resource in one tick and would otherwise each fire a GET; once the shared
+// promise settles the next fetch hits the network fresh, so mutations that
+// update local state never read a stale cached list.
+const listFetch = createRequestCache<unknown>();
 
 type UseCrudResourceOptions<T> = {
   endpoint: string;
@@ -59,7 +67,9 @@ export function useCrudResource<T extends { uuid: string }>({
     try {
       setIsLoading(true);
       setError(null);
-      const data = await apiGet<T[]>(endpoint, accessToken);
+      const data = (await listFetch.fetch(`${accessToken}:${endpoint}`, () =>
+        apiGet<T[]>(endpoint, accessToken),
+      )) as T[];
       setItems(data);
     } catch (err) {
       reportError(`Error fetching ${endpoint}:`, err);

@@ -11,6 +11,7 @@ import {
   deleteEvaluator,
   type EvaluatorData,
 } from "../evaluatorApi";
+import { clearAllRequestCaches } from "../requestCache";
 
 jest.mock("next-auth/react", () => ({
   signOut: jest.fn(),
@@ -46,6 +47,9 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_BACKEND_URL = "http://test-backend";
   (signOut as jest.Mock).mockClear();
   global.fetch = jest.fn();
+  // fetchAllEvaluators dedupes in-flight calls via a module-level cache; reset
+  // it so each test starts clean.
+  clearAllRequestCaches();
 });
 
 describe("isDefaultEvaluator", () => {
@@ -176,6 +180,27 @@ describe("fetch helpers", () => {
       "http://test-backend/evaluators?include_defaults=true",
       expect.objectContaining({ method: "GET" }),
     );
+  });
+
+  it("fetchAllEvaluators dedupes concurrent callers into one request", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (global.fetch as jest.Mock).mockReturnValueOnce(
+      new Promise((res) => {
+        resolveFetch = res;
+      }),
+    );
+
+    const p1 = fetchAllEvaluators("token");
+    const p2 = fetchAllEvaluators("token");
+
+    resolveFetch(mockResponse({ jsonBody: { items: [{ uuid: "ev-1" }] } }));
+    const [a, b] = await Promise.all([p1, p2]);
+
+    expect(a).toEqual([{ uuid: "ev-1" }]);
+    expect(b).toEqual([{ uuid: "ev-1" }]);
+    // The three consumers (evaluators page, Evaluators tab, Tests tab) that
+    // mount together share a single network request.
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   it("fetchAllEvaluators signs out and returns [] on 401", async () => {

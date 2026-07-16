@@ -1,5 +1,6 @@
 import { signOut } from "next-auth/react";
 import { getBackendUrl, getDefaultHeaders, unwrapList } from "@/lib/api";
+import { createRequestCache } from "@/lib/requestCache";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 
 /**
@@ -86,19 +87,32 @@ export function isEvaluatorNameConflict(
 }
 
 /**
+ * In-flight dedup for the evaluator library. Deliberately dedup-only (no
+ * persisted result): the `/evaluators` page, the agent Evaluators tab, and the
+ * Tests tab all call `fetchAllEvaluators` and can mount in the same tick, so
+ * without this they fire duplicate fetches of a large list. A persisted cache
+ * is avoided on purpose — evaluators are created, duplicated, and deleted from
+ * many scattered call sites, so a stale cache would be hard to invalidate
+ * reliably. Once the shared promise settles, the next call fetches fresh.
+ */
+const evaluatorLibraryFetch = createRequestCache<EvaluatorData[]>();
+
+/**
  * Fetch the full evaluator library (owner-created + seeded defaults). Used by
  * the create/duplicate name checks and the "add existing" picker.
  */
 export async function fetchAllEvaluators(
   accessToken: string,
 ): Promise<EvaluatorData[]> {
-  const response = await fetch(
-    `${getBackendUrl()}/evaluators?include_defaults=true`,
-    { method: "GET", headers: getDefaultHeaders(accessToken) },
-  );
-  if (await handledUnauthorized(response)) return [];
-  if (!response.ok) throw new Error("Failed to fetch evaluators");
-  return unwrapList<EvaluatorData>(await response.json());
+  return evaluatorLibraryFetch.fetch(accessToken, async () => {
+    const response = await fetch(
+      `${getBackendUrl()}/evaluators?include_defaults=true`,
+      { method: "GET", headers: getDefaultHeaders(accessToken) },
+    );
+    if (await handledUnauthorized(response)) return [];
+    if (!response.ok) throw new Error("Failed to fetch evaluators");
+    return unwrapList<EvaluatorData>(await response.json());
+  });
 }
 
 /** Fetch the evaluators currently attached to an agent. */
