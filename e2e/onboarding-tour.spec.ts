@@ -61,7 +61,7 @@ type TestPayload = {
 const ISO = "2026-07-16T00:00:00Z";
 
 // Two LLM-reply evaluators: one "Correctness" (the default next-reply slug the
-// dialog seeds), one "Tone & helpfulness" (a complementary dimension). Both are
+// dialog seeds), one "Reply Conciseness" (the second check the flow adds). Both are
 // evaluator_type "llm" so they render the "LLM reply" pill AND actually grade a
 // next-reply test — the exact property the tour's picker now depends on.
 const LIBRARY_EVALUATORS: EvaluatorPayload[] = [
@@ -80,10 +80,10 @@ const LIBRARY_EVALUATORS: EvaluatorPayload[] = [
     updated_at: ISO,
   },
   {
-    uuid: "ev-tone",
-    name: "Tone & helpfulness",
-    description: "Stays kind and clear",
-    slug: "default-llm-tone",
+    uuid: "ev-concise",
+    name: "Reply Conciseness",
+    description: "Is the reply concise?",
+    slug: "reply-conciseness",
     is_default: true,
     evaluator_type: "llm",
     output_type: "binary",
@@ -121,9 +121,9 @@ const RUN_EVALUATORS = [
     version_number: 1,
   },
   {
-    uuid: "ev-tone",
-    name: "Tone & helpfulness",
-    description: "Stays kind and clear",
+    uuid: "ev-concise",
+    name: "Reply Conciseness",
+    description: "Is the reply concise?",
     output_type: "binary",
     version_number: 1,
   },
@@ -161,12 +161,12 @@ function caseResult(opts: {
         variable_values: { criteria: opts.criteria },
       },
       {
-        evaluator_uuid: "ev-tone",
+        evaluator_uuid: "ev-concise",
         match: true,
         value_name: "Pass",
-        reasoning: "The tone is friendly and clear.",
+        reasoning: "The reply is concise and to the point.",
         variable_values: {
-          criteria: "Stays warm and kind, and is easy to understand.",
+          criteria: "The reply is concise and free of rambling or filler.",
         },
       },
     ],
@@ -391,11 +391,11 @@ const STEPS: { title: string; auto?: boolean }[] = [
   { title: "Save your work" },
   { title: "Add an evaluator" },
   { title: "Choose what to check" },
-  { title: "Add another dimension" },
+  { title: "Add another check" },
   { title: "Add them to your agent" },
   { title: "Create your first test" },
   { title: "The scenario" },
-  { title: "Two dimensions, one test" },
+  { title: "How your test is graded" },
   { title: "Add a test it should fail" },
   { title: "A scenario it cannot answer" },
   { title: "Require what it cannot give" },
@@ -487,7 +487,7 @@ test.describe("Onboarding flagship tour (fully mocked, no backend)", () => {
         // Exactly one popover — no orphan left over from the create-navigation.
         await expect(page.locator(".driver-popover")).toHaveCount(1);
       }
-      if (step.title === "Add another dimension") {
+      if (step.title === "Add another check") {
         // Correctness is ticked; the picker highlights the just-picked row.
         await expect(
           page.locator('[data-tour="add-evaluators-dialog"]'),

@@ -10,10 +10,12 @@
 
 import {
   chooseCorrectnessRow,
-  chooseSecondEvaluatorRow,
+  chooseRowByName,
   isLlmReplyRow,
+  planFromEvaluators,
   buildFirstEvalTour,
   FIRST_EVAL_TOUR_ID,
+  type EvaluatorPlan,
 } from "../firstEval";
 
 // The pill label EvaluatorTypePill renders for each evaluator_type.
@@ -87,68 +89,123 @@ describe("chooseCorrectnessRow", () => {
   });
 });
 
-describe("chooseSecondEvaluatorRow", () => {
-  it("ticks a complementary LLM-reply row, not the conversation one", () => {
+describe("chooseRowByName", () => {
+  it("ticks the unchecked LLM-reply row whose name matches", () => {
     const rows = [
       makeRow({ name: "Correctness", type: "llm", checked: true }),
-      makeRow({ name: "Conversation quality", type: "conversation" }),
-      makeRow({ name: "Politeness", type: "llm" }),
+      makeRow({ name: "Reply Conciseness", type: "llm" }),
+      makeRow({ name: "Coherence", type: "conversation" }),
     ];
-    const picked = chooseSecondEvaluatorRow(rows);
-    expect(picked).toBe(rows[2]);
-    expect(isLlmReplyRow(picked!)).toBe(true);
+    expect(chooseRowByName(rows, "Reply Conciseness")).toBe(rows[1]);
   });
 
-  it("never picks an already-checked row", () => {
-    const rows = [
-      makeRow({ name: "Correctness", type: "llm", checked: true }),
-      makeRow({ name: "Helpfulness", type: "llm", checked: true }),
-      makeRow({ name: "Clarity", type: "llm" }),
-    ];
-    expect(chooseSecondEvaluatorRow(rows)).toBe(rows[2]);
+  it("ignores a conversation-type row even when the name matches", () => {
+    const rows = [makeRow({ name: "Conciseness", type: "conversation" })];
+    expect(chooseRowByName(rows, "Conciseness")).toBeUndefined();
   });
 
-  it("falls back to any unchecked LLM-reply row when none match the hints", () => {
-    const rows = [
-      makeRow({ name: "Correctness", type: "llm", checked: true }),
-      makeRow({ name: "Full conversation coherence", type: "conversation" }),
-      makeRow({ name: "Some other reply check", type: "llm" }),
-    ];
-    // The only eligible (unchecked + LLM-reply) row wins even without a hint.
-    expect(chooseSecondEvaluatorRow(rows)).toBe(rows[2]);
+  it("skips an already-checked row", () => {
+    const rows = [makeRow({ name: "Conciseness", type: "llm", checked: true })];
+    expect(chooseRowByName(rows, "Conciseness")).toBeUndefined();
   });
 
-  it("returns undefined when the only unchecked rows are conversation-type", () => {
-    const rows = [
-      makeRow({ name: "Correctness", type: "llm", checked: true }),
-      makeRow({ name: "Conversation coherence", type: "conversation" }),
-    ];
-    expect(chooseSecondEvaluatorRow(rows)).toBeUndefined();
+  it("returns undefined for an empty name", () => {
+    const rows = [makeRow({ name: "Conciseness", type: "llm" })];
+    expect(chooseRowByName(rows, "")).toBeUndefined();
   });
 
   it("does not mutate the rows it inspects", () => {
-    const rows = [
-      makeRow({ name: "Correctness", type: "llm", checked: true }),
-      makeRow({ name: "Politeness", type: "llm" }),
-    ];
-    chooseSecondEvaluatorRow(rows);
-    // Choosing is pure: the caller ticks, not the chooser.
-    expect(rowChecked(rows[1])).toBe(false);
+    const rows = [makeRow({ name: "Reply Conciseness", type: "llm" })];
+    chooseRowByName(rows, "Reply Conciseness");
+    expect(rowChecked(rows[0])).toBe(false);
+  });
+});
+
+describe("planFromEvaluators", () => {
+  const correctness = {
+    name: "Correctness",
+    evaluator_type: "llm",
+    slug: "default-llm-next-reply",
+  };
+
+  it("detects Correctness and a conciseness second check", () => {
+    expect(
+      planFromEvaluators([
+        correctness,
+        { name: "Reply Conciseness", evaluator_type: "llm", slug: "reply-conciseness" },
+      ]),
+    ).toEqual({ hasCorrectness: true, secondEvaluatorName: "Reply Conciseness" });
+  });
+
+  it("returns no second when only Correctness exists", () => {
+    expect(planFromEvaluators([correctness])).toEqual({
+      hasCorrectness: true,
+      secondEvaluatorName: null,
+    });
+  });
+
+  it("ignores a conversation-type conciseness evaluator (it cannot grade a next-reply test)", () => {
+    expect(
+      planFromEvaluators([
+        correctness,
+        { name: "Conversation Conciseness", evaluator_type: "conversation", slug: "x" },
+      ]).secondEvaluatorName,
+    ).toBeNull();
+  });
+
+  it("flags Correctness missing", () => {
+    const plan = planFromEvaluators([
+      { name: "Reply Conciseness", evaluator_type: "llm", slug: "reply-conciseness" },
+    ]);
+    expect(plan.hasCorrectness).toBe(false);
   });
 });
 
 describe("buildFirstEvalTour", () => {
-  it("builds the first-eval tour with ordered steps", () => {
-    const tour = buildFirstEvalTour({ getAccessToken: () => "token" });
+  const TWO: EvaluatorPlan = {
+    hasCorrectness: true,
+    secondEvaluatorName: "Reply Conciseness",
+  };
+  const ONE: EvaluatorPlan = { hasCorrectness: true, secondEvaluatorName: null };
+  const build = (plan: EvaluatorPlan) =>
+    buildFirstEvalTour({ getAccessToken: () => "token", plan });
+  const titles = (plan: EvaluatorPlan) => build(plan).steps.map((s) => s.title);
+
+  it("builds the first-eval tour with ordered, described steps", () => {
+    const tour = build(TWO);
     expect(tour.id).toBe(FIRST_EVAL_TOUR_ID);
     expect(tour.steps.length).toBeGreaterThan(0);
     expect(tour.steps[0].title).toMatch(/welcome/i);
-    // Every step has a title and description users read.
     for (const step of tour.steps) {
       expect(step.title.length).toBeGreaterThan(0);
       expect(step.description.length).toBeGreaterThan(0);
     }
     expect(tour.steps[0].description).toContain("performs as intended");
     expect(tour.steps[0].description).toContain("catch issues before deploy");
+  });
+
+  it("includes the second-evaluator step (named) only when one is available", () => {
+    const two = titles(TWO);
+    expect(two).toContain("Add another check");
+    expect(two).toContain("Add them to your agent");
+    // The second evaluator is named in the step copy.
+    const addAnother = build(TWO).steps.find(
+      (s) => s.title === "Add another check",
+    );
+    expect(addAnother?.description).toContain("Reply Conciseness");
+
+    const one = titles(ONE);
+    expect(one).not.toContain("Add another check");
+    expect(one).toContain("Add it to your agent");
+  });
+
+  it("never claims multiple dimensions in the grading step", () => {
+    for (const plan of [TWO, ONE]) {
+      const grading = build(plan).steps.find(
+        (s) => s.title === "How your test is graded",
+      );
+      expect(grading).toBeDefined();
+      expect(grading?.description).toContain("add more checks");
+    }
   });
 });

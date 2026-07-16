@@ -30,7 +30,19 @@ import {
   A,
   buildFirstEvalTour,
   pickFreeName,
+  type EvaluatorPlan,
 } from "../firstEval";
+
+// A two-evaluator plan (Correctness + a "Politeness" second check) so the flow
+// includes the second-pick step under test.
+const TWO_EVAL_PLAN: EvaluatorPlan = {
+  hasCorrectness: true,
+  secondEvaluatorName: "Politeness",
+};
+
+function buildTour(token: string | null = null, plan: EvaluatorPlan = TWO_EVAL_PLAN) {
+  return buildFirstEvalTour({ getAccessToken: () => token, plan });
+}
 
 function stepByTitle(tour: ReturnType<typeof buildFirstEvalTour>, title: string) {
   const step = tour.steps.find((s) => s.title === title);
@@ -38,11 +50,13 @@ function stepByTitle(tour: ReturnType<typeof buildFirstEvalTour>, title: string)
   return step;
 }
 
-function makeLayoutVisible(el: HTMLElement): void {
-  Object.defineProperty(el, "getClientRects", {
-    configurable: true,
-    value: () => [{ width: 10, height: 10 }],
-  });
+function makeLayoutVisible(...els: HTMLElement[]): void {
+  for (const el of els) {
+    Object.defineProperty(el, "getClientRects", {
+      configurable: true,
+      value: () => [{ width: 10, height: 10 }],
+    });
+  }
 }
 
 describe("pickFreeName", () => {
@@ -81,7 +95,7 @@ describe("first-eval tour step actions", () => {
       }),
     });
 
-    const tour = buildFirstEvalTour({ getAccessToken: () => "tok" });
+    const tour = buildTour("tok");
     await stepByTitle(tour, "Create an agent").action?.();
 
     expect(mockClickElement).toHaveBeenCalledWith(A.newAgent);
@@ -93,7 +107,7 @@ describe("first-eval tour step actions", () => {
   });
 
   it("fills the system prompt during prepare", async () => {
-    const tour = buildFirstEvalTour({ getAccessToken: () => null });
+    const tour = buildTour();
     await stepByTitle(tour, "Give it instructions").prepare?.();
     expect(mockFillInput).toHaveBeenCalledWith(
       A.systemPrompt,
@@ -114,14 +128,14 @@ describe("first-eval tour step actions", () => {
     dialog.append(correctness, tone);
     document.body.appendChild(dialog);
 
-    const tour = buildFirstEvalTour({ getAccessToken: () => null });
+    const tour = buildTour();
     await stepByTitle(tour, "Choose what to check").action?.();
     expect(
       correctness.querySelector<HTMLInputElement>('input[type="checkbox"]')
         ?.checked,
     ).toBe(true);
 
-    await stepByTitle(tour, "Add another dimension").action?.();
+    await stepByTitle(tour, "Add another check").action?.();
     expect(
       tone.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked,
     ).toBe(true);
@@ -137,18 +151,24 @@ describe("first-eval tour step actions", () => {
 
     const evaluators = document.createElement("div");
     evaluators.setAttribute("data-tour", "test-evaluators-area");
+    // Each attached evaluator renders as a card holding its name + criteria
+    // field; the Correctness card gets the test's own criterion.
+    const card = document.createElement("div");
+    const name = document.createElement("div");
+    name.textContent = "Correctness";
     const criteria = document.createElement("textarea");
     makeLayoutVisible(criteria);
-    evaluators.appendChild(criteria);
+    card.append(name, criteria);
+    evaluators.appendChild(card);
     document.body.appendChild(evaluators);
 
-    const tour = buildFirstEvalTour({ getAccessToken: () => null });
+    const tour = buildTour();
     stepByTitle(tour, "The scenario").prepare?.();
     expect(userField.value).toContain("clinic");
 
-    await stepByTitle(tour, "Two dimensions, one test").prepare?.();
+    await stepByTitle(tour, "How your test is graded").prepare?.();
     expect(criteria.value).toContain("opening hours");
-    await stepByTitle(tour, "Two dimensions, one test").action?.();
+    await stepByTitle(tour, "How your test is graded").action?.();
     expect(mockClickByText).toHaveBeenCalledWith("Create", { timeout: 8000 });
   });
 
@@ -165,7 +185,7 @@ describe("first-eval tour step actions", () => {
     document.body.appendChild(verdict);
 
     const clickSpy = jest.spyOn(toggle, "click");
-    const tour = buildFirstEvalTour({ getAccessToken: () => null });
+    const tour = buildTour();
     await stepByTitle(tour, "The evaluator's verdict").action?.();
     expect(clickSpy).toHaveBeenCalled();
 
@@ -192,7 +212,7 @@ describe("first-eval tour step actions", () => {
     detail.setAttribute("data-tour", "run-result-detail");
     document.body.append(outputsTab, row, detail);
 
-    const tour = buildFirstEvalTour({ getAccessToken: () => null });
+    const tour = buildTour();
     await stepByTitle(tour, "It passes now ✅").prepare?.();
 
     expect(mockClickElement).toHaveBeenCalledWith(A.runTabOutputs, {

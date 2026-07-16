@@ -14,6 +14,7 @@
  */
 
 import { getBackendUrl, getDefaultHeaders, unwrapList } from "@/lib/api";
+import { isDefaultLLMNextReplyEvaluator } from "@/lib/defaultEvaluators";
 import { WHATSAPP_INVITE_URL } from "@/constants/links";
 import {
   clickByText,
@@ -85,13 +86,28 @@ const DEMO_TESTS: DemoTest[] = [
   },
 ];
 
-// Fallback criteria for the second evaluator's dimension (tone/manner), used to
-// fill any extra criteria field a demo test carries beyond the first.
-const DEMO_TONE_CRITERIA = "Stays warm and kind, and is easy to understand.";
+// Criteria the tour writes into the SECOND evaluator's field so the tour
+// controls what that check grades. It is a mild "conciseness" bar every demo
+// answer clears (the short clinic-hours reply, the pre-fix "Happy to help", and
+// the post-fix phone number are all concise), so the second check always passes
+// and the failing-then-passing story is driven solely by Correctness. Without
+// this, a picked evaluator's own baked criteria (e.g. "exactly one question")
+// could fail the demo answers and break the walkthrough.
+const DEMO_SECOND_CRITERIA =
+  "The reply is concise and free of rambling or filler.";
 
 // The fix appended to the system prompt to close the gap the failing test
 // found: the agent was never given a phone number, so it could not answer.
 const DEMO_PROMPT_FIX = " Our clinic helpline number is 1800-123-4567.";
+
+// The evaluator name goes into a card's description HTML, so escape it (names are
+// user-authored). driver.js renders the description as raw HTML.
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
 
 // Anchors (kept here so component `data-tour` attributes and steps stay in sync).
 export const A = {
@@ -125,11 +141,74 @@ export const A = {
   runReasoningBody: "[data-reasoning-body]",
 } as const;
 
+/**
+ * What the flow adapts to, resolved from the workspace's evaluator library once,
+ * before the tour is built:
+ *  - `hasCorrectness`: the built-in next-reply Correctness default is available
+ *    (it is seeded into every workspace, so this is true in practice).
+ *  - `secondEvaluatorName`: the exact name of a second LLM-reply evaluator to add
+ *    alongside Correctness (a "conciseness"-style check), or null if none exists
+ *    — in which case the flow uses Correctness alone and never invents a second.
+ */
+export type EvaluatorPlan = {
+  hasCorrectness: boolean;
+  secondEvaluatorName: string | null;
+};
+
+type EvaluatorLike = {
+  name?: string;
+  evaluator_type?: string;
+  slug?: string | null;
+  source_default_slug?: string | null;
+};
+
+/**
+ * Decide the evaluator plan from the library list. Pure, so it is unit-testable.
+ * The second evaluator must be an LLM-reply evaluator (only those grade a
+ * next-reply test) whose name reads as a conciseness check, and must not be the
+ * Correctness default itself.
+ */
+export function planFromEvaluators(list: EvaluatorLike[]): EvaluatorPlan {
+  const llm = list.filter((e) => e.evaluator_type === "llm");
+  const hasCorrectness = llm.some((e) => isDefaultLLMNextReplyEvaluator(e));
+  const second = llm.find(
+    (e) => /concise/i.test(e.name ?? "") && !isDefaultLLMNextReplyEvaluator(e),
+  );
+  return { hasCorrectness, secondEvaluatorName: second?.name ?? null };
+}
+
+/**
+ * Fetch the workspace evaluators and resolve the plan. Falls back to
+ * Correctness-only (the safe path — one reliable, tour-controlled check) if the
+ * token is missing or the request fails, so the tour never blocks on the lookup.
+ */
+export async function resolveEvaluatorPlan(
+  accessToken: string | null,
+): Promise<EvaluatorPlan> {
+  const fallback: EvaluatorPlan = {
+    hasCorrectness: true,
+    secondEvaluatorName: null,
+  };
+  if (!accessToken) return fallback;
+  try {
+    const res = await fetch(
+      `${getBackendUrl()}/evaluators?include_defaults=true`,
+      { method: "GET", headers: getDefaultHeaders(accessToken) },
+    );
+    if (!res.ok) return fallback;
+    return planFromEvaluators(unwrapList<EvaluatorLike>(await res.json()));
+  } catch {
+    return fallback;
+  }
+}
+
 export type FirstEvalDeps = {
   // A getter, not a snapshot: the tour is built once but its API calls fire
   // seconds later, so it must read the token fresh (it may still be hydrating
   // when the tour starts).
   getAccessToken: () => string | null;
+  // The evaluator plan, resolved before the tour is built (see resolveEvaluatorPlan).
+  plan: EvaluatorPlan;
 };
 
 /**
@@ -206,12 +285,6 @@ async function resolveFreeName(
   }
 }
 
-// Prefer a second evaluator that grades a clearly different aspect from
-// correctness, so the two checks are genuinely complementary. Deliberately
-// excludes accuracy/correctness-like names (they overlap with Correctness).
-const COMPLEMENTARY_EVALUATOR_HINTS =
-  /tone|polite|empath|kind|helpful|clar|complete|concise|safe|harm/i;
-
 // Only "LLM reply" evaluators (the pill label for `evaluator_type === "llm"`)
 // actually grade a next-reply test: the test dialog seeds evaluators filtered to
 // that type and silently drops "Full conversation" / "LLM output" ones. So the
@@ -244,20 +317,21 @@ export function chooseCorrectnessRow(
 }
 
 /**
- * Choose the second evaluator to tick: an unticked LLM-reply row (so it actually
- * grades the next-reply test), preferring a clearly different dimension from
- * correctness. Pure — returns the row for the caller to tick, or undefined if no
- * eligible row exists.
+ * Choose the second evaluator to tick BY EXACT NAME (the name resolved into the
+ * plan), restricted to unticked LLM-reply rows so it actually grades the
+ * next-reply test. Matching a specific name — rather than a fuzzy "complementary"
+ * guess — is what stops the tour ticking an unrelated custom evaluator whose
+ * baked criteria the tour cannot control. Pure; returns the row or undefined.
  */
-export function chooseSecondEvaluatorRow(
+export function chooseRowByName(
   rows: HTMLLabelElement[],
+  name: string,
 ): HTMLLabelElement | undefined {
-  const eligible = rows.filter((r) => isRowUnchecked(r) && isLlmReplyRow(r));
-  return (
-    eligible.find((r) =>
-      COMPLEMENTARY_EVALUATOR_HINTS.test(r.textContent ?? ""),
-    ) ?? eligible[0]
-  );
+  const target = name.trim().toLowerCase();
+  if (!target) return undefined;
+  return rows
+    .filter((r) => isRowUnchecked(r) && isLlmReplyRow(r))
+    .find((r) => (r.textContent ?? "").toLowerCase().includes(target));
 }
 
 /**
@@ -288,35 +362,35 @@ async function pickCorrectness(): Promise<void> {
   tickRow(chooseCorrectnessRow(rows));
 }
 
-/**
- * Tick a second, complementary evaluator that is not already ticked. Restricted
- * to LLM-reply evaluators so it actually grades the next-reply demo test (see
- * `LLM_REPLY_TYPE_LABEL`); among those, prefer a clearly different dimension.
- */
-async function pickSecondEvaluator(): Promise<void> {
+/** Tick the second evaluator, matched by the exact name resolved into the plan. */
+async function pickSecondEvaluator(name: string): Promise<void> {
   const dialog = await waitForElement(A.addEvaluatorsDialog, { timeout: 10000 });
   if (!dialog) return;
   const rows = Array.from(dialog.querySelectorAll<HTMLLabelElement>("label"));
-  tickRow(chooseSecondEvaluatorRow(rows));
+  tickRow(chooseRowByName(rows, name));
 }
 
 /**
- * Fill the success-criteria fields inside the open Create Test editor. The test
- * seeds one evaluator per dimension the agent carries, so there can be more than
- * one criteria field: the first gets the scenario's own criteria, any extra gets
- * a generic tone criteria so the test still validates.
+ * Fill the success-criteria fields inside the open Create Test editor, per
+ * evaluator card (each attached evaluator renders as one card holding its name
+ * and its criteria field). Correctness gets the scenario's own criterion; any
+ * other evaluator gets the tour's benign second criterion — OVERWRITING whatever
+ * that evaluator shipped with, so the tour controls what the second check grades
+ * and it passes on every demo answer. Setting by card identity (not field order)
+ * keeps this correct however the editor lays the cards out.
  */
 function fillEvaluatorCriteria(primary: string): void {
   const area = document.querySelector<HTMLElement>(A.testEvaluatorsArea);
   if (!area) return;
-  const fields = Array.from(
-    area.querySelectorAll<HTMLTextAreaElement | HTMLInputElement>(
+  const cards = Array.from(area.children) as HTMLElement[];
+  cards.forEach((card) => {
+    const field = card.querySelector<HTMLTextAreaElement | HTMLInputElement>(
       "textarea, input[type='text']",
-    ),
-  ).filter((f) => !f.value.trim());
-  fields.forEach((f, i) =>
-    setNativeValue(f, i === 0 ? primary : DEMO_TONE_CRITERIA),
-  );
+    );
+    if (!field) return;
+    const isCorrectness = /correct/i.test(card.textContent ?? "");
+    setNativeValue(field, isCorrectness ? primary : DEMO_SECOND_CRITERIA);
+  });
 }
 
 /**
@@ -388,6 +462,9 @@ async function appendPromptFix(): Promise<void> {
 }
 
 export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
+  // The flow adapts to the workspace: add a second check only when a suitable
+  // (conciseness) evaluator exists; otherwise use Correctness alone.
+  const secondName = deps.plan.secondEvaluatorName;
   const steps: TourStep[] = [
     {
       title: "Welcome to Calibrate 👋",
@@ -463,32 +540,40 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     {
       anchor: A.addEvaluatorsDialog,
       title: "Choose what to check",
-      description:
-        "These are the checks you can grade your agent with. We will pick <strong>two</strong> that work well together. First, <strong>Correctness</strong>: does the answer get it right?",
+      description: secondName
+        ? "These are the checks you can grade your agent with. First, <strong>Correctness</strong>: does the answer get it right?"
+        : "These are the checks you can grade your agent with. We will use <strong>Correctness</strong>: does the answer get it right?",
       side: "left",
       actionLabel: "Pick Correctness",
       action: async () => {
         await pickCorrectness();
       },
     },
+    // Only add a second check when the workspace actually has one to add.
+    ...(secondName
+      ? [
+          {
+            anchor: A.addEvaluatorsDialog,
+            title: "Add another check",
+            description: `Correctness is ticked. Now add <strong>${escapeHtml(
+              secondName,
+            )}</strong> as a second, independent check, so you grade more than one aspect of the reply.`,
+            side: "left" as const,
+            actionLabel: "Pick it",
+            action: async () => {
+              await pickSecondEvaluator(secondName);
+            },
+          },
+        ]
+      : []),
     {
       anchor: A.addEvaluatorsDialog,
-      title: "Add another dimension",
-      description:
-        "Correctness is ticked. Now add a <strong>second, independent check</strong>, such as tone or helpfulness. One check rarely catches everything, so two work better together.",
+      title: secondName ? "Add them to your agent" : "Add it to your agent",
+      description: secondName
+        ? "Both checks are ticked. Let us <strong>add them</strong> so every test grades the reply on both."
+        : "Correctness is ticked. Let us <strong>add it</strong> so every test grades the reply. You can <strong>add more checks</strong> anytime.",
       side: "left",
-      actionLabel: "Pick a second",
-      action: async () => {
-        await pickSecondEvaluator();
-      },
-    },
-    {
-      anchor: A.addEvaluatorsDialog,
-      title: "Add them to your agent",
-      description:
-        "Both checks are ticked. Let us <strong>add them</strong> so every test grades the reply on both.",
-      side: "left",
-      actionLabel: "Add them",
+      actionLabel: secondName ? "Add them" : "Add it",
       action: async () => {
         await clickElement(A.evaluatorsAddConfirm);
       },
@@ -521,9 +606,10 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     },
     {
       anchor: A.testEvaluatorsArea,
-      title: "Two dimensions, one test",
-      description:
-        "Both evaluators you added grade this test, each against its own <strong>success criteria</strong>. One check rarely captures everything, so they cover <strong>different aspects</strong> of the reply. Let us save this test.",
+      title: "How your test is graded",
+      description: secondName
+        ? "Your evaluators grade this reply, each against its own <strong>success criterion</strong>. You can <strong>add more checks</strong> anytime to cover other aspects. Let us save this test."
+        : "Your evaluator grades this reply against a <strong>success criterion</strong>. You can <strong>add more checks</strong> anytime to cover other aspects. Let us save this test.",
       side: "left",
       actionLabel: "Create test",
       timeout: 12000,

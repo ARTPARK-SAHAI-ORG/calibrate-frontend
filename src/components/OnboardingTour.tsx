@@ -9,6 +9,7 @@ import {
   clearTourSeen,
   hasSeenTour,
   isTourActive,
+  resolveEvaluatorPlan,
   runTour,
   TOUR_IDS,
   TOUR_REQUEST_EVENT,
@@ -36,10 +37,26 @@ export function OnboardingTour() {
   const tokenRef = useRef<string | null>(accessToken);
   tokenRef.current = accessToken;
 
-  const startTour = (tourId: TourId) => {
-    if (tourId === TOUR_IDS.firstEval) {
-      void runTour(buildFirstEvalTour({ getAccessToken: () => tokenRef.current }));
+  // The token hydrates a beat after mount (localStorage read in an effect, or the
+  // NextAuth session settling), so a tour started right away can see it null.
+  // Wait briefly for it before resolving the plan, otherwise the plan lookup
+  // would fall back to Correctness-only even in a workspace that has more.
+  const waitForToken = async (): Promise<string | null> => {
+    for (let i = 0; i < 20 && !tokenRef.current; i++) {
+      await new Promise((r) => setTimeout(r, 100));
     }
+    return tokenRef.current;
+  };
+
+  const startTour = async (tourId: TourId) => {
+    if (tourId !== TOUR_IDS.firstEval) return;
+    // Resolve which evaluators the workspace has BEFORE building the tour, so the
+    // flow matches reality (two checks when a conciseness evaluator exists,
+    // Correctness alone otherwise).
+    const plan = await resolveEvaluatorPlan(await waitForToken());
+    void runTour(
+      buildFirstEvalTour({ getAccessToken: () => tokenRef.current, plan }),
+    );
   };
 
   // Replay on request from anywhere in the app.
@@ -49,7 +66,7 @@ export function OnboardingTour() {
       if (!tourId) return;
       clearTourSeen(tourId);
       if (isTourActive()) return;
-      startTour(tourId);
+      void startTour(tourId);
     };
     window.addEventListener(TOUR_REQUEST_EVENT, handler);
     return () => window.removeEventListener(TOUR_REQUEST_EVENT, handler);
@@ -68,7 +85,7 @@ export function OnboardingTour() {
 
     const timer = window.setTimeout(() => {
       if (!isTourActive() && !hasSeenTour(TOUR_IDS.firstEval)) {
-        startTour(TOUR_IDS.firstEval);
+        void startTour(TOUR_IDS.firstEval);
       }
     }, 700);
     return () => window.clearTimeout(timer);

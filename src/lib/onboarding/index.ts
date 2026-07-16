@@ -16,8 +16,10 @@ export {
 } from "./state";
 export {
   buildFirstEvalTour,
+  resolveEvaluatorPlan,
   FIRST_EVAL_TOUR_ID,
   type FirstEvalDeps,
+  type EvaluatorPlan,
 } from "./tours/firstEval";
 
 /** Window event that requests (re)starting a tour; detail carries the tour id. */
