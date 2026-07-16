@@ -244,6 +244,61 @@ describe("STTResultsTable", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("renders a Semantic WER column with a formatted value when a row carries it", () => {
+    render(
+      <STTResultsTable results={[{ ...baseRow, semantic_wer: 0.076923 }]} />,
+    );
+    expect(screen.getAllByText("Semantic WER").length).toBeGreaterThan(0);
+    // Formatted to 4 dp (appears in both desktop + mobile layouts).
+    expect(screen.getAllByText("0.0769").length).toBeGreaterThan(0);
+  });
+
+  it("accepts Semantic WER as a stringified number", () => {
+    render(<STTResultsTable results={[{ ...baseRow, semantic_wer: "0.5" }]} />);
+    expect(screen.getAllByText("Semantic WER").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("0.5").length).toBeGreaterThan(0);
+  });
+
+  it("surfaces a reasoning tooltip trigger when Semantic WER carries reasoning", () => {
+    render(
+      <STTResultsTable
+        results={[
+          {
+            ...baseRow,
+            semantic_wer: 0.05,
+            semantic_wer_reasoning: "Only a filler word differs.",
+          },
+        ]}
+      />,
+    );
+    // One trigger per layout (desktop + mobile).
+    expect(
+      screen.getAllByLabelText("View Semantic WER reasoning").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("omits the reasoning trigger when Semantic WER has no reasoning", () => {
+    render(<STTResultsTable results={[{ ...baseRow, semantic_wer: 0.05 }]} />);
+    expect(
+      screen.queryByLabelText("View Semantic WER reasoning"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides the Semantic WER column when no row carries it", () => {
+    render(<STTResultsTable results={[baseRow]} />);
+    expect(screen.queryByText("Semantic WER")).not.toBeInTheDocument();
+  });
+
+  it("hides the Semantic WER column when showMetrics=false", () => {
+    render(
+      <STTResultsTable
+        results={[{ ...baseRow, semantic_wer: 0.05 }]}
+        showMetrics={false}
+      />,
+    );
+    expect(screen.queryByText("Semantic WER")).not.toBeInTheDocument();
+  });
+
   it("attaches tableRef to the desktop table wrapper", () => {
     const ref = React.createRef<HTMLDivElement>();
     render(<STTResultsTable results={[baseRow]} tableRef={ref} />);

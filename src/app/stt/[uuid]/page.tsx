@@ -97,6 +97,9 @@ type EvaluatorRun = {
 type ProviderMetrics = {
   wer?: number;
   cer?: number;
+  // LLM-judged WER that ignores errors which wouldn't change an agent's
+  // understanding. Present only when the run computed it.
+  semantic_wer?: number;
   string_similarity?: number;
   llm_judge_score?: number;
   // Present only when the run used Sarvam LLM judges. LLM-WER/CER share the
@@ -119,6 +122,8 @@ type ProviderResultRow = {
   pred: string;
   wer: string;
   cer?: string;
+  semantic_wer?: number | string;
+  semantic_wer_reasoning?: string;
   string_similarity?: string;
   llm_judge_score?: string;
   llm_judge_reasoning?: string;
@@ -149,6 +154,7 @@ type LeaderboardSummary = {
   count: number;
   wer?: number;
   cer?: number;
+  semantic_wer?: number;
   string_similarity?: number;
   llm_judge_score?: number;
   // Present only when the run used Sarvam LLM judges.
@@ -596,6 +602,16 @@ export default function STTEvaluationDetailPage() {
     [evaluationResult],
   );
 
+  // Whether this run computed Semantic WER — drives the extra About-tab row and
+  // the CSV column. Detected from the aggregate metric on any provider.
+  const hasSemanticWer = useMemo(
+    () =>
+      (evaluationResult?.provider_results ?? []).some(
+        (pr) => pr.metrics?.semantic_wer != null,
+      ),
+    [evaluationResult],
+  );
+
   // "Submit for labelling": pick individual result rows (per provider) and
   // send them to an STT annotation task. Rows are keyed `${provider}:${index}`
   // — the same keys `STTResultsTable` toggles — so selection is stable across
@@ -762,6 +778,10 @@ export default function STTEvaluationDetailPage() {
                         { key: "predicted_text", header: "Predicted text" },
                         { key: "wer", header: "WER" },
                         { key: "cer", header: "CER" },
+                        // Semantic WER, only when the run computed it.
+                        ...(hasSemanticWer
+                          ? [{ key: "semantic_wer", header: "Semantic WER" }]
+                          : []),
                         // Sarvam LLM metrics, only when the run computed them.
                         ...(hasSarvamMetrics
                           ? SARVAM_METRIC_FIELDS.map((f) => ({
@@ -784,6 +804,9 @@ export default function STTEvaluationDetailPage() {
                             predicted_text: r.pred,
                             wer: r.wer,
                             cer: r.cer,
+                            ...(hasSemanticWer
+                              ? { semantic_wer: r.semantic_wer ?? "" }
+                              : {}),
                             ...(hasSarvamMetrics
                               ? Object.fromEntries(
                                   SARVAM_METRIC_FIELDS.map((f) => [
@@ -929,6 +952,7 @@ export default function STTEvaluationDetailPage() {
                   {displayedActiveTab === "about" && canShowLeaderboard && (
                     <STTEvaluationAbout
                       showSarvamMetrics={hasSarvamMetrics}
+                      showSemanticWer={hasSemanticWer}
                       evaluatorRows={aboutEvaluators.map((e) => ({
                         key: e.uuid,
                         metric: (

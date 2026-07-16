@@ -311,6 +311,9 @@ export default function PublicSTTPage() {
                         ? "Pass / Fail"
                         : "-",
                 }))}
+                showSemanticWer={(data.provider_results ?? []).some(
+                  (pr) => pr.metrics?.semantic_wer != null,
+                )}
               />
             )}
           </>

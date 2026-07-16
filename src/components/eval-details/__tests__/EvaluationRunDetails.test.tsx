@@ -15,6 +15,7 @@ import {
   TTSEvaluationOutputs,
   WER_ABOUT_METRIC,
   CER_ABOUT_METRIC,
+  SEMANTIC_WER_ABOUT_METRIC,
   TTFB_ABOUT_METRIC,
   type EvaluatorAboutMetricRow,
   type STTProviderResultForDetails,
@@ -410,6 +411,65 @@ describe("STTEvaluationAbout", () => {
     });
     expect(metrics[6]).toMatchObject({ key: "pass_fail" });
   });
+
+  it("omits the Semantic WER row by default", () => {
+    render(<STTEvaluationAbout evaluatorRows={[binaryRow]} />);
+    const metrics = JSON.parse(
+      screen.getByTestId("about-metrics-table").textContent ?? "",
+    );
+    expect(metrics.map((m: { key?: string }) => m.key)).not.toContain(
+      "semantic_wer",
+    );
+  });
+
+  it("inserts the Semantic WER row after WER/CER when showSemanticWer is set", () => {
+    render(<STTEvaluationAbout evaluatorRows={[binaryRow]} showSemanticWer />);
+    const metrics = JSON.parse(
+      screen.getByTestId("about-metrics-table").textContent ?? "",
+    );
+    expect(metrics[0]).toEqual(WER_ABOUT_METRIC);
+    expect(metrics[1]).toEqual(CER_ABOUT_METRIC);
+    expect(metrics[2]).toMatchObject({
+      key: "semantic_wer",
+      preference: "Lower is better",
+      range: "0 - ∞",
+    });
+    // The evaluator row follows the Semantic WER row.
+    expect(metrics[3]).toMatchObject({ key: "pass_fail" });
+  });
+
+  it("orders Semantic WER before the Sarvam rows when both are shown", () => {
+    render(
+      <STTEvaluationAbout
+        evaluatorRows={[binaryRow]}
+        showSemanticWer
+        showSarvamMetrics
+      />,
+    );
+    const keys = JSON.parse(
+      screen.getByTestId("about-metrics-table").textContent ?? "",
+    ).map((m: { key?: string }) => m.key);
+    expect(keys.slice(2, 7)).toEqual([
+      "semantic_wer",
+      "sarvam_llm_wer",
+      "sarvam_llm_cer",
+      "sarvam_intent",
+      "sarvam_entity",
+    ]);
+  });
+});
+
+describe("SEMANTIC_WER_ABOUT_METRIC", () => {
+  it("links the metric label to the Pipecat STT benchmark", () => {
+    render(<div>{SEMANTIC_WER_ABOUT_METRIC.metric}</div>);
+    const link = screen.getByRole("link", { name: "Semantic WER" });
+    expect(link).toHaveAttribute(
+      "href",
+      "https://github.com/pipecat-ai/stt-benchmark#semantic-wer",
+    );
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
 });
 
 describe("TTSEvaluationAbout", () => {
@@ -542,6 +602,50 @@ describe("STTEvaluationLeaderboard", () => {
       "wer",
       "cer",
     ]);
+  });
+
+  it("inserts a Semantic WER chart/column after CER when the rows carry it", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[
+          { run: "openai", wer: 0.1, cer: 0.05, semantic_wer: 0.02 },
+        ]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns).toEqual([
+      { key: "run", header: "Run" },
+      { key: "wer", header: "WER" },
+      { key: "cer", header: "CER" },
+      { key: "semantic_wer", header: "Semantic WER" },
+    ]);
+    const charts = JSON.parse(
+      screen.getByTestId("leaderboard-charts").textContent ?? "[]",
+    ).flat();
+    expect(charts).toContainEqual({
+      title: "Semantic WER",
+      dataKey: "semantic_wer",
+    });
+  });
+
+  it("omits the Semantic WER leaderboard chart/column when rows lack it", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "openai", wer: 0.1, cer: 0.05 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns.map((c: { key: string }) => c.key)).not.toContain(
+      "semantic_wer",
+    );
   });
 
   it("omits evaluator leaderboard columns/charts when no run carries a value", () => {
@@ -885,6 +989,31 @@ describe("STTEvaluationOutputs", () => {
     );
     expect(screen.queryByTestId("metric-LLM-WER")).not.toBeInTheDocument();
     expect(screen.queryByTestId("metric-Intent Score")).not.toBeInTheDocument();
+  });
+
+  it("adds a Semantic WER metric card when the run carries it", () => {
+    const providerResults: STTProviderResultForDetails[] = [
+      {
+        provider: "openai",
+        success: true,
+        metrics: { wer: 0.15, cer: 0.17, semantic_wer: 0.076923 },
+        results: [],
+      },
+    ];
+    render(
+      <STTEvaluationOutputs {...baseProps} providerResults={providerResults} />,
+    );
+    expect(screen.getByTestId("metric-Semantic WER").textContent).toBe("0.0769");
+  });
+
+  it("omits the Semantic WER metric card when the metric is absent", () => {
+    const providerResults: STTProviderResultForDetails[] = [
+      { provider: "openai", success: true, metrics: { wer: 0.1, cer: 0.05 }, results: [] },
+    ];
+    render(
+      <STTEvaluationOutputs {...baseProps} providerResults={providerResults} />,
+    );
+    expect(screen.queryByTestId("metric-Semantic WER")).not.toBeInTheDocument();
   });
 
   it("renders '-' for WER and CER when their metrics are null", () => {

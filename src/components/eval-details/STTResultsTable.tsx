@@ -47,6 +47,11 @@ export type STTResultRow = {
   pred: string;
   wer: string;
   cer?: string;
+  // LLM-judged word error rate that ignores errors which wouldn't change an
+  // agent's understanding — present only when the run computed it.
+  // `semantic_wer_reasoning` is the judge's plain-text explanation.
+  semantic_wer?: number | string;
+  semantic_wer_reasoning?: string;
   string_similarity?: string;
   // Sarvam LLM-judge metrics — present only when the run used Sarvam LLM
   // judges. `sarvam_llm_wer_reasoning` is a JSON string of the judged segments;
@@ -124,6 +129,7 @@ const STT_COL_WIDTHS = {
   text: 280,
   wer: 80,
   cer: 80,
+  semanticWer: 130,
   similarity: 110,
   evaluator: 130,
   llmJudge: 110,
@@ -137,9 +143,10 @@ function fmtMetric(v: number | string | undefined | null): string {
   return Number.isNaN(n) ? "-" : String(parseFloat(n.toFixed(4)));
 }
 
-// The Sarvam LLM-WER reasoning is a JSON string of the judged segments.
-// Pretty-print it for the tooltip, falling back to the raw string.
-function formatSarvamReasoning(raw: string | undefined): string | undefined {
+// Reasoning shown in a metric tooltip. Sarvam LLM-WER carries a JSON string of
+// judged segments (pretty-printed here); Intent / Entity and Semantic WER carry
+// plain-text explanations (passed through unchanged when JSON parsing fails).
+function formatReasoningTooltip(raw: string | undefined): string | undefined {
   if (!raw) return undefined;
   try {
     return JSON.stringify(JSON.parse(raw), null, 2);
@@ -148,9 +155,10 @@ function formatSarvamReasoning(raw: string | undefined): string | undefined {
   }
 }
 
-// A metric cell that shows a Sarvam LLM score plus an optional reasoning
-// tooltip (LLM-WER's judged segments, or Intent / Entity's explanation).
-function SarvamMetricCell({
+// A metric cell that shows a numeric score plus an optional reasoning tooltip.
+// Used for the Sarvam LLM judges (LLM-WER's judged segments, Intent / Entity's
+// explanation) and for Semantic WER (its judge reasoning).
+function MetricValueWithReasoning({
   value,
   reasoning,
   label,
@@ -161,7 +169,7 @@ function SarvamMetricCell({
   label: string;
 }) {
   const text = fmtMetric(value);
-  const tip = formatSarvamReasoning(reasoning);
+  const tip = formatReasoningTooltip(reasoning);
   if (!tip) return <>{text}</>;
   return (
     <span className="inline-flex items-center gap-1">
@@ -195,7 +203,7 @@ function readSarvamValue(
 function renderSarvamValue(field: SarvamMetricField, row: STTResultRow) {
   const value = readSarvamValue(row, field.key);
   return field.reasoningKey ? (
-    <SarvamMetricCell
+    <MetricValueWithReasoning
       value={value}
       reasoning={row[field.reasoningKey] as string | undefined}
       label={field.label}
@@ -214,6 +222,11 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
       const v = readSarvamValue(r, f.key);
       return v != null && v !== "";
     }),
+  );
+  // Semantic WER column renders only when the run carries it. Mirrors the
+  // Sarvam-metric filtering above.
+  const hasSemanticWer = results.some(
+    (r) => r.semantic_wer != null && r.semantic_wer !== "",
   );
   // When `evaluatorColumns` is provided, each evaluator gets its own column;
   // the legacy `llm_judge_*` rendering branch is skipped.
@@ -262,6 +275,7 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
     if (showMetrics) {
       total += STT_COL_WIDTHS.wer;
       total += STT_COL_WIDTHS.cer;
+      if (hasSemanticWer) total += STT_COL_WIDTHS.semanticWer;
       total += sarvamFields.reduce((sum, f) => sum + f.width, 0);
       if (showSimilarity) total += STT_COL_WIDTHS.similarity;
       if (useDynamic) total += visibleEvaluatorColumns.length * STT_COL_WIDTHS.evaluator;
@@ -295,6 +309,9 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                   <>
                     <th style={{ width: STT_COL_WIDTHS.wer }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">WER</th>
                     <th style={{ width: STT_COL_WIDTHS.cer }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">CER</th>
+                    {hasSemanticWer && (
+                      <th style={{ width: STT_COL_WIDTHS.semanticWer }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">Semantic WER</th>
+                    )}
                     {sarvamFields.map((f) => (
                       <th key={f.key} style={{ width: f.width }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">{f.label}</th>
                     ))}
@@ -360,6 +377,15 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                         <td className="px-4 py-3 text-[13px] text-foreground">
                           {result.cer != null ? parseFloat(parseFloat(result.cer).toFixed(4)) : "-"}
                         </td>
+                        {hasSemanticWer && (
+                          <td className="px-4 py-3 text-[13px] text-foreground">
+                            <MetricValueWithReasoning
+                              value={result.semantic_wer}
+                              reasoning={result.semantic_wer_reasoning}
+                              label="Semantic WER"
+                            />
+                          </td>
+                        )}
                         {sarvamFields.map((f) => (
                           <td key={f.key} className="px-4 py-3 text-[13px] text-foreground">
                             {renderSarvamValue(f, result)}
@@ -463,6 +489,20 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                       <span className="text-[11px] text-muted-foreground uppercase tracking-wide">CER</span>
                       <p className="text-[13px] text-foreground">{result.cer != null ? parseFloat(parseFloat(result.cer).toFixed(4)) : "-"}</p>
                     </div>
+                    {hasSemanticWer && (
+                      <div>
+                        <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Semantic WER</span>
+                        {/* div (not p) — the reasoning tooltip renders a block
+                            wrapper, which can't nest inside a <p>. */}
+                        <div className="text-[13px] text-foreground">
+                          <MetricValueWithReasoning
+                            value={result.semantic_wer}
+                            reasoning={result.semantic_wer_reasoning}
+                            label="Semantic WER"
+                          />
+                        </div>
+                      </div>
+                    )}
                     {sarvamFields.map((f) => (
                       <div key={f.key}>
                         <span className="text-[11px] text-muted-foreground uppercase tracking-wide">{f.label}</span>

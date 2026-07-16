@@ -18,7 +18,7 @@ import {
   type TTSResultRow,
 } from "./TTSResultsTable";
 import type { LatencyMetric } from "./ttsEvalTypes";
-import { SARVAM_ASR_BLOG_URL } from "@/constants/links";
+import { PIPECAT_SEMANTIC_WER_URL, SARVAM_ASR_BLOG_URL } from "@/constants/links";
 import { SARVAM_METRIC_FIELDS } from "./sarvamMetrics";
 
 type EvaluationStatus = "queued" | "in_progress" | "done" | "failed";
@@ -102,6 +102,10 @@ export type STTProviderResultForDetails = ProviderResultLike & {
     | (Record<string, unknown> & {
         wer?: number;
         cer?: number;
+        // LLM-judged word error rate that only counts errors which would
+        // change an agent's understanding (see Pipecat's STT benchmark).
+        // Present only when the run computed it.
+        semantic_wer?: number;
         // Present only when the run used Sarvam LLM judges. LLM-WER/CER share
         // the `sarvam_llm_*` keys; intent/entity use the `_score` suffix.
         sarvam_llm_wer?: number;
@@ -155,6 +159,28 @@ export const CER_ABOUT_METRIC: MetricDescription = {
   metric: "CER (Character Error Rate)",
   description:
     "Character error rate measures the percentage of characters that differ between the reference transcription and the predicted transcription.",
+  preference: "Lower is better",
+  range: "0 - \u221E",
+};
+
+// Semantic WER (see Pipecat's STT benchmark). Rendered on the STT About tab
+// only when a run computed it. The metric name links out to the benchmark's
+// definition in a new tab.
+export const SEMANTIC_WER_ABOUT_METRIC: MetricDescription = {
+  key: "semantic_wer",
+  metric: (
+    <a
+      href={PIPECAT_SEMANTIC_WER_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-foreground underline-offset-2 hover:underline"
+      title="Learn more in the Pipecat STT benchmark"
+    >
+      Semantic WER
+    </a>
+  ),
+  description:
+    "Semantic WER measures only transcription errors that would impact an LLM agent's understanding. Punctuation, contractions, filler words, and equivalent phrasings are ignored.",
   preference: "Lower is better",
   range: "0 - \u221E",
 };
@@ -320,16 +346,20 @@ function chunkChartRows(charts: ChartConfig[]): ChartConfig[][] {
 export function STTEvaluationAbout({
   evaluatorRows,
   showSarvamMetrics = false,
+  showSemanticWer = false,
 }: {
   evaluatorRows: EvaluatorAboutMetricRow[];
   /** Include the Sarvam LLM-judge metric rows — set when the run used them. */
   showSarvamMetrics?: boolean;
+  /** Include the Semantic WER row — set when the run computed it. */
+  showSemanticWer?: boolean;
 }) {
   return (
     <AboutMetricsTable
       metrics={[
         WER_ABOUT_METRIC,
         CER_ABOUT_METRIC,
+        ...(showSemanticWer ? [SEMANTIC_WER_ABOUT_METRIC] : []),
         ...(showSarvamMetrics ? SARVAM_ABOUT_METRICS : []),
         ...evaluatorRowsToMetricDescriptions(evaluatorRows),
       ]}
@@ -369,6 +399,12 @@ export function STTEvaluationLeaderboard({
     leaderboardSummary.some((row) => row[field.key] != null),
   );
 
+  // Semantic WER only appears as a leaderboard chart/column when the rows
+  // actually carry it (the run computed it).
+  const showSemanticWer = leaderboardSummary.some(
+    (row) => row.semantic_wer != null,
+  );
+
   // Drop evaluator columns/charts that no run carries a value for — an
   // all-"-" column (e.g. an evaluator that didn't run) is just noise.
   // Mirrors the Sarvam filtering above.
@@ -381,6 +417,9 @@ export function STTEvaluationLeaderboard({
   const allCharts: ChartConfig[] = [
     { title: "WER", dataKey: "wer" },
     { title: "CER", dataKey: "cer" },
+    ...(showSemanticWer
+      ? [{ title: "Semantic WER", dataKey: "semantic_wer" }]
+      : []),
     ...sarvamFields.map((field) => ({ title: field.label, dataKey: field.key })),
     ...evaluatorChartConfigs(visibleEvaluatorColumns),
   ];
@@ -393,6 +432,9 @@ export function STTEvaluationLeaderboard({
         { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
         { key: "wer", header: "WER" },
         { key: "cer", header: "CER" },
+        ...(showSemanticWer
+          ? [{ key: "semantic_wer", header: "Semantic WER" }]
+          : []),
         ...sarvamFields.map((field) => ({ key: field.key, header: field.label })),
         ...evaluatorLeaderboardColumns(visibleEvaluatorColumns),
       ]}
@@ -568,6 +610,17 @@ export function STTEvaluationOutputs({
                           ? parseFloat(providerResult.metrics.cer.toFixed(4))
                           : "-",
                     },
+                    // Semantic WER — shown only when the run computed it.
+                    ...(providerResult.metrics.semantic_wer != null
+                      ? [
+                          {
+                            label: "Semantic WER",
+                            value: parseFloat(
+                              providerResult.metrics.semantic_wer.toFixed(4),
+                            ),
+                          },
+                        ]
+                      : []),
                     // Sarvam LLM-judge metrics (LLM-WER/CER, Intent, Entity) —
                     // each shown only when the run computed it.
                     ...SARVAM_METRIC_FIELDS.flatMap((field) => {
