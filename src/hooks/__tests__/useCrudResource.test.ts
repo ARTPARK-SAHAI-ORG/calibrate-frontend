@@ -120,8 +120,8 @@ describe("useCrudResource", () => {
       expect(mockApiPost).not.toHaveBeenCalled();
     });
 
-    it("creates an item successfully and refetches", async () => {
-      mockApiGet.mockResolvedValue([]);
+    it("creates an item and merges it locally without refetching", async () => {
+      mockApiGet.mockResolvedValueOnce([{ uuid: "1", name: "a" }]);
       const newItem: Item = { uuid: "2", name: "new" };
       mockApiPost.mockResolvedValueOnce(newItem);
 
@@ -138,8 +138,12 @@ describe("useCrudResource", () => {
 
       expect(created).toEqual(newItem);
       expect(mockApiPost).toHaveBeenCalledWith("/things", "tok", { name: "new" });
-      // fetchItems called once on mount + once after create
-      expect(mockApiGet).toHaveBeenCalledTimes(2);
+      // No refetch: the created item is appended to the existing list.
+      expect(mockApiGet).toHaveBeenCalledTimes(1);
+      expect(result.current.items).toEqual([
+        { uuid: "1", name: "a" },
+        newItem,
+      ]);
       expect(result.current.isCreating).toBe(false);
       expect(result.current.createError).toBeNull();
     });
@@ -194,8 +198,11 @@ describe("useCrudResource", () => {
       expect(mockApiPut).not.toHaveBeenCalled();
     });
 
-    it("updates an item successfully and refetches", async () => {
-      mockApiGet.mockResolvedValue([]);
+    it("updates an item and replaces it locally without refetching", async () => {
+      mockApiGet.mockResolvedValueOnce([
+        { uuid: "1", name: "a" },
+        { uuid: "2", name: "b" },
+      ]);
       const updatedItem: Item = { uuid: "1", name: "updated" };
       mockApiPut.mockResolvedValueOnce(updatedItem);
 
@@ -211,7 +218,12 @@ describe("useCrudResource", () => {
 
       expect(updated).toEqual(updatedItem);
       expect(mockApiPut).toHaveBeenCalledWith("/things/1", "tok", { name: "updated" });
-      expect(mockApiGet).toHaveBeenCalledTimes(2);
+      // No refetch: the matching row is replaced in place, order preserved.
+      expect(mockApiGet).toHaveBeenCalledTimes(1);
+      expect(result.current.items).toEqual([
+        updatedItem,
+        { uuid: "2", name: "b" },
+      ]);
       expect(result.current.isUpdating).toBe(false);
     });
 
