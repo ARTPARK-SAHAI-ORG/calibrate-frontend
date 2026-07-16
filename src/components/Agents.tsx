@@ -6,8 +6,9 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
+import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
 import { useHideFloatingButton } from "@/components/AppLayout";
-import { useAccessToken } from "@/hooks";
+import { useAccessToken, useAgentDeletion } from "@/hooks";
 import { readNameConflictMessage } from "@/lib/parseBackendError";
 
 type Agent = {
@@ -47,13 +48,6 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [deletingAgentUuid, setDeletingAgentUuid] = useState<string | null>(
-    null,
-  );
-
-  // Delete confirmation state
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
 
   // Duplicate dialog state
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
@@ -136,19 +130,33 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
     return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
   });
 
-  // Open delete confirmation dialog
-  const openDeleteDialog = (agent: Agent) => {
-    setAgentToDelete(agent);
-    setDeleteDialogOpen(true);
-  };
+  // Selection + single/bulk delete logic lives in the shared hook, so the
+  // agents list mirrors the STT/TTS evaluation lists.
+  const {
+    selectedAgentUuids,
+    allSelected,
+    hasSelectableAgents,
+    agentCheckboxProps,
+    toggleSelectAll,
+    deleteDialogOpen,
+    agentToDelete,
+    agentsToDeleteBulk,
+    isDeleting,
+    deleteError,
+    openDeleteDialog,
+    openBulkDeleteDialog,
+    closeDeleteDialog,
+    deleteAgents,
+  } = useAgentDeletion<Agent>({
+    agents: sortedAgents,
+    accessToken: backendAccessToken,
+    onDeleted: (uuids) => {
+      const deletedSet = new Set(uuids);
+      setAgents((prev) => prev.filter((agent) => !deletedSet.has(agent.uuid)));
+    },
+  });
 
-  // Close delete confirmation dialog
-  const closeDeleteDialog = () => {
-    if (!deletingAgentUuid) {
-      setDeleteDialogOpen(false);
-      setAgentToDelete(null);
-    }
-  };
+  const isBulkDelete = agentsToDeleteBulk.length > 0;
 
   // Open duplicate dialog
   const openDuplicateDialog = (agent: Agent) => {
@@ -165,49 +173,6 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
   // Handle agent duplicated - add to list
   const handleAgentDuplicated = (newAgent: Agent) => {
     setAgents((prevAgents) => [newAgent, ...prevAgents]);
-  };
-
-  const handleDeleteAgent = async () => {
-    if (!agentToDelete) return;
-
-    try {
-      setDeletingAgentUuid(agentToDelete.uuid);
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-      if (!backendUrl) {
-        throw new Error("BACKEND_URL environment variable is not set");
-      }
-
-      // DELETE /agents/{agent_uuid} - agent_uuid is required in path
-      const response = await fetch(
-        `${backendUrl}/agents/${agentToDelete.uuid}`,
-        {
-          method: "DELETE",
-          headers: {
-            accept: "application/json",
-            Authorization: `Bearer ${backendAccessToken}`,
-          },
-        },
-      );
-
-      if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error("Failed to delete agent");
-      }
-
-      // Remove the agent from the list
-      setAgents((prevAgents) =>
-        prevAgents.filter((agent) => agent.uuid !== agentToDelete.uuid),
-      );
-      closeDeleteDialog();
-    } catch (err) {
-      reportError("Error deleting agent:", err);
-    } finally {
-      setDeletingAgentUuid(null);
-    }
   };
 
   const toggleSort = () => {
@@ -322,9 +287,19 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
         </div>
       ) : (
         <>
-          <p className="text-sm text-muted-foreground mb-3">
-            {agents.length} {agents.length === 1 ? "agent" : "agents"}
-          </p>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <p className="text-sm text-muted-foreground">
+              {agents.length} {agents.length === 1 ? "agent" : "agents"}
+            </p>
+            {selectedAgentUuids.size > 0 && (
+              <button
+                onClick={openBulkDeleteDialog}
+                className="h-9 px-4 rounded-md text-sm font-medium border border-red-500 text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer flex-shrink-0"
+              >
+                Delete selected ({selectedAgentUuids.size})
+              </button>
+            )}
+          </div>
           {/* Mobile Sort Button */}
           <div className="flex justify-end md:hidden mb-3">
             <button
@@ -353,7 +328,15 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
           {/* Desktop Table View */}
           <div className="hidden md:block border border-border rounded-xl overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-[1fr_160px_1fr_auto_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+            <div className="grid grid-cols-[40px_1fr_160px_1fr_auto_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
+              <div className="flex items-center">
+                <SelectCheckbox
+                  checked={allSelected}
+                  onToggle={toggleSelectAll}
+                  disabled={!hasSelectableAgents}
+                  label="Select all agents"
+                />
+              </div>
               <div className="text-sm font-medium text-muted-foreground">
                 Name
               </div>
@@ -390,8 +373,12 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
             {sortedAgents.map((agent) => (
               <div
                 key={agent.uuid}
-                className="grid grid-cols-[1fr_160px_1fr_auto_auto] gap-4 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors"
+                className="grid grid-cols-[40px_1fr_160px_1fr_auto_auto] gap-4 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors items-center"
               >
+                {/* Selection checkbox */}
+                <div className="flex items-center pl-4">
+                  <SelectCheckbox {...agentCheckboxProps(agent)} />
+                </div>
                 {/* Name Column */}
                 <Link
                   href={`/agents/${agent.uuid}`}
@@ -475,11 +462,11 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                       e.stopPropagation();
                       openDeleteDialog(agent);
                     }}
-                    disabled={deletingAgentUuid === agent.uuid}
+                    disabled={isDeleting && agentToDelete?.uuid === agent.uuid}
                     className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Delete agent"
                   >
-                    {deletingAgentUuid === agent.uuid ? (
+                    {isDeleting && agentToDelete?.uuid === agent.uuid ? (
                       <svg
                         className="w-4 h-4 animate-spin"
                         fill="none"
@@ -527,6 +514,9 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                 key={agent.uuid}
                 className="border border-border rounded-lg overflow-hidden bg-background"
               >
+                <div className="flex items-center px-4 pt-4">
+                  <SelectCheckbox {...agentCheckboxProps(agent)} />
+                </div>
                 <Link
                   href={`/agents/${agent.uuid}`}
                   onClick={(e) => {
@@ -535,7 +525,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                       onNavigateToAgent(agent.uuid);
                     }
                   }}
-                  className="block p-4"
+                  className="block px-4 pb-4 pt-2"
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <div className="font-medium text-sm text-foreground">
@@ -583,10 +573,10 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
                       e.stopPropagation();
                       openDeleteDialog(agent);
                     }}
-                    disabled={deletingAgentUuid === agent.uuid}
+                    disabled={isDeleting && agentToDelete?.uuid === agent.uuid}
                     className="flex-1 h-8 flex items-center justify-center gap-2 rounded-md text-xs font-medium text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {deletingAgentUuid === agent.uuid ? (
+                    {isDeleting && agentToDelete?.uuid === agent.uuid ? (
                       <svg
                         className="w-4 h-4 animate-spin"
                         fill="none"
@@ -645,11 +635,22 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
       <DeleteConfirmationDialog
         isOpen={deleteDialogOpen}
         onClose={closeDeleteDialog}
-        onConfirm={handleDeleteAgent}
-        title="Delete agent"
-        message={`Are you sure you want to delete "${agentToDelete?.name}"?`}
+        onConfirm={deleteAgents}
+        title={isBulkDelete ? "Delete agents" : "Delete agent"}
+        message={
+          isBulkDelete
+            ? `Are you sure you want to delete ${agentsToDeleteBulk.length} agent${
+                agentsToDeleteBulk.length > 1 ? "s" : ""
+              }? This action cannot be undone.`
+            : `Are you sure you want to delete "${agentToDelete?.name}"? This action cannot be undone.`
+        }
         confirmText="Delete"
-        isDeleting={!!deletingAgentUuid}
+        isDeleting={isDeleting}
+        extraContent={
+          deleteError ? (
+            <p className="text-sm text-red-500">{deleteError}</p>
+          ) : undefined
+        }
       />
 
       {/* Duplicate Agent Dialog */}
