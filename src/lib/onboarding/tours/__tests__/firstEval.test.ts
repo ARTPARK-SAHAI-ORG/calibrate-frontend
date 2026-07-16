@@ -148,5 +148,7 @@ describe("buildFirstEvalTour", () => {
       expect(step.title.length).toBeGreaterThan(0);
       expect(step.description.length).toBeGreaterThan(0);
     }
+    expect(tour.steps[0].description).toContain("performs as intended");
+    expect(tour.steps[0].description).toContain("catch issues before deploy");
   });
 });

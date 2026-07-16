@@ -169,7 +169,7 @@ async function submitCreateTest(): Promise<void> {
 }
 
 /** Return `base`, or the first free "base (N)" variant not in `taken`. */
-function pickFreeName(base: string, taken: Set<string>): string {
+export function pickFreeName(base: string, taken: Set<string>): string {
   if (!taken.has(base.toLowerCase())) return base;
   for (let i = 2; i < 1000; i++) {
     const candidate = `${base} (${i})`;
