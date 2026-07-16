@@ -40,6 +40,14 @@ type ParetoFrontierChartProps = {
   passRateLabel?: string;
   filename?: string;
   height?: number;
+  /** Noun for a plotted item — "model" (LLM) / "provider" (STT/TTS). */
+  entityNoun?: string;
+  /** Quality-axis noun used in the caption — "pass rate" / "accuracy" / "quality". */
+  qualityNoun?: string;
+  /** Comparative phrase for a higher Y — "more tests it passes" / "more accurate it is". */
+  qualityComparative?: string;
+  /** X-axis title line. */
+  costAxisLabel?: string;
 };
 
 // Bubble radius range (px) mapped from latency (min latency → small, max → big).
@@ -121,6 +129,10 @@ export function ParetoFrontierChart({
   passRateLabel = "Pass rate",
   filename = "pareto-frontier",
   height = 400,
+  entityNoun = "model",
+  qualityNoun = "pass rate",
+  qualityComparative = "more tests it passes",
+  costAxisLabel = "Average cost (USD) →  cheaper is better",
 }: ParetoFrontierChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [frontierOnly, setFrontierOnly] = useState(false);
@@ -183,7 +195,8 @@ export function ParetoFrontierChart({
       <div className="flex flex-col min-h-[160px]">
         <h3 className="text-[15px] font-semibold mb-2">{title}</h3>
         <p className="text-xs text-muted-foreground mt-auto mb-auto text-center py-8">
-          No chart data (models are missing cost or pass-rate values).
+          No chart data ({entityNoun}s are missing cost or {qualityNoun}{" "}
+          values).
         </p>
       </div>
     );
@@ -324,24 +337,26 @@ export function ParetoFrontierChart({
   // bubble size mean, then how to read the result. The result sentence differs
   // when only one model is on the frontier (no dashed line is drawn) vs. several.
   const axisSentence = hasLatency
-    ? "Each dot is a model. The higher it sits, the more tests it passes. The further left, the less it costs to run. The smaller it is, the faster it replies. So the best models sit toward the top-left."
-    : "Each dot is a model. The higher it sits, the more tests it passes, and the further left, the less it costs to run. So the best models sit toward the top-left.";
-  const axesList = hasLatency ? "pass rate, cost, and speed" : "both pass rate and cost";
+    ? `Each dot is a ${entityNoun}. The higher it sits, the ${qualityComparative}. The further left, the less it costs to run. The smaller it is, the faster it replies. So the best ${entityNoun}s sit toward the top-left.`
+    : `Each dot is a ${entityNoun}. The higher it sits, the ${qualityComparative}, and the further left, the less it costs to run. So the best ${entityNoun}s sit toward the top-left.`;
+  const axesList = hasLatency
+    ? `${qualityNoun}, cost, and speed`
+    : `both ${qualityNoun} and cost`;
   const hasFrontierLine = frontierData.length >= 2;
   const winnerLabel = frontierData[0]?.label;
   const resultSentence = hasFrontierLine ? (
     <>
-      Stick to the models on the dashed line: they are the best picks. For any
-      model not on it, one that is will match or beat it on {axesList}, so there
-      is no reason to choose it.
+      Stick to the {entityNoun}s on the dashed line: they are the best picks. For
+      any {entityNoun} not on it, one that is will match or beat it on {axesList},
+      so there is no reason to choose it.
     </>
   ) : (
     <>
       <strong className="font-semibold text-foreground">
-        {winnerLabel ?? "One model"}
+        {winnerLabel ?? `One ${entityNoun}`}
       </strong>{" "}
-      comes out on top: it matches or beats every other model on {axesList}, so
-      it is the clear pick.
+      comes out on top: it matches or beats every other {entityNoun} on{" "}
+      {axesList}, so it is the clear pick.
     </>
   );
 
@@ -402,7 +417,7 @@ export function ParetoFrontierChart({
               tick={{ fontSize: 12 }}
               tickFormatter={(v) => formatCostUsd(v)}
               label={{
-                value: "Average cost (USD) →  cheaper is better",
+                value: costAxisLabel,
                 position: "insideBottom",
                 offset: -24,
                 style: { fontSize: 12, fill: "currentColor" },

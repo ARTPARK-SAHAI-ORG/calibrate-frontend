@@ -99,7 +99,42 @@ describe("ParetoFrontierChart", () => {
   it("shows the empty state when no model has cost + pass rate", () => {
     renderChart([{ model: "x", label: "X", cost: NaN, passRate: NaN }]);
     expect(
-      screen.getByText(/missing cost or pass-rate values/i),
+      screen.getByText(/missing cost or pass rate values/i),
+    ).toBeInTheDocument();
+  });
+
+  it("uses the entity/quality copy overrides (STT/TTS framing)", () => {
+    render(
+      <ParetoFrontierChart
+        points={points}
+        colorMap={getColorMap(points.map((p) => p.model))}
+        title="Accuracy vs cost tradeoff"
+        passRateLabel="Accuracy"
+        qualityNoun="accuracy"
+        qualityComparative="more accurate it is"
+        entityNoun="provider"
+      />,
+    );
+    expect(
+      screen.getByText(/Accuracy vs cost tradeoff/i),
+    ).toBeInTheDocument();
+    // Caption talks about providers + accuracy, not models + pass rate.
+    expect(screen.getByText(/Each dot is a provider/i)).toBeInTheDocument();
+    expect(screen.getByText(/the more accurate it is/i)).toBeInTheDocument();
+    expect(screen.getByText(/accuracy, cost, and speed/i)).toBeInTheDocument();
+  });
+
+  it("uses the entity override in the empty-state copy", () => {
+    render(
+      <ParetoFrontierChart
+        points={[{ model: "x", label: "X", cost: NaN, passRate: NaN }]}
+        colorMap={getColorMap(["x"])}
+        entityNoun="provider"
+        qualityNoun="accuracy"
+      />,
+    );
+    expect(
+      screen.getByText(/providers are missing cost or accuracy values/i),
     ).toBeInTheDocument();
   });
 });
