@@ -1079,6 +1079,7 @@ export function TestRunnerDialog({
               )}
             <button
               onClick={onClose}
+              data-tour="run-close"
               className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer shrink-0"
             >
               <CloseIcon className="w-5 h-5" />

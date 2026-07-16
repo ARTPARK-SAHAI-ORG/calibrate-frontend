@@ -22,11 +22,15 @@ import {
   fillAllByPlaceholderPrefix,
   fillByPlaceholder,
   fillInput,
+  setNativeValue,
   waitForElement,
 } from "../dom";
 import type { Tour, TourStep } from "../engine";
 
 export const FIRST_EVAL_TOUR_ID = "first-eval";
+
+/** Title of the first "add a test" step (the manual-testing fast-forward target). */
+export const FIRST_EVAL_TESTS_STEP_TITLE = "Create your first test";
 
 // The welcome card's help links (driver.js renders the description as HTML).
 function welcomeDescription(): string {
@@ -40,18 +44,18 @@ function welcomeDescription(): string {
     link(docsUrl, "Read the docs"),
   ].join(" &nbsp;·&nbsp; ");
   return (
-    "<div>Calibrate helps you <strong>check that your AI agent actually does its job</strong>, " +
+    "<div>Calibrate helps you check that your AI agent actually <strong>does its job</strong>, " +
     "whether it types or talks. Testing by hand is tedious and easy to get " +
     "wrong, so we do it for you.</div>" +
     '<div style="margin-top:0.6em;">Want to see how it works? Let us build a ' +
-    "<strong>quick demo agent</strong> and put it through its paces together. " +
-    "Takes about a " +
-    "minute, and you can delete it after.</div>" +
+    "<strong>quick demo agent</strong> and test it together. " +
+    "It takes about a " +
+    "minute, and you can delete it afterwards.</div>" +
     `<div style="margin-top:0.6em;font-size:0.8rem;">${links}</div>`
   );
 }
 
-const DEMO_AGENT_NAME = "Demo agent";
+const DEMO_AGENT_NAME = "Community Clinic Helpline";
 
 const DEMO_SYSTEM_PROMPT =
   "You are a friendly helpline assistant for a non-profit that runs free " +
@@ -74,12 +78,23 @@ const DEMO_TESTS: DemoTest[] = [
     criteria: "States the clinic's opening hours clearly and kindly.",
   },
   {
-    name: "Demo · appointment needed",
-    userMessage: "Do I need an appointment to visit?",
-    agentMessage: "No appointment is needed. You can walk in anytime during opening hours.",
-    criteria: "Explains the walk-in and appointment policy accurately.",
+    // Designed to fail: the agent was never given a phone number, so it cannot
+    // provide one (and a good model will not invent one). That obvious gap is
+    // the point: it shows evaluations catching real problems.
+    name: "Demo · phone number it lacks",
+    userMessage: "What is the clinic's phone number?",
+    agentMessage: "Happy to help with that.",
+    criteria: "Gives the caller the clinic's phone number.",
   },
 ];
+
+// Fallback criteria for the second evaluator's dimension (tone/manner), used to
+// fill any extra criteria field a demo test carries beyond the first.
+const DEMO_TONE_CRITERIA = "Stays warm and kind, and is easy to understand.";
+
+// The fix appended to the system prompt to close the gap the failing test
+// found: the agent was never given a phone number, so it could not answer.
+const DEMO_PROMPT_FIX = " Our clinic helpline number is 1800-123-4567.";
 
 // Anchors (kept here so component `data-tour` attributes and steps stay in sync).
 export const A = {
@@ -88,6 +103,7 @@ export const A = {
   agentCreateSubmit: '[data-tour="agent-create-submit"]',
   systemPrompt: '[data-tour="agent-system-prompt"]',
   save: '[data-tour="agent-save"]',
+  tabAgent: '[data-tour="agent-tab-agent"]',
   tabEvaluators: '[data-tour="agent-tab-evaluators"]',
   evaluatorsAdd: '[data-tour="evaluators-add"]',
   addEvaluatorsDialog: '[data-tour="add-evaluators-dialog"]',
@@ -100,12 +116,16 @@ export const A = {
   testEvaluatorsArea: '[data-tour="test-evaluators-area"]',
   testEditorClose: '[data-tour="test-editor-close"]',
   testsRunAll: '[data-tour="tests-run-all"]',
+  runClose: '[data-tour="run-close"]',
+  startTour: '[data-tour="start-tour"]',
   runSummary: '[data-tour="test-run-summary"]',
   runTabOutputs: '[data-tour="run-tab-outputs"]',
   runOutputsList: '[data-tour="run-outputs-list"]',
   runResultRow: '[data-tour="run-result-row"]',
   runResultDetail: '[data-tour="run-result-detail"]',
   runResultVerdict: '[data-tour="run-result-verdict"]',
+  // The expanded reasoning body (shared verdict-card attribute, not a data-tour).
+  runReasoningBody: "[data-reasoning-body]",
 } as const;
 
 export type FirstEvalDeps = {
@@ -142,28 +162,13 @@ async function openCreateTestEditor(
   await fillByPlaceholder("Your test name", name, { timeout: 8000 });
 }
 
-/** Submit the open Create Test editor and dismiss the "add to defaults" prompt. */
+/** Submit the open Create Test editor. */
 async function submitCreateTest(): Promise<void> {
   await clickByText("Create", { timeout: 8000 });
-  // "Update default evaluators?" only appears when the test references an
-  // evaluator not already on the agent — the tour's isn't, so this usually
-  // doesn't show. Use a short timeout so we dismiss it if present without
-  // stalling the tour when it never appears.
-  await clickByText("Not now", { timeout: 1200 });
+  // No "Update default evaluators?" prompt to handle: the tour already attached
+  // Correctness to the agent (step 7) and the demo tests reference only that
+  // evaluator, so every evaluator the test uses is already a default.
   await delay(300);
-}
-
-/** Create one demo test end to end through the real dialog. */
-async function createOneTest(test: DemoTest, deps: FirstEvalDeps): Promise<void> {
-  await openCreateTestEditor(test.name, deps);
-  fillTestScenario(test);
-  await fillByPlaceholder(
-    "Criteria that the agent's response should satisfy",
-    test.criteria,
-    { timeout: 8000 },
-  );
-  await delay(150);
-  await submitCreateTest();
 }
 
 /** Return `base`, or the first free "base (N)" variant not in `taken`. */
@@ -204,19 +209,137 @@ async function resolveFreeName(
   }
 }
 
-/** Tick the Correctness evaluator in the picker and confirm. */
-async function selectAndAddCorrectness(): Promise<void> {
+// Prefer a second evaluator that grades a clearly different aspect from
+// correctness, so the two checks are genuinely complementary. Deliberately
+// excludes accuracy/correctness-like names (they overlap with Correctness).
+const COMPLEMENTARY_EVALUATOR_HINTS =
+  /tone|polite|empath|kind|helpful|clar|complete|concise|safe|harm/i;
+
+/**
+ * Scroll a picker row into view, tick its checkbox, and light the row up clearly
+ * (green "selected" tint + ring) so it is obvious which evaluator was just
+ * picked. The highlight goes away when the dialog closes, so no cleanup needed.
+ */
+function tickRow(row: HTMLLabelElement | undefined): void {
+  if (!row) return;
+  row.scrollIntoView({ block: "center" });
+  const checkbox = row.querySelector<HTMLInputElement>('input[type="checkbox"]');
+  if (checkbox && !checkbox.checked) checkbox.click();
+  row.style.borderRadius = "8px";
+  row.style.transition = "background-color 0.15s ease";
+  row.style.backgroundColor = "color-mix(in srgb, #22c55e 20%, transparent)";
+  row.style.boxShadow = "inset 0 0 0 2px color-mix(in srgb, #22c55e 60%, transparent)";
+}
+
+/** Tick the Correctness evaluator (falls back to the first row). */
+async function pickCorrectness(): Promise<void> {
   const dialog = await waitForElement(A.addEvaluatorsDialog, { timeout: 10000 });
   if (!dialog) return;
   const rows = Array.from(dialog.querySelectorAll<HTMLLabelElement>("label"));
-  const target =
-    rows.find((r) => /correct/i.test(r.textContent ?? "")) ?? rows[0];
-  const checkbox = target?.querySelector<HTMLInputElement>(
-    'input[type="checkbox"]',
+  tickRow(rows.find((r) => /correct/i.test(r.textContent ?? "")) ?? rows[0]);
+}
+
+/** Tick a second, complementary evaluator that is not already ticked. */
+async function pickSecondEvaluator(): Promise<void> {
+  const dialog = await waitForElement(A.addEvaluatorsDialog, { timeout: 10000 });
+  if (!dialog) return;
+  const rows = Array.from(dialog.querySelectorAll<HTMLLabelElement>("label"));
+  const unchecked = rows.filter((r) => {
+    const cb = r.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    return cb && !cb.checked;
+  });
+  tickRow(
+    unchecked.find((r) =>
+      COMPLEMENTARY_EVALUATOR_HINTS.test(r.textContent ?? ""),
+    ) ?? unchecked[0],
   );
-  if (checkbox && !checkbox.checked) checkbox.click();
-  await delay(200);
-  await clickElement(A.evaluatorsAddConfirm);
+}
+
+/**
+ * Fill the success-criteria fields inside the open Create Test editor. The test
+ * seeds one evaluator per dimension the agent carries, so there can be more than
+ * one criteria field: the first gets the scenario's own criteria, any extra gets
+ * a generic tone criteria so the test still validates.
+ */
+function fillEvaluatorCriteria(primary: string): void {
+  const area = document.querySelector<HTMLElement>(A.testEvaluatorsArea);
+  if (!area) return;
+  const fields = Array.from(
+    area.querySelectorAll<HTMLTextAreaElement | HTMLInputElement>(
+      "textarea, input[type='text']",
+    ),
+  ).filter((f) => !f.value.trim());
+  fields.forEach((f, i) =>
+    setNativeValue(f, i === 0 ? primary : DEMO_TONE_CRITERIA),
+  );
+}
+
+/**
+ * Expand the reasoning on the failed evaluator's verdict card (falling back to
+ * the first one) so the tour can highlight it. Prefers the card that shows a
+ * "Fail" verdict, since that is the one the walkthrough is talking about.
+ */
+function expandFailedReasoning(): void {
+  const panel = document.querySelector<HTMLElement>(A.runResultVerdict);
+  if (!panel) return;
+  const toggles = Array.from(
+    panel.querySelectorAll<HTMLButtonElement>("button"),
+  ).filter((b) => /see reasoning/i.test(b.textContent ?? ""));
+  if (toggles.length === 0) return;
+  const failToggle =
+    toggles.find((b) => {
+      // Walk up a few levels to the evaluator card and check its verdict.
+      let el: HTMLElement | null = b;
+      for (let i = 0; i < 4 && el; i++) {
+        if (/\bfail\b/i.test(el.textContent ?? "")) return true;
+        el = el.parentElement;
+      }
+      return false;
+    }) ?? toggles[0];
+  failToggle.click();
+}
+
+/** Open the previously-failing phone-number test result in the outputs list. */
+function openPhoneNumberResult(): void {
+  const rows = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('[data-tour="run-result-row"]'),
+  );
+  const target =
+    rows.find((r) => /phone number/i.test(r.textContent ?? "")) ?? rows[0];
+  target?.click();
+}
+
+/**
+ * Append the fix to the system prompt and select the added text so the user can
+ * see exactly what changed.
+ */
+async function appendPromptFix(): Promise<void> {
+  const el = await waitForElement(A.systemPrompt, { timeout: 12000 });
+  if (
+    !(el instanceof HTMLTextAreaElement) &&
+    !(el instanceof HTMLInputElement)
+  ) {
+    return;
+  }
+  const base = el.value.replace(/\s+$/, "");
+  const next = `${base}${DEMO_PROMPT_FIX}`;
+  setNativeValue(el, next);
+  // Let React's re-render from the input event settle first, otherwise it resets
+  // the caret and the selection of the new line is lost.
+  await delay(80);
+  const selectNewLine = () => {
+    el.focus();
+    try {
+      // Select only the appended line so the user sees exactly what changed.
+      el.setSelectionRange(base.length, next.length);
+    } catch {
+      /* selection not supported on this element */
+    }
+  };
+  selectNewLine();
+  // Re-apply after the popover renders and steals focus, so the highlighted
+  // selection of the new line stays visible rather than graying out.
+  window.setTimeout(selectNewLine, 300);
 }
 
 export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
@@ -247,7 +370,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.agentTypeOptions,
       title: "Build or connect",
       description:
-        "You can <strong>build a new agent</strong> right here, or <strong>connect one you already run</strong>. We will build one for this demo.",
+        "You can <strong>build</strong> a new agent right here, or <strong>connect</strong> one you already run. We will build one for this demo.",
       side: "right",
       align: "center",
       actionLabel: "Create",
@@ -261,7 +384,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.systemPrompt,
       title: "Give it instructions",
       description:
-        "This is where you <strong>tell your agent how to behave</strong>. We have popped in a sample for a community health helpline so you can see the idea.",
+        "Our demo agent is a <strong>community health clinic</strong> helpline: it answers callers' questions about hours, services, and appointments. This is where you tell it <strong>how to behave</strong>, and we have added a sample so you can see how it works.",
       side: "top",
       actionLabel: "Next",
       timeout: 15000,
@@ -284,7 +407,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.tabEvaluators,
       title: "Add an evaluator",
       description:
-        "To <strong>grade</strong> your agent automatically, Calibrate uses <strong>a strong LLM as a judge</strong>, called an evaluator. It <strong>scores each answer against a criteria</strong> you set, for example whether the answer is correct or stays polite. Let us add one.",
+        "To <strong>grade</strong> your agent automatically, Calibrate uses a strong LLM as a judge, called an evaluator. It <strong>scores each answer</strong> against a criteria you set, for example whether the answer is correct or stays polite. Let us add one.",
       side: "bottom",
       actionLabel: "Next",
       action: async () => {
@@ -296,18 +419,40 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.addEvaluatorsDialog,
       title: "Choose what to check",
       description:
-        "We will start with <strong>Correctness</strong>, which simply checks whether your agent got the answer right",
+        "These are the checks you can grade your agent with. We will pick <strong>two</strong> that work well together. First, <strong>Correctness</strong>: does the answer get it right?",
       side: "left",
-      actionLabel: "Add it",
+      actionLabel: "Pick Correctness",
       action: async () => {
-        await selectAndAddCorrectness();
+        await pickCorrectness();
+      },
+    },
+    {
+      anchor: A.addEvaluatorsDialog,
+      title: "Add another dimension",
+      description:
+        "Correctness is ticked. Now add a <strong>second, independent check</strong>, such as tone or helpfulness. One check rarely catches everything, so two work better together.",
+      side: "left",
+      actionLabel: "Pick a second",
+      action: async () => {
+        await pickSecondEvaluator();
+      },
+    },
+    {
+      anchor: A.addEvaluatorsDialog,
+      title: "Add them to your agent",
+      description:
+        "Both checks are ticked. Let us <strong>add them</strong> so every test grades the reply on both.",
+      side: "left",
+      actionLabel: "Add them",
+      action: async () => {
+        await clickElement(A.evaluatorsAddConfirm);
       },
     },
     {
       anchor: A.tabTests,
-      title: "Meet your tests",
+      title: "Create your first test",
       description:
-        "This is where the real work happens. A test contains a <strong>scenario</strong> your agent can face in <strong>production</strong> and the <strong>success criteria</strong> for a good response. Let us build one together.",
+        "A test is made of two things: a <strong>scenario</strong> your agent may face, and the <strong>success criteria</strong> for a good response. Let us build one together.",
       side: "bottom",
       actionLabel: "Add a test",
       prepare: async () => {
@@ -331,9 +476,9 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     },
     {
       anchor: A.testEvaluatorsArea,
-      title: "The success criteria",
+      title: "Two dimensions, one test",
       description:
-        "This is <strong>what a good answer must do</strong>. Your evaluator scores the reply against it. Let us save this test.",
+        "Both evaluators you added grade this test, each against its own <strong>success criteria</strong>. One check rarely captures everything, so they cover <strong>different aspects</strong> of the reply. Let us save this test.",
       side: "left",
       actionLabel: "Create test",
       timeout: 12000,
@@ -343,6 +488,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
           DEMO_TESTS[0].criteria,
           { timeout: 8000 },
         );
+        fillEvaluatorCriteria(DEMO_TESTS[0].criteria);
       },
       action: async () => {
         await submitCreateTest();
@@ -350,21 +496,53 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
     },
     {
       anchor: A.testRowFirst,
-      title: "Add one more",
+      title: "Add a test it should fail",
       description:
-        "That is one test. Let us <strong>add a second</strong> the same way, so your agent has a couple to handle.",
+        "Tests are most useful when they <strong>catch problems</strong>. Let us add a second test we expect the agent to <strong>fail</strong>, and build it the same way.",
       side: "bottom",
       actionLabel: "Add it",
       timeout: 12000,
       action: async () => {
-        await createOneTest(DEMO_TESTS[1], deps);
+        await openCreateTestEditor(DEMO_TESTS[1].name, deps);
+      },
+    },
+    {
+      anchor: A.testConversation,
+      title: "A scenario it cannot answer",
+      description:
+        "Here the caller asks for the <strong>clinic's phone number</strong>, something the agent was never given. Let us see how it responds to a question it cannot answer.",
+      side: "right",
+      actionLabel: "Next",
+      timeout: 15000,
+      prepare: () => {
+        fillTestScenario(DEMO_TESTS[1]);
+      },
+    },
+    {
+      anchor: A.testEvaluatorsArea,
+      title: "Require what it cannot give",
+      description:
+        "The criteria asks it to give the <strong>phone number</strong>. The agent was never given one, so this test should <strong>fail</strong>. That is exactly the kind of gap an evaluation is meant to surface. Let us save it.",
+      side: "left",
+      actionLabel: "Create test",
+      timeout: 12000,
+      prepare: async () => {
+        await fillByPlaceholder(
+          "Criteria that the agent's response should satisfy",
+          DEMO_TESTS[1].criteria,
+          { timeout: 8000 },
+        );
+        fillEvaluatorCriteria(DEMO_TESTS[1].criteria);
+      },
+      action: async () => {
+        await submitCreateTest();
       },
     },
     {
       anchor: A.testsRunAll,
       title: "Run your tests",
       description:
-        "That is a test: <strong>a situation in, a graded answer out</strong>. You have two ready, so let us run them and see how your agent does.",
+        "Both tests are ready, one your agent should <strong>pass</strong> and one it should <strong>fail</strong>. Let us run them and see how it does.",
       side: "bottom",
       align: "end",
       actionLabel: "Run",
@@ -374,10 +552,23 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       },
     },
     {
-      anchor: A.runSummary,
-      title: "Your results",
+      // No anchor: pinned over the run dialog's centre spinner via
+      // `calibrate-tour-running`. Auto-advances to the results once the run
+      // finishes (no button while there is nothing to show yet).
+      title: "Running your tests",
       description:
-        "And there it is, your first evaluation! Up top is your <strong>pass rate</strong>, plus speed, cost, and a score from each evaluator.",
+        "Each test is running now. For every one, the scenario goes to <strong>your agent</strong> and its reply is checked by the <strong>evaluators</strong>. This will only take a moment.",
+      popoverClass: "calibrate-tour-running",
+      autoAdvance: true,
+      action: async () => {
+        await waitForElement(A.runSummary, { timeout: 90000 });
+      },
+    },
+    {
+      anchor: A.runSummary,
+      title: "The results are ready 🎉",
+      description:
+        "Your first evaluation is done! 🥳 This test summary shows your overall <strong>pass rate</strong>, along with speed and cost. One test passed and one failed, so you can already see where the agent needs work.",
       side: "top",
       actionLabel: "Next",
       timeout: 90000,
@@ -386,22 +577,26 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.runTabOutputs,
       title: "See every answer",
       description:
-        "The Summary is the big picture. The Outputs tab shows <strong>each test your agent ran</strong>, one by one.",
+        "That was the overview. The <strong>Outputs</strong> tab shows <strong>each test</strong> your agent ran, one by one.",
       side: "bottom",
       align: "start",
       actionLabel: "Next",
-      action: async () => {
+      prepare: async () => {
+        // Open the Outputs tab now so it is the active tab while this card
+        // describes it (rather than only switching on the next click).
         await clickElement(A.runTabOutputs);
       },
     },
     {
-      anchor: A.runOutputsList,
-      title: "Passed and failed",
+      // The Failed group renders first, so the first result row is the failing
+      // test. Anchor to it directly so the failed case itself is highlighted.
+      anchor: A.runResultRow,
+      title: "Review your failed test",
       description:
-        "Your tests are <strong>grouped by whether they passed</strong>. Both of ours passed. Let us open one and look closer.",
+        "Your tests are <strong>grouped</strong> by whether they passed. Here is the <strong>failed</strong> one. Let us open it and see exactly why.",
       side: "right",
       align: "start",
-      actionLabel: "Open one",
+      actionLabel: "Open it",
       timeout: 10000,
       action: async () => {
         await clickElement(A.runResultRow);
@@ -411,7 +606,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.runResultDetail,
       title: "Your agent's answer",
       description:
-        "This is exactly <strong>what your agent replied</strong>. It is generated fresh each time the test runs.",
+        "This is exactly what your <strong>agent replied</strong>. It is generated fresh each time the test runs.",
       side: "left",
       actionLabel: "Next",
       timeout: 10000,
@@ -420,10 +615,119 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.runResultVerdict,
       title: "The evaluator's verdict",
       description:
-        "And here is the evaluator's call: <strong>pass or fail, with the reason why</strong>. That reasoning is how you spot problems and keep improving your agent. The demo agent is yours to delete anytime.",
+        "Each evaluator gives its verdict here: <strong>pass or fail</strong>. To see why it decided that, open its reasoning.",
       side: "left",
-      actionLabel: "Done",
+      actionLabel: "See reasoning",
       timeout: 10000,
+      action: async () => {
+        // Expand the failed evaluator's reasoning now so the next card can
+        // anchor to it immediately (rather than waiting for an anchor that does
+        // not exist yet).
+        expandFailedReasoning();
+        await waitForElement(A.runReasoningBody, { timeout: 4000 });
+      },
+    },
+    {
+      anchor: A.runReasoningBody,
+      title: "See the reasoning",
+      description:
+        "This is the evaluator's <strong>full reasoning</strong> for its verdict. Reading it is how you understand a failure and decide what to fix.",
+      side: "left",
+      actionLabel: "Next",
+      timeout: 8000,
+    },
+    {
+      anchor: A.systemPrompt,
+      title: "Fix the gap it found",
+      description:
+        "Back on your agent. The failing test showed it had <strong>no phone number</strong> to give. We are adding one line of instruction, highlighted here, so it can answer. Fixing the exact gap a test finds is how you improve.",
+      side: "top",
+      actionLabel: "Save",
+      timeout: 12000,
+      prepare: async () => {
+        await clickElement(A.runClose, { timeout: 8000 });
+        await clickElement(A.tabAgent, { timeout: 8000 });
+        await appendPromptFix();
+      },
+      action: async () => {
+        await clickElement(A.save);
+      },
+    },
+    {
+      anchor: A.testsRunAll,
+      title: "Run the tests again",
+      description:
+        "Now run the same tests again with the fix in place, and see whether the failure turns into a pass.",
+      side: "bottom",
+      align: "end",
+      actionLabel: "Run",
+      timeout: 12000,
+      prepare: async () => {
+        await clickElement(A.tabTests);
+      },
+      action: async () => {
+        await clickElement(A.testsRunAll);
+      },
+    },
+    {
+      // Pinned over the centre spinner like the first run; auto-advances to the
+      // results once the run finishes.
+      title: "Running again",
+      description:
+        "Running the same tests with the fix in place. This will only take a moment.",
+      popoverClass: "calibrate-tour-running",
+      autoAdvance: true,
+      action: async () => {
+        await waitForElement(A.runSummary, { timeout: 90000 });
+      },
+    },
+    {
+      anchor: A.runResultDetail,
+      title: "It passes now ✅",
+      description:
+        "Here is the same test that failed before. With the fix in place, the agent now gives the phone number, so it <strong>passes</strong>. See for yourself.",
+      side: "left",
+      actionLabel: "Next",
+      timeout: 90000,
+      prepare: async () => {
+        // Open the Outputs tab and the previously-failing test so the pass is
+        // shown on the exact case, not just the summary.
+        await clickElement(A.runTabOutputs, { timeout: 10000 });
+        await waitForElement(A.runResultRow, { timeout: 8000 });
+        openPhoneNumberResult();
+        await waitForElement(A.runResultDetail, { timeout: 8000 });
+      },
+    },
+    {
+      // The biggest takeaway, on its own card (centered).
+      title: "This is the big idea 💪",
+      description:
+        "You just made your agent better, and you have proof. <strong>Run tests, find mistakes, fix, and repeat</strong>. Keep doing this and your agent gets stronger over time, and never breaks in the same way twice.",
+      actionLabel: "Next",
+    },
+    {
+      anchor: A.testsCreate,
+      title: "Keep adding tests",
+      description:
+        "Real users will ask things you did not expect. Each time you find a question your agent gets wrong, <strong>save it as a test</strong> here. Over time these tests add up, so your agent keeps improving and never makes the same mistake twice.",
+      side: "bottom",
+      align: "end",
+      actionLabel: "Next",
+      timeout: 10000,
+      prepare: async () => {
+        await clickElement(A.runClose, { timeout: 8000 });
+        await waitForElement(A.testsCreate, { timeout: 8000 });
+      },
+    },
+    {
+      anchor: A.startTour,
+      title: "That is the first walkthrough 🎉",
+      description:
+        "You built an agent, tested it, read a verdict, and fixed a problem it found. You can <strong>replay anytime</strong> from Start tour here.",
+      side: "right",
+      align: "center",
+      actionLabel: "Finish",
+      timeout: 8000,
     },
   ];
 

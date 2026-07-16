@@ -19,6 +19,7 @@ export {
 export {
   buildFirstEvalTour,
   FIRST_EVAL_TOUR_ID,
+  FIRST_EVAL_TESTS_STEP_TITLE,
   type FirstEvalDeps,
 } from "./tours/firstEval";
 

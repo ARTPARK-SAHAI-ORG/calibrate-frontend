@@ -534,6 +534,7 @@ export function AppLayout({
                         {item.id === "guided-tour" ? (
                           <button
                             onClick={handleStartGuidedTour}
+                            data-tour="start-tour"
                             className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer text-muted-foreground hover:bg-accent/50 hover:text-foreground"
                           >
                             {item.icon}
@@ -612,6 +613,7 @@ export function AppLayout({
                         <button
                           onClick={handleStartGuidedTour}
                           aria-label={item.label}
+                          data-tour="start-tour"
                           className="w-10 h-10 flex items-center justify-center rounded-md transition-colors cursor-pointer text-muted-foreground hover:bg-accent/50 hover:text-foreground"
                         >
                           {item.icon}

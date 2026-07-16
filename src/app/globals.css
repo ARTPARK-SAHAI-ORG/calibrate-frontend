@@ -126,31 +126,35 @@ body {
    colors on its buttons, so the button rules use !important to win reliably. */
 .driver-popover.calibrate-tour {
   --driver-animation-duration: 0.25s;
+  /* Inherit the app's UI font instead of driver's Helvetica fallback. */
+  font-family: inherit;
   background-color: var(--popover);
   color: var(--foreground);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 16px;
   box-shadow:
     0 12px 32px rgba(0, 0, 0, 0.22),
     0 2px 6px rgba(0, 0, 0, 0.08);
-  min-width: 288px;
-  max-width: 340px;
-  padding: 18px 18px 16px;
+  min-width: 320px;
+  max-width: 380px;
+  padding: 22px 22px 18px;
 }
 
 .driver-popover.calibrate-tour .driver-popover-title {
   color: var(--foreground);
-  font-size: 1.0625rem;
-  font-weight: 600;
+  font-size: 1.15rem;
+  font-weight: 650;
   line-height: 1.35;
+  letter-spacing: -0.01em;
   padding-right: 1.5rem;
 }
 
 .driver-popover.calibrate-tour .driver-popover-description {
-  color: var(--muted-foreground);
-  font-size: 0.875rem;
-  line-height: 1.4;
-  margin-top: 0.375rem;
+  /* Higher-contrast body than muted-foreground so it is comfortable to read. */
+  color: color-mix(in srgb, var(--foreground) 84%, var(--background));
+  font-size: 0.95rem;
+  line-height: 1.62;
+  margin-top: 0.55rem;
 }
 
 /* Key phrases: brighter + heavier so the card is skimmable at a glance. */
@@ -238,16 +242,86 @@ body {
   opacity: 0.9 !important;
 }
 
-/* Arrow follows the popover background per side. */
+/* The spotlighted element shows at full brightness through the overlay cutout;
+   add a bold neutral ring + glow (foreground-based, not purple, no fill) so even
+   dark-on-dark targets like the sidebar Start tour button clearly stand out. */
+.driver-active-element {
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 3px var(--foreground),
+    0 0 0 5px color-mix(in srgb, var(--foreground) 30%, transparent),
+    0 0 14px 2px color-mix(in srgb, var(--foreground) 30%, transparent) !important;
+}
+
+/* Highlighter-style selection so the newly-added prompt line is easy to read:
+   a bright amber background with dark text (readable in light and dark mode),
+   scoped to the spotlighted element only. */
+.driver-active-element::selection,
+.driver-active-element ::selection {
+  background: #fde047;
+  color: #1a1a1a;
+}
+
+/* "Running your tests" card: pin it over the run dialog's detail panel so it
+   covers the centered "Running test" spinner. The tests list is a fixed 320px
+   column on the left, so the detail-panel centre sits 160px (half the list) to
+   the right of the viewport centre — a constant offset at any dialog width. */
+.driver-popover.calibrate-tour.calibrate-tour-running {
+  left: calc(50% + 160px) !important;
+  top: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+/* The running card auto-advances when the run finishes, so it needs no Next /
+   Previous buttons (driver renders them by default on the highlight() path even
+   when showButtons omits them). Only Skip tour + the X remain. */
+.driver-popover.calibrate-tour-running .driver-popover-next-btn,
+.driver-popover.calibrate-tour-running .driver-popover-prev-btn {
+  display: none !important;
+}
+
+/* Spinner beside the running card's heading (where the results card shows its
+   celebration emoji), so the title reads as the live status. */
+.driver-popover.calibrate-tour-running .driver-popover-title::after {
+  content: "";
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-left: 0.5em;
+  vertical-align: -0.08em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: calibrate-tour-spin 0.7s linear infinite;
+}
+@keyframes calibrate-tour-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Arrow follows the popover background per side. Longer + pointier than the
+   driver default (5px all round): the colored border is the arrow's length, the
+   two perpendicular borders its base — a bigger length:base ratio reads sharper
+   and the extra length gives it a clearer reach to the spotlighted element. */
+.driver-popover.calibrate-tour .driver-popover-arrow {
+  border-width: 8px;
+}
 .driver-popover.calibrate-tour .driver-popover-arrow-side-left.driver-popover-arrow {
   border-left-color: var(--popover);
+  border-left-width: 13px;
 }
 .driver-popover.calibrate-tour .driver-popover-arrow-side-right.driver-popover-arrow {
   border-right-color: var(--popover);
+  border-right-width: 13px;
 }
 .driver-popover.calibrate-tour .driver-popover-arrow-side-top.driver-popover-arrow {
   border-top-color: var(--popover);
+  border-top-width: 13px;
 }
 .driver-popover.calibrate-tour .driver-popover-arrow-side-bottom.driver-popover-arrow {
   border-bottom-color: var(--popover);
+  border-bottom-width: 13px;
 }
