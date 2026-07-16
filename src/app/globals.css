@@ -243,15 +243,7 @@ body {
 }
 
 /* The spotlighted element shows at full brightness through the overlay cutout;
-   add a bold neutral ring + glow (foreground-based, not purple, no fill) so even
-   dark-on-dark targets like the sidebar Start tour button clearly stand out. */
-.driver-active-element {
-  border-radius: 8px;
-  box-shadow:
-    0 0 0 3px var(--foreground),
-    0 0 0 5px color-mix(in srgb, var(--foreground) 30%, transparent),
-    0 0 14px 2px color-mix(in srgb, var(--foreground) 30%, transparent) !important;
-}
+   no extra ring — the dimmed overlay is enough to draw focus. */
 
 /* Highlighter-style selection so the newly-added prompt line is easy to read:
    a bright amber background with dark text (readable in light and dark mode),
