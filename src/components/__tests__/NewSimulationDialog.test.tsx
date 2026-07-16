@@ -105,7 +105,8 @@ describe("NewSimulationDialog", () => {
     await waitFor(() =>
       expect(onCreateSimulation).toHaveBeenCalledWith("sim-123"),
     );
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText("Creating...")).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith(
       "http://127.0.0.1:8000/simulations",
       expect.objectContaining({

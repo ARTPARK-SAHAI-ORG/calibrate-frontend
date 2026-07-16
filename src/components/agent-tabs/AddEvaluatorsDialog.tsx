@@ -171,6 +171,7 @@ export function AddEvaluatorsDialog({
       onClick={handleClose}
     >
       <div
+        data-tour="add-evaluators-dialog"
         className="bg-background border border-border rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
@@ -259,6 +260,7 @@ export function AddEvaluatorsDialog({
             Cancel
           </button>
           <button
+            data-tour="evaluators-add-confirm"
             onClick={handleAdd}
             disabled={selectedIds.size === 0 || saving}
             className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"

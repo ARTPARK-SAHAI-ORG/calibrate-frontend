@@ -84,6 +84,7 @@ export function AgentTabContent({
           </div>
           <div className="bg-muted/30 rounded-xl overflow-hidden border border-border md:flex-1 h-[350px] md:h-auto">
             <textarea
+              data-tour="agent-system-prompt"
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
               className="w-full h-full px-3 md:px-4 py-3 text-sm md:text-base bg-muted/30 text-foreground focus:outline-none resize-none"

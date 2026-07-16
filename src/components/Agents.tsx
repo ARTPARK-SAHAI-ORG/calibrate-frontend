@@ -187,6 +187,7 @@ export function Agents({ onNavigateToAgent }: AgentsProps) {
           Agents
         </h2>
         <button
+          data-tour="new-agent"
           onClick={() => setDialogOpen(true)}
           className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
         >
@@ -689,6 +690,9 @@ function NewAgentDialog({
   const handleCreate = async () => {
     if (!agentName.trim()) return;
 
+    // Keep the dialog open (spinner up) through navigation so the agents list
+    // never flashes between "Create" and the new agent's page loading.
+    let navigating = false;
     try {
       setIsCreating(true);
       setError(null);
@@ -746,14 +750,15 @@ function NewAgentDialog({
       const agentUuid = data.uuid;
 
       if (agentUuid && onCreateAgent) {
-        onClose();
+        navigating = true;
         onCreateAgent(agentUuid);
       }
     } catch (err) {
       reportError("Error creating agent:", err);
       setError(err instanceof Error ? err.message : "Failed to create agent");
     } finally {
-      setIsCreating(false);
+      // Leave the spinner up while navigating; the dialog unmounts with the page.
+      if (!navigating) setIsCreating(false);
     }
   };
 
@@ -784,6 +789,7 @@ function NewAgentDialog({
           <div className="relative">
             <input
               type="text"
+              data-tour="agent-name-input"
               value={agentName}
               onChange={(e) => {
                 if (e.target.value.length <= maxLength) {
@@ -817,7 +823,7 @@ function NewAgentDialog({
         </div>
 
         {/* Agent Kind Selection */}
-        <div className="mb-5 space-y-2">
+        <div data-tour="agent-type-options" className="mb-5 space-y-2">
           <label className="block text-[13px] font-medium text-foreground mb-2">
             Setup
           </label>
@@ -908,6 +914,7 @@ function NewAgentDialog({
             Cancel
           </button>
           <button
+            data-tour="agent-create-submit"
             onClick={handleCreate}
             disabled={!agentName.trim() || isCreating}
             className="h-9 px-4 rounded-md text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"

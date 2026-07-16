@@ -1079,6 +1079,7 @@ export function TestRunnerDialog({
               )}
             <button
               onClick={onClose}
+              data-tour="run-close"
               className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer shrink-0"
             >
               <CloseIcon className="w-5 h-5" />
@@ -1122,6 +1123,7 @@ export function TestRunnerDialog({
               <div className="border-b border-border px-4 md:px-6 pt-2 overflow-x-auto hide-scrollbar shrink-0">
                 <div className="flex gap-3 md:gap-4 lg:gap-6">
                   <button
+                    data-tour="run-tab-summary"
                     onClick={() => setActiveTab("summary")}
                     className={`pb-3 px-1 text-sm md:text-base font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
                       activeTab === "summary"
@@ -1132,6 +1134,7 @@ export function TestRunnerDialog({
                     Summary
                   </button>
                   <button
+                    data-tour="run-tab-outputs"
                     onClick={() => setActiveTab("outputs")}
                     className={`pb-3 px-1 text-sm md:text-base font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
                       activeTab === "outputs"
@@ -1146,7 +1149,7 @@ export function TestRunnerDialog({
             )}
 
             {runStatus === "done" && activeTab === "summary" ? (
-              <div className="flex-1 overflow-hidden">
+              <div className="flex-1 overflow-hidden" data-tour="test-run-summary">
                 <TestRunSummary
                   passed={passedTests.length}
                   total={passedTests.length + failedTests.length}

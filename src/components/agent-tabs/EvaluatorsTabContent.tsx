@@ -218,6 +218,7 @@ export function EvaluatorsTabContent({
     <div className="flex flex-wrap items-center gap-2 md:gap-3">
       <button
         type="button"
+        data-tour="evaluators-add"
         onClick={() => setAddDialogOpen(true)}
         className={ADD_BUTTON_CLASS}
       >
@@ -308,6 +309,7 @@ export function EvaluatorsTabContent({
           <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
             <button
               type="button"
+              data-tour="evaluators-add"
               onClick={() => setAddDialogOpen(true)}
               className={ADD_BUTTON_CLASS}
             >

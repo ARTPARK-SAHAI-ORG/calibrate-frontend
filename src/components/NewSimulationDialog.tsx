@@ -32,6 +32,9 @@ export function NewSimulationDialog({
   const handleCreate = async () => {
     if (!simulationName.trim()) return;
 
+    // Keep the dialog open (spinner up) through navigation so the simulations
+    // list never flashes between "Create" and the new simulation's page loading.
+    let navigating = false;
     try {
       setIsCreating(true);
       setError(null);
@@ -71,7 +74,7 @@ export function NewSimulationDialog({
       const simulationUuid = data.uuid;
 
       if (simulationUuid && onCreateSimulation) {
-        onClose(); // Close dialog first
+        navigating = true;
         onCreateSimulation(simulationUuid);
       }
     } catch (err) {
@@ -80,7 +83,8 @@ export function NewSimulationDialog({
         err instanceof Error ? err.message : "Failed to create simulation"
       );
     } finally {
-      setIsCreating(false);
+      // Leave the spinner up while navigating; the dialog unmounts with the page.
+      if (!navigating) setIsCreating(false);
     }
   };
 

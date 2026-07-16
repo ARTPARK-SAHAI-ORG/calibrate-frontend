@@ -1101,6 +1101,7 @@ export function AgentDetail({
           (tab) => (
             <button
               key={tab}
+              data-tour={`agent-tab-${tab}`}
               onClick={() => handleTabChange(tab)}
               className={`pb-3 px-1 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
                 activeTab === tab
