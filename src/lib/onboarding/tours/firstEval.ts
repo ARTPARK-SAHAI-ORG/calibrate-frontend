@@ -100,6 +100,25 @@ const DEMO_SECOND_CRITERIA =
 // found: the agent was never given a phone number, so it could not answer.
 const DEMO_PROMPT_FIX = " Our clinic helpline number is 1800-123-4567.";
 
+// The built-in next-reply Correctness default's name — used both as a fallback
+// when the library lookup fails and as the name to recreate it under if a
+// workspace has deleted it.
+const CORRECTNESS_NAME = "Correctness";
+const CORRECTNESS_DESCRIPTION = "Does the answer get it right?";
+// Its single criteria variable (the tour sets its value per test).
+const CORRECTNESS_CRITERIA_VARIABLE = {
+  name: "criteria",
+  description: "Criteria that the agent's response should satisfy",
+};
+// Fallback judge prompt (mirrors the seeded default) if the backend's
+// default-prompt endpoint is unavailable when recreating Correctness.
+const CORRECTNESS_FALLBACK_PROMPT =
+  "You are a highly accurate evaluator evaluating the response of an agent to a " +
+  "user's message.\n\nYou will be given a conversation between a user and an " +
+  "agent along with the response of the agent to the final user message.\n\nYou " +
+  "need to evaluate if the response adheres to the evaluation criteria:\n\n" +
+  "{{criteria}}";
+
 // The evaluator name goes into a card's description HTML, so escape it (names are
 // user-authored). driver.js renders the description as raw HTML.
 function escapeHtml(s: string): string {
@@ -144,14 +163,16 @@ export const A = {
 /**
  * What the flow adapts to, resolved from the workspace's evaluator library once,
  * before the tour is built:
- *  - `hasCorrectness`: the built-in next-reply Correctness default is available
- *    (it is seeded into every workspace, so this is true in practice).
+ *  - `correctnessName`: the CURRENT display name of the built-in next-reply
+ *    Correctness default, found by its stable slug (so a user renaming it does
+ *    not break the flow), or `null` if the user has deleted it — in which case
+ *    the flow silently recreates it before proceeding.
  *  - `secondEvaluatorName`: the exact name of a second LLM-reply evaluator to add
  *    alongside Correctness (a "conciseness"-style check), or null if none exists
  *    — in which case the flow uses Correctness alone and never invents a second.
  */
 export type EvaluatorPlan = {
-  hasCorrectness: boolean;
+  correctnessName: string | null;
   secondEvaluatorName: string | null;
 };
 
@@ -164,29 +185,34 @@ type EvaluatorLike = {
 
 /**
  * Decide the evaluator plan from the library list. Pure, so it is unit-testable.
- * The second evaluator must be an LLM-reply evaluator (only those grade a
- * next-reply test) whose name reads as a conciseness check, and must not be the
- * Correctness default itself.
+ * Correctness is identified by its stable origin slug — NOT its display name — so
+ * a renamed default is still found. The second evaluator must be an LLM-reply
+ * evaluator (only those grade a next-reply test) whose name reads as a conciseness
+ * check, and must not be the Correctness default itself.
  */
 export function planFromEvaluators(list: EvaluatorLike[]): EvaluatorPlan {
   const llm = list.filter((e) => e.evaluator_type === "llm");
-  const hasCorrectness = llm.some((e) => isDefaultLLMNextReplyEvaluator(e));
+  const correctness = llm.find((e) => isDefaultLLMNextReplyEvaluator(e));
   const second = llm.find(
     (e) => /concise/i.test(e.name ?? "") && !isDefaultLLMNextReplyEvaluator(e),
   );
-  return { hasCorrectness, secondEvaluatorName: second?.name ?? null };
+  return {
+    correctnessName: correctness?.name ?? null,
+    secondEvaluatorName: second?.name ?? null,
+  };
 }
 
 /**
- * Fetch the workspace evaluators and resolve the plan. Falls back to
- * Correctness-only (the safe path — one reliable, tour-controlled check) if the
- * token is missing or the request fails, so the tour never blocks on the lookup.
+ * Fetch the workspace evaluators and resolve the plan. Falls back to the built-in
+ * "Correctness" default, second-check-free (the safe path — one reliable,
+ * tour-controlled check) if the token is missing or the request fails, so the
+ * tour never blocks on the lookup.
  */
 export async function resolveEvaluatorPlan(
   accessToken: string | null,
 ): Promise<EvaluatorPlan> {
   const fallback: EvaluatorPlan = {
-    hasCorrectness: true,
+    correctnessName: CORRECTNESS_NAME,
     secondEvaluatorName: null,
   };
   if (!accessToken) return fallback;
@@ -199,6 +225,81 @@ export async function resolveEvaluatorPlan(
     return planFromEvaluators(unwrapList<EvaluatorLike>(await res.json()));
   } catch {
     return fallback;
+  }
+}
+
+/** What the backend's default-prompt endpoint returns for a purpose. */
+type DefaultPrompt = {
+  system_prompt?: string;
+  judge_model?: string;
+  output_type?: "binary" | "rating";
+};
+
+/**
+ * Build the `POST /evaluators` body for recreating the Correctness default,
+ * mirroring what the Create Evaluator flow sends. Pure, so it is unit-testable.
+ * Uses the backend's canonical prompt/judge model when available, else a
+ * hard-coded fallback prompt; keeps the single `{{criteria}}` variable the tour
+ * fills per test.
+ */
+export function buildCorrectnessPayload(dp: DefaultPrompt | null): {
+  name: string;
+  description: string;
+  evaluator_type: "llm";
+  data_type: "text";
+  kind: "single";
+  output_type: "binary" | "rating";
+  version: {
+    judge_model?: string;
+    system_prompt: string;
+    variables: { name: string; description: string }[];
+  };
+} {
+  return {
+    name: CORRECTNESS_NAME,
+    description: CORRECTNESS_DESCRIPTION,
+    evaluator_type: "llm",
+    data_type: "text",
+    kind: "single",
+    output_type: dp?.output_type ?? "binary",
+    version: {
+      ...(dp?.judge_model ? { judge_model: dp.judge_model } : {}),
+      system_prompt: dp?.system_prompt?.trim() || CORRECTNESS_FALLBACK_PROMPT,
+      variables: [CORRECTNESS_CRITERIA_VARIABLE],
+    },
+  };
+}
+
+/**
+ * Recreate the built-in Correctness evaluator when a workspace has deleted it, so
+ * the tour has a check whose criteria it controls. Best-effort and silent: it
+ * fetches the canonical prompt/judge model, POSTs the evaluator, and swallows any
+ * failure (the tour then simply proceeds — the picker step degrades gracefully).
+ */
+async function createCorrectnessEvaluator(
+  accessToken: string | null,
+): Promise<void> {
+  if (!accessToken) return;
+  try {
+    let dp: DefaultPrompt | null = null;
+    const dpRes = await fetch(
+      `${getBackendUrl()}/evaluators/default-prompt?purpose=llm`,
+      { method: "GET", headers: getDefaultHeaders(accessToken) },
+    );
+    if (dpRes.ok) dp = (await dpRes.json()) as DefaultPrompt;
+    // Without a judge model the backend rejects the create, so only proceed when
+    // the default-prompt lookup gave us one.
+    if (!dp?.judge_model) return;
+    await fetch(`${getBackendUrl()}/evaluators`, {
+      method: "POST",
+      headers: {
+        ...getDefaultHeaders(accessToken),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(buildCorrectnessPayload(dp)),
+    });
+  } catch {
+    /* best-effort: the tour proceeds without it */
   }
 }
 
@@ -304,20 +405,7 @@ function isRowUnchecked(row: HTMLLabelElement): boolean {
 }
 
 /**
- * Choose which row the Correctness step should tick: the Correctness evaluator
- * among LLM-reply rows, falling back to the first LLM-reply row so the pick
- * always grades the next-reply demo test. Pure (no DOM mutation) so it is unit-
- * testable; the caller ticks + highlights the returned row.
- */
-export function chooseCorrectnessRow(
-  rows: HTMLLabelElement[],
-): HTMLLabelElement | undefined {
-  const llmRows = rows.filter(isLlmReplyRow);
-  return llmRows.find((r) => /correct/i.test(r.textContent ?? "")) ?? llmRows[0];
-}
-
-/**
- * Choose the second evaluator to tick BY EXACT NAME (the name resolved into the
+ * Choose the evaluator row to tick BY EXACT NAME (the name resolved into the
  * plan), restricted to unticked LLM-reply rows so it actually grades the
  * next-reply test. Matching a specific name — rather than a fuzzy "complementary"
  * guess — is what stops the tour ticking an unrelated custom evaluator whose
@@ -355,15 +443,8 @@ function tickRow(row: HTMLLabelElement | undefined): void {
  * any row) so the pick always grades the next-reply demo test — see
  * `LLM_REPLY_TYPE_LABEL`.
  */
-async function pickCorrectness(): Promise<void> {
-  const dialog = await waitForElement(A.addEvaluatorsDialog, { timeout: 10000 });
-  if (!dialog) return;
-  const rows = Array.from(dialog.querySelectorAll<HTMLLabelElement>("label"));
-  tickRow(chooseCorrectnessRow(rows));
-}
-
-/** Tick the second evaluator, matched by the exact name resolved into the plan. */
-async function pickSecondEvaluator(name: string): Promise<void> {
+/** Tick an evaluator in the picker, matched by the exact name from the plan. */
+async function pickEvaluatorByName(name: string): Promise<void> {
   const dialog = await waitForElement(A.addEvaluatorsDialog, { timeout: 10000 });
   if (!dialog) return;
   const rows = Array.from(dialog.querySelectorAll<HTMLLabelElement>("label"));
@@ -379,16 +460,21 @@ async function pickSecondEvaluator(name: string): Promise<void> {
  * and it passes on every demo answer. Setting by card identity (not field order)
  * keeps this correct however the editor lays the cards out.
  */
-function fillEvaluatorCriteria(primary: string): void {
+function fillEvaluatorCriteria(primary: string, correctnessName: string): void {
   const area = document.querySelector<HTMLElement>(A.testEvaluatorsArea);
   if (!area) return;
+  const target = correctnessName.trim().toLowerCase();
   const cards = Array.from(area.children) as HTMLElement[];
   cards.forEach((card) => {
     const field = card.querySelector<HTMLTextAreaElement | HTMLInputElement>(
       "textarea, input[type='text']",
     );
     if (!field) return;
-    const isCorrectness = /correct/i.test(card.textContent ?? "");
+    // Identify Correctness by its resolved name (rename-safe), not the literal
+    // word "correct".
+    const isCorrectness = (card.textContent ?? "")
+      .toLowerCase()
+      .includes(target);
     setNativeValue(field, isCorrectness ? primary : DEMO_SECOND_CRITERIA);
   });
 }
@@ -465,6 +551,10 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
   // The flow adapts to the workspace: add a second check only when a suitable
   // (conciseness) evaluator exists; otherwise use Correctness alone.
   const secondName = deps.plan.secondEvaluatorName;
+  // Correctness is identified by its CURRENT name (rename-safe). If the workspace
+  // deleted it (null), recreate it under its default name before the picker opens.
+  const needsCorrectness = deps.plan.correctnessName === null;
+  const correctnessName = deps.plan.correctnessName ?? CORRECTNESS_NAME;
   const steps: TourStep[] = [
     {
       title: "Welcome to Calibrate 👋",
@@ -532,6 +622,13 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
         "To <strong>grade</strong> your agent automatically, Calibrate uses a strong LLM as a judge, called an evaluator. It <strong>scores each answer</strong> against a criteria you set, for example whether the answer is correct or stays polite. Let us add one.",
       side: "bottom",
       actionLabel: "Next",
+      prepare: async () => {
+        // If the workspace deleted the built-in Correctness default, silently
+        // recreate it now so it is in the picker the next click opens.
+        if (needsCorrectness) {
+          await createCorrectnessEvaluator(deps.getAccessToken());
+        }
+      },
       action: async () => {
         await clickElement(A.tabEvaluators);
         await clickElement(A.evaluatorsAdd, { timeout: 8000 });
@@ -541,12 +638,16 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.addEvaluatorsDialog,
       title: "Choose what to check",
       description: secondName
-        ? "These are the checks you can grade your agent with. First, <strong>Correctness</strong>: does the answer get it right?"
-        : "These are the checks you can grade your agent with. We will use <strong>Correctness</strong>: does the answer get it right?",
+        ? `These are the checks you can grade your agent with. First, <strong>${escapeHtml(
+            correctnessName,
+          )}</strong>: does the answer get it right?`
+        : `These are the checks you can grade your agent with. We will use <strong>${escapeHtml(
+            correctnessName,
+          )}</strong>: does the answer get it right?`,
       side: "left",
-      actionLabel: "Pick Correctness",
+      actionLabel: "Pick it",
       action: async () => {
-        await pickCorrectness();
+        await pickEvaluatorByName(correctnessName);
       },
     },
     // Only add a second check when the workspace actually has one to add.
@@ -555,13 +656,15 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
           {
             anchor: A.addEvaluatorsDialog,
             title: "Add another check",
-            description: `Correctness is ticked. Now add <strong>${escapeHtml(
+            description: `${escapeHtml(
+              correctnessName,
+            )} is ticked. Now add <strong>${escapeHtml(
               secondName,
             )}</strong> as a second, independent check, so you grade more than one aspect of the reply.`,
             side: "left" as const,
             actionLabel: "Pick it",
             action: async () => {
-              await pickSecondEvaluator(secondName);
+              await pickEvaluatorByName(secondName);
             },
           },
         ]
@@ -571,7 +674,9 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       title: secondName ? "Add them to your agent" : "Add it to your agent",
       description: secondName
         ? "Both checks are ticked. Let us <strong>add them</strong> so every test grades the reply on both."
-        : "Correctness is ticked. Let us <strong>add it</strong> so every test grades the reply. You can <strong>add more checks</strong> anytime.",
+        : `${escapeHtml(
+            correctnessName,
+          )} is ticked. Let us <strong>add it</strong> so every test grades the reply. You can <strong>add more checks</strong> anytime.`,
       side: "left",
       actionLabel: secondName ? "Add them" : "Add it",
       action: async () => {
@@ -619,7 +724,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
           DEMO_TESTS[0].criteria,
           { timeout: 8000 },
         );
-        fillEvaluatorCriteria(DEMO_TESTS[0].criteria);
+        fillEvaluatorCriteria(DEMO_TESTS[0].criteria, correctnessName);
       },
       action: async () => {
         await submitCreateTest();
@@ -663,7 +768,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
           DEMO_TESTS[1].criteria,
           { timeout: 8000 },
         );
-        fillEvaluatorCriteria(DEMO_TESTS[1].criteria);
+        fillEvaluatorCriteria(DEMO_TESTS[1].criteria, correctnessName);
       },
       action: async () => {
         await submitCreateTest();

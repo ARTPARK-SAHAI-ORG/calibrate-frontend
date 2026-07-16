@@ -9,7 +9,7 @@
  */
 
 import {
-  chooseCorrectnessRow,
+  buildCorrectnessPayload,
   chooseRowByName,
   isLlmReplyRow,
   planFromEvaluators,
@@ -65,30 +65,6 @@ describe("isLlmReplyRow", () => {
   });
 });
 
-describe("chooseCorrectnessRow", () => {
-  it("prefers the Correctness LLM-reply row", () => {
-    const rows = [
-      makeRow({ name: "Tone", type: "llm" }),
-      makeRow({ name: "Correctness", type: "llm" }),
-    ];
-    expect(chooseCorrectnessRow(rows)).toBe(rows[1]);
-  });
-
-  it("falls back to the first LLM-reply row, never a conversation row", () => {
-    const rows = [
-      makeRow({ name: "Full-conversation coherence", type: "conversation" }),
-      makeRow({ name: "Helpfulness", type: "llm" }),
-    ];
-    // No "correct"-named row: fallback must skip the conversation row.
-    expect(chooseCorrectnessRow(rows)).toBe(rows[1]);
-  });
-
-  it("returns undefined when there is no LLM-reply row", () => {
-    const rows = [makeRow({ name: "Coherence", type: "conversation" })];
-    expect(chooseCorrectnessRow(rows)).toBeUndefined();
-  });
-});
-
 describe("chooseRowByName", () => {
   it("ticks the unchecked LLM-reply row whose name matches", () => {
     const rows = [
@@ -128,18 +104,31 @@ describe("planFromEvaluators", () => {
     slug: "default-llm-next-reply",
   };
 
-  it("detects Correctness and a conciseness second check", () => {
+  it("detects Correctness (by name) and a conciseness second check", () => {
     expect(
       planFromEvaluators([
         correctness,
         { name: "Reply Conciseness", evaluator_type: "llm", slug: "reply-conciseness" },
       ]),
-    ).toEqual({ hasCorrectness: true, secondEvaluatorName: "Reply Conciseness" });
+    ).toEqual({
+      correctnessName: "Correctness",
+      secondEvaluatorName: "Reply Conciseness",
+    });
+  });
+
+  it("finds the Correctness default by SLUG even when it was renamed", () => {
+    // Identified by slug, so a renamed default is still returned by its new name.
+    const renamed = {
+      name: "Answer Accuracy",
+      evaluator_type: "llm",
+      slug: "default-llm-next-reply",
+    };
+    expect(planFromEvaluators([renamed]).correctnessName).toBe("Answer Accuracy");
   });
 
   it("returns no second when only Correctness exists", () => {
     expect(planFromEvaluators([correctness])).toEqual({
-      hasCorrectness: true,
+      correctnessName: "Correctness",
       secondEvaluatorName: null,
     });
   });
@@ -153,20 +142,48 @@ describe("planFromEvaluators", () => {
     ).toBeNull();
   });
 
-  it("flags Correctness missing", () => {
+  it("reports correctnessName null when the default was deleted", () => {
     const plan = planFromEvaluators([
       { name: "Reply Conciseness", evaluator_type: "llm", slug: "reply-conciseness" },
     ]);
-    expect(plan.hasCorrectness).toBe(false);
+    expect(plan.correctnessName).toBeNull();
+  });
+});
+
+describe("buildCorrectnessPayload", () => {
+  it("uses the backend default-prompt config when provided", () => {
+    const payload = buildCorrectnessPayload({
+      system_prompt: "Judge against {{criteria}}",
+      judge_model: "openai/gpt-5.4-mini",
+      output_type: "binary",
+    });
+    expect(payload.name).toBe("Correctness");
+    expect(payload.evaluator_type).toBe("llm");
+    expect(payload.data_type).toBe("text");
+    expect(payload.version.judge_model).toBe("openai/gpt-5.4-mini");
+    expect(payload.version.system_prompt).toBe("Judge against {{criteria}}");
+    expect(payload.version.variables).toEqual([
+      { name: "criteria", description: expect.any(String) },
+    ]);
+  });
+
+  it("falls back to a criteria-driven prompt when none is given", () => {
+    const payload = buildCorrectnessPayload(null);
+    expect(payload.version.system_prompt).toContain("{{criteria}}");
+    expect(payload.version.judge_model).toBeUndefined();
+    expect(payload.output_type).toBe("binary");
   });
 });
 
 describe("buildFirstEvalTour", () => {
   const TWO: EvaluatorPlan = {
-    hasCorrectness: true,
+    correctnessName: "Correctness",
     secondEvaluatorName: "Reply Conciseness",
   };
-  const ONE: EvaluatorPlan = { hasCorrectness: true, secondEvaluatorName: null };
+  const ONE: EvaluatorPlan = {
+    correctnessName: "Correctness",
+    secondEvaluatorName: null,
+  };
   const build = (plan: EvaluatorPlan) =>
     buildFirstEvalTour({ getAccessToken: () => "token", plan });
   const titles = (plan: EvaluatorPlan) => build(plan).steps.map((s) => s.title);
@@ -207,5 +224,23 @@ describe("buildFirstEvalTour", () => {
       expect(grading).toBeDefined();
       expect(grading?.description).toContain("add more checks");
     }
+  });
+
+  it("names Correctness by its resolved name in the pick step (rename-safe)", () => {
+    const renamed = build({
+      correctnessName: "Answer Accuracy",
+      secondEvaluatorName: null,
+    });
+    const pick = renamed.steps.find((s) => s.title === "Choose what to check");
+    expect(pick?.description).toContain("Answer Accuracy");
+  });
+
+  it("still builds when Correctness was deleted (recreated silently)", () => {
+    const deleted = build({ correctnessName: null, secondEvaluatorName: null });
+    const titles = deleted.steps.map((s) => s.title);
+    expect(titles).toContain("Choose what to check");
+    // Falls back to the default Correctness name in the copy.
+    const pick = deleted.steps.find((s) => s.title === "Choose what to check");
+    expect(pick?.description).toContain("Correctness");
   });
 });

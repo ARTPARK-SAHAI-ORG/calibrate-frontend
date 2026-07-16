@@ -3,8 +3,8 @@ const mockClickByText = jest.fn().mockResolvedValue(true);
 const mockFillInput = jest.fn().mockResolvedValue(true);
 const mockFillByPlaceholder = jest.fn().mockResolvedValue(true);
 const mockDelay = jest.fn().mockResolvedValue(undefined);
-const mockWaitForElement = jest.fn(
-  async (selector: string) => document.querySelector<HTMLElement>(selector),
+const mockWaitForElement = jest.fn(async (...args: unknown[]) =>
+  document.querySelector<HTMLElement>(args[0] as string),
 );
 
 jest.mock("../../dom", () => ({
@@ -36,7 +36,7 @@ import {
 // A two-evaluator plan (Correctness + a "Politeness" second check) so the flow
 // includes the second-pick step under test.
 const TWO_EVAL_PLAN: EvaluatorPlan = {
-  hasCorrectness: true,
+  correctnessName: "Correctness",
   secondEvaluatorName: "Politeness",
 };
 
@@ -114,6 +114,52 @@ describe("first-eval tour step actions", () => {
       expect.stringContaining("community health clinics"),
       { timeout: 15000 },
     );
+  });
+
+  it("recreates Correctness when the workspace deleted it", async () => {
+    const calls: { url: string; init?: RequestInit }[] = [];
+    (global.fetch as jest.Mock).mockImplementation(
+      async (url: string, init?: RequestInit) => {
+        calls.push({ url, init });
+        if (url.includes("/evaluators/default-prompt")) {
+          return {
+            ok: true,
+            json: async () => ({
+              system_prompt: "Judge against {{criteria}}",
+              judge_model: "openai/gpt-5.4-mini",
+              output_type: "binary",
+            }),
+          };
+        }
+        return { ok: true, json: async () => ({ uuid: "new-correct" }) };
+      },
+    );
+
+    const tour = buildTour("tok", {
+      correctnessName: null,
+      secondEvaluatorName: null,
+    });
+    await stepByTitle(tour, "Add an evaluator").prepare?.();
+
+    const post = calls.find(
+      (c) => c.init?.method === "POST" && c.url.endsWith("/evaluators"),
+    );
+    expect(post).toBeDefined();
+    const body = JSON.parse(post!.init!.body as string);
+    expect(body.name).toBe("Correctness");
+    expect(body.evaluator_type).toBe("llm");
+    expect(body.version.judge_model).toBe("openai/gpt-5.4-mini");
+    expect(body.version.variables[0].name).toBe("criteria");
+  });
+
+  it("does not recreate Correctness when it already exists", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    });
+    const tour = buildTour("tok"); // plan already has Correctness
+    await stepByTitle(tour, "Add an evaluator").prepare?.();
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it("ticks correctness and a second evaluator in the picker", async () => {
