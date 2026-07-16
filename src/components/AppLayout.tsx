@@ -538,7 +538,13 @@ export function AppLayout({
                   )}
                   <ul className="space-y-1">
                     {section.items.map((item) => (
-                      <li key={item.id}>
+                      <li
+                        key={item.id}
+                        // The tour is desktop-only, so hide its launcher on phones.
+                        className={
+                          item.id === "guided-tour" ? "hidden md:block" : undefined
+                        }
+                      >
                         {item.id === "guided-tour" ? (
                           <button
                             onClick={handleStartGuidedTour}
@@ -616,7 +622,13 @@ export function AppLayout({
                 {section.title && <div className="h-px bg-border mx-1 mb-3" />}
                 <ul className="space-y-1">
                   {section.items.map((item) => (
-                    <li key={item.id} className="relative group/tip">
+                    <li
+                      key={item.id}
+                      // The tour is desktop-only, so hide its launcher on phones.
+                      className={`relative group/tip${
+                        item.id === "guided-tour" ? " hidden md:block" : ""
+                      }`}
+                    >
                       {item.id === "guided-tour" ? (
                         <button
                           onClick={handleStartGuidedTour}
@@ -769,8 +781,8 @@ export function AppLayout({
                     </div>
                   </div>
 
-                  {/* Take a tour */}
-                  <div className="p-2 border-b border-border">
+                  {/* Take a tour — desktop-only, so hidden on phones. */}
+                  <div className="p-2 border-b border-border hidden md:block">
                     <button
                       onClick={handleStartGuidedTour}
                       className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted rounded-lg transition-colors cursor-pointer"
