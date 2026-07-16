@@ -8,6 +8,7 @@ import {
   hasSTTEmptyPredictions,
   getFirstSTTEmptyPredictionIndex,
   hasSemanticWerMetric,
+  hasTtfsMetric,
   STTEvaluationAbout,
   TTSEvaluationAbout,
   STTEvaluationLeaderboard,
@@ -1772,5 +1773,204 @@ describe("TTSEvaluationOutputs cost tile", () => {
     expect(
       screen.queryByTestId("metric-Cost (USD/min)"),
     ).not.toBeInTheDocument();
+  });
+});
+
+// ---- TTFS (Time To Final Segment) ----------------------------------------
+
+describe("hasTtfsMetric", () => {
+  it("is true when a provider reports ttfs as a latency block", () => {
+    expect(hasTtfsMetric([{ metrics: { ttfs: { p50: 0.42 } } }])).toBe(true);
+  });
+
+  it("is true when a provider reports ttfs as a plain number", () => {
+    expect(hasTtfsMetric([{ metrics: { ttfs: 0.42 } }])).toBe(true);
+  });
+
+  it("is false when no provider reports ttfs", () => {
+    expect(hasTtfsMetric([{ metrics: { wer: 0.1 } }])).toBe(false);
+    expect(hasTtfsMetric([])).toBe(false);
+    expect(hasTtfsMetric(undefined)).toBe(false);
+  });
+});
+
+describe("STTEvaluationAbout TTFS row", () => {
+  it("omits the TTFS row by default", () => {
+    render(<STTEvaluationAbout evaluatorRows={[]} />);
+    const metrics = JSON.parse(
+      screen.getByTestId("about-metrics-table").textContent ?? "",
+    );
+    expect(metrics.map((m: { key?: string }) => m.key)).not.toContain("ttfs");
+  });
+
+  it("appends the TTFS row when showTtfs is set", () => {
+    render(<STTEvaluationAbout evaluatorRows={[]} showTtfs />);
+    const metrics = JSON.parse(
+      screen.getByTestId("about-metrics-table").textContent ?? "",
+    );
+    const ttfsRow = metrics.find((m: { key?: string }) => m.key === "ttfs");
+    expect(ttfsRow).toMatchObject({ preference: "Lower is better" });
+  });
+});
+
+describe("STTEvaluationLeaderboard TTFS column", () => {
+  it("joins TTFS from providerResults into the row, column and chart", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "deepgram", wer: 0.1, cer: 0.05 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          { provider: "deepgram", metrics: { ttfs: { p50: 0.42 } } },
+        ]}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns).toContainEqual({ key: "ttfs", header: "TTFS (s)" });
+
+    const charts = JSON.parse(
+      screen.getByTestId("leaderboard-charts").textContent ?? "[]",
+    ).flat();
+    expect(charts).toContainEqual({ title: "TTFS (s)", dataKey: "ttfs" });
+
+    const data = JSON.parse(
+      screen.getByTestId("leaderboard-data").textContent ?? "[]",
+    );
+    expect(data[0].ttfs).toBeCloseTo(0.42);
+  });
+
+  it("reads the flattened ttfs_p50 headline off the row", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "openai", wer: 0.1, ttfs_p50: 0.3 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const data = JSON.parse(
+      screen.getByTestId("leaderboard-data").textContent ?? "[]",
+    );
+    expect(data[0].ttfs).toBe(0.3);
+  });
+
+  it("falls back to the legacy flat ttfs key", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "openai", wer: 0.1, ttfs: 0.55 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns.map((c: { key: string }) => c.key)).toContain("ttfs");
+  });
+
+  it("orders TTFS before the cost column", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[
+          { run: "openai", wer: 0.1, ttfs_p50: 0.3, cost_per_minute_usd: 0.004 },
+        ]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    const keys = columns.map((c: { key: string }) => c.key);
+    expect(keys.indexOf("ttfs")).toBeLessThan(
+      keys.indexOf("cost_per_minute_usd"),
+    );
+  });
+
+  it("omits the TTFS column/chart when no run measured it", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "openai", wer: 0.1, cer: 0.05 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns.map((c: { key: string }) => c.key)).not.toContain("ttfs");
+  });
+
+  it("formats the TTFS column to 4 decimals, '-' for non-numbers", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "openai", wer: 0.1, ttfs_p50: 0.123456789 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const columns = (
+      mockLeaderboardCapture.props as unknown as Record<string, unknown>
+    ).columns as Array<{ key: string; render?: (v: unknown) => unknown }>;
+    const ttfsColumn = columns.find((c) => c.key === "ttfs");
+    expect(ttfsColumn?.render?.(0.123456789)).toBe(0.1235);
+    expect(ttfsColumn?.render?.(undefined)).toBe("-");
+  });
+});
+
+describe("STTEvaluationOutputs TTFS tile", () => {
+  const baseProps = {
+    activeProviderKey: null as string | null,
+    onProviderSelect: jest.fn(),
+    status: "done" as const,
+    evaluatorColumns: [],
+    getProviderLabel,
+  };
+
+  it("shows a TTFS tile from the latency block (p50 headline)", () => {
+    render(
+      <STTEvaluationOutputs
+        {...baseProps}
+        providerResults={[
+          {
+            provider: "deepgram",
+            success: true,
+            metrics: { wer: 0.1, cer: 0.05, ttfs: { p50: 0.42 } },
+            results: [],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("metric-TTFS (s)").textContent).toBe("0.42");
+  });
+
+  it("shows a TTFS tile from a plain number", () => {
+    render(
+      <STTEvaluationOutputs
+        {...baseProps}
+        providerResults={[
+          {
+            provider: "openai",
+            success: true,
+            metrics: { wer: 0.1, ttfs: 0.5 },
+            results: [],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("metric-TTFS (s)").textContent).toBe("0.5");
+  });
+
+  it("omits the TTFS tile when no ttfs was measured", () => {
+    render(
+      <STTEvaluationOutputs
+        {...baseProps}
+        providerResults={[
+          { provider: "openai", success: true, metrics: { wer: 0.1 }, results: [] },
+        ]}
+      />,
+    );
+    expect(screen.queryByTestId("metric-TTFS (s)")).not.toBeInTheDocument();
   });
 });

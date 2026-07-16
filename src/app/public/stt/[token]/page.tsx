@@ -12,9 +12,11 @@ import {
   evaluatorColumnsFromRuns,
   evaluatorDescriptionMapFromRuns,
   hasSemanticWerMetric,
+  hasTtfsMetric,
   ratingRange,
   type STTEvaluatorColumn,
 } from "@/components/eval-details";
+import type { LatencyMetric } from "@/components/eval-details/ttsEvalTypes";
 import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
 import type { AudioCostBreakdown } from "@/lib/audioCost";
 import {
@@ -53,10 +55,13 @@ type ProviderMetrics = {
   cer?: number;
   string_similarity?: number;
   llm_judge_score?: number;
+  // TTFS streaming latency. Reported as a latency block or a plain number.
+  ttfs?: LatencyMetric | number;
   // Per-provider cost block. Present only when the run computed cost.
   cost?: AudioCostBreakdown;
   [k: string]:
     | number
+    | LatencyMetric
     | AudioCostBreakdown
     | { type?: string; mean?: number; scale_min?: number; scale_max?: number }
     | undefined;
@@ -88,6 +93,9 @@ type LeaderboardSummary = {
   cer?: number;
   string_similarity?: number;
   llm_judge_score?: number;
+  // TTFS streaming latency (seconds), flattened onto the leaderboard row.
+  ttfs_p50?: number;
+  ttfs?: number;
   // Per-minute USD cost, flattened onto the leaderboard row when computed.
   cost_per_minute_usd?: number;
   [k: string]: string | number | undefined;
@@ -320,6 +328,7 @@ export default function PublicSTTPage() {
                         : "-",
                 }))}
                 showSemanticWer={hasSemanticWerMetric(data.provider_results)}
+                showTtfs={hasTtfsMetric(data.provider_results)}
               />
             )}
           </>
