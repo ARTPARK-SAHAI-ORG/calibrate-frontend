@@ -21,6 +21,7 @@ import { Select } from "@/components/ui/Select";
 import { useAccessToken } from "@/hooks";
 import { apiClient, unwrapList } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
+import { taskOptionsWithAgreement } from "./taskOptions";
 
 type Tab = "overview" | "tasks" | "annotators";
 
@@ -72,6 +73,12 @@ type LabellingTask = {
   updated_at?: string;
   item_count?: number;
   evaluators?: LabellingTaskEvaluator[];
+  /**
+   * True when the task has at least one comparable pair (human-human or any
+   * human-evaluator). All-time / unfiltered — independent of `bucket`/`days`.
+   * Used to filter the Overview task-selector dropdown.
+   */
+  has_agreement?: boolean;
 };
 
 type SortDirection = "asc" | "desc";
@@ -201,16 +208,11 @@ function HumanLabellingPageInner() {
   const [selectedTaskId, setSelectedTaskId] = useState<string>(ALL_TASKS);
   const [bucket] = useState<Bucket>(DEFAULT_BUCKET);
   const [days] = useState<number>(DEFAULT_DAYS);
-  // Task uuids that have any agreement data (human-human or any evaluator).
-  // Populated lazily after tasks load so the dropdown only lists tasks with
-  // at least one comparable pair.
-  const [tasksWithAgreement, setTasksWithAgreement] = useState<Set<string>>(
-    new Set(),
-  );
 
-  const taskOptions: LabellingTaskSummary[] = tasks
-    .filter((t) => tasksWithAgreement.has(t.uuid))
-    .map((t) => ({ uuid: t.uuid, name: t.name }));
+  // The dropdown only lists tasks with at least one comparable pair. The task
+  // list now carries an all-time `has_agreement` flag, so we filter in memory
+  // instead of probing GET /annotation-tasks/{uuid}/agreement per task.
+  const taskOptions: LabellingTaskSummary[] = taskOptionsWithAgreement(tasks);
 
   useEffect(() => {
     document.title = "Human alignment | Calibrate";
@@ -288,38 +290,6 @@ function HumanLabellingPageInner() {
       fetchAnnotators();
     }
   }, [activeTab, fetchAgreement, fetchAnnotators]);
-
-  // Probe each task's agreement endpoint once so we can filter the
-  // task-selector dropdown to those that actually have comparable pairs.
-  useEffect(() => {
-    if (!accessToken || tasks.length === 0) return;
-    let cancelled = false;
-    (async () => {
-      const query = `?bucket=${bucket}&days=${days}`;
-      const results = await Promise.all(
-        tasks.map(async (t) => {
-          try {
-            const data = await apiClient<AgreementResponse>(
-              `/annotation-tasks/${encodeURIComponent(t.uuid)}/agreement${query}`,
-              accessToken,
-            );
-            const hh = (data.human_human?.pair_count ?? 0) > 0;
-            const anyEval = (data.evaluators ?? []).some(
-              (e) => (e.pair_count ?? 0) > 0,
-            );
-            return hh || anyEval ? t.uuid : null;
-          } catch {
-            return null;
-          }
-        }),
-      );
-      if (cancelled) return;
-      setTasksWithAgreement(new Set(results.filter((u): u is string => !!u)));
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [tasks, accessToken, bucket, days]);
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
