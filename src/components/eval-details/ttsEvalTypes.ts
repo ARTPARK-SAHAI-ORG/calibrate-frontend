@@ -10,14 +10,16 @@
  * is the headline value; `mean` / `std` / `values` are the legacy shape kept
  * for runs generated before the switch. Read `p50 ?? mean`.
  */
+// Any percentile may be `null` when a provider didn't produce the latency
+// (e.g. Gemini STT reports no TTFS) — readers treat null like a missing value.
 export type LatencyMetric = {
-  p50?: number;
-  p95?: number;
-  p99?: number;
-  count?: number;
-  mean?: number;
-  std?: number;
-  values?: number[];
+  p50?: number | null;
+  p95?: number | null;
+  p99?: number | null;
+  count?: number | null;
+  mean?: number | null;
+  std?: number | null;
+  values?: number[] | null;
 };
 
 /**

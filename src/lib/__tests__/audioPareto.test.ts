@@ -98,6 +98,17 @@ describe("buildSttParetoPoints", () => {
     expect(Number.isNaN(p.cost)).toBe(true);
     expect(Number.isNaN(p.passRate)).toBe(true);
   });
+
+  it("leaves latency undefined when ttfs is null (e.g. Gemini) but keeps the point valid", () => {
+    const [p] = buildSttParetoPoints(
+      [{ run: "gemini", cost_per_minute_usd: 0.004, wer: 0.1, ttfs: null, ttfs_p50: null }],
+      label,
+    );
+    expect(p.latency).toBeUndefined();
+    // cost + accuracy are still finite, so the point stays on the chart.
+    expect(p.cost).toBe(0.004);
+    expect(p.passRate).toBeCloseTo(90);
+  });
 });
 
 describe("buildTtsParetoPoints", () => {

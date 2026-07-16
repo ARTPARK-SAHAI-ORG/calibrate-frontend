@@ -134,8 +134,9 @@ export type STTProviderResultForDetails = ProviderResultLike & {
         // TTFS (Time To Final Segment) — streaming latency from when the user
         // stops speaking to the final transcription segment. Reported as a
         // latency block (`p50` headline) or a plain number. Present only when
-        // the run measured it.
-        ttfs?: LatencyMetric | number;
+        // the run measured it — `null` for providers that don't report it
+        // (e.g. Gemini STT).
+        ttfs?: LatencyMetric | number | null;
         // Per-provider cost block (per-minute USD pricing × audio duration).
         // Present only when the run computed cost.
         cost?: AudioCostBreakdown;
@@ -159,7 +160,8 @@ export type TTSProviderResultForDetails = ProviderResultLike & {
   // runs still carry `mean`. Read `p50 ?? mean`.
   metrics?:
     | (Record<string, unknown> & {
-        ttfb?: LatencyMetric;
+        // `null` for a provider that didn't report latency.
+        ttfb?: LatencyMetric | null;
         // Per-provider cost block. Present only when the run computed cost.
         cost?: AudioCostBreakdown;
       })

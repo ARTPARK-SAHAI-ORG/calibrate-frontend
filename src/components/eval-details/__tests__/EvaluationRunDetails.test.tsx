@@ -1792,6 +1792,22 @@ describe("hasTtfsMetric", () => {
     expect(hasTtfsMetric([])).toBe(false);
     expect(hasTtfsMetric(undefined)).toBe(false);
   });
+
+  it("treats a null ttfs (e.g. Gemini) as no ttfs", () => {
+    expect(hasTtfsMetric([{ metrics: { ttfs: null } }])).toBe(false);
+    expect(
+      hasTtfsMetric([{ metrics: { ttfs: { p50: null, mean: null } } }]),
+    ).toBe(false);
+  });
+
+  it("is still true when at least one provider reports ttfs alongside a null one", () => {
+    expect(
+      hasTtfsMetric([
+        { metrics: { ttfs: null } },
+        { metrics: { ttfs: { p50: 0.4 } } },
+      ]),
+    ).toBe(true);
+  });
 });
 
 describe("STTEvaluationAbout TTFS row", () => {
@@ -1902,6 +1918,36 @@ describe("STTEvaluationLeaderboard TTFS column", () => {
     expect(columns.map((c: { key: string }) => c.key)).not.toContain("ttfs");
   });
 
+  it("keeps the TTFS column but shows '-' for a provider whose ttfs is null", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[
+          { run: "deepgram", wer: 0.1 },
+          { run: "gemini", wer: 0.2 },
+        ]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          { provider: "deepgram", metrics: { ttfs: { p50: 0.4 } } },
+          { provider: "gemini", metrics: { ttfs: null } },
+        ]}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    // Column is present (deepgram has TTFS)...
+    expect(columns.map((c: { key: string }) => c.key)).toContain("ttfs");
+    // ...but gemini's row has no ttfs value, so the cell renders "-".
+    const data = JSON.parse(
+      screen.getByTestId("leaderboard-data").textContent ?? "[]",
+    );
+    const gemini = data.find((r: { run: string }) => r.run === "gemini");
+    expect(gemini.ttfs).toBeUndefined();
+    const deepgram = data.find((r: { run: string }) => r.run === "deepgram");
+    expect(deepgram.ttfs).toBeCloseTo(0.4);
+  });
+
   it("formats the TTFS column to 4 decimals, '-' for non-numbers", () => {
     render(
       <STTEvaluationLeaderboard
@@ -1972,6 +2018,25 @@ describe("STTEvaluationOutputs TTFS tile", () => {
       />,
     );
     expect(screen.queryByTestId("metric-TTFS (s)")).not.toBeInTheDocument();
+  });
+
+  it("omits the TTFS tile when ttfs is null (e.g. Gemini)", () => {
+    render(
+      <STTEvaluationOutputs
+        {...baseProps}
+        providerResults={[
+          {
+            provider: "gemini",
+            success: true,
+            metrics: { wer: 0.1, ttfs: null },
+            results: [],
+          },
+        ]}
+      />,
+    );
+    expect(screen.queryByTestId("metric-TTFS (s)")).not.toBeInTheDocument();
+    // WER still renders — the null ttfs doesn't break the metrics card.
+    expect(screen.getByTestId("metric-WER").textContent).toBe("0.1");
   });
 });
 
