@@ -43,15 +43,15 @@ function welcomeDescription(): string {
     link(WHATSAPP_INVITE_URL, "Talk to us"),
     link(docsUrl, "Read the docs"),
   ].join(" &nbsp;·&nbsp; ");
+  const bodyStyle = 'style="line-height:1.55;"';
+  const gapStyle = 'style="margin-top:0.75em;line-height:1.55;"';
   return (
-    "<div>Calibrate helps you check that your AI agent actually <strong>does its job</strong>, " +
-    "whether it types or talks. Testing by hand is tedious and easy to get " +
-    "wrong, so we do it for you.</div>" +
-    '<div style="margin-top:0.6em;">Want to see how it works? Let us build a ' +
-    "<strong>quick demo agent</strong> and test it together. " +
-    "It takes about a " +
-    "minute, and you can delete it afterwards.</div>" +
-    `<div style="margin-top:0.6em;font-size:0.8rem;">${links}</div>`
+    `<div ${bodyStyle}>Calibrate checks that your AI agent <strong>performs as intended</strong>.</div>` +
+    `<div ${gapStyle}><strong>Manual</strong> testing is tedious, <strong>doesn't scale</strong>, and lets mistakes slip through.</div>` +
+    `<div ${gapStyle}>With Calibrate, you run structured, repeatable evals that <strong>catch issues before deploy</strong> so you can ship with confidence and find the <strong>best model for every component</strong> of your agent, tailored to your use case.</div>` +
+    `<div ${gapStyle}>Want to see how it works? Let us build a ` +
+    "<strong>quick demo agent</strong> and test it together.</div>" +
+    `<div style="margin-top:0.75em;font-size:0.8rem;">${links}</div>`
   );
 }
 
