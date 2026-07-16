@@ -30,6 +30,7 @@ import {
   A,
   buildFirstEvalTour,
   pickFreeName,
+  resolveEvaluatorPlan,
   type EvaluatorPlan,
 } from "../firstEval";
 
@@ -162,6 +163,64 @@ describe("first-eval tour step actions", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  it("skips the POST when the default-prompt gives no judge model", async () => {
+    const calls: { url: string; init?: RequestInit }[] = [];
+    (global.fetch as jest.Mock).mockImplementation(
+      async (url: string, init?: RequestInit) => {
+        calls.push({ url, init });
+        // default-prompt responds but without a judge_model.
+        return { ok: true, json: async () => ({ system_prompt: "x {{criteria}}" }) };
+      },
+    );
+    const tour = buildTour("tok", {
+      correctnessName: null,
+      secondEvaluatorName: null,
+    });
+    await stepByTitle(tour, "Add an evaluator").prepare?.();
+    // No create POST without a judge model (the backend would reject it).
+    expect(
+      calls.find((c) => c.init?.method === "POST"),
+    ).toBeUndefined();
+  });
+
+  it("does not recreate Correctness without an access token", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    });
+    const tour = buildTour(null, {
+      correctnessName: null,
+      secondEvaluatorName: null,
+    });
+    await stepByTitle(tour, "Add an evaluator").prepare?.();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("swallows a failure while recreating Correctness", async () => {
+    (global.fetch as jest.Mock).mockRejectedValue(new Error("boom"));
+    const tour = buildTour("tok", {
+      correctnessName: null,
+      secondEvaluatorName: null,
+    });
+    await expect(
+      stepByTitle(tour, "Add an evaluator").prepare?.(),
+    ).resolves.toBeUndefined();
+  });
+
+  it("no-ops the pick when the picker dialog is absent", async () => {
+    const tour = buildTour();
+    await expect(
+      stepByTitle(tour, "Choose what to check").action?.(),
+    ).resolves.toBeUndefined();
+  });
+
+  it("no-ops the criteria fill when the evaluators area is absent", async () => {
+    const tour = buildTour();
+    await expect(
+      stepByTitle(tour, "How your test is graded").prepare?.(),
+    ).resolves.toBeUndefined();
+  });
+
   it("ticks correctness and a second evaluator in the picker", async () => {
     const dialog = document.createElement("div");
     dialog.setAttribute("data-tour", "add-evaluators-dialog");
@@ -216,6 +275,12 @@ describe("first-eval tour step actions", () => {
     expect(criteria.value).toContain("opening hours");
     await stepByTitle(tour, "How your test is graded").action?.();
     expect(mockClickByText).toHaveBeenCalledWith("Create", { timeout: 8000 });
+
+    // The second (failing) test writes its own criterion into the same card.
+    stepByTitle(tour, "A scenario it cannot answer").prepare?.();
+    expect(userField.value).toContain("phone number");
+    await stepByTitle(tour, "Require what it cannot give").prepare?.();
+    expect(criteria.value).toContain("phone number");
   });
 
   it("expands failed reasoning and appends the prompt fix", async () => {
@@ -263,6 +328,60 @@ describe("first-eval tour step actions", () => {
 
     expect(mockClickElement).toHaveBeenCalledWith(A.runTabOutputs, {
       timeout: 10000,
+    });
+  });
+});
+
+describe("resolveEvaluatorPlan", () => {
+  beforeEach(() => {
+    global.fetch = jest.fn();
+  });
+
+  it("returns the Correctness-only fallback without a token (no fetch)", async () => {
+    expect(await resolveEvaluatorPlan(null)).toEqual({
+      correctnessName: "Correctness",
+      secondEvaluatorName: null,
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("resolves Correctness + a conciseness second from the library", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        items: [
+          {
+            name: "Correctness",
+            evaluator_type: "llm",
+            slug: "default-llm-next-reply",
+          },
+          {
+            name: "Reply Conciseness",
+            evaluator_type: "llm",
+            slug: "reply-conciseness",
+          },
+        ],
+      }),
+    });
+    expect(await resolveEvaluatorPlan("tok")).toEqual({
+      correctnessName: "Correctness",
+      secondEvaluatorName: "Reply Conciseness",
+    });
+  });
+
+  it("falls back when the request is not ok", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
+    expect(await resolveEvaluatorPlan("tok")).toEqual({
+      correctnessName: "Correctness",
+      secondEvaluatorName: null,
+    });
+  });
+
+  it("falls back when the request throws", async () => {
+    (global.fetch as jest.Mock).mockRejectedValue(new Error("network"));
+    expect(await resolveEvaluatorPlan("tok")).toEqual({
+      correctnessName: "Correctness",
+      secondEvaluatorName: null,
     });
   });
 });

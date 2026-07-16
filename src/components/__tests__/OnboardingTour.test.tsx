@@ -8,6 +8,10 @@ import {
 
 const mockRunTour = jest.fn().mockResolvedValue(undefined);
 const mockIsTourActive = jest.fn().mockReturnValue(false);
+const mockResolvePlan = jest.fn().mockResolvedValue({
+  correctnessName: "Correctness",
+  secondEvaluatorName: null,
+});
 
 jest.mock("../../lib/onboarding", () => {
   const actual = jest.requireActual<typeof import("../../lib/onboarding")>(
@@ -17,6 +21,7 @@ jest.mock("../../lib/onboarding", () => {
     ...actual,
     runTour: (...args: unknown[]) => mockRunTour(...args),
     isTourActive: () => mockIsTourActive(),
+    resolveEvaluatorPlan: (...args: unknown[]) => mockResolvePlan(...args),
     buildFirstEvalTour: jest.fn(() => ({ id: "first-eval", steps: [] })),
   };
 });
@@ -47,9 +52,16 @@ describe("OnboardingTour", () => {
 
   beforeEach(() => {
     localStorage.clear();
+    // A token so the tour's pre-start token wait resolves immediately (the plan
+    // lookup itself is mocked).
+    localStorage.setItem("access_token", "test-token");
     jest.clearAllMocks();
     mockUsePathname.mockReturnValue("/agents");
     mockIsTourActive.mockReturnValue(false);
+    mockResolvePlan.mockResolvedValue({
+      correctnessName: "Correctness",
+      secondEvaluatorName: null,
+    });
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
       value: 1024,
@@ -135,5 +147,27 @@ describe("OnboardingTour", () => {
     });
 
     expect(mockRunTour).not.toHaveBeenCalled();
+  });
+
+  it("still starts (with the fallback plan) when the token never hydrates", async () => {
+    // No token: the pre-start token wait loops to its cap, then proceeds.
+    localStorage.removeItem("access_token");
+    markTourSeen(TOUR_IDS.firstEval, "skipped");
+    render(<OnboardingTour />);
+
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(TOUR_REQUEST_EVENT, { detail: TOUR_IDS.firstEval }),
+      );
+    });
+
+    // Drive the token-wait loop (20 × 100ms) to completion.
+    for (let i = 0; i < 21; i++) {
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+    }
+
+    expect(mockRunTour).toHaveBeenCalledTimes(1);
   });
 });
