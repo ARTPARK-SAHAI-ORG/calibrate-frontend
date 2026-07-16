@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { useDatasetManagement } from "@/hooks/useDatasetManagement";
 import { listDatasets, createDataset, deleteDataset } from "@/lib/datasets";
 import { reportError } from "@/lib/reportError";
+import { clearAllRequestCaches } from "@/lib/requestCache";
 
 jest.mock("../../lib/datasets", () => ({
   __esModule: true,
@@ -42,6 +43,9 @@ const sampleDatasets = [
 describe("useDatasetManagement", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // The datasets list is cached at module scope keyed by access token; wipe
+    // it between tests so each case starts from a clean fetch.
+    clearAllRequestCaches();
   });
 
   it("does not fetch and stays in loading state when accessToken is null", () => {
@@ -308,6 +312,87 @@ describe("useDatasetManagement", () => {
       );
       expect(result.current.isCreating).toBe(false);
       expect(onCreated).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("caching + dedup", () => {
+    it("dedupes concurrent mounts for the same token+type into one request", async () => {
+      mockListDatasets.mockResolvedValue(sampleDatasets);
+      const { result: a } = renderHook(() =>
+        useDatasetManagement("shared", "stt", jest.fn()),
+      );
+      const { result: b } = renderHook(() =>
+        useDatasetManagement("shared", "stt", jest.fn()),
+      );
+
+      await waitFor(() => expect(a.current.datasetsLoading).toBe(false));
+      await waitFor(() => expect(b.current.datasetsLoading).toBe(false));
+
+      expect(mockListDatasets).toHaveBeenCalledTimes(1);
+    });
+
+    it("hydrates a later mount from cache without refetching", async () => {
+      mockListDatasets.mockResolvedValue(sampleDatasets);
+      const first = renderHook(() =>
+        useDatasetManagement("tok", "stt", jest.fn()),
+      );
+      await waitFor(() =>
+        expect(first.result.current.datasetsLoading).toBe(false),
+      );
+      expect(mockListDatasets).toHaveBeenCalledTimes(1);
+
+      const second = renderHook(() =>
+        useDatasetManagement("tok", "stt", jest.fn()),
+      );
+      expect(second.result.current.datasetsLoading).toBe(false);
+      expect(second.result.current.datasets).toEqual(sampleDatasets);
+      expect(mockListDatasets).toHaveBeenCalledTimes(1);
+    });
+
+    it("delete updates the cache so a remount shows the pruned list", async () => {
+      mockListDatasets.mockResolvedValue([
+        sampleDatasets[0],
+        { ...sampleDatasets[0], uuid: "d2", name: "Dataset 2" },
+      ]);
+      mockDeleteDataset.mockResolvedValue(undefined);
+
+      const { result } = renderHook(() =>
+        useDatasetManagement("tok", "stt", jest.fn()),
+      );
+      await waitFor(() => expect(result.current.datasetsLoading).toBe(false));
+
+      await act(async () => {
+        await result.current.handleDeleteDataset("d1");
+      });
+
+      const again = renderHook(() =>
+        useDatasetManagement("tok", "stt", jest.fn()),
+      );
+      expect(again.result.current.datasets.map((d) => d.uuid)).toEqual(["d2"]);
+      expect(mockListDatasets).toHaveBeenCalledTimes(1);
+    });
+
+    it("create invalidates the cache so a remount refetches", async () => {
+      mockListDatasets.mockResolvedValue(sampleDatasets);
+      mockCreateDataset.mockResolvedValue({ uuid: "new", name: "New" });
+
+      const { result } = renderHook(() =>
+        useDatasetManagement("tok", "stt", jest.fn()),
+      );
+      await waitFor(() => expect(result.current.datasetsLoading).toBe(false));
+
+      act(() => result.current.setNewDatasetName("New"));
+      await act(async () => {
+        await result.current.handleCreateDataset();
+      });
+
+      const again = renderHook(() =>
+        useDatasetManagement("tok", "stt", jest.fn()),
+      );
+      await waitFor(() =>
+        expect(again.result.current.datasetsLoading).toBe(false),
+      );
+      expect(mockListDatasets).toHaveBeenCalledTimes(2);
     });
   });
 });

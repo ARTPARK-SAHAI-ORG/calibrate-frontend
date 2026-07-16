@@ -3,6 +3,7 @@ import { reportError } from "@/lib/reportError";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient, apiDelete, apiGet, apiPost } from "@/lib/api";
+import { createRequestCache } from "@/lib/requestCache";
 import {
   ACTIVE_ORG_CHANGED_EVENT,
   ORGANIZATIONS_CHANGED_EVENT,
@@ -255,6 +256,15 @@ type UseOrgMembersReturn = {
   removeMember: (userId: string) => Promise<void>;
 };
 
+// Module-level cache + in-flight dedup for a workspace's member list, keyed by
+// `${accessToken}:${orgUuid}`. Without it, every visit to workspace settings
+// refetches the list; mutations below keep the cache in sync.
+const membersCache = createRequestCache<OrganizationMember[]>({
+  ttlMs: 30_000,
+});
+const membersKey = (accessToken: string, orgUuid: string) =>
+  `${accessToken}:${orgUuid}`;
+
 /**
  * List + invite + remove members of a single workspace.
  */
@@ -262,8 +272,12 @@ export function useOrgMembers(
   accessToken: string | null | undefined,
   orgUuid: string | null,
 ): UseOrgMembersReturn {
-  const [members, setMembers] = useState<OrganizationMember[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const cached =
+    accessToken && orgUuid
+      ? membersCache.peek(membersKey(accessToken, orgUuid))
+      : undefined;
+  const [members, setMembers] = useState<OrganizationMember[]>(cached ?? []);
+  const [isLoading, setIsLoading] = useState(!cached);
   const [error, setError] = useState<string | null>(null);
 
   const refetch = useCallback(async () => {
@@ -275,9 +289,13 @@ export function useOrgMembers(
     try {
       setIsLoading(true);
       setError(null);
-      const data = await apiGet<OrganizationMember[]>(
-        `/organizations/${orgUuid}/members`,
-        accessToken,
+      const data = await membersCache.fetch(
+        membersKey(accessToken, orgUuid),
+        () =>
+          apiGet<OrganizationMember[]>(
+            `/organizations/${orgUuid}/members`,
+            accessToken,
+          ),
       );
       setMembers(data);
     } catch (err) {
@@ -289,8 +307,16 @@ export function useOrgMembers(
   }, [accessToken, orgUuid]);
 
   useEffect(() => {
+    if (accessToken && orgUuid) {
+      const hit = membersCache.peek(membersKey(accessToken, orgUuid));
+      if (hit) {
+        setMembers(hit);
+        setIsLoading(false);
+        return;
+      }
+    }
     refetch();
-  }, [refetch]);
+  }, [accessToken, orgUuid, refetch]);
 
   const addMember = useCallback(
     async (email: string): Promise<OrganizationMember | null> => {
@@ -300,7 +326,11 @@ export function useOrgMembers(
         accessToken,
         { email },
       );
-      setMembers((prev) => [...prev, created]);
+      setMembers((prev) => {
+        const next = [...prev, created];
+        membersCache.set(membersKey(accessToken, orgUuid), next);
+        return next;
+      });
       return created;
     },
     [accessToken, orgUuid],
@@ -315,7 +345,11 @@ export function useOrgMembers(
         `/organizations/${orgUuid}/members/${userId}`,
         accessToken,
       );
-      setMembers((prev) => prev.filter((m) => m.user_id !== userId));
+      setMembers((prev) => {
+        const next = prev.filter((m) => m.user_id !== userId);
+        membersCache.set(membersKey(accessToken, orgUuid), next);
+        return next;
+      });
     },
     [accessToken, orgUuid],
   );
@@ -343,12 +377,25 @@ type UseWorkspaceApiKeysReturn = {
  * `orgUuid` isn't sent in the URL, but is kept as a gate + refetch dependency
  * so the list reloads when the user switches workspaces.
  */
+// Module-level cache + in-flight dedup for a workspace's API keys, keyed by
+// `${accessToken}:${orgUuid}` (the request itself is scoped by the X-Org-UUID
+// header, so orgUuid is the partitioning dimension). Mutations keep it in sync.
+const apiKeysCache = createRequestCache<OrganizationApiKey[]>({
+  ttlMs: 30_000,
+});
+const apiKeysKey = (accessToken: string, orgUuid: string) =>
+  `${accessToken}:${orgUuid}`;
+
 export function useWorkspaceApiKeys(
   accessToken: string | null | undefined,
   orgUuid: string | null,
 ): UseWorkspaceApiKeysReturn {
-  const [apiKeys, setApiKeys] = useState<OrganizationApiKey[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const cached =
+    accessToken && orgUuid
+      ? apiKeysCache.peek(apiKeysKey(accessToken, orgUuid))
+      : undefined;
+  const [apiKeys, setApiKeys] = useState<OrganizationApiKey[]>(cached ?? []);
+  const [isLoading, setIsLoading] = useState(!cached);
   const [error, setError] = useState<string | null>(null);
 
   const refetch = useCallback(async () => {
@@ -360,9 +407,9 @@ export function useWorkspaceApiKeys(
     try {
       setIsLoading(true);
       setError(null);
-      const data = await apiGet<OrganizationApiKey[]>(
-        "/api-keys",
-        accessToken,
+      const data = await apiKeysCache.fetch(
+        apiKeysKey(accessToken, orgUuid),
+        () => apiGet<OrganizationApiKey[]>("/api-keys", accessToken),
       );
       setApiKeys(data);
     } catch (err) {
@@ -374,8 +421,16 @@ export function useWorkspaceApiKeys(
   }, [accessToken, orgUuid]);
 
   useEffect(() => {
+    if (accessToken && orgUuid) {
+      const hit = apiKeysCache.peek(apiKeysKey(accessToken, orgUuid));
+      if (hit) {
+        setApiKeys(hit);
+        setIsLoading(false);
+        return;
+      }
+    }
     refetch();
-  }, [refetch]);
+  }, [accessToken, orgUuid, refetch]);
 
   const createApiKey = useCallback(
     async (name: string): Promise<OrganizationApiKeyWithSecret> => {
@@ -390,7 +445,11 @@ export function useWorkspaceApiKeys(
       // Strip the one-time secret before storing in the list.
       const { key: _key, ...masked } = created;
       void _key;
-      setApiKeys((prev) => [...prev, masked]);
+      setApiKeys((prev) => {
+        const next = [...prev, masked];
+        apiKeysCache.set(apiKeysKey(accessToken, orgUuid), next);
+        return next;
+      });
       return created;
     },
     [accessToken, orgUuid],
@@ -402,7 +461,11 @@ export function useWorkspaceApiKeys(
         throw new Error("Not signed in");
       }
       await apiDelete(`/api-keys/${keyUuid}`, accessToken);
-      setApiKeys((prev) => prev.filter((k) => k.uuid !== keyUuid));
+      setApiKeys((prev) => {
+        const next = prev.filter((k) => k.uuid !== keyUuid);
+        apiKeysCache.set(apiKeysKey(accessToken, orgUuid), next);
+        return next;
+      });
     },
     [accessToken, orgUuid],
   );

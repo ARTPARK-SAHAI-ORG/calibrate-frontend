@@ -19,6 +19,7 @@ import {
   type OrganizationApiKeyWithSecret,
 } from "@/lib/orgs";
 import { reportError } from "@/lib/reportError";
+import { clearAllRequestCaches } from "@/lib/requestCache";
 
 // Use relative specifiers here (not the "@/" alias): next/jest's SWC
 // transform rewrites "@/..." to relative paths only in import/export
@@ -79,6 +80,9 @@ describe("useOrganizations hooks", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     clearOrgsCache();
+    // useOrgMembers / useWorkspaceApiKeys cache at module scope keyed by token;
+    // wipe between tests so each case starts from a clean fetch.
+    clearAllRequestCaches();
   });
 
   describe("clearOrgsCache / seedOrgsCache / fetchOrganizationsDedup", () => {
@@ -460,6 +464,48 @@ describe("useOrganizations hooks", () => {
         }),
       ).rejects.toThrow("Not signed in");
     });
+
+    it("dedupes concurrent mounts for the same token+org into one request", async () => {
+      mockApiGet.mockResolvedValue([member]);
+      const a = renderHook(() => useOrgMembers("tok", "org-1"));
+      const b = renderHook(() => useOrgMembers("tok", "org-1"));
+
+      await waitFor(() => expect(a.result.current.isLoading).toBe(false));
+      await waitFor(() => expect(b.result.current.isLoading).toBe(false));
+
+      expect(mockApiGet).toHaveBeenCalledTimes(1);
+    });
+
+    it("hydrates a later mount from cache without refetching", async () => {
+      mockApiGet.mockResolvedValue([member]);
+      const first = renderHook(() => useOrgMembers("tok", "org-1"));
+      await waitFor(() => expect(first.result.current.isLoading).toBe(false));
+      expect(mockApiGet).toHaveBeenCalledTimes(1);
+
+      const second = renderHook(() => useOrgMembers("tok", "org-1"));
+      expect(second.result.current.isLoading).toBe(false);
+      expect(second.result.current.members).toEqual([member]);
+      expect(mockApiGet).toHaveBeenCalledTimes(1);
+    });
+
+    it("addMember updates the cache so a remount shows the appended member", async () => {
+      mockApiGet.mockResolvedValue([member]);
+      const { result } = renderHook(() => useOrgMembers("tok", "org-1"));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      const newMember: OrganizationMember = { ...member, user_id: "u2", email: "c@d.com" };
+      mockApiPost.mockResolvedValueOnce(newMember);
+      await act(async () => {
+        await result.current.addMember("c@d.com");
+      });
+
+      const again = renderHook(() => useOrgMembers("tok", "org-1"));
+      expect(again.result.current.members.map((m) => m.user_id)).toEqual([
+        "u1",
+        "u2",
+      ]);
+      expect(mockApiGet).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("useWorkspaceApiKeys", () => {
@@ -569,6 +615,40 @@ describe("useOrganizations hooks", () => {
           await result.current.revokeApiKey("k1");
         }),
       ).rejects.toThrow("Not signed in");
+    });
+
+    it("dedupes concurrent mounts and hydrates a later mount from cache", async () => {
+      const { key: _key, ...masked } = keyWithSecret;
+      void _key;
+      mockApiGet.mockResolvedValue([masked]);
+
+      const a = renderHook(() => useWorkspaceApiKeys("tok", "org-1"));
+      const b = renderHook(() => useWorkspaceApiKeys("tok", "org-1"));
+      await waitFor(() => expect(a.result.current.isLoading).toBe(false));
+      await waitFor(() => expect(b.result.current.isLoading).toBe(false));
+      expect(mockApiGet).toHaveBeenCalledTimes(1);
+
+      const later = renderHook(() => useWorkspaceApiKeys("tok", "org-1"));
+      expect(later.result.current.isLoading).toBe(false);
+      expect(later.result.current.apiKeys).toEqual([masked]);
+      expect(mockApiGet).toHaveBeenCalledTimes(1);
+    });
+
+    it("revoke updates the cache so a remount shows the pruned list", async () => {
+      const { key: _key, ...masked } = keyWithSecret;
+      void _key;
+      mockApiGet.mockResolvedValue([masked]);
+      const { result } = renderHook(() => useWorkspaceApiKeys("tok", "org-1"));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      mockApiDelete.mockResolvedValueOnce(undefined);
+      await act(async () => {
+        await result.current.revokeApiKey("k1");
+      });
+
+      const again = renderHook(() => useWorkspaceApiKeys("tok", "org-1"));
+      expect(again.result.current.apiKeys).toEqual([]);
+      expect(mockApiGet).toHaveBeenCalledTimes(1);
     });
   });
 });

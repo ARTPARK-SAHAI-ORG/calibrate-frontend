@@ -1,6 +1,7 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useCrudResource, useFetchResource } from "@/hooks/useCrudResource";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
+import { clearAllRequestCaches } from "@/lib/requestCache";
 
 jest.mock("../../lib/api", () => ({
   apiGet: jest.fn(),
@@ -23,6 +24,7 @@ type Item = { uuid: string; name: string };
 describe("useCrudResource", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    clearAllRequestCaches();
   });
 
   it("does not fetch when accessToken is missing", async () => {
@@ -103,6 +105,23 @@ describe("useCrudResource", () => {
     });
 
     expect(mockApiGet).toHaveBeenCalledTimes(2);
+  });
+
+  it("dedupes concurrent mounts for the same endpoint+token into one request", async () => {
+    mockApiGet.mockResolvedValue([{ uuid: "1", name: "a" }]);
+
+    const a = renderHook(() =>
+      useCrudResource<Item>({ endpoint: "/things", accessToken: "tok" })
+    );
+    const b = renderHook(() =>
+      useCrudResource<Item>({ endpoint: "/things", accessToken: "tok" })
+    );
+
+    await waitFor(() => expect(a.result.current.isLoading).toBe(false));
+    await waitFor(() => expect(b.result.current.isLoading).toBe(false));
+
+    // Both mounts shared one in-flight GET.
+    expect(mockApiGet).toHaveBeenCalledTimes(1);
   });
 
   describe("create", () => {
