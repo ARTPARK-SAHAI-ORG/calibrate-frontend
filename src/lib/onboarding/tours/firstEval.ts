@@ -29,9 +29,6 @@ import type { Tour, TourStep } from "../engine";
 
 export const FIRST_EVAL_TOUR_ID = "first-eval";
 
-/** Title of the first "add a test" step (the manual-testing fast-forward target). */
-export const FIRST_EVAL_TESTS_STEP_TITLE = "Create your first test";
-
 // The welcome card's help links (driver.js renders the description as HTML).
 function welcomeDescription(): string {
   const docsUrl =
@@ -215,6 +212,54 @@ async function resolveFreeName(
 const COMPLEMENTARY_EVALUATOR_HINTS =
   /tone|polite|empath|kind|helpful|clar|complete|concise|safe|harm/i;
 
+// Only "LLM reply" evaluators (the pill label for `evaluator_type === "llm"`)
+// actually grade a next-reply test: the test dialog seeds evaluators filtered to
+// that type and silently drops "Full conversation" / "LLM output" ones. So the
+// second pick MUST be an LLM-reply evaluator, otherwise the card's claim that
+// both checks grade the test would be false — one would be ignored at run time.
+const LLM_REPLY_TYPE_LABEL = /LLM\s*reply/i;
+
+/** True if a picker row is an LLM-reply evaluator (grades a next-reply test). */
+export function isLlmReplyRow(row: HTMLLabelElement): boolean {
+  return LLM_REPLY_TYPE_LABEL.test(row.textContent ?? "");
+}
+
+/** True if a picker row's checkbox is currently unticked. */
+function isRowUnchecked(row: HTMLLabelElement): boolean {
+  const cb = row.querySelector<HTMLInputElement>('input[type="checkbox"]');
+  return !!cb && !cb.checked;
+}
+
+/**
+ * Choose which row the Correctness step should tick: the Correctness evaluator
+ * among LLM-reply rows, falling back to the first LLM-reply row so the pick
+ * always grades the next-reply demo test. Pure (no DOM mutation) so it is unit-
+ * testable; the caller ticks + highlights the returned row.
+ */
+export function chooseCorrectnessRow(
+  rows: HTMLLabelElement[],
+): HTMLLabelElement | undefined {
+  const llmRows = rows.filter(isLlmReplyRow);
+  return llmRows.find((r) => /correct/i.test(r.textContent ?? "")) ?? llmRows[0];
+}
+
+/**
+ * Choose the second evaluator to tick: an unticked LLM-reply row (so it actually
+ * grades the next-reply test), preferring a clearly different dimension from
+ * correctness. Pure — returns the row for the caller to tick, or undefined if no
+ * eligible row exists.
+ */
+export function chooseSecondEvaluatorRow(
+  rows: HTMLLabelElement[],
+): HTMLLabelElement | undefined {
+  const eligible = rows.filter((r) => isRowUnchecked(r) && isLlmReplyRow(r));
+  return (
+    eligible.find((r) =>
+      COMPLEMENTARY_EVALUATOR_HINTS.test(r.textContent ?? ""),
+    ) ?? eligible[0]
+  );
+}
+
 /**
  * Scroll a picker row into view, tick its checkbox, and light the row up clearly
  * (green "selected" tint + ring) so it is obvious which evaluator was just
@@ -231,28 +276,28 @@ function tickRow(row: HTMLLabelElement | undefined): void {
   row.style.boxShadow = "inset 0 0 0 2px color-mix(in srgb, #22c55e 60%, transparent)";
 }
 
-/** Tick the Correctness evaluator (falls back to the first row). */
+/**
+ * Tick the Correctness evaluator. Falls back to the first LLM-reply row (not just
+ * any row) so the pick always grades the next-reply demo test — see
+ * `LLM_REPLY_TYPE_LABEL`.
+ */
 async function pickCorrectness(): Promise<void> {
   const dialog = await waitForElement(A.addEvaluatorsDialog, { timeout: 10000 });
   if (!dialog) return;
   const rows = Array.from(dialog.querySelectorAll<HTMLLabelElement>("label"));
-  tickRow(rows.find((r) => /correct/i.test(r.textContent ?? "")) ?? rows[0]);
+  tickRow(chooseCorrectnessRow(rows));
 }
 
-/** Tick a second, complementary evaluator that is not already ticked. */
+/**
+ * Tick a second, complementary evaluator that is not already ticked. Restricted
+ * to LLM-reply evaluators so it actually grades the next-reply demo test (see
+ * `LLM_REPLY_TYPE_LABEL`); among those, prefer a clearly different dimension.
+ */
 async function pickSecondEvaluator(): Promise<void> {
   const dialog = await waitForElement(A.addEvaluatorsDialog, { timeout: 10000 });
   if (!dialog) return;
   const rows = Array.from(dialog.querySelectorAll<HTMLLabelElement>("label"));
-  const unchecked = rows.filter((r) => {
-    const cb = r.querySelector<HTMLInputElement>('input[type="checkbox"]');
-    return cb && !cb.checked;
-  });
-  tickRow(
-    unchecked.find((r) =>
-      COMPLEMENTARY_EVALUATOR_HINTS.test(r.textContent ?? ""),
-    ) ?? unchecked[0],
-  );
+  tickRow(chooseSecondEvaluatorRow(rows));
 }
 
 /**
@@ -723,7 +768,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       anchor: A.startTour,
       title: "That is the first walkthrough 🎉",
       description:
-        "You built an agent, tested it, read a verdict, and fixed a problem it found. You can <strong>replay anytime</strong> from Start tour here.",
+        "You built an agent, tested it, read a verdict, and fixed a problem it found. You can <strong>replay anytime</strong> from Product tour here.",
       side: "right",
       align: "center",
       actionLabel: "Finish",
