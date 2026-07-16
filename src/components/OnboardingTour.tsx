@@ -9,7 +9,6 @@ import {
   clearTourSeen,
   hasSeenTour,
   isTourActive,
-  readProgress,
   runTour,
   TOUR_IDS,
   TOUR_REQUEST_EVENT,
@@ -21,11 +20,11 @@ import {
  * across in-app navigation — which lets an auto-driving tour keep running as it
  * moves the user between routes and dialogs.
  *
- * Responsibilities:
- *  - auto-start the flagship "first evaluation" tour on the first desktop visit
- *    to `/agents`;
- *  - resume an in-flight tour if progress was persisted (e.g. after a reload);
- *  - replay any tour on request (profile menu / sidebar "Start tour").
+ * The tour starts in exactly two ways:
+ *  - auto-start on the first desktop visit to `/agents` (once, until seen);
+ *  - on explicit request (profile menu / sidebar "Product tour").
+ * There is deliberately no mid-flight resume: a page reload just ends the tour
+ * (the app state it drove is gone), and the user can restart it from the button.
  */
 export function OnboardingTour() {
   const pathname = usePathname();
@@ -37,12 +36,9 @@ export function OnboardingTour() {
   const tokenRef = useRef<string | null>(accessToken);
   tokenRef.current = accessToken;
 
-  const startTour = (tourId: TourId, fromStep = 0) => {
+  const startTour = (tourId: TourId) => {
     if (tourId === TOUR_IDS.firstEval) {
-      void runTour(
-        buildFirstEvalTour({ getAccessToken: () => tokenRef.current }),
-        fromStep,
-      );
+      void runTour(buildFirstEvalTour({ getAccessToken: () => tokenRef.current }));
     }
   };
 
@@ -61,19 +57,11 @@ export function OnboardingTour() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken]);
 
-  // Resume an in-flight tour, or auto-start the flagship on first /agents visit.
+  // Auto-start the flagship tour on the first desktop visit to /agents.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (isTourActive()) return;
 
-    // Resume a tour that was mid-flight (survives reloads).
-    const progress = readProgress();
-    if (progress) {
-      startTour(progress.tourId as TourId, progress.stepIndex);
-      return;
-    }
-
-    // First-run auto-start: flagship tour, desktop only, agents landing.
     if (pathname !== "/agents") return;
     if (window.innerWidth < 768) return;
     if (hasSeenTour(TOUR_IDS.firstEval)) return;

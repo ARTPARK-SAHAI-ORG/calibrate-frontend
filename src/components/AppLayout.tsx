@@ -234,7 +234,7 @@ const navSections: NavSection[] = [
     items: [
       {
         id: "guided-tour",
-        label: "Start tour",
+        label: "Product tour",
         icon: (
           <svg
             className="w-4 h-4"

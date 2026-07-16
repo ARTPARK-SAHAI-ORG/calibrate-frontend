@@ -14,12 +14,7 @@
 import { driver, type Driver } from "driver.js";
 import { reportError } from "@/lib/reportError";
 import { waitForElement } from "./dom";
-import {
-  clearProgress,
-  markTourSeen,
-  saveProgress,
-  type TourSeenStatus,
-} from "./state";
+import { markTourSeen, type TourSeenStatus } from "./state";
 
 export type TourStep = {
   /** CSS selector for the element to spotlight (usually a `[data-tour="…"]`). */
@@ -199,8 +194,6 @@ async function showStep(): Promise<void> {
     return;
   }
 
-  saveProgress({ tourId: tour.id, stepIndex: index });
-
   // Hide the current card while this step sets up, so the previous card does not
   // dangle in place during prepare / the anchor wait.
   setPopoverHidden(true);
@@ -321,7 +314,6 @@ function finish(status: TourSeenStatus): void {
   active.ending = true;
   active = null;
   markTourSeen(tour.id, status);
-  clearProgress();
   driverObj.destroy();
 }
 

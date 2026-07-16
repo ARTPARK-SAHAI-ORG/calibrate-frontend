@@ -12,22 +12,16 @@ export {
   getTourStatus,
   markTourSeen,
   clearTourSeen,
-  readProgress,
-  clearProgress,
   ONBOARDING_VERSION,
 } from "./state";
 export {
   buildFirstEvalTour,
   FIRST_EVAL_TOUR_ID,
-  FIRST_EVAL_TESTS_STEP_TITLE,
   type FirstEvalDeps,
 } from "./tours/firstEval";
 
 /** Window event that requests (re)starting a tour; detail carries the tour id. */
 export const TOUR_REQUEST_EVENT = "calibrate:start-tour";
-
-/** Window event the tour fires after seeding demo tests so lists can refresh. */
-export const AGENT_TESTS_UPDATED_EVENT = "calibrate:agent-tests-updated";
 
 /** Registry of tours available for auto-run and manual replay. */
 export const TOUR_IDS = {

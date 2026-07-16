@@ -435,16 +435,6 @@ export function TestsTabContent({
     }
   }, [agentUuid, backendAccessToken, fetchAgentTests]);
 
-  // Let the onboarding tour refresh the list after it seeds demo tests via API.
-  useEffect(() => {
-    const handler = () => {
-      void fetchAgentTests();
-    };
-    window.addEventListener("calibrate:agent-tests-updated", handler);
-    return () =>
-      window.removeEventListener("calibrate:agent-tests-updated", handler);
-  }, [fetchAgentTests]);
-
   // Load the agent's attached evaluators (best-effort; failure just means new
   // tests fall back to the default seed and the post-save prompt is skipped).
   const loadAgentEvaluators = useCallback(async () => {
