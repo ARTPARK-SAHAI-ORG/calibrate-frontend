@@ -3,6 +3,7 @@ export { useAccessToken, useAuth } from "./useAccessToken";
 export { useOpenRouterModels, findModelInProviders } from "./useOpenRouterModels";
 export { useEnabledProviders, isProviderEnabled } from "./useEnabledProviders";
 export { useDatasetManagement } from "./useDatasetManagement";
+export { useBulkDeletion } from "./useBulkDeletion";
 export { useJobDeletion } from "./useJobDeletion";
 export { useAgentDeletion } from "./useAgentDeletion";
 export { useVerifyConnection } from "./useVerifyConnection";
