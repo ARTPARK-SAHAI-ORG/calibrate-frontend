@@ -43,7 +43,6 @@ import {
   buildTtsLabellingRows,
 } from "@/components/human-labelling/ttsLabellingSource";
 import { useSidebarState } from "@/lib/sidebar";
-import { getDataset } from "@/lib/datasets";
 import { ShareButton } from "@/components/ShareButton";
 import { ExportZipButton } from "@/components/ExportZipButton";
 import type { ExportColumn } from "@/components/ExportResultsButton";
@@ -353,15 +352,6 @@ export default function TTSEvaluationDetailPage() {
 
         const result: EvaluationResult = await response.json();
 
-        if (result.dataset_id) {
-          try {
-            await getDataset(backendAccessToken, result.dataset_id);
-          } catch {
-            result.dataset_id = null;
-            result.dataset_name = null;
-          }
-        }
-
         setEvaluationResult(result);
 
         // Set first provider as active tab if results exist (use functional setState to avoid stale closures)
@@ -501,15 +491,6 @@ export default function TTSEvaluationDetailPage() {
       }
 
       const result: EvaluationResult = await response.json();
-
-      if (result.dataset_id) {
-        try {
-          await getDataset(backendAccessToken, result.dataset_id);
-        } catch {
-          result.dataset_id = null;
-          result.dataset_name = null;
-        }
-      }
 
       setEvaluationResult(result);
 

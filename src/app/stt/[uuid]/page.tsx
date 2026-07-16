@@ -39,7 +39,6 @@ import {
   SubmitForLabellingButton,
 } from "@/components/human-labelling/labellingSubmit";
 import { useSidebarState } from "@/lib/sidebar";
-import { getDataset } from "@/lib/datasets";
 import { ShareButton } from "@/components/ShareButton";
 import { ExportResultsButton, ExportColumn } from "@/components/ExportResultsButton";
 import { retryEvaluation } from "@/lib/retryEvaluation";
@@ -378,15 +377,6 @@ export default function STTEvaluationDetailPage() {
 
         const result: EvaluationResult = await response.json();
 
-        if (result.dataset_id) {
-          try {
-            await getDataset(backendAccessToken, result.dataset_id);
-          } catch {
-            result.dataset_id = null;
-            result.dataset_name = null;
-          }
-        }
-
         setEvaluationResult(result);
 
         // Set first provider as active tab if results exist
@@ -524,15 +514,6 @@ export default function STTEvaluationDetailPage() {
       }
 
       const result: EvaluationResult = await response.json();
-
-      if (result.dataset_id) {
-        try {
-          await getDataset(backendAccessToken, result.dataset_id);
-        } catch {
-          result.dataset_id = null;
-          result.dataset_name = null;
-        }
-      }
 
       setEvaluationResult(result);
 
