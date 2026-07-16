@@ -117,5 +117,16 @@ export default defineConfig({
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    // `getBackendUrl()` throws when NEXT_PUBLIC_BACKEND_URL is unset, so the
+    // fully-mocked public specs (which intercept every backend call via
+    // page.route) still need a non-empty value for the client bundle. A real
+    // value (set by the authenticated integration run) always wins; this is a
+    // dummy fallback whose host is never actually reached — routes are matched
+    // by path, and public specs mock them. Landing/login/signup never fetch on
+    // load, so this is inert for them.
+    env: {
+      NEXT_PUBLIC_BACKEND_URL:
+        process.env.NEXT_PUBLIC_BACKEND_URL || "http://backend.e2e.local",
+    },
   },
 });
