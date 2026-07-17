@@ -324,10 +324,10 @@ describe("TestsTabContent save-and-run shortcut", () => {
     expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
   });
 
-  it("runs the edited test from a synthesized fallback when it's missing from the refreshed list", async () => {
+  it("runs the edited test by its own uuid even when the refetch returns it empty", async () => {
     // The list is present for the initial render (so the row is clickable) but
-    // the refresh after the PUT returns empty, forcing updateTest to run a
-    // synthesized TestData built from the captured uuid/name.
+    // the refresh after the PUT returns empty. The edit run keys off the open
+    // test's uuid, not the list, so it still runs.
     let testsCalls = 0;
     global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
       if (url.includes(`/agent-tests/agent/${AGENT_UUID}/tests`)) {

@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { signOut } from "next-auth/react";
 import { useAccessToken, useMaxRowsPerEval, useDialogUrlParam } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
-import { resolveEditedTestToRun } from "@/lib/testRun";
+import { buildTestToRun } from "@/lib/testRun";
 
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
@@ -1277,18 +1277,20 @@ export function TestsTabContent({
         throw new Error("Failed to update test");
       }
 
-      const refreshed = await fetchAgentTests();
+      await fetchAgentTests();
       // "Save and run" takes priority: skip the agent-defaults prompt and go
-      // straight to running the just-saved test the user asked to run.
+      // straight to running the just-saved test. We already hold its uuid
+      // (the open test's id), so run it directly — no list lookup needed.
       if (options?.runAfterSave) {
-        const savedTest = resolveEditedTestToRun(refreshed, {
-          uuid: targetUuid,
-          name: targetName,
-          type: config.evaluation.type,
-          config,
-        });
         closeTestDialogAfterSave();
-        runSavedTest(savedTest);
+        runSavedTest(
+          buildTestToRun({
+            uuid: targetUuid,
+            name: targetName,
+            type: config.evaluation.type,
+            config,
+          }),
+        );
         return;
       }
       const prompted =

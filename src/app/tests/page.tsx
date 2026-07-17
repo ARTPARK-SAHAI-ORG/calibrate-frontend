@@ -7,7 +7,7 @@ import { signOut } from "next-auth/react";
 import { useAccessToken, useDialogUrlParam } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { bulkDeleteTests } from "@/lib/testsApi";
-import { resolveEditedTestToRun } from "@/lib/testRun";
+import { buildTestToRun } from "@/lib/testRun";
 import { AppLayout } from "@/components/AppLayout";
 import {
   ToolPicker,
@@ -937,11 +937,9 @@ function LLMPageInner() {
         headers: getDefaultHeaders(backendAccessToken),
       });
 
-      let refreshed: TestData[] | undefined;
       if (testsResponse.ok) {
         const updatedTests = await testsResponse.json();
-        refreshed = unwrapList<TestData>(updatedTests);
-        setTests(refreshed);
+        setTests(unwrapList<TestData>(updatedTests));
       }
 
       // Reset and close
@@ -949,11 +947,11 @@ function LLMPageInner() {
       setAddTestSidebarOpen(false);
 
       // "Save and run": open the agent-picker run dialog for the just-saved
-      // test (running from this page always picks an agent first). Falls back
-      // to a synthesized TestData if the refetch didn't return it.
+      // test (running from this page always picks an agent first). We already
+      // hold its uuid (the open test's id), so run it directly.
       if (options?.runAfterSave) {
         openRunTestDialog(
-          resolveEditedTestToRun(refreshed, {
+          buildTestToRun({
             uuid: targetUuid,
             name: targetName,
             type: config.evaluation.type,
