@@ -18,6 +18,7 @@ import {
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
+import { RerunIconButton } from "@/components/ui";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import {
   AddRunToLabellingTaskDialog,
@@ -1018,6 +1019,12 @@ export function TestRunnerDialog({
                 <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
                   {runName ?? "Test run"}
                 </h2>
+                {runStatus === "done" && onRerun && rerunTests.length > 0 && (
+                  <RerunIconButton
+                    onClick={() => onRerun(rerunTests)}
+                    className="shrink-0"
+                  />
+                )}
               </div>
               <p className="text-xs text-muted-foreground truncate">
                 {agentName}
@@ -1093,33 +1100,6 @@ export function TestRunnerDialog({
                     className="flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
                   >
                     Submit for labelling
-                  </button>
-                </div>
-              )}
-            {/* Rerun — start a fresh run of the same tests and open it in a
-                new dialog. Shown once the run is done and the backend reported
-                the executed test uuids. */}
-            {runStatus === "done" && onRerun && rerunTests.length > 0 && (
-                <div className="hidden md:block">
-                  <button
-                    type="button"
-                    onClick={() => onRerun(rerunTests)}
-                    className="flex items-center gap-2 h-8 px-2 md:px-3 rounded-md text-xs md:text-sm font-medium border border-border hover:bg-muted/50 transition-colors cursor-pointer"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
-                      />
-                    </svg>
-                    Rerun
                   </button>
                 </div>
               )}

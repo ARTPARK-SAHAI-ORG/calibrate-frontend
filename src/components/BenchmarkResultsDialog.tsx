@@ -16,7 +16,7 @@ import {
   benchmarkLabellingKey,
   type BenchmarkModelResult,
 } from "./eval-details";
-import { StatusBadge } from "@/components/ui";
+import { StatusBadge, RerunIconButton } from "@/components/ui";
 import { getDefaultHeaders } from "@/lib/api";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
@@ -576,6 +576,12 @@ export function BenchmarkResultsDialog({
               <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
                 {runName ?? "Benchmark"}
               </h2>
+              {showRerunButton && handleRerunClick && (
+                <RerunIconButton
+                  onClick={handleRerunClick}
+                  className="shrink-0"
+                />
+              )}
               {!isDone && !isInitialLoading && (
                 <StatusBadge status={taskStatus} showSpinner />
               )}
@@ -670,30 +676,6 @@ export function BenchmarkResultsDialog({
                   Submit for labelling
                 </button>
               )}
-            {/* Rerun button - show when benchmark is complete (not loading and
-                no error). Prefers a direct rerun (onRerun) and falls back to
-                the go-back-to-picker flow (onGoBack). */}
-            {showRerunButton && (
-              <button
-                onClick={handleRerunClick}
-                className="flex items-center gap-2 h-8 px-2 md:px-3 rounded-md text-xs md:text-sm font-medium border border-border hover:bg-muted/50 transition-colors cursor-pointer"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
-                  />
-                </svg>
-                Rerun
-              </button>
-            )}
             <button
               onClick={onClose}
               className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"

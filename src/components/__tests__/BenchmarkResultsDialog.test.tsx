@@ -76,6 +76,11 @@ jest.mock("../ui", () => ({
   StatusBadge: (props: any) => (
     <span data-testid="status-badge">{props.status}</span>
   ),
+  RerunIconButton: (props: any) => (
+    <button aria-label={props.tooltip ?? "Rerun"} onClick={props.onClick}>
+      {props.tooltip ?? "Rerun"}
+    </button>
+  ),
 }));
 
 jest.mock("../../lib/api", () => ({
