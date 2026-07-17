@@ -241,15 +241,13 @@ function LLMPageInner() {
   // When set, the test runner is rerunning this set of tests (from the "Rerun"
   // action on a viewed run) rather than the single `testToRun`.
   const [rerunTests, setRerunTests] = useState<TestData[] | null>(null);
-  // Whether the active rerun should run all linked tests (viewed runs whose
-  // results lack real test uuids) rather than the displayed subset.
-  const [rerunAllLinked, setRerunAllLinked] = useState(false);
-  // Direct benchmark rerun (fresh benchmark, same models, no picker). Keyed so
-  // a repeat rerun remounts and re-POSTs instead of no-op'ing.
+  // Direct benchmark rerun (fresh benchmark, same models + test subset, no
+  // picker). Keyed so a repeat rerun remounts and re-POSTs instead of no-op'ing.
   const [benchmarkRerun, setBenchmarkRerun] = useState<{
     agentUuid: string;
     agentName: string;
     models: string[];
+    testUuids: string[];
     testNames: string[];
   } | null>(null);
   const [benchmarkRerunKey, setBenchmarkRerunKey] = useState(0);
@@ -693,7 +691,6 @@ function LLMPageInner() {
     agentUuid: string,
     agentName: string,
     tests: TestData[],
-    runAllLinked: boolean,
   ) => {
     setViewingRunTest(false);
     setSelectedRun(null);
@@ -701,20 +698,21 @@ function LLMPageInner() {
     setTestRunnerAgentName(agentName);
     setTestToRun(null);
     setRerunTests(tests);
-    setRerunAllLinked(runAllLinked);
     setTestRunnerOpen(true);
   };
 
-  // Rerun a completed benchmark with the same models (skips the model picker).
+  // Rerun a completed benchmark with the same models and test subset (skips the
+  // model picker).
   const handleRerunBenchmark = (
     agentUuid: string,
     agentName: string,
     models: string[],
+    testUuids: string[],
     testNames: string[],
   ) => {
     setViewingRunBenchmark(false);
     setSelectedRun(null);
-    setBenchmarkRerun({ agentUuid, agentName, models, testNames });
+    setBenchmarkRerun({ agentUuid, agentName, models, testUuids, testNames });
     setBenchmarkRerunKey((k) => k + 1);
   };
 
@@ -1917,12 +1915,10 @@ function LLMPageInner() {
           setTestRunnerOpen(false);
           setTestToRun(null);
           setRerunTests(null);
-          setRerunAllLinked(false);
         }}
         agentUuid={testRunnerAgentUuid}
         agentName={testRunnerAgentName}
         tests={rerunTests ?? (testToRun ? [testToRun] : [])}
-        runAllLinked={rerunAllLinked}
         onRunCreated={(taskId) =>
           prependOptimisticTestRun(
             taskId,
@@ -1931,13 +1927,8 @@ function LLMPageInner() {
             testRunnerAgentName,
           )
         }
-        onRerun={(tests, runAllLinked) =>
-          handleRerunTests(
-            testRunnerAgentUuid,
-            testRunnerAgentName,
-            tests,
-            runAllLinked,
-          )
+        onRerun={(tests) =>
+          handleRerunTests(testRunnerAgentUuid, testRunnerAgentName, tests)
         }
       />
 
@@ -1972,12 +1963,11 @@ function LLMPageInner() {
           }
           taskId={selectedRun.uuid}
           initialRunStatus={selectedRun.status}
-          onRerun={(tests, runAllLinked) =>
+          onRerun={(tests) =>
             handleRerunTests(
               selectedRun.agent_id,
               selectedRun.agent_name,
               tests,
-              runAllLinked,
             )
           }
         />
@@ -1998,19 +1988,21 @@ function LLMPageInner() {
           testNames={[]}
           models={[]}
           taskId={selectedRun.uuid}
-          onRerun={(models, testNames) =>
+          onRerun={(models, testUuids, testNames) =>
             handleRerunBenchmark(
               selectedRun.agent_id,
               selectedRun.agent_name,
               models,
+              testUuids,
               testNames,
             )
           }
         />
       )}
 
-      {/* Direct Benchmark Rerun Dialog — fresh benchmark of the same models,
-          skipping the model picker. Keyed so a repeat rerun remounts. */}
+      {/* Direct Benchmark Rerun Dialog — fresh benchmark of the same models and
+          test subset, skipping the model picker. Keyed so a repeat rerun
+          remounts. */}
       {benchmarkRerun && (
         <BenchmarkResultsDialog
           key={benchmarkRerunKey}
@@ -2018,7 +2010,7 @@ function LLMPageInner() {
           onClose={() => setBenchmarkRerun(null)}
           agentUuid={benchmarkRerun.agentUuid}
           agentName={benchmarkRerun.agentName}
-          testUuids={[]}
+          testUuids={benchmarkRerun.testUuids}
           testNames={benchmarkRerun.testNames}
           models={benchmarkRerun.models}
           onBenchmarkCreated={(taskId) =>
@@ -2029,11 +2021,12 @@ function LLMPageInner() {
               benchmarkRerun.agentName,
             )
           }
-          onRerun={(models, testNames) =>
+          onRerun={(models, testUuids, testNames) =>
             handleRerunBenchmark(
               benchmarkRerun.agentUuid,
               benchmarkRerun.agentName,
               models,
+              testUuids,
               testNames,
             )
           }

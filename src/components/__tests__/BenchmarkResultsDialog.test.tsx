@@ -733,6 +733,7 @@ describe("BenchmarkResultsDialog", () => {
               task_id: "task-rerun",
               status: "completed",
               name: "Rerun Source",
+              test_uuids: ["tu-1", "tu-2"],
               model_results: [
                 {
                   model: "gpt-4",
@@ -772,6 +773,7 @@ describe("BenchmarkResultsDialog", () => {
           {...defaultProps}
           isOpen
           models={[]}
+          testUuids={[]}
           testNames={[]}
           taskId="task-rerun"
           onGoBack={onGoBack}
@@ -788,6 +790,7 @@ describe("BenchmarkResultsDialog", () => {
       expect(onRerun).toHaveBeenCalledTimes(1);
       expect(onRerun).toHaveBeenCalledWith(
         ["gpt-4", "claude"],
+        ["tu-1", "tu-2"],
         ["Test One", "Test Two"],
       );
       expect(onGoBack).not.toHaveBeenCalled();

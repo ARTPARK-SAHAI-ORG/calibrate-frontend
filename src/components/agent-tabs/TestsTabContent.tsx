@@ -378,6 +378,7 @@ export function TestsTabContent({
   // unchanged prop.
   const [benchmarkRerun, setBenchmarkRerun] = useState<{
     models: string[];
+    testUuids: string[];
     testNames: string[];
   } | null>(null);
   const [benchmarkRerunKey, setBenchmarkRerunKey] = useState(0);
@@ -1385,23 +1386,26 @@ export function TestsTabContent({
     }
   };
 
-  // Rerun a completed test run as a fresh run, swapping the view dialog for the
-  // live new-run dialog. `runAllLinked` is true when the viewed run's results
-  // lacked real test uuids (so we rerun all linked tests instead of a subset).
-  const handleRerunTests = (tests: TestData[], rerunAllLinked: boolean) => {
+  // Rerun a completed test run as a fresh run of the same tests, swapping the
+  // view dialog for the live new-run dialog.
+  const handleRerunTests = (tests: TestData[]) => {
     setViewingTestResults(false);
     setSelectedPastRun(null);
-    setRunAllLinked(rerunAllLinked);
+    setRunAllLinked(false);
     setTestsToRun(tests);
     setTestRunnerOpen(true);
   };
 
-  // Rerun a completed benchmark with the same models, swapping the view dialog
-  // for a fresh live benchmark (skips the model picker).
-  const handleRerunBenchmark = (models: string[], testNames: string[]) => {
+  // Rerun a completed benchmark with the same models and test subset, swapping
+  // the view dialog for a fresh live benchmark (skips the model picker).
+  const handleRerunBenchmark = (
+    models: string[],
+    testUuids: string[],
+    testNames: string[],
+  ) => {
     setViewingBenchmarkResults(false);
     setSelectedPastRun(null);
-    setBenchmarkRerun({ models, testNames });
+    setBenchmarkRerun({ models, testUuids, testNames });
     setBenchmarkRerunKey((k) => k + 1);
   };
 
@@ -2803,7 +2807,7 @@ export function TestsTabContent({
           onClose={() => setBenchmarkRerun(null)}
           agentUuid={agentUuid}
           agentName={agentName}
-          testUuids={[]}
+          testUuids={benchmarkRerun.testUuids}
           testNames={benchmarkRerun.testNames}
           models={benchmarkRerun.models}
           onBenchmarkCreated={handleBenchmarkCreated}

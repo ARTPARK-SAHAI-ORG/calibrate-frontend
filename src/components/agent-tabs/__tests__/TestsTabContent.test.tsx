@@ -1093,16 +1093,13 @@ describe("TestsTabContent — benchmark & past runs", () => {
     await user.click(screen.getByText("2 tests"));
     await screen.findByTestId("test-runner-dialog");
 
-    // Fire the rerun with two real-uuid tests (as the dialog would when the
-    // results carry real uuids → not run-all-linked).
+    // Fire the rerun with the exact tests the run executed (as the dialog would
+    // from the run's test_uuids).
     await act(async () => {
-      testRunnerProps.onRerun(
-        [
-          { ...responseTest, uuid: "real-1", name: "A" },
-          { ...responseTest, uuid: "real-2", name: "B" },
-        ],
-        false,
-      );
+      testRunnerProps.onRerun([
+        { ...responseTest, uuid: "real-1", name: "A" },
+        { ...responseTest, uuid: "real-2", name: "B" },
+      ]);
     });
 
     // The fresh new-run dialog is open with both tests and not run-all-linked.
@@ -1114,46 +1111,6 @@ describe("TestsTabContent — benchmark & past runs", () => {
       "real-1",
       "real-2",
     ]);
-  });
-
-  it("reruns a unit-test run with all-linked when the results lacked real uuids", async () => {
-    state.agentTests = [responseTest];
-    state.pastRuns = [
-      {
-        uuid: "run-unit",
-        name: "",
-        status: "completed",
-        type: "llm-unit-test",
-        updated_at: "2026-01-01 09:00:00",
-        total_tests: 2,
-        passed: 2,
-        failed: 0,
-        results: [
-          { passed: true, test_case: { name: "A" } },
-          { passed: true, test_case: { name: "B" } },
-        ],
-      },
-    ];
-    const user = setupUser();
-    renderComponent();
-    await screen.findAllByText("Greeting test");
-
-    await user.click(screen.getByText("2 tests"));
-    await screen.findByTestId("test-runner-dialog");
-
-    await act(async () => {
-      testRunnerProps.onRerun(
-        [
-          { ...responseTest, uuid: "generated-0-A", name: "A" },
-          { ...responseTest, uuid: "generated-1-B", name: "B" },
-        ],
-        true,
-      );
-    });
-
-    await screen.findByTestId("test-runner-dialog");
-    expect(testRunnerProps.taskId).toBeUndefined();
-    expect(testRunnerProps.runAllLinked).toBe(true);
   });
 
   it("reruns a benchmark: opens a direct benchmark dialog with the given models, no picker", async () => {
@@ -1179,14 +1136,19 @@ describe("TestsTabContent — benchmark & past runs", () => {
     await screen.findByTestId("benchmark-results-dialog");
 
     await act(async () => {
-      benchmarkResultsProps.onRerun(["gpt-4", "claude"], ["A", "B"]);
+      benchmarkResultsProps.onRerun(
+        ["gpt-4", "claude"],
+        ["tu-1", "tu-2"],
+        ["A", "B"],
+      );
     });
 
     await screen.findByTestId("benchmark-results-dialog");
-    // The direct-rerun instance carries the models/testNames and no taskId, so
-    // it POSTs a fresh benchmark rather than viewing an existing one.
+    // The direct-rerun instance carries the models/test subset/testNames and no
+    // taskId, so it POSTs a fresh benchmark rather than viewing an existing one.
     expect(benchmarkResultsProps.taskId).toBeUndefined();
     expect(benchmarkResultsProps.models).toEqual(["gpt-4", "claude"]);
+    expect(benchmarkResultsProps.testUuids).toEqual(["tu-1", "tu-2"]);
     expect(benchmarkResultsProps.testNames).toEqual(["A", "B"]);
     expect(typeof benchmarkResultsProps.onBenchmarkCreated).toBe("function");
   });

@@ -43,6 +43,10 @@ type BenchmarkStatusResponse = {
   leaderboard_summary?: BenchmarkLeaderboardSummaryRow[];
   /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
   evaluators?: TestRunEvaluator[];
+  /** The test uuids this benchmark executed, in run order (shared across all
+   * models — not repeated per model). Used to rerun the same subset. Absent on
+   * benchmarks that predate the backend snapshot. */
+  test_uuids?: string[];
   results_s3_prefix?: string;
   error?: string;
   is_public?: boolean;
@@ -61,10 +65,14 @@ type BenchmarkResultsDialogProps = {
   taskId?: string; // If provided, view existing benchmark results instead of starting new
   onBenchmarkCreated?: (taskId: string) => void; // Called when a new benchmark is created
   // Called when the user clicks "Rerun" on a completed benchmark. Hands the
-  // parent the models (and test names, for progress display) this benchmark
-  // covered so it can start a fresh benchmark and open it in a new dialog.
-  // Takes precedence over `onGoBack` for the header button when provided.
-  onRerun?: (models: string[], testNames: string[]) => void;
+  // parent the models, the executed test uuids (the subset to rerun), and the
+  // test names (for progress display) so it can start a fresh benchmark and
+  // open it in a new dialog. Takes precedence over `onGoBack` when provided.
+  onRerun?: (
+    models: string[],
+    testUuids: string[],
+    testNames: string[],
+  ) => void;
 };
 
 export function BenchmarkResultsDialog({
@@ -114,6 +122,9 @@ export function BenchmarkResultsDialog({
   // Top-level evaluators block from the benchmark response. See the
   // matching state in TestRunnerDialog for the same plumbing.
   const [runEvaluators, setRunEvaluators] = useState<TestRunEvaluator[]>([]);
+  // The test uuids this benchmark executed, from the status response. Drives
+  // the rerun subset; empty on legacy benchmarks that predate the snapshot.
+  const [runTestUuids, setRunTestUuids] = useState<string[]>([]);
   const [addToTaskOpen, setAddToTaskOpen] = useState(false);
   const {
     selected: labellingSelectedKeys,
@@ -219,6 +230,7 @@ export function BenchmarkResultsDialog({
         setModelResults([]);
         setLeaderboardSummary(undefined);
         setRunEvaluators([]);
+        setRunTestUuids([]);
         setError(null);
         setExpandedProviders(new Set(models.length > 0 ? [models[0]] : []));
         setSelectedTest(null);
@@ -334,6 +346,9 @@ export function BenchmarkResultsDialog({
       // the same dialog lifecycle.
       setRunEvaluators(
         Array.isArray(result.evaluators) ? result.evaluators : [],
+      );
+      setRunTestUuids(
+        Array.isArray(result.test_uuids) ? result.test_uuids : [],
       );
 
       // Update model results (intermediate or final)
@@ -526,11 +541,12 @@ export function BenchmarkResultsDialog({
     (mr.test_results ?? []).some((tr) => isLabellingEligibleRaw(tr)),
   );
 
-  // Config for a rerun. When viewing a past benchmark the `models` prop is
-  // empty, so fall back to the models the loaded results carry; likewise
-  // recover test names from the first model row that has results.
+  // Config for a rerun. When viewing a past benchmark the props are empty, so
+  // fall back to what the loaded results carry: models from the model rows, the
+  // executed test uuids from the run, and test names from the first model row.
   const rerunModels =
     models.length > 0 ? models : modelResults.map((m) => m.model).filter(Boolean);
+  const rerunTestUuids = testUuids.length > 0 ? testUuids : runTestUuids;
   const rerunTestNames =
     testNames.length > 0
       ? testNames
@@ -543,7 +559,7 @@ export function BenchmarkResultsDialog({
   const canDirectRerun = !!onRerun && rerunModels.length > 0;
   const showRerunButton = isDone && !error && (canDirectRerun || !!onGoBack);
   const handleRerunClick = canDirectRerun
-    ? () => onRerun!(rerunModels, rerunTestNames)
+    ? () => onRerun!(rerunModels, rerunTestUuids, rerunTestNames)
     : onGoBack;
 
   return (
