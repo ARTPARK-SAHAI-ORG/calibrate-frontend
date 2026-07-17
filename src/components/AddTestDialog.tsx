@@ -2944,11 +2944,12 @@ export function AddTestDialog({
   };
 
   // True when the form differs from the post-load baseline (i.e. there are
-  // unsaved edits). Mirrors the backdrop discard-guard check; treats the
-  // not-yet-captured baseline as "dirty" to err against silently dropping
-  // edits.
+  // unsaved edits). A just-loaded, untouched form is NOT changed: until the
+  // baseline is captured there can't be user edits yet (the Run button is
+  // disabled while the test is still loading), so a null baseline counts as
+  // clean rather than prompting spuriously.
   const hasUnsavedEdits = () =>
-    baselineRef.current === null ||
+    baselineRef.current !== null &&
     serializeFormState() !== baselineRef.current;
 
   // "Run test" button. Save and Run stay separate: this never force-saves a
