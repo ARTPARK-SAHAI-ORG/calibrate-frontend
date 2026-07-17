@@ -278,8 +278,10 @@ async function installFakeBackend(page: Page, appOrigin: string): Promise<void> 
         return json(route, {
           uuid: AGENT_UUID,
           name: "Community Clinic Helpline",
+          // The default a freshly created agent loads with — this is what raced
+          // with (and clobbered) the tour's sample fill. The tour must win.
           type: "agent",
-          config: { system_prompt: "" },
+          config: { system_prompt: "You are a helpful assistant." },
           created_at: ISO,
           updated_at: ISO,
         });
@@ -486,6 +488,11 @@ test.describe("Onboarding flagship tour (fully mocked, no backend)", () => {
         });
         // Exactly one popover — no orphan left over from the create-navigation.
         await expect(page.locator(".driver-popover")).toHaveCount(1);
+        // The tour's sample must win over the agent's async-loaded default
+        // ("You are a helpful assistant.") — the clobber this guards against.
+        await expect(
+          page.locator('[data-tour="agent-system-prompt"]'),
+        ).toHaveValue(/community health clinic/i, { timeout: 10000 });
       }
       if (step.title === "Add another check") {
         // Correctness is ticked; the picker highlights the just-picked row.

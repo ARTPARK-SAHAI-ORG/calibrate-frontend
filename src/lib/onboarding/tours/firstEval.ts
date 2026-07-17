@@ -331,6 +331,35 @@ function fillTestScenario(test: DemoTest): void {
 }
 
 /**
+ * Fill the system prompt with the sample and KEEP it filled for a short window.
+ * A freshly created agent's detail page loads its own default prompt ("You are a
+ * helpful assistant.") asynchronously; if that GET resolves AFTER we fill, it
+ * clobbers our sample (AgentDetail sets `systemPrompt` from the response). We
+ * fill immediately so the card shows the sample right away, then re-apply on a
+ * background interval so a late load is corrected without blocking the step.
+ * Exported for unit testing. Returns after the initial fill; the guard runs on.
+ */
+export async function fillSystemPromptResilient(
+  value: string,
+  { checks = 25, intervalMs = 100 } = {},
+): Promise<void> {
+  const ok = await fillInput(A.systemPrompt, value, { timeout: 15000 });
+  if (!ok) return;
+  let n = 0;
+  const id = window.setInterval(() => {
+    const el = document.querySelector<HTMLElement>(A.systemPrompt);
+    if (
+      (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) &&
+      el.value.trim() !== value.trim()
+    ) {
+      el.focus();
+      setNativeValue(el, value);
+    }
+    if (++n >= checks) window.clearInterval(id);
+  }, intervalMs);
+}
+
+/**
  * Open the Create Test dialog and pick "Next reply", which seeds a conversation
  * and the default evaluator. Leaves the editor open for the scenario/criteria
  * to be filled in.
@@ -616,7 +645,9 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       actionLabel: "Next",
       timeout: 15000,
       prepare: async () => {
-        await fillInput(A.systemPrompt, DEMO_SYSTEM_PROMPT, { timeout: 15000 });
+        // Resilient fill: the freshly created agent's default prompt loads
+        // asynchronously and would otherwise clobber our sample (see the helper).
+        await fillSystemPromptResilient(DEMO_SYSTEM_PROMPT);
       },
     },
     {

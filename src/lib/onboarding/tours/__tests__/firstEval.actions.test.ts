@@ -29,6 +29,7 @@ jest.mock("../../../../lib/api", () => ({
 import {
   A,
   buildFirstEvalTour,
+  fillSystemPromptResilient,
   pickFreeName,
   resolveEvaluatorPlan,
   type EvaluatorPlan,
@@ -108,6 +109,7 @@ describe("first-eval tour step actions", () => {
   });
 
   it("fills the system prompt during prepare", async () => {
+    jest.useFakeTimers();
     const tour = buildTour();
     await stepByTitle(tour, "Give it instructions").prepare?.();
     expect(mockFillInput).toHaveBeenCalledWith(
@@ -115,6 +117,30 @@ describe("first-eval tour step actions", () => {
       expect.stringContaining("community health clinics"),
       { timeout: 15000 },
     );
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  });
+
+  it("re-applies the system prompt if the agent load clobbers it", async () => {
+    jest.useFakeTimers();
+    const el = document.createElement("textarea");
+    el.setAttribute("data-tour", "agent-system-prompt");
+    // fillInput is mocked (no real write), so simulate the agent-load default
+    // sitting in the field; the background guard must overwrite it.
+    el.value = "You are a helpful assistant.";
+    makeLayoutVisible(el);
+    document.body.appendChild(el);
+
+    await fillSystemPromptResilient("SAMPLE PROMPT", {
+      checks: 5,
+      intervalMs: 10,
+    });
+    // One guard tick is enough to correct the clobbered value.
+    jest.advanceTimersByTime(10);
+    expect(el.value).toBe("SAMPLE PROMPT");
+
+    jest.clearAllTimers();
+    jest.useRealTimers();
   });
 
   it("recreates Correctness when the workspace deleted it", async () => {
