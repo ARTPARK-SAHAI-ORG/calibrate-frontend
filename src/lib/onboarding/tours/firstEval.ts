@@ -322,6 +322,34 @@ async function findUsableCorrectness(
 }
 
 /**
+ * Find a usable second "Conciseness" check. Like the Correctness reuse, this does
+ * NOT trust the list's `variables` (the list omits them for custom evaluators,
+ * which would wrongly drop a valid one). Instead it verifies each Conciseness-
+ * named LLM-reply evaluator's live prompt actually references the `{{criteria}}`
+ * variable the tour fills — otherwise the tour cannot control what it grades.
+ * Returns its name, or null when none qualifies (the flow then uses one check).
+ */
+async function findUsableSecond(
+  list: EvaluatorLike[],
+  accessToken: string,
+): Promise<string | null> {
+  const candidates = list
+    .filter(
+      (e) =>
+        e.evaluator_type === "llm" &&
+        CONCISENESS_NAME.test(e.name ?? "") &&
+        !isDefaultLLMNextReplyEvaluator(e),
+    )
+    .slice(0, 6);
+  for (const c of candidates) {
+    if (!c.uuid) continue;
+    const live = await fetchLivePrompt(c.uuid, accessToken);
+    if (live && live.includes("{{criteria}}")) return c.name ?? null;
+  }
+  return null;
+}
+
+/**
  * Fetch the workspace evaluators and resolve the plan. Reuses an existing
  * Correctness ONLY if its live prompt exactly matches the canonical one (else it
  * is recreated). Falls back to the built-in "Correctness" default, second-check-
@@ -357,6 +385,9 @@ export async function resolveEvaluatorPlan(
         accessToken,
       );
     }
+    // Same treatment for the second check: verify by prompt, not the list's
+    // (possibly omitted) variables, so a valid Conciseness check is not dropped.
+    plan.secondEvaluatorName = await findUsableSecond(list, accessToken);
     return plan;
   } catch {
     return fallback;

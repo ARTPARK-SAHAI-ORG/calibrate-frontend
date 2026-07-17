@@ -449,9 +449,12 @@ describe("resolveEvaluatorPlan", () => {
     },
   ];
 
-  // Per-URL mock: the list, the canonical default-prompt, and the candidate's
-  // detail (whose live prompt is compared against the canonical).
-  function mockEvaluatorFetches(detailPrompt: string, items: unknown[] = ITEMS) {
+  // Per-URL mock: the list, the canonical default-prompt, and each evaluator's
+  // detail keyed by uuid (so Correctness and the second can be tested apart).
+  function mockEvaluatorFetches(
+    promptByUuid: Record<string, string>,
+    items: unknown[] = ITEMS,
+  ) {
     (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
       if (url.includes("/evaluators/default-prompt")) {
         return {
@@ -459,11 +462,12 @@ describe("resolveEvaluatorPlan", () => {
           json: async () => ({ system_prompt: CANON, judge_model: "m" }),
         };
       }
-      if (/\/evaluators\/[^/?]+$/.test(url)) {
+      const m = url.match(/\/evaluators\/([^/?]+)$/);
+      if (m) {
         return {
           ok: true,
           json: async () => ({
-            versions: [{ uuid: "v1", system_prompt: detailPrompt }],
+            versions: [{ uuid: "v1", system_prompt: promptByUuid[m[1]] ?? "" }],
             live_version_index: 0,
           }),
         };
@@ -472,8 +476,8 @@ describe("resolveEvaluatorPlan", () => {
     });
   }
 
-  it("reuses Correctness when its live prompt matches the canonical", async () => {
-    mockEvaluatorFetches(CANON);
+  it("reuses Correctness and the second when their live prompts qualify", async () => {
+    mockEvaluatorFetches({ "ev-correct": CANON, "ev-conc": CANON });
     expect(await resolveEvaluatorPlan("tok")).toEqual({
       correctnessName: "Correctness",
       secondEvaluatorName: "Reply Conciseness",
@@ -484,7 +488,7 @@ describe("resolveEvaluatorPlan", () => {
     // A previous run created this: no default slug, and the LIST omits its
     // variables — but its live prompt matches the canonical, so it must be reused
     // (via the prompt check) rather than creating Correctness (3).
-    mockEvaluatorFetches(CANON, [
+    mockEvaluatorFetches({ "ev-c2": CANON }, [
       { uuid: "ev-c2", name: "Correctness (2)", evaluator_type: "llm" },
     ]);
     expect((await resolveEvaluatorPlan("tok")).correctnessName).toBe(
@@ -495,10 +499,25 @@ describe("resolveEvaluatorPlan", () => {
   it("recreates (correctnessName null) when the reused prompt differs", async () => {
     // Slug + declared criteria variable, but the live prompt still has the
     // placeholder — not the canonical prompt, so it must not be reused.
-    mockEvaluatorFetches("You need to evaluate:\n\n<ENTER CRITERIA HERE>");
+    mockEvaluatorFetches({
+      "ev-correct": "You need to evaluate:\n\n<ENTER CRITERIA HERE>",
+      "ev-conc": CANON,
+    });
     const plan = await resolveEvaluatorPlan("tok");
     expect(plan.correctnessName).toBeNull();
     expect(plan.secondEvaluatorName).toBe("Reply Conciseness");
+  });
+
+  it("drops the second check when its live prompt has no criteria variable", async () => {
+    // The LIST would say it has a variable, but the real prompt does not use
+    // {{criteria}} — so the tour cannot control it and must not attach it.
+    mockEvaluatorFetches({
+      "ev-correct": CANON,
+      "ev-conc": "Judge conciseness. No variable here.",
+    });
+    const plan = await resolveEvaluatorPlan("tok");
+    expect(plan.correctnessName).toBe("Correctness");
+    expect(plan.secondEvaluatorName).toBeNull();
   });
 
   it("falls back when the request is not ok", async () => {
