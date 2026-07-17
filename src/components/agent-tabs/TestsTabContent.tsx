@@ -430,9 +430,7 @@ export function TestsTabContent({
       }
 
       const data = await response.json();
-      const list = unwrapList<TestData>(data);
-      setAgentTests(list);
-      return list;
+      setAgentTests(unwrapList<TestData>(data));
     } catch (err) {
       reportError("Error fetching agent tests:", err);
       setAgentTestsError(
@@ -896,8 +894,8 @@ export function TestsTabContent({
   ) => {
     setValidationAttempted(true);
     if (!newTestName.trim()) return;
-    // The created test's name is unique per agent (the backend rejects
-    // duplicates), so we can recover it from the refreshed list to run it.
+    // Kept for the run-after-save display name; the run itself keys off the
+    // uuid the create call returns.
     const targetName = newTestName.trim();
 
     try {

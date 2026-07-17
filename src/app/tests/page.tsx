@@ -625,8 +625,8 @@ function LLMPageInner() {
   ) => {
     setValidationAttempted(true);
     if (!newTestName.trim()) return;
-    // The created test's name is unique, so it can be recovered from the
-    // refreshed list to run it.
+    // Kept for the run-after-save display name; the run itself keys off the
+    // uuid the create call returns.
     const targetName = newTestName.trim();
 
     try {
