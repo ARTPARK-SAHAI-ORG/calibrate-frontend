@@ -19,6 +19,7 @@ const TEST_EVALUATORS = [
 jest.mock("../../../hooks", () => ({
   useAccessToken: () => "test-token",
   useMaxRowsPerEval: () => 100,
+  useDialogUrlParam: () => ({ setParam: jest.fn() }),
 }));
 
 jest.mock("../../../lib/reportError", () => ({
