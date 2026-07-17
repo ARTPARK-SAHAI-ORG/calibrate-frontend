@@ -21,6 +21,11 @@ import {
   BenchmarkRerunDialog,
   useBenchmarkRerun,
 } from "@/components/BenchmarkRerunDialog";
+import {
+  makeOptimisticTestRun,
+  makeOptimisticBenchmarkRun,
+  type OptimisticRun,
+} from "@/lib/optimisticRuns";
 import { RunTestDialog } from "@/components/RunTestDialog";
 import {
   AddTestDialog,
@@ -627,27 +632,16 @@ function LLMPageInner() {
   };
 
   // Prepend an optimistic pending run to the Runs list so a freshly-started
-  // rerun shows up immediately (the pending-run poller then fills it in).
-  const prependOptimisticTestRun = (
-    taskId: string,
-    tests: TestData[],
+  // rerun shows up immediately (the pending-run poller then fills it in). The
+  // core row is shared with the agent Tests tab; here we add the AllRun-only
+  // fields the list needs (agent identity + share/error flags).
+  const prependOptimisticRun = (
+    core: OptimisticRun,
     agentUuid: string,
     agentName: string,
   ) => {
     const newRun: AllRun = {
-      uuid: taskId,
-      name: "",
-      status: "pending",
-      type: "llm-unit-test",
-      updated_at: new Date().toISOString(),
-      total_tests: tests.length,
-      passed: null,
-      failed: null,
-      results: tests.map((t) => ({
-        name: t.name,
-        passed: null,
-        test_case: { name: t.name },
-      })),
+      ...core,
       error: false,
       is_public: false,
       share_token: null,
@@ -657,30 +651,29 @@ function LLMPageInner() {
     setAllRuns((prev) => [newRun, ...prev]);
   };
 
+  const prependOptimisticTestRun = (
+    taskId: string,
+    tests: TestData[],
+    agentUuid: string,
+    agentName: string,
+  ) =>
+    prependOptimisticRun(
+      makeOptimisticTestRun(taskId, tests, new Date().toISOString()),
+      agentUuid,
+      agentName,
+    );
+
   const prependOptimisticBenchmarkRun = (
     taskId: string,
     models: string[],
     agentUuid: string,
     agentName: string,
-  ) => {
-    const newRun: AllRun = {
-      uuid: taskId,
-      name: "Benchmark",
-      status: "pending",
-      type: "llm-benchmark",
-      updated_at: new Date().toISOString(),
-      total_tests: null,
-      passed: null,
-      failed: null,
-      model_results: models.map((m) => ({ model: m })),
-      error: false,
-      is_public: false,
-      share_token: null,
-      agent_id: agentUuid,
-      agent_name: agentName,
-    };
-    setAllRuns((prev) => [newRun, ...prev]);
-  };
+  ) =>
+    prependOptimisticRun(
+      makeOptimisticBenchmarkRun(taskId, models, new Date().toISOString()),
+      agentUuid,
+      agentName,
+    );
 
   // Rerun a completed test run as a fresh run of the same tests, swapping the
   // view dialog for the live new-run dialog.

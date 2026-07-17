@@ -15,6 +15,10 @@ import {
   BenchmarkRerunDialog,
   useBenchmarkRerun,
 } from "@/components/BenchmarkRerunDialog";
+import {
+  makeOptimisticTestRun,
+  makeOptimisticBenchmarkRun,
+} from "@/lib/optimisticRuns";
 import { CompareModelsButton } from "@/components/agent-tabs/CompareModelsButton";
 import {
   AddTestDialog,
@@ -1412,44 +1416,24 @@ export function TestsTabContent({
   };
 
   // Handle when a new test run is created
-  const handleTestRunCreated = (taskId: string, testCount?: number) => {
-    const count = testCount ?? testsToRun.length;
-    // Create optimistic results array with test names for display
-    const optimisticResults: TestRunResult[] = testsToRun.map((test) => ({
-      name: test.name,
-      passed: null,
-      test_case: {
-        name: test.name,
-      },
-    }));
-    const newRun: TestRun = {
-      uuid: taskId,
-      name: "",
-      status: "pending",
-      type: "llm-unit-test",
-      updated_at: new Date().toISOString(),
-      total_tests: count,
-      passed: null,
-      failed: null,
-      results: optimisticResults,
-    };
+  const handleTestRunCreated = (taskId: string) => {
+    const newRun: TestRun = makeOptimisticTestRun(
+      taskId,
+      testsToRun,
+      new Date().toISOString(),
+    );
     setPastRuns((prev) => [newRun, ...prev]);
     // Polling is handled by the useEffect that watches pastRuns for pending items
   };
 
-  // Handle when a new benchmark is created
+  // Handle when a new benchmark is created. Models aren't known here (the
+  // picker owns them), so the row shows "0 models" until the poller fills it in.
   const handleBenchmarkCreated = (taskId: string) => {
-    const newRun: TestRun = {
-      uuid: taskId,
-      name: "Benchmark",
-      status: "pending",
-      type: "llm-benchmark",
-      updated_at: new Date().toISOString(),
-      total_tests: null,
-      passed: null,
-      failed: null,
-      model_results: [],
-    };
+    const newRun: TestRun = makeOptimisticBenchmarkRun(
+      taskId,
+      [],
+      new Date().toISOString(),
+    );
     setPastRuns((prev) => [newRun, ...prev]);
     // Polling is handled by the useEffect that watches pastRuns for pending items
   };
