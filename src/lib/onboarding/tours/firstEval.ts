@@ -275,22 +275,47 @@ async function fetchCanonicalCorrectnessPrompt(
   }
 }
 
+// Cheap pre-filter for correctness candidates whose prompt we then verify. The
+// name hint also catches evaluators the tour created on a previous run
+// ("Correctness (2)", "(3)", …) — which carry no default slug — so re-running
+// reuses one instead of endlessly creating the next number.
+const CORRECTNESS_NAME_HINT = /correctness/i;
+
 /**
- * Whether the existing Correctness candidate is safe for the tour to reuse: its
- * live prompt must EXACTLY match the canonical correctness prompt. This rejects
- * an evaluator that carries the slug + a declared `criteria` variable but was
- * left with the placeholder (or any other prompt) — the tour recreates a proper
- * one instead of grading with something it does not control.
+ * Find an existing evaluator the tour can REUSE as Correctness: an LLM-reply
+ * evaluator with a `criteria` variable whose live prompt EXACTLY matches the
+ * canonical correctness prompt. Considers the built-in default (by slug) AND any
+ * "Correctness"-named evaluator (e.g. one the tour created before, which has no
+ * slug), preferring the built-in. Returns its name, or null when none qualifies
+ * (so a proper one is created). Bounds the number of detail fetches.
  */
-async function correctnessPromptMatches(
-  uuid: string,
+async function findUsableCorrectness(
+  list: EvaluatorLike[],
+  canonicalPrompt: string,
   accessToken: string,
-): Promise<boolean> {
-  const [canonical, live] = await Promise.all([
-    fetchCanonicalCorrectnessPrompt(accessToken),
-    fetchLivePrompt(uuid, accessToken),
-  ]);
-  return !!canonical && !!live && live.trim() === canonical.trim();
+): Promise<string | null> {
+  const candidates = list
+    .filter(
+      (e) =>
+        e.evaluator_type === "llm" &&
+        hasCriteriaVariable(e) &&
+        (isDefaultLLMNextReplyEvaluator(e) ||
+          CORRECTNESS_NAME_HINT.test(e.name ?? "")),
+    )
+    // Prefer the built-in default (by slug) first.
+    .sort(
+      (a, b) =>
+        Number(isDefaultLLMNextReplyEvaluator(b)) -
+        Number(isDefaultLLMNextReplyEvaluator(a)),
+    )
+    .slice(0, 6);
+  const target = canonicalPrompt.trim();
+  for (const c of candidates) {
+    if (!c.uuid) continue;
+    const live = await fetchLivePrompt(c.uuid, accessToken);
+    if (live && live.trim() === target) return c.name ?? null;
+  }
+  return null;
 }
 
 /**
@@ -316,19 +341,18 @@ export async function resolveEvaluatorPlan(
     if (!res.ok) return fallback;
     const list = unwrapList<EvaluatorLike>(await res.json());
     const plan = planFromEvaluators(list);
-    // Verify the Correctness we'd reuse is genuinely the canonical one; if its
-    // prompt differs at all, treat it as absent so a proper one is recreated.
-    if (plan.correctnessName) {
-      const candidate = list.find(
-        (e) =>
-          e.evaluator_type === "llm" &&
-          isDefaultLLMNextReplyEvaluator(e) &&
-          hasCriteriaVariable(e),
+    // Resolve which Correctness to REUSE by prompt identity — including one the
+    // tour created on a previous run (no default slug) — so re-running does not
+    // keep creating Correctness (2), (3), … A proper one is created only when
+    // nothing usable exists. If the canonical prompt is unavailable, keep the
+    // slug-based result from planFromEvaluators (best-effort).
+    const canonical = await fetchCanonicalCorrectnessPrompt(accessToken);
+    if (canonical) {
+      plan.correctnessName = await findUsableCorrectness(
+        list,
+        canonical,
+        accessToken,
       );
-      const ok =
-        !!candidate?.uuid &&
-        (await correctnessPromptMatches(candidate.uuid, accessToken));
-      if (!ok) plan.correctnessName = null;
     }
     return plan;
   } catch {

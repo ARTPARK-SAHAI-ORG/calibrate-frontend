@@ -451,7 +451,7 @@ describe("resolveEvaluatorPlan", () => {
 
   // Per-URL mock: the list, the canonical default-prompt, and the candidate's
   // detail (whose live prompt is compared against the canonical).
-  function mockEvaluatorFetches(detailPrompt: string) {
+  function mockEvaluatorFetches(detailPrompt: string, items: unknown[] = ITEMS) {
     (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
       if (url.includes("/evaluators/default-prompt")) {
         return {
@@ -468,7 +468,7 @@ describe("resolveEvaluatorPlan", () => {
           }),
         };
       }
-      return { ok: true, json: async () => ({ items: ITEMS }) };
+      return { ok: true, json: async () => ({ items }) };
     });
   }
 
@@ -478,6 +478,22 @@ describe("resolveEvaluatorPlan", () => {
       correctnessName: "Correctness",
       secondEvaluatorName: "Reply Conciseness",
     });
+  });
+
+  it("reuses a tour-created Correctness (2) that has no default slug", async () => {
+    // A previous run created this; it has no slug but a matching canonical prompt,
+    // so it must be reused rather than creating Correctness (3).
+    mockEvaluatorFetches(CANON, [
+      {
+        uuid: "ev-c2",
+        name: "Correctness (2)",
+        evaluator_type: "llm",
+        live_version: { variables: [{ name: "criteria" }] },
+      },
+    ]);
+    expect((await resolveEvaluatorPlan("tok")).correctnessName).toBe(
+      "Correctness (2)",
+    );
   });
 
   it("recreates (correctnessName null) when the reused prompt differs", async () => {
