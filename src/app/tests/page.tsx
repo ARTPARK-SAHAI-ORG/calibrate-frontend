@@ -238,9 +238,12 @@ function LLMPageInner() {
   const [testRunnerOpen, setTestRunnerOpen] = useState(false);
   const [testRunnerAgentUuid, setTestRunnerAgentUuid] = useState<string>("");
   const [testRunnerAgentName, setTestRunnerAgentName] = useState<string>("");
-  // When set, the test runner is rerunning this exact set of tests (from the
-  // "Rerun" action on a viewed run) rather than the single `testToRun`.
+  // When set, the test runner is rerunning this set of tests (from the "Rerun"
+  // action on a viewed run) rather than the single `testToRun`.
   const [rerunTests, setRerunTests] = useState<TestData[] | null>(null);
+  // Whether the active rerun should run all linked tests (viewed runs whose
+  // results lack real test uuids) rather than the displayed subset.
+  const [rerunAllLinked, setRerunAllLinked] = useState(false);
   // Direct benchmark rerun (fresh benchmark, same models, no picker). Keyed so
   // a repeat rerun remounts and re-POSTs instead of no-op'ing.
   const [benchmarkRerun, setBenchmarkRerun] = useState<{
@@ -690,6 +693,7 @@ function LLMPageInner() {
     agentUuid: string,
     agentName: string,
     tests: TestData[],
+    runAllLinked: boolean,
   ) => {
     setViewingRunTest(false);
     setSelectedRun(null);
@@ -697,6 +701,7 @@ function LLMPageInner() {
     setTestRunnerAgentName(agentName);
     setTestToRun(null);
     setRerunTests(tests);
+    setRerunAllLinked(runAllLinked);
     setTestRunnerOpen(true);
   };
 
@@ -1912,10 +1917,12 @@ function LLMPageInner() {
           setTestRunnerOpen(false);
           setTestToRun(null);
           setRerunTests(null);
+          setRerunAllLinked(false);
         }}
         agentUuid={testRunnerAgentUuid}
         agentName={testRunnerAgentName}
         tests={rerunTests ?? (testToRun ? [testToRun] : [])}
+        runAllLinked={rerunAllLinked}
         onRunCreated={(taskId) =>
           prependOptimisticTestRun(
             taskId,
@@ -1924,8 +1931,13 @@ function LLMPageInner() {
             testRunnerAgentName,
           )
         }
-        onRerun={(tests) =>
-          handleRerunTests(testRunnerAgentUuid, testRunnerAgentName, tests)
+        onRerun={(tests, runAllLinked) =>
+          handleRerunTests(
+            testRunnerAgentUuid,
+            testRunnerAgentName,
+            tests,
+            runAllLinked,
+          )
         }
       />
 
@@ -1960,11 +1972,12 @@ function LLMPageInner() {
           }
           taskId={selectedRun.uuid}
           initialRunStatus={selectedRun.status}
-          onRerun={(tests) =>
+          onRerun={(tests, runAllLinked) =>
             handleRerunTests(
               selectedRun.agent_id,
               selectedRun.agent_name,
               tests,
+              runAllLinked,
             )
           }
         />

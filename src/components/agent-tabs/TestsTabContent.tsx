@@ -1385,12 +1385,13 @@ export function TestsTabContent({
     }
   };
 
-  // Rerun a completed test run as a fresh run of the same tests, swapping the
-  // view dialog for the live new-run dialog.
-  const handleRerunTests = (tests: TestData[]) => {
+  // Rerun a completed test run as a fresh run, swapping the view dialog for the
+  // live new-run dialog. `runAllLinked` is true when the viewed run's results
+  // lacked real test uuids (so we rerun all linked tests instead of a subset).
+  const handleRerunTests = (tests: TestData[], rerunAllLinked: boolean) => {
     setViewingTestResults(false);
     setSelectedPastRun(null);
-    setRunAllLinked(false);
+    setRunAllLinked(rerunAllLinked);
     setTestsToRun(tests);
     setTestRunnerOpen(true);
   };

@@ -236,7 +236,7 @@ describe("TestRunnerDialog", () => {
     ).toBe(false);
   });
 
-  it("shows a Rerun button on a completed run and hands the real-uuid tests to onRerun", async () => {
+  it("reruns exactly the same tests when the results carry real uuids", async () => {
     const onRerun = jest.fn();
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
@@ -254,13 +254,6 @@ describe("TestRunnerDialog", () => {
               {
                 test_uuid: "real-test-1",
                 name: "Real Test",
-                status: "passed",
-                passed: true,
-              },
-              // Backend omitted a uuid → dialog synthesises a `generated-*`
-              // placeholder that must be excluded from the rerun set.
-              {
-                name: "Placeholder Test",
                 status: "passed",
                 passed: true,
               },
@@ -288,12 +281,13 @@ describe("TestRunnerDialog", () => {
     await setupUser().click(rerunButton);
 
     expect(onRerun).toHaveBeenCalledTimes(1);
-    const passedTests = onRerun.mock.calls[0][0];
-    expect(passedTests).toHaveLength(1);
-    expect(passedTests[0].uuid).toBe("real-test-1");
+    const [tests, runAllLinked] = onRerun.mock.calls[0];
+    // Real uuids present → rerun those exact tests, not all linked.
+    expect(runAllLinked).toBe(false);
+    expect(tests.map((t: { uuid: string }) => t.uuid)).toEqual(["real-test-1"]);
   });
 
-  it("hides the Rerun button when no test carries a real uuid", async () => {
+  it("reruns all linked tests when the viewed results lack real uuids", async () => {
     const onRerun = jest.fn();
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
@@ -307,7 +301,8 @@ describe("TestRunnerDialog", () => {
             name: "Synthetic Run",
             passed: 1,
             failed: 0,
-            // No test_uuid on any row → all synthesised as `generated-*`.
+            // No test_uuid on any row → all synthesised as `generated-*`, so a
+            // per-uuid rerun is impossible and we fall back to all linked.
             results: [{ name: "Only Test", status: "passed", passed: true }],
           }),
         );
@@ -328,12 +323,15 @@ describe("TestRunnerDialog", () => {
       />,
     );
 
-    await waitFor(() =>
-      expect(screen.getByText("Synthetic Run")).toBeInTheDocument(),
-    );
-    expect(
-      screen.queryByRole("button", { name: /Rerun/ }),
-    ).not.toBeInTheDocument();
+    const rerunButton = await screen.findByRole("button", { name: /Rerun/ });
+    await setupUser().click(rerunButton);
+
+    expect(onRerun).toHaveBeenCalledTimes(1);
+    const [tests, runAllLinked] = onRerun.mock.calls[0];
+    expect(runAllLinked).toBe(true);
+    // The displayed rows still seed the new dialog's list even though their
+    // uuids are synthetic (the POST omits test_uuids when running all linked).
+    expect(tests).toHaveLength(1);
   });
 
   it("does not show a Rerun button when onRerun is not provided", async () => {

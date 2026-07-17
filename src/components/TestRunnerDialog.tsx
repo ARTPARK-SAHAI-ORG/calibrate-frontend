@@ -147,14 +147,17 @@ type TestRunnerDialogProps = {
   ) => void; // Called when run status changes (for coordinated polling)
   runAllLinked?: boolean; // When true, omit test_uuids from run request (backend runs all linked tests)
   // Called when the user clicks "Rerun" on a completed run. Hands the parent
-  // the real-uuid tests this run covered so it can start a fresh run and open
-  // it in a new dialog. Omit to hide the button.
-  onRerun?: (tests: TestData[]) => void;
+  // the tests to display plus whether to run all linked tests: a viewed past
+  // run's results don't carry real backend uuids (see below), so those can't be
+  // re-POSTed individually and we fall back to rerunning all linked tests
+  // (`runAllLinked` → POST `{}`). A fresh run still holds real uuids, so it
+  // reruns exactly those. Omit to hide the button.
+  onRerun?: (tests: TestData[], runAllLinked: boolean) => void;
 };
 
-// UUIDs the parents synthesise for tests reconstructed from a viewed run's
-// results (they carry no real backend uuid). A rerun can't POST these, so they
-// are filtered out when building the rerun test set.
+// UUIDs the parents / this dialog synthesise for tests reconstructed from a
+// viewed run's results — the run-detail endpoint may omit `test_uuid`, so they
+// carry no real backend uuid and can't be re-POSTed individually.
 const SYNTHETIC_TEST_UUID_PREFIXES = [
   "past-run-test-",
   "run-test-",
@@ -977,11 +980,13 @@ export function TestRunnerDialog({
     [testResults, runEvaluators],
   );
 
-  // Tests eligible for a rerun: only those carrying a real backend uuid (a
-  // viewed run may hold synthetic placeholders that can't be re-POSTed).
-  const rerunnableTests = testResults
-    .map((r) => r.test)
-    .filter((t) => isRealTestUuid(t.uuid));
+  // Rerun config. When every displayed test carries a real backend uuid we can
+  // rerun exactly those; otherwise (a viewed past run whose results omit
+  // `test_uuid`) we rerun all linked tests. Either way the displayed rows seed
+  // the new dialog's initial list.
+  const rerunTests = testResults.map((r) => r.test);
+  const canRerunExactTests =
+    rerunTests.length > 0 && rerunTests.every((t) => isRealTestUuid(t.uuid));
 
   // Check if the entire run errored (all tests have errors, none have real results)
   const isOverallError =
@@ -1093,13 +1098,13 @@ export function TestRunnerDialog({
             {/* Rerun — start a fresh run of the same tests and open it in a
                 new dialog. Only when the run is done and we hold real test
                 uuids to re-POST. */}
-            {runStatus === "done" &&
-              onRerun &&
-              rerunnableTests.length > 0 && (
+            {runStatus === "done" && onRerun && rerunTests.length > 0 && (
                 <div className="hidden md:block">
                   <button
                     type="button"
-                    onClick={() => onRerun(rerunnableTests)}
+                    onClick={() =>
+                      onRerun(rerunTests, !canRerunExactTests)
+                    }
                     className="flex items-center gap-2 h-8 px-2 md:px-3 rounded-md text-xs md:text-sm font-medium border border-border hover:bg-muted/50 transition-colors cursor-pointer"
                   >
                     <svg
