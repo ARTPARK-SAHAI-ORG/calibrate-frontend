@@ -16,10 +16,19 @@ const TEST_EVALUATORS = [
   { evaluator_uuid: "ev-new", variable_values: {} },
 ];
 
+const verifySavedAgentMock = jest.fn(async () => true);
 jest.mock("../../../hooks", () => ({
   useAccessToken: () => "test-token",
   useMaxRowsPerEval: () => 100,
   useDialogUrlParam: () => ({ setParam: jest.fn() }),
+  useVerifyConnection: () => ({
+    isVerifying: false,
+    verifyError: null,
+    verifySampleResponse: null,
+    verifySavedAgent: verifySavedAgentMock,
+    verifyAdHoc: jest.fn(),
+    dismiss: jest.fn(),
+  }),
 }));
 
 jest.mock("../../../lib/reportError", () => ({
@@ -233,7 +242,7 @@ describe("TestsTabContent save-and-run shortcut", () => {
     );
   });
 
-  it("does not offer the shortcut when a connection agent is unverified", async () => {
+  it("offers the shortcut for an unverified connection agent and diverts it to the verify gate", async () => {
     const user = setupUser();
     render(
       <TestsTabContent
@@ -245,10 +254,17 @@ describe("TestsTabContent save-and-run shortcut", () => {
 
     await screen.findByRole("button", { name: "Create test" });
     await user.click(screen.getByRole("button", { name: "Create test" }));
+    // The shortcut is now always offered; the verify gate handles unverified.
     expect(screen.getByTestId("add-test-dialog")).toHaveAttribute(
       "data-run",
-      "false",
+      "true",
     );
+
+    await user.click(screen.getByRole("button", { name: "Submit and run" }));
+
+    // Instead of the runner, the verify-to-run gate opens.
+    expect(await screen.findByText("Verify connection to run")).toBeInTheDocument();
+    expect(screen.queryByTestId("test-runner")).not.toBeInTheDocument();
   });
 
   it("runs the just-created test and skips the defaults prompt on 'Create and run'", async () => {

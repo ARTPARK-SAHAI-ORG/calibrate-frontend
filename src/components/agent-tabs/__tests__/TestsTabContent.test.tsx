@@ -20,6 +20,20 @@ const useMaxRowsPerEvalMock = jest.fn();
 let dialogUrlParamArgs: any = null;
 const setTestIdParamMock = jest.fn();
 
+// Controllable verify hook. `verifySavedAgentMock` resolves a boolean per test;
+// the state fields are read back into the captured VerifyToRunDialog props.
+const verifySavedAgentMock = jest.fn(async () => true);
+const verifyDismissMock = jest.fn();
+const verifyState: {
+  isVerifying: boolean;
+  verifyError: string | null;
+  verifySampleResponse: Record<string, unknown> | null;
+} = {
+  isVerifying: false,
+  verifyError: null,
+  verifySampleResponse: null,
+};
+
 jest.mock("../../../hooks", () => ({
   __esModule: true,
   useAccessToken: () => useAccessTokenMock(),
@@ -27,6 +41,30 @@ jest.mock("../../../hooks", () => ({
   useDialogUrlParam: (args: any) => {
     dialogUrlParamArgs = args;
     return { setParam: setTestIdParamMock };
+  },
+  useVerifyConnection: () => ({
+    isVerifying: verifyState.isVerifying,
+    verifyError: verifyState.verifyError,
+    verifySampleResponse: verifyState.verifySampleResponse,
+    verifySavedAgent: verifySavedAgentMock,
+    verifyAdHoc: jest.fn(),
+    dismiss: verifyDismissMock,
+  }),
+}));
+
+let verifyToRunProps: any = null;
+jest.mock("../../VerifyToRunDialog", () => ({
+  __esModule: true,
+  VerifyToRunDialog: (props: any) => {
+    verifyToRunProps = props;
+    return props.isOpen ? (
+      <div data-testid="verify-to-run-dialog">
+        <div data-testid="verify-agent-name">{props.agentName}</div>
+        <button onClick={props.onVerify}>VerifyToRun</button>
+        <button onClick={props.onGoToConnection}>GoToConnection</button>
+        <button onClick={props.onClose}>CloseVerifyToRun</button>
+      </div>
+    ) : null;
   },
 }));
 
@@ -347,6 +385,13 @@ beforeEach(() => {
   testRunnerProps = null;
   benchmarkProps = null;
   benchmarkResultsProps = null;
+  verifyToRunProps = null;
+  verifySavedAgentMock.mockReset();
+  verifySavedAgentMock.mockResolvedValue(true);
+  verifyDismissMock.mockClear();
+  verifyState.isVerifying = false;
+  verifyState.verifyError = null;
+  verifyState.verifySampleResponse = null;
   (signOut as jest.Mock).mockClear();
   (showLimitToast as jest.Mock).mockClear();
   (readBulkNameConflictMessage as jest.Mock).mockResolvedValue(null);
@@ -1184,14 +1229,130 @@ describe("TestsTabContent — benchmark & past runs", () => {
 });
 
 describe("TestsTabContent — connection agent", () => {
-  it("disables Run all for an unverified connection agent", async () => {
+  it("opens the verify gate instead of running for an unverified connection agent", async () => {
+    const user = setupUser();
+    state.agentTests = [responseTest];
+    renderComponent({
+      agentType: "connection",
+      connectionVerified: false,
+      agentName: "My Bot",
+    });
+    await screen.findAllByText("Greeting test");
+
+    // Run all is now clickable; clicking it diverts into the verify gate
+    // rather than opening the test runner.
+    const runAll = screen.getByText("Run all tests").closest("button")!;
+    expect(runAll).not.toBeDisabled();
+    await user.click(runAll);
+
+    expect(screen.getByTestId("verify-to-run-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("verify-agent-name")).toHaveTextContent("My Bot");
+    expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+  });
+
+  it("per-row run also diverts to the verify gate when unverified", async () => {
+    const user = setupUser();
     state.agentTests = [responseTest];
     renderComponent({
       agentType: "connection",
       connectionVerified: false,
     });
     await screen.findAllByText("Greeting test");
-    const runAll = screen.getByText("Run all tests").closest("button");
-    expect(runAll).toBeDisabled();
+
+    const runRow = screen.getAllByTitle("Run test")[0];
+    await user.click(runRow);
+
+    expect(screen.getByTestId("verify-to-run-dialog")).toBeInTheDocument();
+    expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+  });
+
+  it("runs the pending tests after a successful verification", async () => {
+    const user = setupUser();
+    const onConnectionVerified = jest.fn();
+    verifySavedAgentMock.mockResolvedValue(true);
+    state.agentTests = [responseTest];
+    renderComponent({
+      agentType: "connection",
+      connectionVerified: false,
+      onConnectionVerified,
+    });
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByText("Run all tests").closest("button")!);
+    await user.click(screen.getByText("VerifyToRun"));
+
+    await waitFor(() =>
+      expect(verifySavedAgentMock).toHaveBeenCalledWith("agent-1"),
+    );
+    expect(onConnectionVerified).toHaveBeenCalled();
+    // Gate closes, the runner opens with the pending run.
+    expect(
+      screen.queryByTestId("verify-to-run-dialog"),
+    ).not.toBeInTheDocument();
+    const runner = await screen.findByTestId("test-runner-dialog");
+    expect(runner).toBeInTheDocument();
+    expect(screen.getByTestId("runner-test-count")).toHaveTextContent("1");
+  });
+
+  it("keeps the gate open and does not run when verification fails", async () => {
+    const user = setupUser();
+    const onConnectionVerified = jest.fn();
+    verifySavedAgentMock.mockResolvedValue(false);
+    state.agentTests = [responseTest];
+    renderComponent({
+      agentType: "connection",
+      connectionVerified: false,
+      onConnectionVerified,
+    });
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByText("Run all tests").closest("button")!);
+    await user.click(screen.getByText("VerifyToRun"));
+
+    await waitFor(() => expect(verifySavedAgentMock).toHaveBeenCalled());
+    expect(onConnectionVerified).not.toHaveBeenCalled();
+    expect(screen.getByTestId("verify-to-run-dialog")).toBeInTheDocument();
+    expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+  });
+
+  it("navigates to the connection tab from the failed gate", async () => {
+    const user = setupUser();
+    const onNavigateToConnection = jest.fn();
+    verifySavedAgentMock.mockResolvedValue(false);
+    state.agentTests = [responseTest];
+    renderComponent({
+      agentType: "connection",
+      connectionVerified: false,
+      onNavigateToConnection,
+    });
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByText("Run all tests").closest("button")!);
+    await user.click(screen.getByText("VerifyToRun"));
+    await waitFor(() => expect(verifySavedAgentMock).toHaveBeenCalled());
+    await user.click(screen.getByText("GoToConnection"));
+
+    expect(onNavigateToConnection).toHaveBeenCalled();
+    expect(
+      screen.queryByTestId("verify-to-run-dialog"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("runs directly for a verified connection agent", async () => {
+    const user = setupUser();
+    state.agentTests = [responseTest];
+    renderComponent({
+      agentType: "connection",
+      connectionVerified: true,
+    });
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByText("Run all tests").closest("button")!);
+
+    expect(
+      screen.queryByTestId("verify-to-run-dialog"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("test-runner-dialog")).toBeInTheDocument();
+    expect(verifySavedAgentMock).not.toHaveBeenCalled();
   });
 });

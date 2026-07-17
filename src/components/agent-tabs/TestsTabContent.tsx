@@ -3,12 +3,18 @@ import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { signOut } from "next-auth/react";
-import { useAccessToken, useMaxRowsPerEval, useDialogUrlParam } from "@/hooks";
+import {
+  useAccessToken,
+  useMaxRowsPerEval,
+  useDialogUrlParam,
+  useVerifyConnection,
+} from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { buildTestToRun } from "@/lib/testRun";
 
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
+import { VerifyToRunDialog } from "@/components/VerifyToRunDialog";
 import { BenchmarkDialog } from "@/components/BenchmarkDialog";
 import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
 import {
@@ -217,6 +223,13 @@ type TestsTabContentProps = {
     { verified: boolean; verified_at: string; error: string | null }
   >;
   benchmarkProvider?: string;
+  /**
+   * Called after a connection agent is verified from the run gate, so the
+   * parent can clear the unverified state (and re-enable normal runs).
+   */
+  onConnectionVerified?: () => void;
+  /** Switch the agent detail view to the Connection (configuration) tab. */
+  onNavigateToConnection?: () => void;
 };
 
 export function TestsTabContent({
@@ -227,6 +240,8 @@ export function TestsTabContent({
   supportsBenchmark,
   benchmarkModelsVerified,
   benchmarkProvider,
+  onConnectionVerified,
+  onNavigateToConnection,
 }: TestsTabContentProps) {
   const backendAccessToken = useAccessToken();
   const maxRowsPerEval = useMaxRowsPerEval();
@@ -356,6 +371,16 @@ export function TestsTabContent({
   const [testRunnerOpen, setTestRunnerOpen] = useState(false);
   const [testsToRun, setTestsToRun] = useState<TestData[]>([]);
   const [runAllLinked, setRunAllLinked] = useState(false);
+
+  // Verify-to-run gate. When an unverified connection agent tries to run
+  // tests, we stash the intended run here and open the verify dialog instead
+  // of running (which would just fail against an unverified endpoint).
+  const verify = useVerifyConnection();
+  const [verifyToRunOpen, setVerifyToRunOpen] = useState(false);
+  const [pendingRun, setPendingRun] = useState<{
+    tests: TestData[];
+    runAll: boolean;
+  } | null>(null);
 
   // Benchmark dialog state
   const [benchmarkDialogOpen, setBenchmarkDialogOpen] = useState(false);
@@ -1041,15 +1066,61 @@ export function TestsTabContent({
     resetTestDialog();
   };
 
+  // Single gate for every run entry point (header "Run all", bulk "Run",
+  // per-row play, "Save and run", rerun). Enforces the per-run row limit and,
+  // for an unverified connection agent, diverts into the verify-to-run flow
+  // instead of starting a run that would fail against an unverified endpoint.
+  const startRun = (tests: TestData[], runAll: boolean) => {
+    if (tests.length === 0) return;
+    if (tests.length > maxRowsPerEval) {
+      showLimitToast(
+        `You can only run up to ${maxRowsPerEval} tests at a time.`,
+      );
+      return;
+    }
+    if (isConnectionUnverified) {
+      verify.dismiss();
+      setPendingRun({ tests, runAll });
+      setVerifyToRunOpen(true);
+      return;
+    }
+    setTestsToRun(tests);
+    setRunAllLinked(runAll);
+    setTestRunnerOpen(true);
+  };
+
+  // "Verify" pressed in the run gate: verify the saved agent, then either
+  // resume the pending run (success) or leave the failure showing so the user
+  // can jump to the connection settings.
+  const handleVerifyToRun = async () => {
+    const success = await verify.verifySavedAgent(agentUuid);
+    if (!success) return;
+    onConnectionVerified?.();
+    setVerifyToRunOpen(false);
+    if (pendingRun) {
+      setTestsToRun(pendingRun.tests);
+      setRunAllLinked(pendingRun.runAll);
+      setTestRunnerOpen(true);
+      setPendingRun(null);
+    }
+  };
+
+  const closeVerifyToRun = () => {
+    setVerifyToRunOpen(false);
+    setPendingRun(null);
+    verify.dismiss();
+  };
+
+  const goToConnectionSettings = () => {
+    closeVerifyToRun();
+    onNavigateToConnection?.();
+  };
+
   // Open the test runner for a single just-saved test. Backing the dialog's
   // "Save and run" shortcut, it mirrors the row-level play action (run one
-  // specific test, not the whole linked set). Skipped for an unverified
-  // connection, matching where the shortcut is offered.
+  // specific test, not the whole linked set).
   const runSavedTest = (test: TestData) => {
-    if (isConnectionUnverified) return;
-    setTestsToRun([test]);
-    setRunAllLinked(false);
-    setTestRunnerOpen(true);
+    startRun([test], false);
   };
 
   // Test is already saved when this prompt is shown. Declining (Not now / X)
@@ -1392,9 +1463,7 @@ export function TestsTabContent({
   const handleRerunTests = (tests: TestData[]) => {
     setViewingTestResults(false);
     setSelectedPastRun(null);
-    setRunAllLinked(false);
-    setTestsToRun(tests);
-    setTestRunnerOpen(true);
+    startRun(tests, false);
   };
 
   // Rerun a completed benchmark with the same models and test subset, swapping
@@ -1923,50 +1992,27 @@ export function TestsTabContent({
           {/* Left group: act-on-the-tests buttons. */}
           <div className="flex flex-wrap items-center gap-2 md:gap-3">
             {/* Run all tests — sky tint, "play" semantic. */}
-            <div className="relative group/runall">
-              <button
-                data-tour="tests-run-all"
-                onClick={() => {
-                  if (isConnectionUnverified) return;
-                  if (agentTests.length > maxRowsPerEval) {
-                    showLimitToast(
-                      `You can only run up to ${maxRowsPerEval} tests at a time.`,
-                    );
-                    return;
-                  }
-                  setTestsToRun(agentTests);
-                  setRunAllLinked(true);
-                  setTestRunnerOpen(true);
-                }}
-                disabled={isConnectionUnverified}
-                className={`h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border transition-colors flex items-center gap-2 bg-sky-500/12 border-sky-500/45 text-sky-950 dark:text-sky-100 ${
-                  isConnectionUnverified
-                    ? "opacity-50 cursor-not-allowed"
-                    : "hover:bg-sky-500/22 dark:hover:bg-sky-500/18 cursor-pointer"
-                }`}
+            <button
+              data-tour="tests-run-all"
+              onClick={() => startRun(agentTests, true)}
+              className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border transition-colors flex items-center gap-2 bg-sky-500/12 border-sky-500/45 text-sky-950 dark:text-sky-100 hover:bg-sky-500/22 dark:hover:bg-sky-500/18 cursor-pointer"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
               >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
-                  />
-                </svg>
-                <span className="hidden sm:inline">Run all tests</span>
-                <span className="sm:hidden">Run all</span>
-              </button>
-              {isConnectionUnverified && (
-                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/runall:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
-                  Verify agent connection first
-                </div>
-              )}
-            </div>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
+                />
+              </svg>
+              <span className="hidden sm:inline">Run all tests</span>
+              <span className="sm:hidden">Run all</span>
+            </button>
 
             {/* Compare models — amber tint, "analyse" semantic. */}
             <CompareModelsButton
@@ -2222,53 +2268,32 @@ export function TestsTabContent({
                       setSelectedTestUuids(new Set());
                     }}
                   />
-                  <div className="relative group/runselected">
-                    <button
-                      onClick={() => {
-                        if (isConnectionUnverified) return;
-                        if (selectedTestUuids.size > maxRowsPerEval) {
-                          showLimitToast(
-                            `You can only run up to ${maxRowsPerEval} tests at a time.`,
-                          );
-                          return;
-                        }
-                        const selected = agentTests.filter((t) =>
-                          selectedTestUuids.has(t.uuid),
-                        );
-                        if (selected.length === 0) return;
-                        setTestsToRun(selected);
-                        setRunAllLinked(false);
-                        setTestRunnerOpen(true);
-                        setSelectedTestUuids(new Set());
-                      }}
-                      disabled={isConnectionUnverified}
-                      className={`h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background transition-opacity flex items-center gap-1.5 ${
-                        isConnectionUnverified
-                          ? "opacity-50 cursor-not-allowed"
-                          : "hover:opacity-90 cursor-pointer"
-                      }`}
+                  <button
+                    onClick={() => {
+                      const selected = agentTests.filter((t) =>
+                        selectedTestUuids.has(t.uuid),
+                      );
+                      if (selected.length === 0) return;
+                      startRun(selected, false);
+                      setSelectedTestUuids(new Set());
+                    }}
+                    className="h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background transition-opacity flex items-center gap-1.5 hover:opacity-90 cursor-pointer"
+                  >
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
                     >
-                      <svg
-                        className="w-3.5 h-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
-                        />
-                      </svg>
-                      Run
-                    </button>
-                    {isConnectionUnverified && (
-                      <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/runselected:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
-                        Verify agent connection first
-                      </div>
-                    )}
-                  </div>
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
+                      />
+                    </svg>
+                    Run
+                  </button>
                 </div>
               </div>
             )}
@@ -2388,9 +2413,7 @@ export function TestsTabContent({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              setTestsToRun([test]);
-                              setRunAllLinked(false);
-                              setTestRunnerOpen(true);
+                              startRun([test], false);
                             }}
                             className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
                             title="Run test"
@@ -2503,9 +2526,7 @@ export function TestsTabContent({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              setTestsToRun([test]);
-                              setRunAllLinked(false);
-                              setTestRunnerOpen(true);
+                              startRun([test], false);
                             }}
                             className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
                             title="Run test"
@@ -2663,7 +2684,7 @@ export function TestsTabContent({
           initialEvaluators={initialEvaluators}
           agentEvaluatorUuids={agentEvaluators.map((e) => e.uuid)}
           agentEvaluatorsPending={!agentEvaluatorsLoaded}
-          showRunAfterSave={!isConnectionUnverified}
+          showRunAfterSave
           onRun={() => {
             // Run the already-saved version of the test being edited (the
             // "run directly" / "discard and run" path). Build the run target
@@ -2718,6 +2739,18 @@ export function TestsTabContent({
         runAllLinked={runAllLinked}
         onRunCreated={handleTestRunCreated}
         onRerun={handleRerunTests}
+      />
+
+      {/* Verify-to-run gate for unverified connection agents. */}
+      <VerifyToRunDialog
+        isOpen={verifyToRunOpen}
+        agentName={agentName}
+        isVerifying={verify.isVerifying}
+        error={verify.verifyError}
+        sampleResponse={verify.verifySampleResponse}
+        onVerify={handleVerifyToRun}
+        onGoToConnection={goToConnectionSettings}
+        onClose={closeVerifyToRun}
       />
 
       {/* Benchmark Dialog */}

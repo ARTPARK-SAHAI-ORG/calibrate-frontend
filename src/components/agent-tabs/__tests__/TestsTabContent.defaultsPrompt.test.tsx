@@ -20,6 +20,14 @@ jest.mock("../../../hooks", () => ({
   useAccessToken: () => "test-token",
   useMaxRowsPerEval: () => 100,
   useDialogUrlParam: () => ({ setParam: jest.fn() }),
+  useVerifyConnection: () => ({
+    isVerifying: false,
+    verifyError: null,
+    verifySampleResponse: null,
+    verifySavedAgent: jest.fn(async () => true),
+    verifyAdHoc: jest.fn(),
+    dismiss: jest.fn(),
+  }),
 }));
 
 jest.mock("../../../lib/reportError", () => ({
