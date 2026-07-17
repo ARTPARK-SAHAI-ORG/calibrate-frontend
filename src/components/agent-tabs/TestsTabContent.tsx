@@ -3,7 +3,7 @@ import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { signOut } from "next-auth/react";
-import { useAccessToken, useMaxRowsPerEval } from "@/hooks";
+import { useAccessToken, useMaxRowsPerEval, useDialogUrlParam } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
@@ -313,6 +313,16 @@ export function TestsTabContent({
   const [initialEvaluators, setInitialEvaluators] = useState<
     AttachedEvaluatorInit[] | undefined
   >(undefined);
+
+  // Deep-link the open test to `?testId=<uuid>` so a reload re-opens it and
+  // the URL can be shared to open the test directly. `openEditTest` is defined
+  // below; the closure only runs from the hook's effect after mount, so the
+  // forward reference is safe.
+  const { setParam: setTestIdParam } = useDialogUrlParam({
+    param: "testId",
+    enabled: !!backendAccessToken,
+    onOpen: (uuid) => openEditTest(uuid),
+  });
 
   // Selection state for bulk operations
   const [selectedTestUuids, setSelectedTestUuids] = useState<Set<string>>(
@@ -976,6 +986,7 @@ export function TestsTabContent({
 
   // Reset all edit/create-related state. Called when closing the dialog.
   const resetTestDialog = () => {
+    setTestIdParam(null);
     setEditingTestUuid(null);
     setIsLoadingTest(false);
     setInitialTab(undefined);
@@ -1039,6 +1050,8 @@ export function TestsTabContent({
       setCreateDialogOpen(true);
       setCreateError(null);
       setNameConflictError(null);
+      // Reflect the open test in the URL (shareable / reload-stable).
+      setTestIdParam(uuid);
 
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
@@ -1091,6 +1104,9 @@ export function TestsTabContent({
       setCreateError(
         err instanceof Error ? err.message : "Failed to load test",
       );
+      // Drop a stale/invalid testId from the URL so a shared or reloaded link
+      // to a missing test doesn't keep re-opening the error on every load.
+      setTestIdParam(null);
     } finally {
       setIsLoadingTest(false);
     }

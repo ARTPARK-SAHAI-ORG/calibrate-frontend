@@ -15,10 +15,19 @@ import {
 const useAccessTokenMock = jest.fn();
 const useMaxRowsPerEvalMock = jest.fn();
 
+// Capture the deep-link hook's args (esp. onOpen) and expose a spy setParam so
+// we can assert URL writes/clears and drive the "open from URL" path directly.
+let dialogUrlParamArgs: any = null;
+const setTestIdParamMock = jest.fn();
+
 jest.mock("../../../hooks", () => ({
   __esModule: true,
   useAccessToken: () => useAccessTokenMock(),
   useMaxRowsPerEval: () => useMaxRowsPerEvalMock(),
+  useDialogUrlParam: (args: any) => {
+    dialogUrlParamArgs = args;
+    return { setParam: setTestIdParamMock };
+  },
 }));
 
 jest.mock("../../../lib/reportError", () => ({
@@ -332,6 +341,8 @@ beforeEach(() => {
   useMaxRowsPerEvalMock.mockReturnValue(100);
   deleteDialogProps = null;
   addTestDialogProps = null;
+  dialogUrlParamArgs = null;
+  setTestIdParamMock.mockClear();
   bulkUploadProps = null;
   testRunnerProps = null;
   benchmarkProps = null;
@@ -613,6 +624,73 @@ describe("TestsTabContent — populated table", () => {
     await user.click(screen.getByText("Run all tests"));
     expect(showLimitToast).toHaveBeenCalled();
     expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+  });
+});
+
+describe("TestsTabContent — test deep-link (?testId)", () => {
+  beforeEach(() => {
+    state.agentTests = [responseTest, toolCallTest];
+  });
+
+  it("writes the test uuid to the URL when a row is opened", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getAllByText("Greeting test")[0]);
+    await screen.findByTestId("add-test-dialog");
+    expect(setTestIdParamMock).toHaveBeenCalledWith("t1");
+  });
+
+  it("opens the test named by the deep-link (onOpen) in edit mode", async () => {
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    // Simulate the hook resolving a `?testId=t1` URL on load.
+    expect(typeof dialogUrlParamArgs.onOpen).toBe("function");
+    await act(async () => {
+      dialogUrlParamArgs.onOpen("t1");
+    });
+    await screen.findByTestId("add-test-dialog");
+    expect(screen.getByTestId("add-test-editing")).toHaveTextContent("editing");
+  });
+
+  it("clears the testId from the URL when the dialog is closed", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getAllByText("Greeting test")[0]);
+    await screen.findByTestId("add-test-dialog");
+    setTestIdParamMock.mockClear();
+
+    await user.click(screen.getByText("CloseAddTest"));
+    expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
+    expect(setTestIdParamMock).toHaveBeenCalledWith(null);
+  });
+
+  it("drops a stale testId from the URL when the test detail fetch fails", async () => {
+    state.detailInit = { ok: false, status: 500 };
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await act(async () => {
+      dialogUrlParamArgs.onOpen("does-not-exist");
+    });
+    await screen.findByTestId("add-test-error");
+    expect(setTestIdParamMock).toHaveBeenCalledWith(null);
+  });
+
+  it("gates the deep-link on the access token being present", () => {
+    renderComponent();
+    expect(dialogUrlParamArgs.param).toBe("testId");
+    expect(dialogUrlParamArgs.enabled).toBe(true);
+  });
+
+  it("disables the deep-link when there is no access token", () => {
+    useAccessTokenMock.mockReturnValue(null);
+    renderComponent();
+    expect(dialogUrlParamArgs.enabled).toBe(false);
   });
 });
 

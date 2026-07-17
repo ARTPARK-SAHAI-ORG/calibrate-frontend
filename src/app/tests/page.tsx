@@ -4,7 +4,7 @@ import { reportError } from "@/lib/reportError";
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { useAccessToken } from "@/hooks";
+import { useAccessToken, useDialogUrlParam } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { bulkDeleteTests } from "@/lib/testsApi";
 import { AppLayout } from "@/components/AppLayout";
@@ -193,6 +193,16 @@ function LLMPageInner() {
   );
   const [editingTestUuid, setEditingTestUuid] = useState<string | null>(null);
   const [isLoadingTest, setIsLoadingTest] = useState(false);
+  // Deep-link the open test to `?testId=<uuid>` so a reload re-opens it and
+  // the URL can be shared to open the test directly. Only active on the Tests
+  // tab (the Runs tab owns `?runId=`). `openEditTest` is defined below; the
+  // closure only runs from the hook's effect after mount, so the forward
+  // reference is safe.
+  const { setParam: setTestIdParam } = useDialogUrlParam({
+    param: "testId",
+    enabled: activeTab === "tests" && !!backendAccessToken,
+    onOpen: (uuid) => openEditTest(uuid),
+  });
   // UUID of the test whose details are being fetched for duplication. Drives
   // the per-row spinner; the dialog only opens once the fetch resolves.
   const [duplicatingUuid, setDuplicatingUuid] = useState<string | null>(null);
@@ -705,6 +715,8 @@ function LLMPageInner() {
       setEditingTestUuid(uuid);
       setAddTestSidebarOpen(true);
       setCreateError(null);
+      // Reflect the open test in the URL (shareable / reload-stable).
+      setTestIdParam(uuid);
 
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) {
@@ -763,6 +775,9 @@ function LLMPageInner() {
       setCreateError(
         err instanceof Error ? err.message : "Failed to load test"
       );
+      // Drop a stale/invalid testId from the URL so a shared or reloaded link
+      // to a missing test doesn't keep re-opening the error on every load.
+      setTestIdParam(null);
     } finally {
       setIsLoadingTest(false);
     }
@@ -924,6 +939,7 @@ function LLMPageInner() {
 
   // Reset form fields
   const resetForm = () => {
+    setTestIdParam(null);
     setNewTestName("");
     setEditingTestUuid(null);
     setCreateError(null);
