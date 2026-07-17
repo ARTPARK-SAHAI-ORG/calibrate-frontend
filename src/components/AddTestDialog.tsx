@@ -16,10 +16,7 @@ import { isDefaultLLMNextReplyEvaluator } from "@/lib/defaultEvaluators";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
 import { NestedContainer } from "@/components/ui/NestedContainer";
-import {
-  readToolParameters,
-  NormalizedToolParam,
-} from "@/lib/toolParams";
+import { readToolParameters, NormalizedToolParam } from "@/lib/toolParams";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { formatTurnTimestamp } from "@/components/test-results/shared";
@@ -86,7 +83,12 @@ type ExpectedParam = {
 // containing a `match_type` key is always a spec.
 const parseArgMatch = (
   v: any,
-): { matchType: MatchType; value: any; criteria: string; judgeModel?: string } => {
+): {
+  matchType: MatchType;
+  value: any;
+  criteria: string;
+  judgeModel?: string;
+} => {
   if (
     v !== null &&
     typeof v === "object" &&
@@ -98,7 +100,8 @@ const parseArgMatch = (
         matchType: "llm_judge",
         value: undefined,
         criteria: typeof v.criteria === "string" ? v.criteria : "",
-        judgeModel: typeof v.judge_model === "string" ? v.judge_model : undefined,
+        judgeModel:
+          typeof v.judge_model === "string" ? v.judge_model : undefined,
       };
     }
     if (v.match_type === "any") {
@@ -222,9 +225,7 @@ const buildExpectedParamsFromToolConfig = (
 // start out unselected (offered as add-back chips); only required ones are
 // shown. If a level has no required params at all, the first one is selected so
 // the form isn't empty. Applied recursively to nested object properties.
-const defaultSelectedParams = (
-  params: ExpectedParam[],
-): ExpectedParam[] => {
+const defaultSelectedParams = (params: ExpectedParam[]): ExpectedParam[] => {
   const required = params.filter((p) => p.required);
   const chosen = required.length > 0 ? required : params.slice(0, 1);
   return chosen.map((p) =>
@@ -591,7 +592,8 @@ function AddBackChips({
 // structured-output tools default to a minimal acknowledgement. Hoisted to
 // constants so the value is identical across the load-synthesis path, the
 // "add tool call" path, and the textarea placeholder.
-const DEFAULT_WEBHOOK_RESPONSE = '{\n  "status": "success",\n  "response": {}\n}';
+const DEFAULT_WEBHOOK_RESPONSE =
+  '{\n  "status": "success",\n  "response": {}\n}';
 const DEFAULT_STRUCTURED_RESPONSE = '{\n  "status": "received"\n}';
 const RESPONSE_PLACEHOLDER = `// any valid JSON value\n${DEFAULT_WEBHOOK_RESPONSE}`;
 
@@ -683,7 +685,6 @@ export type EvaluatorRefPayload = {
   evaluator_uuid: string;
   variable_values?: Record<string, string>;
 };
-
 
 type AttachedEvaluator = {
   evaluator_uuid: string;
@@ -1875,9 +1876,7 @@ export function AddTestDialog({
     // the scroll target *inside* the setState updater and reading it back on
     // the next line is unreliable — the updater runs after this function
     // returns, so the target was often still null and the scroll never fired.
-    const existing = new Set(
-      attachedEvaluators.map((e) => e.evaluator_uuid),
-    );
+    const existing = new Set(attachedEvaluators.map((e) => e.evaluator_uuid));
     const toAdd = options.filter((option) => !existing.has(option.uuid));
     if (toAdd.length === 0) {
       closeEvaluatorPicker();
@@ -1994,7 +1993,11 @@ export function AddTestDialog({
       }));
       return;
     }
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    if (
+      parsed === null ||
+      typeof parsed !== "object" ||
+      Array.isArray(parsed)
+    ) {
       setToolJsonError((prev) => ({
         ...prev,
         [tool.id]: "The top-level value must be a JSON object of parameters.",
@@ -2246,15 +2249,17 @@ export function AddTestDialog({
       <select
         value={mode}
         onChange={(e) =>
-          updateExpectedParamMatchMode(toolId, path, e.target.value as MatchMode)
+          updateExpectedParamMatchMode(
+            toolId,
+            path,
+            e.target.value as MatchMode,
+          )
         }
         aria-label="Match mode"
         className="h-10 pl-3 pr-8 rounded-lg text-sm font-medium bg-foreground text-background border border-transparent hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer appearance-none transition-opacity"
       >
         <option value="exact">Is exactly</option>
-        {allowLlm && (
-          <option value="llm_judge">satisfies the criteria</option>
-        )}
+        {allowLlm && <option value="llm_judge">satisfies the criteria</option>}
         <option value="null">Is null</option>
         <option value="any">Is any</option>
       </select>
@@ -2456,7 +2461,8 @@ export function AddTestDialog({
                   <div className="flex-1" />
                   {collapseToggle}
                   {renderRequiredBadge(param.required)}
-                  {!param.required && renderRemoveParamButton(toolId, paramPath)}
+                  {!param.required &&
+                    renderRemoveParamButton(toolId, paramPath)}
                 </div>
                 {renderParamNameInput(toolId, paramPath, param.name, nameError)}
               </>
@@ -2541,7 +2547,8 @@ export function AddTestDialog({
       const missingValue =
         !leafFilled &&
         (param.required || (!param.custom ? true : !!param.name.trim()));
-      const valueError = showErrors && (missingValue || typeError || booleanUnset);
+      const valueError =
+        showErrors && (missingValue || typeError || booleanUnset);
       const fieldClass = `w-full h-10 px-4 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed ${
         valueError ? "border-red-500" : "border-border"
       }`;
@@ -2562,7 +2569,11 @@ export function AddTestDialog({
                   <select
                     value={booleanUnset ? "" : param.value}
                     onChange={(e) =>
-                      updateExpectedParamValue(toolId, paramPath, e.target.value)
+                      updateExpectedParamValue(
+                        toolId,
+                        paramPath,
+                        e.target.value,
+                      )
                     }
                     className={`${fieldClass} pr-10 cursor-pointer appearance-none`}
                   >
@@ -2609,10 +2620,9 @@ export function AddTestDialog({
                   placeholder="e.g. A friendly reminder with the date"
                   className={`${fieldClass} flex-1 min-w-0`}
                 />
-              ) : isNull || isAny ? (
-                // "Is null" / "Is any" assert presence only — no value box.
-                null
-              ) : (
+              ) : isNull ||
+                isAny ? // "Is null" / "Is any" assert presence only — no value box.
+              null : (
                 <input
                   type="text"
                   value={param.value}
@@ -2640,8 +2650,8 @@ export function AddTestDialog({
           )}
           {showErrors && typeError && (
             <p className="text-xs text-red-500">
-              Enter a valid {param.dataType === "integer" ? "integer" : "number"}
-              .
+              Enter a valid{" "}
+              {param.dataType === "integer" ? "integer" : "number"}.
             </p>
           )}
         </div>
@@ -3128,7 +3138,8 @@ export function AddTestDialog({
               Unsaved changes
             </h3>
             <p className="text-sm text-muted-foreground mb-6">
-              Running now uses the last saved version, not your edits
+              Do you want to discard your changes and run the test with the last
+              saved version?
             </p>
             <div className="flex items-center justify-end gap-3">
               <button
@@ -3280,7 +3291,7 @@ export function AddTestDialog({
                       <label className="text-base font-medium text-foreground">
                         Evaluators
                       </label>
-                      {!isLabelItem && (
+                      {!isLabelItem &&
                         (() => {
                           const remainingOptions =
                             availableLLMEvaluators.filter(
@@ -3293,8 +3304,7 @@ export function AddTestDialog({
                                     CONVERSATION_EVALUATOR_TYPE
                                   : o.evaluator_type === "llm"),
                             );
-                          const noOptionsLeft =
-                            remainingOptions.length === 0;
+                          const noOptionsLeft = remainingOptions.length === 0;
                           return (
                             <button
                               onClick={() => {
@@ -3306,9 +3316,7 @@ export function AddTestDialog({
                                 }
                               }}
                               disabled={
-                                evaluatorsLoading ||
-                                isLoading ||
-                                noOptionsLeft
+                                evaluatorsLoading || isLoading || noOptionsLeft
                               }
                               // Tinted violet so the action stands out from
                               // the neutral form chrome around it. Validation
@@ -3324,8 +3332,7 @@ export function AddTestDialog({
                               Add evaluator
                             </button>
                           );
-                        })()
-                      )}
+                        })()}
                     </div>
 
                     {/* Evaluator picker dropdown */}
@@ -3377,7 +3384,8 @@ export function AddTestDialog({
                                   </div>
                                 );
                               }
-                              const defaults = matches.filter(isDefaultEvaluator);
+                              const defaults =
+                                matches.filter(isDefaultEvaluator);
                               const mine = matches.filter(isOwnedEvaluator);
                               const showSections =
                                 defaults.length > 0 && mine.length > 0;
@@ -3438,9 +3446,10 @@ export function AddTestDialog({
                             <button
                               type="button"
                               onClick={() => {
-                                const selected = getAvailablePickerEvaluators().filter(
-                                  (o) => evaluatorPickerSelectedIds.has(o.uuid),
-                                );
+                                const selected =
+                                  getAvailablePickerEvaluators().filter((o) =>
+                                    evaluatorPickerSelectedIds.has(o.uuid),
+                                  );
                                 attachEvaluatorsFromOptions(selected);
                               }}
                               disabled={evaluatorPickerSelectedIds.size === 0}
@@ -3806,7 +3815,9 @@ export function AddTestDialog({
                                         </button>
                                         <button
                                           type="button"
-                                          onClick={() => enterToolJsonMode(tool)}
+                                          onClick={() =>
+                                            enterToolJsonMode(tool)
+                                          }
                                           className={`h-7 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer ${
                                             jsonModeToolIds.has(tool.id)
                                               ? "bg-foreground text-background"

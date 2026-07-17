@@ -7,6 +7,7 @@ import { signOut } from "next-auth/react";
 import { useAccessToken, useDialogUrlParam } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { bulkDeleteTests } from "@/lib/testsApi";
+import { resolveEditedTestToRun } from "@/lib/testRun";
 import { AppLayout } from "@/components/AppLayout";
 import {
   ToolPicker,
@@ -948,21 +949,17 @@ function LLMPageInner() {
       setAddTestSidebarOpen(false);
 
       // "Save and run": open the agent-picker run dialog for the just-saved
-      // test (running from this page always picks an agent first). Fall back
+      // test (running from this page always picks an agent first). Falls back
       // to a synthesized TestData if the refetch didn't return it.
       if (options?.runAfterSave) {
-        const savedTest: TestData = refreshed?.find(
-          (t) => t.uuid === targetUuid
-        ) ?? {
-          uuid: targetUuid,
-          name: targetName,
-          description: "",
-          type: config.evaluation.type,
-          config,
-          created_at: "",
-          updated_at: "",
-        };
-        openRunTestDialog(savedTest);
+        openRunTestDialog(
+          resolveEditedTestToRun(refreshed, {
+            uuid: targetUuid,
+            name: targetName,
+            type: config.evaluation.type,
+            config,
+          })
+        );
       }
     } catch (err) {
       reportError("Error updating test:", err);

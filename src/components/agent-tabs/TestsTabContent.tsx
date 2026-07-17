@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { signOut } from "next-auth/react";
 import { useAccessToken, useMaxRowsPerEval, useDialogUrlParam } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
+import { resolveEditedTestToRun } from "@/lib/testRun";
 
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
@@ -1280,17 +1281,12 @@ export function TestsTabContent({
       // "Save and run" takes priority: skip the agent-defaults prompt and go
       // straight to running the just-saved test the user asked to run.
       if (options?.runAfterSave) {
-        const savedTest: TestData = refreshed?.find(
-          (t) => t.uuid === targetUuid,
-        ) ?? {
+        const savedTest = resolveEditedTestToRun(refreshed, {
           uuid: targetUuid,
           name: targetName,
-          description: "",
           type: config.evaluation.type,
           config,
-          created_at: "",
-          updated_at: "",
-        };
+        });
         closeTestDialogAfterSave();
         runSavedTest(savedTest);
         return;
