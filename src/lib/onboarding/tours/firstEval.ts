@@ -183,18 +183,26 @@ type EvaluatorLike = {
   source_default_slug?: string | null;
 };
 
+// The second check must be a genuine "Conciseness" evaluator. Match the WHOLE
+// word (so "Reply Conciseness" or "Conciseness" qualify) but NOT names that
+// merely contain the letters — e.g. a throwaway "Conciseness2" or "Concise" must
+// be ignored, otherwise the tour would grade against an evaluator the user did
+// not mean.
+const CONCISENESS_NAME = /\bconciseness\b/i;
+
 /**
  * Decide the evaluator plan from the library list. Pure, so it is unit-testable.
  * Correctness is identified by its stable origin slug — NOT its display name — so
  * a renamed default is still found. The second evaluator must be an LLM-reply
- * evaluator (only those grade a next-reply test) whose name reads as a conciseness
- * check, and must not be the Correctness default itself.
+ * evaluator (only those grade a next-reply test) whose name contains the whole
+ * word "Conciseness", and must not be the Correctness default itself.
  */
 export function planFromEvaluators(list: EvaluatorLike[]): EvaluatorPlan {
   const llm = list.filter((e) => e.evaluator_type === "llm");
   const correctness = llm.find((e) => isDefaultLLMNextReplyEvaluator(e));
   const second = llm.find(
-    (e) => /concise/i.test(e.name ?? "") && !isDefaultLLMNextReplyEvaluator(e),
+    (e) =>
+      CONCISENESS_NAME.test(e.name ?? "") && !isDefaultLLMNextReplyEvaluator(e),
   );
   return {
     correctnessName: correctness?.name ?? null,
@@ -405,11 +413,12 @@ function isRowUnchecked(row: HTMLLabelElement): boolean {
 }
 
 /**
- * Choose the evaluator row to tick BY EXACT NAME (the name resolved into the
+ * Choose the evaluator row to tick by its EXACT name (the name resolved into the
  * plan), restricted to unticked LLM-reply rows so it actually grades the
- * next-reply test. Matching a specific name — rather than a fuzzy "complementary"
- * guess — is what stops the tour ticking an unrelated custom evaluator whose
- * baked criteria the tour cannot control. Pure; returns the row or undefined.
+ * next-reply test. The match is on the row's name element being exactly `name` —
+ * NOT merely containing it — so "Conciseness" never ticks a "Conciseness2" row,
+ * and so the tour never ticks an unrelated evaluator whose criteria it cannot
+ * control. Pure; returns the row or undefined.
  */
 export function chooseRowByName(
   rows: HTMLLabelElement[],
@@ -417,9 +426,15 @@ export function chooseRowByName(
 ): HTMLLabelElement | undefined {
   const target = name.trim().toLowerCase();
   if (!target) return undefined;
+  // A row's name lives in its own element; match that element's text exactly
+  // rather than the whole row (which also holds the type pill + description).
+  const hasExactName = (row: HTMLLabelElement): boolean =>
+    Array.from(row.querySelectorAll<HTMLElement>("*")).some(
+      (el) => (el.textContent ?? "").trim().toLowerCase() === target,
+    );
   return rows
     .filter((r) => isRowUnchecked(r) && isLlmReplyRow(r))
-    .find((r) => (r.textContent ?? "").toLowerCase().includes(target));
+    .find(hasExactName);
 }
 
 /**

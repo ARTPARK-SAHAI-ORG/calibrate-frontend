@@ -90,6 +90,15 @@ describe("chooseRowByName", () => {
     expect(chooseRowByName(rows, "")).toBeUndefined();
   });
 
+  it("matches the exact name, never a longer name that contains it", () => {
+    const rows = [
+      makeRow({ name: "Conciseness2", type: "llm" }),
+      makeRow({ name: "Conciseness", type: "llm" }),
+    ];
+    // "Conciseness2" comes first, but only the exact "Conciseness" row wins.
+    expect(chooseRowByName(rows, "Conciseness")).toBe(rows[1]);
+  });
+
   it("does not mutate the rows it inspects", () => {
     const rows = [makeRow({ name: "Reply Conciseness", type: "llm" })];
     chooseRowByName(rows, "Reply Conciseness");
@@ -124,6 +133,16 @@ describe("planFromEvaluators", () => {
       slug: "default-llm-next-reply",
     };
     expect(planFromEvaluators([renamed]).correctnessName).toBe("Answer Accuracy");
+  });
+
+  it("ignores a name that only contains the letters (e.g. Conciseness2)", () => {
+    // Whole-word "conciseness" only — a throwaway "Conciseness2" is not a match.
+    const plan = planFromEvaluators([
+      correctness,
+      { name: "Conciseness2", evaluator_type: "llm", slug: "conciseness2" },
+      { name: "Concise", evaluator_type: "llm", slug: "concise" },
+    ]);
+    expect(plan.secondEvaluatorName).toBeNull();
   });
 
   it("returns no second when only Correctness exists", () => {
