@@ -85,7 +85,8 @@ describe("OnboardingTour", () => {
     });
 
     expect(mockRunTour).toHaveBeenCalledTimes(1);
-    expect(hasSeenTour(TOUR_IDS.firstEval)).toBe(false);
+    // Marked seen the moment it starts, so a reload won't auto-restart it.
+    expect(hasSeenTour(TOUR_IDS.firstEval)).toBe(true);
   });
 
   it("does not auto-start when the tour was already seen", async () => {
@@ -122,8 +123,8 @@ describe("OnboardingTour", () => {
     expect(mockRunTour).not.toHaveBeenCalled();
   });
 
-  it("starts on explicit request after clearing the seen flag", async () => {
-    markTourSeen(TOUR_IDS.firstEval, "skipped");
+  it("replays on explicit request even when already seen, without un-seeing it", async () => {
+    markTourSeen(TOUR_IDS.firstEval, "completed");
     render(<OnboardingTour />);
 
     await act(async () => {
@@ -132,8 +133,29 @@ describe("OnboardingTour", () => {
       );
     });
 
-    expect(hasSeenTour(TOUR_IDS.firstEval)).toBe(false);
+    // The button starts it regardless of the flag, and does NOT clear the flag
+    // (clearing would make a later reload auto-restart it).
     expect(mockRunTour).toHaveBeenCalledTimes(1);
+    expect(hasSeenTour(TOUR_IDS.firstEval)).toBe(true);
+  });
+
+  it("does not auto-restart after the button starts it (reload)", async () => {
+    // Fresh user clicks the button: it starts and marks seen.
+    render(<OnboardingTour />);
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(TOUR_REQUEST_EVENT, { detail: TOUR_IDS.firstEval }),
+      );
+    });
+    expect(mockRunTour).toHaveBeenCalledTimes(1);
+
+    // Simulate a reload: a fresh mount on /agents must NOT auto-start again.
+    mockRunTour.mockClear();
+    render(<OnboardingTour />);
+    await act(async () => {
+      jest.advanceTimersByTime(700);
+    });
+    expect(mockRunTour).not.toHaveBeenCalled();
   });
 
   it("ignores tour requests while a tour is already active", async () => {

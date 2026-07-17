@@ -6,9 +6,9 @@ import "driver.js/dist/driver.css";
 import { useAccessToken } from "@/hooks";
 import {
   buildFirstEvalTour,
-  clearTourSeen,
   hasSeenTour,
   isTourActive,
+  markTourSeen,
   resolveEvaluatorPlan,
   runTour,
   TOUR_IDS,
@@ -50,6 +50,10 @@ export function OnboardingTour() {
 
   const startTour = async (tourId: TourId) => {
     if (tourId !== TOUR_IDS.firstEval) return;
+    // Mark it seen the moment it starts, so a page reload does NOT auto-restart
+    // it (there is no mid-flight resume). finish() records the final outcome; the
+    // "Product tour" button can always replay it regardless of this flag.
+    markTourSeen(tourId, "skipped");
     // Resolve which evaluators the workspace has BEFORE building the tour, so the
     // flow matches reality (two checks when a conciseness evaluator exists,
     // Correctness alone otherwise).
@@ -64,8 +68,9 @@ export function OnboardingTour() {
     const handler = (e: Event) => {
       const tourId = (e as CustomEvent<TourId>).detail;
       if (!tourId) return;
-      clearTourSeen(tourId);
       if (isTourActive()) return;
+      // Note: we do NOT clear the seen flag here — clearing it would make a
+      // subsequent reload auto-restart the tour. The button starts it directly.
       void startTour(tourId);
     };
     window.addEventListener(TOUR_REQUEST_EVENT, handler);
