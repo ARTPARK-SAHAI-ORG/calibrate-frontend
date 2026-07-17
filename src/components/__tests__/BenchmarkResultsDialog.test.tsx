@@ -796,6 +796,53 @@ describe("BenchmarkResultsDialog", () => {
       expect(onGoBack).not.toHaveBeenCalled();
     });
 
+    it("hides the Rerun button on a legacy benchmark with no test_uuids (no onGoBack fallback)", async () => {
+      // A viewed benchmark that predates the backend snapshot: no test_uuids,
+      // and the view surfaces pass onRerun but not onGoBack.
+      (global.fetch as jest.Mock).mockImplementation((url: string) => {
+        if (url.endsWith("/agent-tests/benchmark/task-legacy")) {
+          return Promise.resolve(
+            jsonResponse({
+              task_id: "task-legacy",
+              status: "completed",
+              name: "Legacy Benchmark",
+              model_results: [
+                {
+                  model: "gpt-4",
+                  success: true,
+                  message: "",
+                  total_tests: 1,
+                  passed: 1,
+                  failed: 0,
+                  test_results: [{ name: "Test One", passed: true }],
+                },
+              ],
+            }),
+          );
+        }
+        return Promise.reject(new Error(`Unexpected fetch ${url}`));
+      });
+
+      render(
+        <BenchmarkResultsDialog
+          {...defaultProps}
+          isOpen
+          models={[]}
+          testUuids={[]}
+          testNames={[]}
+          taskId="task-legacy"
+          onRerun={jest.fn()}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(screen.getByText("Legacy Benchmark")).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByRole("button", { name: /Rerun/ }),
+      ).not.toBeInTheDocument();
+    });
+
     it("switches tabs between leaderboard and outputs", async () => {
       await renderDoneRun();
       const user = setupUser();

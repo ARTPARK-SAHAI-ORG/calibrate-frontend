@@ -555,8 +555,12 @@ export function BenchmarkResultsDialog({
             (m) => m.test_results && m.test_results.length > 0,
           )?.test_results ?? []
         ).map((tr) => tr.name ?? "");
-  // Direct rerun wins over the go-back-to-picker fallback when available.
-  const canDirectRerun = !!onRerun && rerunModels.length > 0;
+  // Direct rerun wins over the go-back-to-picker fallback when available. It
+  // needs the executed test uuids to reproduce the run's subset — a benchmark
+  // that predates the backend snapshot can't be reliably rerun, so the button
+  // is hidden rather than silently rerunning the wrong test set.
+  const canDirectRerun =
+    !!onRerun && rerunModels.length > 0 && rerunTestUuids.length > 0;
   const showRerunButton = isDone && !error && (canDirectRerun || !!onGoBack);
   const handleRerunClick = canDirectRerun
     ? () => onRerun!(rerunModels, rerunTestUuids, rerunTestNames)

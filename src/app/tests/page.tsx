@@ -684,6 +684,15 @@ function LLMPageInner() {
 
   // Rerun a completed test run as a fresh run of the same tests, swapping the
   // view dialog for the live new-run dialog.
+  // Drop a lingering `?runId=<viewed run>` so a reload after a rerun doesn't
+  // re-open the old run. No-op when the URL isn't pointing at a run (e.g. a
+  // repeat rerun from the fresh dialog).
+  const clearRunIdFromUrl = () => {
+    if (searchParams.get("runId")) {
+      router.replace("/tests?tab=runs", { scroll: false });
+    }
+  };
+
   const handleRerunTests = (
     agentUuid: string,
     agentName: string,
@@ -691,6 +700,7 @@ function LLMPageInner() {
   ) => {
     setViewingRunTest(false);
     setSelectedRun(null);
+    clearRunIdFromUrl();
     setTestRunnerAgentUuid(agentUuid);
     setTestRunnerAgentName(agentName);
     setTestToRun(null);
@@ -709,6 +719,7 @@ function LLMPageInner() {
   ) => {
     setViewingRunBenchmark(false);
     setSelectedRun(null);
+    clearRunIdFromUrl();
     benchmarkRerun.start({ agentUuid, agentName, models, testUuids, testNames });
   };
 
