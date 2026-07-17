@@ -291,9 +291,10 @@ export const TTFB_ABOUT_METRIC: MetricDescription = {
   range: "0 - \u221E",
 };
 
-// TTFS (Time To Final Segment) \u2014 the streaming STT latency defined by Pipecat's
-// STT benchmark. Rendered on the STT About tab only when a run measured it. The
-// metric name links out to the benchmark's definition in a new tab.
+// STT latency is surfaced as "Latency" in the table/tiles; the About tab is
+// where it's explained as TTFS (Time To Final Segment), the streaming STT
+// latency defined by Pipecat's STT benchmark. The metric name links out to the
+// benchmark's definition in a new tab. Rendered only when a run measured it.
 export const TTFS_ABOUT_METRIC: MetricDescription = {
   key: "ttfs",
   metric: (
@@ -304,11 +305,11 @@ export const TTFS_ABOUT_METRIC: MetricDescription = {
       className="text-foreground underline-offset-2 hover:underline"
       title="Learn more in the Pipecat STT benchmark"
     >
-      TTFS (Time To Final Segment)
+      Latency
     </a>
   ),
   description:
-    "TTFS measures the streaming latency from when the user stops speaking to when the final transcription segment is received. Lower TTFS means faster response times for voice agents. The reported value is the median (p50) across the dataset.",
+    "For streaming STT, latency is measured as TTFS (Time To Final Segment): the time from when the user stops speaking to when the final transcription segment is received. Lower is better \u2014 faster responses for voice agents. The reported value is the median (p50) across the dataset.",
   preference: "Lower is better",
   range: "0 - \u221E",
 };
@@ -426,9 +427,11 @@ function evaluatorLeaderboardColumns(
   }));
 }
 
-/** Flat leaderboard-row key + label for the STT TTFS column / chart. */
+// STT latency lives on the `ttfs` row key (TTFS = Time To Final Segment) but is
+// labelled "Latency (s)" in the UI, matching the TTS latency column; the About
+// tab explains that STT latency is TTFS.
 const TTFS_KEY = "ttfs";
-const TTFS_LABEL = "TTFS (s)";
+const TTFS_LABEL = "Latency (s)";
 
 /** Leaderboard column for TTFS (STT only). */
 const ttfsLeaderboardColumn = {

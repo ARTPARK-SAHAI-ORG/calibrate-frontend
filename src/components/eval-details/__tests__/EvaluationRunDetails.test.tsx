@@ -1843,13 +1843,15 @@ describe("STTEvaluationAbout TTFS row", () => {
     expect(metrics.map((m: { key?: string }) => m.key)).not.toContain("ttfs");
   });
 
-  it("appends the TTFS row when showTtfs is set", () => {
+  it("appends the latency row (explained as TTFS) when showTtfs is set", () => {
     render(<STTEvaluationAbout evaluatorRows={[]} showTtfs />);
     const metrics = JSON.parse(
       screen.getByTestId("about-metrics-table").textContent ?? "",
     );
     const ttfsRow = metrics.find((m: { key?: string }) => m.key === "ttfs");
     expect(ttfsRow).toMatchObject({ preference: "Lower is better" });
+    // The About tab is where the "Latency" table label is explained as TTFS.
+    expect(ttfsRow.description).toMatch(/TTFS \(Time To Final Segment\)/);
   });
 });
 
@@ -1868,12 +1870,12 @@ describe("STTEvaluationLeaderboard TTFS column", () => {
     const columns = JSON.parse(
       screen.getByTestId("leaderboard-columns").textContent ?? "[]",
     );
-    expect(columns).toContainEqual({ key: "ttfs", header: "TTFS (s)" });
+    expect(columns).toContainEqual({ key: "ttfs", header: "Latency (s)" });
 
     const charts = JSON.parse(
       screen.getByTestId("leaderboard-charts").textContent ?? "[]",
     ).flat();
-    expect(charts).toContainEqual({ title: "TTFS (s)", dataKey: "ttfs" });
+    expect(charts).toContainEqual({ title: "Latency (s)", dataKey: "ttfs" });
 
     const data = JSON.parse(
       screen.getByTestId("leaderboard-data").textContent ?? "[]",
@@ -2011,7 +2013,7 @@ describe("STTEvaluationOutputs TTFS tile", () => {
         ]}
       />,
     );
-    expect(screen.getByTestId("metric-TTFS (s)").textContent).toBe("0.42");
+    expect(screen.getByTestId("metric-Latency (s)").textContent).toBe("0.42");
   });
 
   it("shows a TTFS tile from a plain number", () => {
@@ -2028,7 +2030,7 @@ describe("STTEvaluationOutputs TTFS tile", () => {
         ]}
       />,
     );
-    expect(screen.getByTestId("metric-TTFS (s)").textContent).toBe("0.5");
+    expect(screen.getByTestId("metric-Latency (s)").textContent).toBe("0.5");
   });
 
   it("omits the TTFS tile when no ttfs was measured", () => {
@@ -2040,7 +2042,7 @@ describe("STTEvaluationOutputs TTFS tile", () => {
         ]}
       />,
     );
-    expect(screen.queryByTestId("metric-TTFS (s)")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("metric-Latency (s)")).not.toBeInTheDocument();
   });
 
   it("omits the TTFS tile when ttfs is null (e.g. Gemini)", () => {
@@ -2057,7 +2059,7 @@ describe("STTEvaluationOutputs TTFS tile", () => {
         ]}
       />,
     );
-    expect(screen.queryByTestId("metric-TTFS (s)")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("metric-Latency (s)")).not.toBeInTheDocument();
     // WER still renders — the null ttfs doesn't break the metrics card.
     expect(screen.getByTestId("metric-WER").textContent).toBe("0.1");
   });
