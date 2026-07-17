@@ -184,7 +184,6 @@ type EvaluatorLike = {
   evaluator_type?: string;
   slug?: string | null;
   source_default_slug?: string | null;
-  live_version?: { variables?: { name?: string }[] | null } | null;
 };
 
 // The second check must be a genuine "Conciseness" evaluator. Match the WHOLE
@@ -193,46 +192,6 @@ type EvaluatorLike = {
 // be ignored, otherwise the tour would grade against an evaluator the user did
 // not mean.
 const CONCISENESS_NAME = /\bconciseness\b/i;
-
-/**
- * Whether an evaluator exposes the `criteria` variable the tour sets per test.
- * This is what makes an evaluator USABLE by the tour: an evaluator carrying the
- * default slug but built with the raw placeholder ("<ENTER EVALUATION CRITERIA
- * HERE>") instead of `{{criteria}}` has NO criteria variable, so the tour cannot
- * control what it grades — it must be treated as unusable and recreated.
- */
-function hasCriteriaVariable(e: EvaluatorLike): boolean {
-  return !!e.live_version?.variables?.some(
-    (v) => (v.name ?? "").toLowerCase() === "criteria",
-  );
-}
-
-/**
- * Decide the evaluator plan from the library list. Pure, so it is unit-testable.
- * Correctness is identified by its stable origin slug — NOT its display name — so
- * a renamed default is still found — AND it must actually carry the `criteria`
- * variable the tour fills; a slug-matching evaluator without it (e.g. one the
- * user rebuilt with a placeholder prompt) is treated as absent so a proper one is
- * recreated. The second evaluator must be an LLM-reply evaluator (only those
- * grade a next-reply test) whose name contains the whole word "Conciseness",
- * is not the Correctness default, and likewise carries a criteria variable.
- */
-export function planFromEvaluators(list: EvaluatorLike[]): EvaluatorPlan {
-  const llm = list.filter((e) => e.evaluator_type === "llm");
-  const correctness = llm.find(
-    (e) => isDefaultLLMNextReplyEvaluator(e) && hasCriteriaVariable(e),
-  );
-  const second = llm.find(
-    (e) =>
-      CONCISENESS_NAME.test(e.name ?? "") &&
-      !isDefaultLLMNextReplyEvaluator(e) &&
-      hasCriteriaVariable(e),
-  );
-  return {
-    correctnessName: correctness?.name ?? null,
-    secondEvaluatorName: second?.name ?? null,
-  };
-}
 
 /** The live version's judge prompt for evaluator `uuid`, or null. */
 async function fetchLivePrompt(
@@ -355,17 +314,16 @@ export async function resolveEvaluatorPlan(
     );
     if (!res.ok) return fallback;
     const list = unwrapList<EvaluatorLike>(await res.json());
-    const plan = planFromEvaluators(list);
-    // Resolve which Correctness to REUSE by prompt identity (against the
-    // hard-coded canonical, so nothing depends on a backend prompt endpoint) —
-    // including one the tour created on a previous run (no default slug) — so
-    // re-running does not keep creating Correctness (2), (3), … A proper one is
-    // created only when nothing usable exists.
-    plan.correctnessName = await findUsableCorrectness(list, accessToken);
-    // Same treatment for the second check: verify by prompt, not the list's
-    // (possibly omitted) variables, so a valid Conciseness check is not dropped.
-    plan.secondEvaluatorName = await findUsableSecond(list, accessToken);
-    return plan;
+    // Resolve BOTH checks by prompt identity (verified against the actual live
+    // prompt, not the list's possibly-omitted variables): reuse a Correctness
+    // whose prompt equals the hard-coded canonical — including one the tour
+    // created on a previous run (no default slug), so re-running does not keep
+    // creating Correctness (2), (3), … — and add a Conciseness second only if its
+    // prompt genuinely uses {{criteria}} the tour can control.
+    return {
+      correctnessName: await findUsableCorrectness(list, accessToken),
+      secondEvaluatorName: await findUsableSecond(list, accessToken),
+    };
   } catch {
     return fallback;
   }
