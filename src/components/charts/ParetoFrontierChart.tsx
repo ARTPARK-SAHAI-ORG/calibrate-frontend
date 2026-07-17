@@ -135,7 +135,9 @@ export function ParetoFrontierChart({
   costAxisLabel = "Average cost (USD) →  cheaper is better",
 }: ParetoFrontierChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
-  const [frontierOnly, setFrontierOnly] = useState(false);
+  // Default to showing only the frontier — dominated models are noise for the
+  // "which should I pick" question; users can reveal them via the toggle.
+  const [frontierOnly, setFrontierOnly] = useState(true);
   const [hoveredModel, setHoveredModel] = useState<string | null>(null);
   const [chartWidth, setChartWidth] = useState(DEFAULT_CHART_WIDTH);
 

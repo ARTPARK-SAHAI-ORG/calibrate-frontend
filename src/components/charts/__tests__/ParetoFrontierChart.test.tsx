@@ -96,6 +96,20 @@ describe("ParetoFrontierChart", () => {
     expect(screen.getByText(/comes out on top: it matches or beats every other model/i)).toBeInTheDocument();
   });
 
+  it("defaults to Frontier only — dominated models are hidden and the toggle is active", () => {
+    // "champion" dominates "weak", so "weak" is off the frontier.
+    renderChart([
+      { model: "champion", label: "champion", cost: 0.001, passRate: 96, latency: 300 },
+      { model: "weak", label: "weak", cost: 0.02, passRate: 88, latency: 1400 },
+    ]);
+    // The toggle is active by default (frontier-only styling).
+    const toggle = screen.getByRole("button", { name: /Frontier only/i });
+    expect(toggle).toHaveClass("bg-foreground");
+    // The frontier model renders; the dominated model's bubble label does not.
+    expect(screen.getByText("champion", { selector: "text" })).toBeInTheDocument();
+    expect(screen.queryByText("weak")).not.toBeInTheDocument();
+  });
+
   it("shows the empty state when no model has cost + pass rate", () => {
     renderChart([{ model: "x", label: "X", cost: NaN, passRate: NaN }]);
     expect(
