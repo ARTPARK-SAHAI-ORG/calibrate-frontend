@@ -365,12 +365,7 @@ export function ParetoFrontierChart({
   return (
     <div>
       <div className="flex items-start justify-between mb-2 gap-3">
-        <div>
-          <h3 className="text-[15px] font-semibold">{title}</h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {axisSentence} {resultSentence}
-          </p>
-        </div>
+        <h3 className="text-[15px] font-semibold">{title}</h3>
         <div className="flex flex-shrink-0 items-center gap-2">
           {hasDominated && (
             <button
@@ -467,6 +462,9 @@ export function ParetoFrontierChart({
           </ScatterChart>
         </ResponsiveContainer>
       </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {axisSentence} {resultSentence}
+      </p>
     </div>
   );
 }
