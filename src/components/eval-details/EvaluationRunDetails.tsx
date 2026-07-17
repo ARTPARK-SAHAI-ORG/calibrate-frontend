@@ -27,7 +27,7 @@ import { SARVAM_METRIC_FIELDS } from "./sarvamMetrics";
 import {
   type AudioCostBreakdown,
   costTiles,
-  costConversionCaveat,
+  costCaveats,
   readTotalCostUsd,
 } from "@/lib/audioCost";
 import {
@@ -444,6 +444,23 @@ const ttfsChartConfig: ChartConfig = { title: TTFS_LABEL, dataKey: TTFS_KEY };
 /** X-axis title for the STT/TTS Pareto frontier (total run cost, USD). */
 const PARETO_COST_AXIS_LABEL = "Total cost (USD) →  cheaper is better";
 
+/** Renders the applicable cost caveats as stacked muted lines (or nothing). */
+function costCaveatFootnote(
+  metrics: Record<string, unknown> | null | undefined,
+  component: "stt" | "tts",
+  runDate?: string | null,
+): React.ReactNode {
+  const lines = costCaveats(metrics, { component, runDate });
+  if (lines.length === 0) return undefined;
+  return (
+    <div className="space-y-1">
+      {lines.map((line, i) => (
+        <p key={i}>{line}</p>
+      ))}
+    </div>
+  );
+}
+
 /**
  * Adds a derived numeric metric to leaderboard rows under `key`, reading it via
  * `read` (row → value, falling back to a joined provider value). Rows without a
@@ -859,8 +876,9 @@ export function STTEvaluationOutputs({
             <div className="space-y-4 md:space-y-6">
               {providerResult.success && providerResult.metrics && (
                 <ProviderMetricsCard
-                  footnote={costConversionCaveat(
+                  footnote={costCaveatFootnote(
                     providerResult.metrics,
+                    "stt",
                     runDate,
                   )}
                   metrics={[
@@ -1083,8 +1101,9 @@ export function TTSEvaluationOutputs({
             <div className="space-y-4 md:space-y-6">
               {providerResult.success && providerResult.metrics && (
                 <ProviderMetricsCard
-                  footnote={costConversionCaveat(
+                  footnote={costCaveatFootnote(
                     providerResult.metrics,
+                    "tts",
                     runDate,
                   )}
                   metrics={[

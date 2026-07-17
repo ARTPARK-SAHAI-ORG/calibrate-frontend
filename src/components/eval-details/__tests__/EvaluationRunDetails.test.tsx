@@ -1625,6 +1625,8 @@ describe("STTEvaluationOutputs cost tiles", () => {
     expect(screen.getByTestId("metric-Cost per minute").textContent).toBe(
       "$0.0048",
     );
+    // General estimate caveat is shown; no FX-conversion line for a USD provider.
+    expect(screen.getByText(/Cost is an estimate from bundled/)).toBeInTheDocument();
     expect(screen.queryByText(/converted from/i)).not.toBeInTheDocument();
   });
 
@@ -1655,9 +1657,12 @@ describe("STTEvaluationOutputs cost tiles", () => {
     );
     expect(screen.getByTestId("metric-Cost per minute").textContent).toBe("₹0.5");
     expect(screen.getByTestId("metric-Total cost").textContent).toBe("$0.0104");
+    // General estimate caveat is always present when cost is shown.
+    expect(screen.getByText(/Cost is an estimate from bundled/)).toBeInTheDocument();
+    // Plus the dated FX-conversion caveat for the INR provider.
     expect(
       screen.getByText(
-        "Total cost converted from INR at ₹96.35 = $1, rate as of Jul 15, 2026.",
+        "Total cost converted from INR at a live mid-market rate (₹96.35 = $1 as of Jul 15, 2026); a real payment also incurs FX margin and GST.",
       ),
     ).toBeInTheDocument();
   });
@@ -1743,8 +1748,38 @@ describe("TTSEvaluationOutputs cost tiles", () => {
       "₹3000",
     );
     expect(
-      screen.getByText(/Total cost converted from INR at ₹96.35 = \$1/),
+      screen.getByText(
+        /Total cost converted from INR at a live mid-market rate \(₹96.35 = \$1 as of Jul 15, 2026\)/,
+      ),
     ).toBeInTheDocument();
+    // Character-billed → no audio-billed approximation caveat.
+    expect(screen.queryByText(/Audio-billed models/)).not.toBeInTheDocument();
+  });
+
+  it("shows the audio-billed approximation caveat for a minute-billed TTS provider", () => {
+    render(
+      <TTSEvaluationOutputs
+        {...baseProps}
+        providerResults={[
+          {
+            provider: "openai",
+            success: true,
+            metrics: {
+              ttfb: { p50: 0.5 },
+              cost: {
+                billing_unit: "minute",
+                currency: "USD",
+                cost_per_minute_currency: 0.015,
+                cost_usd: 0.045,
+              },
+            },
+            results: [],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText(/Audio-billed models/)).toBeInTheDocument();
+    expect(screen.getByText(/Cost is an estimate from bundled/)).toBeInTheDocument();
   });
 
   it("omits the cost tiles when no cost was computed", () => {

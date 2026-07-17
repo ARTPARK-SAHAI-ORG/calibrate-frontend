@@ -6,7 +6,9 @@ import {
   totalCostTile,
   unitCostTile,
   formatCaveatDate,
-  costConversionCaveat,
+  costCaveats,
+  GENERAL_COST_CAVEAT,
+  TTS_AUDIO_BILLED_CAVEAT,
 } from "../audioCost";
 
 // Sample payloads mirroring the six backend shapes.
@@ -149,25 +151,64 @@ describe("formatCaveatDate", () => {
   });
 });
 
-describe("costConversionCaveat", () => {
-  it("notes the rate and run date for an INR provider", () => {
-    expect(
-      costConversionCaveat({ cost: sttMinuteInr }, "2026-07-15 10:00:00"),
-    ).toBe("Total cost converted from INR at ₹96.35 = $1, rate as of Jul 15, 2026.");
+describe("costCaveats", () => {
+  it("always leads with the general estimate caveat when cost is present", () => {
+    const lines = costCaveats({ cost: sttMinuteUsd }, { component: "stt" });
+    expect(lines[0]).toBe(GENERAL_COST_CAVEAT);
+    expect(lines).toHaveLength(1);
   });
 
-  it("omits the date when the run date is unavailable", () => {
-    expect(costConversionCaveat({ cost: ttsCharInr })).toBe(
-      "Total cost converted from INR at ₹96.35 = $1.",
+  it("adds the audio-billed note for minute-billed TTS only", () => {
+    const ttsMinute = costCaveats(
+      { cost: { billing_unit: "minute", currency: "USD", cost_usd: 0.045 } },
+      { component: "tts" },
+    );
+    expect(ttsMinute).toContain(TTS_AUDIO_BILLED_CAVEAT);
+
+    // Character-billed TTS and any STT don't get the audio-billed note.
+    expect(costCaveats({ cost: ttsCharUsd }, { component: "tts" })).not.toContain(
+      TTS_AUDIO_BILLED_CAVEAT,
+    );
+    expect(
+      costCaveats({ cost: sttMinuteUsd }, { component: "stt" }),
+    ).not.toContain(TTS_AUDIO_BILLED_CAVEAT);
+  });
+
+  it("adds the FX-conversion caveat (rate + run date) for a non-USD provider", () => {
+    const lines = costCaveats(
+      { cost: sttMinuteInr },
+      { component: "stt", runDate: "2026-07-15 10:00:00" },
+    );
+    expect(lines).toContain(
+      "Total cost converted from INR at a live mid-market rate (₹96.35 = $1 as of Jul 15, 2026); a real payment also incurs FX margin and GST.",
     );
   });
 
-  it("returns null for USD providers (no conversion happened)", () => {
-    expect(costConversionCaveat({ cost: sttMinuteUsd }, "2026-07-15")).toBeNull();
-    expect(costConversionCaveat({ cost: ttsCharUsd })).toBeNull();
+  it("omits the date in the FX caveat when the run date is unavailable", () => {
+    const lines = costCaveats({ cost: ttsCharInr }, { component: "tts" });
+    expect(lines).toContain(
+      "Total cost converted from INR at a live mid-market rate (₹96.35 = $1); a real payment also incurs FX margin and GST.",
+    );
+    // Character-billed → no audio-billed note; general + FX only.
+    expect(lines).toHaveLength(2);
   });
 
-  it("returns null when there is no cost", () => {
-    expect(costConversionCaveat({ wer: 0.1 })).toBeNull();
+  it("has no FX caveat for USD providers", () => {
+    const lines = costCaveats({ cost: ttsCharUsd }, { component: "tts" });
+    expect(lines).toEqual([GENERAL_COST_CAVEAT]);
+  });
+
+  it("falls back to a generic FX phrase when the rate is missing", () => {
+    const lines = costCaveats(
+      { cost: { billing_unit: "minute", currency: "INR", cost_usd: 0.01 } },
+      { component: "stt" },
+    );
+    expect(lines[1]).toBe(
+      "Total cost converted from INR at a live mid-market rate (INR to USD); a real payment also incurs FX margin and GST.",
+    );
+  });
+
+  it("returns [] when there is no cost", () => {
+    expect(costCaveats({ wer: 0.1 }, { component: "stt" })).toEqual([]);
   });
 });

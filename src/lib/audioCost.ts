@@ -143,26 +143,47 @@ export function formatCaveatDate(dateString?: string | null): string | null {
   });
 }
 
+export type CostCaveatContext = {
+  /** Which evaluation this cost is for — decides the audio-billed TTS caveat. */
+  component: "stt" | "tts";
+  /** Run date (created_at) — dates the FX conversion for non-USD providers. */
+  runDate?: string | null;
+};
+
+/** Applies to every estimated cost — rates are bundled, tier/variant-limited. */
+export const GENERAL_COST_CAVEAT =
+  "Cost is an estimate from bundled provider rates (captured mid-2026) at each provider's standard pay-as-you-go tier and a single model variant. Per-request minimums, rounding, taxes, and volume or committed-use discounts are not modeled, so many short requests read low.";
+
+/** Applies to minute-billed TTS (audio-token models estimated from audio length). */
+export const TTS_AUDIO_BILLED_CAVEAT =
+  "Audio-billed models (e.g. OpenAI, Gemini) are approximated as measured audio length × per-minute rate, so the same text can cost differently across providers.";
+
 /**
- * Caveat for a non-USD provider whose USD total was converted from its native
- * currency, noting the rate and the run date it was applied on. Null for USD
- * providers (no conversion happened).
+ * The caveats to surface wherever this provider's cost is shown. Always includes
+ * the general estimate caveat; adds the audio-billed-TTS note for minute-billed
+ * TTS and the FX-conversion note (rate + run date) for non-USD providers. Empty
+ * when the run computed no cost.
  */
-export function costConversionCaveat(
-  source: unknown,
-  runDate?: string | null,
-): string | null {
+export function costCaveats(source: unknown, ctx: CostCaveatContext): string[] {
   const cost = readCost(source);
-  if (!cost) return null;
+  if (!cost) return [];
+  const lines: string[] = [GENERAL_COST_CAVEAT];
+  if (ctx.component === "tts" && cost.billing_unit === "minute") {
+    lines.push(TTS_AUDIO_BILLED_CAVEAT);
+  }
   const currency = (cost.currency ?? "USD").toUpperCase();
-  if (currency === "USD") return null;
-  const rate = coerceNumber(cost.conversion_rate);
-  const symbol = CURRENCY_SYMBOLS[currency] ?? currency;
-  const ratePart =
-    rate != null
-      ? `${symbol}${parseFloat(rate.toFixed(2))} = $1`
-      : `${currency} to USD`;
-  const date = formatCaveatDate(runDate);
-  const asOf = date ? `, rate as of ${date}` : "";
-  return `Total cost converted from ${currency} at ${ratePart}${asOf}.`;
+  if (currency !== "USD") {
+    const rate = coerceNumber(cost.conversion_rate);
+    const symbol = CURRENCY_SYMBOLS[currency] ?? currency;
+    const ratePart =
+      rate != null
+        ? `${symbol}${parseFloat(rate.toFixed(2))} = $1`
+        : `${currency} to USD`;
+    const date = formatCaveatDate(ctx.runDate);
+    const asOf = date ? ` as of ${date}` : "";
+    lines.push(
+      `Total cost converted from ${currency} at a live mid-market rate (${ratePart}${asOf}); a real payment also incurs FX margin and GST.`,
+    );
+  }
+  return lines;
 }
