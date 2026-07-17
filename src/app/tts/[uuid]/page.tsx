@@ -151,6 +151,8 @@ type EvaluationResult = {
   error?: string | null;
   is_public?: boolean;
   share_token?: string | null;
+  /** When the run was created — dates the INR conversion-rate caveat. */
+  created_at?: string | null;
 };
 
 type EvaluatorSummary = {
@@ -954,6 +956,7 @@ export default function TTSEvaluationDetailPage() {
                       status={evaluationResult.status}
                       evaluatorColumns={evaluatorColumns}
                       getProviderLabel={getProviderLabel}
+                      runDate={evaluationResult.created_at}
                       labellingSelection={
                         evaluationResult.status === "done"
                           ? ttsLabellingSelected

@@ -1,24 +1,43 @@
 /**
  * Cost helpers for STT / TTS evaluation runs.
  *
- * Each provider's `metrics` now carries a nested `cost` block computed from the
- * provider's per-minute pricing and the evaluated audio duration. The headline
- * figure we surface is `cost_per_minute_usd` (USD per minute of audio), which is
- * comparable across providers regardless of dataset size. Aggregated leaderboard
- * rows may instead carry a flattened `cost_per_minute_usd`, so readers tolerate
- * both shapes.
+ * Each provider's `metrics` carries a nested `cost` block. The shape varies by
+ * how the provider bills and prices:
+ *   - `billing_unit`: "minute" (audio) or "character" (text).
+ *   - `currency`: the provider's native pricing currency ("USD" or "INR").
+ * The per-unit price is always in the native currency
+ * (`cost_per_minute_currency` / `cost_per_million_chars_currency`), while
+ * `cost_usd` is the total run cost converted to USD — the one figure that is
+ * comparable across providers regardless of unit or currency. For non-USD
+ * providers the block also carries `cost_in_currency` (native total) and
+ * `conversion_rate` (native units per USD) used for that conversion.
  */
 
 export type AudioCostBreakdown = {
   provider?: string;
   pricing_model?: string;
-  currency?: string;
+  /** "minute" (audio-billed) or "character" (text-billed). */
   billing_unit?: string;
   total_seconds?: number;
   audio_minutes?: number;
-  cost_per_minute_usd?: number;
+  total_characters?: number;
+  /** Native pricing currency, e.g. "USD" or "INR". */
+  currency?: string;
+  /** Native price per audio minute (minute-billed providers). */
+  cost_per_minute_currency?: number;
+  /** Native price per 1M characters (character-billed providers). */
+  cost_per_million_chars_currency?: number;
+  /** Total cost in the native currency (present when currency !== USD). */
+  cost_in_currency?: number;
+  /** Native units per USD used to convert (present when currency !== USD). */
+  conversion_rate?: number;
+  /** Total run cost in USD — comparable across providers. Always present. */
   cost_usd?: number;
+  /** Rows whose audio couldn't be read and so were excluded from the cost. */
+  excluded_row_indices?: number[];
 };
+
+const CURRENCY_SYMBOLS: Record<string, string> = { USD: "$", INR: "₹" };
 
 function coerceNumber(v: unknown): number | null {
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
@@ -30,43 +49,120 @@ function coerceNumber(v: unknown): number | null {
 }
 
 /**
- * Read the per-minute USD cost from an STT/TTS metrics-like object. Provider
- * metrics nest it under `cost` (`cost.cost_per_minute_usd`); aggregated
- * leaderboard rows may flatten it to `cost_per_minute_usd`. Tolerate both, plus
- * string-encoded numbers. Returns `null` when no cost was computed.
+ * Pull the cost breakdown out of a metrics-like object. Provider metrics nest
+ * it under `cost`; a leaderboard row may carry the cost fields flattened. Falls
+ * back to `null` when there's no cost.
  */
-export function readCostPerMinuteUsd(source: unknown): number | null {
+export function readCost(source: unknown): AudioCostBreakdown | null {
   if (!source || typeof source !== "object") return null;
   const obj = source as Record<string, unknown>;
-  const flat = coerceNumber(obj.cost_per_minute_usd);
-  if (flat != null) return flat;
-  const cost = obj.cost;
-  if (cost && typeof cost === "object") {
-    return coerceNumber((cost as Record<string, unknown>).cost_per_minute_usd);
+  const nested = obj.cost;
+  if (nested && typeof nested === "object") return nested as AudioCostBreakdown;
+  if (
+    "cost_usd" in obj ||
+    "cost_per_minute_currency" in obj ||
+    "cost_per_million_chars_currency" in obj
+  ) {
+    return obj as AudioCostBreakdown;
   }
   return null;
 }
 
 /**
- * Map each provider (leaderboard `run`) to its per-minute USD cost, keeping only
- * providers that computed one. Used to join provider-level cost onto leaderboard
- * rows that don't carry it directly.
+ * Total run cost in USD — the cross-provider-comparable figure (used by the
+ * Pareto frontier's cost axis and the "Total cost" metric tile). Null when the
+ * run computed no cost.
  */
-export function costByRunFromProviders(
-  providerResults:
-    | Array<{ provider: string; metrics?: Record<string, unknown> | null }>
-    | null
-    | undefined,
-): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const pr of providerResults ?? []) {
-    const cpm = readCostPerMinuteUsd(pr.metrics);
-    if (cpm != null) out[pr.provider] = cpm;
-  }
-  return out;
+export function readTotalCostUsd(source: unknown): number | null {
+  const cost = readCost(source);
+  return cost ? coerceNumber(cost.cost_usd) : null;
 }
 
-/** Column/tile/chart label for the per-minute cost metric. */
-export const COST_PER_MINUTE_LABEL = "Cost (USD/min)";
-/** Flat leaderboard-row key the cost column / chart read from. */
-export const COST_PER_MINUTE_KEY = "cost_per_minute_usd";
+/** Format a money amount with its currency symbol; precision scales with magnitude. */
+export function formatMoney(
+  value: number | null | undefined,
+  currency = "USD",
+): string {
+  if (value == null) return "—";
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  const symbol = CURRENCY_SYMBOLS[currency.toUpperCase()] ?? `${currency} `;
+  if (n === 0) return `${symbol}0`;
+  const abs = Math.abs(n);
+  const decimals = abs >= 1 ? 2 : abs >= 0.01 ? 4 : 6;
+  // parseFloat drops trailing zeros so whole values show no decimals.
+  return `${symbol}${parseFloat(n.toFixed(decimals))}`;
+}
+
+export type CostTile = { label: string; value: string };
+
+/** "Total cost" tile in USD. Null when no USD total was computed. */
+export function totalCostTile(cost: AudioCostBreakdown): CostTile | null {
+  const usd = coerceNumber(cost.cost_usd);
+  if (usd == null) return null;
+  return { label: "Total cost", value: formatMoney(usd, "USD") };
+}
+
+/** Per-unit price tile in the provider's native currency (per minute / 1M chars). */
+export function unitCostTile(cost: AudioCostBreakdown): CostTile | null {
+  const currency = cost.currency ?? "USD";
+  if (cost.billing_unit === "character") {
+    const v = coerceNumber(cost.cost_per_million_chars_currency);
+    if (v == null) return null;
+    return { label: "Cost per 1M characters", value: formatMoney(v, currency) };
+  }
+  const v = coerceNumber(cost.cost_per_minute_currency);
+  if (v == null) return null;
+  return { label: "Cost per minute", value: formatMoney(v, currency) };
+}
+
+/**
+ * The cost tiles for a provider's Overall Metrics card: total USD cost plus the
+ * native per-unit price. Empty when the run computed no cost.
+ */
+export function costTiles(source: unknown): CostTile[] {
+  const cost = readCost(source);
+  if (!cost) return [];
+  const tiles: CostTile[] = [];
+  const total = totalCostTile(cost);
+  if (total) tiles.push(total);
+  const unit = unitCostTile(cost);
+  if (unit) tiles.push(unit);
+  return tiles;
+}
+
+/** Date-only format for the caveat (e.g. "15 Jul 2026"). Null on bad/empty input. */
+export function formatCaveatDate(dateString?: string | null): string | null {
+  if (!dateString) return null;
+  const d = new Date(dateString.replace(" ", "T"));
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+/**
+ * Caveat for a non-USD provider whose USD total was converted from its native
+ * currency, noting the rate and the run date it was applied on. Null for USD
+ * providers (no conversion happened).
+ */
+export function costConversionCaveat(
+  source: unknown,
+  runDate?: string | null,
+): string | null {
+  const cost = readCost(source);
+  if (!cost) return null;
+  const currency = (cost.currency ?? "USD").toUpperCase();
+  if (currency === "USD") return null;
+  const rate = coerceNumber(cost.conversion_rate);
+  const symbol = CURRENCY_SYMBOLS[currency] ?? currency;
+  const ratePart =
+    rate != null
+      ? `${symbol}${parseFloat(rate.toFixed(2))} = $1`
+      : `${currency} to USD`;
+  const date = formatCaveatDate(runDate);
+  const asOf = date ? `, rate as of ${date}` : "";
+  return `Total cost converted from ${currency} at ${ratePart}${asOf}.`;
+}

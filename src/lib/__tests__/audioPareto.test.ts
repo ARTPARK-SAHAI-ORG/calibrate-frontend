@@ -69,8 +69,8 @@ describe("buildSttParetoPoints", () => {
   it("maps cost, accuracy and TTFS (as ms) per row", () => {
     const points = buildSttParetoPoints(
       [
-        { run: "openai", cost_per_minute_usd: 0.004, semantic_wer: 0.02, ttfs: 0.4 },
-        { run: "deepgram", cost_per_minute_usd: 0.002, wer: 0.1 },
+        { run: "openai", cost_usd: 0.004, semantic_wer: 0.02, ttfs: 0.4 },
+        { run: "deepgram", cost_usd: 0.002, wer: 0.1 },
       ],
       label,
     );
@@ -87,7 +87,7 @@ describe("buildSttParetoPoints", () => {
 
   it("reads TTFS from the flattened ttfs_p50 headline", () => {
     const [p] = buildSttParetoPoints(
-      [{ run: "a", cost_per_minute_usd: 0.004, wer: 0.1, ttfs_p50: 0.3 }],
+      [{ run: "a", cost_usd: 0.004, wer: 0.1, ttfs_p50: 0.3 }],
       label,
     );
     expect(p.latency).toBe(300);
@@ -101,7 +101,7 @@ describe("buildSttParetoPoints", () => {
 
   it("leaves latency undefined when ttfs is null (e.g. Gemini) but keeps the point valid", () => {
     const [p] = buildSttParetoPoints(
-      [{ run: "gemini", cost_per_minute_usd: 0.004, wer: 0.1, ttfs: null, ttfs_p50: null }],
+      [{ run: "gemini", cost_usd: 0.004, wer: 0.1, ttfs: null, ttfs_p50: null }],
       label,
     );
     expect(p.latency).toBeUndefined();
@@ -116,7 +116,7 @@ describe("buildTtsParetoPoints", () => {
 
   it("uses the primary evaluator for quality and TTFB (ms) for latency", () => {
     const [p] = buildTtsParetoPoints(
-      [{ run: "eleven", cost_per_minute_usd: 0.01, nat: 0.9, ttfb_p50: 0.5 }],
+      [{ run: "eleven", cost_usd: 0.01, nat: 0.9, ttfb_p50: 0.5 }],
       cols,
       label,
     );
@@ -126,7 +126,7 @@ describe("buildTtsParetoPoints", () => {
 
   it("falls back to legacy flat ttfb", () => {
     const [p] = buildTtsParetoPoints(
-      [{ run: "a", cost_per_minute_usd: 0.01, nat: 0.9, ttfb: 0.7 }],
+      [{ run: "a", cost_usd: 0.01, nat: 0.9, ttfb: 0.7 }],
       cols,
       label,
     );

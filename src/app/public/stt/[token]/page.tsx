@@ -96,8 +96,6 @@ type LeaderboardSummary = {
   // TTFS streaming latency (seconds), flattened onto the leaderboard row.
   ttfs_p50?: number;
   ttfs?: number;
-  // Per-minute USD cost, flattened onto the leaderboard row when computed.
-  cost_per_minute_usd?: number;
   [k: string]: string | number | undefined;
 };
 
@@ -108,6 +106,8 @@ type EvaluationResult = {
   provider_results?: ProviderResult[];
   leaderboard_summary?: LeaderboardSummary[];
   error?: string | null;
+  /** When the run was created — dates the INR conversion-rate caveat. */
+  created_at?: string | null;
 };
 
 const getProviderLabel = (value: string): string => {
@@ -305,6 +305,7 @@ export default function PublicSTTPage() {
                 status={data.status}
                 evaluatorColumns={evaluatorColumns}
                 getProviderLabel={getProviderLabel}
+                runDate={data.created_at}
                 className="flex flex-col md:flex-row border border-border rounded-xl overflow-hidden min-h-[480px]"
               />
             )}

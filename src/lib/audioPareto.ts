@@ -2,11 +2,12 @@
  * Builds Pareto-frontier points for the STT and TTS leaderboards, mirroring the
  * LLM benchmark's cost-vs-quality-vs-latency scatter.
  *
- * The shared axes are: cost per minute on X (lower better), a 0–100 quality
- * score on Y (higher better), and latency as the bubble size / third objective
- * (lower better). Latency is passed to the chart in milliseconds (× 1000 from
- * the seconds the STT/TTS runs report) so the existing `formatLatencyMs` /
- * bubble sizing apply unchanged.
+ * The shared axes are: total run cost in USD on X (lower better) — the one
+ * cross-provider-comparable cost figure, since providers bill in different
+ * units/currencies — a 0–100 quality score on Y (higher better), and latency as
+ * the bubble size / third objective (lower better). Latency is passed to the
+ * chart in milliseconds (× 1000 from the seconds the STT/TTS runs report) so the
+ * existing `formatLatencyMs` / bubble sizing apply unchanged.
  *
  *   - STT quality = accuracy = 1 − Semantic WER (falling back to 1 − WER when a
  *     run didn't compute Semantic WER), clamped to 0–100%.
@@ -16,7 +17,7 @@
 
 import type { ParetoModelPoint } from "@/components/charts/ParetoFrontierChart";
 import { isValidParetoPoint } from "@/lib/paretoFrontier";
-import { readCostPerMinuteUsd } from "@/lib/audioCost";
+import { readTotalCostUsd } from "@/lib/audioCost";
 
 const SECONDS_TO_MS = 1000;
 
@@ -75,7 +76,7 @@ export function buildSttParetoPoints(
   return rows.map((row) => ({
     model: row.run,
     label: getLabel(row.run),
-    cost: readCostPerMinuteUsd(row) ?? NaN,
+    cost: readTotalCostUsd(row) ?? NaN,
     passRate: sttAccuracyPercent(row) ?? NaN,
     latency: latencyMs(
       toFiniteNumber(row.ttfs) ?? toFiniteNumber(row.ttfs_p50),
@@ -93,7 +94,7 @@ export function buildTtsParetoPoints(
   return rows.map((row) => ({
     model: row.run,
     label: getLabel(row.run),
-    cost: readCostPerMinuteUsd(row) ?? NaN,
+    cost: readTotalCostUsd(row) ?? NaN,
     passRate: ttsQualityPercent(row, primary) ?? NaN,
     latency: latencyMs(
       toFiniteNumber(row.ttfb_p50) ?? toFiniteNumber(row.ttfb),

@@ -178,9 +178,6 @@ type LeaderboardSummary = {
   // runs report the median under `ttfs_p50`; older runs used a flat `ttfs`.
   ttfs_p50?: number;
   ttfs?: number;
-  // Per-minute USD cost, flattened onto the leaderboard row when the run
-  // computed cost.
-  cost_per_minute_usd?: number;
   [k: string]: string | number | undefined;
 };
 
@@ -196,6 +193,8 @@ type EvaluationResult = {
   error?: string | null;
   is_public?: boolean;
   share_token?: string | null;
+  /** When the run was created — dates the INR conversion-rate caveat. */
+  created_at?: string | null;
 };
 
 type EvaluatorSummary = {
@@ -1049,6 +1048,7 @@ export default function STTEvaluationDetailPage() {
                       status={evaluationResult.status}
                       evaluatorColumns={evaluatorColumns}
                       getProviderLabel={getProviderLabel}
+                      runDate={evaluationResult.created_at}
                       tableRef={tableContainerRef}
                       labellingSelection={
                         evaluationResult.status === "done"

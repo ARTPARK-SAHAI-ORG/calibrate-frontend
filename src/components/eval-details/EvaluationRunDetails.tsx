@@ -24,13 +24,11 @@ import {
   SARVAM_ASR_BLOG_URL,
 } from "@/constants/links";
 import { SARVAM_METRIC_FIELDS } from "./sarvamMetrics";
-import { formatCostUsd } from "@/lib/llmMetrics";
 import {
   type AudioCostBreakdown,
-  COST_PER_MINUTE_KEY,
-  COST_PER_MINUTE_LABEL,
-  costByRunFromProviders,
-  readCostPerMinuteUsd,
+  costTiles,
+  costConversionCaveat,
+  readTotalCostUsd,
 } from "@/lib/audioCost";
 import {
   buildSttParetoPoints,
@@ -428,20 +426,6 @@ function evaluatorLeaderboardColumns(
   }));
 }
 
-/** Leaderboard column for per-minute cost (shared by STT and TTS). */
-const costLeaderboardColumn = {
-  key: COST_PER_MINUTE_KEY,
-  header: COST_PER_MINUTE_LABEL,
-  render: (v: unknown) => (typeof v === "number" ? formatCostUsd(v) : "-"),
-};
-
-/** Leaderboard chart for per-minute cost (shared by STT and TTS). */
-const costChartConfig: ChartConfig = {
-  title: COST_PER_MINUTE_LABEL,
-  dataKey: COST_PER_MINUTE_KEY,
-  formatTooltip: (v: number) => formatCostUsd(v),
-};
-
 /** Flat leaderboard-row key + label for the STT TTFS column / chart. */
 const TTFS_KEY = "ttfs";
 const TTFS_LABEL = "TTFS (s)";
@@ -457,8 +441,8 @@ const ttfsLeaderboardColumn = {
 /** Leaderboard chart for TTFS (STT only). */
 const ttfsChartConfig: ChartConfig = { title: TTFS_LABEL, dataKey: TTFS_KEY };
 
-/** X-axis title for the STT/TTS Pareto frontier (cost is per audio minute). */
-const PARETO_COST_AXIS_LABEL = "Cost per minute (USD) →  cheaper is better";
+/** X-axis title for the STT/TTS Pareto frontier (total run cost, USD). */
+const PARETO_COST_AXIS_LABEL = "Total cost (USD) →  cheaper is better";
 
 /**
  * Adds a derived numeric metric to leaderboard rows under `key`, reading it via
@@ -481,25 +465,29 @@ function withRowMetric(
 }
 
 /**
- * Joins per-minute USD cost onto leaderboard rows. Reads the cost off the row
- * itself when the summary carries it, otherwise off the matching provider
- * result. Exposes it under the flat `COST_PER_MINUTE_KEY` the cost column /
- * chart read, and reports whether any row ended up with a cost.
+ * Joins total USD cost onto leaderboard rows under a flat `cost_usd` key so the
+ * Pareto builder can read it. Reads the cost off the row itself when the summary
+ * carries it, otherwise off the matching provider result. Cost is no longer a
+ * leaderboard column — it's shown per-provider on the Overall Metrics card and
+ * used only as the Pareto cost axis here.
  */
-function withCostPerMinute(
+function withTotalCostUsd(
   leaderboardSummary: LeaderboardSummaryForDetails[],
   providerResults?: Array<{
     provider: string;
     metrics?: Record<string, unknown> | null;
   }>,
-): { rows: LeaderboardSummaryForDetails[]; showCost: boolean } {
-  const costByRun = costByRunFromProviders(providerResults);
-  const { rows, show } = withRowMetric(
+): LeaderboardSummaryForDetails[] {
+  const costByRun: Record<string, number> = {};
+  for (const pr of providerResults ?? []) {
+    const c = readTotalCostUsd(pr.metrics);
+    if (c != null) costByRun[pr.provider] = c;
+  }
+  return withRowMetric(
     leaderboardSummary,
-    COST_PER_MINUTE_KEY,
-    (row) => costByRun[row.run] ?? readCostPerMinuteUsd(row),
-  );
-  return { rows, showCost: show };
+    "cost_usd",
+    (row) => costByRun[row.run] ?? readTotalCostUsd(row),
+  ).rows;
 }
 
 /**
@@ -613,12 +601,10 @@ export function STTEvaluationLeaderboard({
     (row) => row.semantic_wer != null,
   );
 
-  // Join TTFS and per-minute cost onto each row (from the row itself or the
-  // matching provider result) and expose them under the flat keys the
-  // column/chart read.
-  const withCost = withCostPerMinute(leaderboardSummary, providerResults);
-  const { rows, showTtfs } = withTtfs(withCost.rows, providerResults);
-  const showCost = withCost.showCost;
+  // Join TTFS onto each row for its column/chart, and total USD cost (Pareto
+  // axis only — cost is not a leaderboard column).
+  const withCostRows = withTotalCostUsd(leaderboardSummary, providerResults);
+  const { rows, showTtfs } = withTtfs(withCostRows, providerResults);
 
   // Drop evaluator columns/charts that no run carries a value for — an
   // all-"-" column (e.g. an evaluator that didn't run) is just noise.
@@ -638,7 +624,6 @@ export function STTEvaluationLeaderboard({
     ...sarvamFields.map((field) => ({ title: field.label, dataKey: field.key })),
     ...evaluatorChartConfigs(visibleEvaluatorColumns),
     ...(showTtfs ? [ttfsChartConfig] : []),
-    ...(showCost ? [costChartConfig] : []),
   ];
   const chartRows = chunkChartRows(allCharts);
 
@@ -661,7 +646,6 @@ export function STTEvaluationLeaderboard({
         ...sarvamFields.map((field) => ({ key: field.key, header: field.label })),
         ...evaluatorLeaderboardColumns(visibleEvaluatorColumns),
         ...(showTtfs ? [ttfsLeaderboardColumn] : []),
-        ...(showCost ? [costLeaderboardColumn] : []),
       ]}
       data={rows}
       charts={chartRows}
@@ -714,14 +698,13 @@ export function TTSEvaluationLeaderboard({
   const renderTtfb = (v: string | number | undefined) =>
     v != null ? parseFloat(Number(v).toFixed(4)) : "-";
 
-  // Join per-minute cost onto each row (from the row itself or the matching
-  // provider result) and expose it under a flat key the column/chart read.
-  const { rows, showCost } = withCostPerMinute(leaderboardSummary, providerResults);
+  // Join total USD cost onto each row for the Pareto axis (cost is not a
+  // leaderboard column — it's shown per-provider on the Overall Metrics card).
+  const rows = withTotalCostUsd(leaderboardSummary, providerResults);
 
   const allCharts: ChartConfig[] = [
     ...evaluatorChartConfigs(evaluatorColumns),
     { title: "Latency (s)", dataKey: ttfbKey },
-    ...(showCost ? [costChartConfig] : []),
   ];
   const chartRows = chunkChartRows(allCharts);
 
@@ -743,7 +726,6 @@ export function TTSEvaluationLeaderboard({
         { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
         ...evaluatorLeaderboardColumns(evaluatorColumns),
         { key: ttfbKey, header: "Latency (s)", render: renderTtfb },
-        ...(showCost ? [costLeaderboardColumn] : []),
       ]}
       data={rows}
       charts={chartRows}
@@ -777,6 +759,7 @@ export function STTEvaluationOutputs({
   getProviderLabel,
   className = "flex flex-col md:flex-row border border-border rounded-xl overflow-hidden md:h-[calc(100vh-220px)]",
   tableRef,
+  runDate,
   labellingSelection,
   onToggleLabellingSelection,
   onLabellingBulkToggle,
@@ -789,6 +772,8 @@ export function STTEvaluationOutputs({
   getProviderLabel: (value: string) => string;
   className?: string;
   tableRef?: React.RefObject<HTMLDivElement | null>;
+  // Run date (created_at) — used to date the INR conversion-rate caveat.
+  runDate?: string | null;
   // Labelling selection (opt-in). Keys are scoped per provider — the active
   // provider's key prefix is prepended so a row's identity is stable across
   // provider switches (e.g. `openai:0`).
@@ -874,6 +859,10 @@ export function STTEvaluationOutputs({
             <div className="space-y-4 md:space-y-6">
               {providerResult.success && providerResult.metrics && (
                 <ProviderMetricsCard
+                  footnote={costConversionCaveat(
+                    providerResult.metrics,
+                    runDate,
+                  )}
                   metrics={[
                     {
                       label: "WER",
@@ -923,17 +912,9 @@ export function STTEvaluationOutputs({
                           },
                         ]
                       : []),
-                    // Cost tile — shown only when the run computed cost.
-                    ...(readCostPerMinuteUsd(providerResult.metrics) != null
-                      ? [
-                          {
-                            label: COST_PER_MINUTE_LABEL,
-                            value: formatCostUsd(
-                              readCostPerMinuteUsd(providerResult.metrics),
-                            ),
-                          },
-                        ]
-                      : []),
+                    // Cost tiles — total USD cost + native per-unit price.
+                    // Shown only when the run computed cost.
+                    ...costTiles(providerResult.metrics),
                     // Evaluator tiles — shown only when this provider actually
                     // has a value for the evaluator (mirrors the Sarvam tiles),
                     // so e.g. a "Semantic match" tile is hidden when it didn't
@@ -991,6 +972,7 @@ export function TTSEvaluationOutputs({
   evaluatorColumns,
   getProviderLabel,
   className = "flex flex-col md:flex-row border border-border rounded-xl overflow-hidden md:h-[calc(100vh-220px)]",
+  runDate,
   labellingSelection,
   onToggleLabellingSelection,
   onLabellingBulkToggle,
@@ -1002,6 +984,8 @@ export function TTSEvaluationOutputs({
   status: EvaluationStatus;
   evaluatorColumns: TTSEvaluatorColumn[];
   getProviderLabel: (value: string) => string;
+  // Run date (created_at) — used to date the INR conversion-rate caveat.
+  runDate?: string | null;
   className?: string;
   // Labelling selection (opt-in). Keys are scoped per provider — the active
   // provider's key prefix is prepended so a row's identity is stable across
@@ -1099,6 +1083,10 @@ export function TTSEvaluationOutputs({
             <div className="space-y-4 md:space-y-6">
               {providerResult.success && providerResult.metrics && (
                 <ProviderMetricsCard
+                  footnote={costConversionCaveat(
+                    providerResult.metrics,
+                    runDate,
+                  )}
                   metrics={[
                     ...evaluatorColumns.map((col) => ({
                       label: col.label,
@@ -1109,17 +1097,9 @@ export function TTSEvaluationOutputs({
                       ),
                     })),
                     { label: "Latency (s)", value: ttfbValue },
-                    // Cost tile — shown only when the run computed cost.
-                    ...(readCostPerMinuteUsd(providerResult.metrics) != null
-                      ? [
-                          {
-                            label: COST_PER_MINUTE_LABEL,
-                            value: formatCostUsd(
-                              readCostPerMinuteUsd(providerResult.metrics),
-                            ),
-                          },
-                        ]
-                      : []),
+                    // Cost tiles — total USD cost + native per-unit price.
+                    // Shown only when the run computed cost.
+                    ...costTiles(providerResult.metrics),
                   ]}
                 />
               )}

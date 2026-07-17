@@ -97,8 +97,10 @@ jest.mock("../ProviderSidebar", () => ({
 jest.mock("../ProviderMetricsCard", () => ({
   ProviderMetricsCard: ({
     metrics,
+    footnote,
   }: {
     metrics: Array<{ label: string; value: unknown }>;
+    footnote?: React.ReactNode;
   }) => (
     <div data-testid="provider-metrics-card">
       {metrics.map((m) => (
@@ -106,6 +108,7 @@ jest.mock("../ProviderMetricsCard", () => ({
           {String(m.value)}
         </div>
       ))}
+      {footnote && <div data-testid="metrics-footnote">{footnote}</div>}
     </div>
   ),
 }));
@@ -1537,109 +1540,42 @@ describe("TTSEvaluationOutputs", () => {
   });
 });
 
-// ---- Cost (USD/min) ------------------------------------------------------
+// ---- Cost ----------------------------------------------------------------
 
-describe("STTEvaluationLeaderboard cost column", () => {
-  it("joins per-minute cost from providerResults into the row, column and chart", () => {
+describe("STT/TTS leaderboards no longer render a cost column", () => {
+  it("STT leaderboard has no cost column even when providers carry cost", () => {
     render(
       <STTEvaluationLeaderboard
         leaderboardSummary={[{ run: "cartesia", wer: 0.1, cer: 0.05 }]}
         evaluatorColumns={[]}
         getProviderLabel={getProviderLabel}
         providerResults={[
-          {
-            provider: "cartesia",
-            metrics: { cost: { cost_per_minute_usd: 0.0021666667 } },
-          },
+          { provider: "cartesia", metrics: { cost: { cost_usd: 0.0096 } } },
         ]}
       />,
     );
-
     const columns = JSON.parse(
       screen.getByTestId("leaderboard-columns").textContent ?? "[]",
     );
-    expect(columns).toContainEqual({
-      key: "cost_per_minute_usd",
-      header: "Cost (USD/min)",
-    });
-
+    const keys = columns.map((c: { key: string }) => c.key);
+    expect(keys).not.toContain("cost_usd");
+    expect(keys).not.toContain("cost_per_minute_usd");
     const charts = JSON.parse(
       screen.getByTestId("leaderboard-charts").textContent ?? "[]",
     ).flat();
-    expect(charts).toContainEqual({
-      title: "Cost (USD/min)",
-      dataKey: "cost_per_minute_usd",
-    });
-
-    const data = JSON.parse(
-      screen.getByTestId("leaderboard-data").textContent ?? "[]",
-    );
-    expect(data[0].cost_per_minute_usd).toBeCloseTo(0.0021666667);
-  });
-
-  it("reads cost flattened on the leaderboard row when providerResults is absent", () => {
-    render(
-      <STTEvaluationLeaderboard
-        leaderboardSummary={[
-          { run: "openai", wer: 0.1, cer: 0.05, cost_per_minute_usd: 0.004 },
-        ]}
-        evaluatorColumns={[]}
-        getProviderLabel={getProviderLabel}
-      />,
-    );
-    const columns = JSON.parse(
-      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
-    );
-    expect(columns.map((c: { key: string }) => c.key)).toContain(
-      "cost_per_minute_usd",
+    expect(charts.map((c: { title: string }) => c.title)).not.toContain(
+      "Cost (USD/min)",
     );
   });
 
-  it("omits the cost column/chart when no run computed cost", () => {
-    render(
-      <STTEvaluationLeaderboard
-        leaderboardSummary={[{ run: "openai", wer: 0.1, cer: 0.05 }]}
-        evaluatorColumns={[]}
-        getProviderLabel={getProviderLabel}
-        providerResults={[{ provider: "openai", metrics: { wer: 0.1 } }]}
-      />,
-    );
-    const columns = JSON.parse(
-      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
-    );
-    expect(columns.map((c: { key: string }) => c.key)).not.toContain(
-      "cost_per_minute_usd",
-    );
-  });
-
-  it("formats the cost column via formatCostUsd", () => {
-    render(
-      <STTEvaluationLeaderboard
-        leaderboardSummary={[
-          { run: "openai", wer: 0.1, cost_per_minute_usd: 0.0021666667 },
-        ]}
-        evaluatorColumns={[]}
-        getProviderLabel={getProviderLabel}
-      />,
-    );
-    const columns = (
-      mockLeaderboardCapture.props as unknown as Record<string, unknown>
-    ).columns as Array<{ key: string; render?: (v: unknown) => unknown }>;
-    const costColumn = columns.find((c) => c.key === "cost_per_minute_usd");
-    expect(costColumn?.render?.(0.0021666667)).toBe("$0.002167");
-    expect(costColumn?.render?.(undefined)).toBe("-");
-  });
-});
-
-describe("TTSEvaluationLeaderboard cost column", () => {
-  it("appends the cost column/chart after Latency when providerResults carry cost", () => {
+  it("TTS leaderboard has no cost column even when providers carry cost", () => {
     render(
       <TTSEvaluationLeaderboard
         leaderboardSummary={[{ run: "cartesia", ttfb_p50: 0.5 }]}
         evaluatorColumns={[]}
         getProviderLabel={getProviderLabel}
         providerResults={[
-          { provider: "cartesia", metrics: { cost: { cost_per_minute_usd: 0.003 } } },
+          { provider: "cartesia", metrics: { cost: { cost_usd: 11 } } },
         ]}
       />,
     );
@@ -1649,35 +1585,11 @@ describe("TTSEvaluationLeaderboard cost column", () => {
     expect(columns.map((c: { key: string }) => c.key)).toEqual([
       "run",
       "ttfb_p50",
-      "cost_per_minute_usd",
     ]);
-    const charts = JSON.parse(
-      screen.getByTestId("leaderboard-charts").textContent ?? "[]",
-    ).flat();
-    expect(charts.map((c: { dataKey: string }) => c.dataKey)).toEqual([
-      "ttfb_p50",
-      "cost_per_minute_usd",
-    ]);
-  });
-
-  it("omits the cost column when no cost is present", () => {
-    render(
-      <TTSEvaluationLeaderboard
-        leaderboardSummary={[{ run: "openai", ttfb_p50: 0.5 }]}
-        evaluatorColumns={[]}
-        getProviderLabel={getProviderLabel}
-      />,
-    );
-    const columns = JSON.parse(
-      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
-    );
-    expect(columns.map((c: { key: string }) => c.key)).not.toContain(
-      "cost_per_minute_usd",
-    );
   });
 });
 
-describe("STTEvaluationOutputs cost tile", () => {
+describe("STTEvaluationOutputs cost tiles", () => {
   const baseProps = {
     activeProviderKey: null as string | null,
     onProviderSelect: jest.fn(),
@@ -1686,30 +1598,71 @@ describe("STTEvaluationOutputs cost tile", () => {
     getProviderLabel,
   };
 
-  it("shows a cost tile from the nested cost block", () => {
+  it("shows total USD + native per-minute tiles for a USD provider", () => {
     render(
       <STTEvaluationOutputs
         {...baseProps}
         providerResults={[
           {
-            provider: "cartesia",
+            provider: "deepgram",
             success: true,
             metrics: {
               wer: 0.1,
               cer: 0.05,
-              cost: { cost_per_minute_usd: 0.0021666667 },
+              cost: {
+                billing_unit: "minute",
+                currency: "USD",
+                cost_per_minute_currency: 0.0048,
+                cost_usd: 0.0096,
+              },
             },
             results: [],
           },
         ]}
       />,
     );
-    expect(screen.getByTestId("metric-Cost (USD/min)").textContent).toBe(
-      "$0.002167",
+    expect(screen.getByTestId("metric-Total cost").textContent).toBe("$0.0096");
+    expect(screen.getByTestId("metric-Cost per minute").textContent).toBe(
+      "$0.0048",
     );
+    expect(screen.queryByText(/converted from/i)).not.toBeInTheDocument();
   });
 
-  it("omits the cost tile when no cost was computed", () => {
+  it("shows the INR conversion caveat dated with the run for an INR provider", () => {
+    render(
+      <STTEvaluationOutputs
+        {...baseProps}
+        runDate="2026-07-15 10:00:00"
+        providerResults={[
+          {
+            provider: "sarvam",
+            success: true,
+            metrics: {
+              wer: 0.1,
+              cost: {
+                billing_unit: "minute",
+                currency: "INR",
+                cost_per_minute_currency: 0.5,
+                cost_in_currency: 1.0,
+                conversion_rate: 96.35,
+                cost_usd: 0.01038,
+              },
+            },
+            results: [],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("metric-Cost per minute").textContent).toBe("₹0.5");
+    expect(screen.getByTestId("metric-Total cost").textContent).toBe("$0.0104");
+    expect(
+      screen.getByText(
+        "Total cost converted from INR at ₹96.35 = $1, rate as of Jul 15, 2026.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("omits the cost tiles when no cost was computed", () => {
     render(
       <STTEvaluationOutputs
         {...baseProps}
@@ -1718,13 +1671,12 @@ describe("STTEvaluationOutputs cost tile", () => {
         ]}
       />,
     );
-    expect(
-      screen.queryByTestId("metric-Cost (USD/min)"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("metric-Total cost")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("metric-Cost per minute")).not.toBeInTheDocument();
   });
 });
 
-describe("TTSEvaluationOutputs cost tile", () => {
+describe("TTSEvaluationOutputs cost tiles", () => {
   const baseProps = {
     activeProviderKey: null as string | null,
     onProviderSelect: jest.fn(),
@@ -1733,17 +1685,22 @@ describe("TTSEvaluationOutputs cost tile", () => {
     getProviderLabel,
   };
 
-  it("shows a cost tile alongside latency", () => {
+  it("shows total USD + per-1M-characters tiles for a character-billed provider", () => {
     render(
       <TTSEvaluationOutputs
         {...baseProps}
         providerResults={[
           {
-            provider: "cartesia",
+            provider: "groq",
             success: true,
             metrics: {
               ttfb: { p50: 0.5 },
-              cost: { cost_per_minute_usd: 0.003 },
+              cost: {
+                billing_unit: "character",
+                currency: "USD",
+                cost_per_million_chars_currency: 22,
+                cost_usd: 11,
+              },
             },
             results: [],
           },
@@ -1751,12 +1708,46 @@ describe("TTSEvaluationOutputs cost tile", () => {
       />,
     );
     expect(screen.getByTestId("metric-Latency (s)").textContent).toBe("0.5");
-    expect(screen.getByTestId("metric-Cost (USD/min)").textContent).toBe(
-      "$0.003",
+    expect(screen.getByTestId("metric-Total cost").textContent).toBe("$11");
+    expect(screen.getByTestId("metric-Cost per 1M characters").textContent).toBe(
+      "$22",
     );
   });
 
-  it("omits the cost tile when no cost was computed", () => {
+  it("shows the INR caveat for a character-billed INR provider", () => {
+    render(
+      <TTSEvaluationOutputs
+        {...baseProps}
+        runDate="2026-07-15 10:00:00"
+        providerResults={[
+          {
+            provider: "sarvam",
+            success: true,
+            metrics: {
+              ttfb: { p50: 0.5 },
+              cost: {
+                billing_unit: "character",
+                currency: "INR",
+                cost_per_million_chars_currency: 3000,
+                cost_in_currency: 1500,
+                conversion_rate: 96.35,
+                cost_usd: 15.57,
+              },
+            },
+            results: [],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("metric-Cost per 1M characters").textContent).toBe(
+      "₹3000",
+    );
+    expect(
+      screen.getByText(/Total cost converted from INR at ₹96.35 = \$1/),
+    ).toBeInTheDocument();
+  });
+
+  it("omits the cost tiles when no cost was computed", () => {
     render(
       <TTSEvaluationOutputs
         {...baseProps}
@@ -1770,9 +1761,7 @@ describe("TTSEvaluationOutputs cost tile", () => {
         ]}
       />,
     );
-    expect(
-      screen.queryByTestId("metric-Cost (USD/min)"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("metric-Total cost")).not.toBeInTheDocument();
   });
 });
 
@@ -1885,11 +1874,11 @@ describe("STTEvaluationLeaderboard TTFS column", () => {
     expect(columns.map((c: { key: string }) => c.key)).toContain("ttfs");
   });
 
-  it("orders TTFS before the cost column", () => {
+  it("renders TTFS as the last column (cost is not a column)", () => {
     render(
       <STTEvaluationLeaderboard
         leaderboardSummary={[
-          { run: "openai", wer: 0.1, ttfs_p50: 0.3, cost_per_minute_usd: 0.004 },
+          { run: "openai", wer: 0.1, ttfs_p50: 0.3, cost_usd: 0.004 },
         ]}
         evaluatorColumns={[]}
         getProviderLabel={getProviderLabel}
@@ -1899,9 +1888,8 @@ describe("STTEvaluationLeaderboard TTFS column", () => {
       screen.getByTestId("leaderboard-columns").textContent ?? "[]",
     );
     const keys = columns.map((c: { key: string }) => c.key);
-    expect(keys.indexOf("ttfs")).toBeLessThan(
-      keys.indexOf("cost_per_minute_usd"),
-    );
+    expect(keys[keys.length - 1]).toBe("ttfs");
+    expect(keys).not.toContain("cost_usd");
   });
 
   it("omits the TTFS column/chart when no run measured it", () => {
@@ -2064,8 +2052,8 @@ describe("STTEvaluationLeaderboard Pareto frontier", () => {
         evaluatorColumns={[]}
         getProviderLabel={getProviderLabel}
         providerResults={[
-          { provider: "openai", metrics: { cost: { cost_per_minute_usd: 0.004 } } },
-          { provider: "deepgram", metrics: { cost: { cost_per_minute_usd: 0.002 } } },
+          { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
+          { provider: "deepgram", metrics: { cost: { cost_usd: 0.002 } } },
         ]}
       />,
     );
@@ -2083,7 +2071,7 @@ describe("STTEvaluationLeaderboard Pareto frontier", () => {
         evaluatorColumns={[]}
         getProviderLabel={getProviderLabel}
         providerResults={[
-          { provider: "openai", metrics: { cost: { cost_per_minute_usd: 0.004 } } },
+          { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
         ]}
       />,
     );
@@ -2100,7 +2088,7 @@ describe("STTEvaluationLeaderboard Pareto frontier", () => {
         evaluatorColumns={[]}
         getProviderLabel={getProviderLabel}
         providerResults={[
-          { provider: "openai", metrics: { cost: { cost_per_minute_usd: 0.004 } } },
+          { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
           { provider: "deepgram", metrics: { wer: 0.2 } },
         ]}
       />,
@@ -2114,8 +2102,8 @@ describe("TTSEvaluationLeaderboard Pareto frontier", () => {
     render(
       <TTSEvaluationLeaderboard
         leaderboardSummary={[
-          { run: "eleven", nat: 0.9, cost_per_minute_usd: 0.01 },
-          { run: "azure", nat: 0.7, cost_per_minute_usd: 0.006 },
+          { run: "eleven", nat: 0.9, cost_usd: 0.01 },
+          { run: "azure", nat: 0.7, cost_usd: 0.006 },
         ]}
         evaluatorColumns={[
           { key: "nat", label: "Naturalness", outputType: "binary", scoreField: "nat" },
@@ -2134,8 +2122,8 @@ describe("TTSEvaluationLeaderboard Pareto frontier", () => {
     render(
       <TTSEvaluationLeaderboard
         leaderboardSummary={[
-          { run: "eleven", cost_per_minute_usd: 0.01 },
-          { run: "azure", cost_per_minute_usd: 0.006 },
+          { run: "eleven", cost_usd: 0.01 },
+          { run: "azure", cost_usd: 0.006 },
         ]}
         evaluatorColumns={[]}
         getProviderLabel={getProviderLabel}
