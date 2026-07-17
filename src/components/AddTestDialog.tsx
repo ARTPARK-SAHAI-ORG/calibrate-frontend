@@ -726,7 +726,11 @@ type AddTestDialogProps = {
   itemDescription?: string;
   setItemDescription?: (description: string) => void;
   validationAttempted: boolean;
-  onSubmit: (config: TestConfig, evaluators: EvaluatorRefPayload[]) => void;
+  onSubmit: (
+    config: TestConfig,
+    evaluators: EvaluatorRefPayload[],
+    options?: { runAfterSave?: boolean },
+  ) => void;
   initialTab?: "next-reply" | "tool-invocation" | "conversation";
   initialConfig?: TestConfig;
   initialEvaluators?: AttachedEvaluatorInit[];
@@ -764,6 +768,15 @@ type AddTestDialogProps = {
    * `agent_response` being judged. Takes precedence over `allowAgentLastMessage`.
    */
   requireAssistantLastMessage?: boolean;
+  /**
+   * When true, the footer shows an extra "Save and run" / "Create and run"
+   * button next to the primary save action. It saves the test and then asks
+   * the parent to run it immediately (via `onSubmit`'s `runAfterSave` option),
+   * sparing the user the close-then-play round-trip. Only offered in the
+   * default `mode === "test"` flow; callers without an agent to run against
+   * (e.g. the standalone tests page, labelling items) leave it unset.
+   */
+  showRunAfterSave?: boolean;
 };
 
 export function AddTestDialog({
@@ -788,6 +801,7 @@ export function AddTestDialog({
   mode = "test",
   allowAgentLastMessage = false,
   requireAssistantLastMessage = false,
+  showRunAfterSave = false,
 }: AddTestDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
@@ -1148,6 +1162,10 @@ export function AddTestDialog({
 
   const [localValidationAttempted, setLocalValidationAttempted] =
     useState(false);
+  // Which footer action fired the in-flight save, so the spinner shows on the
+  // button the user actually clicked ("Save" vs. "Save and run"). Reset once
+  // the save settles (the dialog either closes or surfaces an error).
+  const [submitRunAfterSave, setSubmitRunAfterSave] = useState(false);
   // Dialog-level message for failed tool-call validation (e.g. an unset boolean
   // or an incomplete parameter). Shown in the footer; cleared on each attempt.
   const [toolValidationError, setToolValidationError] = useState<string | null>(
@@ -2816,8 +2834,11 @@ export function AddTestDialog({
     return false;
   };
 
-  // Handle form submission
-  const handleSubmit = () => {
+  // Handle form submission. `runAfterSave` is set by the "Save and run" /
+  // "Create and run" footer button; it's forwarded to the parent so it can
+  // open the test runner once the save persists.
+  const handleSubmit = (runAfterSave = false) => {
+    setSubmitRunAfterSave(runAfterSave);
     setLocalValidationAttempted(true);
     setToolValidationError(null);
 
@@ -2889,7 +2910,7 @@ export function AddTestDialog({
 
     const config = buildConfig();
     const evaluators = buildEvaluatorsPayload();
-    onSubmit(config, evaluators);
+    onSubmit(config, evaluators, { runAfterSave });
   };
 
   const handleBackdropClick = () => {
@@ -3805,35 +3826,72 @@ export function AddTestDialog({
                     : `The conversation history should end with a user message, not an agent message`;
                   const isButtonDisabled =
                     isCreating || isLoading || isLastMessageInvalid;
+                  // The "Save and run" shortcut is only offered in the default
+                  // test flow (not labelling items) when the parent can run.
+                  const canRunAfterSave = showRunAfterSave && !isLabelItem;
+                  const spinner = (
+                    <svg
+                      className="w-4 h-4 animate-spin"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                  );
 
                   return (
-                    <div className="relative group">
+                    <div className="relative group flex items-center gap-2">
+                      {canRunAfterSave && (
+                        <button
+                          onClick={() => handleSubmit(true)}
+                          disabled={isButtonDisabled}
+                          title={
+                            isEditing
+                              ? "Save your changes and run this test"
+                              : "Create this test and run it"
+                          }
+                          className="h-9 md:h-10 px-3 md:px-4 rounded-lg text-sm md:text-base font-medium border transition-colors flex items-center gap-2 bg-sky-500/12 border-sky-500/45 text-sky-950 dark:text-sky-100 hover:bg-sky-500/22 dark:hover:bg-sky-500/18 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isCreating && submitRunAfterSave ? (
+                            spinner
+                          ) : (
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
+                              />
+                            </svg>
+                          )}
+                          {isEditing ? "Save and run" : "Create and run"}
+                        </button>
+                      )}
                       <button
-                        onClick={handleSubmit}
+                        onClick={() => handleSubmit(false)}
                         disabled={isButtonDisabled}
                         className="h-9 md:h-10 px-4 md:px-5 rounded-lg text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
-                        {isCreating ? (
+                        {isCreating && !submitRunAfterSave ? (
                           <>
-                            <svg
-                              className="w-4 h-4 animate-spin"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                              ></circle>
-                              <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                              ></path>
-                            </svg>
+                            {spinner}
                             {isEditing ? "Saving..." : "Creating..."}
                           </>
                         ) : isEditing ? (

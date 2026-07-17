@@ -429,7 +429,9 @@ export function TestsTabContent({
       }
 
       const data = await response.json();
-      setAgentTests(unwrapList<TestData>(data));
+      const list = unwrapList<TestData>(data);
+      setAgentTests(list);
+      return list;
     } catch (err) {
       reportError("Error fetching agent tests:", err);
       setAgentTestsError(
@@ -889,9 +891,13 @@ export function TestsTabContent({
   const createTestForAgent = async (
     config: TestConfig,
     evaluators: EvaluatorRefPayload[],
+    options?: { runAfterSave?: boolean },
   ) => {
     setValidationAttempted(true);
     if (!newTestName.trim()) return;
+    // The created test's name is unique per agent (the backend rejects
+    // duplicates), so we can recover it from the refreshed list to run it.
+    const targetName = newTestName.trim();
 
     try {
       setIsCreating(true);
@@ -959,13 +965,27 @@ export function TestsTabContent({
       const result = (await response.json().catch(() => null)) as {
         warnings?: string[] | null;
       } | null;
-      await fetchAgentTests();
+      const refreshed = await fetchAgentTests();
       if (result?.warnings && result.warnings.length > 0) {
         setCreateError(
           `Test created but could not be attached to this agent: ${result.warnings.join("; ")}`,
         );
         setIsCreating(false);
         return;
+      }
+      // "Create and run": skip the agent-defaults prompt and run the new test
+      // straight away. The test only shows in the runner if it linked to this
+      // agent (it's in the refreshed list); if the lookup misses we fall back
+      // to closing normally rather than running an unresolved test.
+      if (options?.runAfterSave) {
+        const savedTest = refreshed?.find((t) => t.name === targetName);
+        if (savedTest) {
+          setNewTestName("");
+          setValidationAttempted(false);
+          closeTestDialogAfterSave();
+          runSavedTest(savedTest);
+          return;
+        }
       }
       const prompted = usesEvaluators
         ? await maybePromptAgentDefaults(evaluators)
@@ -1002,6 +1022,17 @@ export function TestsTabContent({
   const closeTestDialogAfterSave = () => {
     setCreateDialogOpen(false);
     resetTestDialog();
+  };
+
+  // Open the test runner for a single just-saved test. Backing the dialog's
+  // "Save and run" shortcut, it mirrors the row-level play action (run one
+  // specific test, not the whole linked set). Skipped for an unverified
+  // connection, matching where the shortcut is offered.
+  const runSavedTest = (test: TestData) => {
+    if (isConnectionUnverified) return;
+    setTestsToRun([test]);
+    setRunAllLinked(false);
+    setTestRunnerOpen(true);
   };
 
   // Test is already saved when this prompt is shown. Declining (Not now / X)
@@ -1182,9 +1213,13 @@ export function TestsTabContent({
   const updateTest = async (
     config: TestConfig,
     evaluators: EvaluatorRefPayload[],
+    options?: { runAfterSave?: boolean },
   ) => {
     setValidationAttempted(true);
     if (!newTestName.trim() || !editingTestUuid) return;
+    // Capture before closeTestDialogAfterSave resets the edit state below.
+    const targetUuid = editingTestUuid;
+    const targetName = newTestName.trim();
 
     try {
       setIsCreating(true);
@@ -1241,7 +1276,25 @@ export function TestsTabContent({
         throw new Error("Failed to update test");
       }
 
-      await fetchAgentTests();
+      const refreshed = await fetchAgentTests();
+      // "Save and run" takes priority: skip the agent-defaults prompt and go
+      // straight to running the just-saved test the user asked to run.
+      if (options?.runAfterSave) {
+        const savedTest: TestData = refreshed?.find(
+          (t) => t.uuid === targetUuid,
+        ) ?? {
+          uuid: targetUuid,
+          name: targetName,
+          description: "",
+          type: config.evaluation.type,
+          config,
+          created_at: "",
+          updated_at: "",
+        };
+        closeTestDialogAfterSave();
+        runSavedTest(savedTest);
+        return;
+      }
       const prompted =
         config.evaluation.type === "response" ||
         config.evaluation.type === "conversation"
@@ -2588,6 +2641,7 @@ export function TestsTabContent({
           initialEvaluators={initialEvaluators}
           agentEvaluatorUuids={agentEvaluators.map((e) => e.uuid)}
           agentEvaluatorsPending={!agentEvaluatorsLoaded}
+          showRunAfterSave={!isConnectionUnverified}
         />
       )}
 

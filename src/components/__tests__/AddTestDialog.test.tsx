@@ -764,5 +764,132 @@ describe("AddTestDialog", () => {
       await user.type(descriptionBox, "Some notes");
       expect(descriptionBox).toHaveValue("Some notes");
     });
+
+    it("never offers the run shortcut even when showRunAfterSave is set", () => {
+      render(
+        <AddTestDialog
+          {...baseProps({
+            mode: "labelItem",
+            itemDescription: "",
+            setItemDescription: jest.fn(),
+            showRunAfterSave: true,
+          })}
+        />,
+      );
+      expect(
+        screen.queryByRole("button", { name: /Create and run/ }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("save-and-run shortcut", () => {
+    it("does not render the run button unless showRunAfterSave is set", async () => {
+      render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
+      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+      expect(
+        screen.queryByRole("button", { name: /Create and run/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders 'Save and run' when editing with showRunAfterSave", async () => {
+      const initialConfig: TestConfig = {
+        history: [
+          { role: "user", content: "Hi" },
+          { role: "assistant", content: "Hello" },
+          { role: "user", content: "How are you?" },
+        ],
+        evaluation: { type: "response" },
+      };
+      render(
+        <AddTestDialog
+          {...baseProps({
+            isEditing: true,
+            initialTab: "next-reply",
+            initialConfig,
+            testName: "Existing",
+            showRunAfterSave: true,
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: /Save and run/ }),
+        ).toBeInTheDocument(),
+      );
+    });
+
+    it("submits with runAfterSave:true when the run button is clicked, and false for the plain create", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...baseProps({
+            initialTab: "next-reply",
+            onSubmit,
+            showRunAfterSave: true,
+          })}
+        />,
+      );
+      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+
+      await user.type(screen.getByPlaceholderText("Your test name"), "My test");
+      const textareas = document.querySelectorAll("textarea[data-msg-id]");
+      await user.type(textareas[0], "Hi there");
+      await user.type(textareas[1], "Hello!");
+      await user.type(textareas[2], "How are you?");
+      await user.type(
+        screen.getByPlaceholderText("Enter value for {{criteria}}"),
+        "Reply is polite",
+      );
+
+      await user.click(screen.getByRole("button", { name: /Create and run/ }));
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(onSubmit.mock.calls[0][2]).toEqual({ runAfterSave: true });
+
+      await user.click(screen.getByRole("button", { name: "Create" }));
+      expect(onSubmit).toHaveBeenCalledTimes(2);
+      expect(onSubmit.mock.calls[1][2]).toEqual({ runAfterSave: false });
+    });
+
+    it("shows the spinner on the run button while creating after a run-click", async () => {
+      const user = setupUser();
+      // A controlled wrapper that flips isCreating on once the run button is
+      // clicked, so we can assert the spinner lands on the run button (not the
+      // plain Create button).
+      function CreatingWrapper() {
+        const React = require("react");
+        const [creating, setCreating] = React.useState(false);
+        return (
+          <ControlledDialog
+            {...baseProps({
+              initialTab: "next-reply",
+              showRunAfterSave: true,
+              isCreating: creating,
+              onSubmit: () => setCreating(true),
+            })}
+          />
+        );
+      }
+      render(<CreatingWrapper />);
+      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
+
+      await user.type(screen.getByPlaceholderText("Your test name"), "My test");
+      const textareas = document.querySelectorAll("textarea[data-msg-id]");
+      await user.type(textareas[0], "Hi there");
+      await user.type(textareas[1], "Hello!");
+      await user.type(textareas[2], "How are you?");
+      await user.type(
+        screen.getByPlaceholderText("Enter value for {{criteria}}"),
+        "Reply is polite",
+      );
+
+      const runButton = screen.getByRole("button", { name: /Create and run/ });
+      await user.click(runButton);
+      // The run button keeps its label and gains a spinner; the plain button
+      // shows "Creating..." only when it was the trigger — here it should not.
+      expect(within(runButton).queryByRole("img")).not.toBeInTheDocument();
+      expect(runButton.querySelector(".animate-spin")).toBeInTheDocument();
+      expect(screen.queryByText("Creating...")).not.toBeInTheDocument();
+    });
   });
 });
