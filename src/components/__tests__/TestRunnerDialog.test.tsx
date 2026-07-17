@@ -39,6 +39,19 @@ jest.mock("../eval-details", () => ({
       summary {passed}/{total}
     </div>
   ),
+  LLMEvaluationAbout: (props: any) => (
+    <div data-testid="about-panel">
+      Test pass rate
+      {JSON.stringify({
+        showLatency: props.showLatency,
+        showCost: props.showCost,
+        showTokens: props.showTokens,
+        showToolCalls: props.showToolCalls,
+        evaluators: props.evaluators?.length ?? 0,
+      })}
+    </div>
+  ),
+  evaluatorSummaryToAbout: (entries: any) => entries ?? [],
 }));
 
 jest.mock("../ShareButton", () => ({
@@ -734,9 +747,16 @@ describe("TestRunnerDialog", () => {
     );
     expect(screen.getByText(/summary 1\/1/)).toBeInTheDocument();
 
-    // Tab nav is visible once done; switching back to outputs works.
-    await setupUser().click(screen.getByRole("button", { name: "Outputs" }));
+    // Tab nav is visible once done; switch back to outputs.
+    const user = setupUser();
+    await user.click(screen.getByRole("button", { name: "Outputs" }));
     expect(screen.getByTestId("outputs-panel")).toBeInTheDocument();
+
+    // The About tab explains the metrics (always documents pass rate).
+    await user.click(screen.getByRole("button", { name: "About" }));
+    expect(screen.getByTestId("about-panel")).toHaveTextContent(
+      "Test pass rate",
+    );
   });
 
   it("shows the overall error state when the whole run errors", async () => {

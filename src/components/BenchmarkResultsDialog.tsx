@@ -14,8 +14,11 @@ import {
   BenchmarkOutputsPanel,
   BenchmarkCombinedLeaderboard,
   benchmarkLabellingKey,
+  LLMEvaluationAbout,
+  evaluatorColumnsToAbout,
   type BenchmarkModelResult,
 } from "./eval-details";
+import { buildBenchmarkCombinedLeaderboardPayload } from "@/lib/benchmarkEvaluatorSummary";
 import { StatusBadge, RerunIconButton } from "@/components/ui";
 import { getDefaultHeaders } from "@/lib/api";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
@@ -91,9 +94,9 @@ export function BenchmarkResultsDialog({
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
 
-  const [activeTab, setActiveTab] = useState<"leaderboard" | "outputs">(
-    "outputs",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "leaderboard" | "outputs" | "about"
+  >("outputs");
   // Track which providers are expanded
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(
     new Set(),
@@ -533,6 +536,17 @@ export function BenchmarkResultsDialog({
 
   const benchmarkScoreLabel = "Test pass rate (%)";
 
+  // Metric-presence plan for the About tab (built only when it's showing so the
+  // scan doesn't run on every poll). Shares the leaderboard's builder.
+  const aboutPlan =
+    isDone && activeTab === "about"
+      ? (buildBenchmarkCombinedLeaderboardPayload(
+          leaderboardSummary,
+          modelResults,
+          benchmarkScoreLabel,
+        )?.plan ?? null)
+      : null;
+
   // Check if we have any results to show
   const hasAnyResults = modelResults.some(
     (m) => m.test_results && m.test_results.length > 0,
@@ -770,6 +784,16 @@ export function BenchmarkResultsDialog({
               >
                 Outputs
               </button>
+              <button
+                onClick={() => setActiveTab("about")}
+                className={`pb-3 px-1 text-sm md:text-base font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                  activeTab === "about"
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                About
+              </button>
             </div>
           </div>
         )}
@@ -785,6 +809,19 @@ export function BenchmarkResultsDialog({
                   modelResults={modelResults}
                   filename={`benchmark-leaderboard-${agentName.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
                   benchmarkScoreLabel={benchmarkScoreLabel}
+                />
+              </div>
+            )}
+
+            {/* About Tab - explains the metrics (latency is p50, cost/tokens mean). */}
+            {isDone && activeTab === "about" && (
+              <div className="p-4 md:p-6 overflow-y-auto h-full">
+                <LLMEvaluationAbout
+                  showToolCalls={!!aboutPlan?.showToolCallPassRate}
+                  showLatency={!!aboutPlan?.showLatency}
+                  showCost={!!aboutPlan?.showCost}
+                  showTokens={!!aboutPlan?.showTokens}
+                  evaluators={evaluatorColumnsToAbout(aboutPlan?.evaluators)}
                 />
               </div>
             )}

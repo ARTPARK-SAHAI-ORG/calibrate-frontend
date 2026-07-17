@@ -11,7 +11,12 @@ import {
   type PagerNav,
 } from "@/components/test-results/shared";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
-import { TestRunOutputsPanel, TestRunSummary } from "@/components/eval-details";
+import {
+  TestRunOutputsPanel,
+  TestRunSummary,
+  LLMEvaluationAbout,
+  evaluatorSummaryToAbout,
+} from "@/components/eval-details";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
 import {
@@ -70,7 +75,9 @@ export default function PublicTestRunPage() {
   const [notFound, setNotFound] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [nav, setNav] = useState<PagerNav | null>(null);
-  const [activeTab, setActiveTab] = useState<"summary" | "outputs">("summary");
+  const [activeTab, setActiveTab] = useState<"summary" | "outputs" | "about">(
+    "summary",
+  );
 
   useEffect(() => { document.title = "LLM unit test | Calibrate"; }, []);
 
@@ -126,7 +133,7 @@ export default function PublicTestRunPage() {
         {/* Tab nav */}
         <div className="relative flex items-end justify-between gap-2 border-b border-border">
           <div className="flex gap-2">
-            {(["summary", "outputs"] as const).map((tab) => (
+            {(["summary", "outputs", "about"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -215,6 +222,24 @@ export default function PublicTestRunPage() {
               enableEvaluatorLinks={false}
             />
           </div>
+        )}
+
+        {/* About tab — explains the metrics (latency is p50, cost/tokens mean). */}
+        {activeTab === "about" && (
+          <LLMEvaluationAbout
+            showToolCalls={toolCall.total > 0}
+            showLatency={!!data.latency_ms}
+            showCost={!!data.cost}
+            showTokens={!!data.total_tokens}
+            evaluators={evaluatorSummaryToAbout(
+              buildEvaluatorSummaryFromResults(
+                results,
+                Object.fromEntries(
+                  (data.evaluators ?? []).map((e) => [e.uuid, e]),
+                ),
+              ),
+            )}
+          />
         )}
       </div>
     </PublicPageLayout>

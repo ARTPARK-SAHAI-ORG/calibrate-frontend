@@ -3,9 +3,17 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
-import { BenchmarkCombinedLeaderboard, BenchmarkOutputsPanel } from "@/components/eval-details";
+import {
+  BenchmarkCombinedLeaderboard,
+  BenchmarkOutputsPanel,
+  LLMEvaluationAbout,
+  evaluatorColumnsToAbout,
+} from "@/components/eval-details";
 import type { BenchmarkModelResult } from "@/components/eval-details";
-import type { BenchmarkLeaderboardSummaryRow } from "@/lib/benchmarkEvaluatorSummary";
+import {
+  buildBenchmarkCombinedLeaderboardPayload,
+  type BenchmarkLeaderboardSummaryRow,
+} from "@/lib/benchmarkEvaluatorSummary";
 import { ResultPager, type TestRunEvaluator, type PagerNav } from "@/components/test-results/shared";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
@@ -27,7 +35,9 @@ export default function PublicBenchmarkPage() {
   const [data, setData] = useState<BenchmarkStatusResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [activeTab, setActiveTab] = useState<"leaderboard" | "outputs">("leaderboard");
+  const [activeTab, setActiveTab] = useState<
+    "leaderboard" | "outputs" | "about"
+  >("leaderboard");
   const [expandedModels, setExpandedModels] = useState<Set<string>>(new Set());
   const [selectedTest, setSelectedTest] = useState<{ model: string; testIndex: number } | null>(null);
   const [nav, setNav] = useState<PagerNav | null>(null);
@@ -68,6 +78,16 @@ export default function PublicBenchmarkPage() {
 
   const benchmarkScoreLabel = "Test pass rate (%)";
 
+  // Metric-presence plan for the About tab (only built when it's showing).
+  const aboutPlan =
+    activeTab === "about"
+      ? (buildBenchmarkCombinedLeaderboardPayload(
+          data.leaderboard_summary,
+          data.model_results ?? [],
+          benchmarkScoreLabel,
+        )?.plan ?? null)
+      : null;
+
   const toggleModel = (model: string) => {
     setExpandedModels((prev) => {
       const next = new Set(prev);
@@ -83,7 +103,7 @@ export default function PublicBenchmarkPage() {
         {/* Tab nav */}
         <div className="relative flex items-end justify-between gap-2 border-b border-border">
           <div className="flex gap-2">
-            {(["leaderboard", "outputs"] as const).map((tab) => (
+            {(["leaderboard", "outputs", "about"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -137,6 +157,17 @@ export default function PublicBenchmarkPage() {
             modelResults={data.model_results ?? []}
             filename={`benchmark-leaderboard-${token.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
             benchmarkScoreLabel={benchmarkScoreLabel}
+          />
+        )}
+
+        {/* About Tab — explains the metrics (latency is p50, cost/tokens mean). */}
+        {activeTab === "about" && (
+          <LLMEvaluationAbout
+            showToolCalls={!!aboutPlan?.showToolCallPassRate}
+            showLatency={!!aboutPlan?.showLatency}
+            showCost={!!aboutPlan?.showCost}
+            showTokens={!!aboutPlan?.showTokens}
+            evaluators={evaluatorColumnsToAbout(aboutPlan?.evaluators)}
           />
         )}
 
