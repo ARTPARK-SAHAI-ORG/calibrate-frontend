@@ -60,6 +60,17 @@ type TestPayload = {
 
 const ISO = "2026-07-16T00:00:00Z";
 
+// The correctness judge prompt. The default-prompt endpoint returns the human
+// PLACEHOLDER form; the stored live version has the {{criteria}} VARIABLE wired.
+// The tour reuses Correctness only if its live prompt matches the canonical
+// (placeholder wired), which this pair exercises end to end.
+const CORRECTNESS_PROMPT_PREFIX =
+  "You are a highly accurate evaluator.\n\nEvaluate if the response adheres to " +
+  "the evaluation criteria:\n\n";
+const CORRECTNESS_DEFAULT_PROMPT =
+  CORRECTNESS_PROMPT_PREFIX + "<ENTER EVALUATION CRITERIA HERE>";
+const CORRECTNESS_LIVE_PROMPT = CORRECTNESS_PROMPT_PREFIX + "{{criteria}}";
+
 // Two LLM-reply evaluators: one "Correctness" (the default next-reply slug the
 // dialog seeds), one "Reply Conciseness" (the second check the flow adds). Both are
 // evaluator_type "llm" so they render the "LLM reply" pill AND actually grade a
@@ -312,6 +323,21 @@ async function installFakeBackend(page: Page, appOrigin: string): Promise<void> 
       // --- Evaluator library ---
       if (method === "GET" && pathname === "/evaluators") {
         return json(route, LIBRARY_EVALUATORS);
+      }
+      // Canonical correctness prompt (placeholder form).
+      if (method === "GET" && pathname === "/evaluators/default-prompt") {
+        return json(route, {
+          system_prompt: CORRECTNESS_DEFAULT_PROMPT,
+          judge_model: "openai/gpt-5.4-mini",
+          output_type: "binary",
+        });
+      }
+      // Evaluator detail — the reuse check reads the live version's prompt.
+      if (method === "GET" && /^\/evaluators\/[^/]+$/.test(pathname)) {
+        return json(route, {
+          versions: [{ uuid: "v1", system_prompt: CORRECTNESS_LIVE_PROMPT }],
+          live_version_index: 0,
+        });
       }
 
       // --- Tools (unused by the tour, but the pages fetch them) ---

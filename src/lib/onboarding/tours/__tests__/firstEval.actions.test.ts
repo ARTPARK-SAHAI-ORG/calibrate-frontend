@@ -431,30 +431,62 @@ describe("resolveEvaluatorPlan", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it("resolves Correctness + a conciseness second from the library", async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        items: [
-          {
-            name: "Correctness",
-            evaluator_type: "llm",
-            slug: "default-llm-next-reply",
-            live_version: { variables: [{ name: "criteria" }] },
-          },
-          {
-            name: "Reply Conciseness",
-            evaluator_type: "llm",
-            slug: "reply-conciseness",
-            live_version: { variables: [{ name: "criteria" }] },
-          },
-        ],
-      }),
+  const CANON = "You need to evaluate:\n\n{{criteria}}";
+  const ITEMS = [
+    {
+      uuid: "ev-correct",
+      name: "Correctness",
+      evaluator_type: "llm",
+      slug: "default-llm-next-reply",
+      live_version: { variables: [{ name: "criteria" }] },
+    },
+    {
+      uuid: "ev-conc",
+      name: "Reply Conciseness",
+      evaluator_type: "llm",
+      slug: "reply-conciseness",
+      live_version: { variables: [{ name: "criteria" }] },
+    },
+  ];
+
+  // Per-URL mock: the list, the canonical default-prompt, and the candidate's
+  // detail (whose live prompt is compared against the canonical).
+  function mockEvaluatorFetches(detailPrompt: string) {
+    (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
+      if (url.includes("/evaluators/default-prompt")) {
+        return {
+          ok: true,
+          json: async () => ({ system_prompt: CANON, judge_model: "m" }),
+        };
+      }
+      if (/\/evaluators\/[^/?]+$/.test(url)) {
+        return {
+          ok: true,
+          json: async () => ({
+            versions: [{ uuid: "v1", system_prompt: detailPrompt }],
+            live_version_index: 0,
+          }),
+        };
+      }
+      return { ok: true, json: async () => ({ items: ITEMS }) };
     });
+  }
+
+  it("reuses Correctness when its live prompt matches the canonical", async () => {
+    mockEvaluatorFetches(CANON);
     expect(await resolveEvaluatorPlan("tok")).toEqual({
       correctnessName: "Correctness",
       secondEvaluatorName: "Reply Conciseness",
     });
+  });
+
+  it("recreates (correctnessName null) when the reused prompt differs", async () => {
+    // Slug + declared criteria variable, but the live prompt still has the
+    // placeholder — not the canonical prompt, so it must not be reused.
+    mockEvaluatorFetches("You need to evaluate:\n\n<ENTER CRITERIA HERE>");
+    const plan = await resolveEvaluatorPlan("tok");
+    expect(plan.correctnessName).toBeNull();
+    expect(plan.secondEvaluatorName).toBe("Reply Conciseness");
   });
 
   it("falls back when the request is not ok", async () => {

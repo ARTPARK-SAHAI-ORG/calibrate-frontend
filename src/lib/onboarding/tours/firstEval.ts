@@ -177,6 +177,7 @@ export type EvaluatorPlan = {
 };
 
 type EvaluatorLike = {
+  uuid?: string;
   name?: string;
   evaluator_type?: string;
   slug?: string | null;
@@ -231,11 +232,74 @@ export function planFromEvaluators(list: EvaluatorLike[]): EvaluatorPlan {
   };
 }
 
+/** The live version's judge prompt for evaluator `uuid`, or null. */
+async function fetchLivePrompt(
+  uuid: string,
+  accessToken: string,
+): Promise<string | null> {
+  try {
+    const res = await fetch(`${getBackendUrl()}/evaluators/${uuid}`, {
+      method: "GET",
+      headers: getDefaultHeaders(accessToken),
+    });
+    if (!res.ok) return null;
+    const d = (await res.json()) as {
+      versions?: { uuid?: string; system_prompt?: string }[];
+      live_version_index?: number | null;
+      live_version_id?: string | null;
+    };
+    const versions = Array.isArray(d.versions) ? d.versions : [];
+    const live =
+      (typeof d.live_version_index === "number" &&
+        versions[d.live_version_index]) ||
+      versions.find((v) => v.uuid === d.live_version_id);
+    return typeof live?.system_prompt === "string" ? live.system_prompt : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The canonical correctness judge prompt (backend default, {{criteria}} wired). */
+async function fetchCanonicalCorrectnessPrompt(
+  accessToken: string,
+): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `${getBackendUrl()}/evaluators/default-prompt?purpose=llm`,
+      { method: "GET", headers: getDefaultHeaders(accessToken) },
+    );
+    if (!res.ok) return null;
+    const dp = (await res.json()) as DefaultPrompt;
+    return ensureCriteriaVariable(dp?.system_prompt);
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Fetch the workspace evaluators and resolve the plan. Falls back to the built-in
- * "Correctness" default, second-check-free (the safe path — one reliable,
- * tour-controlled check) if the token is missing or the request fails, so the
- * tour never blocks on the lookup.
+ * Whether the existing Correctness candidate is safe for the tour to reuse: its
+ * live prompt must EXACTLY match the canonical correctness prompt. This rejects
+ * an evaluator that carries the slug + a declared `criteria` variable but was
+ * left with the placeholder (or any other prompt) — the tour recreates a proper
+ * one instead of grading with something it does not control.
+ */
+async function correctnessPromptMatches(
+  uuid: string,
+  accessToken: string,
+): Promise<boolean> {
+  const [canonical, live] = await Promise.all([
+    fetchCanonicalCorrectnessPrompt(accessToken),
+    fetchLivePrompt(uuid, accessToken),
+  ]);
+  return !!canonical && !!live && live.trim() === canonical.trim();
+}
+
+/**
+ * Fetch the workspace evaluators and resolve the plan. Reuses an existing
+ * Correctness ONLY if its live prompt exactly matches the canonical one (else it
+ * is recreated). Falls back to the built-in "Correctness" default, second-check-
+ * free (the safe path — one reliable, tour-controlled check) if the token is
+ * missing or the request fails, so the tour never blocks on the lookup.
  */
 export async function resolveEvaluatorPlan(
   accessToken: string | null,
@@ -251,7 +315,23 @@ export async function resolveEvaluatorPlan(
       { method: "GET", headers: getDefaultHeaders(accessToken) },
     );
     if (!res.ok) return fallback;
-    return planFromEvaluators(unwrapList<EvaluatorLike>(await res.json()));
+    const list = unwrapList<EvaluatorLike>(await res.json());
+    const plan = planFromEvaluators(list);
+    // Verify the Correctness we'd reuse is genuinely the canonical one; if its
+    // prompt differs at all, treat it as absent so a proper one is recreated.
+    if (plan.correctnessName) {
+      const candidate = list.find(
+        (e) =>
+          e.evaluator_type === "llm" &&
+          isDefaultLLMNextReplyEvaluator(e) &&
+          hasCriteriaVariable(e),
+      );
+      const ok =
+        !!candidate?.uuid &&
+        (await correctnessPromptMatches(candidate.uuid, accessToken));
+      if (!ok) plan.correctnessName = null;
+    }
+    return plan;
   } catch {
     return fallback;
   }
