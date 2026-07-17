@@ -177,6 +177,66 @@ describe("first-eval tour step actions", () => {
     expect(body.evaluator_type).toBe("llm");
     expect(body.version.judge_model).toBe("openai/gpt-5.4-mini");
     expect(body.version.variables[0].name).toBe("criteria");
+    // The prompt must reference the {{criteria}} variable, not a placeholder.
+    expect(body.version.system_prompt).toContain("{{criteria}}");
+  });
+
+  it("recreates Correctness under a FREE name when one already exists", async () => {
+    // A user replaced the default with their own "Correctness" (no default slug),
+    // so the plan reports none; we must create ours under a non-colliding name
+    // and pick THAT one — never the user's.
+    const calls: { url: string; init?: RequestInit }[] = [];
+    (global.fetch as jest.Mock).mockImplementation(
+      async (url: string, init?: RequestInit) => {
+        calls.push({ url, init });
+        if (url.includes("/evaluators/default-prompt")) {
+          return {
+            ok: true,
+            json: async () => ({
+              system_prompt: "Adhere to {{criteria}}",
+              judge_model: "m",
+            }),
+          };
+        }
+        if (init?.method === "POST") {
+          return { ok: true, json: async () => ({ uuid: "new" }) };
+        }
+        // GET /evaluators list: the workspace already has a "Correctness".
+        return { ok: true, json: async () => ({ items: [{ name: "Correctness" }] }) };
+      },
+    );
+
+    const tour = buildTour("tok", {
+      correctnessName: null,
+      secondEvaluatorName: null,
+    });
+    await stepByTitle(tour, "Add an evaluator").prepare?.();
+
+    // Picker holds the user's broken "Correctness" AND our created "Correctness (2)".
+    const dialog = document.createElement("div");
+    dialog.setAttribute("data-tour", "add-evaluators-dialog");
+    const labelRow = (name: string) => {
+      const el = document.createElement("label");
+      el.innerHTML = `<input type="checkbox" /><span>${name}</span><span>LLM reply</span>`;
+      return el;
+    };
+    const userRow = labelRow("Correctness");
+    const oursRow = labelRow("Correctness (2)");
+    dialog.append(userRow, oursRow);
+    document.body.appendChild(dialog);
+
+    await stepByTitle(tour, "Choose what to check").action?.();
+
+    const checked = (row: HTMLElement) =>
+      row.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked;
+    // We tick OUR created "Correctness (2)", never the user's "Correctness".
+    expect(checked(oursRow)).toBe(true);
+    expect(checked(userRow)).toBe(false);
+
+    const post = calls.find(
+      (c) => c.init?.method === "POST" && c.url.endsWith("/evaluators"),
+    );
+    expect(JSON.parse(post!.init!.body as string).name).toBe("Correctness (2)");
   });
 
   it("does not recreate Correctness when it already exists", async () => {

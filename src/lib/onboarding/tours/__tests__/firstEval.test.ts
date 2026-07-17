@@ -10,6 +10,7 @@
 
 import {
   buildCorrectnessPayload,
+  ensureCriteriaVariable,
   chooseRowByName,
   isLlmReplyRow,
   planFromEvaluators,
@@ -191,6 +192,43 @@ describe("buildCorrectnessPayload", () => {
     expect(payload.version.system_prompt).toContain("{{criteria}}");
     expect(payload.version.judge_model).toBeUndefined();
     expect(payload.output_type).toBe("binary");
+  });
+
+  it("wires the {{criteria}} variable when the backend prompt has a placeholder", () => {
+    // The default-prompt endpoint returns a human placeholder, not the variable.
+    const payload = buildCorrectnessPayload({
+      system_prompt:
+        "Evaluate if the response adheres to:\n\n<ENTER EVALUATION CRITERIA HERE>",
+      judge_model: "openai/gpt-5.4-mini",
+    });
+    expect(payload.version.system_prompt).toContain("{{criteria}}");
+    expect(payload.version.system_prompt).not.toContain("ENTER EVALUATION");
+  });
+
+  it("creates under the given (free) name", () => {
+    expect(buildCorrectnessPayload(null, "Correctness (2)").name).toBe(
+      "Correctness (2)",
+    );
+  });
+});
+
+describe("ensureCriteriaVariable", () => {
+  it("keeps a prompt that already references {{criteria}}", () => {
+    expect(ensureCriteriaVariable("Judge against {{criteria}} now")).toBe(
+      "Judge against {{criteria}} now",
+    );
+  });
+
+  it("replaces a <...criteria...> placeholder with the {{criteria}} variable", () => {
+    expect(ensureCriteriaVariable("Adhere to <ENTER CRITERIA HERE>")).toBe(
+      "Adhere to {{criteria}}",
+    );
+  });
+
+  it("falls back to the built-in prompt when there is no criteria slot", () => {
+    expect(ensureCriteriaVariable("no variable here")).toContain("{{criteria}}");
+    expect(ensureCriteriaVariable("")).toContain("{{criteria}}");
+    expect(ensureCriteriaVariable(undefined)).toContain("{{criteria}}");
   });
 });
 

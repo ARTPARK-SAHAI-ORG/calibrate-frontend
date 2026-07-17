@@ -244,13 +244,32 @@ type DefaultPrompt = {
 };
 
 /**
+ * Ensure the judge prompt actually references the `{{criteria}}` VARIABLE. The
+ * backend's default-prompt endpoint returns a human placeholder instead (e.g.
+ * "<ENTER EVALUATION CRITERIA HERE>"), which would leave the criteria variable
+ * declared-but-unused — so the tour's per-test criterion would never reach the
+ * judge. Wire that placeholder to `{{criteria}}`; if we cannot, use the
+ * hard-coded fallback that already contains it. Exported for unit testing.
+ */
+export function ensureCriteriaVariable(prompt: string | undefined): string {
+  const p = (prompt ?? "").trim();
+  if (!p) return CORRECTNESS_FALLBACK_PROMPT;
+  if (p.includes("{{criteria}}")) return p;
+  const wired = p.replace(/<[^>]*criteria[^>]*>/i, "{{criteria}}");
+  return wired.includes("{{criteria}}") ? wired : CORRECTNESS_FALLBACK_PROMPT;
+}
+
+/**
  * Build the `POST /evaluators` body for recreating the Correctness default,
  * mirroring what the Create Evaluator flow sends. Pure, so it is unit-testable.
- * Uses the backend's canonical prompt/judge model when available, else a
- * hard-coded fallback prompt; keeps the single `{{criteria}}` variable the tour
- * fills per test.
+ * Uses the backend's canonical judge model when available and a prompt that is
+ * guaranteed to reference the single `{{criteria}}` variable the tour fills per
+ * test. `name` lets the caller avoid colliding with an existing evaluator.
  */
-export function buildCorrectnessPayload(dp: DefaultPrompt | null): {
+export function buildCorrectnessPayload(
+  dp: DefaultPrompt | null,
+  name: string = CORRECTNESS_NAME,
+): {
   name: string;
   description: string;
   evaluator_type: "llm";
@@ -264,7 +283,7 @@ export function buildCorrectnessPayload(dp: DefaultPrompt | null): {
   };
 } {
   return {
-    name: CORRECTNESS_NAME,
+    name,
     description: CORRECTNESS_DESCRIPTION,
     evaluator_type: "llm",
     data_type: "text",
@@ -272,22 +291,28 @@ export function buildCorrectnessPayload(dp: DefaultPrompt | null): {
     output_type: dp?.output_type ?? "binary",
     version: {
       ...(dp?.judge_model ? { judge_model: dp.judge_model } : {}),
-      system_prompt: dp?.system_prompt?.trim() || CORRECTNESS_FALLBACK_PROMPT,
+      system_prompt: ensureCriteriaVariable(dp?.system_prompt),
       variables: [CORRECTNESS_CRITERIA_VARIABLE],
     },
   };
 }
 
 /**
- * Recreate the built-in Correctness evaluator when a workspace has deleted it, so
- * the tour has a check whose criteria it controls. Best-effort and silent: it
- * fetches the canonical prompt/judge model, POSTs the evaluator, and swallows any
- * failure (the tour then simply proceeds — the picker step degrades gracefully).
+ * Recreate a proper Correctness evaluator when the workspace has no built-in one
+ * — either it was deleted, OR the user replaced it with a custom evaluator that
+ * does not carry the default slug (so the plan cannot find it). In both cases the
+ * tour needs a check whose `{{criteria}}` it controls, so it creates its own.
+ *
+ * Crucially it picks a FREE name (the backend rejects duplicate names, and a
+ * user's own "Correctness" would otherwise both collide and, if we reused the
+ * name, get picked instead of ours). Returns the name actually created so the
+ * tour picks THAT exact evaluator — or null on any failure (best-effort; the
+ * tour then degrades gracefully).
  */
 async function createCorrectnessEvaluator(
   accessToken: string | null,
-): Promise<void> {
-  if (!accessToken) return;
+): Promise<string | null> {
+  if (!accessToken) return null;
   try {
     let dp: DefaultPrompt | null = null;
     const dpRes = await fetch(
@@ -297,17 +322,26 @@ async function createCorrectnessEvaluator(
     if (dpRes.ok) dp = (await dpRes.json()) as DefaultPrompt;
     // Without a judge model the backend rejects the create, so only proceed when
     // the default-prompt lookup gave us one.
-    if (!dp?.judge_model) return;
-    await fetch(`${getBackendUrl()}/evaluators`, {
+    if (!dp?.judge_model) return null;
+    // Avoid colliding with an existing evaluator named "Correctness" (e.g. the
+    // user's own custom one). Pick a free name and create under it.
+    const name = await resolveFreeName(
+      CORRECTNESS_NAME,
+      "/evaluators",
+      accessToken,
+    );
+    const res = await fetch(`${getBackendUrl()}/evaluators`, {
       method: "POST",
       headers: {
         ...getDefaultHeaders(accessToken),
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(buildCorrectnessPayload(dp)),
+      body: JSON.stringify(buildCorrectnessPayload(dp, name)),
     });
+    return res.ok ? name : null;
   } catch {
     /* best-effort: the tour proceeds without it */
+    return null;
   }
 }
 
@@ -599,6 +633,10 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
   // deleted it (null), recreate it under its default name before the picker opens.
   const needsCorrectness = deps.plan.correctnessName === null;
   const correctnessName = deps.plan.correctnessName ?? CORRECTNESS_NAME;
+  // Mutable: when Correctness is recreated we may create it under a free,
+  // non-colliding name; the later pick + criteria steps must target whatever we
+  // actually created, not the placeholder name.
+  const correctness = { name: correctnessName };
   const steps: TourStep[] = [
     {
       title: "Welcome to Calibrate 👋",
@@ -669,10 +707,13 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       side: "bottom",
       actionLabel: "Next",
       prepare: async () => {
-        // If the workspace deleted the built-in Correctness default, silently
-        // recreate it now so it is in the picker the next click opens.
+        // If the workspace has no built-in Correctness (deleted, or replaced by a
+        // custom evaluator without the default slug), silently recreate a proper
+        // one now — under a free name — so it is in the picker the next click
+        // opens, and remember that name so the pick + criteria target it.
         if (needsCorrectness) {
-          await createCorrectnessEvaluator(deps.getAccessToken());
+          const created = await createCorrectnessEvaluator(deps.getAccessToken());
+          if (created) correctness.name = created;
         }
       },
       action: async () => {
@@ -693,7 +734,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       side: "left",
       actionLabel: "Pick it",
       action: async () => {
-        await pickEvaluatorByName(correctnessName);
+        await pickEvaluatorByName(correctness.name);
       },
     },
     // Only add a second check when the workspace actually has one to add.
@@ -770,7 +811,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
           DEMO_TESTS[0].criteria,
           { timeout: 8000 },
         );
-        fillEvaluatorCriteria(DEMO_TESTS[0].criteria, correctnessName);
+        fillEvaluatorCriteria(DEMO_TESTS[0].criteria, correctness.name);
       },
       action: async () => {
         await submitCreateTest();
@@ -814,7 +855,7 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
           DEMO_TESTS[1].criteria,
           { timeout: 8000 },
         );
-        fillEvaluatorCriteria(DEMO_TESTS[1].criteria, correctnessName);
+        fillEvaluatorCriteria(DEMO_TESTS[1].criteria, correctness.name);
       },
       action: async () => {
         await submitCreateTest();
