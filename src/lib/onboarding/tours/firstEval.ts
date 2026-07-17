@@ -143,7 +143,6 @@ export const A = {
   agentTypeOptions: '[data-tour="agent-type-options"]',
   tabTests: '[data-tour="agent-tab-tests"]',
   testsCreate: '[data-tour="tests-create"]',
-  testRowFirst: '[data-tour="test-row-first"]',
   testConversation: '[data-tour="test-conversation"]',
   testEvaluatorsArea: '[data-tour="test-evaluators-area"]',
   testEditorClose: '[data-tour="test-editor-close"]',
@@ -919,11 +918,14 @@ export function buildFirstEvalTour(deps: FirstEvalDeps): Tour {
       },
     },
     {
-      anchor: A.testRowFirst,
+      // Point at the "Create test" button — the card is about ADDING a test, so
+      // highlighting the existing test row would be confusing.
+      anchor: A.testsCreate,
       title: "Add a test it should fail",
       description:
         "Tests are most useful when they <strong>catch problems</strong>. Let us add a second test we expect the agent to <strong>fail</strong>, and build it the same way.",
       side: "bottom",
+      align: "end",
       actionLabel: "Add it",
       timeout: 12000,
       action: async () => {
