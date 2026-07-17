@@ -11,6 +11,14 @@ import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog"
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { BenchmarkDialog } from "@/components/BenchmarkDialog";
 import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
+import {
+  BenchmarkRerunDialog,
+  useBenchmarkRerun,
+} from "@/components/BenchmarkRerunDialog";
+import {
+  makeOptimisticTestRun,
+  makeOptimisticBenchmarkRun,
+} from "@/lib/optimisticRuns";
 import { CompareModelsButton } from "@/components/agent-tabs/CompareModelsButton";
 import {
   AddTestDialog,
@@ -371,6 +379,10 @@ export function TestsTabContent({
   const [selectedPastRun, setSelectedPastRun] = useState<TestRun | null>(null);
   const [viewingTestResults, setViewingTestResults] = useState(false);
   const [viewingBenchmarkResults, setViewingBenchmarkResults] = useState(false);
+
+  // Direct benchmark rerun: starts a fresh benchmark (no picker) with the same
+  // models + test subset as a completed run and shows it live.
+  const benchmarkRerun = useBenchmarkRerun();
 
   // Track polling intervals for pending runs
   const pendingRunsPollingRef = useRef<NodeJS.Timeout | null>(null);
@@ -1375,45 +1387,53 @@ export function TestsTabContent({
     }
   };
 
+  // Rerun a completed test run as a fresh run of the same tests, swapping the
+  // view dialog for the live new-run dialog.
+  const handleRerunTests = (tests: TestData[]) => {
+    setViewingTestResults(false);
+    setSelectedPastRun(null);
+    setRunAllLinked(false);
+    setTestsToRun(tests);
+    setTestRunnerOpen(true);
+  };
+
+  // Rerun a completed benchmark with the same models and test subset, swapping
+  // the view dialog for a fresh live benchmark (skips the model picker).
+  const handleRerunBenchmark = (
+    models: string[],
+    testUuids: string[],
+    testNames: string[],
+  ) => {
+    setViewingBenchmarkResults(false);
+    setSelectedPastRun(null);
+    benchmarkRerun.start({
+      agentUuid,
+      agentName,
+      models,
+      testUuids,
+      testNames,
+    });
+  };
+
   // Handle when a new test run is created
-  const handleTestRunCreated = (taskId: string, testCount?: number) => {
-    const count = testCount ?? testsToRun.length;
-    // Create optimistic results array with test names for display
-    const optimisticResults: TestRunResult[] = testsToRun.map((test) => ({
-      name: test.name,
-      passed: null,
-      test_case: {
-        name: test.name,
-      },
-    }));
-    const newRun: TestRun = {
-      uuid: taskId,
-      name: "",
-      status: "pending",
-      type: "llm-unit-test",
-      updated_at: new Date().toISOString(),
-      total_tests: count,
-      passed: null,
-      failed: null,
-      results: optimisticResults,
-    };
+  const handleTestRunCreated = (taskId: string) => {
+    const newRun: TestRun = makeOptimisticTestRun(
+      taskId,
+      testsToRun,
+      new Date().toISOString(),
+    );
     setPastRuns((prev) => [newRun, ...prev]);
     // Polling is handled by the useEffect that watches pastRuns for pending items
   };
 
-  // Handle when a new benchmark is created
+  // Handle when a new benchmark is created. Models aren't known here (the
+  // picker owns them), so the row shows "0 models" until the poller fills it in.
   const handleBenchmarkCreated = (taskId: string) => {
-    const newRun: TestRun = {
-      uuid: taskId,
-      name: "Benchmark",
-      status: "pending",
-      type: "llm-benchmark",
-      updated_at: new Date().toISOString(),
-      total_tests: null,
-      passed: null,
-      failed: null,
-      model_results: [],
-    };
+    const newRun: TestRun = makeOptimisticBenchmarkRun(
+      taskId,
+      [],
+      new Date().toISOString(),
+    );
     setPastRuns((prev) => [newRun, ...prev]);
     // Polling is handled by the useEffect that watches pastRuns for pending items
   };
@@ -2697,6 +2717,7 @@ export function TestsTabContent({
         tests={testsToRun}
         runAllLinked={runAllLinked}
         onRunCreated={handleTestRunCreated}
+        onRerun={handleRerunTests}
       />
 
       {/* Benchmark Dialog */}
@@ -2740,6 +2761,7 @@ export function TestsTabContent({
           taskId={selectedPastRun.uuid}
           initialRunStatus={selectedPastRun.status}
           onStatusUpdate={handleRunStatusUpdate}
+          onRerun={handleRerunTests}
         />
       )}
 
@@ -2757,8 +2779,19 @@ export function TestsTabContent({
           testNames={[]}
           models={[]}
           taskId={selectedPastRun.uuid}
+          onRerun={handleRerunBenchmark}
         />
       )}
+
+      {/* Direct Benchmark Rerun Dialog — fresh benchmark of the same models and
+          test subset, skipping the model picker. */}
+      <BenchmarkRerunDialog
+        config={benchmarkRerun.config}
+        rerunKey={benchmarkRerun.key}
+        onClose={benchmarkRerun.clear}
+        onBenchmarkCreated={(taskId) => handleBenchmarkCreated(taskId)}
+        onRerun={benchmarkRerun.start}
+      />
     </div>
   );
 }

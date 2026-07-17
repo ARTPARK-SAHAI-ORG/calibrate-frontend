@@ -18,6 +18,7 @@ import {
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
+import { RerunIconButton } from "@/components/ui";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import {
   AddRunToLabellingTaskDialog,
@@ -120,6 +121,10 @@ type TestRunStatusResponse = {
   cost?: AggStat;
   total_tokens?: AggStat;
   results_s3_prefix?: string;
+  /** The test uuids this run executed, in run order. Used to rerun the exact
+   * same tests. Absent on runs created before the backend started snapshotting
+   * it — the Rerun button is hidden in that case. */
+  test_uuids?: string[];
   error?: string;
   is_public?: boolean;
   share_token?: string | null;
@@ -146,6 +151,10 @@ type TestRunnerDialogProps = {
     failed?: number | null,
   ) => void; // Called when run status changes (for coordinated polling)
   runAllLinked?: boolean; // When true, omit test_uuids from run request (backend runs all linked tests)
+  // Called when the user clicks "Rerun" on a completed run, with the exact
+  // tests it executed (from the run's `test_uuids`). The parent starts a fresh
+  // run of those and opens it in a new dialog. Omit to hide the button.
+  onRerun?: (tests: TestData[]) => void;
 };
 
 export function TestRunnerDialog({
@@ -159,6 +168,7 @@ export function TestRunnerDialog({
   initialRunStatus,
   onStatusUpdate,
   runAllLinked,
+  onRerun,
 }: TestRunnerDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
@@ -181,6 +191,10 @@ export function TestRunnerDialog({
   // a uuid-keyed map below and passed into TestRunOutputsPanel as the
   // source of truth for per-evaluator metadata.
   const [runEvaluators, setRunEvaluators] = useState<TestRunEvaluator[]>([]);
+  // The test uuids this run executed (in run order), from the run-status
+  // response. Drives the Rerun button — empty on legacy runs that predate the
+  // backend snapshot, which hides the button.
+  const [runTestUuids, setRunTestUuids] = useState<string[]>([]);
   // Aggregate latency / cost blocks from the run-status response, surfaced on
   // the Summary tab. Per-evaluator metrics aren't sent for single runs, so we
   // derive those client-side from each case's judge_results (see useMemo below).
@@ -271,6 +285,7 @@ export function TestRunnerDialog({
     clearLabellingSelection();
     setCurrentTaskId(taskId);
     setRunEvaluators([]);
+    setRunTestUuids([]);
     resetSummary();
     setActiveTab("outputs");
 
@@ -320,6 +335,7 @@ export function TestRunnerDialog({
     clearLabellingSelection();
     setCurrentTaskId(null);
     setRunEvaluators([]);
+    setRunTestUuids([]);
     resetSummary();
     setActiveTab("outputs");
     const initialResults: TestResult[] = tests.map((test) => ({
@@ -377,6 +393,11 @@ export function TestRunnerDialog({
       // / past-run-view that omits the field.
       setRunEvaluators(
         Array.isArray(result.evaluators) ? result.evaluators : [],
+      );
+      // Sync the executed test uuids (drives the Rerun button). Always set so a
+      // prior run's ids can't leak into a fresh run / past-run view.
+      setRunTestUuids(
+        Array.isArray(result.test_uuids) ? result.test_uuids : [],
       );
       // Sync the aggregate latency / cost blocks. Always set (including the
       // null case) so a prior run's numbers can't leak in.
@@ -956,6 +977,19 @@ export function TestRunnerDialog({
     [testResults, runEvaluators],
   );
 
+  // The exact tests to rerun, built from the run's executed `test_uuids` (in
+  // run order). Names are lifted from the matching result row for a nicer
+  // initial display; the rerun POST only needs the uuids.
+  const rerunTests: TestData[] = runTestUuids.map((uuid, i) => ({
+    uuid,
+    name: testResults[i]?.test.name ?? "",
+    description: "",
+    type: "response",
+    config: {},
+    created_at: "",
+    updated_at: "",
+  }));
+
   // Check if the entire run errored (all tests have errors, none have real results)
   const isOverallError =
     runStatus === "failed" &&
@@ -985,6 +1019,12 @@ export function TestRunnerDialog({
                 <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
                   {runName ?? "Test run"}
                 </h2>
+                {runStatus === "done" && onRerun && rerunTests.length > 0 && (
+                  <RerunIconButton
+                    onClick={() => onRerun(rerunTests)}
+                    className="shrink-0"
+                  />
+                )}
               </div>
               <p className="text-xs text-muted-foreground truncate">
                 {agentName}

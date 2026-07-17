@@ -16,7 +16,7 @@ import {
   benchmarkLabellingKey,
   type BenchmarkModelResult,
 } from "./eval-details";
-import { StatusBadge } from "@/components/ui";
+import { StatusBadge, RerunIconButton } from "@/components/ui";
 import { getDefaultHeaders } from "@/lib/api";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { useHideFloatingButton } from "@/components/AppLayout";
@@ -43,6 +43,10 @@ type BenchmarkStatusResponse = {
   leaderboard_summary?: BenchmarkLeaderboardSummaryRow[];
   /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
   evaluators?: TestRunEvaluator[];
+  /** The test uuids this benchmark executed, in run order (shared across all
+   * models — not repeated per model). Used to rerun the same subset. Absent on
+   * benchmarks that predate the backend snapshot. */
+  test_uuids?: string[];
   results_s3_prefix?: string;
   error?: string;
   is_public?: boolean;
@@ -60,6 +64,15 @@ type BenchmarkResultsDialogProps = {
   models: string[];
   taskId?: string; // If provided, view existing benchmark results instead of starting new
   onBenchmarkCreated?: (taskId: string) => void; // Called when a new benchmark is created
+  // Called when the user clicks "Rerun" on a completed benchmark. Hands the
+  // parent the models, the executed test uuids (the subset to rerun), and the
+  // test names (for progress display) so it can start a fresh benchmark and
+  // open it in a new dialog. Takes precedence over `onGoBack` when provided.
+  onRerun?: (
+    models: string[],
+    testUuids: string[],
+    testNames: string[],
+  ) => void;
 };
 
 export function BenchmarkResultsDialog({
@@ -73,6 +86,7 @@ export function BenchmarkResultsDialog({
   models,
   taskId,
   onBenchmarkCreated,
+  onRerun,
 }: BenchmarkResultsDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
@@ -108,6 +122,9 @@ export function BenchmarkResultsDialog({
   // Top-level evaluators block from the benchmark response. See the
   // matching state in TestRunnerDialog for the same plumbing.
   const [runEvaluators, setRunEvaluators] = useState<TestRunEvaluator[]>([]);
+  // The test uuids this benchmark executed, from the status response. Drives
+  // the rerun subset; empty on legacy benchmarks that predate the snapshot.
+  const [runTestUuids, setRunTestUuids] = useState<string[]>([]);
   const [addToTaskOpen, setAddToTaskOpen] = useState(false);
   const {
     selected: labellingSelectedKeys,
@@ -213,6 +230,7 @@ export function BenchmarkResultsDialog({
         setModelResults([]);
         setLeaderboardSummary(undefined);
         setRunEvaluators([]);
+        setRunTestUuids([]);
         setError(null);
         setExpandedProviders(new Set(models.length > 0 ? [models[0]] : []));
         setSelectedTest(null);
@@ -328,6 +346,9 @@ export function BenchmarkResultsDialog({
       // the same dialog lifecycle.
       setRunEvaluators(
         Array.isArray(result.evaluators) ? result.evaluators : [],
+      );
+      setRunTestUuids(
+        Array.isArray(result.test_uuids) ? result.test_uuids : [],
       );
 
       // Update model results (intermediate or final)
@@ -520,6 +541,31 @@ export function BenchmarkResultsDialog({
     (mr.test_results ?? []).some((tr) => isLabellingEligibleRaw(tr)),
   );
 
+  // Config for a rerun. When viewing a past benchmark the props are empty, so
+  // fall back to what the loaded results carry: models from the model rows, the
+  // executed test uuids from the run, and test names from the first model row.
+  const rerunModels =
+    models.length > 0 ? models : modelResults.map((m) => m.model).filter(Boolean);
+  const rerunTestUuids = testUuids.length > 0 ? testUuids : runTestUuids;
+  const rerunTestNames =
+    testNames.length > 0
+      ? testNames
+      : (
+          modelResults.find(
+            (m) => m.test_results && m.test_results.length > 0,
+          )?.test_results ?? []
+        ).map((tr) => tr.name ?? "");
+  // Direct rerun wins over the go-back-to-picker fallback when available. It
+  // needs the executed test uuids to reproduce the run's subset — a benchmark
+  // that predates the backend snapshot can't be reliably rerun, so the button
+  // is hidden rather than silently rerunning the wrong test set.
+  const canDirectRerun =
+    !!onRerun && rerunModels.length > 0 && rerunTestUuids.length > 0;
+  const showRerunButton = isDone && !error && (canDirectRerun || !!onGoBack);
+  const handleRerunClick = canDirectRerun
+    ? () => onRerun!(rerunModels, rerunTestUuids, rerunTestNames)
+    : onGoBack;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-background rounded-none md:rounded-xl w-full max-w-[92rem] h-full md:h-[92vh] flex flex-col shadow-2xl">
@@ -530,6 +576,12 @@ export function BenchmarkResultsDialog({
               <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
                 {runName ?? "Benchmark"}
               </h2>
+              {showRerunButton && handleRerunClick && (
+                <RerunIconButton
+                  onClick={handleRerunClick}
+                  className="shrink-0"
+                />
+              )}
               {!isDone && !isInitialLoading && (
                 <StatusBadge status={taskStatus} showSpinner />
               )}
@@ -624,28 +676,6 @@ export function BenchmarkResultsDialog({
                   Submit for labelling
                 </button>
               )}
-            {/* Rerun button - show when benchmark is complete (not loading and no error) */}
-            {isDone && !error && onGoBack && (
-              <button
-                onClick={onGoBack}
-                className="flex items-center gap-2 h-8 px-2 md:px-3 rounded-md text-xs md:text-sm font-medium border border-border hover:bg-muted/50 transition-colors cursor-pointer"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
-                  />
-                </svg>
-                Rerun
-              </button>
-            )}
             <button
               onClick={onClose}
               className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"

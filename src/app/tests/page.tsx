@@ -17,6 +17,15 @@ import {
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
+import {
+  BenchmarkRerunDialog,
+  useBenchmarkRerun,
+} from "@/components/BenchmarkRerunDialog";
+import {
+  makeOptimisticTestRun,
+  makeOptimisticBenchmarkRun,
+  type OptimisticRun,
+} from "@/lib/optimisticRuns";
 import { RunTestDialog } from "@/components/RunTestDialog";
 import {
   AddTestDialog,
@@ -238,6 +247,12 @@ function LLMPageInner() {
   const [testRunnerOpen, setTestRunnerOpen] = useState(false);
   const [testRunnerAgentUuid, setTestRunnerAgentUuid] = useState<string>("");
   const [testRunnerAgentName, setTestRunnerAgentName] = useState<string>("");
+  // When set, the test runner is rerunning this set of tests (from the "Rerun"
+  // action on a viewed run) rather than the single `testToRun`.
+  const [rerunTests, setRerunTests] = useState<TestData[] | null>(null);
+  // Direct benchmark rerun (fresh benchmark, same models + test subset, no
+  // picker).
+  const benchmarkRerun = useBenchmarkRerun();
 
   // Bulk upload modal state
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
@@ -614,6 +629,91 @@ function LLMPageInner() {
       setRunTestDialogOpen(false);
       setTestToRun(null);
     }
+  };
+
+  // Prepend an optimistic pending run to the Runs list so a freshly-started
+  // rerun shows up immediately (the pending-run poller then fills it in). The
+  // core row is shared with the agent Tests tab; here we add the AllRun-only
+  // fields the list needs (agent identity + share/error flags).
+  const prependOptimisticRun = (
+    core: OptimisticRun,
+    agentUuid: string,
+    agentName: string,
+  ) => {
+    const newRun: AllRun = {
+      ...core,
+      error: false,
+      is_public: false,
+      share_token: null,
+      agent_id: agentUuid,
+      agent_name: agentName,
+    };
+    setAllRuns((prev) => [newRun, ...prev]);
+  };
+
+  const prependOptimisticTestRun = (
+    taskId: string,
+    tests: TestData[],
+    agentUuid: string,
+    agentName: string,
+  ) =>
+    prependOptimisticRun(
+      makeOptimisticTestRun(taskId, tests, new Date().toISOString()),
+      agentUuid,
+      agentName,
+    );
+
+  const prependOptimisticBenchmarkRun = (
+    taskId: string,
+    models: string[],
+    agentUuid: string,
+    agentName: string,
+  ) =>
+    prependOptimisticRun(
+      makeOptimisticBenchmarkRun(taskId, models, new Date().toISOString()),
+      agentUuid,
+      agentName,
+    );
+
+  // Rerun a completed test run as a fresh run of the same tests, swapping the
+  // view dialog for the live new-run dialog.
+  // Drop a lingering `?runId=<viewed run>` so a reload after a rerun doesn't
+  // re-open the old run. No-op when the URL isn't pointing at a run (e.g. a
+  // repeat rerun from the fresh dialog).
+  const clearRunIdFromUrl = () => {
+    if (searchParams.get("runId")) {
+      router.replace("/tests?tab=runs", { scroll: false });
+    }
+  };
+
+  const handleRerunTests = (
+    agentUuid: string,
+    agentName: string,
+    tests: TestData[],
+  ) => {
+    setViewingRunTest(false);
+    setSelectedRun(null);
+    clearRunIdFromUrl();
+    setTestRunnerAgentUuid(agentUuid);
+    setTestRunnerAgentName(agentName);
+    setTestToRun(null);
+    setRerunTests(tests);
+    setTestRunnerOpen(true);
+  };
+
+  // Rerun a completed benchmark with the same models and test subset (skips the
+  // model picker).
+  const handleRerunBenchmark = (
+    agentUuid: string,
+    agentName: string,
+    models: string[],
+    testUuids: string[],
+    testNames: string[],
+  ) => {
+    setViewingRunBenchmark(false);
+    setSelectedRun(null);
+    clearRunIdFromUrl();
+    benchmarkRerun.start({ agentUuid, agentName, models, testUuids, testNames });
   };
 
   // Create test via POST /tests/bulk (used for both single and bulk flows for
@@ -1814,10 +1914,22 @@ function LLMPageInner() {
         onClose={() => {
           setTestRunnerOpen(false);
           setTestToRun(null);
+          setRerunTests(null);
         }}
         agentUuid={testRunnerAgentUuid}
         agentName={testRunnerAgentName}
-        tests={testToRun ? [testToRun] : []}
+        tests={rerunTests ?? (testToRun ? [testToRun] : [])}
+        onRunCreated={(taskId) =>
+          prependOptimisticTestRun(
+            taskId,
+            rerunTests ?? (testToRun ? [testToRun] : []),
+            testRunnerAgentUuid,
+            testRunnerAgentName,
+          )
+        }
+        onRerun={(tests) =>
+          handleRerunTests(testRunnerAgentUuid, testRunnerAgentName, tests)
+        }
       />
 
       {/* Bulk Upload Modal */}
@@ -1851,6 +1963,13 @@ function LLMPageInner() {
           }
           taskId={selectedRun.uuid}
           initialRunStatus={selectedRun.status}
+          onRerun={(tests) =>
+            handleRerunTests(
+              selectedRun.agent_id,
+              selectedRun.agent_name,
+              tests,
+            )
+          }
         />
       )}
 
@@ -1869,8 +1988,34 @@ function LLMPageInner() {
           testNames={[]}
           models={[]}
           taskId={selectedRun.uuid}
+          onRerun={(models, testUuids, testNames) =>
+            handleRerunBenchmark(
+              selectedRun.agent_id,
+              selectedRun.agent_name,
+              models,
+              testUuids,
+              testNames,
+            )
+          }
         />
       )}
+
+      {/* Direct Benchmark Rerun Dialog — fresh benchmark of the same models and
+          test subset, skipping the model picker. */}
+      <BenchmarkRerunDialog
+        config={benchmarkRerun.config}
+        rerunKey={benchmarkRerun.key}
+        onClose={benchmarkRerun.clear}
+        onBenchmarkCreated={(taskId, cfg) =>
+          prependOptimisticBenchmarkRun(
+            taskId,
+            cfg.models,
+            cfg.agentUuid,
+            cfg.agentName,
+          )
+        }
+        onRerun={benchmarkRerun.start}
+      />
     </AppLayout>
   );
 }
