@@ -372,6 +372,16 @@ export function TestsTabContent({
   const [viewingTestResults, setViewingTestResults] = useState(false);
   const [viewingBenchmarkResults, setViewingBenchmarkResults] = useState(false);
 
+  // Direct benchmark rerun state: starts a fresh benchmark (no picker) with the
+  // same models as a completed run and shows it live. `benchmarkRerunKey`
+  // remounts the dialog so a repeat rerun re-POSTs instead of no-op'ing on an
+  // unchanged prop.
+  const [benchmarkRerun, setBenchmarkRerun] = useState<{
+    models: string[];
+    testNames: string[];
+  } | null>(null);
+  const [benchmarkRerunKey, setBenchmarkRerunKey] = useState(0);
+
   // Track polling intervals for pending runs
   const pendingRunsPollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -1373,6 +1383,25 @@ export function TestsTabContent({
     } else {
       setViewingBenchmarkResults(true);
     }
+  };
+
+  // Rerun a completed test run as a fresh run of the same tests, swapping the
+  // view dialog for the live new-run dialog.
+  const handleRerunTests = (tests: TestData[]) => {
+    setViewingTestResults(false);
+    setSelectedPastRun(null);
+    setRunAllLinked(false);
+    setTestsToRun(tests);
+    setTestRunnerOpen(true);
+  };
+
+  // Rerun a completed benchmark with the same models, swapping the view dialog
+  // for a fresh live benchmark (skips the model picker).
+  const handleRerunBenchmark = (models: string[], testNames: string[]) => {
+    setViewingBenchmarkResults(false);
+    setSelectedPastRun(null);
+    setBenchmarkRerun({ models, testNames });
+    setBenchmarkRerunKey((k) => k + 1);
   };
 
   // Handle when a new test run is created
@@ -2697,6 +2726,7 @@ export function TestsTabContent({
         tests={testsToRun}
         runAllLinked={runAllLinked}
         onRunCreated={handleTestRunCreated}
+        onRerun={handleRerunTests}
       />
 
       {/* Benchmark Dialog */}
@@ -2740,6 +2770,7 @@ export function TestsTabContent({
           taskId={selectedPastRun.uuid}
           initialRunStatus={selectedPastRun.status}
           onStatusUpdate={handleRunStatusUpdate}
+          onRerun={handleRerunTests}
         />
       )}
 
@@ -2757,6 +2788,25 @@ export function TestsTabContent({
           testNames={[]}
           models={[]}
           taskId={selectedPastRun.uuid}
+          onRerun={handleRerunBenchmark}
+        />
+      )}
+
+      {/* Direct Benchmark Rerun Dialog — fresh benchmark of the same models,
+          skipping the model picker. Keyed so a repeat rerun remounts and
+          re-POSTs. */}
+      {benchmarkRerun && (
+        <BenchmarkResultsDialog
+          key={benchmarkRerunKey}
+          isOpen
+          onClose={() => setBenchmarkRerun(null)}
+          agentUuid={agentUuid}
+          agentName={agentName}
+          testUuids={[]}
+          testNames={benchmarkRerun.testNames}
+          models={benchmarkRerun.models}
+          onBenchmarkCreated={handleBenchmarkCreated}
+          onRerun={handleRerunBenchmark}
         />
       )}
     </div>

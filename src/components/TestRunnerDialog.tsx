@@ -146,7 +146,27 @@ type TestRunnerDialogProps = {
     failed?: number | null,
   ) => void; // Called when run status changes (for coordinated polling)
   runAllLinked?: boolean; // When true, omit test_uuids from run request (backend runs all linked tests)
+  // Called when the user clicks "Rerun" on a completed run. Hands the parent
+  // the real-uuid tests this run covered so it can start a fresh run and open
+  // it in a new dialog. Omit to hide the button.
+  onRerun?: (tests: TestData[]) => void;
 };
+
+// UUIDs the parents synthesise for tests reconstructed from a viewed run's
+// results (they carry no real backend uuid). A rerun can't POST these, so they
+// are filtered out when building the rerun test set.
+const SYNTHETIC_TEST_UUID_PREFIXES = [
+  "past-run-test-",
+  "run-test-",
+  "generated-",
+];
+
+function isRealTestUuid(uuid: string): boolean {
+  return (
+    !!uuid &&
+    !SYNTHETIC_TEST_UUID_PREFIXES.some((prefix) => uuid.startsWith(prefix))
+  );
+}
 
 export function TestRunnerDialog({
   isOpen,
@@ -159,6 +179,7 @@ export function TestRunnerDialog({
   initialRunStatus,
   onStatusUpdate,
   runAllLinked,
+  onRerun,
 }: TestRunnerDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
@@ -956,6 +977,12 @@ export function TestRunnerDialog({
     [testResults, runEvaluators],
   );
 
+  // Tests eligible for a rerun: only those carrying a real backend uuid (a
+  // viewed run may hold synthetic placeholders that can't be re-POSTed).
+  const rerunnableTests = testResults
+    .map((r) => r.test)
+    .filter((t) => isRealTestUuid(t.uuid));
+
   // Check if the entire run errored (all tests have errors, none have real results)
   const isOverallError =
     runStatus === "failed" &&
@@ -1060,6 +1087,35 @@ export function TestRunnerDialog({
                     className="flex items-center gap-2 h-8 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-rose-500/14 border-rose-500/45 text-rose-950 dark:text-rose-100 hover:bg-rose-500/26 dark:hover:bg-rose-500/20"
                   >
                     Submit for labelling
+                  </button>
+                </div>
+              )}
+            {/* Rerun — start a fresh run of the same tests and open it in a
+                new dialog. Only when the run is done and we hold real test
+                uuids to re-POST. */}
+            {runStatus === "done" &&
+              onRerun &&
+              rerunnableTests.length > 0 && (
+                <div className="hidden md:block">
+                  <button
+                    type="button"
+                    onClick={() => onRerun(rerunnableTests)}
+                    className="flex items-center gap-2 h-8 px-2 md:px-3 rounded-md text-xs md:text-sm font-medium border border-border hover:bg-muted/50 transition-colors cursor-pointer"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
+                      />
+                    </svg>
+                    Rerun
                   </button>
                 </div>
               )}

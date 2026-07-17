@@ -723,6 +723,76 @@ describe("BenchmarkResultsDialog", () => {
       expect(onGoBack).toHaveBeenCalledTimes(1);
     });
 
+    it("prefers onRerun (direct rerun) over onGoBack and passes derived models/testNames", async () => {
+      // Viewing a past run: `models` prop is empty, so the rerun config must be
+      // recovered from the loaded model_results.
+      (global.fetch as jest.Mock).mockImplementation((url: string) => {
+        if (url.endsWith("/agent-tests/benchmark/task-rerun")) {
+          return Promise.resolve(
+            jsonResponse({
+              task_id: "task-rerun",
+              status: "completed",
+              name: "Rerun Source",
+              model_results: [
+                {
+                  model: "gpt-4",
+                  success: true,
+                  message: "",
+                  total_tests: 2,
+                  passed: 2,
+                  failed: 0,
+                  test_results: [
+                    { name: "Test One", passed: true },
+                    { name: "Test Two", passed: true },
+                  ],
+                },
+                {
+                  model: "claude",
+                  success: true,
+                  message: "",
+                  total_tests: 2,
+                  passed: 2,
+                  failed: 0,
+                  test_results: [
+                    { name: "Test One", passed: true },
+                    { name: "Test Two", passed: true },
+                  ],
+                },
+              ],
+            }),
+          );
+        }
+        return Promise.reject(new Error(`Unexpected fetch ${url}`));
+      });
+
+      const onGoBack = jest.fn();
+      const onRerun = jest.fn();
+      render(
+        <BenchmarkResultsDialog
+          {...defaultProps}
+          isOpen
+          models={[]}
+          testNames={[]}
+          taskId="task-rerun"
+          onGoBack={onGoBack}
+          onRerun={onRerun}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByText("Rerun Source")).toBeInTheDocument(),
+      );
+
+      const user = setupUser();
+      await user.click(screen.getByRole("button", { name: /Rerun/ }));
+
+      expect(onRerun).toHaveBeenCalledTimes(1);
+      expect(onRerun).toHaveBeenCalledWith(
+        ["gpt-4", "claude"],
+        ["Test One", "Test Two"],
+      );
+      expect(onGoBack).not.toHaveBeenCalled();
+    });
+
     it("switches tabs between leaderboard and outputs", async () => {
       await renderDoneRun();
       const user = setupUser();

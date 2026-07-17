@@ -236,6 +236,153 @@ describe("TestRunnerDialog", () => {
     ).toBe(false);
   });
 
+  it("shows a Rerun button on a completed run and hands the real-uuid tests to onRerun", async () => {
+    const onRerun = jest.fn();
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.endsWith("/agent-tests/run/task-rerun")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-rerun",
+            status: "completed",
+            name: "Past Run",
+            passed: 1,
+            failed: 0,
+            results: [
+              {
+                test_uuid: "real-test-1",
+                name: "Real Test",
+                status: "passed",
+                passed: true,
+              },
+              // Backend omitted a uuid → dialog synthesises a `generated-*`
+              // placeholder that must be excluded from the rerun set.
+              {
+                name: "Placeholder Test",
+                status: "passed",
+                passed: true,
+              },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        tests={[]}
+        taskId="task-rerun"
+        initialRunStatus="completed"
+        onRerun={onRerun}
+      />,
+    );
+
+    const rerunButton = await screen.findByRole("button", { name: /Rerun/ });
+    await setupUser().click(rerunButton);
+
+    expect(onRerun).toHaveBeenCalledTimes(1);
+    const passedTests = onRerun.mock.calls[0][0];
+    expect(passedTests).toHaveLength(1);
+    expect(passedTests[0].uuid).toBe("real-test-1");
+  });
+
+  it("hides the Rerun button when no test carries a real uuid", async () => {
+    const onRerun = jest.fn();
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.endsWith("/agent-tests/run/task-synthetic")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-synthetic",
+            status: "completed",
+            name: "Synthetic Run",
+            passed: 1,
+            failed: 0,
+            // No test_uuid on any row → all synthesised as `generated-*`.
+            results: [{ name: "Only Test", status: "passed", passed: true }],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        tests={[]}
+        taskId="task-synthetic"
+        initialRunStatus="completed"
+        onRerun={onRerun}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("Synthetic Run")).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole("button", { name: /Rerun/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not show a Rerun button when onRerun is not provided", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.endsWith("/agent-tests/run/task-norerun")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-norerun",
+            status: "completed",
+            name: "No Rerun Run",
+            passed: 1,
+            failed: 0,
+            results: [
+              {
+                test_uuid: "real-test-1",
+                name: "Real Test",
+                status: "passed",
+                passed: true,
+              },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        tests={[]}
+        taskId="task-norerun"
+        initialRunStatus="completed"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("No Rerun Run")).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole("button", { name: /Rerun/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows the overall error state when the whole run errors", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {

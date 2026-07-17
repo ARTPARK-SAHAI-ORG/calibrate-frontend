@@ -60,6 +60,11 @@ type BenchmarkResultsDialogProps = {
   models: string[];
   taskId?: string; // If provided, view existing benchmark results instead of starting new
   onBenchmarkCreated?: (taskId: string) => void; // Called when a new benchmark is created
+  // Called when the user clicks "Rerun" on a completed benchmark. Hands the
+  // parent the models (and test names, for progress display) this benchmark
+  // covered so it can start a fresh benchmark and open it in a new dialog.
+  // Takes precedence over `onGoBack` for the header button when provided.
+  onRerun?: (models: string[], testNames: string[]) => void;
 };
 
 export function BenchmarkResultsDialog({
@@ -73,6 +78,7 @@ export function BenchmarkResultsDialog({
   models,
   taskId,
   onBenchmarkCreated,
+  onRerun,
 }: BenchmarkResultsDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
@@ -520,6 +526,26 @@ export function BenchmarkResultsDialog({
     (mr.test_results ?? []).some((tr) => isLabellingEligibleRaw(tr)),
   );
 
+  // Config for a rerun. When viewing a past benchmark the `models` prop is
+  // empty, so fall back to the models the loaded results carry; likewise
+  // recover test names from the first model row that has results.
+  const rerunModels =
+    models.length > 0 ? models : modelResults.map((m) => m.model).filter(Boolean);
+  const rerunTestNames =
+    testNames.length > 0
+      ? testNames
+      : (
+          modelResults.find(
+            (m) => m.test_results && m.test_results.length > 0,
+          )?.test_results ?? []
+        ).map((tr) => tr.name ?? "");
+  // Direct rerun wins over the go-back-to-picker fallback when available.
+  const canDirectRerun = !!onRerun && rerunModels.length > 0;
+  const showRerunButton = isDone && !error && (canDirectRerun || !!onGoBack);
+  const handleRerunClick = canDirectRerun
+    ? () => onRerun!(rerunModels, rerunTestNames)
+    : onGoBack;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-background rounded-none md:rounded-xl w-full max-w-[92rem] h-full md:h-[92vh] flex flex-col shadow-2xl">
@@ -624,10 +650,12 @@ export function BenchmarkResultsDialog({
                   Submit for labelling
                 </button>
               )}
-            {/* Rerun button - show when benchmark is complete (not loading and no error) */}
-            {isDone && !error && onGoBack && (
+            {/* Rerun button - show when benchmark is complete (not loading and
+                no error). Prefers a direct rerun (onRerun) and falls back to
+                the go-back-to-picker flow (onGoBack). */}
+            {showRerunButton && (
               <button
-                onClick={onGoBack}
+                onClick={handleRerunClick}
                 className="flex items-center gap-2 h-8 px-2 md:px-3 rounded-md text-xs md:text-sm font-medium border border-border hover:bg-muted/50 transition-colors cursor-pointer"
               >
                 <svg
