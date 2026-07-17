@@ -440,11 +440,13 @@ describe("resolveEvaluatorPlan", () => {
             name: "Correctness",
             evaluator_type: "llm",
             slug: "default-llm-next-reply",
+            live_version: { variables: [{ name: "criteria" }] },
           },
           {
             name: "Reply Conciseness",
             evaluator_type: "llm",
             slug: "reply-conciseness",
+            live_version: { variables: [{ name: "criteria" }] },
           },
         ],
       }),

@@ -108,17 +108,25 @@ describe("chooseRowByName", () => {
 });
 
 describe("planFromEvaluators", () => {
+  // The tour can only use an evaluator that exposes the `criteria` variable.
+  const CRITERIA = { live_version: { variables: [{ name: "criteria" }] } };
   const correctness = {
     name: "Correctness",
     evaluator_type: "llm",
     slug: "default-llm-next-reply",
+    ...CRITERIA,
   };
 
   it("detects Correctness (by name) and a conciseness second check", () => {
     expect(
       planFromEvaluators([
         correctness,
-        { name: "Reply Conciseness", evaluator_type: "llm", slug: "reply-conciseness" },
+        {
+          name: "Reply Conciseness",
+          evaluator_type: "llm",
+          slug: "reply-conciseness",
+          ...CRITERIA,
+        },
       ]),
     ).toEqual({
       correctnessName: "Correctness",
@@ -132,16 +140,43 @@ describe("planFromEvaluators", () => {
       name: "Answer Accuracy",
       evaluator_type: "llm",
       slug: "default-llm-next-reply",
+      ...CRITERIA,
     };
     expect(planFromEvaluators([renamed]).correctnessName).toBe("Answer Accuracy");
+  });
+
+  it("treats a slug-matching Correctness WITHOUT a criteria variable as absent", () => {
+    // The user rebuilt Correctness with a raw placeholder prompt (no {{criteria}}),
+    // so it carries the slug but has no criteria variable — the tour cannot
+    // control it and must recreate a proper one.
+    const placeholderBuilt = {
+      name: "Correctness",
+      evaluator_type: "llm",
+      slug: "default-llm-next-reply",
+      live_version: { variables: [] },
+    };
+    expect(planFromEvaluators([placeholderBuilt]).correctnessName).toBeNull();
+  });
+
+  it("ignores a conciseness evaluator without a criteria variable", () => {
+    const plan = planFromEvaluators([
+      correctness,
+      {
+        name: "Reply Conciseness",
+        evaluator_type: "llm",
+        slug: "reply-conciseness",
+        live_version: { variables: [] },
+      },
+    ]);
+    expect(plan.secondEvaluatorName).toBeNull();
   });
 
   it("ignores a name that only contains the letters (e.g. Conciseness2)", () => {
     // Whole-word "conciseness" only — a throwaway "Conciseness2" is not a match.
     const plan = planFromEvaluators([
       correctness,
-      { name: "Conciseness2", evaluator_type: "llm", slug: "conciseness2" },
-      { name: "Concise", evaluator_type: "llm", slug: "concise" },
+      { name: "Conciseness2", evaluator_type: "llm", slug: "c2", ...CRITERIA },
+      { name: "Concise", evaluator_type: "llm", slug: "concise", ...CRITERIA },
     ]);
     expect(plan.secondEvaluatorName).toBeNull();
   });
@@ -157,14 +192,24 @@ describe("planFromEvaluators", () => {
     expect(
       planFromEvaluators([
         correctness,
-        { name: "Conversation Conciseness", evaluator_type: "conversation", slug: "x" },
+        {
+          name: "Conversation Conciseness",
+          evaluator_type: "conversation",
+          slug: "x",
+          ...CRITERIA,
+        },
       ]).secondEvaluatorName,
     ).toBeNull();
   });
 
   it("reports correctnessName null when the default was deleted", () => {
     const plan = planFromEvaluators([
-      { name: "Reply Conciseness", evaluator_type: "llm", slug: "reply-conciseness" },
+      {
+        name: "Reply Conciseness",
+        evaluator_type: "llm",
+        slug: "reply-conciseness",
+        ...CRITERIA,
+      },
     ]);
     expect(plan.correctnessName).toBeNull();
   });
