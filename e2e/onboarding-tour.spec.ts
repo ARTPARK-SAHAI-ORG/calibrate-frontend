@@ -496,9 +496,11 @@ test.describe("Onboarding flagship tour (fully mocked, no backend)", () => {
       }
       if (step.title === "Add another check") {
         // Correctness is ticked; the picker highlights the just-picked row.
-        await expect(
-          page.locator('[data-tour="add-evaluators-dialog"]'),
-        ).toBeVisible();
+        const dialog = page.locator('[data-tour="add-evaluators-dialog"]');
+        await expect(dialog).toBeVisible();
+        // The flow is locked to the card: the spotlighted dialog is marked
+        // non-interactive, so the user can't close it and desync the tour.
+        await expect(dialog).toHaveClass(/driver-no-interaction/);
       }
       if (step.title === "Review your failed test") {
         // The first (failed) result row is the phone-number test.

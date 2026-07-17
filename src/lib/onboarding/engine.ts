@@ -102,6 +102,12 @@ export async function runTour(tour: Tour): Promise<void> {
 
   const driverObj = driver({
     allowClose: true,
+    // Lock the flow to the tour card: the user must not be able to click the
+    // spotlighted element itself (e.g. close the evaluator picker's X), which
+    // would desync the app from the step the card describes. This blocks USER
+    // pointer clicks on the highlighted element (via a pointer-events:none
+    // class); the tour's own programmatic .click() calls still drive it.
+    disableActiveInteraction: true,
     // No cross-fade between steps: since we drive via highlight(), the fade can
     // briefly show the old and new popover at once (looks like two popovers).
     animate: false,
