@@ -480,16 +480,12 @@ describe("resolveEvaluatorPlan", () => {
     });
   });
 
-  it("reuses a tour-created Correctness (2) that has no default slug", async () => {
-    // A previous run created this; it has no slug but a matching canonical prompt,
-    // so it must be reused rather than creating Correctness (3).
+  it("reuses a tour-created Correctness (2) with no slug and no listed variables", async () => {
+    // A previous run created this: no default slug, and the LIST omits its
+    // variables — but its live prompt matches the canonical, so it must be reused
+    // (via the prompt check) rather than creating Correctness (3).
     mockEvaluatorFetches(CANON, [
-      {
-        uuid: "ev-c2",
-        name: "Correctness (2)",
-        evaluator_type: "llm",
-        live_version: { variables: [{ name: "criteria" }] },
-      },
+      { uuid: "ev-c2", name: "Correctness (2)", evaluator_type: "llm" },
     ]);
     expect((await resolveEvaluatorPlan("tok")).correctnessName).toBe(
       "Correctness (2)",

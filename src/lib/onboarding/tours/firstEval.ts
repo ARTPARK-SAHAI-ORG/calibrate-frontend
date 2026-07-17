@@ -295,10 +295,13 @@ async function findUsableCorrectness(
   accessToken: string,
 ): Promise<string | null> {
   const candidates = list
+    // Do NOT gate candidates on the list's `variables` — the list may omit them
+    // for custom (tour-created) evaluators, which would wrongly exclude a good
+    // copy. The prompt check below is authoritative: a canonical prompt contains
+    // {{criteria}} by definition.
     .filter(
       (e) =>
         e.evaluator_type === "llm" &&
-        hasCriteriaVariable(e) &&
         (isDefaultLLMNextReplyEvaluator(e) ||
           CORRECTNESS_NAME_HINT.test(e.name ?? "")),
     )
