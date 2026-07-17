@@ -3104,30 +3104,42 @@ export function AddTestDialog({
             className="absolute inset-0 bg-black/30"
             onClick={() => setShowRunUnsavedConfirm(false)}
           />
-          <div className="relative bg-background rounded-xl shadow-2xl border border-border p-6 max-w-sm w-full mx-4">
-            <h3 className="text-lg font-semibold text-foreground mb-2">
+          <div className="relative bg-background rounded-2xl shadow-2xl border border-border p-6 max-w-lg w-full mx-4">
+            <button
+              onClick={() => setShowRunUnsavedConfirm(false)}
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+              aria-label="Cancel"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+            <h3 className="text-lg font-semibold text-foreground mb-1 pr-8">
               Unsaved changes
             </h3>
             <p className="text-sm text-muted-foreground mb-6">
-              You have unsaved changes. Running the test now will use the last
-              saved version unless you save first.
+              Running now uses the last saved version, not your edits
             </p>
-            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3">
-              <button
-                onClick={() => setShowRunUnsavedConfirm(false)}
-                className="h-10 px-4 rounded-lg text-sm font-medium bg-background text-foreground hover:bg-muted transition-colors cursor-pointer border border-border"
-              >
-                Cancel
-              </button>
+            <div className="flex items-center justify-end gap-3">
               <button
                 onClick={handleDiscardAndRunFromPrompt}
-                className="h-10 px-4 rounded-lg text-sm font-medium bg-background text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer border border-red-500/40"
+                className="h-10 px-4 rounded-lg text-sm font-medium whitespace-nowrap bg-background text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer border border-red-500/40"
               >
                 Discard and run
               </button>
               <button
                 onClick={handleSaveAndRunFromPrompt}
-                className="h-10 px-4 rounded-lg text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+                className="h-10 px-4 rounded-lg text-sm font-medium whitespace-nowrap bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
               >
                 Save and run
               </button>
