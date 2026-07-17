@@ -1764,12 +1764,19 @@ function LLMPageInner() {
           showRunAfterSave
           onRun={() => {
             // Run the already-saved version of the test being edited (the
-            // "run directly" / "discard and run" path). Close the editor,
-            // then open the agent picker for the saved test.
-            const saved = tests.find((t) => t.uuid === editingTestUuid);
+            // "run directly" / "discard and run" path). Build the run target
+            // from the open test's uuid — no list lookup — then close and open
+            // the agent picker for it.
+            if (!editingTestUuid) return;
+            const runTest = buildTestToRun({
+              uuid: editingTestUuid,
+              name: newTestName.trim(),
+              type: initialConfig?.evaluation.type ?? "response",
+              config: initialConfig ?? {},
+            });
             resetForm();
             setAddTestSidebarOpen(false);
-            if (saved) openRunTestDialog(saved);
+            openRunTestDialog(runTest);
           }}
         />
       )}

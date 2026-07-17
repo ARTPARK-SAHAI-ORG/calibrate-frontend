@@ -2648,11 +2648,17 @@ export function TestsTabContent({
           showRunAfterSave={!isConnectionUnverified}
           onRun={() => {
             // Run the already-saved version of the test being edited (the
-            // "run directly" / "discard and run" path). Close the editor
-            // first, then open the runner.
-            const saved = agentTests.find((t) => t.uuid === editingTestUuid);
+            // "run directly" / "discard and run" path). Build the run target
+            // from the open test's uuid — no list lookup — then close and run.
+            if (!editingTestUuid) return;
+            const runTest = buildTestToRun({
+              uuid: editingTestUuid,
+              name: newTestName.trim(),
+              type: initialConfig?.evaluation.type ?? "response",
+              config: initialConfig ?? {},
+            });
             closeTestDialogAfterSave();
-            if (saved) runSavedTest(saved);
+            runSavedTest(runTest);
           }}
         />
       )}
