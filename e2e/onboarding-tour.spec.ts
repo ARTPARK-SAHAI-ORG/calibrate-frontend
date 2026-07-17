@@ -60,16 +60,16 @@ type TestPayload = {
 
 const ISO = "2026-07-16T00:00:00Z";
 
-// The correctness judge prompt. The default-prompt endpoint returns the human
-// PLACEHOLDER form; the stored live version has the {{criteria}} VARIABLE wired.
-// The tour reuses Correctness only if its live prompt matches the canonical
-// (placeholder wired), which this pair exercises end to end.
-const CORRECTNESS_PROMPT_PREFIX =
-  "You are a highly accurate evaluator.\n\nEvaluate if the response adheres to " +
-  "the evaluation criteria:\n\n";
-const CORRECTNESS_DEFAULT_PROMPT =
-  CORRECTNESS_PROMPT_PREFIX + "<ENTER EVALUATION CRITERIA HERE>";
-const CORRECTNESS_LIVE_PROMPT = CORRECTNESS_PROMPT_PREFIX + "{{criteria}}";
+// The tour reuses Correctness only if its live prompt EXACTLY equals the
+// hard-coded canonical prompt in firstEval.ts (CANONICAL_CORRECTNESS_PROMPT).
+// This must be kept byte-identical to that constant so the mocked Correctness is
+// reused (not recreated) during the tour.
+const CORRECTNESS_LIVE_PROMPT =
+  "You are a highly accurate evaluator evaluating the response of an agent to a " +
+  "user's message.\n\nYou will be given a conversation between a user and an " +
+  "agent along with the response of the agent to the final user message.\n\nYou " +
+  "need to evaluate if the response adheres to the evaluation criteria:\n\n" +
+  "{{criteria}}";
 
 // Two LLM-reply evaluators: one "Correctness" (the default next-reply slug the
 // dialog seeds), one "Reply Conciseness" (the second check the flow adds). Both are
@@ -324,10 +324,10 @@ async function installFakeBackend(page: Page, appOrigin: string): Promise<void> 
       if (method === "GET" && pathname === "/evaluators") {
         return json(route, LIBRARY_EVALUATORS);
       }
-      // Canonical correctness prompt (placeholder form).
+      // Only the judge model is read from here now (the prompt is hard-coded in
+      // the tour); used solely on the recreate path, which reuse avoids.
       if (method === "GET" && pathname === "/evaluators/default-prompt") {
         return json(route, {
-          system_prompt: CORRECTNESS_DEFAULT_PROMPT,
           judge_model: "openai/gpt-5.4-mini",
           output_type: "binary",
         });

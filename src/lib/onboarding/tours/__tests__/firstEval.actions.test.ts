@@ -29,6 +29,7 @@ jest.mock("../../../../lib/api", () => ({
 import {
   A,
   buildFirstEvalTour,
+  CANONICAL_CORRECTNESS_PROMPT,
   fillSystemPromptResilient,
   pickFreeName,
   resolveEvaluatorPlan,
@@ -431,7 +432,8 @@ describe("resolveEvaluatorPlan", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  const CANON = "You need to evaluate:\n\n{{criteria}}";
+  // Reuse compares against the hard-coded canonical prompt.
+  const CANON = CANONICAL_CORRECTNESS_PROMPT;
   const ITEMS = [
     {
       uuid: "ev-correct",

@@ -110,9 +110,12 @@ const CORRECTNESS_CRITERIA_VARIABLE = {
   name: "criteria",
   description: "Criteria that the agent's response should satisfy",
 };
-// Fallback judge prompt (mirrors the seeded default) if the backend's
-// default-prompt endpoint is unavailable when recreating Correctness.
-const CORRECTNESS_FALLBACK_PROMPT =
+// The canonical Correctness judge prompt, HARD-CODED so reuse and creation never
+// depend on a backend endpoint. The tour both creates Correctness with this exact
+// text and reuses an existing one only if its prompt equals this — so the two
+// sides can never drift and re-trigger duplicate creation. This is the exact
+// seeded-default correctness prompt.
+export const CANONICAL_CORRECTNESS_PROMPT =
   "You are a highly accurate evaluator evaluating the response of an agent to a " +
   "user's message.\n\nYou will be given a conversation between a user and an " +
   "agent along with the response of the agent to the final user message.\n\nYou " +
@@ -258,23 +261,6 @@ async function fetchLivePrompt(
   }
 }
 
-/** The canonical correctness judge prompt (backend default, {{criteria}} wired). */
-async function fetchCanonicalCorrectnessPrompt(
-  accessToken: string,
-): Promise<string | null> {
-  try {
-    const res = await fetch(
-      `${getBackendUrl()}/evaluators/default-prompt?purpose=llm`,
-      { method: "GET", headers: getDefaultHeaders(accessToken) },
-    );
-    if (!res.ok) return null;
-    const dp = (await res.json()) as DefaultPrompt;
-    return ensureCriteriaVariable(dp?.system_prompt);
-  } catch {
-    return null;
-  }
-}
-
 // Cheap pre-filter for correctness candidates whose prompt we then verify. The
 // name hint also catches evaluators the tour created on a previous run
 // ("Correctness (2)", "(3)", …) — which carry no default slug — so re-running
@@ -283,22 +269,20 @@ const CORRECTNESS_NAME_HINT = /correctness/i;
 
 /**
  * Find an existing evaluator the tour can REUSE as Correctness: an LLM-reply
- * evaluator with a `criteria` variable whose live prompt EXACTLY matches the
- * canonical correctness prompt. Considers the built-in default (by slug) AND any
- * "Correctness"-named evaluator (e.g. one the tour created before, which has no
- * slug), preferring the built-in. Returns its name, or null when none qualifies
- * (so a proper one is created). Bounds the number of detail fetches.
+ * evaluator whose live prompt EXACTLY matches the hard-coded canonical prompt.
+ * Considers the built-in default (by slug) AND any "Correctness"-named evaluator
+ * (e.g. one the tour created before, which has no slug), preferring the built-in.
+ * Returns its name, or null when none qualifies (so a proper one is created).
+ * Bounds the number of detail fetches.
  */
 async function findUsableCorrectness(
   list: EvaluatorLike[],
-  canonicalPrompt: string,
   accessToken: string,
 ): Promise<string | null> {
   const candidates = list
     // Do NOT gate candidates on the list's `variables` — the list may omit them
     // for custom (tour-created) evaluators, which would wrongly exclude a good
-    // copy. The prompt check below is authoritative: a canonical prompt contains
-    // {{criteria}} by definition.
+    // copy. The prompt check below is authoritative.
     .filter(
       (e) =>
         e.evaluator_type === "llm" &&
@@ -312,7 +296,7 @@ async function findUsableCorrectness(
         Number(isDefaultLLMNextReplyEvaluator(a)),
     )
     .slice(0, 6);
-  const target = canonicalPrompt.trim();
+  const target = CANONICAL_CORRECTNESS_PROMPT.trim();
   for (const c of candidates) {
     if (!c.uuid) continue;
     const live = await fetchLivePrompt(c.uuid, accessToken);
@@ -372,19 +356,12 @@ export async function resolveEvaluatorPlan(
     if (!res.ok) return fallback;
     const list = unwrapList<EvaluatorLike>(await res.json());
     const plan = planFromEvaluators(list);
-    // Resolve which Correctness to REUSE by prompt identity — including one the
-    // tour created on a previous run (no default slug) — so re-running does not
-    // keep creating Correctness (2), (3), … A proper one is created only when
-    // nothing usable exists. If the canonical prompt is unavailable, keep the
-    // slug-based result from planFromEvaluators (best-effort).
-    const canonical = await fetchCanonicalCorrectnessPrompt(accessToken);
-    if (canonical) {
-      plan.correctnessName = await findUsableCorrectness(
-        list,
-        canonical,
-        accessToken,
-      );
-    }
+    // Resolve which Correctness to REUSE by prompt identity (against the
+    // hard-coded canonical, so nothing depends on a backend prompt endpoint) —
+    // including one the tour created on a previous run (no default slug) — so
+    // re-running does not keep creating Correctness (2), (3), … A proper one is
+    // created only when nothing usable exists.
+    plan.correctnessName = await findUsableCorrectness(list, accessToken);
     // Same treatment for the second check: verify by prompt, not the list's
     // (possibly omitted) variables, so a valid Conciseness check is not dropped.
     plan.secondEvaluatorName = await findUsableSecond(list, accessToken);
@@ -402,27 +379,12 @@ type DefaultPrompt = {
 };
 
 /**
- * Ensure the judge prompt actually references the `{{criteria}}` VARIABLE. The
- * backend's default-prompt endpoint returns a human placeholder instead (e.g.
- * "<ENTER EVALUATION CRITERIA HERE>"), which would leave the criteria variable
- * declared-but-unused — so the tour's per-test criterion would never reach the
- * judge. Wire that placeholder to `{{criteria}}`; if we cannot, use the
- * hard-coded fallback that already contains it. Exported for unit testing.
- */
-export function ensureCriteriaVariable(prompt: string | undefined): string {
-  const p = (prompt ?? "").trim();
-  if (!p) return CORRECTNESS_FALLBACK_PROMPT;
-  if (p.includes("{{criteria}}")) return p;
-  const wired = p.replace(/<[^>]*criteria[^>]*>/i, "{{criteria}}");
-  return wired.includes("{{criteria}}") ? wired : CORRECTNESS_FALLBACK_PROMPT;
-}
-
-/**
  * Build the `POST /evaluators` body for recreating the Correctness default,
  * mirroring what the Create Evaluator flow sends. Pure, so it is unit-testable.
- * Uses the backend's canonical judge model when available and a prompt that is
- * guaranteed to reference the single `{{criteria}}` variable the tour fills per
- * test. `name` lets the caller avoid colliding with an existing evaluator.
+ * The prompt is the HARD-CODED canonical one (so a created evaluator matches what
+ * the reuse check looks for, and nothing depends on a backend prompt endpoint);
+ * only the judge model comes from the backend default (which model to use). `name`
+ * lets the caller avoid colliding with an existing evaluator.
  */
 export function buildCorrectnessPayload(
   dp: DefaultPrompt | null,
@@ -449,7 +411,7 @@ export function buildCorrectnessPayload(
     output_type: dp?.output_type ?? "binary",
     version: {
       ...(dp?.judge_model ? { judge_model: dp.judge_model } : {}),
-      system_prompt: ensureCriteriaVariable(dp?.system_prompt),
+      system_prompt: CANONICAL_CORRECTNESS_PROMPT,
       variables: [CORRECTNESS_CRITERIA_VARIABLE],
     },
   };
