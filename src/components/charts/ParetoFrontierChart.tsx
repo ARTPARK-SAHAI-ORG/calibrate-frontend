@@ -19,6 +19,7 @@ import {
 import { layoutParetoLabels } from "@/lib/paretoLabelLayout";
 import { formatCostUsd, formatLatencyMs, formatPercent } from "@/lib/llmMetrics";
 import { downloadChartPng } from "./downloadChart";
+import { Tooltip as InfoTooltip } from "@/components/Tooltip";
 
 export type ParetoModelPoint = {
   /** Stable model id (matches the leaderboard row `model`) — used for colors. */
@@ -87,27 +88,38 @@ function ParetoTooltip({
 }) {
   if (!active || !payload || payload.length === 0) return null;
   const d = payload[0].payload;
+  const rows: Array<{ label: string; value: string }> = [
+    { label: passRateLabel, value: formatPercent(d.passRate) },
+    { label: "Cost", value: formatCostUsd(d.cost) },
+    ...(typeof d.latency === "number" && Number.isFinite(d.latency)
+      ? [{ label: "Latency", value: formatLatencyMs(d.latency) }]
+      : []),
+  ];
   return (
-    <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs shadow-md">
-      <div className="mb-1 flex items-center gap-1.5 font-semibold text-foreground">
-        {d.label}
+    <div className="min-w-[10rem] rounded-xl border border-border bg-background/95 px-3.5 py-2.5 text-xs shadow-lg backdrop-blur-sm">
+      <div className="mb-2 flex items-center gap-1.5">
+        <span className="text-[13px] font-semibold text-foreground">
+          {d.label}
+        </span>
         {d.onFrontier && (
           <span className="rounded bg-foreground px-1.5 py-0.5 text-[10px] font-medium text-background">
             Frontier
           </span>
         )}
       </div>
-      <div className="text-muted-foreground">
-        {passRateLabel}: <span className="text-foreground">{formatPercent(d.passRate)}</span>
+      <div className="space-y-1">
+        {rows.map((row) => (
+          <div
+            key={row.label}
+            className="flex items-center justify-between gap-6"
+          >
+            <span className="text-muted-foreground">{row.label}</span>
+            <span className="font-medium text-foreground tabular-nums">
+              {row.value}
+            </span>
+          </div>
+        ))}
       </div>
-      <div className="text-muted-foreground">
-        Cost: <span className="text-foreground">{formatCostUsd(d.cost)}</span>
-      </div>
-      {typeof d.latency === "number" && Number.isFinite(d.latency) && (
-        <div className="text-muted-foreground">
-          Latency: <span className="text-foreground">{formatLatencyMs(d.latency)}</span>
-        </div>
-      )}
     </div>
   );
 }
@@ -276,6 +288,15 @@ export function ParetoFrontierChart({
           : 0.4;
     const stroke = isHovered || d.onFrontier ? "#0f172a" : "#94a3b8";
     const strokeWidth = isHovered ? 2.5 : d.onFrontier ? 1.5 : 1;
+    const fill = colorMap.get(d.model) || "#A8D5E2";
+    // Soft colored glow — strongest on hover, gentle on frontier dots, none on
+    // faded/dominated dots. Gives the plot the calmer, lit-up feel of the
+    // Artificial Analysis chart without changing any positions.
+    const glow = isHovered
+      ? `drop-shadow(0 0 7px ${fill})`
+      : d.onFrontier && !someHovered
+        ? `drop-shadow(0 0 3px ${fill})`
+        : "none";
 
     const layout = labelLayout.get(d.model) ?? { side: "right" as const, dy: 0 };
     const labelX = layout.side === "left" ? cx - r - 5 : cx + r + 5;
@@ -283,23 +304,53 @@ export function ParetoFrontierChart({
     const edgeX = layout.side === "left" ? cx - r : cx + r;
     const labelOpacity = isHovered ? 1 : someHovered ? 0.25 : 0.85;
 
+    // Crosshair guides drop from the hovered point to both axes so its exact
+    // score and cost are easy to read off the ticks.
+    const plotBottom = height - MARGIN.bottom;
+    const plotLeft = MARGIN.left;
+
     return (
       <g
         onMouseEnter={() => setHoveredModel(d.model)}
         onMouseLeave={() => setHoveredModel(null)}
         style={{ cursor: "pointer" }}
       >
+        {isHovered && (
+          <g pointerEvents="none">
+            <line
+              x1={cx}
+              y1={cy}
+              x2={cx}
+              y2={plotBottom}
+              stroke="#94a3b8"
+              strokeWidth={1}
+              strokeDasharray="4 4"
+              strokeOpacity={0.55}
+            />
+            <line
+              x1={plotLeft}
+              y1={cy}
+              x2={cx}
+              y2={cy}
+              stroke="#94a3b8"
+              strokeWidth={1}
+              strokeDasharray="4 4"
+              strokeOpacity={0.55}
+            />
+          </g>
+        )}
         <circle
           cx={cx}
           cy={cy}
           r={r}
-          fill={colorMap.get(d.model) || "#A8D5E2"}
+          fill={fill}
           fillOpacity={fillOpacity}
           stroke={stroke}
           strokeWidth={strokeWidth}
           style={{
+            filter: glow,
             transition:
-              "r 120ms ease, fill-opacity 120ms ease, stroke-width 120ms ease",
+              "r 120ms ease, fill-opacity 120ms ease, stroke-width 120ms ease, filter 120ms ease",
           }}
         />
         {Math.abs(layout.dy) > 1 && (
@@ -346,26 +397,39 @@ export function ParetoFrontierChart({
     : `both ${qualityNoun} and cost`;
   const hasFrontierLine = frontierData.length >= 2;
   const winnerLabel = frontierData[0]?.label;
-  const resultSentence = hasFrontierLine ? (
-    <>
-      Stick to the {entityNoun}s on the dashed line: they are the best picks. For
-      any {entityNoun} not on it, one that is will match or beat it on {axesList},
-      so there is no reason to choose it.
-    </>
-  ) : (
-    <>
-      <strong className="font-semibold text-foreground">
-        {winnerLabel ?? `One ${entityNoun}`}
-      </strong>{" "}
-      comes out on top: it matches or beats every other {entityNoun} on{" "}
-      {axesList}, so it is the clear pick.
-    </>
-  );
+  const resultSentence = hasFrontierLine
+    ? `Stick to the ${entityNoun}s on the dashed line: they are the best picks. For any ${entityNoun} not on it, one that is will match or beat it on ${axesList}, so there is no reason to choose it.`
+    : `${winnerLabel ?? `One ${entityNoun}`} comes out on top: it matches or beats every other ${entityNoun} on ${axesList}, so it is the clear pick.`;
+  const captionText = `${axisSentence} ${resultSentence}`;
 
   return (
     <div>
       <div className="flex items-start justify-between mb-2 gap-3">
-        <h3 className="text-[15px] font-semibold">{title}</h3>
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-[15px] font-semibold">{title}</h3>
+          {/* How-to-read text tucked behind an info icon (revealed on hover). */}
+          <InfoTooltip content={captionText}>
+            <button
+              type="button"
+              aria-label="How to read this chart"
+              className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </button>
+          </InfoTooltip>
+        </div>
         <div className="flex flex-shrink-0 items-center gap-2">
           {hasDominated && (
             <button
@@ -435,7 +499,7 @@ export function ParetoFrontierChart({
               }}
             />
             <Tooltip
-              cursor={{ strokeDasharray: "3 3" }}
+              cursor={false}
               content={<ParetoTooltip passRateLabel={passRateLabel} />}
             />
             {/* Frontier points, connected by a dashed line in cost order — but
@@ -462,9 +526,6 @@ export function ParetoFrontierChart({
           </ScatterChart>
         </ResponsiveContainer>
       </div>
-      <p className="mt-2 text-xs text-muted-foreground">
-        {axisSentence} {resultSentence}
-      </p>
     </div>
   );
 }

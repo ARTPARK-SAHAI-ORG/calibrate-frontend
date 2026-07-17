@@ -1,9 +1,27 @@
+import React from "react";
 import { render, screen } from "@/test-utils";
 import {
   ParetoFrontierChart,
   type ParetoModelPoint,
 } from "@/components/charts/ParetoFrontierChart";
 import { getColorMap } from "@/components/charts/LeaderboardBarChart";
+
+// The how-to-read caption lives behind an info-icon Tooltip (portal, shown on
+// hover). Render its content inline so caption assertions don't need to hover.
+jest.mock("../../Tooltip", () => ({
+  Tooltip: ({
+    content,
+    children,
+  }: {
+    content: string;
+    children: React.ReactNode;
+  }) => (
+    <>
+      {children}
+      <span data-testid="info-tooltip-content">{content}</span>
+    </>
+  ),
+}));
 
 // jsdom has no ResizeObserver, and recharts' ResponsiveContainer needs a
 // non-zero measured size to actually render the inner chart SVG. Immediately
@@ -83,6 +101,13 @@ describe("ParetoFrontierChart", () => {
     expect(screen.getByText("Premium")).toBeInTheDocument();
   });
 
+  it("exposes the how-to-read caption via an info-icon trigger", () => {
+    renderChart(points);
+    expect(
+      screen.getByRole("button", { name: /how to read this chart/i }),
+    ).toBeInTheDocument();
+  });
+
   it("drops the dashed-line wording when only one model is on the frontier", () => {
     // "champion" dominates all others (cheapest, best pass rate, fastest), so it
     // is the sole frontier model and no line is drawn.
@@ -91,9 +116,11 @@ describe("ParetoFrontierChart", () => {
       { model: "weak", label: "weak", cost: 0.02, passRate: 88, latency: 1400 },
     ]);
     expect(screen.queryByText(/dashed line/i)).not.toBeInTheDocument();
-    const boldName = screen.getByText("champion", { selector: "strong" });
-    expect(boldName).toHaveClass("font-semibold", "text-foreground");
-    expect(screen.getByText(/comes out on top: it matches or beats every other model/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /champion comes out on top: it matches or beats every other model/i,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("defaults to Frontier only — dominated models are hidden and the toggle is active", () => {
