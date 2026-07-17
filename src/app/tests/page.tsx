@@ -688,17 +688,20 @@ function LLMPageInner() {
         throw new Error("Failed to create test");
       }
 
+      // POST /tests/bulk returns { uuids, count, message, warnings }.
+      const result = (await response.json().catch(() => null)) as {
+        uuids?: string[] | null;
+      } | null;
+
       // Refetch the tests list to get the updated data
       const testsResponse = await fetch(`${backendUrl}/tests`, {
         method: "GET",
         headers: getDefaultHeaders(backendAccessToken),
       });
 
-      let refreshed: TestData[] | undefined;
       if (testsResponse.ok) {
         const updatedTests = await testsResponse.json();
-        refreshed = unwrapList<TestData>(updatedTests);
-        setTests(refreshed);
+        setTests(unwrapList<TestData>(updatedTests));
       }
 
       // Reset form fields
@@ -707,10 +710,18 @@ function LLMPageInner() {
       // Close the sidebar
       setAddTestSidebarOpen(false);
 
-      // "Create and run": open the agent-picker run dialog for the new test.
-      if (options?.runAfterSave) {
-        const savedTest = refreshed?.find((t) => t.name === targetName);
-        if (savedTest) openRunTestDialog(savedTest);
+      // "Create and run": open the agent-picker run dialog for the new test,
+      // using the uuid the create call returned.
+      const newUuid = result?.uuids?.[0];
+      if (options?.runAfterSave && newUuid) {
+        openRunTestDialog(
+          buildTestToRun({
+            uuid: newUuid,
+            name: targetName,
+            type: config.evaluation.type,
+            config,
+          })
+        );
       }
     } catch (err) {
       reportError("Error creating test:", err);

@@ -963,10 +963,12 @@ export function TestsTabContent({
       // but won't show up in this agent's list — refresh anyway (it's still
       // a no-op for the agent table) but surface the warning and keep the
       // dialog open so the user knows they need to retry the attach.
+      // POST /tests/bulk returns { uuids, count, message, warnings }.
       const result = (await response.json().catch(() => null)) as {
+        uuids?: string[] | null;
         warnings?: string[] | null;
       } | null;
-      const refreshed = await fetchAgentTests();
+      await fetchAgentTests();
       if (result?.warnings && result.warnings.length > 0) {
         setCreateError(
           `Test created but could not be attached to this agent: ${result.warnings.join("; ")}`,
@@ -975,18 +977,22 @@ export function TestsTabContent({
         return;
       }
       // "Create and run": skip the agent-defaults prompt and run the new test
-      // straight away. The test only shows in the runner if it linked to this
-      // agent (it's in the refreshed list); if the lookup misses we fall back
-      // to closing normally rather than running an unresolved test.
-      if (options?.runAfterSave) {
-        const savedTest = refreshed?.find((t) => t.name === targetName);
-        if (savedTest) {
-          setNewTestName("");
-          setValidationAttempted(false);
-          closeTestDialogAfterSave();
-          runSavedTest(savedTest);
-          return;
-        }
+      // straight away, using the uuid the create call returned (linking to
+      // this agent already succeeded — warnings are handled above).
+      const newUuid = result?.uuids?.[0];
+      if (options?.runAfterSave && newUuid) {
+        setNewTestName("");
+        setValidationAttempted(false);
+        closeTestDialogAfterSave();
+        runSavedTest(
+          buildTestToRun({
+            uuid: newUuid,
+            name: targetName,
+            type: config.evaluation.type,
+            config,
+          }),
+        );
+        return;
       }
       const prompted = usesEvaluators
         ? await maybePromptAgentDefaults(evaluators)

@@ -150,19 +150,6 @@ const newEvaluator = (): EvaluatorData => ({
   evaluator_type: "llm",
 });
 
-const savedTest = {
-  uuid: "test-saved",
-  name: "Saved test",
-  description: "",
-  type: "response" as const,
-  config: {
-    history: [{ role: "user", content: "Hello" }],
-    evaluation: { type: "response" },
-  },
-  created_at: "2026-01-01T00:00:00Z",
-  updated_at: "2026-01-01T00:00:00Z",
-};
-
 const existingAgentTest = {
   uuid: "test-1",
   name: "Refund test",
@@ -182,7 +169,11 @@ function jsonResponse(data: unknown, ok = true, status = 200) {
 
 function setupFetch({
   agentTests = [] as Array<typeof existingAgentTest>,
-}: { agentTests?: Array<typeof existingAgentTest> } = {}) {
+  bulkUuids = ["test-saved"] as string[],
+}: {
+  agentTests?: Array<typeof existingAgentTest>;
+  bulkUuids?: string[];
+} = {}) {
   global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
     if (url.includes(`/agent-tests/agent/${AGENT_UUID}/tests`)) {
       return jsonResponse({ items: agentTests, total: agentTests.length });
@@ -194,7 +185,8 @@ function setupFetch({
       return jsonResponse({ items: [], total: 0 });
     }
     if (init?.method === "POST" && url.includes("/tests/bulk")) {
-      return jsonResponse({});
+      // POST /tests/bulk returns the created uuids.
+      return jsonResponse({ uuids: bulkUuids, count: bulkUuids.length, warnings: null });
     }
     if (init?.method === "PUT" && url.includes("/tests/test-1")) {
       return jsonResponse({});
@@ -260,9 +252,9 @@ describe("TestsTabContent save-and-run shortcut", () => {
   });
 
   it("runs the just-created test and skips the defaults prompt on 'Create and run'", async () => {
-    // After the create POST, the tests list resolves with the new test so the
-    // parent can look it up by name to run it.
-    setupFetch({ agentTests: [savedTest] });
+    // The create POST returns the new test's uuid, so the run keys off that
+    // directly (no list lookup by name).
+    setupFetch({ bulkUuids: ["test-saved"] });
     const user = setupUser();
     render(<TestsTabContent agentUuid={AGENT_UUID} />);
 
@@ -372,10 +364,10 @@ describe("TestsTabContent save-and-run shortcut", () => {
     );
   });
 
-  it("falls back to the defaults prompt when the created test can't be found to run", async () => {
-    // The tests list never returns a "Saved test", so the run lookup misses
-    // and the flow continues to the normal defaults prompt.
-    setupFetch({ agentTests: [] });
+  it("falls back to the defaults prompt when the create response has no uuid", async () => {
+    // Without a uuid in the create response there's nothing to run, so the
+    // flow continues to the normal defaults prompt.
+    setupFetch({ bulkUuids: [] });
     const user = setupUser();
     render(<TestsTabContent agentUuid={AGENT_UUID} />);
 
