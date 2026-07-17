@@ -619,10 +619,14 @@ function LLMPageInner() {
   // a consistent backend contract — see also BulkUploadTestsModal).
   const createTest = async (
     config: TestConfig,
-    evaluators: EvaluatorRefPayload[]
+    evaluators: EvaluatorRefPayload[],
+    options?: { runAfterSave?: boolean }
   ) => {
     setValidationAttempted(true);
     if (!newTestName.trim()) return;
+    // The created test's name is unique, so it can be recovered from the
+    // refreshed list to run it.
+    const targetName = newTestName.trim();
 
     try {
       setIsCreating(true);
@@ -689,9 +693,11 @@ function LLMPageInner() {
         headers: getDefaultHeaders(backendAccessToken),
       });
 
+      let refreshed: TestData[] | undefined;
       if (testsResponse.ok) {
         const updatedTests = await testsResponse.json();
-        setTests(unwrapList<TestData>(updatedTests));
+        refreshed = unwrapList<TestData>(updatedTests);
+        setTests(refreshed);
       }
 
       // Reset form fields
@@ -699,6 +705,12 @@ function LLMPageInner() {
 
       // Close the sidebar
       setAddTestSidebarOpen(false);
+
+      // "Create and run": open the agent-picker run dialog for the new test.
+      if (options?.runAfterSave) {
+        const savedTest = refreshed?.find((t) => t.name === targetName);
+        if (savedTest) openRunTestDialog(savedTest);
+      }
     } catch (err) {
       reportError("Error creating test:", err);
       setCreateError(
@@ -855,10 +867,14 @@ function LLMPageInner() {
   // Update existing test via PUT API
   const updateTest = async (
     config: TestConfig,
-    evaluators: EvaluatorRefPayload[]
+    evaluators: EvaluatorRefPayload[],
+    options?: { runAfterSave?: boolean }
   ) => {
     setValidationAttempted(true);
     if (!newTestName.trim() || !editingTestUuid) return;
+    // Capture before resetForm() clears the edit state below.
+    const targetUuid = editingTestUuid;
+    const targetName = newTestName.trim();
 
     try {
       setIsCreating(true);
@@ -920,14 +936,34 @@ function LLMPageInner() {
         headers: getDefaultHeaders(backendAccessToken),
       });
 
+      let refreshed: TestData[] | undefined;
       if (testsResponse.ok) {
         const updatedTests = await testsResponse.json();
-        setTests(unwrapList<TestData>(updatedTests));
+        refreshed = unwrapList<TestData>(updatedTests);
+        setTests(refreshed);
       }
 
       // Reset and close
       resetForm();
       setAddTestSidebarOpen(false);
+
+      // "Save and run": open the agent-picker run dialog for the just-saved
+      // test (running from this page always picks an agent first). Fall back
+      // to a synthesized TestData if the refetch didn't return it.
+      if (options?.runAfterSave) {
+        const savedTest: TestData = refreshed?.find(
+          (t) => t.uuid === targetUuid
+        ) ?? {
+          uuid: targetUuid,
+          name: targetName,
+          description: "",
+          type: config.evaluation.type,
+          config,
+          created_at: "",
+          updated_at: "",
+        };
+        openRunTestDialog(savedTest);
+      }
     } catch (err) {
       reportError("Error updating test:", err);
       setCreateError(
@@ -1719,6 +1755,7 @@ function LLMPageInner() {
           initialTab={initialTab}
           initialConfig={initialConfig}
           initialEvaluators={initialEvaluators}
+          showRunAfterSave
         />
       )}
 

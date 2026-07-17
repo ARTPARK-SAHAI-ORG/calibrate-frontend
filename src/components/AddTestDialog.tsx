@@ -773,8 +773,9 @@ type AddTestDialogProps = {
    * button next to the primary save action. It saves the test and then asks
    * the parent to run it immediately (via `onSubmit`'s `runAfterSave` option),
    * sparing the user the close-then-play round-trip. Only offered in the
-   * default `mode === "test"` flow; callers without an agent to run against
-   * (e.g. the standalone tests page, labelling items) leave it unset.
+   * default `mode === "test"` flow. Set by the agent Tests tab (runs against
+   * that agent) and the standalone tests page (which opens an agent picker
+   * first); labelling-item callers leave it unset.
    */
   showRunAfterSave?: boolean;
 };
