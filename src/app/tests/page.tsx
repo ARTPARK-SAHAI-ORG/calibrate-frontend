@@ -193,15 +193,16 @@ function LLMPageInner() {
   );
   const [editingTestUuid, setEditingTestUuid] = useState<string | null>(null);
   const [isLoadingTest, setIsLoadingTest] = useState(false);
-  // Deep-link the open test to `?testId=<uuid>` so a reload re-opens it and
-  // the URL can be shared to open the test directly. Only active on the Tests
-  // tab (the Runs tab owns `?runId=`). `openEditTest` is defined below; the
-  // closure only runs from the hook's effect after mount, so the forward
-  // reference is safe.
+  // Deep-link the open test to `?testId=<uuid>` so a reload re-opens it, the
+  // URL can be shared, and the Back button closes the dialog. Only active on
+  // the Tests tab (the Runs tab owns `?runId=`). `openEditTest` /
+  // `closeAddTestDialog` are defined below; the closures only run from the
+  // hook's effect after mount, so the forward references are safe.
   const { setParam: setTestIdParam } = useDialogUrlParam({
     param: "testId",
     enabled: activeTab === "tests" && !!backendAccessToken,
     onOpen: (uuid) => openEditTest(uuid),
+    onClose: () => closeAddTestDialog(),
   });
   // UUID of the test whose details are being fetched for duplication. Drives
   // the per-row spinner; the dialog only opens once the fetch resolves.
@@ -950,6 +951,14 @@ function LLMPageInner() {
     setInitialEvaluators(undefined);
   };
 
+  // Close the add/edit test dialog. Used by the dialog's own close control and
+  // by the deep-link hook when the Back button clears `?testId`. resetForm
+  // clears the URL param, which is a no-op when Back already removed it.
+  const closeAddTestDialog = () => {
+    resetForm();
+    setAddTestSidebarOpen(false);
+  };
+
   // Filter tests by type filter and search query. The match mode applies to
   // the test name. All filtering is client-side over the already-fetched list.
   const trimmedQuery = searchQuery.trim();
@@ -1694,10 +1703,7 @@ function LLMPageInner() {
       {addTestSidebarOpen && (
         <AddTestDialog
           isOpen={addTestSidebarOpen}
-          onClose={() => {
-            resetForm();
-            setAddTestSidebarOpen(false);
-          }}
+          onClose={closeAddTestDialog}
           isEditing={!!editingTestUuid}
           isLoading={isLoadingTest}
           isCreating={isCreating}

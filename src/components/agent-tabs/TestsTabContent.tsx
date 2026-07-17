@@ -314,14 +314,15 @@ export function TestsTabContent({
     AttachedEvaluatorInit[] | undefined
   >(undefined);
 
-  // Deep-link the open test to `?testId=<uuid>` so a reload re-opens it and
-  // the URL can be shared to open the test directly. `openEditTest` is defined
-  // below; the closure only runs from the hook's effect after mount, so the
-  // forward reference is safe.
+  // Deep-link the open test to `?testId=<uuid>` so a reload re-opens it, the
+  // URL can be shared, and the Back button closes the dialog. `openEditTest` /
+  // `closeTestDialogAfterSave` are defined below; the closures only run from
+  // the hook's effect after mount, so the forward references are safe.
   const { setParam: setTestIdParam } = useDialogUrlParam({
     param: "testId",
     enabled: !!backendAccessToken,
     onOpen: (uuid) => openEditTest(uuid),
+    onClose: () => closeTestDialogAfterSave(),
   });
 
   // Selection state for bulk operations

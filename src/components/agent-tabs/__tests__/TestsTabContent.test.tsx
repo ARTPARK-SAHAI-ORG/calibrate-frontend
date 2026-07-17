@@ -655,6 +655,23 @@ describe("TestsTabContent — test deep-link (?testId)", () => {
     expect(screen.getByTestId("add-test-editing")).toHaveTextContent("editing");
   });
 
+  it("closes the dialog when the Back button clears the param (onClose)", async () => {
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await act(async () => {
+      dialogUrlParamArgs.onOpen("t1");
+    });
+    await screen.findByTestId("add-test-dialog");
+
+    // Simulate Back removing `?testId` — the hook fires onClose.
+    expect(typeof dialogUrlParamArgs.onClose).toBe("function");
+    await act(async () => {
+      dialogUrlParamArgs.onClose();
+    });
+    expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
+  });
+
   it("clears the testId from the URL when the dialog is closed", async () => {
     const user = setupUser();
     renderComponent();
