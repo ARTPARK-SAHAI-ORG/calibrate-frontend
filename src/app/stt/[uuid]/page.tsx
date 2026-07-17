@@ -136,6 +136,8 @@ type ProviderResultRow = {
   cer?: string;
   semantic_wer?: number | string;
   semantic_wer_reasoning?: string;
+  // Per-row latency in seconds (TTFS). `null` for providers that don't report it.
+  ttfs?: number | string | null;
   string_similarity?: string;
   llm_judge_score?: string;
   llm_judge_reasoning?: string;
