@@ -11,6 +11,10 @@ import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog"
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { BenchmarkDialog } from "@/components/BenchmarkDialog";
 import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
+import {
+  BenchmarkRerunDialog,
+  useBenchmarkRerun,
+} from "@/components/BenchmarkRerunDialog";
 import { CompareModelsButton } from "@/components/agent-tabs/CompareModelsButton";
 import {
   AddTestDialog,
@@ -372,16 +376,9 @@ export function TestsTabContent({
   const [viewingTestResults, setViewingTestResults] = useState(false);
   const [viewingBenchmarkResults, setViewingBenchmarkResults] = useState(false);
 
-  // Direct benchmark rerun state: starts a fresh benchmark (no picker) with the
-  // same models as a completed run and shows it live. `benchmarkRerunKey`
-  // remounts the dialog so a repeat rerun re-POSTs instead of no-op'ing on an
-  // unchanged prop.
-  const [benchmarkRerun, setBenchmarkRerun] = useState<{
-    models: string[];
-    testUuids: string[];
-    testNames: string[];
-  } | null>(null);
-  const [benchmarkRerunKey, setBenchmarkRerunKey] = useState(0);
+  // Direct benchmark rerun: starts a fresh benchmark (no picker) with the same
+  // models + test subset as a completed run and shows it live.
+  const benchmarkRerun = useBenchmarkRerun();
 
   // Track polling intervals for pending runs
   const pendingRunsPollingRef = useRef<NodeJS.Timeout | null>(null);
@@ -1405,8 +1402,13 @@ export function TestsTabContent({
   ) => {
     setViewingBenchmarkResults(false);
     setSelectedPastRun(null);
-    setBenchmarkRerun({ models, testUuids, testNames });
-    setBenchmarkRerunKey((k) => k + 1);
+    benchmarkRerun.start({
+      agentUuid,
+      agentName,
+      models,
+      testUuids,
+      testNames,
+    });
   };
 
   // Handle when a new test run is created
@@ -2797,23 +2799,15 @@ export function TestsTabContent({
         />
       )}
 
-      {/* Direct Benchmark Rerun Dialog — fresh benchmark of the same models,
-          skipping the model picker. Keyed so a repeat rerun remounts and
-          re-POSTs. */}
-      {benchmarkRerun && (
-        <BenchmarkResultsDialog
-          key={benchmarkRerunKey}
-          isOpen
-          onClose={() => setBenchmarkRerun(null)}
-          agentUuid={agentUuid}
-          agentName={agentName}
-          testUuids={benchmarkRerun.testUuids}
-          testNames={benchmarkRerun.testNames}
-          models={benchmarkRerun.models}
-          onBenchmarkCreated={handleBenchmarkCreated}
-          onRerun={handleRerunBenchmark}
-        />
-      )}
+      {/* Direct Benchmark Rerun Dialog — fresh benchmark of the same models and
+          test subset, skipping the model picker. */}
+      <BenchmarkRerunDialog
+        config={benchmarkRerun.config}
+        rerunKey={benchmarkRerun.key}
+        onClose={benchmarkRerun.clear}
+        onBenchmarkCreated={(taskId) => handleBenchmarkCreated(taskId)}
+        onRerun={benchmarkRerun.start}
+      />
     </div>
   );
 }

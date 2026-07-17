@@ -17,6 +17,10 @@ import {
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
 import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
+import {
+  BenchmarkRerunDialog,
+  useBenchmarkRerun,
+} from "@/components/BenchmarkRerunDialog";
 import { RunTestDialog } from "@/components/RunTestDialog";
 import {
   AddTestDialog,
@@ -242,15 +246,8 @@ function LLMPageInner() {
   // action on a viewed run) rather than the single `testToRun`.
   const [rerunTests, setRerunTests] = useState<TestData[] | null>(null);
   // Direct benchmark rerun (fresh benchmark, same models + test subset, no
-  // picker). Keyed so a repeat rerun remounts and re-POSTs instead of no-op'ing.
-  const [benchmarkRerun, setBenchmarkRerun] = useState<{
-    agentUuid: string;
-    agentName: string;
-    models: string[];
-    testUuids: string[];
-    testNames: string[];
-  } | null>(null);
-  const [benchmarkRerunKey, setBenchmarkRerunKey] = useState(0);
+  // picker).
+  const benchmarkRerun = useBenchmarkRerun();
 
   // Bulk upload modal state
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
@@ -712,8 +709,7 @@ function LLMPageInner() {
   ) => {
     setViewingRunBenchmark(false);
     setSelectedRun(null);
-    setBenchmarkRerun({ agentUuid, agentName, models, testUuids, testNames });
-    setBenchmarkRerunKey((k) => k + 1);
+    benchmarkRerun.start({ agentUuid, agentName, models, testUuids, testNames });
   };
 
   // Create test via POST /tests/bulk (used for both single and bulk flows for
@@ -2001,37 +1997,21 @@ function LLMPageInner() {
       )}
 
       {/* Direct Benchmark Rerun Dialog — fresh benchmark of the same models and
-          test subset, skipping the model picker. Keyed so a repeat rerun
-          remounts. */}
-      {benchmarkRerun && (
-        <BenchmarkResultsDialog
-          key={benchmarkRerunKey}
-          isOpen
-          onClose={() => setBenchmarkRerun(null)}
-          agentUuid={benchmarkRerun.agentUuid}
-          agentName={benchmarkRerun.agentName}
-          testUuids={benchmarkRerun.testUuids}
-          testNames={benchmarkRerun.testNames}
-          models={benchmarkRerun.models}
-          onBenchmarkCreated={(taskId) =>
-            prependOptimisticBenchmarkRun(
-              taskId,
-              benchmarkRerun.models,
-              benchmarkRerun.agentUuid,
-              benchmarkRerun.agentName,
-            )
-          }
-          onRerun={(models, testUuids, testNames) =>
-            handleRerunBenchmark(
-              benchmarkRerun.agentUuid,
-              benchmarkRerun.agentName,
-              models,
-              testUuids,
-              testNames,
-            )
-          }
-        />
-      )}
+          test subset, skipping the model picker. */}
+      <BenchmarkRerunDialog
+        config={benchmarkRerun.config}
+        rerunKey={benchmarkRerun.key}
+        onClose={benchmarkRerun.clear}
+        onBenchmarkCreated={(taskId, cfg) =>
+          prependOptimisticBenchmarkRun(
+            taskId,
+            cfg.models,
+            cfg.agentUuid,
+            cfg.agentName,
+          )
+        }
+        onRerun={benchmarkRerun.start}
+      />
     </AppLayout>
   );
 }
