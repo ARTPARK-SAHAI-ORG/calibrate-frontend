@@ -1756,6 +1756,15 @@ function LLMPageInner() {
           initialConfig={initialConfig}
           initialEvaluators={initialEvaluators}
           showRunAfterSave
+          onRun={() => {
+            // Run the already-saved version of the test being edited (the
+            // "run directly" / "discard and run" path). Close the editor,
+            // then open the agent picker for the saved test.
+            const saved = tests.find((t) => t.uuid === editingTestUuid);
+            resetForm();
+            setAddTestSidebarOpen(false);
+            if (saved) openRunTestDialog(saved);
+          }}
         />
       )}
 

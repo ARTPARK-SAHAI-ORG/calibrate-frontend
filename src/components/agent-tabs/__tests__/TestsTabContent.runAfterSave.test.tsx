@@ -67,6 +67,7 @@ jest.mock("../../AddTestDialog", () => ({
     setTestName,
     isEditing,
     showRunAfterSave,
+    onRun,
   }: {
     isOpen: boolean;
     onSubmit: (
@@ -78,6 +79,7 @@ jest.mock("../../AddTestDialog", () => ({
     setTestName: (name: string) => void;
     isEditing: boolean;
     showRunAfterSave?: boolean;
+    onRun?: () => void;
   }) => {
     useEffect(() => {
       if (isOpen && !testName.trim()) {
@@ -106,6 +108,9 @@ jest.mock("../../AddTestDialog", () => ({
           }
         >
           Submit and run
+        </button>
+        <button type="button" onClick={() => onRun?.()}>
+          Run directly
         </button>
       </div>
     );
@@ -294,6 +299,27 @@ describe("TestsTabContent save-and-run shortcut", () => {
     expect(
       screen.queryByRole("heading", { name: "Update default evaluators?" }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
+  });
+
+  it("runs the already-saved test via onRun without saving (the run-directly / discard path)", async () => {
+    setupFetch({ agentTests: [existingAgentTest] });
+    const user = setupUser();
+    render(<TestsTabContent agentUuid={AGENT_UUID} />);
+
+    const matches = await screen.findAllByText("Refund test");
+    await user.click(matches[0]);
+    const dialog = await screen.findByTestId("add-test-dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Run directly" }));
+
+    // The runner opens with the saved test; no PUT was issued (no save).
+    expect(await screen.findByTestId("test-runner")).toHaveTextContent(
+      "runner:Refund test",
+    );
+    const puts = (global.fetch as jest.Mock).mock.calls.filter(
+      ([, init]) => init?.method === "PUT",
+    );
+    expect(puts).toHaveLength(0);
     expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
   });
 

@@ -770,14 +770,29 @@ type AddTestDialogProps = {
   requireAssistantLastMessage?: boolean;
   /**
    * When true, the footer shows an extra "Run test" button next to the
-   * primary save action. It saves the test and then asks
-   * the parent to run it immediately (via `onSubmit`'s `runAfterSave` option),
-   * sparing the user the close-then-play round-trip. Only offered in the
-   * default `mode === "test"` flow. Set by the agent Tests tab (runs against
-   * that agent) and the standalone tests page (which opens an agent picker
-   * first); labelling-item callers leave it unset.
+   * primary Save action. Only offered in the default `mode === "test"` flow.
+   * Set by the agent Tests tab (runs against that agent) and the standalone
+   * tests page (which opens an agent picker first); labelling-item callers
+   * leave it unset.
+   *
+   * Run semantics (Save and Run stay separate actions):
+   * - Editing with NO unsaved edits → runs the already-saved test directly
+   *   via `onRun` (no save).
+   * - Editing WITH unsaved edits → prompts: "Save and run" (saves via
+   *   `onSubmit({ runAfterSave: true })` then runs) or "Discard and run"
+   *   (runs the saved version via `onRun`, dropping the edits).
+   * - Creating → there's no saved version, so it always creates and runs via
+   *   `onSubmit({ runAfterSave: true })`.
    */
   showRunAfterSave?: boolean;
+  /**
+   * Runs the currently-saved test without saving the form. Used for the
+   * "run directly" and "discard and run" paths above. The parent is
+   * responsible for closing this dialog and opening its runner. Required
+   * (alongside `showRunAfterSave`) for the run button to fully work when
+   * editing; create-only contexts may omit it.
+   */
+  onRun?: () => void;
 };
 
 export function AddTestDialog({
@@ -803,6 +818,7 @@ export function AddTestDialog({
   allowAgentLastMessage = false,
   requireAssistantLastMessage = false,
   showRunAfterSave = false,
+  onRun,
 }: AddTestDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
@@ -1340,6 +1356,9 @@ export function AddTestDialog({
     params: Array<{ name: string; value: string }>;
   } | null>(null);
   const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
+  // Shown when the user hits "Run test" while editing with unsaved edits:
+  // asks whether to save-then-run or discard-and-run the saved version.
+  const [showRunUnsavedConfirm, setShowRunUnsavedConfirm] = useState(false);
 
   // Discard-guard baseline. `baselineRef` holds a serialized snapshot of the
   // form's canonical (would-be-saved) content, captured once the dialog has
@@ -2914,6 +2933,42 @@ export function AddTestDialog({
     onSubmit(config, evaluators, { runAfterSave });
   };
 
+  // True when the form differs from the post-load baseline (i.e. there are
+  // unsaved edits). Mirrors the backdrop discard-guard check; treats the
+  // not-yet-captured baseline as "dirty" to err against silently dropping
+  // edits.
+  const hasUnsavedEdits = () =>
+    baselineRef.current === null ||
+    serializeFormState() !== baselineRef.current;
+
+  // "Run test" button. Save and Run stay separate: this never force-saves a
+  // clean form. Creating always creates-and-runs (no saved version exists);
+  // editing runs the saved test directly when clean, and prompts when dirty.
+  const handleRunClick = () => {
+    if (!isEditing) {
+      handleSubmit(true);
+      return;
+    }
+    if (hasUnsavedEdits()) {
+      setShowRunUnsavedConfirm(true);
+      return;
+    }
+    // Clean edit: run the already-saved test without a save round-trip.
+    if (onRun) onRun();
+    else handleSubmit(true);
+  };
+
+  const handleSaveAndRunFromPrompt = () => {
+    setShowRunUnsavedConfirm(false);
+    handleSubmit(true);
+  };
+
+  const handleDiscardAndRunFromPrompt = () => {
+    setShowRunUnsavedConfirm(false);
+    if (onRun) onRun();
+    else handleSubmit(true);
+  };
+
   const handleBackdropClick = () => {
     // Skip the discard prompt when the form is unchanged from the baseline
     // captured after load (pristine open, or edits reverted). When the
@@ -3035,6 +3090,46 @@ export function AddTestDialog({
                 className="h-10 px-4 rounded-lg text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors cursor-pointer"
               >
                 Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Run-with-unsaved-changes confirmation. Only reachable while editing
+          with unsaved edits; offers save-then-run or discard-and-run. */}
+      {showRunUnsavedConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/30"
+            onClick={() => setShowRunUnsavedConfirm(false)}
+          />
+          <div className="relative bg-background rounded-xl shadow-2xl border border-border p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              Unsaved changes
+            </h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              You have unsaved changes. Running the test now will use the last
+              saved version unless you save first.
+            </p>
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3">
+              <button
+                onClick={() => setShowRunUnsavedConfirm(false)}
+                className="h-10 px-4 rounded-lg text-sm font-medium bg-background text-foreground hover:bg-muted transition-colors cursor-pointer border border-border"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDiscardAndRunFromPrompt}
+                className="h-10 px-4 rounded-lg text-sm font-medium bg-background text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer border border-red-500/40"
+              >
+                Discard and run
+              </button>
+              <button
+                onClick={handleSaveAndRunFromPrompt}
+                className="h-10 px-4 rounded-lg text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+              >
+                Save and run
               </button>
             </div>
           </div>
@@ -3856,9 +3951,9 @@ export function AddTestDialog({
                     <div className="relative group flex items-center gap-2">
                       {canRunAfterSave && (
                         <button
-                          onClick={() => handleSubmit(true)}
+                          onClick={handleRunClick}
                           disabled={isButtonDisabled}
-                          title="Save any changes and run this test"
+                          title="Run this test"
                           className="h-9 md:h-10 px-3 md:px-4 rounded-lg text-sm md:text-base font-medium border transition-colors flex items-center gap-2 bg-sky-500/12 border-sky-500/45 text-sky-950 dark:text-sky-100 hover:bg-sky-500/22 dark:hover:bg-sky-500/18 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {isCreating && submitRunAfterSave ? (

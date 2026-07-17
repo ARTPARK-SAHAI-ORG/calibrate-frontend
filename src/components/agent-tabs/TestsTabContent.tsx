@@ -2642,6 +2642,14 @@ export function TestsTabContent({
           agentEvaluatorUuids={agentEvaluators.map((e) => e.uuid)}
           agentEvaluatorsPending={!agentEvaluatorsLoaded}
           showRunAfterSave={!isConnectionUnverified}
+          onRun={() => {
+            // Run the already-saved version of the test being edited (the
+            // "run directly" / "discard and run" path). Close the editor
+            // first, then open the runner.
+            const saved = agentTests.find((t) => t.uuid === editingTestUuid);
+            closeTestDialogAfterSave();
+            if (saved) runSavedTest(saved);
+          }}
         />
       )}
 
