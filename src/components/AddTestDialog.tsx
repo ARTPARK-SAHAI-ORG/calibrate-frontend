@@ -769,8 +769,8 @@ type AddTestDialogProps = {
    */
   requireAssistantLastMessage?: boolean;
   /**
-   * When true, the footer shows an extra "Save and run" / "Create and run"
-   * button next to the primary save action. It saves the test and then asks
+   * When true, the footer shows an extra "Run test" button next to the
+   * primary save action. It saves the test and then asks
    * the parent to run it immediately (via `onSubmit`'s `runAfterSave` option),
    * sparing the user the close-then-play round-trip. Only offered in the
    * default `mode === "test"` flow. Set by the agent Tests tab (runs against
@@ -3858,11 +3858,7 @@ export function AddTestDialog({
                         <button
                           onClick={() => handleSubmit(true)}
                           disabled={isButtonDisabled}
-                          title={
-                            isEditing
-                              ? "Save your changes and run this test"
-                              : "Create this test and run it"
-                          }
+                          title="Save any changes and run this test"
                           className="h-9 md:h-10 px-3 md:px-4 rounded-lg text-sm md:text-base font-medium border transition-colors flex items-center gap-2 bg-sky-500/12 border-sky-500/45 text-sky-950 dark:text-sky-100 hover:bg-sky-500/22 dark:hover:bg-sky-500/18 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {isCreating && submitRunAfterSave ? (
@@ -3882,7 +3878,7 @@ export function AddTestDialog({
                               />
                             </svg>
                           )}
-                          {isEditing ? "Save and run" : "Create and run"}
+                          Run test
                         </button>
                       )}
                       <button

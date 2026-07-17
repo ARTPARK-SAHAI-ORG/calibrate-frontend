@@ -777,7 +777,7 @@ describe("AddTestDialog", () => {
         />,
       );
       expect(
-        screen.queryByRole("button", { name: /Create and run/ }),
+        screen.queryByRole("button", { name: /Run test/ }),
       ).not.toBeInTheDocument();
     });
   });
@@ -787,11 +787,11 @@ describe("AddTestDialog", () => {
       render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
       await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
       expect(
-        screen.queryByRole("button", { name: /Create and run/ }),
+        screen.queryByRole("button", { name: /Run test/ }),
       ).not.toBeInTheDocument();
     });
 
-    it("renders 'Save and run' when editing with showRunAfterSave", async () => {
+    it("renders 'Run test' when editing with showRunAfterSave", async () => {
       const initialConfig: TestConfig = {
         history: [
           { role: "user", content: "Hi" },
@@ -813,7 +813,7 @@ describe("AddTestDialog", () => {
       );
       await waitFor(() =>
         expect(
-          screen.getByRole("button", { name: /Save and run/ }),
+          screen.getByRole("button", { name: /Run test/ }),
         ).toBeInTheDocument(),
       );
     });
@@ -842,7 +842,7 @@ describe("AddTestDialog", () => {
         "Reply is polite",
       );
 
-      await user.click(screen.getByRole("button", { name: /Create and run/ }));
+      await user.click(screen.getByRole("button", { name: /Run test/ }));
       expect(onSubmit).toHaveBeenCalledTimes(1);
       expect(onSubmit.mock.calls[0][2]).toEqual({ runAfterSave: true });
 
@@ -883,7 +883,7 @@ describe("AddTestDialog", () => {
         "Reply is polite",
       );
 
-      const runButton = screen.getByRole("button", { name: /Create and run/ });
+      const runButton = screen.getByRole("button", { name: /Run test/ });
       await user.click(runButton);
       // The run button keeps its label and gains a spinner; the plain button
       // shows "Creating..." only when it was the trigger — here it should not.
