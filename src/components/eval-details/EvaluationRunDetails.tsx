@@ -28,6 +28,7 @@ import {
   type AudioCostBreakdown,
   costTiles,
   costCaveats,
+  formatMoney,
   readTotalCostUsd,
 } from "@/lib/audioCost";
 import {
@@ -444,6 +445,27 @@ const ttfsLeaderboardColumn = {
 /** Leaderboard chart for TTFS (STT only). */
 const ttfsChartConfig: ChartConfig = { title: TTFS_LABEL, dataKey: TTFS_KEY };
 
+// Total run cost in USD — the one cross-provider-comparable cost figure (the
+// per-unit / native price stays on the per-provider Overall Metrics card).
+// Shown as a leaderboard column + chart, keyed on the `cost_usd` joined by
+// `withTotalCostUsd`.
+const COST_USD_KEY = "cost_usd";
+const COST_USD_LABEL = "Total cost (USD)";
+
+/** Leaderboard column for total USD cost (shared by STT and TTS). */
+const costLeaderboardColumn = {
+  key: COST_USD_KEY,
+  header: COST_USD_LABEL,
+  render: (v: unknown) => (typeof v === "number" ? formatMoney(v, "USD") : "-"),
+};
+
+/** Leaderboard chart for total USD cost (shared by STT and TTS). */
+const costChartConfig: ChartConfig = {
+  title: COST_USD_LABEL,
+  dataKey: COST_USD_KEY,
+  formatTooltip: (v: number) => formatMoney(v, "USD"),
+};
+
 /** X-axis title for the STT/TTS Pareto frontier (total run cost, USD). */
 const PARETO_COST_AXIS_LABEL = "Total cost (USD) →  cheaper is better";
 
@@ -485,11 +507,11 @@ function withRowMetric(
 }
 
 /**
- * Joins total USD cost onto leaderboard rows under a flat `cost_usd` key so the
- * Pareto builder can read it. Reads the cost off the row itself when the summary
- * carries it, otherwise off the matching provider result. Cost is no longer a
- * leaderboard column — it's shown per-provider on the Overall Metrics card and
- * used only as the Pareto cost axis here.
+ * Joins total USD cost onto leaderboard rows under a flat `cost_usd` key (the
+ * comparable cost figure). Reads the cost off the row itself when the summary
+ * carries it, otherwise off the matching provider result. Drives both the "Total
+ * cost (USD)" leaderboard column/chart and the Pareto cost axis; the per-unit /
+ * native price stays on the per-provider Overall Metrics card.
  */
 function withTotalCostUsd(
   leaderboardSummary: LeaderboardSummaryForDetails[],
@@ -497,17 +519,18 @@ function withTotalCostUsd(
     provider: string;
     metrics?: Record<string, unknown> | null;
   }>,
-): LeaderboardSummaryForDetails[] {
+): { rows: LeaderboardSummaryForDetails[]; showCost: boolean } {
   const costByRun: Record<string, number> = {};
   for (const pr of providerResults ?? []) {
     const c = readTotalCostUsd(pr.metrics);
     if (c != null) costByRun[pr.provider] = c;
   }
-  return withRowMetric(
+  const { rows, show } = withRowMetric(
     leaderboardSummary,
-    "cost_usd",
+    COST_USD_KEY,
     (row) => costByRun[row.run] ?? readTotalCostUsd(row),
-  ).rows;
+  );
+  return { rows, showCost: show };
 }
 
 /**
@@ -621,10 +644,11 @@ export function STTEvaluationLeaderboard({
     (row) => row.semantic_wer != null,
   );
 
-  // Join TTFS onto each row for its column/chart, and total USD cost (Pareto
-  // axis only — cost is not a leaderboard column).
-  const withCostRows = withTotalCostUsd(leaderboardSummary, providerResults);
-  const { rows, showTtfs } = withTtfs(withCostRows, providerResults);
+  // Join total USD cost (comparable) and TTFS onto each row for their columns,
+  // charts, and the Pareto axis.
+  const withCost = withTotalCostUsd(leaderboardSummary, providerResults);
+  const { rows, showTtfs } = withTtfs(withCost.rows, providerResults);
+  const showCost = withCost.showCost;
 
   // Drop evaluator columns/charts that no run carries a value for — an
   // all-"-" column (e.g. an evaluator that didn't run) is just noise.
@@ -644,6 +668,7 @@ export function STTEvaluationLeaderboard({
     ...sarvamFields.map((field) => ({ title: field.label, dataKey: field.key })),
     ...evaluatorChartConfigs(visibleEvaluatorColumns),
     ...(showTtfs ? [ttfsChartConfig] : []),
+    ...(showCost ? [costChartConfig] : []),
   ];
   const chartRows = chunkChartRows(allCharts);
 
@@ -666,6 +691,7 @@ export function STTEvaluationLeaderboard({
         ...sarvamFields.map((field) => ({ key: field.key, header: field.label })),
         ...evaluatorLeaderboardColumns(visibleEvaluatorColumns),
         ...(showTtfs ? [ttfsLeaderboardColumn] : []),
+        ...(showCost ? [costLeaderboardColumn] : []),
       ]}
       data={rows}
       charts={chartRows}
@@ -718,13 +744,14 @@ export function TTSEvaluationLeaderboard({
   const renderTtfb = (v: string | number | undefined) =>
     v != null ? parseFloat(Number(v).toFixed(4)) : "-";
 
-  // Join total USD cost onto each row for the Pareto axis (cost is not a
-  // leaderboard column — it's shown per-provider on the Overall Metrics card).
-  const rows = withTotalCostUsd(leaderboardSummary, providerResults);
+  // Join total USD cost (comparable) onto each row for the cost column/chart and
+  // the Pareto axis; the per-unit / native price stays on the per-provider card.
+  const { rows, showCost } = withTotalCostUsd(leaderboardSummary, providerResults);
 
   const allCharts: ChartConfig[] = [
     ...evaluatorChartConfigs(evaluatorColumns),
     { title: "Latency (s)", dataKey: ttfbKey },
+    ...(showCost ? [costChartConfig] : []),
   ];
   const chartRows = chunkChartRows(allCharts);
 
@@ -746,6 +773,7 @@ export function TTSEvaluationLeaderboard({
         { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
         ...evaluatorLeaderboardColumns(evaluatorColumns),
         { key: ttfbKey, header: "Latency (s)", render: renderTtfb },
+        ...(showCost ? [costLeaderboardColumn] : []),
       ]}
       data={rows}
       charts={chartRows}

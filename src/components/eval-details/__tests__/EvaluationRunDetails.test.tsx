@@ -1542,8 +1542,8 @@ describe("TTSEvaluationOutputs", () => {
 
 // ---- Cost ----------------------------------------------------------------
 
-describe("STT/TTS leaderboards no longer render a cost column", () => {
-  it("STT leaderboard has no cost column even when providers carry cost", () => {
+describe("STT/TTS leaderboard Total cost (USD) column", () => {
+  it("adds a Total cost (USD) column + chart when providers carry cost, keyed cost_usd", () => {
     render(
       <STTEvaluationLeaderboard
         leaderboardSummary={[{ run: "cartesia", wer: 0.1, cer: 0.05 }]}
@@ -1557,18 +1557,41 @@ describe("STT/TTS leaderboards no longer render a cost column", () => {
     const columns = JSON.parse(
       screen.getByTestId("leaderboard-columns").textContent ?? "[]",
     );
-    const keys = columns.map((c: { key: string }) => c.key);
-    expect(keys).not.toContain("cost_usd");
-    expect(keys).not.toContain("cost_per_minute_usd");
+    expect(columns).toContainEqual({
+      key: "cost_usd",
+      header: "Total cost (USD)",
+    });
     const charts = JSON.parse(
       screen.getByTestId("leaderboard-charts").textContent ?? "[]",
     ).flat();
-    expect(charts.map((c: { title: string }) => c.title)).not.toContain(
-      "Cost (USD/min)",
+    expect(charts).toContainEqual({
+      title: "Total cost (USD)",
+      dataKey: "cost_usd",
+    });
+    // The joined value is on the row data (comparable across providers).
+    const data = JSON.parse(
+      screen.getByTestId("leaderboard-data").textContent ?? "[]",
     );
+    expect(data[0].cost_usd).toBeCloseTo(0.0096);
   });
 
-  it("TTS leaderboard has no cost column even when providers carry cost", () => {
+  it("formats the Total cost column via formatMoney (USD)", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "cartesia", wer: 0.1, cost_usd: 0.0096 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const columns = (
+      mockLeaderboardCapture.props as unknown as Record<string, unknown>
+    ).columns as Array<{ key: string; render?: (v: unknown) => unknown }>;
+    const costColumn = columns.find((c) => c.key === "cost_usd");
+    expect(costColumn?.render?.(0.0096)).toBe("$0.0096");
+    expect(costColumn?.render?.(undefined)).toBe("-");
+  });
+
+  it("appends the Total cost column after Latency on the TTS leaderboard", () => {
     render(
       <TTSEvaluationLeaderboard
         leaderboardSummary={[{ run: "cartesia", ttfb_p50: 0.5 }]}
@@ -1585,7 +1608,23 @@ describe("STT/TTS leaderboards no longer render a cost column", () => {
     expect(columns.map((c: { key: string }) => c.key)).toEqual([
       "run",
       "ttfb_p50",
+      "cost_usd",
     ]);
+  });
+
+  it("omits the Total cost column when no provider carries cost", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "openai", wer: 0.1, cer: 0.05 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[{ provider: "openai", metrics: { wer: 0.1 } }]}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns.map((c: { key: string }) => c.key)).not.toContain("cost_usd");
   });
 });
 
@@ -1911,7 +1950,7 @@ describe("STTEvaluationLeaderboard TTFS column", () => {
     expect(columns.map((c: { key: string }) => c.key)).toContain("ttfs");
   });
 
-  it("renders TTFS as the last column (cost is not a column)", () => {
+  it("orders TTFS before the Total cost column", () => {
     render(
       <STTEvaluationLeaderboard
         leaderboardSummary={[
@@ -1925,8 +1964,8 @@ describe("STTEvaluationLeaderboard TTFS column", () => {
       screen.getByTestId("leaderboard-columns").textContent ?? "[]",
     );
     const keys = columns.map((c: { key: string }) => c.key);
-    expect(keys[keys.length - 1]).toBe("ttfs");
-    expect(keys).not.toContain("cost_usd");
+    expect(keys.indexOf("ttfs")).toBeLessThan(keys.indexOf("cost_usd"));
+    expect(keys[keys.length - 1]).toBe("cost_usd");
   });
 
   it("omits the TTFS column/chart when no run measured it", () => {
