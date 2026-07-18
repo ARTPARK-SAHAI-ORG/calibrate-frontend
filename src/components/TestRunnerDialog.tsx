@@ -16,6 +16,7 @@ import {
   type PagerNav,
 } from "./test-results/shared";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
+import { startAgentTestRun } from "@/lib/agentTestRun";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
 import { RerunIconButton } from "@/components/ui";
@@ -136,8 +137,10 @@ type TestRunnerDialogProps = {
   agentUuid: string;
   agentName: string;
   tests: TestData[];
-  taskId?: string; // If provided, view existing run results instead of starting a new run
-  onRunCreated?: (taskId: string) => void; // Called when a new run is created
+  // The run to show. This dialog never starts a run of its own: the caller
+  // starts it (see `startAgentTestRun` in `@/lib/agentTestRun`) and hands the
+  // returned uuid down here. Without it the dialog only renders its shell.
+  taskId?: string;
   initialRunStatus?: string; // Initial status of the run (for viewing past runs)
   onStatusUpdate?: (
     taskId: string,
@@ -150,7 +153,9 @@ type TestRunnerDialogProps = {
     passed?: number | null,
     failed?: number | null,
   ) => void; // Called when run status changes (for coordinated polling)
-  runAllLinked?: boolean; // When true, omit test_uuids from run request (backend runs all linked tests)
+  // When true, the in-dialog "retry all" re-runs every test linked to the
+  // agent (the backend picks them) instead of the rows currently displayed.
+  runAllLinked?: boolean;
   // Called when the user clicks "Rerun" on a completed run, with the exact
   // tests it executed (from the run's `test_uuids`). The parent starts a fresh
   // run of those and opens it in a new dialog. Omit to hide the button.
@@ -164,7 +169,6 @@ export function TestRunnerDialog({
   agentName,
   tests,
   taskId,
-  onRunCreated,
   initialRunStatus,
   onStatusUpdate,
   runAllLinked,
@@ -323,46 +327,6 @@ export function TestRunnerDialog({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, taskId, backendAccessToken]);
-
-  // Start new test run when dialog opens without taskId.
-  //
-  // Guarded so one dialog-open starts exactly ONE run. `taskId` is a prop and
-  // stays undefined for a fresh run (the id we get back lands in the internal
-  // `currentTaskId`), so it can't gate re-entry. Without the ref, any parent
-  // that hands us a new `tests` array identity per render — e.g. the inline
-  // `tests={testToRun ? [testToRun] : []}` on /tests — re-fires this effect on
-  // every render, and since runAllTests calls `onRunCreated` (which re-renders
-  // that parent) it loops, POSTing /run hundreds of times.
-  const autoStartedRef = useRef(false);
-  useEffect(() => {
-    if (!isOpen) {
-      autoStartedRef.current = false;
-      return;
-    }
-    if (taskId || tests.length === 0 || autoStartedRef.current) {
-      return;
-    }
-    autoStartedRef.current = true;
-
-    setSelectedTestUuid(null);
-    hasAutoSelectedRef.current = false;
-    clearLabellingSelection();
-    setCurrentTaskId(null);
-    setRunEvaluators([]);
-    setRunTestUuids([]);
-    resetSummary();
-    setActiveTab("outputs");
-    const initialResults: TestResult[] = tests.map((test) => ({
-      test,
-      status: "pending",
-    }));
-    setTestResults(initialResults);
-
-    setTimeout(() => {
-      runAllTests(initialResults);
-    }, 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, taskId, tests]);
 
   const pollTaskStatus = async (taskId: string, backendUrl: string) => {
     try {
@@ -587,80 +551,6 @@ export function TestRunnerDialog({
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
       }
-    }
-  };
-
-  const runAllTests = async (initialResults: TestResult[]) => {
-    setIsRunning(true);
-
-    // Clear any existing polling interval
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
-    }
-
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!backendUrl) {
-      reportError("BACKEND_URL environment variable is not set");
-      setIsRunning(false);
-      return;
-    }
-
-    // Set all tests to queued initially
-    setRunStatus("queued");
-    setTestResults((prev) => prev.map((r) => ({ ...r, status: "queued" })));
-
-    try {
-      const testUuids = initialResults.map((r) => r.test.uuid);
-
-      const response = await fetch(
-        `${backendUrl}/agent-tests/agent/${agentUuid}/run`,
-        {
-          method: "POST",
-          headers: {
-            ...getDefaultHeaders(backendAccessToken),
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(runAllLinked ? {} : { test_uuids: testUuids }),
-        },
-      );
-
-      if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error("Failed to start test run");
-      }
-
-      const result: TestRunStatusResponse = await response.json();
-      const newTaskId = result.task_id;
-      setCurrentTaskId(newTaskId);
-
-      // Notify parent about the new run
-      if (onRunCreated) {
-        onRunCreated(newTaskId);
-      }
-
-      // Start polling immediately
-      pollingIntervalRef.current = setInterval(() => {
-        pollTaskStatus(newTaskId, backendUrl);
-      }, POLLING_INTERVAL_MS);
-
-      // Also poll immediately to get the first result
-      pollTaskStatus(newTaskId, backendUrl);
-    } catch (error) {
-      reportError("Error starting test run:", error);
-      setTestResults((prev) =>
-        prev.map((r) => ({
-          ...r,
-          status: "failed",
-          error:
-            error instanceof Error ? error.message : "Failed to start test run",
-        })),
-      );
-      setIsRunning(false);
     }
   };
 
@@ -938,17 +828,55 @@ export function TestRunnerDialog({
     }
   };
 
+  // Re-runs every test currently shown in the dialog. This is an explicit
+  // user click inside the dialog, so starting a run here is safe. The new run
+  // replaces the one on screen; `currentTaskId` tracks it for share and
+  // labelling wiring.
   const retryAll = async () => {
-    // Reset all tests to pending
+    const testUuids = testResults.map((r) => r.test.uuid);
+    if (testUuids.length === 0) return;
+
     setTestResults((prev) =>
       prev.map((r) => ({ ...r, status: "pending", error: undefined })),
     );
+    setIsRunning(true);
+    setRunStatus("queued");
 
-    const resetResults = testResults.map((r) => ({
-      ...r,
-      status: "pending" as const,
-    }));
-    await runAllTests(resetResults);
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+
+    try {
+      const newTaskId = await startAgentTestRun({
+        agentUuid,
+        testUuids,
+        runAllLinked,
+        accessToken: backendAccessToken,
+      });
+      // Null means the session expired and we are being signed out.
+      if (!newTaskId) return;
+
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL!;
+      setCurrentTaskId(newTaskId);
+      setTestResults((prev) => prev.map((r) => ({ ...r, status: "queued" })));
+
+      pollingIntervalRef.current = setInterval(() => {
+        pollTaskStatus(newTaskId, backendUrl);
+      }, POLLING_INTERVAL_MS);
+      pollTaskStatus(newTaskId, backendUrl);
+    } catch (error) {
+      reportError("Error starting test run:", error);
+      setTestResults((prev) =>
+        prev.map((r) => ({
+          ...r,
+          status: "failed",
+          error:
+            error instanceof Error ? error.message : "Failed to start test run",
+        })),
+      );
+      setIsRunning(false);
+    }
   };
 
   const selectedResult = testResults.find(

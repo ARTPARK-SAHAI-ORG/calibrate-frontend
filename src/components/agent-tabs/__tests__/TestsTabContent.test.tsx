@@ -3,6 +3,7 @@ import { render, screen, setupUser, waitFor, act } from "@/test-utils";
 import { signOut } from "next-auth/react";
 import { TestsTabContent } from "../TestsTabContent";
 import { showLimitToast } from "@/constants/limits";
+import { toast } from "sonner";
 import {
   readBulkNameConflictMessage,
   readNameConflictMessage,
@@ -66,6 +67,11 @@ jest.mock("../../VerifyToRunDialog", () => ({
       </div>
     ) : null;
   },
+}));
+
+jest.mock("sonner", () => ({
+  __esModule: true,
+  toast: { error: jest.fn(), success: jest.fn() },
 }));
 
 jest.mock("../../../lib/reportError", () => ({
@@ -175,9 +181,6 @@ jest.mock("../../TestRunnerDialog", () => ({
     return props.isOpen ? (
       <div data-testid="test-runner-dialog">
         <div data-testid="runner-test-count">{props.tests.length}</div>
-        <button onClick={() => props.onRunCreated?.("task-1", 2)}>
-          TriggerRunCreated
-        </button>
         <button
           onClick={() =>
             props.onStatusUpdate?.("run-pending", "completed", [], 1, 0)
@@ -287,6 +290,12 @@ function installFetch() {
     if (url.includes("/agent-tests/agent/") && url.endsWith("/runs")) {
       return jsonResponse(state.pastRuns, state.pastRunsInit);
     }
+    if (url.includes("/agent-tests/agent/") && url.endsWith("/run")) {
+      return jsonResponse(
+        state.startRunResult ?? { task_id: "new-run-1" },
+        state.startRunInit,
+      );
+    }
     if (url.includes("/agent-tests/bulk-delete-tests")) {
       const body = JSON.parse(opts.body);
       return jsonResponse(
@@ -367,6 +376,13 @@ function installFetch() {
   }) as any;
 }
 
+// Every POST to the start-run endpoint, as [url, options] pairs.
+function startRunCalls() {
+  return (global.fetch as jest.Mock).mock.calls.filter(
+    (c: any[]) => c[1]?.method === "POST" && String(c[0]).endsWith("/run"),
+  );
+}
+
 function renderComponent(
   overrides: Partial<React.ComponentProps<typeof TestsTabContent>> = {},
 ) {
@@ -394,6 +410,7 @@ beforeEach(() => {
   verifyState.verifySampleResponse = null;
   (signOut as jest.Mock).mockClear();
   (showLimitToast as jest.Mock).mockClear();
+  (toast.error as jest.Mock).mockClear();
   (readBulkNameConflictMessage as jest.Mock).mockResolvedValue(null);
   (readNameConflictMessage as jest.Mock).mockResolvedValue(null);
   state = {
@@ -648,6 +665,12 @@ describe("TestsTabContent — populated table", () => {
     await user.click(screen.getAllByTitle("Run test")[0]);
     await screen.findByTestId("test-runner-dialog");
     expect(screen.getByTestId("runner-test-count")).toHaveTextContent("1");
+    // The caller starts the run and hands the dialog the resulting uuid.
+    expect(testRunnerProps.taskId).toBe("new-run-1");
+    expect(startRunCalls()).toHaveLength(1);
+    expect(JSON.parse(startRunCalls()[0][1].body)).toEqual({
+      test_uuids: ["t1"],
+    });
   });
 
   it("runs all tests from the header button", async () => {
@@ -658,6 +681,68 @@ describe("TestsTabContent — populated table", () => {
     await user.click(screen.getByText("Run all tests"));
     await screen.findByTestId("test-runner-dialog");
     expect(screen.getByTestId("runner-test-count")).toHaveTextContent("2");
+    expect(testRunnerProps.taskId).toBe("new-run-1");
+    expect(testRunnerProps.runAllLinked).toBe(true);
+    // "Run all" defers the test selection to the backend, so no test_uuids.
+    expect(startRunCalls()).toHaveLength(1);
+    expect(JSON.parse(startRunCalls()[0][1].body)).toEqual({});
+  });
+
+  it("fires exactly one run request for repeated clicks on the same button", async () => {
+    // Hold the start-run POST open so the second click lands mid-flight.
+    let releaseRun: (value: Response) => void = () => {};
+    const routed = global.fetch as jest.Mock;
+    global.fetch = jest.fn(async (url: string, opts: any = {}) => {
+      if (opts.method === "POST" && String(url).endsWith("/run")) {
+        return new Promise<Response>((resolve) => {
+          releaseRun = resolve;
+        });
+      }
+      return routed(url, opts);
+    }) as any;
+
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByText("Run all tests"));
+    await user.click(screen.getByText("Run all tests"));
+    expect(startRunCalls()).toHaveLength(1);
+
+    await act(async () => {
+      releaseRun(jsonResponse({ task_id: "new-run-1" }));
+    });
+    await screen.findByTestId("test-runner-dialog");
+    expect(startRunCalls()).toHaveLength(1);
+  });
+
+  it("does not open the runner when the run fails to start", async () => {
+    state.startRunInit = { ok: false, status: 500 };
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByText("Run all tests"));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+    // No optimistic "Past runs" row for a run that never started.
+    expect(screen.queryByText("Running")).not.toBeInTheDocument();
+  });
+
+  it("bails quietly and signs out when the run start returns 401", async () => {
+    state.startRunInit = { ok: false, status: 401 };
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByText("Run all tests"));
+
+    await waitFor(() =>
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+    );
+    expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it("shows a limit toast when running more tests than allowed", async () => {
@@ -669,6 +754,7 @@ describe("TestsTabContent — populated table", () => {
     await user.click(screen.getByText("Run all tests"));
     expect(showLimitToast).toHaveBeenCalled();
     expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+    expect(startRunCalls()).toHaveLength(0);
   });
 });
 
@@ -1010,7 +1096,7 @@ describe("TestsTabContent — benchmark & past runs", () => {
     await screen.findByText("0 models");
   });
 
-  it("adds an optimistic run when a test run is created", async () => {
+  it("adds an optimistic run as soon as the run is started", async () => {
     state.agentTests = [responseTest];
     const user = setupUser();
     renderComponent();
@@ -1018,8 +1104,10 @@ describe("TestsTabContent — benchmark & past runs", () => {
 
     await user.click(screen.getByText("Run all tests"));
     await screen.findByTestId("test-runner-dialog");
-    await user.click(screen.getByText("TriggerRunCreated"));
+    // The row comes from the uuid we already hold, without the dialog telling
+    // us a run was created.
     await screen.findByText("Running");
+    expect(screen.getAllByText("Running")).toHaveLength(1);
   });
 
   it("renders past-run status pills (breakdown, error, complete)", async () => {
@@ -1147,12 +1235,14 @@ describe("TestsTabContent — benchmark & past runs", () => {
       ]);
     });
 
-    // The fresh new-run dialog is open with both tests and not run-all-linked.
+    // The fresh new-run dialog is open with both tests and not run-all-linked,
+    // showing the uuid of the run the rerun just started.
     await screen.findByTestId("test-runner-dialog");
     expect(screen.getByTestId("runner-test-count")).toHaveTextContent("2");
-    expect(testRunnerProps.taskId).toBeUndefined();
+    expect(testRunnerProps.taskId).toBe("new-run-1");
     expect(testRunnerProps.runAllLinked).toBe(false);
-    expect(testRunnerProps.tests.map((t) => t.uuid)).toEqual([
+    expect(startRunCalls()).toHaveLength(1);
+    expect(testRunnerProps.tests.map((t: { uuid: string }) => t.uuid)).toEqual([
       "real-1",
       "real-2",
     ]);
@@ -1248,6 +1338,8 @@ describe("TestsTabContent — connection agent", () => {
     expect(screen.getByTestId("verify-to-run-dialog")).toBeInTheDocument();
     expect(screen.getByTestId("verify-agent-name")).toHaveTextContent("My Bot");
     expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+    // The gate must block before the run is started, not after.
+    expect(startRunCalls()).toHaveLength(0);
   });
 
   it("per-row run also diverts to the verify gate when unverified", async () => {
@@ -1292,6 +1384,27 @@ describe("TestsTabContent — connection agent", () => {
     const runner = await screen.findByTestId("test-runner-dialog");
     expect(runner).toBeInTheDocument();
     expect(screen.getByTestId("runner-test-count")).toHaveTextContent("1");
+    // The resumed run goes through the same start call, exactly once.
+    expect(startRunCalls()).toHaveLength(1);
+    expect(testRunnerProps.taskId).toBe("new-run-1");
+  });
+
+  it("keeps the gate open and surfaces the error when the resumed run fails to start", async () => {
+    const user = setupUser();
+    verifySavedAgentMock.mockResolvedValue(true);
+    state.startRunInit = { ok: false, status: 500 };
+    state.agentTests = [responseTest];
+    renderComponent({
+      agentType: "connection",
+      connectionVerified: false,
+    });
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByText("Run all tests").closest("button")!);
+    await user.click(screen.getByText("VerifyToRun"));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
   });
 
   it("keeps the gate open and does not run when verification fails", async () => {
@@ -1352,7 +1465,7 @@ describe("TestsTabContent — connection agent", () => {
     expect(
       screen.queryByTestId("verify-to-run-dialog"),
     ).not.toBeInTheDocument();
-    expect(screen.getByTestId("test-runner-dialog")).toBeInTheDocument();
+    expect(await screen.findByTestId("test-runner-dialog")).toBeInTheDocument();
     expect(verifySavedAgentMock).not.toHaveBeenCalled();
   });
 

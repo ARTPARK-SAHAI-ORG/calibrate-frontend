@@ -190,6 +190,10 @@ function setupFetch({
     if (url.includes(`/agent-tests/agent/${AGENT_UUID}/runs`)) {
       return jsonResponse({ items: [], total: 0 });
     }
+    // The caller starts the run and hands the uuid to the runner dialog.
+    if (url.includes(`/agent-tests/agent/${AGENT_UUID}/run`)) {
+      return jsonResponse({ task_id: "run-1" });
+    }
     if (url === `${BACKEND}/tests`) {
       return jsonResponse({ items: [], total: 0 });
     }
@@ -345,6 +349,9 @@ describe("TestsTabContent save-and-run shortcut", () => {
       }
       if (url.includes(`/agent-tests/agent/${AGENT_UUID}/runs`)) {
         return jsonResponse({ items: [], total: 0 });
+      }
+      if (url.includes(`/agent-tests/agent/${AGENT_UUID}/run`)) {
+        return jsonResponse({ task_id: "run-1" });
       }
       if (init?.method === "PUT" && url.includes("/tests/test-1")) {
         return jsonResponse({});

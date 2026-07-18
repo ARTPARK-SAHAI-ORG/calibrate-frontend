@@ -122,27 +122,16 @@ describe("TestRunnerDialog", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("starts exactly one run when the parent re-renders with a fresh tests array", async () => {
-    // Regression: the parent (/tests page) built `tests` inline, so every
-    // re-render handed the dialog a new array identity. The start-run effect
-    // depends on `tests`, and its own onRunCreated re-renders that parent —
-    // which looped and fired POST /run hundreds of times.
-    const onRunCreated = jest.fn();
+  it("never starts a run when it opens without a taskId", async () => {
+    // Regression: the dialog used to POST /run from an effect watching `tests`.
+    // A parent handing it a fresh array identity per render re-fired that
+    // effect and looped, firing hundreds of runs. Starting a run now belongs
+    // to the caller; the dialog only ever displays the run it is given.
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
-        return Promise.resolve(
-          jsonResponse({ task_id: "task-1", status: "in_progress" }),
-        );
-      }
-      if (url.endsWith("/agent-tests/run/task-1")) {
-        return Promise.resolve(
-          jsonResponse({ task_id: "task-1", status: "in_progress", results: [] }),
-        );
-      }
-      return Promise.resolve(jsonResponse({}));
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
     });
 
     const props = {
@@ -150,36 +139,27 @@ describe("TestRunnerDialog", () => {
       onClose: jest.fn(),
       agentUuid: "agent-1",
       agentName: "My Agent",
-      onRunCreated,
     };
     // Each render passes a brand-new array, exactly as the inline prop did.
     const { rerender } = render(
       <TestRunnerDialog {...props} tests={[makeTest()]} />,
     );
-
-    await waitFor(() => expect(onRunCreated).toHaveBeenCalledWith("task-1"));
-
     for (let i = 0; i < 5; i++) {
       rerender(<TestRunnerDialog {...props} tests={[makeTest()]} />);
     }
 
-    await waitFor(() => {
-      const runCalls = (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+    expect(await screen.findByText("Test run")).toBeInTheDocument();
+    expect(
+      (global.fetch as jest.Mock).mock.calls.some(([url]) =>
         String(url).endsWith("/agent-tests/agent/agent-1/run"),
-      );
-      expect(runCalls).toHaveLength(1);
-    });
-    expect(onRunCreated).toHaveBeenCalledTimes(1);
+      ),
+    ).toBe(false);
   });
 
-  it("starts a new run, polls, and lands on the summary tab when done", async () => {
-    const onRunCreated = jest.fn();
+  it("polls the run it is handed and lands on the summary tab when done", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
-      }
-      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
-        return Promise.resolve(jsonResponse({ task_id: "task-1", status: "in_progress" }));
       }
       if (url.endsWith("/agent-tests/run/task-1")) {
         return Promise.resolve(
@@ -213,11 +193,11 @@ describe("TestRunnerDialog", () => {
         agentUuid="agent-1"
         agentName="My Agent"
         tests={[makeTest()]}
-        onRunCreated={onRunCreated}
+        taskId="task-1"
+        initialRunStatus="in_progress"
       />,
     );
 
-    await waitFor(() => expect(onRunCreated).toHaveBeenCalledWith("task-1"));
     await waitFor(() =>
       expect(screen.getByTestId("summary-panel")).toBeInTheDocument(),
     );
@@ -436,9 +416,6 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
-        return Promise.resolve(jsonResponse({ task_id: "task-err", status: "in_progress" }));
-      }
       if (url.endsWith("/agent-tests/run/task-err")) {
         return Promise.resolve(
           jsonResponse({
@@ -461,6 +438,8 @@ describe("TestRunnerDialog", () => {
         agentUuid="agent-1"
         agentName="My Agent"
         tests={[makeTest()]}
+        taskId="task-err"
+        initialRunStatus="in_progress"
       />,
     );
 
@@ -475,9 +454,6 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
-        return Promise.resolve(jsonResponse({ task_id: "task-401", status: "in_progress" }));
-      }
       if (url.endsWith("/agent-tests/run/task-401")) {
         return Promise.resolve(jsonResponse({}, false, 401));
       }
@@ -491,6 +467,8 @@ describe("TestRunnerDialog", () => {
         agentUuid="agent-1"
         agentName="My Agent"
         tests={[makeTest()]}
+        taskId="task-401"
+        initialRunStatus="in_progress"
       />,
     );
 
@@ -499,64 +477,7 @@ describe("TestRunnerDialog", () => {
     );
   });
 
-  it("signs out on a 401 when starting the run", async () => {
-    const { signOut } = require("next-auth/react");
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes("/evaluators?include_defaults=true")) {
-        return Promise.resolve(jsonResponse([]));
-      }
-      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
-        return Promise.resolve(jsonResponse({}, false, 401));
-      }
-      return Promise.reject(new Error(`Unexpected fetch ${url}`));
-    });
-
-    render(
-      <TestRunnerDialog
-        isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
-        tests={[makeTest()]}
-      />,
-    );
-
-    await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
-    );
-  });
-
-  it("marks tests failed when starting the run throws", async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes("/evaluators?include_defaults=true")) {
-        return Promise.resolve(jsonResponse([]));
-      }
-      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
-        return Promise.resolve(jsonResponse({}, false, 500));
-      }
-      return Promise.reject(new Error(`Unexpected fetch ${url}`));
-    });
-
-    render(
-      <TestRunnerDialog
-        isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
-        tests={[makeTest()]}
-      />,
-    );
-
-    // The run-start failure marks the (only) test row as failed, but
-    // `runStatus` itself stays whatever it was before the throw (only the
-    // per-test rows carry the error) — so the outputs panel renders with a
-    // failed row rather than the overall-error screen.
-    await waitFor(() =>
-      expect(screen.getByText(/Test One:failed/)).toBeInTheDocument(),
-    );
-  });
-
-  it("handles a missing NEXT_PUBLIC_BACKEND_URL gracefully when starting a run", async () => {
+  it("handles a missing NEXT_PUBLIC_BACKEND_URL gracefully", async () => {
     delete process.env.NEXT_PUBLIC_BACKEND_URL;
     render(
       <TestRunnerDialog
@@ -577,7 +498,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      return Promise.resolve(jsonResponse({ task_id: "t", status: "in_progress" }));
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
     });
     const onClose = jest.fn();
     const user = setupUser();
@@ -709,9 +630,6 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
-        return Promise.resolve(jsonResponse({ task_id: "task-tick", status: "in_progress" }));
-      }
       if (url.endsWith("/agent-tests/run/task-tick")) {
         pollCount += 1;
         const done = pollCount >= 2;
@@ -735,12 +653,13 @@ describe("TestRunnerDialog", () => {
         agentUuid="agent-1"
         agentName="My Agent"
         tests={[makeTest()]}
+        taskId="task-tick"
+        initialRunStatus="in_progress"
       />,
     );
 
-    // Let the initial setTimeout(runAllTests, 0) fire, then flush the POST +
-    // first immediate poll, then advance past one polling interval to
-    // trigger the `setInterval` callback's own poll.
+    // Flush the immediate first poll, then advance past one polling interval
+    // to trigger the `setInterval` callback's own poll.
     await act(async () => {
       jest.advanceTimersByTime(0);
       await Promise.resolve();
@@ -783,7 +702,7 @@ describe("TestRunnerDialog", () => {
   });
 
   // NOTE: `onStatusUpdate` is gated on the `isRunning` state variable read
-  // inside `pollTaskStatus`/`runAllTests`. Both are defined once per render
+  // inside `pollTaskStatus`. It is defined once per render
   // and invoked later via `setTimeout`/`setInterval` closures set up in a
   // mount-only effect, so they always see the pre-`setIsRunning(true)`
   // value of `isRunning` (stale closure) — the callback is effectively
@@ -795,9 +714,6 @@ describe("TestRunnerDialog", () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
-      }
-      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
-        return Promise.resolve(jsonResponse({ task_id: "task-notify", status: "in_progress" }));
       }
       if (url.endsWith("/agent-tests/run/task-notify")) {
         return Promise.resolve(
@@ -827,6 +743,8 @@ describe("TestRunnerDialog", () => {
         agentUuid="agent-1"
         agentName="My Agent"
         tests={[makeTest()]}
+        taskId="task-notify"
+        initialRunStatus="in_progress"
         onStatusUpdate={onStatusUpdate}
       />,
     );
@@ -846,7 +764,7 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.reject(new Error("network down"));
       }
-      return Promise.resolve(jsonResponse({ task_id: "t", status: "in_progress", results: [] }));
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
     });
 
     render(
@@ -860,43 +778,6 @@ describe("TestRunnerDialog", () => {
     );
 
     expect(await screen.findByText("My Agent")).toBeInTheDocument();
-  });
-
-  it("passes through the runAllLinked flag by omitting test_uuids", async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string, init?: any) => {
-      if (url.includes("/evaluators?include_defaults=true")) {
-        return Promise.resolve(jsonResponse([]));
-      }
-      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
-        expect(JSON.parse(init.body)).toEqual({});
-        return Promise.resolve(jsonResponse({ task_id: "task-linked", status: "in_progress" }));
-      }
-      if (url.endsWith("/agent-tests/run/task-linked")) {
-        return Promise.resolve(
-          jsonResponse({ task_id: "task-linked", status: "in_progress", results: [] }),
-        );
-      }
-      return Promise.reject(new Error(`Unexpected fetch ${url}`));
-    });
-
-    render(
-      <TestRunnerDialog
-        isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
-        tests={[makeTest()]}
-        runAllLinked
-      />,
-    );
-
-    await waitFor(() =>
-      expect(
-        (global.fetch as jest.Mock).mock.calls.some(([url]) =>
-          String(url).endsWith("/agent-tests/agent/agent-1/run"),
-        ),
-      ).toBe(true),
-    );
   });
 
   it("seeds running rows from `tests` while viewing an in-progress run, and tears down the prior interval when taskId changes", async () => {
@@ -1001,9 +882,6 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
-        return Promise.resolve(jsonResponse({ task_id: "task-match", status: "in_progress" }));
-      }
       if (url.endsWith("/agent-tests/run/task-match")) {
         pollN += 1;
         if (pollN === 1) {
@@ -1036,6 +914,8 @@ describe("TestRunnerDialog", () => {
         agentUuid="agent-1"
         agentName="My Agent"
         tests={[makeTest()]}
+        taskId="task-match"
+        initialRunStatus="in_progress"
       />,
     );
 

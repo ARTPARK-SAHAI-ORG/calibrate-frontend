@@ -3,6 +3,7 @@ import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { signOut } from "next-auth/react";
+import { toast } from "sonner";
 import {
   useAccessToken,
   useMaxRowsPerEval,
@@ -11,6 +12,7 @@ import {
 } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { buildTestToRun } from "@/lib/testRun";
+import { startAgentTestRun } from "@/lib/agentTestRun";
 
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
@@ -367,10 +369,19 @@ export function TestsTabContent({
     "remove",
   );
 
-  // Test runner dialog state
+  // Test runner dialog state. The run is started here (not by the dialog), so
+  // `testRunTaskId` holds the uuid the backend returned and the dialog only
+  // displays that run.
   const [testRunnerOpen, setTestRunnerOpen] = useState(false);
   const [testsToRun, setTestsToRun] = useState<TestData[]>([]);
   const [runAllLinked, setRunAllLinked] = useState(false);
+  const [testRunTaskId, setTestRunTaskId] = useState<string | undefined>(
+    undefined,
+  );
+  // True while the start-run request is in flight. A ref (not state) because
+  // it only needs to gate the next click synchronously, and flipping it must
+  // not re-render the table.
+  const isStartingRunRef = useRef(false);
 
   // Verify-to-run gate. When an unverified connection agent tries to run
   // tests, we stash the intended run here and open the verify dialog instead
@@ -1070,35 +1081,79 @@ export function TestsTabContent({
     resetTestDialog();
   };
 
+  // Add the "Past runs" row for a run we just started. Takes the tests
+  // explicitly because `testsToRun` has not settled yet at the call site.
+  const addOptimisticTestRun = (taskId: string, tests: TestData[]) => {
+    const newRun: TestRun = makeOptimisticTestRun(
+      taskId,
+      tests,
+      new Date().toISOString(),
+    );
+    setPastRuns((prev) => [newRun, ...prev]);
+    // Polling is handled by the useEffect that watches pastRuns for pending items
+  };
+
+  // Actually start the run, then hand the returned uuid to the test runner.
+  // Starting the run belongs here, at the click, rather than inside the dialog:
+  // a dialog effect watching props fired the same POST over and over.
+  const beginRun = async (
+    tests: TestData[],
+    runAll: boolean,
+    onStarted?: () => void,
+  ) => {
+    // Ignore repeat clicks while the POST is in flight, so one press is one run.
+    if (isStartingRunRef.current) return;
+    isStartingRunRef.current = true;
+    try {
+      const taskId = await startAgentTestRun({
+        agentUuid,
+        testUuids: tests.map((t) => t.uuid),
+        runAllLinked: runAll,
+        accessToken: backendAccessToken,
+      });
+      // null means the session expired and the user is being signed out.
+      if (!taskId) return;
+      setTestsToRun(tests);
+      setRunAllLinked(runAll);
+      setTestRunTaskId(taskId);
+      setTestRunnerOpen(true);
+      addOptimisticTestRun(taskId, tests);
+      onStarted?.();
+    } catch (err) {
+      reportError("Error starting test run:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Failed to start test run",
+      );
+    } finally {
+      isStartingRunRef.current = false;
+    }
+  };
+
   // Single gate for every run entry point (header "Run all", bulk "Run",
   // per-row play, "Save and run", rerun). Enforces the per-run row limit and,
   // for an unverified connection agent, diverts into the verify-to-run flow
   // instead of starting a run that would fail against an unverified endpoint.
-  // Returns true only when the test runner actually opened, so callers can
-  // hold off on side effects (clearing a selection) when the run was diverted.
-  const startRun = (
+  // Anything that passes the guards goes on to `beginRun`, which starts the
+  // run and opens the test runner on its uuid.
+  const startRun = async (
     tests: TestData[],
     runAll: boolean,
     onStarted?: () => void,
-  ): boolean => {
-    if (tests.length === 0) return false;
+  ): Promise<void> => {
+    if (tests.length === 0) return;
     if (tests.length > maxRowsPerEval) {
       showLimitToast(
         `You can only run up to ${maxRowsPerEval} tests at a time.`,
       );
-      return false;
+      return;
     }
     if (isConnectionUnverified) {
       verify.dismiss();
       setPendingRun({ tests, runAll, onStarted });
       setVerifyToRunOpen(true);
-      return false;
+      return;
     }
-    setTestsToRun(tests);
-    setRunAllLinked(runAll);
-    setTestRunnerOpen(true);
-    onStarted?.();
-    return true;
+    await beginRun(tests, runAll, onStarted);
   };
 
   // "Verify" pressed in the run gate: verify the saved agent, then either
@@ -1110,11 +1165,9 @@ export function TestsTabContent({
     onConnectionVerified?.();
     setVerifyToRunOpen(false);
     if (pendingRun) {
-      setTestsToRun(pendingRun.tests);
-      setRunAllLinked(pendingRun.runAll);
-      setTestRunnerOpen(true);
-      pendingRun.onStarted?.();
+      const resumed = pendingRun;
       setPendingRun(null);
+      await beginRun(resumed.tests, resumed.runAll, resumed.onStarted);
     }
   };
 
@@ -1495,17 +1548,6 @@ export function TestsTabContent({
       testUuids,
       testNames,
     });
-  };
-
-  // Handle when a new test run is created
-  const handleTestRunCreated = (taskId: string) => {
-    const newRun: TestRun = makeOptimisticTestRun(
-      taskId,
-      testsToRun,
-      new Date().toISOString(),
-    );
-    setPastRuns((prev) => [newRun, ...prev]);
-    // Polling is handled by the useEffect that watches pastRuns for pending items
   };
 
   // Handle when a new benchmark is created. Models aren't known here (the
@@ -2749,12 +2791,13 @@ export function TestsTabContent({
           setTestRunnerOpen(false);
           setTestsToRun([]);
           setRunAllLinked(false);
+          setTestRunTaskId(undefined);
         }}
         agentUuid={agentUuid}
         agentName={agentName}
         tests={testsToRun}
+        taskId={testRunTaskId}
         runAllLinked={runAllLinked}
-        onRunCreated={handleTestRunCreated}
         onRerun={handleRerunTests}
       />
 
