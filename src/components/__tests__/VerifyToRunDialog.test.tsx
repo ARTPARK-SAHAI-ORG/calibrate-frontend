@@ -26,7 +26,7 @@ describe("VerifyToRunDialog", () => {
     render(<VerifyToRunDialog {...baseProps} onVerify={onVerify} />);
 
     expect(screen.getByText("Verify connection to run")).toBeInTheDocument();
-    expect(screen.getByText(/has not been verified yet/)).toBeInTheDocument();
+    expect(screen.getByText(/is not verified yet/)).toBeInTheDocument();
     // No jump-to-settings button until a failure.
     expect(
       screen.queryByRole("button", { name: "Go to connection settings" }),

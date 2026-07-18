@@ -38,9 +38,7 @@ export function VerifyToRunMessage({
           />
         </svg>
         <p className="text-foreground text-xs md:text-sm leading-relaxed">
-          &quot;{agentName}&quot; is a connection agent whose endpoint has not
-          been verified yet. Verify the connection before running tests against
-          it.
+          &quot;{agentName}&quot; is not verified yet.
         </p>
       </div>
     );

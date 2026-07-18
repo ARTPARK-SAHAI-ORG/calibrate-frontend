@@ -11,7 +11,7 @@ describe("VerifyToRunMessage", () => {
       />,
     );
     expect(
-      screen.getByText(/has not been verified yet/),
+      screen.getByText(/is not verified yet/),
     ).toHaveTextContent("Support Bot");
     expect(screen.queryByText("Verification failed")).not.toBeInTheDocument();
   });

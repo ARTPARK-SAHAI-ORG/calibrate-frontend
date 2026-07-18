@@ -287,7 +287,7 @@ describe("RunTestDialog", () => {
 
     // The verify gate takes over inline; the run does not fire.
     expect(
-      screen.getByText(/has not been verified yet/),
+      screen.getByText(/is not verified yet/),
     ).toBeInTheDocument();
     expect(onRunTest).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Verify" })).toBeInTheDocument();
