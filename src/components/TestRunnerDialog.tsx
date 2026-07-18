@@ -133,7 +133,6 @@ type TestRunStatusResponse = {
 type TestRunnerDialogProps = {
   isOpen: boolean;
   onClose: () => void;
-  agentUuid: string;
   agentName: string;
   tests: TestData[];
   // The run to show. This dialog never starts a run of its own: the caller
@@ -161,7 +160,6 @@ type TestRunnerDialogProps = {
 export function TestRunnerDialog({
   isOpen,
   onClose,
-  agentUuid,
   agentName,
   tests,
   taskId,

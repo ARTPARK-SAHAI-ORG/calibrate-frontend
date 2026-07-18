@@ -374,7 +374,6 @@ export function TestsTabContent({
   // displays that run.
   const [testRunnerOpen, setTestRunnerOpen] = useState(false);
   const [testsToRun, setTestsToRun] = useState<TestData[]>([]);
-  const [runAllLinked, setRunAllLinked] = useState(false);
   const [testRunTaskId, setTestRunTaskId] = useState<string | undefined>(
     undefined,
   );
@@ -1114,7 +1113,6 @@ export function TestsTabContent({
       // null means the session expired and the user is being signed out.
       if (!taskId) return;
       setTestsToRun(tests);
-      setRunAllLinked(runAll);
       setTestRunTaskId(taskId);
       setTestRunnerOpen(true);
       addOptimisticTestRun(taskId, tests);
@@ -2790,10 +2788,8 @@ export function TestsTabContent({
         onClose={() => {
           setTestRunnerOpen(false);
           setTestsToRun([]);
-          setRunAllLinked(false);
           setTestRunTaskId(undefined);
         }}
-        agentUuid={agentUuid}
         agentName={agentName}
         tests={testsToRun}
         taskId={testRunTaskId}
@@ -2836,7 +2832,6 @@ export function TestsTabContent({
             setViewingTestResults(false);
             setSelectedPastRun(null);
           }}
-          agentUuid={agentUuid}
           agentName={agentName}
           tests={
             // Convert results to TestData format for in-progress runs

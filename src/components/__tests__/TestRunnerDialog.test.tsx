@@ -113,9 +113,7 @@ describe("TestRunnerDialog", () => {
     const { container } = render(
       <TestRunnerDialog
         isOpen={false}
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
+        onClose={jest.fn()}        agentName="My Agent"
         tests={[]}
       />,
     );
@@ -136,9 +134,7 @@ describe("TestRunnerDialog", () => {
 
     const props = {
       isOpen: true,
-      onClose: jest.fn(),
-      agentUuid: "agent-1",
-      agentName: "My Agent",
+      onClose: jest.fn(),      agentName: "My Agent",
     };
     // Each render passes a brand-new array, exactly as the inline prop did.
     const { rerender } = render(
@@ -189,9 +185,7 @@ describe("TestRunnerDialog", () => {
     render(
       <TestRunnerDialog
         isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
+        onClose={jest.fn()}        agentName="My Agent"
         tests={[makeTest()]}
         taskId="task-1"
         initialRunStatus="in_progress"
@@ -245,9 +239,7 @@ describe("TestRunnerDialog", () => {
     render(
       <TestRunnerDialog
         isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
+        onClose={jest.fn()}        agentName="My Agent"
         tests={[]}
         taskId="task-existing"
         initialRunStatus="completed"
@@ -295,9 +287,7 @@ describe("TestRunnerDialog", () => {
     render(
       <TestRunnerDialog
         isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
+        onClose={jest.fn()}        agentName="My Agent"
         tests={[]}
         taskId="task-rerun"
         initialRunStatus="completed"
@@ -346,9 +336,7 @@ describe("TestRunnerDialog", () => {
     render(
       <TestRunnerDialog
         isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
+        onClose={jest.fn()}        agentName="My Agent"
         tests={[]}
         taskId="task-legacy"
         initialRunStatus="completed"
@@ -394,9 +382,7 @@ describe("TestRunnerDialog", () => {
     render(
       <TestRunnerDialog
         isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
+        onClose={jest.fn()}        agentName="My Agent"
         tests={[]}
         taskId="task-norerun"
         initialRunStatus="completed"
@@ -434,9 +420,7 @@ describe("TestRunnerDialog", () => {
     render(
       <TestRunnerDialog
         isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
+        onClose={jest.fn()}        agentName="My Agent"
         tests={[makeTest()]}
         taskId="task-err"
         initialRunStatus="in_progress"
@@ -463,9 +447,7 @@ describe("TestRunnerDialog", () => {
     render(
       <TestRunnerDialog
         isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
+        onClose={jest.fn()}        agentName="My Agent"
         tests={[makeTest()]}
         taskId="task-401"
         initialRunStatus="in_progress"
@@ -482,9 +464,7 @@ describe("TestRunnerDialog", () => {
     render(
       <TestRunnerDialog
         isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
+        onClose={jest.fn()}        agentName="My Agent"
         tests={[makeTest()]}
       />,
     );
@@ -505,9 +485,7 @@ describe("TestRunnerDialog", () => {
     render(
       <TestRunnerDialog
         isOpen
-        onClose={onClose}
-        agentUuid="agent-1"
-        agentName="My Agent"
+        onClose={onClose}        agentName="My Agent"
         tests={[makeTest()]}
       />,
     );
@@ -555,9 +533,7 @@ describe("TestRunnerDialog", () => {
       render(
         <TestRunnerDialog
           isOpen
-          onClose={jest.fn()}
-          agentUuid="agent-1"
-          agentName="My Agent"
+          onClose={jest.fn()}          agentName="My Agent"
           tests={[]}
           taskId="task-label"
           initialRunStatus="completed"
@@ -649,9 +625,7 @@ describe("TestRunnerDialog", () => {
     render(
       <TestRunnerDialog
         isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
+        onClose={jest.fn()}        agentName="My Agent"
         tests={[makeTest()]}
         taskId="task-tick"
         initialRunStatus="in_progress"
@@ -688,9 +662,7 @@ describe("TestRunnerDialog", () => {
     render(
       <TestRunnerDialog
         isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
+        onClose={jest.fn()}        agentName="My Agent"
         tests={[]}
         taskId="task-bad"
         initialRunStatus="in_progress"
@@ -739,9 +711,7 @@ describe("TestRunnerDialog", () => {
     render(
       <TestRunnerDialog
         isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
+        onClose={jest.fn()}        agentName="My Agent"
         tests={[makeTest()]}
         taskId="task-notify"
         initialRunStatus="in_progress"
@@ -770,9 +740,7 @@ describe("TestRunnerDialog", () => {
     render(
       <TestRunnerDialog
         isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
+        onClose={jest.fn()}        agentName="My Agent"
         tests={[makeTest()]}
       />,
     );
@@ -796,9 +764,7 @@ describe("TestRunnerDialog", () => {
     const { rerender } = render(
       <TestRunnerDialog
         isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
+        onClose={jest.fn()}        agentName="My Agent"
         tests={[makeTest()]}
         taskId="task-a"
         initialRunStatus="in_progress"
@@ -811,9 +777,7 @@ describe("TestRunnerDialog", () => {
     rerender(
       <TestRunnerDialog
         isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
+        onClose={jest.fn()}        agentName="My Agent"
         tests={[makeTest()]}
         taskId="task-b"
         initialRunStatus="in_progress"
@@ -859,9 +823,7 @@ describe("TestRunnerDialog", () => {
     render(
       <TestRunnerDialog
         isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
+        onClose={jest.fn()}        agentName="My Agent"
         tests={[]}
         taskId="task-fallback"
         initialRunStatus="completed"
@@ -910,9 +872,7 @@ describe("TestRunnerDialog", () => {
     render(
       <TestRunnerDialog
         isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
+        onClose={jest.fn()}        agentName="My Agent"
         tests={[makeTest()]}
         taskId="task-match"
         initialRunStatus="in_progress"
@@ -955,9 +915,7 @@ describe("TestRunnerDialog", () => {
     render(
       <TestRunnerDialog
         isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
+        onClose={jest.fn()}        agentName="My Agent"
         tests={[]}
         taskId="task-select"
         initialRunStatus="in_progress"

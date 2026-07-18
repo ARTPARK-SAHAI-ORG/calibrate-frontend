@@ -10,6 +10,7 @@ import {
   Suspense,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { signOut } from "next-auth/react";
 import { useAccessToken, useDialogUrlParam } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
@@ -602,12 +603,14 @@ function LLMPageInner() {
   // Start a run of the given tests and open the runner dialog on the run that
   // comes back. Starting the run is the caller's job, so it happens exactly
   // once per click instead of being inferred from a prop change in the dialog.
+  // Returns true only when the runner was opened, so callers can roll back any
+  // state they staged for the run.
   const startRunAndOpenRunner = async (
     agentUuid: string,
     agentName: string,
     testsForRun: TestData[],
-  ) => {
-    if (startingRunRef.current) return;
+  ): Promise<boolean> => {
+    if (startingRunRef.current) return false;
     startingRunRef.current = true;
 
     try {
@@ -618,7 +621,7 @@ function LLMPageInner() {
       });
 
       // null means the session expired and the user is being signed out.
-      if (!taskId) return;
+      if (!taskId) return false;
 
       // Optimistic row in the Runs list, the pending-run poller fills it in.
       prependOptimisticTestRun(taskId, testsForRun, agentUuid, agentName);
@@ -627,11 +630,15 @@ function LLMPageInner() {
       setTestRunnerAgentUuid(agentUuid);
       setTestRunnerAgentName(agentName);
       setTestRunnerOpen(true);
+      return true;
     } catch (err) {
+      // A failed run start is not a list-load failure, so it must not replace
+      // the tests list with the full-page error panel.
       reportError("Error starting test run:", err);
-      setTestsError(
+      toast.error(
         err instanceof Error ? err.message : "Failed to start test run"
       );
+      return false;
     } finally {
       startingRunRef.current = false;
     }
@@ -752,7 +759,10 @@ function LLMPageInner() {
     clearRunIdFromUrl();
     setTestToRun(null);
     setRerunTests(tests);
-    await startRunAndOpenRunner(agentUuid, agentName, tests);
+    const started = await startRunAndOpenRunner(agentUuid, agentName, tests);
+    // The dialog never opened, so its onClose will not run. Clear the staged
+    // rerun tests here or the next run would list these instead.
+    if (!started) setRerunTests(null);
   };
 
   // Rerun a completed benchmark with the same models and test subset (skips the
@@ -1971,7 +1981,6 @@ function LLMPageInner() {
           setRerunTests(null);
           setTestRunnerTaskId(null);
         }}
-        agentUuid={testRunnerAgentUuid}
         agentName={testRunnerAgentName}
         tests={testRunnerTests}
         taskId={testRunnerTaskId ?? undefined}
@@ -1996,7 +2005,6 @@ function LLMPageInner() {
             setSelectedRun(null);
             router.replace("/tests?tab=runs", { scroll: false });
           }}
-          agentUuid={selectedRun.agent_id}
           agentName={selectedRun.agent_name}
           tests={
             selectedRun.results?.map((r, i) => ({

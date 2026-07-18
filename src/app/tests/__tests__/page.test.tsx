@@ -5,12 +5,20 @@
  * startAgentTestRun on the click, then hands the returned run uuid to the
  * dialog, which is display only. These tests pin that contract: exactly one
  * start call per click, the dialog opens on the returned uuid, rerun starts a
- * fresh run, and a failed start leaves the dialog closed.
+ * fresh run, and a failed start leaves the dialog closed, surfaces a toast
+ * rather than tearing down the tests list, and stages no leftover rerun state.
  */
 import React from "react";
 import { render, screen, waitFor, setupUser } from "@/test-utils";
+import { toast } from "sonner";
 import TestsPage from "../page";
 import { startAgentTestRun } from "../../../lib/agentTestRun";
+
+jest.mock("sonner", () => ({
+  toast: { error: jest.fn(), success: jest.fn() },
+}));
+
+const mockToastError = toast.error as jest.MockedFunction<typeof toast.error>;
 
 // The page chrome isn't under test — render children straight through.
 jest.mock("../../../components/AppLayout", () => ({
@@ -75,9 +83,12 @@ jest.mock("../../../components/TestRunnerDialog", () => ({
     return props.isOpen ? (
       <div>
         <span data-testid="runner-task-id">{props.taskId ?? "none"}</span>
+        <span data-testid="runner-tests">
+          {props.tests.map((t) => t.name).join(",")}
+        </span>
         <button
           onClick={() =>
-            props.onRerun?.([{ uuid: "test-1", name: "First test" }])
+            props.onRerun?.([{ uuid: "test-9", name: "Rerun only test" }])
           }
         >
           mock-rerun
@@ -180,13 +191,18 @@ describe("/tests run start", () => {
     expect(mockStartAgentTestRun).toHaveBeenCalledTimes(2);
     expect(mockStartAgentTestRun).toHaveBeenLastCalledWith({
       agentUuid: "agent-1",
-      testUuids: ["test-1"],
+      testUuids: ["test-9"],
       accessToken: "test-token",
     });
+    expect(screen.getByTestId("runner-tests")).toHaveTextContent(
+      "Rerun only test",
+    );
   });
 
-  it("does not open the runner when the start call fails", async () => {
-    mockStartAgentTestRun.mockRejectedValue(new Error("Failed to start test run"));
+  it("toasts a failed start and leaves the tests list intact", async () => {
+    mockStartAgentTestRun.mockRejectedValue(
+      new Error("Failed to start test run"),
+    );
     const user = setupUser();
 
     render(<TestsPage />);
@@ -194,10 +210,41 @@ describe("/tests run start", () => {
 
     await waitFor(() => expect(mockStartAgentTestRun).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId("runner-task-id")).not.toBeInTheDocument();
-    // The failure is surfaced through the page's error state.
-    expect(
-      await screen.findByText("Failed to start test run"),
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mockToastError).toHaveBeenCalledWith("Failed to start test run"),
+    );
+    // The list survives: no full-page load-error panel, no reload prompt.
+    // The row renders twice: the desktop table and the mobile card.
+    expect(screen.getAllByText("First test").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Retry")).not.toBeInTheDocument();
+  });
+
+  it("does not carry stale rerun tests into the next run after a failed rerun", async () => {
+    mockStartAgentTestRun.mockResolvedValue("run-abc");
+    const user = setupUser();
+
+    render(<TestsPage />);
+    await runFirstTest(user);
+    await waitFor(() =>
+      expect(screen.getByTestId("runner-task-id")).toHaveTextContent("run-abc"),
+    );
+
+    // Rerun a different set of tests, and have the start fail.
+    mockStartAgentTestRun.mockRejectedValue(new Error("nope"));
+    await user.click(screen.getByText("mock-rerun"));
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith("nope"));
+
+    // The next ordinary run must list the picked test, not the failed rerun's.
+    mockStartAgentTestRun.mockResolvedValue("run-xyz");
+    await runFirstTest(user);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("runner-task-id")).toHaveTextContent("run-xyz"),
+    );
+    expect(screen.getByTestId("runner-tests")).toHaveTextContent("First test");
+    expect(screen.getByTestId("runner-tests")).not.toHaveTextContent(
+      "Rerun only test",
+    );
   });
 
   it("does not open the runner when the session expired", async () => {
