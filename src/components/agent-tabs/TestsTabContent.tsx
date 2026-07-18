@@ -380,6 +380,10 @@ export function TestsTabContent({
   const [pendingRun, setPendingRun] = useState<{
     tests: TestData[];
     runAll: boolean;
+    // Side effect the caller wants applied only once the run truly starts,
+    // e.g. the bulk action clearing its ticked rows. Carried through the
+    // verify gate so a resumed run applies it too.
+    onStarted?: () => void;
   } | null>(null);
 
   // Benchmark dialog state
@@ -1070,23 +1074,31 @@ export function TestsTabContent({
   // per-row play, "Save and run", rerun). Enforces the per-run row limit and,
   // for an unverified connection agent, diverts into the verify-to-run flow
   // instead of starting a run that would fail against an unverified endpoint.
-  const startRun = (tests: TestData[], runAll: boolean) => {
-    if (tests.length === 0) return;
+  // Returns true only when the test runner actually opened, so callers can
+  // hold off on side effects (clearing a selection) when the run was diverted.
+  const startRun = (
+    tests: TestData[],
+    runAll: boolean,
+    onStarted?: () => void,
+  ): boolean => {
+    if (tests.length === 0) return false;
     if (tests.length > maxRowsPerEval) {
       showLimitToast(
         `You can only run up to ${maxRowsPerEval} tests at a time.`,
       );
-      return;
+      return false;
     }
     if (isConnectionUnverified) {
       verify.dismiss();
-      setPendingRun({ tests, runAll });
+      setPendingRun({ tests, runAll, onStarted });
       setVerifyToRunOpen(true);
-      return;
+      return false;
     }
     setTestsToRun(tests);
     setRunAllLinked(runAll);
     setTestRunnerOpen(true);
+    onStarted?.();
+    return true;
   };
 
   // "Verify" pressed in the run gate: verify the saved agent, then either
@@ -1101,6 +1113,7 @@ export function TestsTabContent({
       setTestsToRun(pendingRun.tests);
       setRunAllLinked(pendingRun.runAll);
       setTestRunnerOpen(true);
+      pendingRun.onStarted?.();
       setPendingRun(null);
     }
   };
@@ -2274,8 +2287,12 @@ export function TestsTabContent({
                         selectedTestUuids.has(t.uuid),
                       );
                       if (selected.length === 0) return;
-                      startRun(selected, false);
-                      setSelectedTestUuids(new Set());
+                      // Keep the ticked rows if the run was diverted (verify
+                      // gate, row limit); they clear once a run really starts,
+                      // including after a resume from the verify gate.
+                      startRun(selected, false, () =>
+                        setSelectedTestUuids(new Set()),
+                      );
                     }}
                     className="h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background transition-opacity flex items-center gap-1.5 hover:opacity-90 cursor-pointer"
                   >

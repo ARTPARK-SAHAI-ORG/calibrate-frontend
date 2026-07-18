@@ -1355,4 +1355,79 @@ describe("TestsTabContent — connection agent", () => {
     expect(screen.getByTestId("test-runner-dialog")).toBeInTheDocument();
     expect(verifySavedAgentMock).not.toHaveBeenCalled();
   });
+
+  it("keeps the bulk selection when the run is diverted to the verify gate", async () => {
+    const user = setupUser();
+    state.agentTests = [responseTest, toolCallTest];
+    renderComponent({
+      agentType: "connection",
+      connectionVerified: false,
+    });
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getAllByTitle("Select test")[0]);
+    expect(screen.getByText(/test selected/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Run" }));
+
+    // The gate opened, no run started, so the ticked row must survive.
+    expect(screen.getByTestId("verify-to-run-dialog")).toBeInTheDocument();
+    expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+    expect(screen.getByText(/test selected/)).toBeInTheDocument();
+  });
+
+  it("keeps the bulk selection after the verify gate is dismissed", async () => {
+    const user = setupUser();
+    state.agentTests = [responseTest, toolCallTest];
+    renderComponent({
+      agentType: "connection",
+      connectionVerified: false,
+    });
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getAllByTitle("Select test")[0]);
+    await user.click(screen.getByRole("button", { name: "Run" }));
+    await user.click(screen.getByText("CloseVerifyToRun"));
+
+    expect(
+      screen.queryByTestId("verify-to-run-dialog"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/test selected/)).toBeInTheDocument();
+  });
+
+  it("clears the bulk selection once a resumed run starts after verifying", async () => {
+    const user = setupUser();
+    verifySavedAgentMock.mockResolvedValue(true);
+    state.agentTests = [responseTest, toolCallTest];
+    renderComponent({
+      agentType: "connection",
+      connectionVerified: false,
+    });
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getAllByTitle("Select test")[0]);
+    await user.click(screen.getByRole("button", { name: "Run" }));
+    await user.click(screen.getByText("VerifyToRun"));
+
+    await screen.findByTestId("test-runner-dialog");
+    expect(screen.getByTestId("runner-test-count")).toHaveTextContent("1");
+    expect(screen.queryByText(/test selected/)).not.toBeInTheDocument();
+  });
+
+  it("clears the bulk selection when a verified agent runs immediately", async () => {
+    const user = setupUser();
+    state.agentTests = [responseTest, toolCallTest];
+    renderComponent({
+      agentType: "connection",
+      connectionVerified: true,
+    });
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getAllByTitle("Select test")[0]);
+    await user.click(screen.getByRole("button", { name: "Run" }));
+
+    expect(screen.getByTestId("test-runner-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("runner-test-count")).toHaveTextContent("1");
+    expect(screen.queryByText(/test selected/)).not.toBeInTheDocument();
+  });
 });
