@@ -324,11 +324,25 @@ export function TestRunnerDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, taskId, backendAccessToken]);
 
-  // Start new test run when dialog opens without taskId
+  // Start new test run when dialog opens without taskId.
+  //
+  // Guarded so one dialog-open starts exactly ONE run. `taskId` is a prop and
+  // stays undefined for a fresh run (the id we get back lands in the internal
+  // `currentTaskId`), so it can't gate re-entry. Without the ref, any parent
+  // that hands us a new `tests` array identity per render — e.g. the inline
+  // `tests={testToRun ? [testToRun] : []}` on /tests — re-fires this effect on
+  // every render, and since runAllTests calls `onRunCreated` (which re-renders
+  // that parent) it loops, POSTing /run hundreds of times.
+  const autoStartedRef = useRef(false);
   useEffect(() => {
-    if (!isOpen || taskId || tests.length === 0) {
+    if (!isOpen) {
+      autoStartedRef.current = false;
       return;
     }
+    if (taskId || tests.length === 0 || autoStartedRef.current) {
+      return;
+    }
+    autoStartedRef.current = true;
 
     setSelectedTestUuid(null);
     hasAutoSelectedRef.current = false;

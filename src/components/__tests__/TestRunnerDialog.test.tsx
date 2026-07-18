@@ -122,6 +122,56 @@ describe("TestRunnerDialog", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("starts exactly one run when the parent re-renders with a fresh tests array", async () => {
+    // Regression: the parent (/tests page) built `tests` inline, so every
+    // re-render handed the dialog a new array identity. The start-run effect
+    // depends on `tests`, and its own onRunCreated re-renders that parent —
+    // which looped and fired POST /run hundreds of times.
+    const onRunCreated = jest.fn();
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
+        return Promise.resolve(
+          jsonResponse({ task_id: "task-1", status: "in_progress" }),
+        );
+      }
+      if (url.endsWith("/agent-tests/run/task-1")) {
+        return Promise.resolve(
+          jsonResponse({ task_id: "task-1", status: "in_progress", results: [] }),
+        );
+      }
+      return Promise.resolve(jsonResponse({}));
+    });
+
+    const props = {
+      isOpen: true,
+      onClose: jest.fn(),
+      agentUuid: "agent-1",
+      agentName: "My Agent",
+      onRunCreated,
+    };
+    // Each render passes a brand-new array, exactly as the inline prop did.
+    const { rerender } = render(
+      <TestRunnerDialog {...props} tests={[makeTest()]} />,
+    );
+
+    await waitFor(() => expect(onRunCreated).toHaveBeenCalledWith("task-1"));
+
+    for (let i = 0; i < 5; i++) {
+      rerender(<TestRunnerDialog {...props} tests={[makeTest()]} />);
+    }
+
+    await waitFor(() => {
+      const runCalls = (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+        String(url).endsWith("/agent-tests/agent/agent-1/run"),
+      );
+      expect(runCalls).toHaveLength(1);
+    });
+    expect(onRunCreated).toHaveBeenCalledTimes(1);
+  });
+
   it("starts a new run, polls, and lands on the summary tab when done", async () => {
     const onRunCreated = jest.fn();
     (global.fetch as jest.Mock).mockImplementation((url: string) => {

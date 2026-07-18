@@ -1,7 +1,14 @@
 "use client";
 import { reportError } from "@/lib/reportError";
 
-import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  Suspense,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useAccessToken, useDialogUrlParam } from "@/hooks";
@@ -250,6 +257,15 @@ function LLMPageInner() {
   // When set, the test runner is rerunning this set of tests (from the "Rerun"
   // action on a viewed run) rather than the single `testToRun`.
   const [rerunTests, setRerunTests] = useState<TestData[] | null>(null);
+
+  // Memoised so the runner dialog receives a STABLE array. Built inline it was
+  // a fresh identity every render, which re-triggered the dialog's start-run
+  // effect (that effect's onRunCreated re-renders this page, so it looped and
+  // fired POST /run repeatedly).
+  const testRunnerTests = useMemo(
+    () => rerunTests ?? (testToRun ? [testToRun] : []),
+    [rerunTests, testToRun],
+  );
   // Direct benchmark rerun (fresh benchmark, same models + test subset, no
   // picker).
   const benchmarkRerun = useBenchmarkRerun();
@@ -1918,11 +1934,11 @@ function LLMPageInner() {
         }}
         agentUuid={testRunnerAgentUuid}
         agentName={testRunnerAgentName}
-        tests={rerunTests ?? (testToRun ? [testToRun] : [])}
+        tests={testRunnerTests}
         onRunCreated={(taskId) =>
           prependOptimisticTestRun(
             taskId,
-            rerunTests ?? (testToRun ? [testToRun] : []),
+            testRunnerTests,
             testRunnerAgentUuid,
             testRunnerAgentName,
           )
