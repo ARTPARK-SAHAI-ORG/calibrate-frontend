@@ -682,7 +682,6 @@ describe("TestsTabContent — populated table", () => {
     await screen.findByTestId("test-runner-dialog");
     expect(screen.getByTestId("runner-test-count")).toHaveTextContent("2");
     expect(testRunnerProps.taskId).toBe("new-run-1");
-    expect(testRunnerProps.runAllLinked).toBe(true);
     // "Run all" defers the test selection to the backend, so no test_uuids.
     expect(startRunCalls()).toHaveLength(1);
     expect(JSON.parse(startRunCalls()[0][1].body)).toEqual({});
@@ -1240,7 +1239,6 @@ describe("TestsTabContent — benchmark & past runs", () => {
     await screen.findByTestId("test-runner-dialog");
     expect(screen.getByTestId("runner-test-count")).toHaveTextContent("2");
     expect(testRunnerProps.taskId).toBe("new-run-1");
-    expect(testRunnerProps.runAllLinked).toBe(false);
     expect(startRunCalls()).toHaveLength(1);
     expect(testRunnerProps.tests.map((t: { uuid: string }) => t.uuid)).toEqual([
       "real-1",

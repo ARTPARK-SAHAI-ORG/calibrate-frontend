@@ -2797,7 +2797,6 @@ export function TestsTabContent({
         agentName={agentName}
         tests={testsToRun}
         taskId={testRunTaskId}
-        runAllLinked={runAllLinked}
         onRerun={handleRerunTests}
       />
 
