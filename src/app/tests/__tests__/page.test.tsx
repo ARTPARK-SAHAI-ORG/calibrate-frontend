@@ -3,10 +3,11 @@
  *
  * The page (not TestRunnerDialog) starts an agent test run: it calls
  * startAgentTestRun on the click, then hands the returned run uuid to the
- * dialog, which is display only. These tests pin that contract: exactly one
- * start call per click, the dialog opens on the returned uuid, rerun starts a
- * fresh run, and a failed start leaves the dialog closed, surfaces a toast
- * rather than tearing down the tests list, and stages no leftover rerun state.
+ * dialog, which is display only: it renders from what the server returns for
+ * that uuid, so the page passes it no test list. These tests pin that contract:
+ * exactly one start call per click, the dialog opens on the returned uuid,
+ * rerun starts a fresh run, and a failed start leaves the dialog closed,
+ * surfacing a toast rather than tearing down the tests list.
  */
 import React from "react";
 import { render, screen, waitFor, setupUser } from "@/test-utils";
@@ -72,7 +73,6 @@ jest.mock("../../../components/BulkUploadTestsModal", () => ({
 type RunnerProps = {
   isOpen: boolean;
   taskId?: string;
-  tests: { uuid: string; name: string }[];
   onRerun?: (tests: { uuid: string; name: string }[]) => void;
 };
 let runnerOpenLog: RunnerProps[] = [];
@@ -83,9 +83,6 @@ jest.mock("../../../components/TestRunnerDialog", () => ({
     return props.isOpen ? (
       <div>
         <span data-testid="runner-task-id">{props.taskId ?? "none"}</span>
-        <span data-testid="runner-tests">
-          {props.tests.map((t) => t.name).join(",")}
-        </span>
         <button
           onClick={() =>
             props.onRerun?.([{ uuid: "test-9", name: "Rerun only test" }])
@@ -194,9 +191,6 @@ describe("/tests run start", () => {
       testUuids: ["test-9"],
       accessToken: "test-token",
     });
-    expect(screen.getByTestId("runner-tests")).toHaveTextContent(
-      "Rerun only test",
-    );
   });
 
   it("toasts a failed start and leaves the tests list intact", async () => {
@@ -219,7 +213,7 @@ describe("/tests run start", () => {
     expect(screen.queryByText("Retry")).not.toBeInTheDocument();
   });
 
-  it("does not carry stale rerun tests into the next run after a failed rerun", async () => {
+  it("opens the next run on its own uuid after a failed rerun", async () => {
     mockStartAgentTestRun.mockResolvedValue("run-abc");
     const user = setupUser();
 
@@ -234,17 +228,18 @@ describe("/tests run start", () => {
     await user.click(screen.getByText("mock-rerun"));
     await waitFor(() => expect(mockToastError).toHaveBeenCalledWith("nope"));
 
-    // The next ordinary run must list the picked test, not the failed rerun's.
+    // A failed start never swaps the run under the dialog, so it still shows
+    // the run it was opened on.
+    expect(screen.getByTestId("runner-task-id")).toHaveTextContent("run-abc");
+
+    // The next ordinary run opens on the fresh uuid, not the previous one.
     mockStartAgentTestRun.mockResolvedValue("run-xyz");
     await runFirstTest(user);
 
     await waitFor(() =>
       expect(screen.getByTestId("runner-task-id")).toHaveTextContent("run-xyz"),
     );
-    expect(screen.getByTestId("runner-tests")).toHaveTextContent("First test");
-    expect(screen.getByTestId("runner-tests")).not.toHaveTextContent(
-      "Rerun only test",
-    );
+    expect(mockStartAgentTestRun).toHaveBeenCalledTimes(3);
   });
 
   it("does not open the runner when the session expired", async () => {

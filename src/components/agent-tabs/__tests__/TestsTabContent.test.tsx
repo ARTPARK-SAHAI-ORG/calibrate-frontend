@@ -180,7 +180,6 @@ jest.mock("../../TestRunnerDialog", () => ({
     testRunnerProps = props;
     return props.isOpen ? (
       <div data-testid="test-runner-dialog">
-        <div data-testid="runner-test-count">{props.tests.length}</div>
         <button
           onClick={() =>
             props.onStatusUpdate?.("run-pending", "completed", [], 1, 0)
@@ -664,7 +663,6 @@ describe("TestsTabContent — populated table", () => {
 
     await user.click(screen.getAllByTitle("Run test")[0]);
     await screen.findByTestId("test-runner-dialog");
-    expect(screen.getByTestId("runner-test-count")).toHaveTextContent("1");
     // The caller starts the run and hands the dialog the resulting uuid.
     expect(testRunnerProps.taskId).toBe("new-run-1");
     expect(startRunCalls()).toHaveLength(1);
@@ -680,7 +678,6 @@ describe("TestsTabContent — populated table", () => {
 
     await user.click(screen.getByText("Run all tests"));
     await screen.findByTestId("test-runner-dialog");
-    expect(screen.getByTestId("runner-test-count")).toHaveTextContent("2");
     expect(testRunnerProps.taskId).toBe("new-run-1");
     // "Run all" defers the test selection to the backend, so no test_uuids.
     expect(startRunCalls()).toHaveLength(1);
@@ -1234,16 +1231,14 @@ describe("TestsTabContent — benchmark & past runs", () => {
       ]);
     });
 
-    // The fresh new-run dialog is open with both tests and not run-all-linked,
-    // showing the uuid of the run the rerun just started.
+    // The fresh new-run dialog is open on the run the rerun just started, and
+    // the run was started for both tests, not run-all-linked.
     await screen.findByTestId("test-runner-dialog");
-    expect(screen.getByTestId("runner-test-count")).toHaveTextContent("2");
     expect(testRunnerProps.taskId).toBe("new-run-1");
     expect(startRunCalls()).toHaveLength(1);
-    expect(testRunnerProps.tests.map((t: { uuid: string }) => t.uuid)).toEqual([
-      "real-1",
-      "real-2",
-    ]);
+    expect(JSON.parse(startRunCalls()[0][1].body)).toEqual({
+      test_uuids: ["real-1", "real-2"],
+    });
   });
 
   it("reruns a benchmark: opens a direct benchmark dialog with the given models, no picker", async () => {
@@ -1381,9 +1376,10 @@ describe("TestsTabContent — connection agent", () => {
     ).not.toBeInTheDocument();
     const runner = await screen.findByTestId("test-runner-dialog");
     expect(runner).toBeInTheDocument();
-    expect(screen.getByTestId("runner-test-count")).toHaveTextContent("1");
-    // The resumed run goes through the same start call, exactly once.
+    // The resumed run goes through the same start call, exactly once, and
+    // keeps the pending "run all" shape.
     expect(startRunCalls()).toHaveLength(1);
+    expect(JSON.parse(startRunCalls()[0][1].body)).toEqual({});
     expect(testRunnerProps.taskId).toBe("new-run-1");
   });
 
@@ -1521,7 +1517,9 @@ describe("TestsTabContent — connection agent", () => {
     await user.click(screen.getByText("VerifyToRun"));
 
     await screen.findByTestId("test-runner-dialog");
-    expect(screen.getByTestId("runner-test-count")).toHaveTextContent("1");
+    expect(JSON.parse(startRunCalls()[0][1].body)).toEqual({
+      test_uuids: ["t1"],
+    });
     expect(screen.queryByText(/test selected/)).not.toBeInTheDocument();
   });
 
@@ -1538,7 +1536,9 @@ describe("TestsTabContent — connection agent", () => {
     await user.click(screen.getByRole("button", { name: "Run" }));
 
     expect(screen.getByTestId("test-runner-dialog")).toBeInTheDocument();
-    expect(screen.getByTestId("runner-test-count")).toHaveTextContent("1");
+    expect(JSON.parse(startRunCalls()[0][1].body)).toEqual({
+      test_uuids: ["t1"],
+    });
     expect(screen.queryByText(/test selected/)).not.toBeInTheDocument();
   });
 });

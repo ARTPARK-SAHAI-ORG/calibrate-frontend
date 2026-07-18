@@ -35,23 +35,11 @@ jest.mock("../../../lib/reportError", () => ({
   reportError: jest.fn(),
 }));
 
-// Renders a marker only while open, listing the tests it was handed to run —
-// lets the parent-side "save and run" flow be asserted end-to-end.
+// Renders a marker only while open. The dialog now loads its own results from
+// the run, so which test was run is asserted on the start-run request body.
 jest.mock("../../TestRunnerDialog", () => ({
-  TestRunnerDialog: ({
-    isOpen,
-    tests,
-  }: {
-    isOpen: boolean;
-    tests: Array<{ uuid: string; name: string }>;
-  }) =>
-    isOpen ? (
-      <div data-testid="test-runner">
-        {tests.map((t) => (
-          <span key={t.uuid}>runner:{t.name}</span>
-        ))}
-      </div>
-    ) : null,
+  TestRunnerDialog: ({ isOpen }: { isOpen: boolean }) =>
+    isOpen ? <div data-testid="test-runner" /> : null,
 }));
 jest.mock("../../BenchmarkDialog", () => ({
   BenchmarkDialog: () => null,
@@ -172,6 +160,15 @@ const existingAgentTest = {
   updated_at: "2026-01-01T00:00:00Z",
 };
 
+// The uuids the run was started for, read off the start-run POST body.
+function startedTestUuids() {
+  const call = (global.fetch as jest.Mock).mock.calls.find(
+    ([url, init]) =>
+      init?.method === "POST" && String(url).endsWith(`/${AGENT_UUID}/run`),
+  );
+  return call ? JSON.parse(call[1].body).test_uuids : undefined;
+}
+
 function jsonResponse(data: unknown, ok = true, status = 200) {
   return { ok, status, json: async () => data };
 }
@@ -282,10 +279,10 @@ describe("TestsTabContent save-and-run shortcut", () => {
     await user.click(screen.getByRole("button", { name: "Create test" }));
     await user.click(screen.getByRole("button", { name: "Submit and run" }));
 
-    // The runner opens with the created test; the defaults prompt never shows.
-    expect(await screen.findByTestId("test-runner")).toHaveTextContent(
-      "runner:Saved test",
-    );
+    // The runner opens on a run started for the created test; the defaults
+    // prompt never shows.
+    expect(await screen.findByTestId("test-runner")).toBeInTheDocument();
+    expect(startedTestUuids()).toEqual(["test-saved"]);
     expect(
       screen.queryByRole("heading", { name: "Update default evaluators?" }),
     ).not.toBeInTheDocument();
@@ -306,9 +303,8 @@ describe("TestsTabContent save-and-run shortcut", () => {
       within(dialog).getByRole("button", { name: "Submit and run" }),
     );
 
-    expect(await screen.findByTestId("test-runner")).toHaveTextContent(
-      "runner:Refund test",
-    );
+    expect(await screen.findByTestId("test-runner")).toBeInTheDocument();
+    expect(startedTestUuids()).toEqual(["test-1"]);
     expect(
       screen.queryByRole("heading", { name: "Update default evaluators?" }),
     ).not.toBeInTheDocument();
@@ -325,10 +321,9 @@ describe("TestsTabContent save-and-run shortcut", () => {
     const dialog = await screen.findByTestId("add-test-dialog");
     await user.click(within(dialog).getByRole("button", { name: "Run directly" }));
 
-    // The runner opens with the saved test; no PUT was issued (no save).
-    expect(await screen.findByTestId("test-runner")).toHaveTextContent(
-      "runner:Refund test",
-    );
+    // The runner opens on a run for the saved test; no PUT was issued (no save).
+    expect(await screen.findByTestId("test-runner")).toBeInTheDocument();
+    expect(startedTestUuids()).toEqual(["test-1"]);
     const puts = (global.fetch as jest.Mock).mock.calls.filter(
       ([, init]) => init?.method === "PUT",
     );
@@ -382,9 +377,8 @@ describe("TestsTabContent save-and-run shortcut", () => {
       within(dialog).getByRole("button", { name: "Submit and run" }),
     );
 
-    expect(await screen.findByTestId("test-runner")).toHaveTextContent(
-      "runner:Refund test",
-    );
+    expect(await screen.findByTestId("test-runner")).toBeInTheDocument();
+    expect(startedTestUuids()).toEqual(["test-1"]);
   });
 
   it("falls back to the defaults prompt when the create response has no uuid", async () => {

@@ -6,7 +6,6 @@ import {
   useEffect,
   useRef,
   useCallback,
-  useMemo,
   Suspense,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -256,9 +255,6 @@ function LLMPageInner() {
   const [testRunnerOpen, setTestRunnerOpen] = useState(false);
   const [testRunnerAgentUuid, setTestRunnerAgentUuid] = useState<string>("");
   const [testRunnerAgentName, setTestRunnerAgentName] = useState<string>("");
-  // When set, the test runner is rerunning this set of tests (from the "Rerun"
-  // action on a viewed run) rather than the single `testToRun`.
-  const [rerunTests, setRerunTests] = useState<TestData[] | null>(null);
   // The run this page started for the runner dialog to display. The page owns
   // starting the run, the dialog only shows it.
   const [testRunnerTaskId, setTestRunnerTaskId] = useState<string | null>(null);
@@ -266,11 +262,6 @@ function LLMPageInner() {
   // second click cannot fire a duplicate run.
   const startingRunRef = useRef(false);
 
-  // Memoised so the runner dialog receives a stable array across re-renders.
-  const testRunnerTests = useMemo(
-    () => rerunTests ?? (testToRun ? [testToRun] : []),
-    [rerunTests, testToRun],
-  );
   // Direct benchmark rerun (fresh benchmark, same models + test subset, no
   // picker).
   const benchmarkRerun = useBenchmarkRerun();
@@ -603,14 +594,12 @@ function LLMPageInner() {
   // Start a run of the given tests and open the runner dialog on the run that
   // comes back. Starting the run is the caller's job, so it happens exactly
   // once per click instead of being inferred from a prop change in the dialog.
-  // Returns true only when the runner was opened, so callers can roll back any
-  // state they staged for the run.
   const startRunAndOpenRunner = async (
     agentUuid: string,
     agentName: string,
     testsForRun: TestData[],
-  ): Promise<boolean> => {
-    if (startingRunRef.current) return false;
+  ) => {
+    if (startingRunRef.current) return;
     startingRunRef.current = true;
 
     try {
@@ -621,7 +610,7 @@ function LLMPageInner() {
       });
 
       // null means the session expired and the user is being signed out.
-      if (!taskId) return false;
+      if (!taskId) return;
 
       // Optimistic row in the Runs list, the pending-run poller fills it in.
       prependOptimisticTestRun(taskId, testsForRun, agentUuid, agentName);
@@ -630,7 +619,6 @@ function LLMPageInner() {
       setTestRunnerAgentUuid(agentUuid);
       setTestRunnerAgentName(agentName);
       setTestRunnerOpen(true);
-      return true;
     } catch (err) {
       // A failed run start is not a list-load failure, so it must not replace
       // the tests list with the full-page error panel.
@@ -638,7 +626,6 @@ function LLMPageInner() {
       toast.error(
         err instanceof Error ? err.message : "Failed to start test run"
       );
-      return false;
     } finally {
       startingRunRef.current = false;
     }
@@ -758,11 +745,7 @@ function LLMPageInner() {
     setSelectedRun(null);
     clearRunIdFromUrl();
     setTestToRun(null);
-    setRerunTests(tests);
-    const started = await startRunAndOpenRunner(agentUuid, agentName, tests);
-    // The dialog never opened, so its onClose will not run. Clear the staged
-    // rerun tests here or the next run would list these instead.
-    if (!started) setRerunTests(null);
+    await startRunAndOpenRunner(agentUuid, agentName, tests);
   };
 
   // Rerun a completed benchmark with the same models and test subset (skips the
@@ -1978,11 +1961,9 @@ function LLMPageInner() {
         onClose={() => {
           setTestRunnerOpen(false);
           setTestToRun(null);
-          setRerunTests(null);
           setTestRunnerTaskId(null);
         }}
         agentName={testRunnerAgentName}
-        tests={testRunnerTests}
         taskId={testRunnerTaskId ?? undefined}
         onRerun={(tests) =>
           handleRerunTests(testRunnerAgentUuid, testRunnerAgentName, tests)
@@ -2006,17 +1987,6 @@ function LLMPageInner() {
             router.replace("/tests?tab=runs", { scroll: false });
           }}
           agentName={selectedRun.agent_name}
-          tests={
-            selectedRun.results?.map((r, i) => ({
-              uuid: `run-test-${i}`,
-              name: r.name || r.test_case?.name || `Test ${i + 1}`,
-              description: "",
-              type: "response" as const,
-              config: {},
-              created_at: "",
-              updated_at: "",
-            })) || []
-          }
           taskId={selectedRun.uuid}
           initialRunStatus={selectedRun.status}
           onRerun={(tests) =>

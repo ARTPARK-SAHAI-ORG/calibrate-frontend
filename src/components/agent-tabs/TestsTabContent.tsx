@@ -373,7 +373,6 @@ export function TestsTabContent({
   // `testRunTaskId` holds the uuid the backend returned and the dialog only
   // displays that run.
   const [testRunnerOpen, setTestRunnerOpen] = useState(false);
-  const [testsToRun, setTestsToRun] = useState<TestData[]>([]);
   const [testRunTaskId, setTestRunTaskId] = useState<string | undefined>(
     undefined,
   );
@@ -1081,7 +1080,7 @@ export function TestsTabContent({
   };
 
   // Add the "Past runs" row for a run we just started. Takes the tests
-  // explicitly because `testsToRun` has not settled yet at the call site.
+  // explicitly, from the click that started the run.
   const addOptimisticTestRun = (taskId: string, tests: TestData[]) => {
     const newRun: TestRun = makeOptimisticTestRun(
       taskId,
@@ -1112,7 +1111,6 @@ export function TestsTabContent({
       });
       // null means the session expired and the user is being signed out.
       if (!taskId) return;
-      setTestsToRun(tests);
       setTestRunTaskId(taskId);
       setTestRunnerOpen(true);
       addOptimisticTestRun(taskId, tests);
@@ -2787,11 +2785,9 @@ export function TestsTabContent({
         isOpen={testRunnerOpen}
         onClose={() => {
           setTestRunnerOpen(false);
-          setTestsToRun([]);
           setTestRunTaskId(undefined);
         }}
         agentName={agentName}
-        tests={testsToRun}
         taskId={testRunTaskId}
         onRerun={handleRerunTests}
       />
@@ -2833,18 +2829,6 @@ export function TestsTabContent({
             setSelectedPastRun(null);
           }}
           agentName={agentName}
-          tests={
-            // Convert results to TestData format for in-progress runs
-            selectedPastRun.results?.map((r, i) => ({
-              uuid: `past-run-test-${i}`,
-              name: r.name || r.test_case?.name || `Test ${i + 1}`,
-              description: "",
-              type: "response" as const,
-              config: {},
-              created_at: "",
-              updated_at: "",
-            })) || []
-          }
           taskId={selectedPastRun.uuid}
           initialRunStatus={selectedPastRun.status}
           onStatusUpdate={handleRunStatusUpdate}

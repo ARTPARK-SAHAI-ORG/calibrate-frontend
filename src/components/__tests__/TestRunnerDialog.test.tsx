@@ -72,19 +72,6 @@ jest.mock("sonner", () => ({
 
 const BACKEND_URL = "http://backend.test";
 
-function makeTest(overrides: Partial<any> = {}) {
-  return {
-    uuid: "test-1",
-    name: "Test One",
-    description: "",
-    type: "response",
-    config: {},
-    created_at: "",
-    updated_at: "",
-    ...overrides,
-  };
-}
-
 function jsonResponse(body: any, ok = true, status = ok ? 200 : 500) {
   return {
     ok,
@@ -114,7 +101,6 @@ describe("TestRunnerDialog", () => {
       <TestRunnerDialog
         isOpen={false}
         onClose={jest.fn()}        agentName="My Agent"
-        tests={[]}
       />,
     );
     expect(container).toBeEmptyDOMElement();
@@ -136,12 +122,12 @@ describe("TestRunnerDialog", () => {
       isOpen: true,
       onClose: jest.fn(),      agentName: "My Agent",
     };
-    // Each render passes a brand-new array, exactly as the inline prop did.
+    // Re-render repeatedly with fresh prop identities; none of it may fire a run.
     const { rerender } = render(
-      <TestRunnerDialog {...props} tests={[makeTest()]} />,
+      <TestRunnerDialog {...props} onStatusUpdate={jest.fn()} />,
     );
     for (let i = 0; i < 5; i++) {
-      rerender(<TestRunnerDialog {...props} tests={[makeTest()]} />);
+      rerender(<TestRunnerDialog {...props} onStatusUpdate={jest.fn()} />);
     }
 
     expect(await screen.findByText("Test run")).toBeInTheDocument();
@@ -186,7 +172,6 @@ describe("TestRunnerDialog", () => {
       <TestRunnerDialog
         isOpen
         onClose={jest.fn()}        agentName="My Agent"
-        tests={[makeTest()]}
         taskId="task-1"
         initialRunStatus="in_progress"
       />,
@@ -240,7 +225,6 @@ describe("TestRunnerDialog", () => {
       <TestRunnerDialog
         isOpen
         onClose={jest.fn()}        agentName="My Agent"
-        tests={[]}
         taskId="task-existing"
         initialRunStatus="completed"
       />,
@@ -288,7 +272,6 @@ describe("TestRunnerDialog", () => {
       <TestRunnerDialog
         isOpen
         onClose={jest.fn()}        agentName="My Agent"
-        tests={[]}
         taskId="task-rerun"
         initialRunStatus="completed"
         onRerun={onRerun}
@@ -337,7 +320,6 @@ describe("TestRunnerDialog", () => {
       <TestRunnerDialog
         isOpen
         onClose={jest.fn()}        agentName="My Agent"
-        tests={[]}
         taskId="task-legacy"
         initialRunStatus="completed"
         onRerun={onRerun}
@@ -383,7 +365,6 @@ describe("TestRunnerDialog", () => {
       <TestRunnerDialog
         isOpen
         onClose={jest.fn()}        agentName="My Agent"
-        tests={[]}
         taskId="task-norerun"
         initialRunStatus="completed"
       />,
@@ -421,7 +402,6 @@ describe("TestRunnerDialog", () => {
       <TestRunnerDialog
         isOpen
         onClose={jest.fn()}        agentName="My Agent"
-        tests={[makeTest()]}
         taskId="task-err"
         initialRunStatus="in_progress"
       />,
@@ -448,7 +428,6 @@ describe("TestRunnerDialog", () => {
       <TestRunnerDialog
         isOpen
         onClose={jest.fn()}        agentName="My Agent"
-        tests={[makeTest()]}
         taskId="task-401"
         initialRunStatus="in_progress"
       />,
@@ -465,7 +444,6 @@ describe("TestRunnerDialog", () => {
       <TestRunnerDialog
         isOpen
         onClose={jest.fn()}        agentName="My Agent"
-        tests={[makeTest()]}
       />,
     );
     // Nothing to await on network; just ensure it doesn't throw and dialog renders.
@@ -486,7 +464,6 @@ describe("TestRunnerDialog", () => {
       <TestRunnerDialog
         isOpen
         onClose={onClose}        agentName="My Agent"
-        tests={[makeTest()]}
       />,
     );
     const buttons = screen.getAllByRole("button");
@@ -534,7 +511,6 @@ describe("TestRunnerDialog", () => {
         <TestRunnerDialog
           isOpen
           onClose={jest.fn()}          agentName="My Agent"
-          tests={[]}
           taskId="task-label"
           initialRunStatus="completed"
         />,
@@ -626,7 +602,6 @@ describe("TestRunnerDialog", () => {
       <TestRunnerDialog
         isOpen
         onClose={jest.fn()}        agentName="My Agent"
-        tests={[makeTest()]}
         taskId="task-tick"
         initialRunStatus="in_progress"
       />,
@@ -663,7 +638,6 @@ describe("TestRunnerDialog", () => {
       <TestRunnerDialog
         isOpen
         onClose={jest.fn()}        agentName="My Agent"
-        tests={[]}
         taskId="task-bad"
         initialRunStatus="in_progress"
       />,
@@ -712,7 +686,6 @@ describe("TestRunnerDialog", () => {
       <TestRunnerDialog
         isOpen
         onClose={jest.fn()}        agentName="My Agent"
-        tests={[makeTest()]}
         taskId="task-notify"
         initialRunStatus="in_progress"
         onStatusUpdate={onStatusUpdate}
@@ -741,14 +714,13 @@ describe("TestRunnerDialog", () => {
       <TestRunnerDialog
         isOpen
         onClose={jest.fn()}        agentName="My Agent"
-        tests={[makeTest()]}
       />,
     );
 
     expect(await screen.findByText("My Agent")).toBeInTheDocument();
   });
 
-  it("seeds running rows from `tests` while viewing an in-progress run, and tears down the prior interval when taskId changes", async () => {
+  it("shows a loading state instead of fabricated rows until the first poll lands, and tears down the prior interval when taskId changes", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
@@ -765,20 +737,29 @@ describe("TestRunnerDialog", () => {
       <TestRunnerDialog
         isOpen
         onClose={jest.fn()}        agentName="My Agent"
-        tests={[makeTest()]}
         taskId="task-a"
         initialRunStatus="in_progress"
       />,
     );
 
-    // tests.length > 0 seeds one running row immediately, before the first poll resolves.
-    expect(screen.getByText(/Test One:running/)).toBeInTheDocument();
+    // Nothing is fabricated before the first poll resolves: the dialog shows
+    // its loading state and renders no outputs panel at all.
+    expect(screen.getByText("Loading results")).toBeInTheDocument();
+    expect(screen.queryByTestId("outputs-panel")).not.toBeInTheDocument();
+    // A poll that carries no results keeps the loading state up.
+    await waitFor(() =>
+      expect(
+        (global.fetch as jest.Mock).mock.calls.some(([url]) =>
+          String(url).endsWith("/agent-tests/run/task-a"),
+        ),
+      ).toBe(true),
+    );
+    expect(screen.getByText("Loading results")).toBeInTheDocument();
 
     rerender(
       <TestRunnerDialog
         isOpen
         onClose={jest.fn()}        agentName="My Agent"
-        tests={[makeTest()]}
         taskId="task-b"
         initialRunStatus="in_progress"
       />,
@@ -824,7 +805,6 @@ describe("TestRunnerDialog", () => {
       <TestRunnerDialog
         isOpen
         onClose={jest.fn()}        agentName="My Agent"
-        tests={[]}
         taskId="task-fallback"
         initialRunStatus="completed"
       />,
@@ -838,7 +818,7 @@ describe("TestRunnerDialog", () => {
     expect(screen.getByText(/Unknown Test:failed/)).toBeInTheDocument();
   });
 
-  it("matches subsequent poll rows by name, then falls back to index matching and the in-progress running transition", async () => {
+  it("rebuilds rows from each poll and keeps them when a later poll carries no results", async () => {
     let pollN = 0;
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
@@ -847,22 +827,26 @@ describe("TestRunnerDialog", () => {
       if (url.endsWith("/agent-tests/run/task-match")) {
         pollN += 1;
         if (pollN === 1) {
-          // No uuid match (different uuid) but a name match -> hits the
-          // name-matching branch.
+          // Partial results while the run is still in progress.
           return Promise.resolve(
             jsonResponse({
               task_id: "task-match",
               status: "in_progress",
               results: [
-                { test_uuid: "other-uuid", name: "Test One", status: "running", passed: null },
+                {
+                  test_uuid: "test-1",
+                  name: "Test One",
+                  status: "running",
+                  passed: null,
+                },
               ],
             }),
           );
         }
-        // Second/final poll: no matching row at all -> stays running via the
-        // in_progress/queued-or-pending branch, then "done" to stop polling.
+        // Later polls omit the results array entirely; the rows we already
+        // have must survive them.
         return Promise.resolve(
-          jsonResponse({ task_id: "task-match", status: "done", results: [] }),
+          jsonResponse({ task_id: "task-match", status: "in_progress" }),
         );
       }
       return Promise.reject(new Error(`Unexpected fetch ${url}`));
@@ -872,8 +856,8 @@ describe("TestRunnerDialog", () => {
     render(
       <TestRunnerDialog
         isOpen
-        onClose={jest.fn()}        agentName="My Agent"
-        tests={[makeTest()]}
+        onClose={jest.fn()}
+        agentName="My Agent"
         taskId="task-match"
         initialRunStatus="in_progress"
       />,
@@ -884,6 +868,9 @@ describe("TestRunnerDialog", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
+    // The first poll's row is rendered as running.
+    expect(screen.getByText(/Test One:running/)).toBeInTheDocument();
+
     await act(async () => {
       jest.advanceTimersByTime(3000);
       await Promise.resolve();
@@ -891,6 +878,8 @@ describe("TestRunnerDialog", () => {
     });
 
     expect(pollN).toBeGreaterThanOrEqual(2);
+    // Still there after the results-less poll.
+    expect(screen.getByTestId("results-count")).toHaveTextContent("1");
   });
 
   it("selects a test from the outputs panel", async () => {
@@ -916,7 +905,6 @@ describe("TestRunnerDialog", () => {
       <TestRunnerDialog
         isOpen
         onClose={jest.fn()}        agentName="My Agent"
-        tests={[]}
         taskId="task-select"
         initialRunStatus="in_progress"
       />,

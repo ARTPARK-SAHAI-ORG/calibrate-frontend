@@ -134,7 +134,6 @@ type TestRunnerDialogProps = {
   isOpen: boolean;
   onClose: () => void;
   agentName: string;
-  tests: TestData[];
   // The run to show. This dialog never starts a run of its own: the caller
   // starts it (see `startAgentTestRun` in `@/lib/agentTestRun`) and hands the
   // returned uuid down here. Without it the dialog only renders its shell.
@@ -161,7 +160,6 @@ export function TestRunnerDialog({
   isOpen,
   onClose,
   agentName,
-  tests,
   taskId,
   initialRunStatus,
   onStatusUpdate,
@@ -175,6 +173,10 @@ export function TestRunnerDialog({
   const [selectedTestUuid, setSelectedTestUuid] = useState<string | null>(null);
   const [nav, setNav] = useState<PagerNav | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  // True between opening a run and the first poll landing. The rows are built
+  // entirely from the poll response, so until it arrives there is nothing to
+  // render and we show a spinner instead of fabricating placeholder rows.
+  const [isLoadingResults, setIsLoadingResults] = useState(false);
   const [runStatus, setRunStatus] = useState<
     "queued" | "in_progress" | "done" | "failed"
   >("queued");
@@ -293,16 +295,17 @@ export function TestRunnerDialog({
 
     setIsRunning(isInProgress);
 
-    if (initialRunStatus === "done" || initialRunStatus === "completed") {
-      setTestResults([]);
-      setRunStatus("done");
-    } else if (tests.length > 0) {
-      setTestResults(tests.map((test) => ({ test, status: "running" })));
-      setRunStatus("in_progress");
-    } else {
-      setTestResults([]);
-      setRunStatus("queued");
-    }
+    // Rows come only from the poll response, so start empty and show the
+    // loading state until the first one lands.
+    setTestResults([]);
+    setIsLoadingResults(true);
+    setRunStatus(
+      initialRunStatus === "done" || initialRunStatus === "completed"
+        ? "done"
+        : isInProgress
+          ? "in_progress"
+          : "queued",
+    );
 
     // Always fetch once immediately
     pollTaskStatus(taskId, backendUrl);
@@ -391,98 +394,58 @@ export function TestRunnerDialog({
             : "failed";
         };
 
-        // If we're viewing a past run and have no previous results, build from API response
-        if (prev.length === 0 && result.results && result.results.length > 0) {
-          return result.results.map((apiResult, index) => {
-            const testStatus = getTestStatus(apiResult);
-            // Get test name from name (in-progress), test_case.name, or test_name field
-            const testName =
-              apiResult.name ||
-              apiResult.test_case?.name ||
-              apiResult.test_name ||
-              "Unknown Test";
-            // Generate a unique fallback UUID using index if test_uuid is missing
-            const testUuid =
-              apiResult.test_uuid || `generated-${index}-${testName}`;
-            return {
-              test: {
-                uuid: testUuid,
-                name: testName,
-                description: "",
-                type: "response" as const,
-                config: {},
-                created_at: "",
-                updated_at: "",
-              },
-              status: testStatus,
-              chatHistory: apiResult.chat_history,
-              output: apiResult.output ?? undefined,
-              testCase: apiResult.test_case ?? undefined,
-              reasoning: apiResult.reasoning,
-              judgeResults: apiResult.judge_results ?? null,
-              evaluation:
-                testStatus !== "running"
-                  ? (apiResult.evaluation ?? {
-                      passed: testStatus === "passed",
-                    })
-                  : undefined,
-              error: apiResult.error,
-            };
-          });
-        }
+        // Rows are built from the poll response alone. An empty (or absent)
+        // results array carries nothing to render, so keep what we already
+        // have rather than blanking the list mid-run.
+        if (!result.results || result.results.length === 0) return prev;
 
-        // Try to match by test_uuid first, if no match found, update by index or name
-        const updatedResults: TestResult[] = prev.map((r, index) => {
-          // First try to find by UUID in results
-          let apiResult = result.results?.find(
-            (res) => res.test_uuid === r.test.uuid,
-          );
-
-          // If no UUID match, try to find by test name (check both name and test_name)
-          if (!apiResult) {
-            apiResult = result.results?.find(
-              (res) =>
-                res.test_name === r.test.name || res.name === r.test.name,
-            );
-          }
-
-          // If still no match and index is within range, use index-based matching
-          if (!apiResult && result.results && index < result.results.length) {
-            apiResult = result.results[index];
-          }
-
-          if (apiResult) {
-            const testStatus = getTestStatus(apiResult);
-            return {
-              ...r,
-              status: testStatus,
-              chatHistory: apiResult.chat_history,
-              output: apiResult.output ?? undefined,
-              testCase: apiResult.test_case ?? undefined,
-              reasoning: apiResult.reasoning,
-              judgeResults: apiResult.judge_results ?? null,
-              evaluation:
-                testStatus !== "running"
-                  ? (apiResult.evaluation ?? {
-                      passed: testStatus === "passed",
-                    })
-                  : undefined,
-              error: apiResult.error,
-            };
-          }
-
-          // If overall status is in_progress and test is still queued/pending, mark as running
-          if (
-            result.status === "in_progress" &&
-            (r.status === "queued" || r.status === "pending")
-          ) {
-            return { ...r, status: "running" };
-          }
-
-          return r;
+        return result.results.map((apiResult, index) => {
+          const testStatus = getTestStatus(apiResult);
+          // Get test name from name (in-progress), test_case.name, or test_name field
+          const testName =
+            apiResult.name ||
+            apiResult.test_case?.name ||
+            apiResult.test_name ||
+            "Unknown Test";
+          // Generate a unique fallback UUID using index if test_uuid is missing
+          const testUuid =
+            apiResult.test_uuid || `generated-${index}-${testName}`;
+          return {
+            test: {
+              uuid: testUuid,
+              name: testName,
+              description: "",
+              type: "response" as const,
+              config: {},
+              created_at: "",
+              updated_at: "",
+            },
+            status: testStatus,
+            chatHistory: apiResult.chat_history,
+            output: apiResult.output ?? undefined,
+            testCase: apiResult.test_case ?? undefined,
+            reasoning: apiResult.reasoning,
+            judgeResults: apiResult.judge_results ?? null,
+            evaluation:
+              testStatus !== "running"
+                ? (apiResult.evaluation ?? {
+                    passed: testStatus === "passed",
+                  })
+                : undefined,
+            error: apiResult.error,
+          };
         });
-        return updatedResults;
       });
+      // Stop showing the loading state once there is something to render, or
+      // once the run has finished and never will have anything.
+      if (
+        (result.results && result.results.length > 0) ||
+        result.status === "done" ||
+        result.status === "completed" ||
+        result.status === "failed"
+      ) {
+        setIsLoadingResults(false);
+      }
 
       // Notify parent of status update (for coordinated polling)
       // Only notify if there's a status change worth reporting (not for initial fetch of completed runs)
@@ -539,6 +502,7 @@ export function TestRunnerDialog({
       reportError("Error polling task status:", error);
       setRunStatus("failed");
       setIsRunning(false);
+      setIsLoadingResults(false);
       setCurrentTaskId(null);
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
@@ -764,6 +728,31 @@ export function TestRunnerDialog({
                 persists.
               </p>
             </div>
+          </div>
+        ) : isLoadingResults && testResults.length === 0 ? (
+          /* Waiting for the first poll of this run to land. Rows come only
+             from the server, so there is nothing to show until then. */
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6">
+            <svg
+              className="w-5 h-5 animate-spin text-muted-foreground"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+            <p className="text-sm text-muted-foreground">Loading results</p>
           </div>
         ) : (
           /* Content */
