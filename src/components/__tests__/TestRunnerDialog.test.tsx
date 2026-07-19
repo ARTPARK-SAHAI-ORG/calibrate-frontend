@@ -720,6 +720,40 @@ describe("TestRunnerDialog", () => {
     expect(await screen.findByText("My Agent")).toBeInTheDocument();
   });
 
+  it("explains a run that finished without producing any results", async () => {
+    // The server can fail a run before it has anything to say about individual
+    // tests. Rows come only from the server, so there is nothing to list, and
+    // the dialog used to render an empty panel with no explanation.
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.endsWith("/agent-tests/run/task-empty")) {
+        return Promise.resolve(
+          jsonResponse({ task_id: "task-empty", status: "failed", results: [] }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentName="My Agent"
+        taskId="task-empty"
+        initialRunStatus="in_progress"
+      />,
+    );
+
+    expect(
+      await screen.findByText("This run failed before any tests ran"),
+    ).toBeInTheDocument();
+    // Not left spinning, and no empty results list.
+    expect(screen.queryByText("Loading results")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("outputs-panel")).not.toBeInTheDocument();
+  });
+
   it("shows a loading state instead of fabricated rows until the first poll lands, and tears down the prior interval when taskId changes", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {

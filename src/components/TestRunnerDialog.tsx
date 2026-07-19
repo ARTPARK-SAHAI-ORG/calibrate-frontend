@@ -754,6 +754,39 @@ export function TestRunnerDialog({
             </svg>
             <p className="text-sm text-muted-foreground">Loading results</p>
           </div>
+        ) : testResults.length === 0 &&
+          (runStatus === "failed" || runStatus === "done") ? (
+          /* The run reached a terminal state without producing a single row.
+             Rows come only from the server, so there is nothing to list. Say
+             that plainly instead of leaving an empty panel. */
+          <div className="flex-1 flex items-center justify-center p-6">
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-6 max-w-md text-center">
+              <div className="flex items-center justify-center gap-2 mb-3">
+                <svg
+                  className="w-5 h-5 text-red-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+                  />
+                </svg>
+                <span className="font-medium text-red-500">
+                  {runStatus === "failed"
+                    ? "This run failed before any tests ran"
+                    : "This run finished without any results"}
+                </span>
+              </div>
+              <p className="text-sm text-red-400">
+                Check the agent&apos;s connection, then try running the tests
+                again.
+              </p>
+            </div>
+          </div>
         ) : (
           /* Content */
           <div className="flex-1 flex flex-col overflow-hidden">
