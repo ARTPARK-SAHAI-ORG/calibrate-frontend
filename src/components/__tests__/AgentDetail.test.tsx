@@ -535,6 +535,27 @@ describe("AgentDetail", () => {
     );
   });
 
+  it("saves via Cmd+S / Ctrl+S and ignores plain S", async () => {
+    mockFetchSequenceForAgent(buildAgent);
+    const user = setupUser();
+    render(<AgentDetail agentUuid={buildAgent.uuid} />);
+    await waitFor(() =>
+      expect(screen.getByText("Build Agent")).toBeInTheDocument(),
+    );
+    const callsBefore = (global.fetch as jest.Mock).mock.calls.length;
+
+    await user.keyboard("s");
+    expect((global.fetch as jest.Mock).mock.calls.length).toBe(callsBefore);
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse({ ...buildAgent, config: buildAgent.config }),
+    );
+    await user.keyboard("{Meta>}s{/Meta}");
+    await waitFor(() =>
+      expect(screen.getByText("Saved successfully")).toBeInTheDocument(),
+    );
+  });
+
   it("alerts when saving a build agent fails, and signs out on 401", async () => {
     mockFetchSequenceForAgent(buildAgent);
     const user = setupUser();
