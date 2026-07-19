@@ -835,6 +835,52 @@ describe("TestsTabContent — run controls while a run is starting", () => {
     runTestButtons().forEach((btn) => expect(btn).not.toBeDisabled());
     expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
   });
+
+  it("keeps the bulk toolbar up and spins its own button while the bulk run starts", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByRole("button", { name: "Run" }));
+
+    // The ticks are not cleared yet, so the bar is still shown and its own
+    // button is marked busy while the single POST is in flight.
+    const bulkRun = screen.getByRole("button", { name: "Run" });
+    expect(bulkRun).toBeInTheDocument();
+    expect(bulkRun).toHaveAttribute("aria-busy", "true");
+    expect(
+      (global.fetch as jest.Mock).mock.calls.filter(
+        ([url, init]) =>
+          init?.method === "POST" &&
+          String(url).endsWith("/agent-tests/agent/agent-1/run"),
+      ),
+    ).toHaveLength(1);
+
+    // Once the run has started, the ticks clear and the bar goes away.
+    await release();
+    await screen.findByTestId("test-runner-dialog");
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Run" })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("keeps the selection when the bulk run fails", async () => {
+    state.startRunInit = { ok: false, status: 500 };
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByRole("button", { name: "Run" }));
+
+    await release();
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    // The run did not start, so the ticks are kept and the bar stays for a
+    // retry rather than silently clearing.
+    expect(screen.getByRole("button", { name: "Run" })).toBeInTheDocument();
+    expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+  });
 });
 
 describe("TestsTabContent — test deep-link (?testId)", () => {

@@ -1060,16 +1060,18 @@ export function TestsTabContent({
   // test linked to the agent rather than the given subset.
   // `runKey` identifies the control that was clicked ("all", "bulk", or a test
   // uuid) so only that one shows a spinner while every run control is disabled.
+  // Returns the new run id, or null if nothing started. Callers use that to
+  // hold their state (e.g. keep the bulk selection) until the run is created.
   const launchTestRun = async (
     tests: TestData[],
     allLinked = false,
     runKey = "all",
-  ) => {
+  ): Promise<string | null> => {
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!backendUrl) return;
+    if (!backendUrl) return null;
     // Creating a run is a real, billed call. Ignore repeat clicks until the
     // in-flight one settles.
-    if (startingRun !== null) return;
+    if (startingRun !== null) return null;
     setStartingRun(runKey);
     try {
       const taskId = await startTestRunOrNotify(
@@ -1078,9 +1080,10 @@ export function TestsTabContent({
         agentUuid,
         allLinked ? null : tests.map((t) => t.uuid),
       );
-      if (!taskId) return;
+      if (!taskId) return null;
       addOptimisticTestRun(taskId, tests);
       setOpenTestRunId(taskId);
+      return taskId;
     } finally {
       setStartingRun(null);
     }
@@ -2235,8 +2238,14 @@ export function TestsTabContent({
                           selectedTestUuids.has(t.uuid),
                         );
                         if (selected.length === 0) return;
-                        void launchTestRun(selected, false, "bulk");
-                        setSelectedTestUuids(new Set());
+                        // Clear the ticks only once the run has started, so the
+                        // bar and its spinner stay up during the wait. A failed
+                        // run keeps the selection so it can be retried.
+                        void launchTestRun(selected, false, "bulk").then(
+                          (taskId) => {
+                            if (taskId) setSelectedTestUuids(new Set());
+                          },
+                        );
                       }}
                       disabled={isConnectionUnverified || startingRun !== null}
                       aria-busy={startingRun === "bulk"}
