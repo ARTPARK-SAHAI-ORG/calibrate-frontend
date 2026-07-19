@@ -1,4 +1,4 @@
-import { render, screen, setupUser, waitFor } from "@/test-utils";
+import { render, screen, setupUser, waitFor, act } from "@/test-utils";
 import { RunTestDialog } from "../RunTestDialog";
 
 const pushMock = jest.fn();
@@ -16,6 +16,9 @@ const mockVerifyOutcome: {
   error: string | null;
   sampleResponse: Record<string, unknown> | null;
 } = { success: true, error: null, sampleResponse: null };
+// Set to a promise to hold a check in flight, so `isVerifying` stays true and
+// the mid-check behaviour can be asserted. Null means resolve immediately.
+const mockVerifyHold: { promise: Promise<void> | null } = { promise: null };
 jest.mock("../../hooks", () => {
   const React = require("react");
   return {
@@ -28,6 +31,13 @@ jest.mock("../../hooks", () => {
       });
       const verifySavedAgent = React.useCallback(async (uuid: string) => {
         mockVerifySpy(uuid);
+        if (mockVerifyHold.promise) {
+          setState((s: { isVerifying: boolean }) => ({
+            ...s,
+            isVerifying: true,
+          }));
+          await mockVerifyHold.promise;
+        }
         if (mockVerifyOutcome.success) {
           setState({
             isVerifying: false,
@@ -98,6 +108,7 @@ beforeEach(() => {
   mockVerifyOutcome.success = true;
   mockVerifyOutcome.error = null;
   mockVerifyOutcome.sampleResponse = null;
+  mockVerifyHold.promise = null;
 });
 
 describe("RunTestDialog", () => {
@@ -267,6 +278,48 @@ describe("RunTestDialog", () => {
     );
 
     expect(screen.getByRole("button", { name: /Run test/ })).toBeDisabled();
+  });
+
+  it("cannot be dismissed while verifying", async () => {
+    // Dismissing mid-check used to leave the check running, so the run still
+    // started once it came back. Every way out is closed while it is in
+    // flight, not just Cancel.
+    const user = setupUser();
+    const onClose = jest.fn();
+    const onRunTest = jest.fn();
+    let releaseVerify: () => void = () => {};
+    mockVerifyHold.promise = new Promise<void>((resolve) => {
+      releaseVerify = resolve;
+    });
+
+    const { container } = render(
+      <RunTestDialog
+        isOpen
+        onClose={onClose}
+        testName="My Test"
+        testUuid="t1"
+        onRunTest={onRunTest}
+      />,
+    );
+
+    await user.click(screen.getByText("Select unverified connection"));
+    await user.click(screen.getByRole("button", { name: /Run test/ }));
+    await user.click(screen.getByRole("button", { name: "Verify" }));
+
+    // Mid-check: Cancel, the X, and the backdrop are all inert.
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    const buttons = screen.getAllByRole("button");
+    await user.click(buttons[0]);
+    const backdrop = container.querySelector(
+      ".absolute.inset-0.bg-black\\/50",
+    ) as HTMLElement;
+    await user.click(backdrop);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onRunTest).not.toHaveBeenCalled();
+
+    await act(async () => {
+      releaseVerify();
+    });
   });
 
   it("diverts to the verify gate for an unverified connection agent instead of running", async () => {

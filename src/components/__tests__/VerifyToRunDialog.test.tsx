@@ -44,6 +44,27 @@ describe("VerifyToRunDialog", () => {
     expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
   });
 
+  it("cannot be dismissed while verifying", async () => {
+    // Dismissing mid-check used to leave the check running, so the run still
+    // started once it came back. Every way out is closed while it is in
+    // flight, not just Cancel.
+    const user = setupUser();
+    const onClose = jest.fn();
+    const { container } = render(
+      <VerifyToRunDialog {...baseProps} isVerifying onClose={onClose} />,
+    );
+
+    expect(screen.getByRole("button", { name: "Close" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Close" }));
+
+    const backdrop = container.querySelector(
+      ".absolute.inset-0.bg-black\\/50",
+    ) as HTMLElement;
+    await user.click(backdrop);
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("surfaces the error and offers the jump to connection settings on failure", async () => {
     const user = setupUser();
     const onGoToConnection = jest.fn();

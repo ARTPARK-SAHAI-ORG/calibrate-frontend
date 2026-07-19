@@ -95,8 +95,13 @@ export function RunTestDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      {/* Backdrop. While a check is in flight every way out is closed, the
+          same as Cancel. Otherwise the dialog could be dismissed mid-check and
+          the run would still start once the check came back. */}
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={verify.isVerifying ? undefined : onClose}
+      />
 
       {/* Dialog */}
       <div className="relative w-full max-w-lg mx-4 bg-background border border-border rounded-2xl shadow-2xl">
@@ -107,7 +112,8 @@ export function RunTestDialog({
           </h2>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+            disabled={verify.isVerifying}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg
               className="w-5 h-5"
