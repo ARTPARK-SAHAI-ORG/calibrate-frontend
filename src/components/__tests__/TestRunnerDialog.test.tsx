@@ -1,10 +1,10 @@
-import { render, screen, setupUser, waitFor, within, act } from "@/test-utils";
+import { render, screen, setupUser, waitFor, act } from "@/test-utils";
 import { toast } from "sonner";
 import { TestRunnerDialog } from "../TestRunnerDialog";
 
 // Mock heavy child components so this file tests TestRunnerDialog's own
-// state machine (polling, run lifecycle, labelling gating), not their
-// internals (covered by their own test files / test-results/shared tests).
+// state machine (fetch/poll lifecycle, row derivation, labelling gating), not
+// their internals (covered by their own test files).
 jest.mock("../eval-details", () => ({
   __esModule: true,
   TestRunOutputsPanel: ({
@@ -71,19 +71,7 @@ jest.mock("sonner", () => ({
 }));
 
 const BACKEND_URL = "http://backend.test";
-
-function makeTest(overrides: Partial<any> = {}) {
-  return {
-    uuid: "test-1",
-    name: "Test One",
-    description: "",
-    type: "response",
-    config: {},
-    created_at: "",
-    updated_at: "",
-    ...overrides,
-  };
-}
+const POLL_MS = 3000;
 
 function jsonResponse(body: any, ok = true, status = ok ? 200 : 500) {
   return {
@@ -91,6 +79,23 @@ function jsonResponse(body: any, ok = true, status = ok ? 200 : 500) {
     status,
     json: async () => body,
   };
+}
+
+/** How many times the run endpoint for `taskId` has been fetched. */
+function runFetchCount(taskId: string) {
+  return (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+    String(url).endsWith(`/agent-tests/run/${taskId}`),
+  ).length;
+}
+
+/** Flush pending promises (and optionally timers) inside act(). */
+async function flush(ms = 0) {
+  await act(async () => {
+    if (ms > 0) jest.advanceTimersByTime(ms);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 }
 
 describe("TestRunnerDialog", () => {
@@ -116,95 +121,95 @@ describe("TestRunnerDialog", () => {
         onClose={jest.fn()}
         agentUuid="agent-1"
         agentName="My Agent"
-        tests={[]}
+        taskId="task-1"
       />,
     );
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("starts a new run, polls, and lands on the summary tab when done", async () => {
-    const onRunCreated = jest.fn();
+  it("shows a spinner before the first response, then renders the run's rows", async () => {
+    let resolveRun: (value: any) => void = () => {};
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
-        return Promise.resolve(jsonResponse({ task_id: "task-1", status: "in_progress" }));
-      }
-      if (url.endsWith("/agent-tests/run/task-1")) {
-        return Promise.resolve(
-          jsonResponse({
-            task_id: "task-1",
-            status: "done",
-            name: "Run One",
-            passed: 1,
-            failed: 0,
-            results: [
-              {
-                test_uuid: "test-1",
-                test_name: "Test One",
-                status: "passed",
-                passed: true,
-                chat_history: [],
-                output: { response: "hi" },
-              },
-            ],
-            evaluators: [],
-          }),
-        );
+      if (url.endsWith("/agent-tests/run/task-slow")) {
+        return new Promise((resolve) => {
+          resolveRun = resolve;
+        });
       }
       return Promise.reject(new Error(`Unexpected fetch ${url}`));
     });
 
-    render(
+    const { container } = render(
       <TestRunnerDialog
         isOpen
         onClose={jest.fn()}
         agentUuid="agent-1"
         agentName="My Agent"
-        tests={[makeTest()]}
-        onRunCreated={onRunCreated}
+        taskId="task-slow"
       />,
     );
 
-    await waitFor(() => expect(onRunCreated).toHaveBeenCalledWith("task-1"));
-    await waitFor(() =>
-      expect(screen.getByTestId("summary-panel")).toBeInTheDocument(),
-    );
-    expect(screen.getByText("Run One")).toBeInTheDocument();
-    expect(screen.getByText(/summary 1\/1/)).toBeInTheDocument();
+    // Loading: spinner shown, no outputs panel yet.
+    expect(container.querySelector(".animate-spin")).toBeInTheDocument();
+    expect(screen.queryByTestId("outputs-panel")).not.toBeInTheDocument();
 
-    // Tab nav is visible once done; switch back to outputs.
+    await act(async () => {
+      resolveRun(
+        jsonResponse({
+          task_id: "task-slow",
+          status: "completed",
+          name: "Slow Run",
+          results: [
+            {
+              test_uuid: "test-1",
+              name: "Test One",
+              status: "passed",
+              passed: true,
+            },
+          ],
+        }),
+      );
+    });
+
+    await waitFor(() =>
+      expect(screen.getByText("Slow Run")).toBeInTheDocument(),
+    );
+    expect(container.querySelector(".animate-spin")).not.toBeInTheDocument();
     await setupUser().click(screen.getByRole("button", { name: "Outputs" }));
-    expect(screen.getByTestId("outputs-panel")).toBeInTheDocument();
+    expect(screen.getByText(/Test One:passed/)).toBeInTheDocument();
   });
 
-  it("views an existing completed run via taskId without starting a new run", async () => {
+  it("renders server values: name fallbacks and pass/fail/running from `passed`", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/run/task-existing")) {
+      if (url.endsWith("/agent-tests/run/task-rows")) {
         return Promise.resolve(
           jsonResponse({
-            task_id: "task-existing",
-            status: "completed",
-            name: "Past Run",
-            passed: 2,
-            failed: 0,
+            task_id: "task-rows",
+            status: "in_progress",
+            name: "Rows Run",
             results: [
+              // `name` wins.
               {
-                test_uuid: "test-1",
-                name: "Test One",
-                status: "passed",
+                test_uuid: "t-1",
+                name: "From name",
+                test_name: "ignored",
                 passed: true,
               },
+              // Falls back to test_case.name.
               {
-                test_uuid: "test-2",
-                name: "Test Two",
-                status: "passed",
-                passed: true,
+                test_uuid: "t-2",
+                test_case: { name: "From test_case" },
+                passed: false,
               },
+              // Falls back to test_name.
+              { test_uuid: "t-3", test_name: "From test_name", passed: false },
+              // passed: null → still running, NOT failed.
+              { test_uuid: "t-4", name: "Still Running", passed: null },
             ],
           }),
         );
@@ -218,26 +223,185 @@ describe("TestRunnerDialog", () => {
         onClose={jest.fn()}
         agentUuid="agent-1"
         agentName="My Agent"
-        tests={[]}
-        taskId="task-existing"
-        initialRunStatus="completed"
+        taskId="task-rows"
       />,
     );
 
     await waitFor(() =>
-      expect(screen.getByTestId("summary-panel")).toBeInTheDocument(),
+      expect(screen.getByText(/From name:passed/)).toBeInTheDocument(),
     );
-    expect(screen.getByText("Past Run")).toBeInTheDocument();
-    // POST /run should never be called when viewing an existing run.
-    expect(
-      (global.fetch as jest.Mock).mock.calls.some(([url]) =>
-        String(url).endsWith("/agent-tests/agent/agent-1/run"),
-      ),
-    ).toBe(false);
+    expect(screen.getByText(/From test_case:failed/)).toBeInTheDocument();
+    expect(screen.getByText(/From test_name:failed/)).toBeInTheDocument();
+    expect(screen.getByText(/Still Running:running/)).toBeInTheDocument();
+    expect(screen.queryByText(/Still Running:failed/)).not.toBeInTheDocument();
+  });
+
+  it("renders and selects legacy rows with no test_uuid, without fabricating a test", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.endsWith("/agent-tests/run/task-legacy-rows")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-legacy-rows",
+            status: "completed",
+            name: "Legacy Rows",
+            results: [
+              { name: "Legacy One", status: "passed", passed: true },
+              { name: "Legacy Two", status: "failed", passed: false },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    const user = setupUser();
+    const { container } = render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-legacy-rows"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Outputs" })).toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole("button", { name: "Outputs" }));
+
+    expect(screen.getByTestId("results-count")).toHaveTextContent("2");
+    // Selectable despite having no test_uuid (stable index id is used).
+    await user.click(screen.getByText(/Legacy Two:failed/));
+    expect(screen.getByTestId("selected-id")).toHaveTextContent("idx-1");
+    // No fabricated test object leaks into the UI.
+    expect(container.textContent).not.toMatch(/generated-\d/);
+  });
+
+  it("re-polls while in_progress, picks up new results, and stops once terminal", async () => {
+    jest.useFakeTimers();
+    let pollCount = 0;
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.endsWith("/agent-tests/run/task-tick")) {
+        pollCount += 1;
+        if (pollCount === 1) {
+          return Promise.resolve(
+            jsonResponse({
+              task_id: "task-tick",
+              status: "in_progress",
+              results: [{ test_uuid: "t-1", name: "Test One", passed: null }],
+            }),
+          );
+        }
+        if (pollCount === 2) {
+          return Promise.resolve(
+            jsonResponse({
+              task_id: "task-tick",
+              status: "in_progress",
+              results: [
+                { test_uuid: "t-1", name: "Test One", passed: true },
+                { test_uuid: "t-2", name: "Test Two", passed: null },
+              ],
+            }),
+          );
+        }
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-tick",
+            status: "done",
+            results: [
+              { test_uuid: "t-1", name: "Test One", passed: true },
+              { test_uuid: "t-2", name: "Test Two", passed: false },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-tick"
+      />,
+    );
+
+    await flush();
+    expect(runFetchCount("task-tick")).toBe(1);
+    expect(screen.getByText(/Test One:running/)).toBeInTheDocument();
+
+    // Second poll brings a completed row and a newly-arrived one.
+    await flush(POLL_MS);
+    expect(runFetchCount("task-tick")).toBe(2);
+    expect(screen.getByText(/Test One:passed/)).toBeInTheDocument();
+    expect(screen.getByText(/Test Two:running/)).toBeInTheDocument();
+
+    // Third poll is terminal → polling stops.
+    await flush(POLL_MS);
+    expect(runFetchCount("task-tick")).toBe(3);
+
+    await flush(POLL_MS * 5);
+    expect(runFetchCount("task-tick")).toBe(3);
+  });
+
+  it("stops polling when the dialog is closed or unmounted", async () => {
+    jest.useFakeTimers();
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.endsWith("/agent-tests/run/task-open")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-open",
+            status: "in_progress",
+            results: [],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    const props = {
+      onClose: jest.fn(),
+      agentUuid: "agent-1",
+      agentName: "My Agent",
+      taskId: "task-open",
+    };
+    const { rerender, unmount } = render(
+      <TestRunnerDialog isOpen {...props} />,
+    );
+
+    await flush();
+    await flush(POLL_MS);
+    const countWhileOpen = runFetchCount("task-open");
+    expect(countWhileOpen).toBeGreaterThanOrEqual(2);
+
+    // Closing the dialog tears the interval down.
+    rerender(<TestRunnerDialog isOpen={false} {...props} />);
+    await flush(POLL_MS * 5);
+    expect(runFetchCount("task-open")).toBe(countWhileOpen);
+
+    // Re-open, then unmount: still no further fetches after teardown.
+    rerender(<TestRunnerDialog isOpen {...props} />);
+    await flush();
+    const countAfterReopen = runFetchCount("task-open");
+    unmount();
+    await flush(POLL_MS * 5);
+    expect(runFetchCount("task-open")).toBe(countAfterReopen);
   });
 
   it("reruns the exact tests the run executed, from test_uuids", async () => {
-    const onRerun = jest.fn();
+    const onNewRun = jest.fn();
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
@@ -248,9 +412,6 @@ describe("TestRunnerDialog", () => {
             task_id: "task-rerun",
             status: "completed",
             name: "Past Run",
-            passed: 1,
-            failed: 0,
-            // The backend reports the executed test uuids (in run order).
             test_uuids: ["real-test-1", "real-test-2"],
             results: [
               { name: "Real Test 1", status: "passed", passed: true },
@@ -258,6 +419,9 @@ describe("TestRunnerDialog", () => {
             ],
           }),
         );
+      }
+      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
+        return Promise.resolve(jsonResponse({ task_id: "task-new" }));
       }
       return Promise.reject(new Error(`Unexpected fetch ${url}`));
     });
@@ -268,31 +432,162 @@ describe("TestRunnerDialog", () => {
         onClose={jest.fn()}
         agentUuid="agent-1"
         agentName="My Agent"
-        tests={[]}
         taskId="task-rerun"
-        initialRunStatus="completed"
-        onRerun={onRerun}
+        onNewRun={onNewRun}
       />,
     );
 
     const rerunButton = await screen.findByRole("button", { name: /Rerun/ });
     await setupUser().click(rerunButton);
 
-    expect(onRerun).toHaveBeenCalledTimes(1);
-    const [tests] = onRerun.mock.calls[0];
-    expect(tests.map((t: { uuid: string }) => t.uuid)).toEqual([
-      "real-test-1",
-      "real-test-2",
-    ]);
-    // Names are lifted from the matching result rows for display.
-    expect(tests.map((t: { name: string }) => t.name)).toEqual([
-      "Real Test 1",
-      "Real Test 2",
-    ]);
+    await waitFor(() =>
+      expect(onNewRun).toHaveBeenCalledWith("task-new", [
+        "real-test-1",
+        "real-test-2",
+      ]),
+    );
+    const postCall = (global.fetch as jest.Mock).mock.calls.find(([url]) =>
+      String(url).endsWith("/agent-tests/agent/agent-1/run"),
+    );
+    expect(postCall).toBeDefined();
+    expect(postCall![1].method).toBe("POST");
+    expect(JSON.parse(postCall![1].body)).toEqual({
+      test_uuids: ["real-test-1", "real-test-2"],
+    });
+  });
+
+  // Regression guard for the runaway-run bug from #266: the dialog used to
+  // start runs from an effect that watched a `tests` array prop. `/tests`
+  // rebuilt that array inline on every render, so each parent re-render looked
+  // like new input and fired another run, and each run re-rendered the parent.
+  // One click could put ~115 POSTs on the wire in three seconds. The dialog now
+  // only ever POSTs from a click handler, so re-rendering it must stay silent.
+  it("never starts a run on its own, no matter how often the parent re-renders", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.endsWith("/agent-tests/run/task-idle")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-idle",
+            status: "completed",
+            name: "Idle Run",
+            test_uuids: ["real-test-1"],
+            results: [{ name: "Real Test 1", status: "passed", passed: true }],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    const props = {
+      isOpen: true as const,
+      onClose: jest.fn(),
+      agentUuid: "agent-1",
+      agentName: "My Agent",
+      taskId: "task-idle",
+      onNewRun: jest.fn(),
+    };
+    const { rerender } = render(<TestRunnerDialog {...props} />);
+    await screen.findByText("Idle Run");
+
+    // Re-render repeatedly with fresh inline callback identities, which is what
+    // a parent doing setState on every optimistic row update looks like.
+    for (let i = 0; i < 20; i++) {
+      rerender(
+        <TestRunnerDialog
+          {...props}
+          onClose={() => {}}
+          onNewRun={() => {}}
+        />,
+      );
+    }
+    await flush(30_000);
+
+    const runPosts = (global.fetch as jest.Mock).mock.calls.filter(
+      ([url, init]) =>
+        String(url).endsWith("/agent-tests/agent/agent-1/run") &&
+        init?.method === "POST",
+    );
+    expect(runPosts).toHaveLength(0);
+    expect(props.onNewRun).not.toHaveBeenCalled();
+  });
+
+  // The rerun POST is the one place the dialog still writes to the backend, so
+  // its two failure paths need to leave the user on the run they were viewing
+  // rather than on a blank or half-switched dialog.
+  const renderCompletedRunForRerun = (
+    onNewRun: jest.Mock,
+    startRunResponse: () => Promise<any>,
+  ) => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.endsWith("/agent-tests/run/task-rerun-fail")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-rerun-fail",
+            status: "completed",
+            name: "Past Run",
+            test_uuids: ["real-test-1"],
+            results: [{ name: "Real Test 1", status: "passed", passed: true }],
+          }),
+        );
+      }
+      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
+        return startRunResponse();
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    return render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-rerun-fail"
+        onNewRun={onNewRun}
+      />,
+    );
+  };
+
+  it("shows an error and stays on the current run when the rerun fails", async () => {
+    const onNewRun = jest.fn();
+    renderCompletedRunForRerun(onNewRun, () =>
+      Promise.resolve({ ok: false, status: 500, json: async () => ({}) }),
+    );
+
+    await setupUser().click(
+      await screen.findByRole("button", { name: /Rerun/ }),
+    );
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(onNewRun).not.toHaveBeenCalled();
+    // The run being viewed is still on screen, not cleared.
+    expect(screen.getByText("Past Run")).toBeInTheDocument();
+  });
+
+  it("signs out when the rerun is rejected as unauthorized", async () => {
+    const { signOut } = require("next-auth/react");
+    const onNewRun = jest.fn();
+    renderCompletedRunForRerun(onNewRun, () =>
+      Promise.resolve({ ok: false, status: 401, json: async () => ({}) }),
+    );
+
+    await setupUser().click(
+      await screen.findByRole("button", { name: /Rerun/ }),
+    );
+
+    await waitFor(() =>
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+    );
+    expect(onNewRun).not.toHaveBeenCalled();
   });
 
   it("hides the Rerun button when the run reports no test_uuids (legacy run)", async () => {
-    const onRerun = jest.fn();
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
@@ -303,8 +598,6 @@ describe("TestRunnerDialog", () => {
             task_id: "task-legacy",
             status: "completed",
             name: "Legacy Run",
-            passed: 1,
-            failed: 0,
             // No test_uuids field → the run predates the backend snapshot.
             results: [{ name: "Only Test", status: "passed", passed: true }],
           }),
@@ -319,10 +612,8 @@ describe("TestRunnerDialog", () => {
         onClose={jest.fn()}
         agentUuid="agent-1"
         agentName="My Agent"
-        tests={[]}
         taskId="task-legacy"
-        initialRunStatus="completed"
-        onRerun={onRerun}
+        onNewRun={jest.fn()}
       />,
     );
 
@@ -334,7 +625,7 @@ describe("TestRunnerDialog", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("does not show a Rerun button when onRerun is not provided", async () => {
+  it("does not show a Rerun button when onNewRun is not provided", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
@@ -345,8 +636,7 @@ describe("TestRunnerDialog", () => {
             task_id: "task-norerun",
             status: "completed",
             name: "No Rerun Run",
-            passed: 1,
-            failed: 0,
+            test_uuids: ["real-test-1"],
             results: [
               {
                 test_uuid: "real-test-1",
@@ -367,9 +657,7 @@ describe("TestRunnerDialog", () => {
         onClose={jest.fn()}
         agentUuid="agent-1"
         agentName="My Agent"
-        tests={[]}
         taskId="task-norerun"
-        initialRunStatus="completed"
       />,
     );
 
@@ -381,13 +669,56 @@ describe("TestRunnerDialog", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows the overall error state when the whole run errors", async () => {
+  it("selects the Summary tab automatically when the run completes cleanly", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
-        return Promise.resolve(jsonResponse({ task_id: "task-err", status: "in_progress" }));
+      if (url.endsWith("/agent-tests/run/task-summary")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-summary",
+            status: "done",
+            name: "Run One",
+            results: [
+              {
+                test_uuid: "test-1",
+                name: "Test One",
+                status: "passed",
+                passed: true,
+              },
+            ],
+            evaluators: [],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-summary"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("summary-panel")).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/summary 1\/1/)).toBeInTheDocument();
+
+    // Tab nav is visible once done; switching back to outputs works.
+    await setupUser().click(screen.getByRole("button", { name: "Outputs" }));
+    expect(screen.getByTestId("outputs-panel")).toBeInTheDocument();
+  });
+
+  it("shows the overall error state when the whole run errors", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
       }
       if (url.endsWith("/agent-tests/run/task-err")) {
         return Promise.resolve(
@@ -396,7 +727,12 @@ describe("TestRunnerDialog", () => {
             status: "failed",
             error: "boom",
             results: [
-              { test_uuid: "test-1", status: "failed", passed: false, error: "boom" },
+              {
+                test_uuid: "test-1",
+                status: "failed",
+                passed: false,
+                error: "boom",
+              },
             ],
           }),
         );
@@ -410,23 +746,22 @@ describe("TestRunnerDialog", () => {
         onClose={jest.fn()}
         agentUuid="agent-1"
         agentName="My Agent"
-        tests={[makeTest()]}
+        taskId="task-err"
       />,
     );
 
     await waitFor(() =>
       expect(screen.getByText("Something went wrong")).toBeInTheDocument(),
     );
+    // A failed run must not jump to the summary tab.
+    expect(screen.queryByTestId("summary-panel")).not.toBeInTheDocument();
   });
 
-  it("signs out on a 401 while polling", async () => {
+  it("signs out on a 401 from the run fetch", async () => {
     const { signOut } = require("next-auth/react");
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
-      }
-      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
-        return Promise.resolve(jsonResponse({ task_id: "task-401", status: "in_progress" }));
       }
       if (url.endsWith("/agent-tests/run/task-401")) {
         return Promise.resolve(jsonResponse({}, false, 401));
@@ -440,7 +775,7 @@ describe("TestRunnerDialog", () => {
         onClose={jest.fn()}
         agentUuid="agent-1"
         agentName="My Agent"
-        tests={[makeTest()]}
+        taskId="task-401"
       />,
     );
 
@@ -449,39 +784,12 @@ describe("TestRunnerDialog", () => {
     );
   });
 
-  it("signs out on a 401 when starting the run", async () => {
-    const { signOut } = require("next-auth/react");
+  it("keeps rendering the shell when a poll fails with a non-ok response", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
-        return Promise.resolve(jsonResponse({}, false, 401));
-      }
-      return Promise.reject(new Error(`Unexpected fetch ${url}`));
-    });
-
-    render(
-      <TestRunnerDialog
-        isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
-        tests={[makeTest()]}
-      />,
-    );
-
-    await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
-    );
-  });
-
-  it("marks tests failed when starting the run throws", async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes("/evaluators?include_defaults=true")) {
-        return Promise.resolve(jsonResponse([]));
-      }
-      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
+      if (url.endsWith("/agent-tests/run/task-bad")) {
         return Promise.resolve(jsonResponse({}, false, 500));
       }
       return Promise.reject(new Error(`Unexpected fetch ${url}`));
@@ -493,20 +801,16 @@ describe("TestRunnerDialog", () => {
         onClose={jest.fn()}
         agentUuid="agent-1"
         agentName="My Agent"
-        tests={[makeTest()]}
+        taskId="task-bad"
       />,
     );
 
-    // The run-start failure marks the (only) test row as failed, but
-    // `runStatus` itself stays whatever it was before the throw (only the
-    // per-test rows carry the error) — so the outputs panel renders with a
-    // failed row rather than the overall-error screen.
     await waitFor(() =>
-      expect(screen.getByText(/Test One:failed/)).toBeInTheDocument(),
+      expect(screen.getByText("My Agent")).toBeInTheDocument(),
     );
   });
 
-  it("handles a missing NEXT_PUBLIC_BACKEND_URL gracefully when starting a run", async () => {
+  it("handles a missing NEXT_PUBLIC_BACKEND_URL gracefully", async () => {
     delete process.env.NEXT_PUBLIC_BACKEND_URL;
     render(
       <TestRunnerDialog
@@ -514,12 +818,34 @@ describe("TestRunnerDialog", () => {
         onClose={jest.fn()}
         agentUuid="agent-1"
         agentName="My Agent"
-        tests={[makeTest()]}
+        taskId="task-noenv"
       />,
     );
-    // Nothing to await on network; just ensure it doesn't throw and dialog renders.
     expect(await screen.findByText("Test run")).toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("survives the default-evaluator lookup failing", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.reject(new Error("network down"));
+      }
+      return Promise.resolve(
+        jsonResponse({ task_id: "t", status: "in_progress", results: [] }),
+      );
+    });
+
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="t"
+      />,
+    );
+
+    expect(await screen.findByText("My Agent")).toBeInTheDocument();
   });
 
   it("calls onClose when the close button is clicked", async () => {
@@ -527,7 +853,9 @@ describe("TestRunnerDialog", () => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
       }
-      return Promise.resolve(jsonResponse({ task_id: "t", status: "in_progress" }));
+      return Promise.resolve(
+        jsonResponse({ task_id: "t", status: "in_progress", results: [] }),
+      );
     });
     const onClose = jest.fn();
     const user = setupUser();
@@ -537,12 +865,52 @@ describe("TestRunnerDialog", () => {
         onClose={onClose}
         agentUuid="agent-1"
         agentName="My Agent"
-        tests={[makeTest()]}
+        taskId="t"
       />,
     );
-    const buttons = screen.getAllByRole("button");
-    await user.click(buttons[0]);
+    await user.click(await screen.findByRole("button", { name: "" }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("selects a test from the outputs panel", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.endsWith("/agent-tests/run/task-select")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-select",
+            status: "in_progress",
+            results: [
+              {
+                test_uuid: "test-1",
+                name: "Test One",
+                status: "running",
+                passed: null,
+              },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-select"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("outputs-panel")).toBeInTheDocument(),
+    );
+    await setupUser().click(screen.getByText(/Test One:running/));
+    expect(screen.getByTestId("selected-id")).toHaveTextContent("test-1");
   });
 
   describe("submit for labelling", () => {
@@ -557,8 +925,6 @@ describe("TestRunnerDialog", () => {
               task_id: "task-label",
               status: "completed",
               name: "Label Run",
-              passed: 1,
-              failed: 0,
               results: [
                 {
                   test_uuid: "test-1",
@@ -587,9 +953,7 @@ describe("TestRunnerDialog", () => {
           onClose={jest.fn()}
           agentUuid="agent-1"
           agentName="My Agent"
-          tests={[]}
           taskId="task-label"
-          initialRunStatus="completed"
         />,
       );
       await waitFor(() =>
@@ -650,392 +1014,5 @@ describe("TestRunnerDialog", () => {
       // Should not throw when building CSV rows from the current results.
       await user.click(screen.getByRole("button", { name: "Export" }));
     });
-  });
-
-  it("re-polls on the interval tick and stops once the run completes", async () => {
-    jest.useFakeTimers();
-    let pollCount = 0;
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes("/evaluators?include_defaults=true")) {
-        return Promise.resolve(jsonResponse([]));
-      }
-      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
-        return Promise.resolve(jsonResponse({ task_id: "task-tick", status: "in_progress" }));
-      }
-      if (url.endsWith("/agent-tests/run/task-tick")) {
-        pollCount += 1;
-        const done = pollCount >= 2;
-        return Promise.resolve(
-          jsonResponse({
-            task_id: "task-tick",
-            status: done ? "done" : "in_progress",
-            results: done
-              ? [{ test_uuid: "test-1", name: "Test One", status: "passed", passed: true }]
-              : [],
-          }),
-        );
-      }
-      return Promise.reject(new Error(`Unexpected fetch ${url}`));
-    });
-
-    render(
-      <TestRunnerDialog
-        isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
-        tests={[makeTest()]}
-      />,
-    );
-
-    // Let the initial setTimeout(runAllTests, 0) fire, then flush the POST +
-    // first immediate poll, then advance past one polling interval to
-    // trigger the `setInterval` callback's own poll.
-    await act(async () => {
-      jest.advanceTimersByTime(0);
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-    await act(async () => {
-      jest.advanceTimersByTime(3000);
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    expect(pollCount).toBeGreaterThanOrEqual(2);
-  });
-
-  it("surfaces a poll failure (non-ok response) via reportError and stops the run", async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes("/evaluators?include_defaults=true")) {
-        return Promise.resolve(jsonResponse([]));
-      }
-      if (url.endsWith("/agent-tests/run/task-bad")) {
-        return Promise.resolve(jsonResponse({}, false, 500));
-      }
-      return Promise.reject(new Error(`Unexpected fetch ${url}`));
-    });
-
-    render(
-      <TestRunnerDialog
-        isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
-        tests={[]}
-        taskId="task-bad"
-        initialRunStatus="in_progress"
-      />,
-    );
-
-    // Dialog should still render its shell without crashing.
-    await waitFor(() => expect(screen.getByText("My Agent")).toBeInTheDocument());
-  });
-
-  // NOTE: `onStatusUpdate` is gated on the `isRunning` state variable read
-  // inside `pollTaskStatus`/`runAllTests`. Both are defined once per render
-  // and invoked later via `setTimeout`/`setInterval` closures set up in a
-  // mount-only effect, so they always see the pre-`setIsRunning(true)`
-  // value of `isRunning` (stale closure) — the callback is effectively
-  // unreachable in the current implementation. This test documents that
-  // observed behavior rather than asserting an unreachable code path; it's
-  // a source bug, left unmodified per instructions.
-  it("does not fire onStatusUpdate during polling due to a stale isRunning closure", async () => {
-    const onStatusUpdate = jest.fn();
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes("/evaluators?include_defaults=true")) {
-        return Promise.resolve(jsonResponse([]));
-      }
-      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
-        return Promise.resolve(jsonResponse({ task_id: "task-notify", status: "in_progress" }));
-      }
-      if (url.endsWith("/agent-tests/run/task-notify")) {
-        return Promise.resolve(
-          jsonResponse({
-            task_id: "task-notify",
-            status: "in_progress",
-            passed: 0,
-            failed: 0,
-            results: [
-              {
-                test_uuid: "test-1",
-                test_name: "Test One",
-                status: undefined,
-                passed: null,
-              },
-            ],
-          }),
-        );
-      }
-      return Promise.reject(new Error(`Unexpected fetch ${url}`));
-    });
-
-    render(
-      <TestRunnerDialog
-        isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
-        tests={[makeTest()]}
-        onStatusUpdate={onStatusUpdate}
-      />,
-    );
-
-    await waitFor(() =>
-      expect(
-        (global.fetch as jest.Mock).mock.calls.some(([url]) =>
-          String(url).endsWith("/agent-tests/run/task-notify"),
-        ),
-      ).toBe(true),
-    );
-    expect(onStatusUpdate).not.toHaveBeenCalled();
-  });
-
-  it("falls back to the default evaluator resolution error path without crashing", async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes("/evaluators?include_defaults=true")) {
-        return Promise.reject(new Error("network down"));
-      }
-      return Promise.resolve(jsonResponse({ task_id: "t", status: "in_progress", results: [] }));
-    });
-
-    render(
-      <TestRunnerDialog
-        isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
-        tests={[makeTest()]}
-      />,
-    );
-
-    expect(await screen.findByText("My Agent")).toBeInTheDocument();
-  });
-
-  it("passes through the runAllLinked flag by omitting test_uuids", async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string, init?: any) => {
-      if (url.includes("/evaluators?include_defaults=true")) {
-        return Promise.resolve(jsonResponse([]));
-      }
-      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
-        expect(JSON.parse(init.body)).toEqual({});
-        return Promise.resolve(jsonResponse({ task_id: "task-linked", status: "in_progress" }));
-      }
-      if (url.endsWith("/agent-tests/run/task-linked")) {
-        return Promise.resolve(
-          jsonResponse({ task_id: "task-linked", status: "in_progress", results: [] }),
-        );
-      }
-      return Promise.reject(new Error(`Unexpected fetch ${url}`));
-    });
-
-    render(
-      <TestRunnerDialog
-        isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
-        tests={[makeTest()]}
-        runAllLinked
-      />,
-    );
-
-    await waitFor(() =>
-      expect(
-        (global.fetch as jest.Mock).mock.calls.some(([url]) =>
-          String(url).endsWith("/agent-tests/agent/agent-1/run"),
-        ),
-      ).toBe(true),
-    );
-  });
-
-  it("seeds running rows from `tests` while viewing an in-progress run, and tears down the prior interval when taskId changes", async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes("/evaluators?include_defaults=true")) {
-        return Promise.resolve(jsonResponse([]));
-      }
-      if (url.endsWith("/agent-tests/run/task-a") || url.endsWith("/agent-tests/run/task-b")) {
-        return Promise.resolve(
-          jsonResponse({ task_id: "task-a", status: "in_progress", results: [] }),
-        );
-      }
-      return Promise.reject(new Error(`Unexpected fetch ${url}`));
-    });
-
-    const { rerender } = render(
-      <TestRunnerDialog
-        isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
-        tests={[makeTest()]}
-        taskId="task-a"
-        initialRunStatus="in_progress"
-      />,
-    );
-
-    // tests.length > 0 seeds one running row immediately, before the first poll resolves.
-    expect(screen.getByText(/Test One:running/)).toBeInTheDocument();
-
-    rerender(
-      <TestRunnerDialog
-        isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
-        tests={[makeTest()]}
-        taskId="task-b"
-        initialRunStatus="in_progress"
-      />,
-    );
-
-    await waitFor(() =>
-      expect(
-        (global.fetch as jest.Mock).mock.calls.some(([url]) =>
-          String(url).endsWith("/agent-tests/run/task-b"),
-        ),
-      ).toBe(true),
-    );
-  });
-
-  it("falls back to test_case.name / Unknown Test / a generated uuid when a past run's rows omit name/test_uuid", async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes("/evaluators?include_defaults=true")) {
-        return Promise.resolve(jsonResponse([]));
-      }
-      if (url.endsWith("/agent-tests/run/task-fallback")) {
-        return Promise.resolve(
-          jsonResponse({
-            task_id: "task-fallback",
-            status: "completed",
-            results: [
-              // No `name`/`test_name`, but a `test_case.name` to fall back to.
-              {
-                status: "passed",
-                passed: true,
-                test_case: { name: "From test_case" },
-              },
-              // No name at all -> "Unknown Test" + generated uuid.
-              { status: "failed", passed: false },
-            ],
-          }),
-        );
-      }
-      return Promise.reject(new Error(`Unexpected fetch ${url}`));
-    });
-
-    const user = setupUser();
-    render(
-      <TestRunnerDialog
-        isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
-        tests={[]}
-        taskId="task-fallback"
-        initialRunStatus="completed"
-      />,
-    );
-
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Outputs" })).toBeInTheDocument(),
-    );
-    await user.click(screen.getByRole("button", { name: "Outputs" }));
-    expect(screen.getByText(/From test_case:passed/)).toBeInTheDocument();
-    expect(screen.getByText(/Unknown Test:failed/)).toBeInTheDocument();
-  });
-
-  it("matches subsequent poll rows by name, then falls back to index matching and the in-progress running transition", async () => {
-    let pollN = 0;
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes("/evaluators?include_defaults=true")) {
-        return Promise.resolve(jsonResponse([]));
-      }
-      if (url.endsWith("/agent-tests/agent/agent-1/run")) {
-        return Promise.resolve(jsonResponse({ task_id: "task-match", status: "in_progress" }));
-      }
-      if (url.endsWith("/agent-tests/run/task-match")) {
-        pollN += 1;
-        if (pollN === 1) {
-          // No uuid match (different uuid) but a name match -> hits the
-          // name-matching branch.
-          return Promise.resolve(
-            jsonResponse({
-              task_id: "task-match",
-              status: "in_progress",
-              results: [
-                { test_uuid: "other-uuid", name: "Test One", status: "running", passed: null },
-              ],
-            }),
-          );
-        }
-        // Second/final poll: no matching row at all -> stays running via the
-        // in_progress/queued-or-pending branch, then "done" to stop polling.
-        return Promise.resolve(
-          jsonResponse({ task_id: "task-match", status: "done", results: [] }),
-        );
-      }
-      return Promise.reject(new Error(`Unexpected fetch ${url}`));
-    });
-
-    jest.useFakeTimers();
-    render(
-      <TestRunnerDialog
-        isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
-        tests={[makeTest()]}
-      />,
-    );
-
-    await act(async () => {
-      jest.advanceTimersByTime(0);
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-    await act(async () => {
-      jest.advanceTimersByTime(3000);
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    expect(pollN).toBeGreaterThanOrEqual(2);
-  });
-
-  it("selects a test from the outputs panel", async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes("/evaluators?include_defaults=true")) {
-        return Promise.resolve(jsonResponse([]));
-      }
-      if (url.endsWith("/agent-tests/run/task-select")) {
-        return Promise.resolve(
-          jsonResponse({
-            task_id: "task-select",
-            status: "in_progress",
-            results: [
-              { test_uuid: "test-1", name: "Test One", status: "running", passed: null },
-            ],
-          }),
-        );
-      }
-      return Promise.reject(new Error(`Unexpected fetch ${url}`));
-    });
-
-    render(
-      <TestRunnerDialog
-        isOpen
-        onClose={jest.fn()}
-        agentUuid="agent-1"
-        agentName="My Agent"
-        tests={[]}
-        taskId="task-select"
-        initialRunStatus="in_progress"
-      />,
-    );
-
-    await waitFor(() =>
-      expect(screen.getByTestId("outputs-panel")).toBeInTheDocument(),
-    );
   });
 });

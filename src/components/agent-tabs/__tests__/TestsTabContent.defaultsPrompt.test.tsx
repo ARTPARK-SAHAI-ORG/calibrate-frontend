@@ -134,11 +134,11 @@ function jsonResponse(data: unknown, ok = true, status = 200) {
 }
 
 function setupFetch({
-  agentTests = [] as typeof existingAgentTest[],
+  agentTests = [] as (typeof existingAgentTest)[],
   bulkOk = true,
   putOk = true,
 }: {
-  agentTests?: typeof existingAgentTest[];
+  agentTests?: (typeof existingAgentTest)[];
   bulkOk?: boolean;
   putOk?: boolean;
 } = {}) {
@@ -281,10 +281,14 @@ describe("TestsTabContent agent defaults prompt", () => {
 
     const dialog = await screen.findByTestId("add-test-dialog");
     expect(dialog).toHaveAttribute("data-editing", "true");
-    await user.click(within(dialog).getByRole("button", { name: "Submit test" }));
+    await user.click(
+      within(dialog).getByRole("button", { name: "Submit test" }),
+    );
 
     expect(
-      await screen.findByRole("heading", { name: "Update default evaluators?" }),
+      await screen.findByRole("heading", {
+        name: "Update default evaluators?",
+      }),
     ).toBeInTheDocument();
     expect(screen.getByTestId("add-test-dialog")).toBeInTheDocument();
   });

@@ -5,12 +5,10 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "@/hooks";
-import { getDefaultHeaders } from "@/lib/api";
 import {
   TestCaseOutput,
   TestCaseData,
   JudgeResult,
-  TestRunEvaluator,
   CloseIcon,
   ResultPager,
   type PagerNav,
@@ -31,103 +29,39 @@ import {
   buildEvaluatorSummaryFromResults,
   toolCallPassFail,
 } from "@/lib/testRunSummary";
-import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
+import {
+  startTestRun,
+  fetchTestRun,
+  isTerminalRunStatus,
+  UnauthorizedError,
+  type TestCaseResult,
+  type ChatMessage,
+  type TestRunStatusResponse,
+} from "@/lib/testRunApi";
 import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
 } from "@/lib/defaultEvaluators";
 
-type TestData = {
-  uuid: string;
+// Re-exported for AddRunToLabellingTaskDialog, which imports the type from here.
+export type { TestCaseResult };
+
+/** A single result row, derived straight from the server response every poll. */
+type Row = {
+  /** React key / selection id. The test uuid when the backend sent one,
+   * otherwise a stable index key for legacy rows. */
+  id: string;
+  /** Present only when the backend sent one. Required to rerun this test. */
+  testUuid?: string;
   name: string;
-  description: string;
-  type: "response" | "tool_call" | "conversation";
-  config: Record<string, any>;
-  created_at: string;
-  updated_at: string;
-};
-
-type ChatMessage = {
-  role: "user" | "agent" | "tool";
-  content: string;
-  tool_name?: string;
-  tool_args?: Record<string, any>;
-};
-
-type TestResult = {
-  test: TestData;
-  status: "pending" | "queued" | "running" | "passed" | "failed";
+  status: "passed" | "failed" | "running";
   chatHistory?: ChatMessage[];
   output?: TestCaseOutput;
   testCase?: TestCaseData;
   reasoning?: string;
-  evaluation?: {
-    passed: boolean;
-    message?: string;
-    details?: Record<string, any>;
-  };
-  /** Per-evaluator verdicts for response tests. Null for tool-call tests
-   * and absent for legacy rows. */
+  evaluation?: TestCaseResult["evaluation"];
   judgeResults?: JudgeResult[] | null;
   error?: string;
-};
-
-export type TestCaseResult = {
-  test_uuid?: string;
-  test_name?: string;
-  name?: string; // Test name from in-progress API response
-  status?: "passed" | "failed" | "error";
-  passed?: boolean | null; // null means test is still running
-  reasoning?: string;
-  output?: TestCaseOutput | null;
-  test_case?: TestCaseData | null;
-  chat_history?: ChatMessage[];
-  evaluation?: {
-    passed: boolean;
-    message?: string;
-    details?: Record<string, any>;
-  };
-  /** Per-evaluator verdicts for response tests. Null for tool-call tests
-   * and absent for legacy rows. */
-  judge_results?: JudgeResult[] | null;
-  /** Per-case agent latency (ms) / cost (USD) / total tokens. Lifted to the
-   * top level by the backend (not inside `output`). Null while the case is
-   * running, for eval-only runs, and — for cost — the `openai` provider. */
-  latency_ms?: number | null;
-  cost?: number | null;
-  total_tokens?: number | null;
-  error?: string;
-};
-
-type TestRunStatusResponse = {
-  task_id: string;
-  name?: string;
-  status: string;
-  total_tests?: number;
-  passed?: number;
-  failed?: number;
-  results?: TestCaseResult[];
-  /** Top-level per-evaluator metadata block. Each entry pins the
-   * version the run executed against and carries name, description,
-   * output_config, scale_min, scale_max. Backend guarantees an entry
-   * for every uuid referenced by judge_results (synthesises stubs for
-   * legacy rows). */
-  evaluators?: TestRunEvaluator[];
-  /** Aggregate per-test latency ({p50,p95,p99,count}; legacy runs use
-   * {mean,min,max,count}) plus cost / total tokens ({mean,min,max,count} |
-   * null) across the whole run. Null for eval-only runs or before metrics
-   * land; cost is also null for the `openai` provider. */
-  latency_ms?: LatencyStat;
-  cost?: AggStat;
-  total_tokens?: AggStat;
-  results_s3_prefix?: string;
-  /** The test uuids this run executed, in run order. Used to rerun the exact
-   * same tests. Absent on runs created before the backend started snapshotting
-   * it — the Rerun button is hidden in that case. */
-  test_uuids?: string[];
-  error?: string;
-  is_public?: boolean;
-  share_token?: string | null;
 };
 
 type TestRunnerDialogProps = {
@@ -135,26 +69,10 @@ type TestRunnerDialogProps = {
   onClose: () => void;
   agentUuid: string;
   agentName: string;
-  tests: TestData[];
-  taskId?: string; // If provided, view existing run results instead of starting a new run
-  onRunCreated?: (taskId: string) => void; // Called when a new run is created
-  initialRunStatus?: string; // Initial status of the run (for viewing past runs)
-  onStatusUpdate?: (
-    taskId: string,
-    status: string,
-    results?: {
-      name?: string;
-      passed: boolean | null;
-      test_case?: { name?: string } | null;
-    }[],
-    passed?: number | null,
-    failed?: number | null,
-  ) => void; // Called when run status changes (for coordinated polling)
-  runAllLinked?: boolean; // When true, omit test_uuids from run request (backend runs all linked tests)
-  // Called when the user clicks "Rerun" on a completed run, with the exact
-  // tests it executed (from the run's `test_uuids`). The parent starts a fresh
-  // run of those and opens it in a new dialog. Omit to hide the button.
-  onRerun?: (tests: TestData[]) => void;
+  taskId: string;
+  /** Called after the user starts a fresh run from this dialog. The parent
+   * re-points `taskId` at the new run, which this dialog then loads. */
+  onNewRun?: (taskId: string, testUuids: string[]) => void;
 };
 
 export function TestRunnerDialog({
@@ -162,45 +80,20 @@ export function TestRunnerDialog({
   onClose,
   agentUuid,
   agentName,
-  tests,
   taskId,
-  onRunCreated,
-  initialRunStatus,
-  onStatusUpdate,
-  runAllLinked,
-  onRerun,
+  onNewRun,
 }: TestRunnerDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
 
   const backendAccessToken = useAccessToken();
-  const [testResults, setTestResults] = useState<TestResult[]>([]);
+  // The last server response. The only source of truth for run content.
+  const [run, setRun] = useState<TestRunStatusResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedTestUuid, setSelectedTestUuid] = useState<string | null>(null);
   const [nav, setNav] = useState<PagerNav | null>(null);
-  const [isRunning, setIsRunning] = useState(false);
-  const [runStatus, setRunStatus] = useState<
-    "queued" | "in_progress" | "done" | "failed"
-  >("queued");
-  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
-  const [runName, setRunName] = useState<string | null>(null);
-  const [isPublic, setIsPublic] = useState(false);
-  const [shareToken, setShareToken] = useState<string | null>(null);
   const [defaultNextReplyEvaluator, setDefaultNextReplyEvaluator] =
     useState<DefaultEvaluatorSummary | null>(null);
-  // Top-level evaluators block from the run-status response. Built into
-  // a uuid-keyed map below and passed into TestRunOutputsPanel as the
-  // source of truth for per-evaluator metadata.
-  const [runEvaluators, setRunEvaluators] = useState<TestRunEvaluator[]>([]);
-  // The test uuids this run executed (in run order), from the run-status
-  // response. Drives the Rerun button — empty on legacy runs that predate the
-  // backend snapshot, which hides the button.
-  const [runTestUuids, setRunTestUuids] = useState<string[]>([]);
-  // Aggregate latency / cost blocks from the run-status response, surfaced on
-  // the Summary tab. Per-evaluator metrics aren't sent for single runs, so we
-  // derive those client-side from each case's judge_results (see useMemo below).
-  const [latencyAgg, setLatencyAgg] = useState<LatencyStat>(null);
-  const [costAgg, setCostAgg] = useState<AggStat>(null);
-  const [tokensAgg, setTokensAgg] = useState<AggStat>(null);
   // Which tab is showing. Tabs only render once the run is done; we default to
   // the Summary tab on completion (mirrors the benchmark dialog).
   const [activeTab, setActiveTab] = useState<"summary" | "outputs">("outputs");
@@ -211,39 +104,12 @@ export function TestRunnerDialog({
     bulkToggle: toggleLabellingBulk,
     clear: clearLabellingSelection,
   } = useLabellingSelection();
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   // Tracks whether the dialog has already auto-opened a completed test for
   // this open lifecycle. Set back to false on every dialog open / new run /
   // past-run-view init, and flipped to true after the auto-open fires once.
   // Without this guard, clicking the in-dialog "back to list" button would
   // immediately re-trigger the auto-open, making the list view unreachable.
   const hasAutoSelectedRef = useRef(false);
-
-  // Clear the aggregate latency/cost so a prior run's numbers can't leak into
-  // a fresh run / past-run view that omits the fields.
-  const resetSummary = () => {
-    setLatencyAgg(null);
-    setCostAgg(null);
-    setTokensAgg(null);
-  };
-
-  // Auto-open the first completed test when nothing is selected. Covers both
-  // - live runs: as soon as one test transitions to passed/failed (and the
-  //   user hasn't manually picked anything), open it.
-  // - past completed runs: on dialog open every test is already passed/failed
-  //   so this picks index 0 (i.e. always opens the first test).
-  // Fires at most once per dialog open thanks to `hasAutoSelectedRef`.
-  useEffect(() => {
-    if (hasAutoSelectedRef.current) return;
-    if (selectedTestUuid !== null) return;
-    const firstCompleted = testResults.find(
-      (r) => r.status === "passed" || r.status === "failed",
-    );
-    if (firstCompleted) {
-      hasAutoSelectedRef.current = true;
-      setSelectedTestUuid(firstCompleted.test.uuid);
-    }
-  }, [testResults, selectedTestUuid]);
 
   useEffect(() => {
     if (!isOpen || !backendAccessToken) return;
@@ -264,706 +130,155 @@ export function TestRunnerDialog({
     };
   }, [isOpen, backendAccessToken]);
 
-  // Start polling when dialog opens with a taskId (viewing existing run)
+  // Fetch the run once, then poll until it reaches a terminal status.
   useEffect(() => {
-    // Clear any existing polling interval first
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
-    }
-
-    if (!isOpen || !taskId || !backendAccessToken) {
-      return;
-    }
-
+    if (!isOpen || !taskId || !backendAccessToken) return;
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     if (!backendUrl) return;
 
-    // Initialize state for viewing existing run
+    setRun(null);
+    setIsLoading(true);
     setSelectedTestUuid(null);
+    setActiveTab("outputs");
     hasAutoSelectedRef.current = false;
     clearLabellingSelection();
-    setCurrentTaskId(taskId);
-    setRunEvaluators([]);
-    setRunTestUuids([]);
-    resetSummary();
-    setActiveTab("outputs");
 
-    const isInProgress =
-      initialRunStatus === "pending" ||
-      initialRunStatus === "queued" ||
-      initialRunStatus === "in_progress";
+    let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const stop = () => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
 
-    setIsRunning(isInProgress);
+    const tick = async () => {
+      try {
+        const result = await fetchTestRun(backendUrl, backendAccessToken, taskId);
+        if (cancelled) return;
+        setRun(result);
+        if (isTerminalRunStatus(result.status)) {
+          stop();
+          // Land on the Summary tab when the run finishes cleanly (mirrors the
+          // benchmark dialog). Polling has stopped by now, so this fires once
+          // on completion and will not fight a later manual tab switch. Skip on
+          // failure since there is no useful summary to show.
+          if (result.status !== "failed" && !result.error) {
+            setActiveTab("summary");
+          }
+        }
+      } catch (error) {
+        if (cancelled) return;
+        if (error instanceof UnauthorizedError) {
+          stop();
+          await signOut({ callbackUrl: "/login" });
+          return;
+        }
+        reportError("Error polling test run status:", error);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
 
-    if (initialRunStatus === "done" || initialRunStatus === "completed") {
-      setTestResults([]);
-      setRunStatus("done");
-    } else if (tests.length > 0) {
-      setTestResults(tests.map((test) => ({ test, status: "running" })));
-      setRunStatus("in_progress");
-    } else {
-      setTestResults([]);
-      setRunStatus("queued");
-    }
-
-    // Always fetch once immediately
-    pollTaskStatus(taskId, backendUrl);
-
-    // Start polling - will stop itself when status is done/completed/failed
-    pollingIntervalRef.current = setInterval(() => {
-      pollTaskStatus(taskId, backendUrl);
-    }, POLLING_INTERVAL_MS);
+    tick();
+    interval = setInterval(tick, POLLING_INTERVAL_MS);
 
     return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
+      cancelled = true;
+      stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, taskId, backendAccessToken]);
 
-  // Start new test run when dialog opens without taskId
-  useEffect(() => {
-    if (!isOpen || taskId || tests.length === 0) {
-      return;
-    }
+  const runStatus: "queued" | "in_progress" | "done" | "failed" = useMemo(() => {
+    if (!run) return "queued";
+    if (run.status === "completed" || run.status === "done") return "done";
+    if (run.status === "failed") return "failed";
+    if (run.status === "in_progress") return "in_progress";
+    return "queued";
+  }, [run]);
 
-    setSelectedTestUuid(null);
-    hasAutoSelectedRef.current = false;
-    clearLabellingSelection();
-    setCurrentTaskId(null);
-    setRunEvaluators([]);
-    setRunTestUuids([]);
-    resetSummary();
-    setActiveTab("outputs");
-    const initialResults: TestResult[] = tests.map((test) => ({
-      test,
-      status: "pending",
-    }));
-    setTestResults(initialResults);
-
-    setTimeout(() => {
-      runAllTests(initialResults);
-    }, 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, taskId, tests]);
-
-  const pollTaskStatus = async (taskId: string, backendUrl: string) => {
-    try {
-      const response = await fetch(`${backendUrl}/agent-tests/run/${taskId}`, {
-        method: "GET",
-        headers: getDefaultHeaders(backendAccessToken),
-      });
-
-      if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
-        return;
+  const rows: Row[] = useMemo(() => {
+    const results = run?.results ?? [];
+    const runFailed = run?.status === "failed";
+    return results.map((r: TestCaseResult, i): Row => {
+      let status: Row["status"];
+      if (r.passed === null || r.passed === undefined) {
+        status = "running";
+      } else {
+        status = r.passed === true || r.status === "passed" ? "passed" : "failed";
       }
-
-      if (!response.ok) {
-        throw new Error("Failed to poll task status");
-      }
-
-      const result: TestRunStatusResponse = await response.json();
-
-      // Update overall run status
-      if (
-        result.status === "queued" ||
-        result.status === "in_progress" ||
-        result.status === "done" ||
-        result.status === "completed" ||
-        result.status === "failed"
-      ) {
-        setRunStatus(
-          result.status === "completed"
-            ? "done"
-            : (result.status as "queued" | "in_progress" | "done" | "failed"),
-        );
-      }
-
-      // Capture name and share state from backend
-      if (result.name) setRunName(result.name);
-      if (result.is_public !== undefined) setIsPublic(result.is_public);
-      if (result.share_token !== undefined)
-        setShareToken(result.share_token ?? null);
-      // Always sync to the latest payload (including the empty case) so
-      // the prior run's evaluator metadata can't leak into a fresh run
-      // / past-run-view that omits the field.
-      setRunEvaluators(
-        Array.isArray(result.evaluators) ? result.evaluators : [],
-      );
-      // Sync the executed test uuids (drives the Rerun button). Always set so a
-      // prior run's ids can't leak into a fresh run / past-run view.
-      setRunTestUuids(
-        Array.isArray(result.test_uuids) ? result.test_uuids : [],
-      );
-      // Sync the aggregate latency / cost blocks. Always set (including the
-      // null case) so a prior run's numbers can't leak in.
-      setLatencyAgg(result.latency_ms ?? null);
-      setCostAgg(result.cost ?? null);
-      setTokensAgg(result.total_tokens ?? null);
-
-      // Update test results based on polling response
-      setTestResults((prev) => {
-        // Helper to determine test status from API result
-        const getTestStatus = (
-          apiResult: TestCaseResult,
-        ): "passed" | "failed" | "running" => {
-          // If passed is null, the test is still running
-          if (apiResult.passed === null || apiResult.passed === undefined) {
-            return "running";
-          }
-          return apiResult.passed === true || apiResult.status === "passed"
-            ? "passed"
-            : "failed";
-        };
-
-        // If we're viewing a past run and have no previous results, build from API response
-        if (prev.length === 0 && result.results && result.results.length > 0) {
-          return result.results.map((apiResult, index) => {
-            const testStatus = getTestStatus(apiResult);
-            // Get test name from name (in-progress), test_case.name, or test_name field
-            const testName =
-              apiResult.name ||
-              apiResult.test_case?.name ||
-              apiResult.test_name ||
-              "Unknown Test";
-            // Generate a unique fallback UUID using index if test_uuid is missing
-            const testUuid =
-              apiResult.test_uuid || `generated-${index}-${testName}`;
-            return {
-              test: {
-                uuid: testUuid,
-                name: testName,
-                description: "",
-                type: "response" as const,
-                config: {},
-                created_at: "",
-                updated_at: "",
-              },
-              status: testStatus,
-              chatHistory: apiResult.chat_history,
-              output: apiResult.output ?? undefined,
-              testCase: apiResult.test_case ?? undefined,
-              reasoning: apiResult.reasoning,
-              judgeResults: apiResult.judge_results ?? null,
-              evaluation:
-                testStatus !== "running"
-                  ? (apiResult.evaluation ?? {
-                      passed: testStatus === "passed",
-                    })
-                  : undefined,
-              error: apiResult.error,
-            };
-          });
-        }
-
-        // Try to match by test_uuid first, if no match found, update by index or name
-        const updatedResults: TestResult[] = prev.map((r, index) => {
-          // First try to find by UUID in results
-          let apiResult = result.results?.find(
-            (res) => res.test_uuid === r.test.uuid,
-          );
-
-          // If no UUID match, try to find by test name (check both name and test_name)
-          if (!apiResult) {
-            apiResult = result.results?.find(
-              (res) =>
-                res.test_name === r.test.name || res.name === r.test.name,
-            );
-          }
-
-          // If still no match and index is within range, use index-based matching
-          if (!apiResult && result.results && index < result.results.length) {
-            apiResult = result.results[index];
-          }
-
-          if (apiResult) {
-            const testStatus = getTestStatus(apiResult);
-            return {
-              ...r,
-              status: testStatus,
-              chatHistory: apiResult.chat_history,
-              output: apiResult.output ?? undefined,
-              testCase: apiResult.test_case ?? undefined,
-              reasoning: apiResult.reasoning,
-              judgeResults: apiResult.judge_results ?? null,
-              evaluation:
-                testStatus !== "running"
-                  ? (apiResult.evaluation ?? {
-                      passed: testStatus === "passed",
-                    })
-                  : undefined,
-              error: apiResult.error,
-            };
-          }
-
-          // If overall status is in_progress and test is still queued/pending, mark as running
-          if (
-            result.status === "in_progress" &&
-            (r.status === "queued" || r.status === "pending")
-          ) {
-            return { ...r, status: "running" };
-          }
-
-          return r;
-        });
-        return updatedResults;
-      });
-
-      // Notify parent of status update (for coordinated polling)
-      // Only notify if there's a status change worth reporting (not for initial fetch of completed runs)
-      if (onStatusUpdate && taskId && isRunning) {
-        const apiResults = result.results?.map((r: TestCaseResult) => ({
-          name: r.name || r.test_case?.name,
-          passed: r.passed ?? null,
-          test_case: r.test_case,
-        }));
-        onStatusUpdate(
-          taskId,
-          result.status,
-          apiResults,
-          result.passed,
-          result.failed,
-        );
-      }
-
-      // Check if polling should stop
-      if (
-        result.status === "completed" ||
-        result.status === "failed" ||
-        result.status === "done"
-      ) {
-        setIsRunning(false);
-        if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current);
-          pollingIntervalRef.current = null;
-        }
-
-        // Land on the Summary tab when the run finishes cleanly (mirrors the
-        // benchmark dialog). Polling has stopped by now, so this fires once on
-        // completion and won't fight a later manual tab switch. Skip on failure
-        // since there's no useful summary to show.
-        if (
-          (result.status === "completed" || result.status === "done") &&
-          !result.error
-        ) {
-          setActiveTab("summary");
-        }
-
-        // If there's an overall error, update remaining pending tests
-        if (result.error) {
-          setTestResults((prev) =>
-            prev.map((r) =>
-              r.status === "pending" || r.status === "running"
-                ? { ...r, status: "failed", error: result.error }
-                : r,
-            ),
-          );
-        }
-      }
-    } catch (error) {
-      reportError("Error polling task status:", error);
-      setRunStatus("failed");
-      setIsRunning(false);
-      setCurrentTaskId(null);
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-    }
-  };
-
-  const runAllTests = async (initialResults: TestResult[]) => {
-    setIsRunning(true);
-
-    // Clear any existing polling interval
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
-    }
-
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!backendUrl) {
-      reportError("BACKEND_URL environment variable is not set");
-      setIsRunning(false);
-      return;
-    }
-
-    // Set all tests to queued initially
-    setRunStatus("queued");
-    setTestResults((prev) => prev.map((r) => ({ ...r, status: "queued" })));
-
-    try {
-      const testUuids = initialResults.map((r) => r.test.uuid);
-
-      const response = await fetch(
-        `${backendUrl}/agent-tests/agent/${agentUuid}/run`,
-        {
-          method: "POST",
-          headers: {
-            ...getDefaultHeaders(backendAccessToken),
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(runAllLinked ? {} : { test_uuids: testUuids }),
-        },
-      );
-
-      if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error("Failed to start test run");
-      }
-
-      const result: TestRunStatusResponse = await response.json();
-      const newTaskId = result.task_id;
-      setCurrentTaskId(newTaskId);
-
-      // Notify parent about the new run
-      if (onRunCreated) {
-        onRunCreated(newTaskId);
-      }
-
-      // Start polling immediately
-      pollingIntervalRef.current = setInterval(() => {
-        pollTaskStatus(newTaskId, backendUrl);
-      }, POLLING_INTERVAL_MS);
-
-      // Also poll immediately to get the first result
-      pollTaskStatus(newTaskId, backendUrl);
-    } catch (error) {
-      reportError("Error starting test run:", error);
-      setTestResults((prev) =>
-        prev.map((r) => ({
-          ...r,
-          status: "failed",
-          error:
-            error instanceof Error ? error.message : "Failed to start test run",
-        })),
-      );
-      setIsRunning(false);
-    }
-  };
-
-  const retryTest = async (testUuid: string) => {
-    const testResult = testResults.find((r) => r.test.uuid === testUuid);
-    if (!testResult) return;
-
-    // Update status to running
-    setTestResults((prev) =>
-      prev.map((r) =>
-        r.test.uuid === testUuid
-          ? { ...r, status: "running", error: undefined }
-          : r,
-      ),
-    );
-
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!backendUrl) {
-      setTestResults((prev) =>
-        prev.map((r) =>
-          r.test.uuid === testUuid
-            ? {
-                ...r,
-                status: "failed",
-                error: "BACKEND_URL environment variable is not set",
-              }
-            : r,
-        ),
-      );
-      return;
-    }
-
-    try {
-      // Make API call for single test retry
-      const response = await fetch(
-        `${backendUrl}/agent-tests/agent/${agentUuid}/run`,
-        {
-          method: "POST",
-          headers: {
-            ...getDefaultHeaders(backendAccessToken),
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            test_uuids: [testUuid],
-          }),
-        },
-      );
-
-      if (response.status === 401) {
-        await signOut({ callbackUrl: "/login" });
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error("Failed to retry test");
-      }
-
-      const result: TestRunStatusResponse = await response.json();
-
-      // Poll for this single test result
-      const pollSingleTest = async () => {
-        try {
-          const pollResponse = await fetch(
-            `${backendUrl}/agent-tests/run/${result.task_id}`,
-            {
-              method: "GET",
-              headers: getDefaultHeaders(backendAccessToken),
-            },
-          );
-
-          if (pollResponse.status === 401) {
-            await signOut({ callbackUrl: "/login" });
-            return;
-          }
-
-          if (!pollResponse.ok) {
-            throw new Error("Failed to poll task status");
-          }
-
-          const pollResult: TestRunStatusResponse = await pollResponse.json();
-
-          if (
-            pollResult.status === "completed" ||
-            pollResult.status === "done" ||
-            pollResult.status === "failed"
-          ) {
-            const apiResult = pollResult.results?.find(
-              (res) => res.test_uuid === testUuid,
-            );
-            if (apiResult) {
-              setTestResults((prev) =>
-                prev.map((r) =>
-                  r.test.uuid === testUuid
-                    ? {
-                        ...r,
-                        status:
-                          apiResult.status === "passed" ? "passed" : "failed",
-                        chatHistory: apiResult.chat_history,
-                        evaluation: apiResult.evaluation,
-                        error: apiResult.error,
-                      }
-                    : r,
-                ),
-              );
-            } else if (pollResult.error) {
-              setTestResults((prev) =>
-                prev.map((r) =>
-                  r.test.uuid === testUuid
-                    ? { ...r, status: "failed", error: pollResult.error }
-                    : r,
-                ),
-              );
-            }
-          } else {
-            // Continue polling
-            setTimeout(pollSingleTest, POLLING_INTERVAL_MS);
-          }
-        } catch (error) {
-          setTestResults((prev) =>
-            prev.map((r) =>
-              r.test.uuid === testUuid
-                ? {
-                    ...r,
-                    status: "failed",
-                    error:
-                      error instanceof Error ? error.message : "Test failed",
-                  }
-                : r,
-            ),
-          );
-        }
+      // A run-level failure ends any case the backend left mid-flight.
+      const error =
+        r.error ?? (runFailed && status === "running" ? run?.error : undefined);
+      if (error && status === "running") status = "failed";
+      return {
+        id: r.test_uuid ?? `idx-${i}`,
+        testUuid: r.test_uuid,
+        name: r.name || r.test_case?.name || r.test_name || `Test ${i + 1}`,
+        status,
+        chatHistory: r.chat_history,
+        output: r.output ?? undefined,
+        testCase: r.test_case ?? undefined,
+        reasoning: r.reasoning,
+        judgeResults: r.judge_results ?? null,
+        evaluation:
+          status !== "running"
+            ? (r.evaluation ?? { passed: status === "passed" })
+            : undefined,
+        error,
       };
+    });
+  }, [run]);
 
-      // Start polling for single test
-      if (
-        result.status === "in_progress" ||
-        result.status === "pending" ||
-        result.status === "queued"
-      ) {
-        setTimeout(pollSingleTest, POLLING_INTERVAL_MS);
-      } else if (result.status === "completed" || result.status === "done") {
-        const apiResult = result.results?.find(
-          (res) => res.test_uuid === testUuid,
-        );
-        if (apiResult) {
-          setTestResults((prev) =>
-            prev.map((r) =>
-              r.test.uuid === testUuid
-                ? {
-                    ...r,
-                    status: apiResult.status === "passed" ? "passed" : "failed",
-                    chatHistory: apiResult.chat_history,
-                    evaluation: apiResult.evaluation,
-                    error: apiResult.error,
-                  }
-                : r,
-            ),
-          );
-        }
-      }
-    } catch (error) {
-      setTestResults((prev) =>
-        prev.map((r) =>
-          r.test.uuid === testUuid
-            ? {
-                ...r,
-                status: "failed",
-                error: error instanceof Error ? error.message : "Test failed",
-              }
-            : r,
-        ),
-      );
-    }
-  };
-
-  const retryAllFailed = async () => {
-    const failedTests = testResults.filter((r) => r.status === "failed");
-    if (failedTests.length === 0) return;
-
-    setIsRunning(true);
-
-    // Clear any existing polling interval
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
-    }
-
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!backendUrl) {
-      reportError("BACKEND_URL environment variable is not set");
-      setIsRunning(false);
-      return;
-    }
-
-    // Set failed tests to running
-    setTestResults((prev) =>
-      prev.map((r) =>
-        r.status === "failed"
-          ? { ...r, status: "running", error: undefined }
-          : r,
-      ),
-    );
-
-    try {
-      const testUuids = failedTests.map((r) => r.test.uuid);
-
-      const response = await fetch(
-        `${backendUrl}/agent-tests/agent/${agentUuid}/run`,
-        {
-          method: "POST",
-          headers: {
-            ...getDefaultHeaders(backendAccessToken),
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            test_uuids: testUuids,
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to retry failed tests");
-      }
-
-      const result: TestRunStatusResponse = await response.json();
-      setCurrentTaskId(result.task_id);
-
-      if (
-        result.status === "in_progress" ||
-        result.status === "pending" ||
-        result.status === "queued"
-      ) {
-        pollingIntervalRef.current = setInterval(() => {
-          pollTaskStatus(result.task_id, backendUrl);
-        }, POLLING_INTERVAL_MS);
-      } else if (result.status === "completed" || result.status === "done") {
-        if (result.results && result.results.length > 0) {
-          setTestResults((prev) =>
-            prev.map((r) => {
-              const apiResult = result.results?.find(
-                (res) => res.test_uuid === r.test.uuid,
-              );
-              if (apiResult) {
-                return {
-                  ...r,
-                  status: apiResult.status === "passed" ? "passed" : "failed",
-                  chatHistory: apiResult.chat_history,
-                  evaluation: apiResult.evaluation,
-                  error: apiResult.error,
-                };
-              }
-              return r;
-            }),
-          );
-        }
-        setIsRunning(false);
-      }
-    } catch (error) {
-      reportError("Error retrying failed tests:", error);
-      setTestResults((prev) =>
-        prev.map((r) =>
-          r.status === "running"
-            ? {
-                ...r,
-                status: "failed",
-                error:
-                  error instanceof Error
-                    ? error.message
-                    : "Failed to retry tests",
-              }
-            : r,
-        ),
-      );
-      setIsRunning(false);
-    }
-  };
-
-  const retryAll = async () => {
-    // Reset all tests to pending
-    setTestResults((prev) =>
-      prev.map((r) => ({ ...r, status: "pending", error: undefined })),
-    );
-
-    const resetResults = testResults.map((r) => ({
-      ...r,
-      status: "pending" as const,
-    }));
-    await runAllTests(resetResults);
-  };
-
-  const selectedResult = testResults.find(
-    (r) => r.test.uuid === selectedTestUuid,
+  const runEvaluators = useMemo(
+    () => (Array.isArray(run?.evaluators) ? run.evaluators : []),
+    [run],
   );
+  const evaluatorsByUuid = useMemo(
+    () => Object.fromEntries(runEvaluators.map((e) => [e.uuid, e])),
+    [runEvaluators],
+  );
+  const runTestUuids = useMemo(
+    () => (Array.isArray(run?.test_uuids) ? run.test_uuids : []),
+    [run],
+  );
+  const runName = run?.name ?? null;
 
-  const passedTests = testResults.filter((r) => r.status === "passed");
+  // Auto-open the first completed test when nothing is selected. Covers both
+  // - live runs: as soon as one test transitions to passed/failed (and the
+  //   user hasn't manually picked anything), open it.
+  // - past completed runs: on dialog open every test is already passed/failed
+  //   so this picks index 0 (i.e. always opens the first test).
+  // Fires at most once per dialog open thanks to `hasAutoSelectedRef`.
+  useEffect(() => {
+    if (hasAutoSelectedRef.current) return;
+    if (selectedTestUuid !== null) return;
+    const firstCompleted = rows.find(
+      (r) => r.status === "passed" || r.status === "failed",
+    );
+    if (firstCompleted) {
+      hasAutoSelectedRef.current = true;
+      setSelectedTestUuid(firstCompleted.id);
+    }
+  }, [rows, selectedTestUuid]);
+
+  const passedTests = rows.filter((r) => r.status === "passed");
   // Errored tests carry an `error` and are surfaced as their own category in
   // the list; keep them out of the "failed" count so the header matches.
-  const erroredTests = testResults.filter((r) => !!r.error);
-  const failedTests = testResults.filter(
-    (r) => r.status === "failed" && !r.error,
-  );
+  const failedTests = rows.filter((r) => r.status === "failed" && !r.error);
   // Tool-call pass/fail split for the Summary tab's dedicated card. Keyed off
-  // the test case's evaluation type, not `r.test.type` — the latter is
-  // hardcoded to "response" when results are rebuilt from a viewed past run.
+  // the test case's evaluation type.
   const toolCall = toolCallPassFail(
-    testResults.map((r) => ({
+    rows.map((r) => ({
       toolCall: r.testCase?.evaluation?.type === "tool_call",
       passed: r.status === "passed",
       failed: r.status === "failed" && !r.error,
     })),
   );
-  const hasLabellingEligibleTests = testResults.some((r) =>
+  const hasLabellingEligibleTests = rows.some((r) =>
     isLabellingEligibleRaw({ test_case: r.testCase ?? null }),
   );
-  const queuedTests = testResults.filter((r) => r.status === "queued");
-  const runningTests = testResults.filter((r) => r.status === "running");
-  const pendingTests = testResults.filter((r) => r.status === "pending");
 
   // Per-evaluator metrics for the Summary tab. Single test runs don't ship a
   // backend `evaluator_summary` block (only benchmarks do), so aggregate it
@@ -971,30 +286,43 @@ export function TestRunnerDialog({
   const evaluatorSummary = useMemo(
     () =>
       buildEvaluatorSummaryFromResults(
-        testResults.map((r) => ({ judge_results: r.judgeResults })),
-        Object.fromEntries(runEvaluators.map((e) => [e.uuid, e])),
+        rows.map((r) => ({ judge_results: r.judgeResults })),
+        evaluatorsByUuid,
       ),
-    [testResults, runEvaluators],
+    [rows, evaluatorsByUuid],
   );
 
-  // The exact tests to rerun, built from the run's executed `test_uuids` (in
-  // run order). Names are lifted from the matching result row for a nicer
-  // initial display; the rerun POST only needs the uuids.
-  const rerunTests: TestData[] = runTestUuids.map((uuid, i) => ({
-    uuid,
-    name: testResults[i]?.test.name ?? "",
-    description: "",
-    type: "response",
-    config: {},
-    created_at: "",
-    updated_at: "",
-  }));
+  // Start a fresh run of the same tests and hand it to the parent, which
+  // re-points `taskId` so this dialog loads it.
+  const startRun = async (testUuids: string[]) => {
+    if (testUuids.length === 0) return;
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl) {
+      toast.error("Cannot start a run: the backend URL is not configured.");
+      return;
+    }
+    try {
+      const newTaskId = await startTestRun(
+        backendUrl,
+        backendAccessToken,
+        agentUuid,
+        testUuids,
+      );
+      onNewRun?.(newTaskId, testUuids);
+    } catch (error) {
+      if (error instanceof UnauthorizedError) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+      reportError("Error starting test run:", error);
+      toast.error("Could not start the run. Please try again.");
+    }
+  };
 
-  // Check if the entire run errored (all tests have errors, none have real results)
+  // Check if the entire run errored (no case produced a real result)
   const isOverallError =
     runStatus === "failed" &&
-    testResults.length > 0 &&
-    testResults.every((r) => r.error);
+    (!!run?.error || (rows.length > 0 && rows.every((r) => !!r.error)));
 
   if (!isOpen) return null;
 
@@ -1019,9 +347,9 @@ export function TestRunnerDialog({
                 <h2 className="text-base md:text-lg font-semibold text-foreground truncate">
                   {runName ?? "Test run"}
                 </h2>
-                {runStatus === "done" && onRerun && rerunTests.length > 0 && (
+                {runStatus === "done" && onNewRun && runTestUuids.length > 0 && (
                   <RerunIconButton
-                    onClick={() => onRerun(rerunTests)}
+                    onClick={() => startRun(runTestUuids)}
                     className="shrink-0"
                   />
                 )}
@@ -1045,30 +373,29 @@ export function TestRunnerDialog({
           {/* Right: action buttons + close */}
           <div className="flex items-center gap-2 shrink-0">
             {/* Export results — only shown when run is done */}
-            {runStatus === "done" && testResults.length > 0 && (
+            {runStatus === "done" && rows.length > 0 && (
               <div className="hidden md:block">
                 <ExportResultsButton
                   filename={`${runName ?? "test-run"}-${agentName}`}
                   getRows={() =>
                     buildTestRunCsv(
-                      testResults.map((r) => ({
-                        name: r.test.name,
+                      rows.map((r) => ({
+                        name: r.name,
                         status: r.status,
                         output: r.output,
                         testCase: r.testCase,
                         reasoning: r.reasoning,
                         judgeResults: r.judgeResults,
                       })),
-                      Object.fromEntries(runEvaluators.map((e) => [e.uuid, e])),
+                      evaluatorsByUuid,
                     )
                   }
                 />
               </div>
             )}
             {runStatus === "done" &&
-              testResults.length > 0 &&
-              hasLabellingEligibleTests &&
-              (currentTaskId || taskId) && (
+              rows.length > 0 &&
+              hasLabellingEligibleTests && (
                 <div className="hidden md:block">
                   <button
                     type="button"
@@ -1082,9 +409,9 @@ export function TestRunnerDialog({
                         );
                         return;
                       }
-                      const hasEligibleSelected = testResults.some(
+                      const hasEligibleSelected = rows.some(
                         (r) =>
-                          labellingSelectedIds.has(r.test.uuid) &&
+                          labellingSelectedIds.has(r.id) &&
                           isLabellingEligibleRaw({
                             test_case: r.testCase ?? null,
                           }),
@@ -1103,20 +430,18 @@ export function TestRunnerDialog({
                   </button>
                 </div>
               )}
-            {/* Share button — only shown when run is done and we have a taskId */}
-            {runStatus === "done" &&
-              (currentTaskId || taskId) &&
-              backendAccessToken && (
-                <div className="hidden md:block">
-                  <ShareButton
-                    entityType="test-run"
-                    entityId={(currentTaskId || taskId)!}
-                    accessToken={backendAccessToken}
-                    initialIsPublic={isPublic}
-                    initialShareToken={shareToken}
-                  />
-                </div>
-              )}
+            {/* Share button — only shown when run is done */}
+            {runStatus === "done" && backendAccessToken && (
+              <div className="hidden md:block">
+                <ShareButton
+                  entityType="test-run"
+                  entityId={taskId}
+                  accessToken={backendAccessToken}
+                  initialIsPublic={run?.is_public ?? false}
+                  initialShareToken={run?.share_token ?? null}
+                />
+              </div>
+            )}
             <button
               onClick={onClose}
               data-tour="run-close"
@@ -1127,8 +452,12 @@ export function TestRunnerDialog({
           </div>
         </div>
 
-        {/* Overall Error State - replaces split panel */}
-        {isOverallError ? (
+        {isLoading && !run ? (
+          <div className="flex-1 flex items-center justify-center p-6">
+            <div className="w-8 h-8 border-2 border-muted-foreground/30 border-t-foreground rounded-full animate-spin" />
+          </div>
+        ) : isOverallError ? (
+          /* Overall Error State - replaces split panel */
           <div className="flex-1 flex items-center justify-center p-6">
             <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-6 max-w-md text-center">
               <div className="flex items-center justify-center gap-2 mb-3">
@@ -1193,9 +522,9 @@ export function TestRunnerDialog({
                 <TestRunSummary
                   passed={passedTests.length}
                   total={passedTests.length + failedTests.length}
-                  latency={latencyAgg}
-                  cost={costAgg}
-                  tokens={tokensAgg}
+                  latency={run?.latency_ms ?? null}
+                  cost={run?.cost ?? null}
+                  tokens={run?.total_tokens ?? null}
                   toolCall={toolCall}
                   evaluatorSummary={evaluatorSummary}
                 />
@@ -1203,15 +532,10 @@ export function TestRunnerDialog({
             ) : (
               <div className="flex-1 overflow-hidden">
                 <TestRunOutputsPanel
-                  results={testResults.map((r) => ({
-                    id: r.test.uuid,
-                    name: r.test.name,
-                    status: r.status as
-                      | "passed"
-                      | "failed"
-                      | "running"
-                      | "pending"
-                      | "queued",
+                  results={rows.map((r) => ({
+                    id: r.id,
+                    name: r.name,
+                    status: r.status,
                     output: r.output,
                     testCase: r.testCase,
                     reasoning: r.reasoning,
@@ -1223,9 +547,7 @@ export function TestRunnerDialog({
                   onSelect={setSelectedTestUuid}
                   onClearSelection={() => setSelectedTestUuid(null)}
                   onNavChange={setNav}
-                  evaluatorsByUuid={Object.fromEntries(
-                    runEvaluators.map((e) => [e.uuid, e]),
-                  )}
+                  evaluatorsByUuid={evaluatorsByUuid}
                   legacyDefaultEvaluator={defaultNextReplyEvaluator}
                   labellingSelection={
                     runStatus === "done" ? labellingSelectedIds : undefined
@@ -1242,41 +564,39 @@ export function TestRunnerDialog({
           </div>
         )}
       </div>
-      {(currentTaskId || taskId) && (
-        <AddRunToLabellingTaskDialog
-          isOpen={addToTaskOpen}
-          onClose={() => setAddToTaskOpen(false)}
-          source={{
-            type: "test_run",
-            runUuid: (currentTaskId || taskId)!,
-            runName: runName ?? undefined,
-            results: testResults
-              .filter((r) => labellingSelectedIds.has(r.test.uuid))
-              .map((r) => ({
-                test_uuid: r.test.uuid,
-                test_name: r.test.name,
-                status:
-                  r.status === "passed" || r.status === "failed"
-                    ? r.status
-                    : undefined,
-                passed:
-                  r.status === "passed"
-                    ? true
-                    : r.status === "failed"
-                      ? false
-                      : null,
-                reasoning: r.reasoning,
-                output: r.output ?? null,
-                test_case: r.testCase ?? null,
-                chat_history: r.chatHistory,
-                evaluation: r.evaluation,
-                judge_results: r.judgeResults,
-                error: r.error,
-              })),
-            evaluators: runEvaluators,
-          }}
-        />
-      )}
+      <AddRunToLabellingTaskDialog
+        isOpen={addToTaskOpen}
+        onClose={() => setAddToTaskOpen(false)}
+        source={{
+          type: "test_run",
+          runUuid: taskId,
+          runName: runName ?? undefined,
+          results: rows
+            .filter((r) => labellingSelectedIds.has(r.id))
+            .map((r) => ({
+              test_uuid: r.testUuid,
+              test_name: r.name,
+              status:
+                r.status === "passed" || r.status === "failed"
+                  ? r.status
+                  : undefined,
+              passed:
+                r.status === "passed"
+                  ? true
+                  : r.status === "failed"
+                    ? false
+                    : null,
+              reasoning: r.reasoning,
+              output: r.output ?? null,
+              test_case: r.testCase ?? null,
+              chat_history: r.chatHistory,
+              evaluation: r.evaluation,
+              judge_results: r.judgeResults,
+              error: r.error,
+            })),
+          evaluators: runEvaluators,
+        }}
+      />
     </div>
   );
 }

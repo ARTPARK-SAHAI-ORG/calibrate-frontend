@@ -8,6 +8,8 @@ import { useAccessToken, useDialogUrlParam } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { bulkDeleteTests } from "@/lib/testsApi";
 import { buildTestToRun } from "@/lib/testRun";
+import { startTestRun, UnauthorizedError } from "@/lib/testRunApi";
+import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import {
   ToolPicker,
@@ -181,10 +183,18 @@ function LLMPageInner() {
   const runsAgentDropdownRef = useRef<HTMLDivElement>(null);
   const [runsStatusFilter, setRunsStatusFilter] = useState<"all" | "passed" | "failed" | "error">("all");
 
-  // Viewing a run from the Runs tab
+  // Viewing a benchmark run from the Runs tab
   const [selectedRun, setSelectedRun] = useState<AllRun | null>(null);
-  const [viewingRunTest, setViewingRunTest] = useState(false);
   const [viewingRunBenchmark, setViewingRunBenchmark] = useState(false);
+
+  // The one open test run dialog. Set from a Runs-tab row, from running a
+  // single test, or from a rerun — in every case the run already exists and
+  // this is only its id plus the agent it belongs to.
+  const [openTestRun, setOpenTestRun] = useState<{
+    taskId: string;
+    agentUuid: string;
+    agentName: string;
+  } | null>(null);
 
   // Set page title
   useEffect(() => {
@@ -243,13 +253,6 @@ function LLMPageInner() {
   const [runTestDialogOpen, setRunTestDialogOpen] = useState(false);
   const [testToRun, setTestToRun] = useState<TestData | null>(null);
 
-  // Test runner dialog state
-  const [testRunnerOpen, setTestRunnerOpen] = useState(false);
-  const [testRunnerAgentUuid, setTestRunnerAgentUuid] = useState<string>("");
-  const [testRunnerAgentName, setTestRunnerAgentName] = useState<string>("");
-  // When set, the test runner is rerunning this set of tests (from the "Rerun"
-  // action on a viewed run) rather than the single `testToRun`.
-  const [rerunTests, setRerunTests] = useState<TestData[] | null>(null);
   // Direct benchmark rerun (fresh benchmark, same models + test subset, no
   // picker).
   const benchmarkRerun = useBenchmarkRerun();
@@ -334,14 +337,14 @@ function LLMPageInner() {
   // race-update its mirror copy on this page.
   const pendingRunsPollingRef = useRef<NodeJS.Timeout | null>(null);
   const allRunsRef = useRef<AllRun[]>([]);
-  const viewingRunTestRef = useRef(false);
+  const openTestRunRef = useRef<{ taskId: string } | null>(null);
   const viewingRunBenchmarkRef = useRef(false);
   const selectedRunRef = useRef<AllRun | null>(null);
 
   // Keep refs in sync with state so the polling closure always sees the
   // latest values without re-creating the interval on every render.
   useEffect(() => { allRunsRef.current = allRuns; }, [allRuns]);
-  useEffect(() => { viewingRunTestRef.current = viewingRunTest; }, [viewingRunTest]);
+  useEffect(() => { openTestRunRef.current = openTestRun; }, [openTestRun]);
   useEffect(() => { viewingRunBenchmarkRef.current = viewingRunBenchmark; }, [viewingRunBenchmark]);
   useEffect(() => { selectedRunRef.current = selectedRun; }, [selectedRun]);
 
@@ -355,30 +358,26 @@ function LLMPageInner() {
       pendingRunsPollingRef.current = null;
     }
 
-    const pollPendingRuns = async () => {
-      const viewingRunId =
-        (viewingRunTestRef.current || viewingRunBenchmarkRef.current) &&
-        selectedRunRef.current
-          ? selectedRunRef.current.uuid
-          : null;
+    // The run currently open in a dialog, read fresh from refs so it stays
+    // accurate across the awaits in the loop below.
+    const viewingRunId = () =>
+      openTestRunRef.current?.taskId ??
+      (viewingRunBenchmarkRef.current ? selectedRunRef.current?.uuid : null) ??
+      null;
 
+    const pollPendingRuns = async () => {
       const pendingRuns = allRunsRef.current.filter(
         (run) =>
           (run.status === "pending" ||
             run.status === "queued" ||
             run.status === "in_progress") &&
-          run.uuid !== viewingRunId,
+          run.uuid !== viewingRunId(),
       );
 
       if (pendingRuns.length === 0) return;
 
       for (const run of pendingRuns) {
-        if (
-          (viewingRunTestRef.current || viewingRunBenchmarkRef.current) &&
-          selectedRunRef.current?.uuid === run.uuid
-        ) {
-          continue;
-        }
+        if (run.uuid === viewingRunId()) continue;
 
         try {
           const endpoint =
@@ -440,10 +439,14 @@ function LLMPageInner() {
   }, [activeTab, backendAccessToken]);
 
   const handleRunClick = (run: AllRun) => {
-    setSelectedRun(run);
     if (run.type === "llm-unit-test") {
-      setViewingRunTest(true);
+      setOpenTestRun({
+        taskId: run.uuid,
+        agentUuid: run.agent_id,
+        agentName: run.agent_name,
+      });
     } else {
+      setSelectedRun(run);
       setViewingRunBenchmark(true);
     }
     // Persist the open run on the URL so a reload re-opens the same dialog.
@@ -579,6 +582,14 @@ function LLMPageInner() {
     setRunTestDialogOpen(true);
   };
 
+  // Open the test runner on an already-created run. `lastHandledRunIdRef` is
+  // primed so the `?runId=` effect treats this run as already handled and does
+  // not re-open it underneath us.
+  const openRun = (taskId: string, agentUuid: string, agentName: string) => {
+    lastHandledRunIdRef.current = taskId;
+    setOpenTestRun({ taskId, agentUuid, agentName });
+  };
+
   // Handle running the test
   const handleRunTest = async (
     agentUuid: string,
@@ -620,12 +631,20 @@ function LLMPageInner() {
       // Close the run test selection dialog
       setRunTestDialogOpen(false);
 
-      // Open the TestRunnerDialog with the agent and test
-      setTestRunnerAgentUuid(agentUuid);
-      setTestRunnerAgentName(agentName);
-      setTestRunnerOpen(true);
+      // Start the run here, then open the dialog on its id. The dialog only
+      // ever views an existing run.
+      const taskId = await startTestRun(backendUrl, backendAccessToken, agentUuid, [
+        testToRun.uuid,
+      ]);
+      prependOptimisticTestRun(taskId, [testToRun], agentUuid, agentName);
+      openRun(taskId, agentUuid, agentName);
     } catch (err) {
+      if (err instanceof UnauthorizedError) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
       reportError("Error running test:", err);
+      toast.error("Could not start the test run. Please try again.");
       setRunTestDialogOpen(false);
       setTestToRun(null);
     }
@@ -651,9 +670,12 @@ function LLMPageInner() {
     setAllRuns((prev) => [newRun, ...prev]);
   };
 
+  // `tests` only supplies the row count and the placeholder names; callers that
+  // have nothing but uuids pass blank names and the pending-run poller fills
+  // the row in on its first tick.
   const prependOptimisticTestRun = (
     taskId: string,
-    tests: TestData[],
+    tests: { name: string }[],
     agentUuid: string,
     agentName: string,
   ) =>
@@ -675,30 +697,26 @@ function LLMPageInner() {
       agentName,
     );
 
-  // Rerun a completed test run as a fresh run of the same tests, swapping the
-  // view dialog for the live new-run dialog.
   // Drop a lingering `?runId=<viewed run>` so a reload after a rerun doesn't
-  // re-open the old run. No-op when the URL isn't pointing at a run (e.g. a
-  // repeat rerun from the fresh dialog).
+  // re-open the old run. No-op when the URL isn't pointing at a run.
   const clearRunIdFromUrl = () => {
     if (searchParams.get("runId")) {
       router.replace("/tests?tab=runs", { scroll: false });
     }
   };
 
-  const handleRerunTests = (
+  // Rerunning a test run is now owned by the dialog: it starts the new run and
+  // reports it back through `onNewRun`, which routes into `openRunFromRunsTab`.
+
+  // Same as `openRun`, plus repointing `?runId=` at the new run so the Runs
+  // list and a reload both land on it.
+  const openRunFromRunsTab = (
+    taskId: string,
     agentUuid: string,
     agentName: string,
-    tests: TestData[],
   ) => {
-    setViewingRunTest(false);
-    setSelectedRun(null);
-    clearRunIdFromUrl();
-    setTestRunnerAgentUuid(agentUuid);
-    setTestRunnerAgentName(agentName);
-    setTestToRun(null);
-    setRerunTests(tests);
-    setTestRunnerOpen(true);
+    openRun(taskId, agentUuid, agentName);
+    router.replace(`/tests?tab=runs&runId=${taskId}`, { scroll: false });
   };
 
   // Rerun a completed benchmark with the same models and test subset (skips the
@@ -1908,29 +1926,34 @@ function LLMPageInner() {
         onRunTest={handleRunTest}
       />
 
-      {/* Test Runner Dialog */}
-      <TestRunnerDialog
-        isOpen={testRunnerOpen}
-        onClose={() => {
-          setTestRunnerOpen(false);
-          setTestToRun(null);
-          setRerunTests(null);
-        }}
-        agentUuid={testRunnerAgentUuid}
-        agentName={testRunnerAgentName}
-        tests={rerunTests ?? (testToRun ? [testToRun] : [])}
-        onRunCreated={(taskId) =>
-          prependOptimisticTestRun(
-            taskId,
-            rerunTests ?? (testToRun ? [testToRun] : []),
-            testRunnerAgentUuid,
-            testRunnerAgentName,
-          )
-        }
-        onRerun={(tests) =>
-          handleRerunTests(testRunnerAgentUuid, testRunnerAgentName, tests)
-        }
-      />
+      {/* Test Runner Dialog — always views an existing run, whether it was
+          just started here or picked from the Runs tab. */}
+      {openTestRun && (
+        <TestRunnerDialog
+          isOpen={true}
+          onClose={() => {
+            setOpenTestRun(null);
+            setTestToRun(null);
+            router.replace("/tests?tab=runs", { scroll: false });
+          }}
+          agentUuid={openTestRun.agentUuid}
+          agentName={openTestRun.agentName}
+          taskId={openTestRun.taskId}
+          onNewRun={(taskId, testUuids) => {
+            prependOptimisticTestRun(
+              taskId,
+              testUuids.map(() => ({ name: "" })),
+              openTestRun.agentUuid,
+              openTestRun.agentName,
+            );
+            openRunFromRunsTab(
+              taskId,
+              openTestRun.agentUuid,
+              openTestRun.agentName,
+            );
+          }}
+        />
+      )}
 
       {/* Bulk Upload Modal */}
       <BulkUploadTestsModal
@@ -1938,40 +1961,6 @@ function LLMPageInner() {
         onClose={() => setBulkUploadOpen(false)}
         onSuccess={fetchTests}
       />
-
-      {/* View Run — Test Runner Dialog (from Runs tab) */}
-      {selectedRun && selectedRun.type === "llm-unit-test" && (
-        <TestRunnerDialog
-          isOpen={viewingRunTest}
-          onClose={() => {
-            setViewingRunTest(false);
-            setSelectedRun(null);
-            router.replace("/tests?tab=runs", { scroll: false });
-          }}
-          agentUuid={selectedRun.agent_id}
-          agentName={selectedRun.agent_name}
-          tests={
-            selectedRun.results?.map((r, i) => ({
-              uuid: `run-test-${i}`,
-              name: r.name || r.test_case?.name || `Test ${i + 1}`,
-              description: "",
-              type: "response" as const,
-              config: {},
-              created_at: "",
-              updated_at: "",
-            })) || []
-          }
-          taskId={selectedRun.uuid}
-          initialRunStatus={selectedRun.status}
-          onRerun={(tests) =>
-            handleRerunTests(
-              selectedRun.agent_id,
-              selectedRun.agent_name,
-              tests,
-            )
-          }
-        />
-      )}
 
       {/* View Run — Benchmark Results Dialog (from Runs tab) */}
       {selectedRun && selectedRun.type === "llm-benchmark" && (

@@ -6,6 +6,8 @@ import { signOut } from "next-auth/react";
 import { useAccessToken, useMaxRowsPerEval, useDialogUrlParam } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { buildTestToRun } from "@/lib/testRun";
+import { startTestRun, UnauthorizedError } from "@/lib/testRunApi";
+import { toast } from "sonner";
 
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
@@ -352,10 +354,9 @@ export function TestsTabContent({
     "remove",
   );
 
-  // Test runner dialog state
-  const [testRunnerOpen, setTestRunnerOpen] = useState(false);
-  const [testsToRun, setTestsToRun] = useState<TestData[]>([]);
-  const [runAllLinked, setRunAllLinked] = useState(false);
+  // Test runner dialog state. The dialog is purely a viewer: it is open when
+  // we hold the id of a run that was already created here.
+  const [openTestRunId, setOpenTestRunId] = useState<string | null>(null);
 
   // Benchmark dialog state
   const [benchmarkDialogOpen, setBenchmarkDialogOpen] = useState(false);
@@ -377,7 +378,6 @@ export function TestsTabContent({
 
   // Viewing past run state
   const [selectedPastRun, setSelectedPastRun] = useState<TestRun | null>(null);
-  const [viewingTestResults, setViewingTestResults] = useState(false);
   const [viewingBenchmarkResults, setViewingBenchmarkResults] = useState(false);
 
   // Direct benchmark rerun: starts a fresh benchmark (no picker) with the same
@@ -388,15 +388,15 @@ export function TestsTabContent({
   const pendingRunsPollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Refs to track current viewing state for use in polling callbacks
-  const viewingTestResultsRef = useRef(false);
+  const openTestRunIdRef = useRef<string | null>(null);
   const viewingBenchmarkResultsRef = useRef(false);
   const selectedPastRunRef = useRef<TestRun | null>(null);
   const pastRunsRef = useRef<TestRun[]>([]);
 
   // Keep refs in sync with state
   useEffect(() => {
-    viewingTestResultsRef.current = viewingTestResults;
-  }, [viewingTestResults]);
+    openTestRunIdRef.current = openTestRunId;
+  }, [openTestRunId]);
 
   useEffect(() => {
     viewingBenchmarkResultsRef.current = viewingBenchmarkResults;
@@ -672,10 +672,10 @@ export function TestsTabContent({
     const pollPendingRuns = async () => {
       // Get the ID of the run currently being viewed in the dialog (use refs for current values)
       const viewingRunId =
-        (viewingTestResultsRef.current || viewingBenchmarkResultsRef.current) &&
-        selectedPastRunRef.current
+        openTestRunIdRef.current ??
+        (viewingBenchmarkResultsRef.current && selectedPastRunRef.current
           ? selectedPastRunRef.current.uuid
-          : null;
+          : null);
 
       // Find pending runs that need polling (excluding the one being viewed)
       // Use ref to get current pastRuns to avoid stale closure
@@ -693,9 +693,9 @@ export function TestsTabContent({
       for (const run of pendingRuns) {
         // Double-check if this run is now being viewed in dialog
         if (
-          (viewingTestResultsRef.current ||
-            viewingBenchmarkResultsRef.current) &&
-          selectedPastRunRef.current?.uuid === run.uuid
+          openTestRunIdRef.current === run.uuid ||
+          (viewingBenchmarkResultsRef.current &&
+            selectedPastRunRef.current?.uuid === run.uuid)
         ) {
           continue;
         }
@@ -773,7 +773,7 @@ export function TestsTabContent({
     };
   }, [
     backendAccessToken,
-    viewingTestResults,
+    openTestRunId,
     viewingBenchmarkResults,
     selectedPastRun,
   ]);
@@ -1041,15 +1041,49 @@ export function TestsTabContent({
     resetTestDialog();
   };
 
+  // Prepend the "pending" row for a run that was just created, so it shows in
+  // the past-runs list straight away. The poller below takes it from there.
+  const addOptimisticTestRun = (taskId: string, tests: TestData[]) => {
+    const newRun: TestRun = makeOptimisticTestRun(
+      taskId,
+      tests,
+      new Date().toISOString(),
+    );
+    setPastRuns((prev) => [newRun, ...prev]);
+  };
+
+  // The one place a run is started from this tab: create it, show its pending
+  // row, then open the dialog on the new run id. Pass `allLinked` to run every
+  // test linked to the agent rather than the given subset.
+  const launchTestRun = async (tests: TestData[], allLinked = false) => {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl) return;
+    try {
+      const taskId = await startTestRun(
+        backendUrl,
+        backendAccessToken,
+        agentUuid,
+        allLinked ? null : tests.map((t) => t.uuid),
+      );
+      addOptimisticTestRun(taskId, tests);
+      setOpenTestRunId(taskId);
+    } catch (err) {
+      if (err instanceof UnauthorizedError) {
+        await signOut({ callbackUrl: "/login" });
+        return;
+      }
+      reportError("Error starting test run:", err);
+      toast.error("Could not start the test run. Please try again.");
+    }
+  };
+
   // Open the test runner for a single just-saved test. Backing the dialog's
   // "Save and run" shortcut, it mirrors the row-level play action (run one
   // specific test, not the whole linked set). Skipped for an unverified
   // connection, matching where the shortcut is offered.
   const runSavedTest = (test: TestData) => {
     if (isConnectionUnverified) return;
-    setTestsToRun([test]);
-    setRunAllLinked(false);
-    setTestRunnerOpen(true);
+    void launchTestRun([test]);
   };
 
   // Test is already saved when this prompt is shown. Declining (Not now / X)
@@ -1379,22 +1413,12 @@ export function TestsTabContent({
 
   // Handle clicking on a past run row
   const handlePastRunClick = (run: TestRun) => {
-    setSelectedPastRun(run);
     if (run.type === "llm-unit-test") {
-      setViewingTestResults(true);
-    } else {
-      setViewingBenchmarkResults(true);
+      setOpenTestRunId(run.uuid);
+      return;
     }
-  };
-
-  // Rerun a completed test run as a fresh run of the same tests, swapping the
-  // view dialog for the live new-run dialog.
-  const handleRerunTests = (tests: TestData[]) => {
-    setViewingTestResults(false);
-    setSelectedPastRun(null);
-    setRunAllLinked(false);
-    setTestsToRun(tests);
-    setTestRunnerOpen(true);
+    setSelectedPastRun(run);
+    setViewingBenchmarkResults(true);
   };
 
   // Rerun a completed benchmark with the same models and test subset, swapping
@@ -1415,17 +1439,6 @@ export function TestsTabContent({
     });
   };
 
-  // Handle when a new test run is created
-  const handleTestRunCreated = (taskId: string) => {
-    const newRun: TestRun = makeOptimisticTestRun(
-      taskId,
-      testsToRun,
-      new Date().toISOString(),
-    );
-    setPastRuns((prev) => [newRun, ...prev]);
-    // Polling is handled by the useEffect that watches pastRuns for pending items
-  };
-
   // Handle when a new benchmark is created. Models aren't known here (the
   // picker owns them), so the row shows "0 models" until the poller fills it in.
   const handleBenchmarkCreated = (taskId: string) => {
@@ -1437,32 +1450,6 @@ export function TestsTabContent({
     setPastRuns((prev) => [newRun, ...prev]);
     // Polling is handled by the useEffect that watches pastRuns for pending items
   };
-
-  // Callback when a run completes from the TestRunnerDialog
-  const handleRunStatusUpdate = useCallback(
-    (
-      taskId: string,
-      status: string,
-      results?: TestRunResult[],
-      passed?: number | null,
-      failed?: number | null,
-    ) => {
-      setPastRuns((prev) =>
-        prev.map((run) => {
-          if (run.uuid !== taskId) return run;
-          return {
-            ...run,
-            status,
-            results: results ?? run.results,
-            passed: passed ?? run.passed,
-            failed: failed ?? run.failed,
-            updated_at: new Date().toISOString(),
-          };
-        }),
-      );
-    },
-    [],
-  );
 
   // Remove test(s) from agent OR delete them permanently from the user's
   // entire test library, depending on `deleteMode`.
@@ -1934,9 +1921,7 @@ export function TestsTabContent({
                     );
                     return;
                   }
-                  setTestsToRun(agentTests);
-                  setRunAllLinked(true);
-                  setTestRunnerOpen(true);
+                  void launchTestRun(agentTests, true);
                 }}
                 disabled={isConnectionUnverified}
                 className={`h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border transition-colors flex items-center gap-2 bg-sky-500/12 border-sky-500/45 text-sky-950 dark:text-sky-100 ${
@@ -2236,9 +2221,7 @@ export function TestsTabContent({
                           selectedTestUuids.has(t.uuid),
                         );
                         if (selected.length === 0) return;
-                        setTestsToRun(selected);
-                        setRunAllLinked(false);
-                        setTestRunnerOpen(true);
+                        void launchTestRun(selected);
                         setSelectedTestUuids(new Set());
                       }}
                       disabled={isConnectionUnverified}
@@ -2388,9 +2371,7 @@ export function TestsTabContent({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              setTestsToRun([test]);
-                              setRunAllLinked(false);
-                              setTestRunnerOpen(true);
+                              void launchTestRun([test]);
                             }}
                             className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
                             title="Run test"
@@ -2503,9 +2484,7 @@ export function TestsTabContent({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              setTestsToRun([test]);
-                              setRunAllLinked(false);
-                              setTestRunnerOpen(true);
+                              void launchTestRun([test]);
                             }}
                             className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
                             title="Run test"
@@ -2704,21 +2683,25 @@ export function TestsTabContent({
         lockedAgentUuid={agentUuid}
       />
 
-      {/* Test Runner Dialog */}
-      <TestRunnerDialog
-        isOpen={testRunnerOpen}
-        onClose={() => {
-          setTestRunnerOpen(false);
-          setTestsToRun([]);
-          setRunAllLinked(false);
-        }}
-        agentUuid={agentUuid}
-        agentName={agentName}
-        tests={testsToRun}
-        runAllLinked={runAllLinked}
-        onRunCreated={handleTestRunCreated}
-        onRerun={handleRerunTests}
-      />
+      {/* Test Runner Dialog — one instance for both a just-started run and a
+          past run, driven purely by the run id. */}
+      {openTestRunId && (
+        <TestRunnerDialog
+          isOpen
+          onClose={() => setOpenTestRunId(null)}
+          agentUuid={agentUuid}
+          agentName={agentName}
+          taskId={openTestRunId}
+          onNewRun={(taskId, testUuids) => {
+            const uuids = new Set(testUuids);
+            addOptimisticTestRun(
+              taskId,
+              agentTests.filter((t) => uuids.has(t.uuid)),
+            );
+            setOpenTestRunId(taskId);
+          }}
+        />
+      )}
 
       {/* Benchmark Dialog */}
       <BenchmarkDialog
@@ -2735,35 +2718,6 @@ export function TestsTabContent({
         benchmarkModelsVerified={benchmarkModelsVerified}
         benchmarkProvider={benchmarkProvider}
       />
-
-      {/* View Past Test Results Dialog */}
-      {selectedPastRun && selectedPastRun.type === "llm-unit-test" && (
-        <TestRunnerDialog
-          isOpen={viewingTestResults}
-          onClose={() => {
-            setViewingTestResults(false);
-            setSelectedPastRun(null);
-          }}
-          agentUuid={agentUuid}
-          agentName={agentName}
-          tests={
-            // Convert results to TestData format for in-progress runs
-            selectedPastRun.results?.map((r, i) => ({
-              uuid: `past-run-test-${i}`,
-              name: r.name || r.test_case?.name || `Test ${i + 1}`,
-              description: "",
-              type: "response" as const,
-              config: {},
-              created_at: "",
-              updated_at: "",
-            })) || []
-          }
-          taskId={selectedPastRun.uuid}
-          initialRunStatus={selectedPastRun.status}
-          onStatusUpdate={handleRunStatusUpdate}
-          onRerun={handleRerunTests}
-        />
-      )}
 
       {/* View Past Benchmark Results Dialog */}
       {selectedPastRun && selectedPastRun.type === "llm-benchmark" && (

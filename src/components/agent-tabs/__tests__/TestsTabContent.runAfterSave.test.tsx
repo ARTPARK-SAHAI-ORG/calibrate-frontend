@@ -26,24 +26,33 @@ jest.mock("../../../lib/reportError", () => ({
   reportError: jest.fn(),
 }));
 
-// Renders a marker only while open, listing the tests it was handed to run —
-// lets the parent-side "save and run" flow be asserted end-to-end.
-jest.mock("../../TestRunnerDialog", () => ({
-  TestRunnerDialog: ({
-    isOpen,
-    tests,
-  }: {
-    isOpen: boolean;
-    tests: Array<{ uuid: string; name: string }>;
-  }) =>
-    isOpen ? (
-      <div data-testid="test-runner">
-        {tests.map((t) => (
-          <span key={t.uuid}>runner:{t.name}</span>
-        ))}
-      </div>
-    ) : null,
-}));
+// Ordered log of the two things the refactor cares about: the POST that
+// creates the run, and the dialog appearing. The POST must come first, and the
+// dialog must be handed the task id that POST returned.
+const mockEvents: string[] = [];
+
+// The dialog is a viewer keyed on a run id — it renders the id it was given
+// and logs when it first appears, so the parent-side "save and run" flow can
+// be asserted end-to-end.
+jest.mock("../../TestRunnerDialog", () => {
+  const { useEffect: useEffectHook } = jest.requireActual("react");
+  return {
+    TestRunnerDialog: ({
+      isOpen,
+      taskId,
+    }: {
+      isOpen: boolean;
+      taskId: string;
+    }) => {
+      useEffectHook(() => {
+        if (isOpen) mockEvents.push("dialog-open");
+      }, [isOpen]);
+      return isOpen ? (
+        <div data-testid="test-runner">runner:{taskId}</div>
+      ) : null;
+    },
+  };
+});
 jest.mock("../../BenchmarkDialog", () => ({
   BenchmarkDialog: () => null,
 }));
@@ -167,12 +176,23 @@ function jsonResponse(data: unknown, ok = true, status = 200) {
   return { ok, status, json: async () => data };
 }
 
+// The POST that starts a run, for body/ordering assertions.
+function runPostCall() {
+  return (global.fetch as jest.Mock).mock.calls.find(
+    ([url, init]) =>
+      init?.method === "POST" &&
+      String(url).endsWith(`/agent-tests/agent/${AGENT_UUID}/run`),
+  );
+}
+
 function setupFetch({
   agentTests = [] as Array<typeof existingAgentTest>,
   bulkUuids = ["test-saved"] as string[],
+  runTaskId = "task-42",
 }: {
   agentTests?: Array<typeof existingAgentTest>;
   bulkUuids?: string[];
+  runTaskId?: string;
 } = {}) {
   global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
     if (url.includes(`/agent-tests/agent/${AGENT_UUID}/tests`)) {
@@ -181,12 +201,25 @@ function setupFetch({
     if (url.includes(`/agent-tests/agent/${AGENT_UUID}/runs`)) {
       return jsonResponse({ items: [], total: 0 });
     }
+    // Creating the run. Logged so the test can prove it happened before the
+    // dialog appeared.
+    if (
+      init?.method === "POST" &&
+      url.endsWith(`/agent-tests/agent/${AGENT_UUID}/run`)
+    ) {
+      mockEvents.push("run-post");
+      return jsonResponse({ task_id: runTaskId, status: "pending" });
+    }
     if (url === `${BACKEND}/tests`) {
       return jsonResponse({ items: [], total: 0 });
     }
     if (init?.method === "POST" && url.includes("/tests/bulk")) {
       // POST /tests/bulk returns the created uuids.
-      return jsonResponse({ uuids: bulkUuids, count: bulkUuids.length, warnings: null });
+      return jsonResponse({
+        uuids: bulkUuids,
+        count: bulkUuids.length,
+        warnings: null,
+      });
     }
     if (init?.method === "PUT" && url.includes("/tests/test-1")) {
       return jsonResponse({});
@@ -210,6 +243,7 @@ function setupFetch({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockEvents.length = 0;
   process.env.NEXT_PUBLIC_BACKEND_URL = BACKEND;
   mockFetchAgentEvaluators.mockResolvedValue([attachedEvaluator()]);
   mockFetchAllEvaluators.mockResolvedValue([
@@ -251,10 +285,10 @@ describe("TestsTabContent save-and-run shortcut", () => {
     );
   });
 
-  it("runs the just-created test and skips the defaults prompt on 'Create and run'", async () => {
+  it("creates the run before opening the runner on 'Create and run', and skips the defaults prompt", async () => {
     // The create POST returns the new test's uuid, so the run keys off that
     // directly (no list lookup by name).
-    setupFetch({ bulkUuids: ["test-saved"] });
+    setupFetch({ bulkUuids: ["test-saved"], runTaskId: "task-created" });
     const user = setupUser();
     render(<TestsTabContent agentUuid={AGENT_UUID} />);
 
@@ -262,18 +296,22 @@ describe("TestsTabContent save-and-run shortcut", () => {
     await user.click(screen.getByRole("button", { name: "Create test" }));
     await user.click(screen.getByRole("button", { name: "Submit and run" }));
 
-    // The runner opens with the created test; the defaults prompt never shows.
+    // The runner views the run that POST created — and only after it returned.
     expect(await screen.findByTestId("test-runner")).toHaveTextContent(
-      "runner:Saved test",
+      "runner:task-created",
     );
+    expect(mockEvents).toEqual(["run-post", "dialog-open"]);
+    expect(JSON.parse(runPostCall()[1].body)).toEqual({
+      test_uuids: ["test-saved"],
+    });
     expect(
       screen.queryByRole("heading", { name: "Update default evaluators?" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
   });
 
-  it("runs the just-edited test and skips the defaults prompt on 'Save and run'", async () => {
-    setupFetch({ agentTests: [existingAgentTest] });
+  it("creates the run before opening the runner on 'Save and run', and skips the defaults prompt", async () => {
+    setupFetch({ agentTests: [existingAgentTest], runTaskId: "task-edited" });
     const user = setupUser();
     render(<TestsTabContent agentUuid={AGENT_UUID} />);
 
@@ -287,8 +325,12 @@ describe("TestsTabContent save-and-run shortcut", () => {
     );
 
     expect(await screen.findByTestId("test-runner")).toHaveTextContent(
-      "runner:Refund test",
+      "runner:task-edited",
     );
+    expect(mockEvents).toEqual(["run-post", "dialog-open"]);
+    expect(JSON.parse(runPostCall()[1].body)).toEqual({
+      test_uuids: ["test-1"],
+    });
     expect(
       screen.queryByRole("heading", { name: "Update default evaluators?" }),
     ).not.toBeInTheDocument();
@@ -296,19 +338,24 @@ describe("TestsTabContent save-and-run shortcut", () => {
   });
 
   it("runs the already-saved test via onRun without saving (the run-directly / discard path)", async () => {
-    setupFetch({ agentTests: [existingAgentTest] });
+    setupFetch({ agentTests: [existingAgentTest], runTaskId: "task-direct" });
     const user = setupUser();
     render(<TestsTabContent agentUuid={AGENT_UUID} />);
 
     const matches = await screen.findAllByText("Refund test");
     await user.click(matches[0]);
     const dialog = await screen.findByTestId("add-test-dialog");
-    await user.click(within(dialog).getByRole("button", { name: "Run directly" }));
-
-    // The runner opens with the saved test; no PUT was issued (no save).
-    expect(await screen.findByTestId("test-runner")).toHaveTextContent(
-      "runner:Refund test",
+    await user.click(
+      within(dialog).getByRole("button", { name: "Run directly" }),
     );
+
+    // The runner opens on the created run; no PUT was issued (no save).
+    expect(await screen.findByTestId("test-runner")).toHaveTextContent(
+      "runner:task-direct",
+    );
+    expect(JSON.parse(runPostCall()[1].body)).toEqual({
+      test_uuids: ["test-1"],
+    });
     const puts = (global.fetch as jest.Mock).mock.calls.filter(
       ([, init]) => init?.method === "PUT",
     );
@@ -329,6 +376,12 @@ describe("TestsTabContent save-and-run shortcut", () => {
       }
       if (url.includes(`/agent-tests/agent/${AGENT_UUID}/runs`)) {
         return jsonResponse({ items: [], total: 0 });
+      }
+      if (
+        init?.method === "POST" &&
+        url.endsWith(`/agent-tests/agent/${AGENT_UUID}/run`)
+      ) {
+        return jsonResponse({ task_id: "task-stale-list", status: "pending" });
       }
       if (init?.method === "PUT" && url.includes("/tests/test-1")) {
         return jsonResponse({});
@@ -360,8 +413,11 @@ describe("TestsTabContent save-and-run shortcut", () => {
     );
 
     expect(await screen.findByTestId("test-runner")).toHaveTextContent(
-      "runner:Refund test",
+      "runner:task-stale-list",
     );
+    expect(JSON.parse(runPostCall()[1].body)).toEqual({
+      test_uuids: ["test-1"],
+    });
   });
 
   it("falls back to the defaults prompt when the create response has no uuid", async () => {
@@ -376,7 +432,9 @@ describe("TestsTabContent save-and-run shortcut", () => {
     await user.click(screen.getByRole("button", { name: "Submit and run" }));
 
     expect(
-      await screen.findByRole("heading", { name: "Update default evaluators?" }),
+      await screen.findByRole("heading", {
+        name: "Update default evaluators?",
+      }),
     ).toBeInTheDocument();
     expect(screen.queryByTestId("test-runner")).not.toBeInTheDocument();
   });

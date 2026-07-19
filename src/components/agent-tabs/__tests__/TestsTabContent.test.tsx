@@ -3,6 +3,7 @@ import { render, screen, setupUser, waitFor, act } from "@/test-utils";
 import { signOut } from "next-auth/react";
 import { TestsTabContent } from "../TestsTabContent";
 import { showLimitToast } from "@/constants/limits";
+import { toast } from "sonner";
 import {
   readBulkNameConflictMessage,
   readNameConflictMessage,
@@ -38,6 +39,11 @@ jest.mock("../../../lib/reportError", () => ({
 jest.mock("../../../constants/limits", () => ({
   __esModule: true,
   showLimitToast: jest.fn(),
+}));
+
+jest.mock("sonner", () => ({
+  __esModule: true,
+  toast: { error: jest.fn(), success: jest.fn() },
 }));
 
 jest.mock("../../../lib/parseBackendError", () => ({
@@ -88,10 +94,9 @@ jest.mock("../../AddTestDialog", () => ({
         </button>
         <button
           onClick={() =>
-            props.onSubmit(
-              { history: [], evaluation: { type: "response" } },
-              [{ evaluator_uuid: "e1" }],
-            )
+            props.onSubmit({ history: [], evaluation: { type: "response" } }, [
+              { evaluator_uuid: "e1" },
+            ])
           }
         >
           SubmitResponse
@@ -136,16 +141,10 @@ jest.mock("../../TestRunnerDialog", () => ({
     testRunnerProps = props;
     return props.isOpen ? (
       <div data-testid="test-runner-dialog">
-        <div data-testid="runner-test-count">{props.tests.length}</div>
-        <button onClick={() => props.onRunCreated?.("task-1", 2)}>
-          TriggerRunCreated
-        </button>
-        <button
-          onClick={() =>
-            props.onStatusUpdate?.("run-pending", "completed", [], 1, 0)
-          }
-        >
-          TriggerStatusUpdate
+        {/* The dialog is a pure viewer now: it only knows the run id. */}
+        <div data-testid="runner-task-id">{props.taskId}</div>
+        <button onClick={() => props.onNewRun?.("task-rerun", ["t1", "t2"])}>
+          TriggerNewRun
         </button>
         <button onClick={props.onClose}>CloseRunner</button>
       </div>
@@ -249,6 +248,14 @@ function installFetch() {
     if (url.includes("/agent-tests/agent/") && url.endsWith("/runs")) {
       return jsonResponse(state.pastRuns, state.pastRunsInit);
     }
+    // POST /agent-tests/agent/{uuid}/run — starting a run. The component
+    // creates the run here first and only then opens the runner dialog.
+    if (url.includes("/agent-tests/agent/") && url.endsWith("/run")) {
+      return jsonResponse(
+        state.startRun ?? { task_id: "task-new" },
+        state.startRunInit,
+      );
+    }
     if (url.includes("/agent-tests/bulk-delete-tests")) {
       const body = JSON.parse(opts.body);
       return jsonResponse(
@@ -327,6 +334,15 @@ function installFetch() {
     }
     return jsonResponse({});
   }) as any;
+}
+
+// The single POST that starts a run, for body assertions.
+function runPostCall() {
+  return (global.fetch as jest.Mock).mock.calls.find(
+    ([url, init]) =>
+      init?.method === "POST" &&
+      String(url).endsWith("/agent-tests/agent/agent-1/run"),
+  );
 }
 
 function renderComponent(
@@ -595,24 +611,66 @@ describe("TestsTabContent — populated table", () => {
     );
   });
 
-  it("runs a single test via its row Run button", async () => {
+  it("runs a single test via its row Run button — POSTs just that test's uuid", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getAllByTitle("Run test")[0]);
     await screen.findByTestId("test-runner-dialog");
-    expect(screen.getByTestId("runner-test-count")).toHaveTextContent("1");
+    expect(JSON.parse(runPostCall()[1].body)).toEqual({ test_uuids: ["t1"] });
+    // The dialog views the run the POST just created.
+    expect(screen.getByTestId("runner-task-id")).toHaveTextContent("task-new");
   });
 
-  it("runs all tests from the header button", async () => {
+  it("runs all tests from the header button — POSTs no test_uuids", async () => {
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByText("Run all tests"));
     await screen.findByTestId("test-runner-dialog");
-    expect(screen.getByTestId("runner-test-count")).toHaveTextContent("2");
+    // Run-all-linked sends an empty body; the backend reads the link table.
+    expect(JSON.parse(runPostCall()[1].body)).toEqual({});
+    expect(screen.getByTestId("runner-task-id")).toHaveTextContent("task-new");
+  });
+
+  it("runs the selected tests from the bulk toolbar", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByText("Run"));
+    await screen.findByTestId("test-runner-dialog");
+    expect(JSON.parse(runPostCall()[1].body)).toEqual({
+      test_uuids: ["t1", "t2"],
+    });
+  });
+
+  it("does not open the runner and shows an error toast when starting the run fails", async () => {
+    state.startRunInit = { ok: false, status: 500 };
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByText("Run all tests"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+  });
+
+  it("signs out and does not open the runner on a 401 from the run POST", async () => {
+    state.startRunInit = { ok: false, status: 401 };
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByText("Run all tests"));
+    await waitFor(() =>
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" }),
+    );
+    expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it("shows a limit toast when running more tests than allowed", async () => {
@@ -905,15 +963,17 @@ describe("TestsTabContent — create / bulk upload / attach", () => {
     await waitFor(() => {
       const postCall = (global.fetch as jest.Mock).mock.calls.find(
         (c: any[]) =>
-          c[1]?.method === "POST" &&
-          String(c[0]).endsWith("/agent-tests"),
+          c[1]?.method === "POST" && String(c[0]).endsWith("/agent-tests"),
       );
       expect(postCall).toBeTruthy();
     });
   });
 
   it("select-all in the dropdown selects every available test", async () => {
-    state.allTests = [libraryTest, { ...libraryTest, uuid: "t4", name: "Second lib" }];
+    state.allTests = [
+      libraryTest,
+      { ...libraryTest, uuid: "t4", name: "Second lib" },
+    ];
     const user = setupUser();
     renderComponent();
     await screen.findByText("No tests attached");
@@ -965,16 +1025,17 @@ describe("TestsTabContent — benchmark & past runs", () => {
     await screen.findByText("0 models");
   });
 
-  it("adds an optimistic run when a test run is created", async () => {
+  it("adds an optimistic run as soon as a test run is created", async () => {
     state.agentTests = [responseTest];
     const user = setupUser();
     renderComponent();
     await screen.findAllByText("Greeting test");
 
     await user.click(screen.getByText("Run all tests"));
-    await screen.findByTestId("test-runner-dialog");
-    await user.click(screen.getByText("TriggerRunCreated"));
+    // The pending row is added by the parent when the POST returns, before
+    // (and independently of) the dialog reporting anything back.
     await screen.findByText("Running");
+    await screen.findByTestId("test-runner-dialog");
   });
 
   it("renders past-run status pills (breakdown, error, complete)", async () => {
@@ -1043,6 +1104,7 @@ describe("TestsTabContent — benchmark & past runs", () => {
     // label is unambiguous.
     await user.click(screen.getByText("2 tests"));
     await screen.findByTestId("test-runner-dialog");
+    expect(screen.getByTestId("runner-task-id")).toHaveTextContent("run-unit");
   });
 
   it("opens the benchmark results dialog when a benchmark run row is clicked", async () => {
@@ -1068,7 +1130,10 @@ describe("TestsTabContent — benchmark & past runs", () => {
     await screen.findByTestId("benchmark-results-dialog");
   });
 
-  it("reruns a unit-test run: swaps the view dialog for a fresh new-run dialog with the same tests", async () => {
+  it("switches to the new run and prepends its row when the dialog reports a rerun (onNewRun)", async () => {
+    // The dialog now creates the rerun itself and hands the parent the new run
+    // id + the tests it ran; the parent shows the pending row and re-points the
+    // dialog at that run.
     state.agentTests = [responseTest];
     state.pastRuns = [
       {
@@ -1092,25 +1157,18 @@ describe("TestsTabContent — benchmark & past runs", () => {
 
     await user.click(screen.getByText("2 tests"));
     await screen.findByTestId("test-runner-dialog");
+    expect(screen.getByTestId("runner-task-id")).toHaveTextContent("run-unit");
+    expect(screen.queryByText("Running")).not.toBeInTheDocument();
 
-    // Fire the rerun with the exact tests the run executed (as the dialog would
-    // from the run's test_uuids).
     await act(async () => {
-      testRunnerProps.onRerun([
-        { ...responseTest, uuid: "real-1", name: "A" },
-        { ...responseTest, uuid: "real-2", name: "B" },
-      ]);
+      testRunnerProps.onNewRun("task-rerun", ["t1"]);
     });
 
-    // The fresh new-run dialog is open with both tests and not run-all-linked.
-    await screen.findByTestId("test-runner-dialog");
-    expect(screen.getByTestId("runner-test-count")).toHaveTextContent("2");
-    expect(testRunnerProps.taskId).toBeUndefined();
-    expect(testRunnerProps.runAllLinked).toBe(false);
-    expect(testRunnerProps.tests.map((t) => t.uuid)).toEqual([
-      "real-1",
-      "real-2",
-    ]);
+    // Same single dialog, now viewing the new run, plus a pending row for it.
+    expect(screen.getByTestId("runner-task-id")).toHaveTextContent(
+      "task-rerun",
+    );
+    await screen.findByText("Running");
   });
 
   it("reruns a benchmark: opens a direct benchmark dialog with the given models, no picker", async () => {
