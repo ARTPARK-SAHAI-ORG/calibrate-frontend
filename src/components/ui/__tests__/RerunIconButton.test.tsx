@@ -21,4 +21,32 @@ describe("RerunIconButton", () => {
       screen.getByRole("button", { name: "Run again" }),
     ).toBeInTheDocument();
   });
+
+  it("is disabled and ignores clicks while loading", async () => {
+    const onClick = jest.fn();
+    const user = setupUser();
+    render(<RerunIconButton onClick={onClick} loading />);
+
+    const button = screen.getByRole("button", { name: "Rerun" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("aria-busy", "true");
+    expect(button).toHaveClass("cursor-not-allowed");
+
+    await user.click(button);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it("stays clickable when loading is false", async () => {
+    const onClick = jest.fn();
+    const user = setupUser();
+    render(<RerunIconButton onClick={onClick} loading={false} />);
+
+    const button = screen.getByRole("button", { name: "Rerun" });
+    expect(button).toBeEnabled();
+    expect(button).toHaveAttribute("aria-busy", "false");
+    expect(button).toHaveClass("cursor-pointer");
+
+    await user.click(button);
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
 });

@@ -570,6 +570,23 @@ describe("TestRunnerDialog", () => {
     expect(screen.getByText("Past Run")).toBeInTheDocument();
   });
 
+  it("starts only one run when Rerun is clicked twice quickly", async () => {
+    let startRunCalls = 0;
+    renderCompletedRunForRerun(jest.fn(), () => {
+      startRunCalls += 1;
+      // Never settles, so the second click lands while the first is in flight.
+      return new Promise(() => {});
+    });
+
+    const user = setupUser();
+    const rerunButton = await screen.findByRole("button", { name: /Rerun/ });
+    await user.click(rerunButton);
+    await waitFor(() => expect(rerunButton).toBeDisabled());
+    await user.click(rerunButton);
+
+    expect(startRunCalls).toBe(1);
+  });
+
   it("signs out when the rerun is rejected as unauthorized", async () => {
     const { signOut } = require("next-auth/react");
     const onNewRun = jest.fn();

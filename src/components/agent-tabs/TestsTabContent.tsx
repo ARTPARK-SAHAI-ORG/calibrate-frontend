@@ -22,6 +22,7 @@ import {
   makeOptimisticBenchmarkRun,
 } from "@/lib/optimisticRuns";
 import { CompareModelsButton } from "@/components/agent-tabs/CompareModelsButton";
+import { SpinnerIcon } from "@/components/icons";
 import {
   AddTestDialog,
   TestConfig,
@@ -357,6 +358,9 @@ export function TestsTabContent({
   // Test runner dialog state. The dialog is purely a viewer: it is open when
   // we hold the id of a run that was already created here.
   const [openTestRunId, setOpenTestRunId] = useState<string | null>(null);
+  // Key of the run control whose "create run" call is in flight ("all",
+  // "bulk", or a test uuid). Non-null disables every run control.
+  const [startingRun, setStartingRun] = useState<string | null>(null);
 
   // Benchmark dialog state
   const [benchmarkDialogOpen, setBenchmarkDialogOpen] = useState(false);
@@ -1055,9 +1059,19 @@ export function TestsTabContent({
   // The one place a run is started from this tab: create it, show its pending
   // row, then open the dialog on the new run id. Pass `allLinked` to run every
   // test linked to the agent rather than the given subset.
-  const launchTestRun = async (tests: TestData[], allLinked = false) => {
+  // `runKey` identifies the control that was clicked ("all", "bulk", or a test
+  // uuid) so only that one shows a spinner while every run control is disabled.
+  const launchTestRun = async (
+    tests: TestData[],
+    allLinked = false,
+    runKey = "all",
+  ) => {
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     if (!backendUrl) return;
+    // Creating a run is a real, billed call. Ignore repeat clicks until the
+    // in-flight one settles.
+    if (startingRun !== null) return;
+    setStartingRun(runKey);
     try {
       const taskId = await startTestRun(
         backendUrl,
@@ -1074,6 +1088,8 @@ export function TestsTabContent({
       }
       reportError("Error starting test run:", err);
       toast.error("Could not start the test run. Please try again.");
+    } finally {
+      setStartingRun(null);
     }
   };
 
@@ -1083,7 +1099,7 @@ export function TestsTabContent({
   // connection, matching where the shortcut is offered.
   const runSavedTest = (test: TestData) => {
     if (isConnectionUnverified) return;
-    void launchTestRun([test]);
+    void launchTestRun([test], false, test.uuid);
   };
 
   // Test is already saved when this prompt is shown. Declining (Not now / X)
@@ -1921,28 +1937,33 @@ export function TestsTabContent({
                     );
                     return;
                   }
-                  void launchTestRun(agentTests, true);
+                  void launchTestRun(agentTests, true, "all");
                 }}
-                disabled={isConnectionUnverified}
-                className={`h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border transition-colors flex items-center gap-2 bg-sky-500/12 border-sky-500/45 text-sky-950 dark:text-sky-100 ${
-                  isConnectionUnverified
-                    ? "opacity-50 cursor-not-allowed"
+                disabled={isConnectionUnverified || startingRun !== null}
+                aria-busy={startingRun === "all"}
+                className={`h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border transition-colors flex items-center gap-2 bg-sky-500/12 border-sky-500/45 text-sky-950 dark:text-sky-100 disabled:opacity-50 ${
+                  isConnectionUnverified || startingRun !== null
+                    ? "cursor-not-allowed"
                     : "hover:bg-sky-500/22 dark:hover:bg-sky-500/18 cursor-pointer"
                 }`}
               >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
-                  />
-                </svg>
+                {startingRun === "all" ? (
+                  <SpinnerIcon className="w-4 h-4 animate-spin" />
+                ) : (
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
+                    />
+                  </svg>
+                )}
                 <span className="hidden sm:inline">Run all tests</span>
                 <span className="sm:hidden">Run all</span>
               </button>
@@ -2221,29 +2242,34 @@ export function TestsTabContent({
                           selectedTestUuids.has(t.uuid),
                         );
                         if (selected.length === 0) return;
-                        void launchTestRun(selected);
+                        void launchTestRun(selected, false, "bulk");
                         setSelectedTestUuids(new Set());
                       }}
-                      disabled={isConnectionUnverified}
-                      className={`h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background transition-opacity flex items-center gap-1.5 ${
-                        isConnectionUnverified
-                          ? "opacity-50 cursor-not-allowed"
+                      disabled={isConnectionUnverified || startingRun !== null}
+                      aria-busy={startingRun === "bulk"}
+                      className={`h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background transition-opacity flex items-center gap-1.5 disabled:opacity-50 ${
+                        isConnectionUnverified || startingRun !== null
+                          ? "cursor-not-allowed"
                           : "hover:opacity-90 cursor-pointer"
                       }`}
                     >
-                      <svg
-                        className="w-3.5 h-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
-                        />
-                      </svg>
+                      {startingRun === "bulk" ? (
+                        <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
+                          />
+                        </svg>
+                      )}
                       Run
                     </button>
                     {isConnectionUnverified && (
@@ -2371,24 +2397,34 @@ export function TestsTabContent({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              void launchTestRun([test]);
+                              void launchTestRun([test], false, test.uuid);
                             }}
-                            className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
+                            disabled={startingRun !== null}
+                            aria-busy={startingRun === test.uuid}
+                            className={`w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50 ${
+                              startingRun !== null
+                                ? "cursor-not-allowed"
+                                : "cursor-pointer"
+                            }`}
                             title="Run test"
                           >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={1.5}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
-                              />
-                            </svg>
+                            {startingRun === test.uuid ? (
+                              <SpinnerIcon className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={1.5}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
+                                />
+                              </svg>
+                            )}
                           </button>
                         </div>
                         {/* Duplicate Button — opens the create dialog pre-filled
@@ -2484,24 +2520,34 @@ export function TestsTabContent({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              void launchTestRun([test]);
+                              void launchTestRun([test], false, test.uuid);
                             }}
-                            className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
+                            disabled={startingRun !== null}
+                            aria-busy={startingRun === test.uuid}
+                            className={`w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50 ${
+                              startingRun !== null
+                                ? "cursor-not-allowed"
+                                : "cursor-pointer"
+                            }`}
                             title="Run test"
                           >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={1.5}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
-                              />
-                            </svg>
+                            {startingRun === test.uuid ? (
+                              <SpinnerIcon className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={1.5}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
+                                />
+                              </svg>
+                            )}
                           </button>
                           <button
                             onClick={(e) => {

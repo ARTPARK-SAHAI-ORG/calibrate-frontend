@@ -685,6 +685,158 @@ describe("TestsTabContent — populated table", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Double-click guard: creating a run is a real, billed call, so every run
+// control locks while one POST is in flight and only the clicked one spins.
+// ---------------------------------------------------------------------------
+
+describe("TestsTabContent — run controls while a run is starting", () => {
+  // Holds the run POST open so the in-flight state can be observed.
+  let releaseRunPost: (() => void) | null = null;
+
+  beforeEach(() => {
+    state.agentTests = [responseTest, toolCallTest];
+    releaseRunPost = null;
+    const routedFetch = global.fetch as jest.Mock;
+    global.fetch = jest.fn(async (url: string, opts: RequestInit = {}) => {
+      if (
+        opts.method === "POST" &&
+        String(url).endsWith("/agent-tests/agent/agent-1/run")
+      ) {
+        await new Promise<void>((resolve) => {
+          releaseRunPost = resolve;
+        });
+      }
+      return routedFetch(url, opts);
+    }) as unknown as typeof fetch;
+  });
+
+  // The row Run buttons render twice per test (desktop table + mobile card).
+  const runTestButtons = () => screen.getAllByTitle("Run test");
+  const runAllButton = () =>
+    screen.getByText("Run all tests").closest("button") as HTMLButtonElement;
+
+  async function release() {
+    await act(async () => {
+      releaseRunPost?.();
+      await Promise.resolve();
+    });
+  }
+
+  it("disables every run control and spins the clicked row button", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    const clicked = runTestButtons()[0];
+    await user.click(clicked);
+
+    await waitFor(() => expect(clicked).toBeDisabled());
+    expect(clicked.querySelector(".animate-spin")).toBeInTheDocument();
+    // Every other run control locks too, so a second run cannot be started
+    // from a different button.
+    runTestButtons()
+      .slice(1)
+      .forEach((btn) => expect(btn).toBeDisabled());
+    expect(runAllButton()).toBeDisabled();
+    // Only the clicked control spins.
+    expect(
+      runTestButtons()[1].querySelector(".animate-spin"),
+    ).not.toBeInTheDocument();
+
+    await release();
+    await screen.findByTestId("test-runner-dialog");
+    await waitFor(() => expect(runAllButton()).not.toBeDisabled());
+    runTestButtons().forEach((btn) => expect(btn).not.toBeDisabled());
+  });
+
+  it("does not start a second run when a row button is clicked twice", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    const clicked = runTestButtons()[0];
+    await user.click(clicked);
+    await waitFor(() => expect(clicked).toBeDisabled());
+    // Same button again, and a sibling control, while the first POST is open.
+    await user.click(clicked);
+    await user.click(runAllButton());
+
+    expect(
+      (global.fetch as jest.Mock).mock.calls.filter(
+        ([url, init]) =>
+          init?.method === "POST" &&
+          String(url).endsWith("/agent-tests/agent/agent-1/run"),
+      ),
+    ).toHaveLength(1);
+
+    await release();
+  });
+
+  it("spins the header Run all button and re-enables it after the run starts", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(runAllButton());
+    await waitFor(() => expect(runAllButton()).toBeDisabled());
+    expect(runAllButton().querySelector(".animate-spin")).toBeInTheDocument();
+    runTestButtons().forEach((btn) => expect(btn).toBeDisabled());
+
+    await release();
+    await screen.findByTestId("test-runner-dialog");
+    await waitFor(() => expect(runAllButton()).not.toBeDisabled());
+    expect(
+      runAllButton().querySelector(".animate-spin"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("disables the bulk Run button while another run is starting", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    // Start a run from a row, then open the bulk toolbar: its Run button is
+    // locked too, so the in-flight POST cannot be doubled from there.
+    await user.click(runTestButtons()[0]);
+    await waitFor(() => expect(runTestButtons()[0]).toBeDisabled());
+    await user.click(screen.getByTitle("Select all"));
+
+    const bulkRun = screen.getByRole("button", { name: "Run" });
+    expect(bulkRun).toBeDisabled();
+    await user.click(bulkRun);
+    expect(
+      (global.fetch as jest.Mock).mock.calls.filter(
+        ([url, init]) =>
+          init?.method === "POST" &&
+          String(url).endsWith("/agent-tests/agent/agent-1/run"),
+      ),
+    ).toHaveLength(1);
+
+    await release();
+    await screen.findByTestId("test-runner-dialog");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Run" })).not.toBeDisabled(),
+    );
+  });
+
+  it("re-enables the run controls after a failed run POST", async () => {
+    state.startRunInit = { ok: false, status: 500 };
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(runAllButton());
+    await waitFor(() => expect(runAllButton()).toBeDisabled());
+
+    await release();
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    await waitFor(() => expect(runAllButton()).not.toBeDisabled());
+    runTestButtons().forEach((btn) => expect(btn).not.toBeDisabled());
+    expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+  });
+});
+
 describe("TestsTabContent — test deep-link (?testId)", () => {
   beforeEach(() => {
     state.agentTests = [responseTest, toolCallTest];

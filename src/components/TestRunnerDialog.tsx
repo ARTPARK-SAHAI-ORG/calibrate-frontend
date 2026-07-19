@@ -98,6 +98,9 @@ export function TestRunnerDialog({
   // the Summary tab on completion (mirrors the benchmark dialog).
   const [activeTab, setActiveTab] = useState<"summary" | "outputs">("outputs");
   const [addToTaskOpen, setAddToTaskOpen] = useState(false);
+  // Guards the rerun POST: a test run is billed, so a second click while the
+  // first request is in flight must not start a second run.
+  const [isStartingRun, setIsStartingRun] = useState(false);
   const {
     selected: labellingSelectedIds,
     toggle: toggleLabellingSelection,
@@ -295,12 +298,13 @@ export function TestRunnerDialog({
   // Start a fresh run of the same tests and hand it to the parent, which
   // re-points `taskId` so this dialog loads it.
   const startRun = async (testUuids: string[]) => {
-    if (testUuids.length === 0) return;
+    if (testUuids.length === 0 || isStartingRun) return;
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     if (!backendUrl) {
       toast.error("Cannot start a run: the backend URL is not configured.");
       return;
     }
+    setIsStartingRun(true);
     try {
       const newTaskId = await startTestRun(
         backendUrl,
@@ -316,6 +320,8 @@ export function TestRunnerDialog({
       }
       reportError("Error starting test run:", error);
       toast.error("Could not start the run. Please try again.");
+    } finally {
+      setIsStartingRun(false);
     }
   };
 
@@ -350,6 +356,7 @@ export function TestRunnerDialog({
                 {runStatus === "done" && onNewRun && runTestUuids.length > 0 && (
                   <RerunIconButton
                     onClick={() => startRun(runTestUuids)}
+                    loading={isStartingRun}
                     className="shrink-0"
                   />
                 )}

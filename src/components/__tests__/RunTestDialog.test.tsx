@@ -1,5 +1,7 @@
-import { render, screen, setupUser } from "@/test-utils";
+import { act, render, screen, setupUser } from "@/test-utils";
 import { RunTestDialog } from "../RunTestDialog";
+
+jest.mock("../../lib/reportError", () => ({ reportError: jest.fn() }));
 
 // AgentPicker fetches agents over raw `fetch` when an access token exists.
 // No token is present in jsdom's default localStorage, so its effect is a
@@ -189,5 +191,69 @@ describe("RunTestDialog", () => {
     );
 
     expect(screen.getByRole("button", { name: /Run test/ })).toBeDisabled();
+  });
+
+  it("disables Run test and shows a spinner while the run is starting, and ignores a second click", async () => {
+    const user = setupUser();
+    let resolveRun: () => void = () => {};
+    const onRunTest = jest.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRun = resolve;
+        }),
+    );
+    render(
+      <RunTestDialog
+        isOpen
+        onClose={jest.fn()}
+        testName="My Test"
+        testUuid="t1"
+        onRunTest={onRunTest}
+      />,
+    );
+
+    await user.click(screen.getByText("Select an agent"));
+    const runButton = screen.getByRole("button", { name: /Run test/ });
+    await user.click(runButton);
+
+    expect(onRunTest).toHaveBeenCalledTimes(1);
+    expect(runButton).toBeDisabled();
+    expect(runButton.querySelector(".animate-spin")).toBeInTheDocument();
+
+    // A second click while the run is starting must not create a second run.
+    await user.click(runButton);
+    expect(onRunTest).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveRun();
+    });
+    expect(runButton).toBeEnabled();
+    expect(runButton.querySelector(".animate-spin")).not.toBeInTheDocument();
+  });
+
+  it("re-enables Run test when onRunTest rejects", async () => {
+    const user = setupUser();
+    const onRunTest = jest.fn(() => Promise.reject(new Error("boom")));
+    render(
+      <RunTestDialog
+        isOpen
+        onClose={jest.fn()}
+        testName="My Test"
+        testUuid="t1"
+        onRunTest={onRunTest}
+      />,
+    );
+
+    await user.click(screen.getByText("Select an agent"));
+    const runButton = screen.getByRole("button", { name: /Run test/ });
+    await user.click(runButton);
+
+    expect(onRunTest).toHaveBeenCalledTimes(1);
+    expect(runButton).toBeEnabled();
+    expect(runButton.querySelector(".animate-spin")).not.toBeInTheDocument();
+
+    // The button still works after a failure.
+    await user.click(runButton);
+    expect(onRunTest).toHaveBeenCalledTimes(2);
   });
 });
