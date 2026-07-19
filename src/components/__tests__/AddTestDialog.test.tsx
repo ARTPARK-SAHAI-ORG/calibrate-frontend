@@ -765,14 +765,13 @@ describe("AddTestDialog", () => {
       expect(descriptionBox).toHaveValue("Some notes");
     });
 
-    it("never offers the run shortcut even when showRunAfterSave is set", () => {
+    it("never offers the run shortcut for a labelling item", () => {
       render(
         <AddTestDialog
           {...baseProps({
             mode: "labelItem",
             itemDescription: "",
             setItemDescription: jest.fn(),
-            showRunAfterSave: true,
           })}
         />,
       );
@@ -783,15 +782,7 @@ describe("AddTestDialog", () => {
   });
 
   describe("save-and-run shortcut", () => {
-    it("does not render the run button unless showRunAfterSave is set", async () => {
-      render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
-      await waitFor(() => expect(screen.getByText("Correctness")).toBeInTheDocument());
-      expect(
-        screen.queryByRole("button", { name: /Run test/ }),
-      ).not.toBeInTheDocument();
-    });
-
-    it("renders 'Run test' when editing with showRunAfterSave", async () => {
+    it("renders 'Run test' when editing", async () => {
       const initialConfig: TestConfig = {
         history: [
           { role: "user", content: "Hi" },
@@ -807,7 +798,6 @@ describe("AddTestDialog", () => {
             initialTab: "next-reply",
             initialConfig,
             testName: "Existing",
-            showRunAfterSave: true,
           })}
         />,
       );
@@ -826,7 +816,6 @@ describe("AddTestDialog", () => {
           {...baseProps({
             initialTab: "next-reply",
             onSubmit,
-            showRunAfterSave: true,
           })}
         />,
       );
@@ -863,8 +852,7 @@ describe("AddTestDialog", () => {
           <ControlledDialog
             {...baseProps({
               initialTab: "next-reply",
-              showRunAfterSave: true,
-              isCreating: creating,
+                isCreating: creating,
               onSubmit: () => setCreating(true),
             })}
           />
@@ -924,7 +912,6 @@ describe("AddTestDialog", () => {
             initialConfig: editConfig,
             initialEvaluators: editEvaluators,
             testName: "Existing",
-            showRunAfterSave: true,
             ...overrides,
           })}
         />,

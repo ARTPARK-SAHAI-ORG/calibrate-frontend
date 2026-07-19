@@ -58,9 +58,9 @@ jest.mock("../CompareModelsButton", () => ({
   CompareModelsButton: () => null,
 }));
 
-// The dialog stub sets a name on open, forwards `showRunAfterSave` for
-// assertion, and exposes two submit buttons: a plain save and a save-and-run
-// that passes the `runAfterSave` intent through onSubmit.
+// The dialog stub sets a name on open and exposes two submit buttons: a plain
+// save and a save-and-run that passes the `runAfterSave` intent through
+// onSubmit.
 jest.mock("../../AddTestDialog", () => ({
   AddTestDialog: ({
     isOpen,
@@ -68,7 +68,6 @@ jest.mock("../../AddTestDialog", () => ({
     testName,
     setTestName,
     isEditing,
-    showRunAfterSave,
     onRun,
   }: {
     isOpen: boolean;
@@ -80,7 +79,6 @@ jest.mock("../../AddTestDialog", () => ({
     testName: string;
     setTestName: (name: string) => void;
     isEditing: boolean;
-    showRunAfterSave?: boolean;
     onRun?: () => void;
   }) => {
     useEffect(() => {
@@ -95,7 +93,6 @@ jest.mock("../../AddTestDialog", () => ({
       <div
         data-testid="add-test-dialog"
         data-editing={String(isEditing)}
-        data-run={String(!!showRunAfterSave)}
       >
         <button
           type="button"
@@ -235,18 +232,6 @@ beforeEach(() => {
 });
 
 describe("TestsTabContent save-and-run shortcut", () => {
-  it("passes showRunAfterSave to the dialog for a verified agent", async () => {
-    const user = setupUser();
-    render(<TestsTabContent agentUuid={AGENT_UUID} />);
-
-    await screen.findByRole("button", { name: "Create test" });
-    await user.click(screen.getByRole("button", { name: "Create test" }));
-    expect(screen.getByTestId("add-test-dialog")).toHaveAttribute(
-      "data-run",
-      "true",
-    );
-  });
-
   it("offers the shortcut for an unverified connection agent and diverts it to the verify gate", async () => {
     const user = setupUser();
     render(
@@ -259,12 +244,6 @@ describe("TestsTabContent save-and-run shortcut", () => {
 
     await screen.findByRole("button", { name: "Create test" });
     await user.click(screen.getByRole("button", { name: "Create test" }));
-    // The shortcut is now always offered; the verify gate handles unverified.
-    expect(screen.getByTestId("add-test-dialog")).toHaveAttribute(
-      "data-run",
-      "true",
-    );
-
     await user.click(screen.getByRole("button", { name: "Submit and run" }));
 
     // Instead of the runner, the verify-to-run gate opens.

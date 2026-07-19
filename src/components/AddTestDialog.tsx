@@ -770,11 +770,15 @@ type AddTestDialogProps = {
    */
   requireAssistantLastMessage?: boolean;
   /**
-   * When true, the footer shows an extra "Run test" button next to the
-   * primary Save action. Only offered in the default `mode === "test"` flow.
-   * Set by the agent Tests tab (runs against that agent) and the standalone
-   * tests page (which opens an agent picker first); labelling-item callers
-   * leave it unset.
+   * Runs the currently-saved test without saving the form. Used for the
+   * "run directly" and "discard and run" paths below. The parent is
+   * responsible for closing this dialog and opening its runner. Required for
+   * the run button to fully work when editing; create-only contexts may omit
+   * it.
+   *
+   * The footer shows an extra "Run test" button next to the primary Save
+   * action in the default `mode === "test"` flow. Labelling items never get
+   * it.
    *
    * Run semantics (Save and Run stay separate actions):
    * - Editing with NO unsaved edits → runs the already-saved test directly
@@ -784,14 +788,6 @@ type AddTestDialogProps = {
    *   (runs the saved version via `onRun`, dropping the edits).
    * - Creating → there's no saved version, so it always creates and runs via
    *   `onSubmit({ runAfterSave: true })`.
-   */
-  showRunAfterSave?: boolean;
-  /**
-   * Runs the currently-saved test without saving the form. Used for the
-   * "run directly" and "discard and run" paths above. The parent is
-   * responsible for closing this dialog and opening its runner. Required
-   * (alongside `showRunAfterSave`) for the run button to fully work when
-   * editing; create-only contexts may omit it.
    */
   onRun?: () => void;
 };
@@ -818,7 +814,6 @@ export function AddTestDialog({
   mode = "test",
   allowAgentLastMessage = false,
   requireAssistantLastMessage = false,
-  showRunAfterSave = false,
   onRun,
 }: AddTestDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
@@ -3947,8 +3942,8 @@ export function AddTestDialog({
                   const isButtonDisabled =
                     isCreating || isLoading || isLastMessageInvalid;
                   // The "Save and run" shortcut is only offered in the default
-                  // test flow (not labelling items) when the parent can run.
-                  const canRunAfterSave = showRunAfterSave && !isLabelItem;
+                  // test flow, never for labelling items.
+                  const canRunAfterSave = !isLabelItem;
                   const spinner = (
                     <svg
                       className="w-4 h-4 animate-spin"

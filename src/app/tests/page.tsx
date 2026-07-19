@@ -1891,7 +1891,6 @@ function LLMPageInner() {
           initialTab={initialTab}
           initialConfig={initialConfig}
           initialEvaluators={initialEvaluators}
-          showRunAfterSave
           onRun={() => {
             // Run the already-saved version of the test being edited (the
             // "run directly" / "discard and run" path). Build the run target
