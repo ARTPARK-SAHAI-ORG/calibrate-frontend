@@ -9,13 +9,15 @@ import {
   Suspense,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { toast } from "sonner";
 import { signOut } from "next-auth/react";
-import { useAccessToken, useDialogUrlParam } from "@/hooks";
+import {
+  useAccessToken,
+  useDialogUrlParam,
+  useStartTestRun,
+} from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { bulkDeleteTests } from "@/lib/testsApi";
 import { buildTestToRun } from "@/lib/testRun";
-import { startAgentTestRun } from "@/lib/agentTestRun";
 import { AppLayout } from "@/components/AppLayout";
 import {
   ToolPicker,
@@ -258,9 +260,7 @@ function LLMPageInner() {
   // The run this page started for the runner dialog to display. The page owns
   // starting the run, the dialog only shows it.
   const [testRunnerTaskId, setTestRunnerTaskId] = useState<string | null>(null);
-  // Guards the window between the start POST going out and it coming back, so a
-  // second click cannot fire a duplicate run.
-  const startingRunRef = useRef(false);
+  const startTestRun = useStartTestRun();
 
   // Direct benchmark rerun (fresh benchmark, same models + test subset, no
   // picker).
@@ -599,36 +599,19 @@ function LLMPageInner() {
     agentName: string,
     testsForRun: TestData[],
   ) => {
-    if (startingRunRef.current) return;
-    startingRunRef.current = true;
+    await startTestRun({
+      agentUuid,
+      tests: testsForRun,
+      onStarted: (taskId) => {
+        // Optimistic row in the Runs list, the pending-run poller fills it in.
+        prependOptimisticTestRun(taskId, testsForRun, agentUuid, agentName);
 
-    try {
-      const taskId = await startAgentTestRun({
-        agentUuid,
-        testUuids: testsForRun.map((t) => t.uuid),
-        accessToken: backendAccessToken,
-      });
-
-      // null means the session expired and the user is being signed out.
-      if (!taskId) return;
-
-      // Optimistic row in the Runs list, the pending-run poller fills it in.
-      prependOptimisticTestRun(taskId, testsForRun, agentUuid, agentName);
-
-      setTestRunnerTaskId(taskId);
-      setTestRunnerAgentUuid(agentUuid);
-      setTestRunnerAgentName(agentName);
-      setTestRunnerOpen(true);
-    } catch (err) {
-      // A failed run start is not a list-load failure, so it must not replace
-      // the tests list with the full-page error panel.
-      reportError("Error starting test run:", err);
-      toast.error(
-        err instanceof Error ? err.message : "Failed to start test run"
-      );
-    } finally {
-      startingRunRef.current = false;
-    }
+        setTestRunnerTaskId(taskId);
+        setTestRunnerAgentUuid(agentUuid);
+        setTestRunnerAgentName(agentName);
+        setTestRunnerOpen(true);
+      },
+    });
   };
 
   // Handle running the test

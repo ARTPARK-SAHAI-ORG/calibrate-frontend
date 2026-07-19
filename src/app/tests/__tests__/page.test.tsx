@@ -27,9 +27,12 @@ jest.mock("../../../components/AppLayout", () => ({
   useHideFloatingButton: () => {},
 }));
 
-jest.mock("../../../hooks", () => ({
-  ...jest.requireActual("../../../hooks"),
+// Mocked at the leaf module, not the "hooks" barrel: the page reads the token
+// through the barrel, but useStartTestRun imports this module directly, so both
+// have to see the same token.
+jest.mock("../../../hooks/useAccessToken", () => ({
   useAccessToken: () => "test-token",
+  useAuth: () => ({ accessToken: "test-token", isAuthenticated: true }),
 }));
 
 // Jest mocks are keyed by resolved path, and the "@/" alias does not resolve
@@ -150,6 +153,9 @@ describe("/tests run start", () => {
     expect(mockStartAgentTestRun).toHaveBeenCalledWith({
       agentUuid: "agent-1",
       testUuids: ["test-1"],
+      // This page never runs the agent's whole linked set, it always names the
+      // tests to run.
+      runAllLinked: undefined,
       accessToken: "test-token",
     });
   });
@@ -189,6 +195,7 @@ describe("/tests run start", () => {
     expect(mockStartAgentTestRun).toHaveBeenLastCalledWith({
       agentUuid: "agent-1",
       testUuids: ["test-9"],
+      runAllLinked: undefined,
       accessToken: "test-token",
     });
   });

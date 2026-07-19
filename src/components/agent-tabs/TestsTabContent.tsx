@@ -3,16 +3,15 @@ import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { signOut } from "next-auth/react";
-import { toast } from "sonner";
 import {
   useAccessToken,
   useMaxRowsPerEval,
   useDialogUrlParam,
   useVerifyConnection,
+  useStartTestRun,
 } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { buildTestToRun } from "@/lib/testRun";
-import { startAgentTestRun } from "@/lib/agentTestRun";
 
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
@@ -376,10 +375,9 @@ export function TestsTabContent({
   const [testRunTaskId, setTestRunTaskId] = useState<string | undefined>(
     undefined,
   );
-  // True while the start-run request is in flight. A ref (not state) because
-  // it only needs to gate the next click synchronously, and flipping it must
-  // not re-render the table.
-  const isStartingRunRef = useRef(false);
+  // Shared start-run call: repeat-click guard, expired-session bail and
+  // failure toast all live in the hook.
+  const startTestRun = useStartTestRun();
 
   // Verify-to-run gate. When an unverified connection agent tries to run
   // tests, we stash the intended run here and open the verify dialog instead
@@ -1097,32 +1095,21 @@ export function TestsTabContent({
   const beginRun = async (
     tests: TestData[],
     runAll: boolean,
-    onStarted?: () => void,
+    // The caller's own side effect, e.g. the bulk action clearing its ticked
+    // rows. Named apart from the hook's `onStarted` option below.
+    onRunStarted?: () => void,
   ) => {
-    // Ignore repeat clicks while the POST is in flight, so one press is one run.
-    if (isStartingRunRef.current) return;
-    isStartingRunRef.current = true;
-    try {
-      const taskId = await startAgentTestRun({
-        agentUuid,
-        testUuids: tests.map((t) => t.uuid),
-        runAllLinked: runAll,
-        accessToken: backendAccessToken,
-      });
-      // null means the session expired and the user is being signed out.
-      if (!taskId) return;
-      setTestRunTaskId(taskId);
-      setTestRunnerOpen(true);
-      addOptimisticTestRun(taskId, tests);
-      onStarted?.();
-    } catch (err) {
-      reportError("Error starting test run:", err);
-      toast.error(
-        err instanceof Error ? err.message : "Failed to start test run",
-      );
-    } finally {
-      isStartingRunRef.current = false;
-    }
+    await startTestRun({
+      agentUuid,
+      tests,
+      runAllLinked: runAll,
+      onStarted: (taskId) => {
+        setTestRunTaskId(taskId);
+        setTestRunnerOpen(true);
+        addOptimisticTestRun(taskId, tests);
+        onRunStarted?.();
+      },
+    });
   };
 
   // Single gate for every run entry point (header "Run all", bulk "Run",

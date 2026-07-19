@@ -51,6 +51,10 @@ jest.mock("../../../hooks", () => ({
     verifyAdHoc: jest.fn(),
     dismiss: verifyDismissMock,
   }),
+  // Keep the real start-run hook so the in-flight guard, the 401 bail and the
+  // failure toast are still exercised through the fetch router below.
+  useStartTestRun: () =>
+    jest.requireActual("../../../hooks/useStartTestRun").useStartTestRun(),
 }));
 
 let verifyToRunProps: any = null;

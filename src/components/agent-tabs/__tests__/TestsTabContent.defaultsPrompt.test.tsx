@@ -28,6 +28,9 @@ jest.mock("../../../hooks", () => ({
     verifyAdHoc: jest.fn(),
     dismiss: jest.fn(),
   }),
+  // Keep the real start-run hook so a run still goes through the fetch router.
+  useStartTestRun: () =>
+    jest.requireActual("../../../hooks/useStartTestRun").useStartTestRun(),
 }));
 
 jest.mock("../../../lib/reportError", () => ({
