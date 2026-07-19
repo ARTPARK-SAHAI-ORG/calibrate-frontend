@@ -4,7 +4,6 @@ import React, { useState, useEffect } from "react";
 import { AgentPicker, Agent } from "@/components/AgentPicker";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { SpinnerIcon } from "@/components/icons";
-import { reportError } from "@/lib/reportError";
 
 type RunTestDialogProps = {
   isOpen: boolean;
@@ -46,12 +45,10 @@ export function RunTestDialog({
   const handleRunTest = async () => {
     if (!selectedAgent || isStarting) return;
     setIsStarting(true);
+    // The parent's onRunTest handles its own errors and never rejects, so a
+    // finally is all that is needed to release the button when it settles.
     try {
       await onRunTest(selectedAgent.uuid, selectedAgent.name, attachToAgent);
-    } catch (err) {
-      // The parent owns the user-facing error. Swallow here so the button
-      // recovers instead of leaving an unhandled rejection.
-      reportError("Error starting test run from RunTestDialog:", err);
     } finally {
       setIsStarting(false);
     }

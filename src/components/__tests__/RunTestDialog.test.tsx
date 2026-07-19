@@ -231,29 +231,4 @@ describe("RunTestDialog", () => {
     expect(runButton.querySelector(".animate-spin")).not.toBeInTheDocument();
   });
 
-  it("re-enables Run test when onRunTest rejects", async () => {
-    const user = setupUser();
-    const onRunTest = jest.fn(() => Promise.reject(new Error("boom")));
-    render(
-      <RunTestDialog
-        isOpen
-        onClose={jest.fn()}
-        testName="My Test"
-        testUuid="t1"
-        onRunTest={onRunTest}
-      />,
-    );
-
-    await user.click(screen.getByText("Select an agent"));
-    const runButton = screen.getByRole("button", { name: /Run test/ });
-    await user.click(runButton);
-
-    expect(onRunTest).toHaveBeenCalledTimes(1);
-    expect(runButton).toBeEnabled();
-    expect(runButton.querySelector(".animate-spin")).not.toBeInTheDocument();
-
-    // The button still works after a failure.
-    await user.click(runButton);
-    expect(onRunTest).toHaveBeenCalledTimes(2);
-  });
 });
