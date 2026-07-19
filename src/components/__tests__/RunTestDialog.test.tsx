@@ -280,10 +280,10 @@ describe("RunTestDialog", () => {
     expect(screen.getByRole("button", { name: /Run test/ })).toBeDisabled();
   });
 
-  it("cannot be dismissed while verifying", async () => {
-    // Dismissing mid-check used to leave the check running, so the run still
-    // started once it came back. Every way out is closed while it is in
-    // flight, not just Cancel.
+  it("can still be dismissed while verifying", async () => {
+    // The check has no timeout, so freezing the dialog would trap the user
+    // whenever the agent endpoint hangs. Cancel, the X and the backdrop all
+    // stay live mid-check.
     const user = setupUser();
     const onClose = jest.fn();
     const onRunTest = jest.fn();
@@ -306,20 +306,57 @@ describe("RunTestDialog", () => {
     await user.click(screen.getByRole("button", { name: /Run test/ }));
     await user.click(screen.getByRole("button", { name: "Verify" }));
 
-    // Mid-check: Cancel, the X, and the backdrop are all inert.
-    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
     const buttons = screen.getAllByRole("button");
     await user.click(buttons[0]);
     const backdrop = container.querySelector(
       ".absolute.inset-0.bg-black\\/50",
     ) as HTMLElement;
     await user.click(backdrop);
-    expect(onClose).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(3);
     expect(onRunTest).not.toHaveBeenCalled();
 
     await act(async () => {
       releaseVerify();
     });
+  });
+
+  it("abandons the run when the dialog is closed mid-check, and keeps no stale agent", async () => {
+    // Closing cancels the run. The check keeps going, but the resume path must
+    // notice the dialog is gone and neither run nor write the agent back.
+    const user = setupUser();
+    const onRunTest = jest.fn();
+    let releaseVerify: () => void = () => {};
+    mockVerifyHold.promise = new Promise<void>((resolve) => {
+      releaseVerify = resolve;
+    });
+
+    const props = {
+      testName: "My Test",
+      testUuid: "t1",
+      onClose: jest.fn(),
+      onRunTest,
+    };
+    const { rerender } = render(<RunTestDialog isOpen {...props} />);
+
+    await user.click(screen.getByText("Select unverified connection"));
+    await user.click(screen.getByRole("button", { name: /Run test/ }));
+    await user.click(screen.getByRole("button", { name: "Verify" }));
+
+    // The parent closes the dialog while the check is still in flight.
+    rerender(<RunTestDialog isOpen={false} {...props} />);
+    await act(async () => {
+      releaseVerify();
+      await Promise.resolve();
+    });
+
+    expect(onRunTest).not.toHaveBeenCalled();
+
+    // Reopening starts clean: no agent carried over from the abandoned check.
+    rerender(<RunTestDialog isOpen {...props} />);
+    expect(screen.getByRole("button", { name: /Run test/ })).toBeDisabled();
+    expect(onRunTest).not.toHaveBeenCalled();
   });
 
   it("diverts to the verify gate for an unverified connection agent instead of running", async () => {

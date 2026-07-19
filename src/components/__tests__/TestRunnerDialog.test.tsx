@@ -55,9 +55,9 @@ jest.mock("../ExportResultsButton", () => ({
 
 jest.mock("../human-labelling/AddRunToLabellingTaskDialog", () => ({
   __esModule: true,
-  AddRunToLabellingTaskDialog: ({ isOpen, onClose }: any) =>
+  AddRunToLabellingTaskDialog: ({ isOpen, onClose, source }: any) =>
     isOpen ? (
-      <div data-testid="labelling-dialog">
+      <div data-testid="labelling-dialog" data-run-uuid={source?.runUuid}>
         <button onClick={onClose}>Close labelling</button>
       </div>
     ) : null,
@@ -565,6 +565,47 @@ describe("TestRunnerDialog", () => {
 
       await user.click(screen.getByRole("button", { name: "Close labelling" }));
       expect(screen.queryByTestId("labelling-dialog")).not.toBeInTheDocument();
+    });
+
+    it("drives the share button and the labelling dialog off the taskId it was handed", async () => {
+      // The taskId prop is the single source of truth for the run identity, so
+      // the run-scoped surfaces must both point at it.
+      await renderDoneRun();
+      expect(screen.getByTestId("share-button")).toBeInTheDocument();
+
+      const user = setupUser();
+      await user.click(screen.getByRole("button", { name: "Outputs" }));
+      await user.click(
+        screen.getByRole("button", { name: "toggle-labelling-test-1" }),
+      );
+      await user.click(
+        screen.getByRole("button", { name: "Submit for labelling" }),
+      );
+      expect(screen.getByTestId("labelling-dialog")).toHaveAttribute(
+        "data-run-uuid",
+        "task-label",
+      );
+    });
+
+    it("keeps the share button and labelling entry point after a poll failure", async () => {
+      // A failed poll used to null a separate run-id state. The run-scoped
+      // surfaces read the taskId prop, so they must survive that failure.
+      await renderDoneRun();
+      const user = setupUser();
+      await user.click(screen.getByRole("button", { name: "Outputs" }));
+      await user.click(
+        screen.getByRole("button", { name: "toggle-labelling-test-1" }),
+      );
+
+      (global.fetch as jest.Mock).mockRejectedValue(new Error("network down"));
+
+      await user.click(
+        screen.getByRole("button", { name: "Submit for labelling" }),
+      );
+      expect(screen.getByTestId("labelling-dialog")).toHaveAttribute(
+        "data-run-uuid",
+        "task-label",
+      );
     });
 
     it("exports run results as CSV rows via the export button", async () => {

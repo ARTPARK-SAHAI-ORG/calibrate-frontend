@@ -185,7 +185,6 @@ export function TestRunnerDialog({
   const [runStatus, setRunStatus] = useState<
     "queued" | "in_progress" | "done" | "failed"
   >("queued");
-  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [runName, setRunName] = useState<string | null>(null);
   const [isPublic, setIsPublic] = useState(false);
   const [shareToken, setShareToken] = useState<string | null>(null);
@@ -282,7 +281,6 @@ export function TestRunnerDialog({
     setNav(null);
     hasAutoSelectedRef.current = false;
     clearLabellingSelection();
-    setCurrentTaskId(null);
     setRunName(null);
     setIsPublic(false);
     setShareToken(null);
@@ -315,7 +313,6 @@ export function TestRunnerDialog({
     setSelectedTestUuid(null);
     hasAutoSelectedRef.current = false;
     clearLabellingSelection();
-    setCurrentTaskId(taskId);
     setRunEvaluators([]);
     setRunTestUuids([]);
     resetSummary();
@@ -536,7 +533,6 @@ export function TestRunnerDialog({
       setRunStatus("failed");
       setIsRunning(false);
       setIsLoadingResults(false);
-      setCurrentTaskId(null);
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
@@ -675,7 +671,7 @@ export function TestRunnerDialog({
             {runStatus === "done" &&
               testResults.length > 0 &&
               hasLabellingEligibleTests &&
-              (currentTaskId || taskId) && (
+              taskId && (
                 <div className="hidden md:block">
                   <button
                     type="button"
@@ -711,19 +707,17 @@ export function TestRunnerDialog({
                 </div>
               )}
             {/* Share button — only shown when run is done and we have a taskId */}
-            {runStatus === "done" &&
-              (currentTaskId || taskId) &&
-              backendAccessToken && (
-                <div className="hidden md:block">
-                  <ShareButton
-                    entityType="test-run"
-                    entityId={(currentTaskId || taskId)!}
-                    accessToken={backendAccessToken}
-                    initialIsPublic={isPublic}
-                    initialShareToken={shareToken}
-                  />
-                </div>
-              )}
+            {runStatus === "done" && taskId && backendAccessToken && (
+              <div className="hidden md:block">
+                <ShareButton
+                  entityType="test-run"
+                  entityId={taskId}
+                  accessToken={backendAccessToken}
+                  initialIsPublic={isPublic}
+                  initialShareToken={shareToken}
+                />
+              </div>
+            )}
             <button
               onClick={onClose}
               data-tour="run-close"
@@ -908,13 +902,13 @@ export function TestRunnerDialog({
           </div>
         )}
       </div>
-      {(currentTaskId || taskId) && (
+      {taskId && (
         <AddRunToLabellingTaskDialog
           isOpen={addToTaskOpen}
           onClose={() => setAddToTaskOpen(false)}
           source={{
             type: "test_run",
-            runUuid: (currentTaskId || taskId)!,
+            runUuid: taskId,
             runName: runName ?? undefined,
             results: testResults
               .filter((r) => labellingSelectedIds.has(r.test.uuid))

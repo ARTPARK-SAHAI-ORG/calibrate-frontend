@@ -387,6 +387,11 @@ export function TestsTabContent({
   // of running (which would just fail against an unverified endpoint).
   const verify = useVerifyConnection();
   const [verifyToRunOpen, setVerifyToRunOpen] = useState(false);
+  // Whether the gate is still open, read after the await in
+  // `handleVerifyToRun`. State read there would be the stale value captured by
+  // the render that started the check, so a run the user had cancelled by
+  // closing the dialog would start anyway once the check came back.
+  const verifyToRunOpenRef = useRef(false);
   const [pendingRun, setPendingRun] = useState<{
     tests: TestData[];
     runAll: boolean;
@@ -1159,6 +1164,7 @@ export function TestsTabContent({
       verify.dismiss();
       setPendingRun({ tests, runAll, onStarted });
       setVerifyToRunOpen(true);
+      verifyToRunOpenRef.current = true;
       return;
     }
     await beginRun(tests, runAll, onStarted);
@@ -1170,17 +1176,22 @@ export function TestsTabContent({
   const handleVerifyToRun = async () => {
     const success = await verify.verifySavedAgent(agentUuid);
     if (!success) return;
+    // The agent really is verified now, so record that even if the user closed
+    // the dialog while the check was running. Only the run is abandoned.
     onConnectionVerified?.();
+    const stillOpen = verifyToRunOpenRef.current;
+    verifyToRunOpenRef.current = false;
     setVerifyToRunOpen(false);
-    if (pendingRun) {
-      const resumed = pendingRun;
-      setPendingRun(null);
-      await beginRun(resumed.tests, resumed.runAll, resumed.onStarted);
-    }
+    const resumed = pendingRun;
+    setPendingRun(null);
+    // Closing during the check cancels the run, so do not resume it.
+    if (!stillOpen || !resumed) return;
+    await beginRun(resumed.tests, resumed.runAll, resumed.onStarted);
   };
 
   const closeVerifyToRun = () => {
     setVerifyToRunOpen(false);
+    verifyToRunOpenRef.current = false;
     setPendingRun(null);
     verify.dismiss();
   };

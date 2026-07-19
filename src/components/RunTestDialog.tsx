@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AgentPicker, Agent } from "@/components/AgentPicker";
 import { useHideFloatingButton } from "@/components/AppLayout";
@@ -42,6 +42,10 @@ export function RunTestDialog({
   // so effects depend on it rather than the whole object.
   const dismissVerify = verify.dismiss;
   const [verifyMode, setVerifyMode] = useState(false);
+  // Whether the gate is still live, read after the await in `handleVerify`.
+  // State read there would be the stale value captured by the render that
+  // started the check, so a run the user had cancelled would start anyway.
+  const verifyModeRef = useRef(false);
   const needsVerification =
     selectedAgent?.type === "connection" && selectedAgent?.verified === false;
 
@@ -51,6 +55,7 @@ export function RunTestDialog({
       setSelectedAgent(null);
       setAttachToAgent(true);
       setVerifyMode(false);
+      verifyModeRef.current = false;
       dismissVerify();
     }
   }, [isOpen, dismissVerify]);
@@ -60,6 +65,7 @@ export function RunTestDialog({
   const handleSelectAgent = (agent: Agent | null) => {
     setSelectedAgent(agent);
     setVerifyMode(false);
+    verifyModeRef.current = false;
     dismissVerify();
   };
 
@@ -68,6 +74,7 @@ export function RunTestDialog({
     if (needsVerification) {
       verify.dismiss();
       setVerifyMode(true);
+      verifyModeRef.current = true;
       return;
     }
     onRunTest(selectedAgent.uuid, selectedAgent.name, attachToAgent);
@@ -75,12 +82,17 @@ export function RunTestDialog({
 
   const handleVerify = async () => {
     if (!selectedAgent) return;
-    const success = await verify.verifySavedAgent(selectedAgent.uuid);
-    if (!success) return;
-    // Reflect the fresh verification locally, exit the gate, and run.
     const agent = selectedAgent;
+    const success = await verify.verifySavedAgent(agent.uuid);
+    if (!success) return;
+    // Closing during the check abandons the run. Bail before touching state so
+    // a stale agent can't be written back into a dialog the user has closed,
+    // which would pre-select the wrong agent the next time it opens.
+    if (!verifyModeRef.current) return;
+    // Reflect the fresh verification locally, exit the gate, and run.
     setSelectedAgent({ ...agent, verified: true });
     setVerifyMode(false);
+    verifyModeRef.current = false;
     onRunTest(agent.uuid, agent.name, attachToAgent);
   };
 
@@ -95,12 +107,12 @@ export function RunTestDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop. While a check is in flight every way out is closed, the
-          same as Cancel. Otherwise the dialog could be dismissed mid-check and
-          the run would still start once the check came back. */}
+      {/* Backdrop. Closing stays available while a check is in flight: the
+          check has no timeout, so freezing the dialog would trap the user
+          whenever the agent endpoint hangs. Closing abandons the run. */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={verify.isVerifying ? undefined : onClose}
+        onClick={onClose}
       />
 
       {/* Dialog */}
@@ -112,7 +124,6 @@ export function RunTestDialog({
           </h2>
           <button
             onClick={onClose}
-            disabled={verify.isVerifying}
             className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg
@@ -217,7 +228,6 @@ export function RunTestDialog({
         <div className="px-4 md:px-6 py-3 flex items-center justify-end gap-2 md:gap-3">
           <button
             onClick={onClose}
-            disabled={verify.isVerifying}
             className="h-9 md:h-10 px-4 md:px-5 rounded-lg text-xs md:text-base font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel

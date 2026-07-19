@@ -41,12 +41,12 @@ export function VerifyToRunDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* While a check is in flight every way out is closed, the same as
-          Cancel. Otherwise the dialog could be dismissed mid-check and the
-          run would still start once the check came back. */}
+      {/* Closing stays available while a check is in flight: the check has no
+          timeout, so freezing the dialog would trap the user whenever the
+          agent endpoint hangs. The host abandons the pending run on close. */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={isVerifying ? undefined : onClose}
+        onClick={onClose}
       />
 
       <div className="relative w-full max-w-lg mx-4 bg-background border border-border rounded-2xl shadow-2xl">
@@ -57,7 +57,6 @@ export function VerifyToRunDialog({
           </h2>
           <button
             onClick={onClose}
-            disabled={isVerifying}
             className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label="Close"
           >
@@ -90,7 +89,6 @@ export function VerifyToRunDialog({
         <div className="px-4 md:px-6 py-3 flex items-center justify-end gap-2 md:gap-3">
           <button
             onClick={onClose}
-            disabled={isVerifying}
             className="h-9 md:h-10 px-4 md:px-5 rounded-lg text-xs md:text-base font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel

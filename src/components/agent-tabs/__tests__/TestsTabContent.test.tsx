@@ -1479,6 +1479,47 @@ describe("TestsTabContent — connection agent", () => {
     expect(testRunnerProps.taskId).toBe("new-run-1");
   });
 
+  it("abandons the pending run when the gate is closed mid-check", async () => {
+    // The check has no timeout, so the dialog stays closable while it runs.
+    // Closing cancels the run: when the check comes back it must not start the
+    // run the user just walked away from.
+    const user = setupUser();
+    const onConnectionVerified = jest.fn();
+    let releaseVerify: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      releaseVerify = resolve;
+    });
+    verifySavedAgentMock.mockImplementation(async () => {
+      await held;
+      return true;
+    });
+    state.agentTests = [responseTest];
+    renderComponent({
+      agentType: "connection",
+      connectionVerified: false,
+      onConnectionVerified,
+    });
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByText("Run all tests").closest("button")!);
+    await user.click(screen.getByText("VerifyToRun"));
+    await user.click(screen.getByText("CloseVerifyToRun"));
+
+    await act(async () => {
+      releaseVerify();
+      await Promise.resolve();
+    });
+
+    // The agent genuinely is verified now, so that is still recorded. Only the
+    // run is dropped.
+    await waitFor(() => expect(onConnectionVerified).toHaveBeenCalled());
+    expect(startRunCalls()).toHaveLength(0);
+    expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("verify-to-run-dialog"),
+    ).not.toBeInTheDocument();
+  });
+
   it("keeps the gate open and surfaces the error when the resumed run fails to start", async () => {
     const user = setupUser();
     verifySavedAgentMock.mockResolvedValue(true);

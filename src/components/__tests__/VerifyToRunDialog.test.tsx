@@ -36,25 +36,27 @@ describe("VerifyToRunDialog", () => {
     expect(onVerify).toHaveBeenCalledTimes(1);
   });
 
-  it("shows a spinner label and disables actions while verifying", () => {
+  it("shows a spinner label and disables the verify action while verifying", () => {
     render(<VerifyToRunDialog {...baseProps} isVerifying />);
     expect(
       screen.getByRole("button", { name: /Verifying/ }),
     ).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
   });
 
-  it("cannot be dismissed while verifying", async () => {
-    // Dismissing mid-check used to leave the check running, so the run still
-    // started once it came back. Every way out is closed while it is in
-    // flight, not just Cancel.
+  it("can still be dismissed while verifying", async () => {
+    // The check has no timeout, so freezing the dialog would trap the user
+    // whenever the agent endpoint hangs. Every way out stays live; the host
+    // abandons the pending run when it closes.
     const user = setupUser();
     const onClose = jest.fn();
     const { container } = render(
       <VerifyToRunDialog {...baseProps} isVerifying onClose={onClose} />,
     );
 
-    expect(screen.getByRole("button", { name: "Close" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Close" })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
     await user.click(screen.getByRole("button", { name: "Close" }));
 
     const backdrop = container.querySelector(
@@ -62,7 +64,7 @@ describe("VerifyToRunDialog", () => {
     ) as HTMLElement;
     await user.click(backdrop);
 
-    expect(onClose).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(3);
   });
 
   it("surfaces the error and offers the jump to connection settings on failure", async () => {
