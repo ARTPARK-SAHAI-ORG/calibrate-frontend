@@ -1,4 +1,7 @@
+import { signOut } from "next-auth/react";
+import { toast } from "sonner";
 import { getDefaultHeaders } from "./api";
+import { reportError } from "./reportError";
 import type { AggStat, LatencyStat } from "./llmMetrics";
 import type {
   TestCaseOutput,
@@ -111,6 +114,30 @@ export async function startTestRun(
 
   const result: TestRunStatusResponse = await response.json();
   return result.task_id;
+}
+
+/**
+ * `startTestRun` plus the failure handling every caller needs: sign out on a
+ * 401, otherwise report the error and show one toast. Returns the new task id,
+ * or null when the run could not be started.
+ */
+export async function startTestRunOrNotify(
+  backendUrl: string,
+  accessToken: string | null | undefined,
+  agentUuid: string,
+  testUuids: string[] | null,
+): Promise<string | null> {
+  try {
+    return await startTestRun(backendUrl, accessToken, agentUuid, testUuids);
+  } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      await signOut({ callbackUrl: "/login" });
+      return null;
+    }
+    reportError("Error starting test run:", error);
+    toast.error("Could not start the test run. Please try again.");
+    return null;
+  }
 }
 
 /** Fetch the full state of a run. The dialog's only source of run content. */

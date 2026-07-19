@@ -6,8 +6,7 @@ import { signOut } from "next-auth/react";
 import { useAccessToken, useMaxRowsPerEval, useDialogUrlParam } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { buildTestToRun } from "@/lib/testRun";
-import { startTestRun, UnauthorizedError } from "@/lib/testRunApi";
-import { toast } from "sonner";
+import { startTestRunOrNotify } from "@/lib/testRunApi";
 
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
@@ -1073,21 +1072,15 @@ export function TestsTabContent({
     if (startingRun !== null) return;
     setStartingRun(runKey);
     try {
-      const taskId = await startTestRun(
+      const taskId = await startTestRunOrNotify(
         backendUrl,
         backendAccessToken,
         agentUuid,
         allLinked ? null : tests.map((t) => t.uuid),
       );
+      if (!taskId) return;
       addOptimisticTestRun(taskId, tests);
       setOpenTestRunId(taskId);
-    } catch (err) {
-      if (err instanceof UnauthorizedError) {
-        await signOut({ callbackUrl: "/login" });
-        return;
-      }
-      reportError("Error starting test run:", err);
-      toast.error("Could not start the test run. Please try again.");
     } finally {
       setStartingRun(null);
     }

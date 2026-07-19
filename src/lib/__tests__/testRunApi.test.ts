@@ -1,9 +1,24 @@
+import { signOut } from "next-auth/react";
+import { toast } from "sonner";
 import {
   startTestRun,
+  startTestRunOrNotify,
   fetchTestRun,
   isTerminalRunStatus,
   UnauthorizedError,
 } from "../testRunApi";
+
+jest.mock("next-auth/react", () => ({
+  signOut: jest.fn(),
+}));
+
+jest.mock("sonner", () => ({
+  toast: { error: jest.fn(), success: jest.fn() },
+}));
+
+jest.mock("../reportError", () => ({
+  reportError: jest.fn(),
+}));
 
 const BACKEND_URL = "http://backend.test";
 const TOKEN = "test-token";
@@ -72,6 +87,46 @@ describe("testRunApi", () => {
       await expect(
         startTestRun(BACKEND_URL, TOKEN, "agent-1", null),
       ).rejects.not.toBeInstanceOf(UnauthorizedError);
+    });
+  });
+
+  describe("startTestRunOrNotify", () => {
+    it("returns the new task id on success", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({ task_id: "task-9" }),
+      );
+
+      await expect(
+        startTestRunOrNotify(BACKEND_URL, TOKEN, "agent-1", ["t-1"]),
+      ).resolves.toBe("task-9");
+      expect(signOut).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it("signs the user out and returns null on a 401", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({}, false, 401),
+      );
+
+      await expect(
+        startTestRunOrNotify(BACKEND_URL, TOKEN, "agent-1", null),
+      ).resolves.toBeNull();
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it("shows an error toast and returns null on any other failure", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({}, false, 500),
+      );
+
+      await expect(
+        startTestRunOrNotify(BACKEND_URL, TOKEN, "agent-1", null),
+      ).resolves.toBeNull();
+      expect(signOut).not.toHaveBeenCalled();
+      expect(toast.error).toHaveBeenCalledWith(
+        "Could not start the test run. Please try again.",
+      );
     });
   });
 

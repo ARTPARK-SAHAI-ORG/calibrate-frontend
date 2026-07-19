@@ -30,7 +30,7 @@ import {
   toolCallPassFail,
 } from "@/lib/testRunSummary";
 import {
-  startTestRun,
+  startTestRunOrNotify,
   fetchTestRun,
   isTerminalRunStatus,
   UnauthorizedError,
@@ -306,29 +306,23 @@ export function TestRunnerDialog({
     }
     setIsStartingRun(true);
     try {
-      const newTaskId = await startTestRun(
+      const newTaskId = await startTestRunOrNotify(
         backendUrl,
         backendAccessToken,
         agentUuid,
         testUuids,
       );
-      onNewRun?.(newTaskId, testUuids);
-    } catch (error) {
-      if (error instanceof UnauthorizedError) {
-        await signOut({ callbackUrl: "/login" });
-        return;
-      }
-      reportError("Error starting test run:", error);
-      toast.error("Could not start the run. Please try again.");
+      if (newTaskId) onNewRun?.(newTaskId, testUuids);
     } finally {
       setIsStartingRun(false);
     }
   };
 
-  // Check if the entire run errored (no case produced a real result)
-  const isOverallError =
-    runStatus === "failed" &&
-    (!!run?.error || (rows.length > 0 && rows.every((r) => !!r.error)));
+  // Show the error card only when the failed run left NO usable result: every
+  // row errored, or the run died before any case started (zero rows, and
+  // `[].every` is true). A run-level `error` alone is not enough, since cases
+  // that already produced results must stay visible.
+  const isOverallError = runStatus === "failed" && rows.every((r) => !!r.error);
 
   if (!isOpen) return null;
 

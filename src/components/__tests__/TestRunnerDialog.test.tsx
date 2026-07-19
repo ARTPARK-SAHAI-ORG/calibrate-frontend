@@ -774,6 +774,89 @@ describe("TestRunnerDialog", () => {
     expect(screen.queryByTestId("summary-panel")).not.toBeInTheDocument();
   });
 
+  it("shows the overall error state when the run fails before any case ran", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.endsWith("/agent-tests/run/task-err-empty")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-err-empty",
+            status: "failed",
+            error: "boom",
+            results: [],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-err-empty"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("Something went wrong")).toBeInTheDocument(),
+    );
+  });
+
+  it("keeps partial results visible when a run fails after some cases passed", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.endsWith("/agent-tests/run/task-partial")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-partial",
+            status: "failed",
+            error: "boom",
+            results: [
+              {
+                test_uuid: "test-1",
+                name: "Passed One",
+                status: "passed",
+                passed: true,
+              },
+              {
+                test_uuid: "test-2",
+                name: "Errored One",
+                status: "failed",
+                passed: false,
+                error: "boom",
+              },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-partial"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("outputs-panel")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
+    expect(screen.getByText(/Passed One:passed/)).toBeInTheDocument();
+    expect(screen.getByText(/Errored One:failed/)).toBeInTheDocument();
+  });
+
   it("signs out on a 401 from the run fetch", async () => {
     const { signOut } = require("next-auth/react");
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
