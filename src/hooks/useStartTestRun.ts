@@ -14,7 +14,7 @@ type StartTestRunArgs = {
   runAllLinked?: boolean;
   /**
    * Called once the run exists, with its uuid. Do the per-surface work here:
-   * open the runner on that uuid, add the optimistic row, clear a selection.
+   * hand the uuid to the runner, add the optimistic row, clear a selection.
    * Not called if the run never started.
    */
   onStarted: (taskId: string) => void;
@@ -28,6 +28,9 @@ type StartTestRunArgs = {
  * flight, bail quietly when the session expired, and surface a failure as a
  * toast without disturbing the page. Having each surface write that itself is
  * how they drifted apart before, so it lives here once.
+ *
+ * Resolves true only when the run exists. Callers open the runner on click, so
+ * they use the false case to close it again.
  */
 export function useStartTestRun() {
   const backendAccessToken = useAccessToken();
@@ -41,8 +44,8 @@ export function useStartTestRun() {
       tests,
       runAllLinked,
       onStarted,
-    }: StartTestRunArgs): Promise<void> => {
-      if (isStartingRef.current) return;
+    }: StartTestRunArgs): Promise<boolean> => {
+      if (isStartingRef.current) return false;
       isStartingRef.current = true;
 
       try {
@@ -53,8 +56,9 @@ export function useStartTestRun() {
           accessToken: backendAccessToken,
         });
         // null means the session expired and the user is being signed out.
-        if (!taskId) return;
+        if (!taskId) return false;
         onStarted(taskId);
+        return true;
       } catch (err) {
         // A failed start is not a page-level failure: keep the page as it is
         // and just tell the user.
@@ -62,6 +66,7 @@ export function useStartTestRun() {
         toast.error(
           err instanceof Error ? err.message : "Failed to start test run",
         );
+        return false;
       } finally {
         isStartingRef.current = false;
       }

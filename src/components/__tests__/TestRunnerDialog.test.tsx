@@ -750,7 +750,7 @@ describe("TestRunnerDialog", () => {
       await screen.findByText("This run failed before any tests ran"),
     ).toBeInTheDocument();
     // Not left spinning, and no empty results list.
-    expect(screen.queryByText("Loading results")).not.toBeInTheDocument();
+    expect(screen.queryByText("Loading run")).not.toBeInTheDocument();
     expect(screen.queryByTestId("outputs-panel")).not.toBeInTheDocument();
   });
 
@@ -778,7 +778,7 @@ describe("TestRunnerDialog", () => {
 
     // Nothing is fabricated before the first poll resolves: the dialog shows
     // its loading state and renders no outputs panel at all.
-    expect(screen.getByText("Loading results")).toBeInTheDocument();
+    expect(screen.getByText("Loading run")).toBeInTheDocument();
     expect(screen.queryByTestId("outputs-panel")).not.toBeInTheDocument();
     // A poll that carries no results keeps the loading state up.
     await waitFor(() =>
@@ -788,7 +788,7 @@ describe("TestRunnerDialog", () => {
         ),
       ).toBe(true),
     );
-    expect(screen.getByText("Loading results")).toBeInTheDocument();
+    expect(screen.getByText("Loading run")).toBeInTheDocument();
 
     rerender(
       <TestRunnerDialog
@@ -914,6 +914,143 @@ describe("TestRunnerDialog", () => {
     expect(pollN).toBeGreaterThanOrEqual(2);
     // Still there after the results-less poll.
     expect(screen.getByTestId("results-count")).toHaveTextContent("1");
+  });
+
+  it("shows the loading state while it is open without a run uuid yet", async () => {
+    // The caller opens the dialog the moment the user clicks Run and only
+    // passes `taskId` in once the server answers. That gap must show the same
+    // spinner as the wait for the first poll, never an empty panel.
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <TestRunnerDialog isOpen onClose={jest.fn()} agentName="My Agent" />,
+    );
+
+    expect(screen.getByText("Loading run")).toBeInTheDocument();
+    // No rows, no empty results list, and not the terminal "no results" panel.
+    expect(screen.queryByTestId("outputs-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("summary-panel")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("This run failed before any tests ran"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("This run finished without any results"),
+    ).not.toBeInTheDocument();
+
+    // Still never starts a run of its own, and never polls without a uuid.
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    const urls = (global.fetch as jest.Mock).mock.calls.map(([u]) => String(u));
+    expect(urls.some((u) => u.includes("/agent-tests/agent/"))).toBe(false);
+    expect(urls.some((u) => u.includes("/agent-tests/run/"))).toBe(false);
+  });
+
+  it("starts polling and renders rows once the run uuid arrives", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.endsWith("/agent-tests/run/task-late")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-late",
+            status: "in_progress",
+            name: "Late Run",
+            results: [
+              {
+                test_uuid: "test-1",
+                name: "Test One",
+                status: "running",
+                passed: null,
+              },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    const { rerender } = render(
+      <TestRunnerDialog isOpen onClose={jest.fn()} agentName="My Agent" />,
+    );
+    expect(screen.getByText("Loading run")).toBeInTheDocument();
+
+    // The server answers: the caller hands the uuid down.
+    rerender(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentName="My Agent"
+        taskId="task-late"
+        initialRunStatus="in_progress"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("outputs-panel")).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/Test One:running/)).toBeInTheDocument();
+    expect(screen.queryByText("Loading run")).not.toBeInTheDocument();
+  });
+
+  it("resets to the loading state when reopened, with no stale rows", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (url.endsWith("/agent-tests/run/task-prev")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-prev",
+            status: "completed",
+            name: "Previous Run",
+            results: [
+              {
+                test_uuid: "test-1",
+                name: "Old Test",
+                status: "passed",
+                passed: true,
+              },
+            ],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    const { rerender } = render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentName="My Agent"
+        taskId="task-prev"
+        initialRunStatus="completed"
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByText("Previous Run")).toBeInTheDocument(),
+    );
+
+    // Close, then reopen for a run whose uuid has not arrived yet.
+    rerender(
+      <TestRunnerDialog
+        isOpen={false}
+        onClose={jest.fn()}
+        agentName="My Agent"
+      />,
+    );
+    rerender(
+      <TestRunnerDialog isOpen onClose={jest.fn()} agentName="My Agent" />,
+    );
+
+    expect(screen.getByText("Loading run")).toBeInTheDocument();
+    expect(screen.queryByText("Previous Run")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("outputs-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("summary-panel")).not.toBeInTheDocument();
   });
 
   it("selects a test from the outputs panel", async () => {

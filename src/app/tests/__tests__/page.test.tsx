@@ -5,9 +5,10 @@
  * startAgentTestRun on the click, then hands the returned run uuid to the
  * dialog, which is display only: it renders from what the server returns for
  * that uuid, so the page passes it no test list. These tests pin that contract:
- * exactly one start call per click, the dialog opens on the returned uuid,
- * rerun starts a fresh run, and a failed start leaves the dialog closed,
- * surfacing a toast rather than tearing down the tests list.
+ * exactly one start call per click, the dialog opens immediately on the click
+ * and then takes the returned uuid, rerun starts a fresh run, and a failed
+ * start closes the dialog again, surfacing a toast rather than tearing down the
+ * tests list.
  */
 import React from "react";
 import { render, screen, waitFor, setupUser } from "@/test-utils";
@@ -160,6 +161,43 @@ describe("/tests run start", () => {
     });
   });
 
+  it("opens the runner immediately, before the start request answers", async () => {
+    let resolveStart: (taskId: string) => void = () => {};
+    mockStartAgentTestRun.mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveStart = resolve;
+      }),
+    );
+    const user = setupUser();
+
+    render(<TestsPage />);
+    await runFirstTest(user);
+
+    // Still in flight: the runner is already on screen, with no run uuid yet.
+    await waitFor(() =>
+      expect(screen.getByTestId("runner-task-id")).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("runner-task-id")).toHaveTextContent("none");
+
+    resolveStart("run-abc");
+    await waitFor(() =>
+      expect(screen.getByTestId("runner-task-id")).toHaveTextContent("run-abc"),
+    );
+  });
+
+  it("closes the runner again when the start fails", async () => {
+    mockStartAgentTestRun.mockRejectedValue(new Error("nope"));
+    const user = setupUser();
+
+    render(<TestsPage />);
+    await runFirstTest(user);
+
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith("nope"));
+    // No empty window left spinning, and the list is untouched.
+    expect(screen.queryByTestId("runner-task-id")).not.toBeInTheDocument();
+    expect(screen.getAllByText("First test").length).toBeGreaterThan(0);
+  });
+
   it("does not re-fire the start call on later re-renders", async () => {
     mockStartAgentTestRun.mockResolvedValue("run-abc");
     const user = setupUser();
@@ -235,9 +273,11 @@ describe("/tests run start", () => {
     await user.click(screen.getByText("mock-rerun"));
     await waitFor(() => expect(mockToastError).toHaveBeenCalledWith("nope"));
 
-    // A failed start never swaps the run under the dialog, so it still shows
-    // the run it was opened on.
-    expect(screen.getByTestId("runner-task-id")).toHaveTextContent("run-abc");
+    // A failed start closes the runner rather than leaving it on a run that
+    // never began.
+    await waitFor(() =>
+      expect(screen.queryByTestId("runner-task-id")).not.toBeInTheDocument(),
+    );
 
     // The next ordinary run opens on the fresh uuid, not the previous one.
     mockStartAgentTestRun.mockResolvedValue("run-xyz");

@@ -716,6 +716,98 @@ describe("TestsTabContent — populated table", () => {
     expect(startRunCalls()).toHaveLength(1);
   });
 
+  it("opens the runner on the click, before the start request resolves", async () => {
+    // Hold the start-run POST open so the assertions land mid-flight.
+    let releaseRun: (value: Response) => void = () => {};
+    const routed = global.fetch as jest.Mock;
+    global.fetch = jest.fn(async (url: string, opts: any = {}) => {
+      if (opts.method === "POST" && String(url).endsWith("/run")) {
+        return new Promise<Response>((resolve) => {
+          releaseRun = resolve;
+        });
+      }
+      return routed(url, opts);
+    }) as any;
+
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByText("Run all tests"));
+
+    // Request still in flight: the window is already up, with no uuid yet.
+    await screen.findByTestId("test-runner-dialog");
+    expect(testRunnerProps.taskId).toBeUndefined();
+
+    await act(async () => {
+      releaseRun(jsonResponse({ task_id: "new-run-1" }));
+    });
+    expect(screen.getByTestId("test-runner-dialog")).toBeInTheDocument();
+    expect(testRunnerProps.taskId).toBe("new-run-1");
+  });
+
+  it("keeps the runner open when a repeat click is swallowed mid-flight", async () => {
+    let releaseRun: (value: Response) => void = () => {};
+    const routed = global.fetch as jest.Mock;
+    global.fetch = jest.fn(async (url: string, opts: any = {}) => {
+      if (opts.method === "POST" && String(url).endsWith("/run")) {
+        return new Promise<Response>((resolve) => {
+          releaseRun = resolve;
+        });
+      }
+      return routed(url, opts);
+    }) as any;
+
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByText("Run all tests"));
+    await screen.findByTestId("test-runner-dialog");
+    // The second click starts nothing, and must not close the first click's
+    // window either.
+    await user.click(screen.getByText("Run all tests"));
+    expect(startRunCalls()).toHaveLength(1);
+    expect(screen.getByTestId("test-runner-dialog")).toBeInTheDocument();
+
+    await act(async () => {
+      releaseRun(jsonResponse({ task_id: "new-run-1" }));
+    });
+    expect(screen.getByTestId("test-runner-dialog")).toBeInTheDocument();
+    expect(testRunnerProps.taskId).toBe("new-run-1");
+  });
+
+  it("closes the runner again when the start request fails", async () => {
+    let releaseRun: (value: Response) => void = () => {};
+    const routed = global.fetch as jest.Mock;
+    global.fetch = jest.fn(async (url: string, opts: any = {}) => {
+      if (opts.method === "POST" && String(url).endsWith("/run")) {
+        return new Promise<Response>((resolve) => {
+          releaseRun = resolve;
+        });
+      }
+      return routed(url, opts);
+    }) as any;
+
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    await user.click(screen.getByText("Run all tests"));
+    await screen.findByTestId("test-runner-dialog");
+
+    await act(async () => {
+      releaseRun(jsonResponse({}, { ok: false, status: 500 }));
+    });
+
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId("test-runner-dialog"),
+      ).not.toBeInTheDocument(),
+    );
+    expect(toast.error).toHaveBeenCalled();
+  });
+
   it("does not open the runner when the run fails to start", async () => {
     state.startRunInit = { ok: false, status: 500 };
     const user = setupUser();

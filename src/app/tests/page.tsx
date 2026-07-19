@@ -261,6 +261,9 @@ function LLMPageInner() {
   // starting the run, the dialog only shows it.
   const [testRunnerTaskId, setTestRunnerTaskId] = useState<string | null>(null);
   const startTestRun = useStartTestRun();
+  // Mirrors the hook's in-flight guard so a repeat click can be told apart from
+  // a genuine failure: only the click that opened the runner may close it.
+  const isStartingRunRef = useRef(false);
 
   // Direct benchmark rerun (fresh benchmark, same models + test subset, no
   // picker).
@@ -591,27 +594,48 @@ function LLMPageInner() {
     setRunTestDialogOpen(true);
   };
 
-  // Start a run of the given tests and open the runner dialog on the run that
-  // comes back. Starting the run is the caller's job, so it happens exactly
-  // once per click instead of being inferred from a prop change in the dialog.
+  // Start a run of the given tests and open the runner dialog. The dialog opens
+  // on the click, before the start request answers, so the user gets immediate
+  // feedback; the run uuid is fed in once it arrives. Starting the run is the
+  // caller's job, so it happens exactly once per click instead of being
+  // inferred from a prop change in the dialog.
   const startRunAndOpenRunner = async (
     agentUuid: string,
     agentName: string,
     testsForRun: TestData[],
   ) => {
-    await startTestRun({
-      agentUuid,
-      tests: testsForRun,
-      onStarted: (taskId) => {
-        // Optimistic row in the Runs list, the pending-run poller fills it in.
-        prependOptimisticTestRun(taskId, testsForRun, agentUuid, agentName);
+    // A repeat click while a start is still in flight is swallowed by the hook.
+    // Recognise it here too, so it neither reopens nor closes the runner that
+    // the first click legitimately owns.
+    if (isStartingRunRef.current) return;
+    isStartingRunRef.current = true;
 
-        setTestRunnerTaskId(taskId);
-        setTestRunnerAgentUuid(agentUuid);
-        setTestRunnerAgentName(agentName);
-        setTestRunnerOpen(true);
-      },
-    });
+    // Open now. The agent identity is what the header renders; the uuid is
+    // cleared so the previous run does not flash before this one starts.
+    setTestRunnerTaskId(null);
+    setTestRunnerAgentUuid(agentUuid);
+    setTestRunnerAgentName(agentName);
+    setTestRunnerOpen(true);
+
+    try {
+      const started = await startTestRun({
+        agentUuid,
+        tests: testsForRun,
+        onStarted: (taskId) => {
+          // Optimistic row in the Runs list, the pending-run poller fills it in.
+          prependOptimisticTestRun(taskId, testsForRun, agentUuid, agentName);
+
+          setTestRunnerTaskId(taskId);
+        },
+      });
+
+      // No run exists (failed start or expired session, the hook already told
+      // the user), so take the runner back down instead of leaving an empty
+      // window spinning.
+      if (!started) setTestRunnerOpen(false);
+    } finally {
+      isStartingRunRef.current = false;
+    }
   };
 
   // Handle running the test

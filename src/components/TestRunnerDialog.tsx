@@ -136,7 +136,9 @@ type TestRunnerDialogProps = {
   agentName: string;
   // The run to show. This dialog never starts a run of its own: the caller
   // starts it (see `startAgentTestRun` in `@/lib/agentTestRun`) and hands the
-  // returned uuid down here. Without it the dialog only renders its shell.
+  // returned uuid down here. Callers open the dialog on click and pass this in
+  // once the server answers, so it is legitimately absent for a moment: the
+  // dialog shows its loading state until it arrives.
   taskId?: string;
   initialRunStatus?: string; // Initial status of the run (for viewing past runs)
   onStatusUpdate?: (
@@ -173,10 +175,13 @@ export function TestRunnerDialog({
   const [selectedTestUuid, setSelectedTestUuid] = useState<string | null>(null);
   const [nav, setNav] = useState<PagerNav | null>(null);
   const [isRunning, setIsRunning] = useState(false);
-  // True between opening a run and the first poll landing. The rows are built
-  // entirely from the poll response, so until it arrives there is nothing to
-  // render and we show a spinner instead of fabricating placeholder rows.
-  const [isLoadingResults, setIsLoadingResults] = useState(false);
+  // True between the dialog opening and the first poll landing. Callers open
+  // this dialog on click and hand `taskId` down once the server answers, so
+  // that window covers both waiting for the uuid and waiting for the first
+  // poll. The rows are built entirely from the poll response, so until it
+  // arrives there is nothing to render and we show a spinner instead of
+  // fabricating placeholder rows.
+  const [isLoadingResults, setIsLoadingResults] = useState(isOpen);
   const [runStatus, setRunStatus] = useState<
     "queued" | "in_progress" | "done" | "failed"
   >("queued");
@@ -262,6 +267,34 @@ export function TestRunnerDialog({
       cancelled = true;
     };
   }, [isOpen, backendAccessToken]);
+
+  // Reset the run view on every open. The dialog can be opened before the run
+  // uuid exists (the caller opens it on click and passes `taskId` in once the
+  // server answers), so this clears anything left over from the previous run
+  // and starts in the loading state. Without it the dialog would flash an
+  // empty panel, or stale rows, until the uuid arrives. The polling effect
+  // below runs after this one and re-applies the same reset for the run it is
+  // given, so nothing here fights it.
+  useEffect(() => {
+    if (!isOpen) return;
+    setTestResults([]);
+    setSelectedTestUuid(null);
+    setNav(null);
+    hasAutoSelectedRef.current = false;
+    clearLabellingSelection();
+    setCurrentTaskId(null);
+    setRunName(null);
+    setIsPublic(false);
+    setShareToken(null);
+    setRunEvaluators([]);
+    setRunTestUuids([]);
+    resetSummary();
+    setActiveTab("outputs");
+    setIsRunning(false);
+    setRunStatus("queued");
+    setIsLoadingResults(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // Start polling when dialog opens with a taskId (viewing existing run)
   useEffect(() => {
@@ -730,8 +763,9 @@ export function TestRunnerDialog({
             </div>
           </div>
         ) : isLoadingResults && testResults.length === 0 ? (
-          /* Waiting for the first poll of this run to land. Rows come only
-             from the server, so there is nothing to show until then. */
+          /* Waiting for the run uuid, or for the first poll of the run to
+             land. Rows come only from the server, so there is nothing to
+             show until then. */
           <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6">
             <svg
               className="w-5 h-5 animate-spin text-muted-foreground"
@@ -752,7 +786,7 @@ export function TestRunnerDialog({
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
             </svg>
-            <p className="text-sm text-muted-foreground">Loading results</p>
+            <p className="text-sm text-muted-foreground">Loading run</p>
           </div>
         ) : testResults.length === 0 &&
           (runStatus === "failed" || runStatus === "done") ? (

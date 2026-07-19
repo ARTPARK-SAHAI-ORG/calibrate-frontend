@@ -378,6 +378,9 @@ export function TestsTabContent({
   // Shared start-run call: repeat-click guard, expired-session bail and
   // failure toast all live in the hook.
   const startTestRun = useStartTestRun();
+  // Local copy of the hook's in-flight state, read synchronously at the click
+  // so a swallowed repeat click can be told apart from a genuine failure.
+  const runStartInFlightRef = useRef(false);
 
   // Verify-to-run gate. When an unverified connection agent tries to run
   // tests, we stash the intended run here and open the verify dialog instead
@@ -1099,17 +1102,39 @@ export function TestsTabContent({
     // rows. Named apart from the hook's `onStarted` option below.
     onRunStarted?: () => void,
   ) => {
-    await startTestRun({
-      agentUuid,
-      tests,
-      runAllLinked: runAll,
-      onStarted: (taskId) => {
-        setTestRunTaskId(taskId);
-        setTestRunnerOpen(true);
-        addOptimisticTestRun(taskId, tests);
-        onRunStarted?.();
-      },
-    });
+    // Mirrors the hook's own in-flight guard. A repeat click while the first
+    // start is still open is swallowed there and reported as a failed start,
+    // so bail before touching the dialog: otherwise the repeat click would
+    // close the window the first click legitimately opened.
+    if (runStartInFlightRef.current) return;
+    runStartInFlightRef.current = true;
+
+    // Open on the click rather than on the response, so the most common action
+    // in the product reacts immediately. Clearing the previous run's uuid at
+    // the same moment keeps the dialog from briefly showing the last run.
+    setTestRunTaskId(undefined);
+    setTestRunnerOpen(true);
+
+    try {
+      const started = await startTestRun({
+        agentUuid,
+        tests,
+        runAllLinked: runAll,
+        onStarted: (taskId) => {
+          setTestRunTaskId(taskId);
+          addOptimisticTestRun(taskId, tests);
+          onRunStarted?.();
+        },
+      });
+      // No run exists (expired session or a failure the hook already toasted),
+      // so close the window again instead of leaving it spinning forever.
+      if (!started) {
+        setTestRunnerOpen(false);
+        setTestRunTaskId(undefined);
+      }
+    } finally {
+      runStartInFlightRef.current = false;
+    }
   };
 
   // Single gate for every run entry point (header "Run all", bulk "Run",
