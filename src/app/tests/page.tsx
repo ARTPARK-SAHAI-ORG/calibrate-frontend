@@ -652,11 +652,10 @@ function LLMPageInner() {
         }
       }
 
-      // Close the run test selection dialog
-      setRunTestDialogOpen(false);
-
-      // Start the run here, then open the dialog on its id. The dialog only
-      // ever views an existing run.
+      // Start the run first, keeping the picker up (with its spinner) until
+      // the run id is back, so there is no blank gap between the picker
+      // closing and the run window opening. The dialog only ever views an
+      // existing run.
       const taskId = await startTestRunOrNotify(
         backendUrl,
         backendAccessToken,
@@ -664,10 +663,14 @@ function LLMPageInner() {
         [testToRun.uuid],
       );
       if (!taskId) {
+        setRunTestDialogOpen(false);
         setTestToRun(null);
         return;
       }
       prependOptimisticTestRun(taskId, [testToRun], agentUuid, agentName);
+      // Close the picker and open the run window together, so they swap in a
+      // single paint rather than leaving the plain page showing between them.
+      setRunTestDialogOpen(false);
       openRun(taskId, agentUuid, agentName);
     } catch (err) {
       reportError("Error running test:", err);
