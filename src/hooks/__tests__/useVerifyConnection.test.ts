@@ -396,4 +396,91 @@ describe("useVerifyConnection", () => {
       expect(result.current.verifySampleResponse).toBeNull();
     });
   });
+
+  describe("abandoned attempts", () => {
+    it("drops a failure that lands after dismiss, so a fresh attempt is clean", async () => {
+      // The user closed a slow check and opened a new one. The abandoned
+      // check's error must not paint the new attempt, which on the run picker
+      // could be a different agent entirely.
+      let settle: (value: Response) => void = () => {};
+      fetchMock.mockImplementation(
+        () => new Promise<Response>((resolve) => (settle = resolve)),
+      );
+
+      const { result } = renderHook(() => useVerifyConnection());
+
+      let first: Promise<boolean> = Promise.resolve(false);
+      act(() => {
+        first = result.current.verifySavedAgent("agent-a");
+      });
+      expect(result.current.isVerifying).toBe(true);
+
+      // User walks away from it.
+      act(() => result.current.dismiss());
+      expect(result.current.isVerifying).toBe(false);
+
+      // Agent A's check now fails.
+      await act(async () => {
+        settle(
+          jsonResponse({ success: false, error: "agent A is unreachable" }),
+        );
+        await first;
+      });
+
+      expect(result.current.verifyError).toBeNull();
+      expect(result.current.verifySampleResponse).toBeNull();
+      expect(result.current.isVerifying).toBe(false);
+    });
+
+    it("drops a thrown failure that lands after dismiss", async () => {
+      let reject: (err: Error) => void = () => {};
+      fetchMock.mockImplementation(
+        () => new Promise<Response>((_, rej) => (reject = rej)),
+      );
+
+      const { result } = renderHook(() => useVerifyConnection());
+
+      let first: Promise<boolean> = Promise.resolve(false);
+      act(() => {
+        first = result.current.verifySavedAgent("agent-a");
+      });
+      act(() => result.current.dismiss());
+
+      await act(async () => {
+        reject(new Error("network died"));
+        await first;
+      });
+
+      expect(result.current.verifyError).toBeNull();
+    });
+
+    it("keeps only the newest attempt's result when two overlap", async () => {
+      const settlers: Array<(value: Response) => void> = [];
+      fetchMock.mockImplementation(
+        () => new Promise<Response>((resolve) => settlers.push(resolve)),
+      );
+
+      const { result } = renderHook(() => useVerifyConnection());
+
+      let first: Promise<boolean> = Promise.resolve(false);
+      let second: Promise<boolean> = Promise.resolve(false);
+      act(() => {
+        first = result.current.verifySavedAgent("agent-a");
+      });
+      act(() => {
+        second = result.current.verifySavedAgent("agent-b");
+      });
+
+      // The older check answers last, and must be ignored.
+      await act(async () => {
+        settlers[1](jsonResponse({ success: false, error: "B failed" }));
+        await second;
+        settlers[0](jsonResponse({ success: false, error: "A failed" }));
+        await first;
+      });
+
+      expect(result.current.verifyError).toBe("B failed");
+    });
+  });
+
 });

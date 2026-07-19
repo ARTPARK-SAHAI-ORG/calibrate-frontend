@@ -1,7 +1,7 @@
 "use client";
 import { reportError } from "@/lib/reportError";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { signOut } from "next-auth/react";
 import { useAccessToken } from "./useAccessToken";
 
@@ -31,12 +31,26 @@ export function useVerifyConnection(): VerifyConnectionResult {
     unknown
   > | null>(null);
 
+  // Identifies the attempt currently in flight. A check the user walked away
+  // from must not land on a later one: without this, closing a slow check and
+  // starting another showed the abandoned attempt's error, and for the run
+  // picker that error could belong to a different agent entirely.
+  const attemptRef = useRef(0);
+  const isCurrent = (attempt: number) => attemptRef.current === attempt;
+
   const dismiss = useCallback(() => {
+    // Abandons anything in flight as well as clearing what is on screen, so a
+    // late result cannot repaint a fresh attempt.
+    attemptRef.current += 1;
+    setIsVerifying(false);
     setVerifyError(null);
     setVerifySampleResponse(null);
   }, []);
 
-  const handleResponse = async (response: Response): Promise<boolean> => {
+  const handleResponse = async (
+    response: Response,
+    attempt: number,
+  ): Promise<boolean> => {
     if (response.status === 401) {
       await signOut({ callbackUrl: "/login" });
       return false;
@@ -46,6 +60,9 @@ export function useVerifyConnection(): VerifyConnectionResult {
 
     const result = await response.json();
     const success: boolean = result.success ?? false;
+
+    // The user moved on while this was in flight, so drop it silently.
+    if (!isCurrent(attempt)) return false;
 
     if (success) {
       setVerifyError(null);
@@ -60,6 +77,7 @@ export function useVerifyConnection(): VerifyConnectionResult {
 
   const verifySavedAgent = useCallback(
     async (agentUuid: string, messages?: VerifyMessage[]): Promise<boolean> => {
+      const attempt = ++attemptRef.current;
       setIsVerifying(true);
       setVerifyError(null);
       setVerifySampleResponse(null);
@@ -83,15 +101,16 @@ export function useVerifyConnection(): VerifyConnectionResult {
           },
         );
 
-        return await handleResponse(response);
+        return await handleResponse(response, attempt);
       } catch (err) {
         reportError("Error verifying connection:", err);
+        if (!isCurrent(attempt)) return false;
         setVerifyError(
           err instanceof Error ? err.message : "Verification failed",
         );
         return false;
       } finally {
-        setIsVerifying(false);
+        if (isCurrent(attempt)) setIsVerifying(false);
       }
     },
     [backendAccessToken],
@@ -103,6 +122,7 @@ export function useVerifyConnection(): VerifyConnectionResult {
       agentHeaders?: Record<string, string>,
       messages?: VerifyMessage[],
     ): Promise<boolean> => {
+      const attempt = ++attemptRef.current;
       setIsVerifying(true);
       setVerifyError(null);
       setVerifySampleResponse(null);
@@ -131,15 +151,16 @@ export function useVerifyConnection(): VerifyConnectionResult {
           },
         );
 
-        return await handleResponse(response);
+        return await handleResponse(response, attempt);
       } catch (err) {
         reportError("Error verifying connection:", err);
+        if (!isCurrent(attempt)) return false;
         setVerifyError(
           err instanceof Error ? err.message : "Verification failed",
         );
         return false;
       } finally {
-        setIsVerifying(false);
+        if (isCurrent(attempt)) setIsVerifying(false);
       }
     },
     [backendAccessToken],
