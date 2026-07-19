@@ -80,10 +80,13 @@ describe("useStartTestRun", () => {
       first = result.current({ agentUuid: "agent-1", tests, onStarted });
     });
     // Second click while the first request is still open.
+    let second: string | undefined;
     await act(async () => {
-      await result.current({ agentUuid: "agent-1", tests, onStarted });
+      second = await result.current({ agentUuid: "agent-1", tests, onStarted });
     });
     expect(startMock).toHaveBeenCalledTimes(1);
+    // "busy", not "failed": the caller must not tear down the first click's work.
+    expect(second).toBe("busy");
 
     await act(async () => {
       release("run-3");
@@ -119,12 +122,14 @@ describe("useStartTestRun", () => {
     const onStarted = jest.fn();
     const { result } = renderHook(() => useStartTestRun());
 
+    let outcome: string | undefined;
     await act(async () => {
-      await result.current({ agentUuid: "agent-1", tests, onStarted });
+      outcome = await result.current({ agentUuid: "agent-1", tests, onStarted });
     });
 
     expect(onStarted).not.toHaveBeenCalled();
     expect(toast.error).not.toHaveBeenCalled();
+    expect(outcome).toBe("failed");
   });
 
   it("reports a failure as a toast and does not call onStarted", async () => {

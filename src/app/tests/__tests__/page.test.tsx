@@ -238,6 +238,37 @@ describe("/tests run start", () => {
     });
   });
 
+  it("leaves the open runner alone when a repeat click is swallowed", async () => {
+    let resolveStart: (taskId: string) => void = () => {};
+    mockStartAgentTestRun.mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveStart = resolve;
+      }),
+    );
+    const user = setupUser();
+
+    render(<TestsPage />);
+    await runFirstTest(user);
+    await waitFor(() =>
+      expect(screen.getByTestId("runner-task-id")).toBeInTheDocument(),
+    );
+
+    // A second start while the first is still in flight is swallowed: no second
+    // request goes out, and the runner the first click opened is left as it is.
+    await user.click(screen.getByText("mock-rerun"));
+
+    expect(mockStartAgentTestRun).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("runner-task-id")).toBeInTheDocument();
+    expect(mockToastError).not.toHaveBeenCalled();
+
+    // The swallowed click did not wipe the run: the first start's uuid still
+    // lands in the runner it owns.
+    resolveStart("run-abc");
+    await waitFor(() =>
+      expect(screen.getByTestId("runner-task-id")).toHaveTextContent("run-abc"),
+    );
+  });
+
   it("toasts a failed start and leaves the tests list intact", async () => {
     mockStartAgentTestRun.mockRejectedValue(
       new Error("Failed to start test run"),

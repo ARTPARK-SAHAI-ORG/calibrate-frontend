@@ -41,21 +41,49 @@ export function RunTestDialog({
   // `verify` is a fresh object each render; `dismiss` is stable (useCallback),
   // so effects depend on it rather than the whole object.
   const dismissVerify = verify.dismiss;
-  const [verifyMode, setVerifyMode] = useState(false);
-  // Whether the gate is still live, read after the await in `handleVerify`.
+  // The gate is identified by an attempt id rather than a yes/no flag. This
+  // dialog is never unmounted by its parent, so a slow check outlives a close
+  // and reopen; an id says WHICH gate the check belongs to, so a late result
+  // can only act on the gate that started it. Entering the gate always mints a
+  // fresh id, which also covers re-entering it for the same agent.
+  // `verifyAttempt` is the gate on screen, null when the picker is showing.
+  const [verifyAttempt, setVerifyAttempt] = useState<number | null>(null);
+  // Mirror of `verifyAttempt` for reading after the await in `handleVerify`.
   // State read there would be the stale value captured by the render that
   // started the check, so a run the user had cancelled would start anyway.
-  const verifyModeRef = useRef(false);
+  const verifyAttemptRef = useRef<number | null>(null);
+  const attemptCounterRef = useRef(0);
+  // The attempt whose check is in flight. Tracked here instead of reading
+  // `verify.isVerifying`, which is shared across attempts: an abandoned check
+  // keeps it true and would make a freshly entered gate look busy with no way
+  // to act on it.
+  const [verifyingAttempt, setVerifyingAttempt] = useState<number | null>(null);
   const needsVerification =
     selectedAgent?.type === "connection" && selectedAgent?.verified === false;
+  const verifyMode = verifyAttempt !== null;
+  const isVerifyingThisAttempt =
+    verifyAttempt !== null && verifyingAttempt === verifyAttempt;
+
+  // Keeps the ref and the rendered gate in step; every gate change goes here.
+  const setGateAttempt = (attemptId: number | null) => {
+    verifyAttemptRef.current = attemptId;
+    setVerifyAttempt(attemptId);
+  };
+
+  // Leaves the gate and drops any in-flight check's claim on this dialog.
+  const exitVerifyMode = () => {
+    setGateAttempt(null);
+    setVerifyingAttempt(null);
+  };
 
   // Reset state when dialog closes
   useEffect(() => {
     if (!isOpen) {
       setSelectedAgent(null);
       setAttachToAgent(true);
-      setVerifyMode(false);
-      verifyModeRef.current = false;
+      verifyAttemptRef.current = null;
+      setVerifyAttempt(null);
+      setVerifyingAttempt(null);
       dismissVerify();
     }
   }, [isOpen, dismissVerify]);
@@ -64,8 +92,7 @@ export function RunTestDialog({
   // to the wrong agent.
   const handleSelectAgent = (agent: Agent | null) => {
     setSelectedAgent(agent);
-    setVerifyMode(false);
-    verifyModeRef.current = false;
+    exitVerifyMode();
     dismissVerify();
   };
 
@@ -73,26 +100,35 @@ export function RunTestDialog({
     if (!selectedAgent) return;
     if (needsVerification) {
       verify.dismiss();
-      setVerifyMode(true);
-      verifyModeRef.current = true;
+      attemptCounterRef.current += 1;
+      // A new gate starts idle even if an older check is still running, so the
+      // button reads "Verify" and stays clickable.
+      setVerifyingAttempt(null);
+      setGateAttempt(attemptCounterRef.current);
       return;
     }
     onRunTest(selectedAgent.uuid, selectedAgent.name, attachToAgent);
   };
 
   const handleVerify = async () => {
-    if (!selectedAgent) return;
+    const attemptId = verifyAttemptRef.current;
+    if (!selectedAgent || attemptId === null) return;
     const agent = selectedAgent;
+    setVerifyingAttempt(attemptId);
     const success = await verify.verifySavedAgent(agent.uuid);
+    // Act only if this is still the gate on screen. Closing the dialog, picking
+    // another agent, or entering the gate again all move the attempt id on, so
+    // a check that lands late leaves the dialog exactly as it is: no agent
+    // written back into the picker, no run started for an agent the user is no
+    // longer looking at.
+    if (verifyAttemptRef.current !== attemptId) return;
+    setVerifyingAttempt(null);
+    // A failure keeps the gate up so the error and the jump to the connection
+    // settings stay visible.
     if (!success) return;
-    // Closing during the check abandons the run. Bail before touching state so
-    // a stale agent can't be written back into a dialog the user has closed,
-    // which would pre-select the wrong agent the next time it opens.
-    if (!verifyModeRef.current) return;
     // Reflect the fresh verification locally, exit the gate, and run.
     setSelectedAgent({ ...agent, verified: true });
-    setVerifyMode(false);
-    verifyModeRef.current = false;
+    exitVerifyMode();
     onRunTest(agent.uuid, agent.name, attachToAgent);
   };
 
@@ -234,7 +270,7 @@ export function RunTestDialog({
           </button>
           {verifyMode ? (
             <VerifyToRunActions
-              isVerifying={verify.isVerifying}
+              isVerifying={isVerifyingThisAttempt}
               error={verify.verifyError}
               onVerify={handleVerify}
               onGoToConnection={handleGoToConnection}

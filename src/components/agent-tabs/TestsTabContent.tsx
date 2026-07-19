@@ -9,6 +9,7 @@ import {
   useDialogUrlParam,
   useVerifyConnection,
   useStartTestRun,
+  type StartTestRunResult,
 } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { buildTestToRun } from "@/lib/testRun";
@@ -81,6 +82,18 @@ type TestDetail = TestData & {
     variables?: EvaluatorVariableDef[] | null;
     variable_values?: Record<string, string> | null;
   }> | null;
+};
+
+// A run held back by the verify-to-run gate, waiting on the connection check.
+// Each gate stashes a fresh object, so the object identity also identifies the
+// verify attempt that owns the gate.
+type PendingRun = {
+  tests: TestData[];
+  runAll: boolean;
+  // Side effect the caller wants applied only once the run truly starts, e.g.
+  // the bulk action clearing its ticked rows. Carried through the verify gate
+  // so a resumed run applies it too.
+  onStarted?: () => void;
 };
 
 type TestRunResult = {
@@ -376,30 +389,29 @@ export function TestsTabContent({
     undefined,
   );
   // Shared start-run call: repeat-click guard, expired-session bail and
-  // failure toast all live in the hook.
+  // failure toast all live in the hook, which reports back which of those
+  // happened so this page knows what to do with the window it opened.
   const startTestRun = useStartTestRun();
-  // Local copy of the hook's in-flight state, read synchronously at the click
-  // so a swallowed repeat click can be told apart from a genuine failure.
-  const runStartInFlightRef = useRef(false);
 
   // Verify-to-run gate. When an unverified connection agent tries to run
   // tests, we stash the intended run here and open the verify dialog instead
   // of running (which would just fail against an unverified endpoint).
   const verify = useVerifyConnection();
   const [verifyToRunOpen, setVerifyToRunOpen] = useState(false);
-  // Whether the gate is still open, read after the await in
-  // `handleVerifyToRun`. State read there would be the stale value captured by
-  // the render that started the check, so a run the user had cancelled by
-  // closing the dialog would start anyway once the check came back.
-  const verifyToRunOpenRef = useRef(false);
-  const [pendingRun, setPendingRun] = useState<{
-    tests: TestData[];
-    runAll: boolean;
-    // Side effect the caller wants applied only once the run truly starts,
-    // e.g. the bulk action clearing its ticked rows. Carried through the
-    // verify gate so a resumed run applies it too.
-    onStarted?: () => void;
-  } | null>(null);
+  // The run the currently open gate is holding, or null when no gate is live.
+  //
+  // A ref rather than state for two reasons. It is never rendered, and
+  // `handleVerifyToRun` has to read it after its await, where a render closure
+  // would still hold the value from the render that started the check.
+  //
+  // Its object identity is also the identity of the verify attempt. The check
+  // has no timeout, so the user can cancel a slow one and open a second gate
+  // for a different selection while the first is still running. Matching the
+  // captured object against this ref is what lets the late check see that it
+  // no longer owns the gate. A plain "a gate is open" boolean cannot: it reads
+  // as true for the second gate too, so the first check would close the gate
+  // the user is looking at and run the selection they had walked away from.
+  const pendingRunRef = useRef<PendingRun | null>(null);
 
   // Benchmark dialog state
   const [benchmarkDialogOpen, setBenchmarkDialogOpen] = useState(false);
@@ -1107,38 +1119,29 @@ export function TestsTabContent({
     // rows. Named apart from the hook's `onStarted` option below.
     onRunStarted?: () => void,
   ) => {
-    // Mirrors the hook's own in-flight guard. A repeat click while the first
-    // start is still open is swallowed there and reported as a failed start,
-    // so bail before touching the dialog: otherwise the repeat click would
-    // close the window the first click legitimately opened.
-    if (runStartInFlightRef.current) return;
-    runStartInFlightRef.current = true;
-
     // Open on the click rather than on the response, so the most common action
     // in the product reacts immediately. Clearing the previous run's uuid at
     // the same moment keeps the dialog from briefly showing the last run.
     setTestRunTaskId(undefined);
     setTestRunnerOpen(true);
 
-    try {
-      const started = await startTestRun({
-        agentUuid,
-        tests,
-        runAllLinked: runAll,
-        onStarted: (taskId) => {
-          setTestRunTaskId(taskId);
-          addOptimisticTestRun(taskId, tests);
-          onRunStarted?.();
-        },
-      });
-      // No run exists (expired session or a failure the hook already toasted),
-      // so close the window again instead of leaving it spinning forever.
-      if (!started) {
-        setTestRunnerOpen(false);
-        setTestRunTaskId(undefined);
-      }
-    } finally {
-      runStartInFlightRef.current = false;
+    const result: StartTestRunResult = await startTestRun({
+      agentUuid,
+      tests,
+      runAllLinked: runAll,
+      onStarted: (taskId) => {
+        setTestRunTaskId(taskId);
+        addOptimisticTestRun(taskId, tests);
+        onRunStarted?.();
+      },
+    });
+    // "failed" means no run exists (an expired session, or an error the hook
+    // already toasted), so close the window again instead of leaving it
+    // spinning forever. "busy" is a repeat click the hook swallowed: an
+    // earlier click owns the window, so leave it exactly as it is.
+    if (result === "failed") {
+      setTestRunnerOpen(false);
+      setTestRunTaskId(undefined);
     }
   };
 
@@ -1162,9 +1165,10 @@ export function TestsTabContent({
     }
     if (isConnectionUnverified) {
       verify.dismiss();
-      setPendingRun({ tests, runAll, onStarted });
+      // A fresh object per gate: `handleVerifyToRun` matches on it to tell its
+      // own attempt apart from a later one.
+      pendingRunRef.current = { tests, runAll, onStarted };
       setVerifyToRunOpen(true);
-      verifyToRunOpenRef.current = true;
       return;
     }
     await beginRun(tests, runAll, onStarted);
@@ -1174,25 +1178,27 @@ export function TestsTabContent({
   // resume the pending run (success) or leave the failure showing so the user
   // can jump to the connection settings.
   const handleVerifyToRun = async () => {
+    // The run this click is for, captured before the await so a check that
+    // comes back late can tell whether it still owns the gate.
+    const attempt = pendingRunRef.current;
     const success = await verify.verifySavedAgent(agentUuid);
     if (!success) return;
-    // The agent really is verified now, so record that even if the user closed
-    // the dialog while the check was running. Only the run is abandoned.
+    // The agent really is verified now, so record that even when this attempt
+    // has been abandoned. Only the run is dropped.
     onConnectionVerified?.();
-    const stillOpen = verifyToRunOpenRef.current;
-    verifyToRunOpenRef.current = false;
+    // Cancelled (the ref was cleared) or superseded (the user opened a second
+    // gate for a different selection): this attempt no longer owns the gate on
+    // screen, so leave that gate open, leave its run stashed, and do not fire
+    // this attempt's own onStarted.
+    if (!attempt || pendingRunRef.current !== attempt) return;
+    pendingRunRef.current = null;
     setVerifyToRunOpen(false);
-    const resumed = pendingRun;
-    setPendingRun(null);
-    // Closing during the check cancels the run, so do not resume it.
-    if (!stillOpen || !resumed) return;
-    await beginRun(resumed.tests, resumed.runAll, resumed.onStarted);
+    await beginRun(attempt.tests, attempt.runAll, attempt.onStarted);
   };
 
   const closeVerifyToRun = () => {
     setVerifyToRunOpen(false);
-    verifyToRunOpenRef.current = false;
-    setPendingRun(null);
+    pendingRunRef.current = null;
     verify.dismiss();
   };
 

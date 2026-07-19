@@ -10,6 +10,7 @@ export { useVerifyConnection } from "./useVerifyConnection";
 export type { VerifyConnectionResult } from "./useVerifyConnection";
 export { useMaxRowsPerEval } from "./useMaxRowsPerEval";
 export { useStartTestRun } from "./useStartTestRun";
+export type { StartTestRunResult } from "./useStartTestRun";
 export { useDialogUrlParam } from "./useDialogUrlParam";
 export { usePageErrorState } from "./usePageErrorState";
 export type { PageErrorCode } from "./usePageErrorState";

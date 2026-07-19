@@ -1520,6 +1520,63 @@ describe("TestsTabContent — connection agent", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("does not let a cancelled check resume its run or close a newer gate", async () => {
+    // Cancelling a slow check and starting a different run opens a second
+    // gate. When the first check finally comes back it must recognise it no
+    // longer owns the gate: the run it was holding stays dropped, and the gate
+    // the user is looking at (with its own, different selection) is untouched.
+    const user = setupUser();
+    const onConnectionVerified = jest.fn();
+    let releaseFirstVerify: () => void = () => {};
+    const firstVerifyHeld = new Promise<void>((resolve) => {
+      releaseFirstVerify = resolve;
+    });
+    let verifyCalls = 0;
+    verifySavedAgentMock.mockImplementation(async () => {
+      verifyCalls += 1;
+      // Only the first check hangs; the one for the second gate is immediate.
+      if (verifyCalls === 1) await firstVerifyHeld;
+      return true;
+    });
+    state.agentTests = [responseTest, toolCallTest];
+    renderComponent({
+      agentType: "connection",
+      connectionVerified: false,
+      onConnectionVerified,
+    });
+    await screen.findAllByText("Greeting test");
+
+    // Gate A, for the first test. Start the check, then walk away from it.
+    await user.click(screen.getAllByTitle("Run test")[0]);
+    await user.click(screen.getByText("VerifyToRun"));
+    await user.click(screen.getByText("CloseVerifyToRun"));
+
+    // Gate B, for the second test.
+    await user.click(screen.getAllByTitle("Run test")[1]);
+    expect(screen.getByTestId("verify-to-run-dialog")).toBeInTheDocument();
+
+    // The first check succeeds, late.
+    await act(async () => {
+      releaseFirstVerify();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(onConnectionVerified).toHaveBeenCalled());
+
+    // The first test never runs, and gate B is still standing.
+    expect(startRunCalls()).toHaveLength(0);
+    expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("verify-to-run-dialog")).toBeInTheDocument();
+
+    // Gate B still holds its own selection, so verifying from it runs the
+    // second test rather than the abandoned first one.
+    await user.click(screen.getByText("VerifyToRun"));
+    await screen.findByTestId("test-runner-dialog");
+    expect(startRunCalls()).toHaveLength(1);
+    expect(JSON.parse(startRunCalls()[0][1].body)).toEqual({
+      test_uuids: ["t2"],
+    });
+  });
+
   it("keeps the gate open and surfaces the error when the resumed run fails to start", async () => {
     const user = setupUser();
     verifySavedAgentMock.mockResolvedValue(true);

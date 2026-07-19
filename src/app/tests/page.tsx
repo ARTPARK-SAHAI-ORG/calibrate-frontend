@@ -14,6 +14,7 @@ import {
   useAccessToken,
   useDialogUrlParam,
   useStartTestRun,
+  type StartTestRunResult,
 } from "@/hooks";
 import { getDefaultHeaders, unwrapList } from "@/lib/api";
 import { bulkDeleteTests } from "@/lib/testsApi";
@@ -261,9 +262,6 @@ function LLMPageInner() {
   // starting the run, the dialog only shows it.
   const [testRunnerTaskId, setTestRunnerTaskId] = useState<string | null>(null);
   const startTestRun = useStartTestRun();
-  // Mirrors the hook's in-flight guard so a repeat click can be told apart from
-  // a genuine failure: only the click that opened the runner may close it.
-  const isStartingRunRef = useRef(false);
 
   // Direct benchmark rerun (fresh benchmark, same models + test subset, no
   // picker).
@@ -604,38 +602,33 @@ function LLMPageInner() {
     agentName: string,
     testsForRun: TestData[],
   ) => {
-    // A repeat click while a start is still in flight is swallowed by the hook.
-    // Recognise it here too, so it neither reopens nor closes the runner that
-    // the first click legitimately owns.
-    if (isStartingRunRef.current) return;
-    isStartingRunRef.current = true;
-
     // Open now. The agent identity is what the header renders; the uuid is
     // cleared so the previous run does not flash before this one starts.
+    // Clearing before the hook can report "busy" is safe: the uuid is only ever
+    // set inside onStarted, which runs synchronously just before the hook drops
+    // its in-flight guard, so there is no moment where a runner is showing a
+    // run and a fresh click can still be swallowed as a repeat.
     setTestRunnerTaskId(null);
     setTestRunnerAgentUuid(agentUuid);
     setTestRunnerAgentName(agentName);
     setTestRunnerOpen(true);
 
-    try {
-      const started = await startTestRun({
-        agentUuid,
-        tests: testsForRun,
-        onStarted: (taskId) => {
-          // Optimistic row in the Runs list, the pending-run poller fills it in.
-          prependOptimisticTestRun(taskId, testsForRun, agentUuid, agentName);
+    const result: StartTestRunResult = await startTestRun({
+      agentUuid,
+      tests: testsForRun,
+      onStarted: (taskId) => {
+        // Optimistic row in the Runs list, the pending-run poller fills it in.
+        prependOptimisticTestRun(taskId, testsForRun, agentUuid, agentName);
 
-          setTestRunnerTaskId(taskId);
-        },
-      });
+        setTestRunnerTaskId(taskId);
+      },
+    });
 
-      // No run exists (failed start or expired session, the hook already told
-      // the user), so take the runner back down instead of leaving an empty
-      // window spinning.
-      if (!started) setTestRunnerOpen(false);
-    } finally {
-      isStartingRunRef.current = false;
-    }
+    // "failed": no run exists (a failed start or an expired session, the hook
+    // already told the user), so take the runner back down instead of leaving
+    // an empty window spinning. "busy": an earlier click owns this runner, so
+    // leave it exactly as it is. "started": keep it open on the new run.
+    if (result === "failed") setTestRunnerOpen(false);
   };
 
   // Handle running the test

@@ -31,11 +31,12 @@ jest.mock("../../hooks", () => {
       });
       const verifySavedAgent = React.useCallback(async (uuid: string) => {
         mockVerifySpy(uuid);
+        setState({
+          isVerifying: true,
+          verifyError: null,
+          verifySampleResponse: null,
+        });
         if (mockVerifyHold.promise) {
-          setState((s: { isVerifying: boolean }) => ({
-            ...s,
-            isVerifying: true,
-          }));
           await mockVerifyHold.promise;
         }
         if (mockVerifyOutcome.success) {
@@ -53,13 +54,16 @@ jest.mock("../../hooks", () => {
         });
         return false;
       }, []);
+      // Mirrors the real hook: dismiss clears the error and the sample
+      // response only. `isVerifying` is owned by the request itself and is
+      // cleared when it settles, so an abandoned check leaves it true.
       const dismiss = React.useCallback(
         () =>
-          setState({
-            isVerifying: false,
+          setState((s: { isVerifying: boolean }) => ({
+            ...s,
             verifyError: null,
             verifySampleResponse: null,
-          }),
+          })),
         [],
       );
       return { ...state, verifySavedAgent, verifyAdHoc: jest.fn(), dismiss };
@@ -71,7 +75,9 @@ jest.mock("../../hooks", () => {
 // No token is present in jsdom's default localStorage, so its effect is a
 // no-op — but we still stub the picker itself to drive selection
 // deterministically without depending on that internal fetch timing. A second
-// button selects an unverified connection agent to exercise the verify gate.
+// button selects an unverified connection agent to exercise the verify gate,
+// and a third selects a different unverified connection agent so a check
+// started for one agent can be resolved while the gate shows the other.
 jest.mock("../AgentPicker", () => ({
   __esModule: true,
   AgentPicker: ({ onSelectAgent, label, placeholder }: any) => (
@@ -97,6 +103,19 @@ jest.mock("../AgentPicker", () => ({
         }
       >
         Select unverified connection
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          onSelectAgent({
+            uuid: "conn-2",
+            name: "Other Connection",
+            type: "connection",
+            verified: false,
+          })
+        }
+      >
+        Select other unverified connection
       </button>
     </div>
   ),
@@ -357,6 +376,101 @@ describe("RunTestDialog", () => {
     rerender(<RunTestDialog isOpen {...props} />);
     expect(screen.getByRole("button", { name: /Run test/ })).toBeDisabled();
     expect(onRunTest).not.toHaveBeenCalled();
+  });
+
+  it("ignores a check that comes back for an agent the gate has moved on from", async () => {
+    // The parent never unmounts this dialog, so a slow check survives a close
+    // and reopen. When it lands, the gate belongs to a different agent, and
+    // the late result must not run that older agent or write it back into the
+    // picker.
+    const user = setupUser();
+    const onRunTest = jest.fn();
+    let releaseVerify: () => void = () => {};
+    mockVerifyHold.promise = new Promise<void>((resolve) => {
+      releaseVerify = resolve;
+    });
+
+    const props = {
+      testName: "My Test",
+      testUuid: "t1",
+      onClose: jest.fn(),
+      onRunTest,
+    };
+    const { rerender } = render(<RunTestDialog isOpen {...props} />);
+
+    // Agent A: enter the gate and start a check that will not settle yet.
+    await user.click(screen.getByText("Select unverified connection"));
+    await user.click(screen.getByRole("button", { name: /Run test/ }));
+    await user.click(screen.getByRole("button", { name: "Verify" }));
+    expect(mockVerifySpy).toHaveBeenCalledWith("conn-1");
+
+    // The user closes, reopens, and gates a different agent B.
+    rerender(<RunTestDialog isOpen={false} {...props} />);
+    rerender(<RunTestDialog isOpen {...props} />);
+    await user.click(screen.getByText("Select other unverified connection"));
+    await user.click(screen.getByRole("button", { name: /Run test/ }));
+    expect(screen.getByText(/is not verified yet/)).toHaveTextContent(
+      "Other Connection",
+    );
+
+    // Agent A's check now succeeds.
+    await act(async () => {
+      releaseVerify();
+      await Promise.resolve();
+    });
+
+    // No run for A, and no run at all: B has not been verified.
+    expect(onRunTest).not.toHaveBeenCalled();
+    // The gate is untouched: still agent B, still waiting to be verified.
+    expect(screen.getByText(/is not verified yet/)).toHaveTextContent(
+      "Other Connection",
+    );
+    expect(screen.queryByText(/"My Connection"/)).not.toBeInTheDocument();
+  });
+
+  it("shows an actionable Verify button on a new gate while an abandoned check is still in flight", async () => {
+    // The verify hook's `isVerifying` is shared across attempts and only
+    // clears when the request settles, so a gate entered after a cancelled
+    // check must not inherit its busy state. Against a hanging endpoint that
+    // would leave the button stuck on "Verifying..." indefinitely.
+    const user = setupUser();
+    const onRunTest = jest.fn();
+    let releaseVerify: () => void = () => {};
+    mockVerifyHold.promise = new Promise<void>((resolve) => {
+      releaseVerify = resolve;
+    });
+
+    const props = {
+      testName: "My Test",
+      testUuid: "t1",
+      onClose: jest.fn(),
+      onRunTest,
+    };
+    const { rerender } = render(<RunTestDialog isOpen {...props} />);
+
+    await user.click(screen.getByText("Select unverified connection"));
+    await user.click(screen.getByRole("button", { name: /Run test/ }));
+    await user.click(screen.getByRole("button", { name: "Verify" }));
+    expect(
+      screen.getByRole("button", { name: /Verifying/ }),
+    ).toBeDisabled();
+
+    // Cancel mid-check, then come straight back into the gate.
+    rerender(<RunTestDialog isOpen={false} {...props} />);
+    rerender(<RunTestDialog isOpen {...props} />);
+    await user.click(screen.getByText("Select unverified connection"));
+    await user.click(screen.getByRole("button", { name: /Run test/ }));
+
+    // The fresh gate is usable even though the old check is still running.
+    expect(screen.getByRole("button", { name: "Verify" })).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: /Verifying/ }),
+    ).not.toBeInTheDocument();
+
+    await act(async () => {
+      releaseVerify();
+      await Promise.resolve();
+    });
   });
 
   it("diverts to the verify gate for an unverified connection agent instead of running", async () => {

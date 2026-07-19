@@ -21,6 +21,15 @@ type StartTestRunArgs = {
 };
 
 /**
+ * What happened, so callers do not have to re-derive it:
+ * - "started": the run exists and `onStarted` ran.
+ * - "busy": a start was already in flight, this click was ignored. The caller
+ *   must leave its runner alone, the earlier click owns it.
+ * - "failed": no run. Includes an expired session. The toast is already shown.
+ */
+export type StartTestRunResult = "started" | "busy" | "failed";
+
+/**
  * Starts an agent test run from wherever the user clicked.
  *
  * Both run surfaces (the agent Tests tab and the LLM Tests page) need the same
@@ -29,8 +38,9 @@ type StartTestRunArgs = {
  * toast without disturbing the page. Having each surface write that itself is
  * how they drifted apart before, so it lives here once.
  *
- * Resolves true only when the run exists. Callers open the runner on click, so
- * they use the false case to close it again.
+ * Callers open the runner on click, so the result tells them what to do with
+ * it: keep it for "started", close it for "failed", and leave it alone for
+ * "busy" because an earlier click owns it.
  */
 export function useStartTestRun() {
   const backendAccessToken = useAccessToken();
@@ -44,8 +54,8 @@ export function useStartTestRun() {
       tests,
       runAllLinked,
       onStarted,
-    }: StartTestRunArgs): Promise<boolean> => {
-      if (isStartingRef.current) return false;
+    }: StartTestRunArgs): Promise<StartTestRunResult> => {
+      if (isStartingRef.current) return "busy";
       isStartingRef.current = true;
 
       try {
@@ -56,9 +66,9 @@ export function useStartTestRun() {
           accessToken: backendAccessToken,
         });
         // null means the session expired and the user is being signed out.
-        if (!taskId) return false;
+        if (!taskId) return "failed";
         onStarted(taskId);
-        return true;
+        return "started";
       } catch (err) {
         // A failed start is not a page-level failure: keep the page as it is
         // and just tell the user.
@@ -66,7 +76,7 @@ export function useStartTestRun() {
         toast.error(
           err instanceof Error ? err.message : "Failed to start test run",
         );
-        return false;
+        return "failed";
       } finally {
         isStartingRef.current = false;
       }
