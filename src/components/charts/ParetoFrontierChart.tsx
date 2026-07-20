@@ -149,7 +149,7 @@ function ParetoTooltip({
       </div>
       {typeof d.latency === "number" && Number.isFinite(d.latency) && (
         <div className="text-muted-foreground">
-          Speed: <span className="text-foreground">{formatLatencyMs(d.latency)}</span>
+          Latency: <span className="text-foreground">{formatLatencyMs(d.latency)}</span>
         </div>
       )}
     </div>
@@ -229,7 +229,7 @@ export function ParetoFrontierChart({
   const resolvedTitle =
     title ??
     (hasLatency
-      ? "Cost, quality and speed tradeoff"
+      ? "Cost, quality and latency tradeoff"
       : "Cost and quality tradeoff");
 
   useEffect(() => {
@@ -268,7 +268,7 @@ export function ParetoFrontierChart({
   const resolvedSubtitle =
     subtitle ??
     (hasLatency
-      ? `Each ${entityNoun} is placed by ${qualityComparative}, what it costs, and how fast it replies. The green line joins the best ${entityNoun}s: the ones that nothing else beats on ${qualityNoun}, cost and speed all at once. Any ${entityNoun} below the line is beaten by one on it, so there is no reason to choose it.`
+      ? `Each ${entityNoun} is placed by ${qualityComparative}, what it costs, and how fast it replies. The green line joins the best ${entityNoun}s: the ones that nothing else beats on ${qualityNoun}, cost and latency all at once. Any ${entityNoun} below the line is beaten by one on it, so there is no reason to choose it.`
       : `Each ${entityNoun} is placed by ${qualityComparative} and what it costs. The green line joins the best ${entityNoun}s: the ones that nothing else beats on both ${qualityNoun} and cost at once. Any ${entityNoun} below the line is beaten by one on it, so there is no reason to choose it.`);
 
   // Domains are derived from ALL models (not just the visible ones) so points
@@ -292,11 +292,12 @@ export function ParetoFrontierChart({
     .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
   const zMin = latencies.length ? Math.min(...latencies) : 0;
   const zMax = latencies.length ? Math.max(...latencies) : 0;
-  // Faster (lower latency) → bigger bubble, so the quickest models stand out.
+  // Bubble grows with latency: the slowest reply is the biggest bubble, matching
+  // the intuition that a bigger number is a bigger dot.
   const radiusForLatency = (latency: number): number => {
     if (zMax === zMin) return (R_MIN + R_MAX) / 2;
     const t = (latency - zMin) / (zMax - zMin);
-    return R_MIN + (1 - t) * (R_MAX - R_MIN);
+    return R_MIN + t * (R_MAX - R_MIN);
   };
   const radiusFor = (d: ChartDatum): number => {
     if (!hasLatency || typeof d.latency !== "number" || !Number.isFinite(d.latency)) {
@@ -652,7 +653,7 @@ export function ParetoFrontierChart({
                 </th>
                 {sortHeader("Quality", "quality")}
                 {sortHeader("Cost", "cost")}
-                {hasLatency && sortHeader("Speed", "speed", "pl-3")}
+                {hasLatency && sortHeader("Latency", "speed", "pl-3")}
               </tr>
             </thead>
             <tbody>

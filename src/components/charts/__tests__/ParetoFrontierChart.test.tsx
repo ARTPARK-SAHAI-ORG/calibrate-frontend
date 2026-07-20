@@ -69,7 +69,7 @@ describe("ParetoFrontierChart", () => {
   it("renders the default title and a subtitle that explains the frontier", () => {
     renderChart(points);
     expect(
-      screen.getByText("Cost, quality and speed tradeoff"),
+      screen.getByText("Cost, quality and latency tradeoff"),
     ).toBeInTheDocument();
     expect(screen.getByText(/how fast it replies/i)).toBeInTheDocument();
     expect(
@@ -108,7 +108,7 @@ describe("ParetoFrontierChart", () => {
       screen.getByRole("columnheader", { name: "Cost" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("columnheader", { name: "Speed" }),
+      screen.getByRole("columnheader", { name: "Latency" }),
     ).toBeInTheDocument();
     // Best-only is on by default: frontier models show, dominated ones don't.
     expect(screen.getAllByText("Premium").length).toBeGreaterThan(0);
@@ -241,7 +241,7 @@ describe("ParetoFrontierChart", () => {
       screen.getByText(/each provider is placed by how accurate it is/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/nothing else beats on accuracy, cost and speed/i),
+      screen.getByText(/nothing else beats on accuracy, cost and latency/i),
     ).toBeInTheDocument();
     // Table header is capitalised from the entity noun.
     expect(
