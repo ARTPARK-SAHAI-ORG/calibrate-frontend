@@ -551,9 +551,9 @@ export function TestRunnerDialog({
               <div className="flex-1 overflow-y-auto p-4 md:p-6">
                 <LLMEvaluationAbout
                   showToolCalls={toolCall.total > 0}
-                  showLatency={!!latencyAgg}
-                  showCost={!!costAgg}
-                  showTokens={!!tokensAgg}
+                  showLatency={!!run?.latency_ms}
+                  showCost={!!run?.cost}
+                  showTokens={!!run?.total_tokens}
                   evaluators={evaluatorSummaryToAbout(evaluatorSummary)}
                 />
               </div>
