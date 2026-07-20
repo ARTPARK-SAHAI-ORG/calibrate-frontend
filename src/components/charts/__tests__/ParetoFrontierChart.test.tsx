@@ -1,9 +1,27 @@
+import React from "react";
 import { render, screen } from "@/test-utils";
 import {
   ParetoFrontierChart,
   type ParetoModelPoint,
 } from "@/components/charts/ParetoFrontierChart";
 import { getColorMap } from "@/components/charts/LeaderboardBarChart";
+
+// The how-to-read caption lives behind an info-icon Tooltip (portal, shown on
+// hover). Render its content inline so caption assertions don't need to hover.
+jest.mock("../../Tooltip", () => ({
+  Tooltip: ({
+    content,
+    children,
+  }: {
+    content: string;
+    children: React.ReactNode;
+  }) => (
+    <>
+      {children}
+      <span data-testid="info-tooltip-content">{content}</span>
+    </>
+  ),
+}));
 
 // jsdom has no ResizeObserver, and recharts' ResponsiveContainer needs a
 // non-zero measured size to actually render the inner chart SVG. Immediately
@@ -83,6 +101,13 @@ describe("ParetoFrontierChart", () => {
     expect(screen.getByText("Premium")).toBeInTheDocument();
   });
 
+  it("exposes the how-to-read caption via an info-icon trigger", () => {
+    renderChart(points);
+    expect(
+      screen.getByRole("button", { name: /how to read this chart/i }),
+    ).toBeInTheDocument();
+  });
+
   it("drops the dashed-line wording when only one model is on the frontier", () => {
     // "champion" dominates all others (cheapest, best pass rate, fastest), so it
     // is the sole frontier model and no line is drawn.
@@ -91,15 +116,66 @@ describe("ParetoFrontierChart", () => {
       { model: "weak", label: "weak", cost: 0.02, passRate: 88, latency: 1400 },
     ]);
     expect(screen.queryByText(/dashed line/i)).not.toBeInTheDocument();
-    const boldName = screen.getByText("champion", { selector: "strong" });
-    expect(boldName).toHaveClass("font-semibold", "text-foreground");
-    expect(screen.getByText(/comes out on top: it matches or beats every other model/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /champion comes out on top: it matches or beats every other model/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("defaults to Frontier only — dominated models are hidden and the toggle is active", () => {
+    // "champion" dominates "weak", so "weak" is off the frontier.
+    renderChart([
+      { model: "champion", label: "champion", cost: 0.001, passRate: 96, latency: 300 },
+      { model: "weak", label: "weak", cost: 0.02, passRate: 88, latency: 1400 },
+    ]);
+    // The toggle is active by default (frontier-only styling).
+    const toggle = screen.getByRole("button", { name: /Frontier only/i });
+    expect(toggle).toHaveClass("bg-foreground");
+    // The frontier model renders; the dominated model's bubble label does not.
+    expect(screen.getByText("champion", { selector: "text" })).toBeInTheDocument();
+    expect(screen.queryByText("weak")).not.toBeInTheDocument();
   });
 
   it("shows the empty state when no model has cost + pass rate", () => {
     renderChart([{ model: "x", label: "X", cost: NaN, passRate: NaN }]);
     expect(
-      screen.getByText(/missing cost or pass-rate values/i),
+      screen.getByText(/missing cost or pass rate values/i),
+    ).toBeInTheDocument();
+  });
+
+  it("uses the entity/quality copy overrides (STT/TTS framing)", () => {
+    render(
+      <ParetoFrontierChart
+        points={points}
+        colorMap={getColorMap(points.map((p) => p.model))}
+        title="Accuracy vs cost tradeoff"
+        passRateLabel="Accuracy"
+        qualityNoun="accuracy"
+        qualityComparative="more accurate it is"
+        entityNoun="provider"
+      />,
+    );
+    expect(
+      screen.getByText(/Accuracy vs cost tradeoff/i),
+    ).toBeInTheDocument();
+    // Caption talks about providers + accuracy, not models + pass rate.
+    expect(screen.getByText(/Each dot is a provider/i)).toBeInTheDocument();
+    expect(screen.getByText(/the more accurate it is/i)).toBeInTheDocument();
+    expect(screen.getByText(/accuracy, cost, and speed/i)).toBeInTheDocument();
+  });
+
+  it("uses the entity override in the empty-state copy", () => {
+    render(
+      <ParetoFrontierChart
+        points={[{ model: "x", label: "X", cost: NaN, passRate: NaN }]}
+        colorMap={getColorMap(["x"])}
+        entityNoun="provider"
+        qualityNoun="accuracy"
+      />,
+    );
+    expect(
+      screen.getByText(/providers are missing cost or accuracy values/i),
     ).toBeInTheDocument();
   });
 });

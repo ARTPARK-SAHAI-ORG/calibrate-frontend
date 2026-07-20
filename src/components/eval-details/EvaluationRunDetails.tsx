@@ -18,8 +18,26 @@ import {
   type TTSResultRow,
 } from "./TTSResultsTable";
 import type { LatencyMetric } from "./ttsEvalTypes";
-import { PIPECAT_SEMANTIC_WER_URL, SARVAM_ASR_BLOG_URL } from "@/constants/links";
+import {
+  PIPECAT_SEMANTIC_WER_URL,
+  PIPECAT_STT_TTFS_URL,
+  SARVAM_ASR_BLOG_URL,
+} from "@/constants/links";
 import { SARVAM_METRIC_FIELDS } from "./sarvamMetrics";
+import {
+  type AudioCostBreakdown,
+  costTiles,
+  costCaveats,
+  formatMoney,
+  readTotalCostUsd,
+} from "@/lib/audioCost";
+import {
+  buildSttParetoPoints,
+  buildTtsParetoPoints,
+  countValidParetoPoints,
+} from "@/lib/audioPareto";
+import { ParetoFrontierChart } from "@/components/charts/ParetoFrontierChart";
+import { getColorMap } from "@/components/charts/LeaderboardBarChart";
 
 type EvaluationStatus = "queued" | "in_progress" | "done" | "failed";
 type EvaluatorOutputType = "binary" | "rating";
@@ -112,6 +130,15 @@ export type STTProviderResultForDetails = ProviderResultLike & {
         sarvam_llm_cer?: number;
         sarvam_intent_score?: number;
         sarvam_entity_score?: number;
+        // TTFS (Time To Final Segment) — streaming latency from when the user
+        // stops speaking to the final transcription segment. Reported as a
+        // latency block (`p50` headline) or a plain number. Present only when
+        // the run measured it — `null` for providers that don't report it
+        // (e.g. Gemini STT).
+        ttfs?: LatencyMetric | number | null;
+        // Per-provider cost block (per-minute USD pricing × audio duration).
+        // Present only when the run computed cost.
+        cost?: AudioCostBreakdown;
       })
     | null;
   results?: STTResultRow[] | null;
@@ -130,7 +157,14 @@ function readNumericMetric(v: unknown): number | null {
 export type TTSProviderResultForDetails = ProviderResultLike & {
   // `ttfb` now reports percentiles (`p50` headline + `p95` / `p99`); legacy
   // runs still carry `mean`. Read `p50 ?? mean`.
-  metrics?: (Record<string, unknown> & { ttfb?: LatencyMetric }) | null;
+  metrics?:
+    | (Record<string, unknown> & {
+        // `null` for a provider that didn't report latency.
+        ttfb?: LatencyMetric | null;
+        // Per-provider cost block. Present only when the run computed cost.
+        cost?: AudioCostBreakdown;
+      })
+    | null;
   results?: TTSResultRow[] | null;
 };
 
@@ -258,6 +292,55 @@ export const TTFB_ABOUT_METRIC: MetricDescription = {
   range: "0 - \u221E",
 };
 
+// STT latency is surfaced as "Latency" in the table/tiles; the About tab is
+// where it's explained as TTFS (Time To Final Segment), the streaming STT
+// latency defined by Pipecat's STT benchmark. The metric name links out to the
+// benchmark's definition in a new tab. Rendered only when a run measured it.
+export const TTFS_ABOUT_METRIC: MetricDescription = {
+  key: "ttfs",
+  metric: (
+    <a
+      href={PIPECAT_STT_TTFS_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-foreground underline-offset-2 hover:underline"
+      title="Learn more in the Pipecat STT benchmark"
+    >
+      Latency
+    </a>
+  ),
+  description:
+    "For streaming STT, latency is measured as TTFS (Time To Final Segment): the time from when the user stops speaking to when the final transcription segment is received. Lower is better \u2014 faster responses for voice agents. The reported value is the median (p50) across the dataset.",
+  preference: "Lower is better",
+  range: "0 - \u221E",
+};
+
+/**
+ * Read a latency value in seconds from a TTFS/TTFB-style metric, tolerating
+ * both the percentile block (`p50` headline, legacy `mean`) and a plain number.
+ */
+function readLatencySeconds(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (value && typeof value === "object") {
+    const m = value as LatencyMetric;
+    const v = m.p50 ?? m.mean;
+    return typeof v === "number" && Number.isFinite(v) ? v : null;
+  }
+  return null;
+}
+
+/** Whether any provider measured TTFS. Drives the STT About-tab row. */
+export function hasTtfsMetric(
+  providerResults:
+    | Array<{ metrics?: Record<string, unknown> | null }>
+    | null
+    | undefined,
+): boolean {
+  return (providerResults ?? []).some(
+    (pr) => readLatencySeconds(pr.metrics?.ttfs) != null,
+  );
+}
+
 export function ratingRange(scaleValues: number[]): string {
   if (scaleValues.length === 0) return "-";
   const min = Math.min(...scaleValues);
@@ -345,6 +428,140 @@ function evaluatorLeaderboardColumns(
   }));
 }
 
+// STT latency lives on the `ttfs` row key (TTFS = Time To Final Segment) but is
+// labelled "Latency (s)" in the UI, matching the TTS latency column; the About
+// tab explains that STT latency is TTFS.
+const TTFS_KEY = "ttfs";
+const TTFS_LABEL = "Latency (s)";
+
+/** Leaderboard column for TTFS (STT only). */
+const ttfsLeaderboardColumn = {
+  key: TTFS_KEY,
+  header: TTFS_LABEL,
+  render: (v: unknown) =>
+    typeof v === "number" ? parseFloat(v.toFixed(4)) : "-",
+};
+
+/** Leaderboard chart for TTFS (STT only). */
+const ttfsChartConfig: ChartConfig = { title: TTFS_LABEL, dataKey: TTFS_KEY };
+
+// Total run cost in USD — the one cross-provider-comparable cost figure (the
+// per-unit / native price stays on the per-provider Overall Metrics card).
+// Shown as a leaderboard column + chart, keyed on the `cost_usd` joined by
+// `withTotalCostUsd`.
+const COST_USD_KEY = "cost_usd";
+const COST_USD_LABEL = "Total cost (USD)";
+
+/** Leaderboard column for total USD cost (shared by STT and TTS). */
+const costLeaderboardColumn = {
+  key: COST_USD_KEY,
+  header: COST_USD_LABEL,
+  render: (v: unknown) => (typeof v === "number" ? formatMoney(v, "USD") : "-"),
+};
+
+/** Leaderboard chart for total USD cost (shared by STT and TTS). */
+const costChartConfig: ChartConfig = {
+  title: COST_USD_LABEL,
+  dataKey: COST_USD_KEY,
+  formatTooltip: (v: number) => formatMoney(v, "USD"),
+};
+
+/** X-axis title for the STT/TTS Pareto frontier (total run cost, USD). */
+const PARETO_COST_AXIS_LABEL = "Total cost (USD) →  cheaper is better";
+
+/** Renders the applicable cost caveats as stacked muted lines (or nothing). */
+function costCaveatFootnote(
+  metrics: Record<string, unknown> | null | undefined,
+  component: "stt" | "tts",
+  runDate?: string | null,
+): React.ReactNode {
+  const lines = costCaveats(metrics, { component, runDate });
+  if (lines.length === 0) return undefined;
+  return (
+    <div className="space-y-1">
+      {lines.map((line, i) => (
+        <p key={i}>{line}</p>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Adds a derived numeric metric to leaderboard rows under `key`, reading it via
+ * `read` (row → value, falling back to a joined provider value). Rows without a
+ * value are left untouched; returns whether any row ended up with one.
+ */
+function withRowMetric(
+  rows: LeaderboardSummaryForDetails[],
+  key: string,
+  read: (row: LeaderboardSummaryForDetails) => number | null,
+): { rows: LeaderboardSummaryForDetails[]; show: boolean } {
+  let show = false;
+  const out = rows.map((row) => {
+    const v = read(row);
+    if (v == null) return row;
+    show = true;
+    return { ...row, [key]: v };
+  });
+  return { rows: out, show };
+}
+
+/**
+ * Joins total USD cost onto leaderboard rows under a flat `cost_usd` key (the
+ * comparable cost figure). Reads the cost off the row itself when the summary
+ * carries it, otherwise off the matching provider result. Drives both the "Total
+ * cost (USD)" leaderboard column/chart and the Pareto cost axis; the per-unit /
+ * native price stays on the per-provider Overall Metrics card.
+ */
+function withTotalCostUsd(
+  leaderboardSummary: LeaderboardSummaryForDetails[],
+  providerResults?: Array<{
+    provider: string;
+    metrics?: Record<string, unknown> | null;
+  }>,
+): { rows: LeaderboardSummaryForDetails[]; showCost: boolean } {
+  const costByRun: Record<string, number> = {};
+  for (const pr of providerResults ?? []) {
+    const c = readTotalCostUsd(pr.metrics);
+    if (c != null) costByRun[pr.provider] = c;
+  }
+  const { rows, show } = withRowMetric(
+    leaderboardSummary,
+    COST_USD_KEY,
+    (row) => costByRun[row.run] ?? readTotalCostUsd(row),
+  );
+  return { rows, showCost: show };
+}
+
+/**
+ * Joins TTFS (seconds) onto STT leaderboard rows under a single flat `ttfs`
+ * key. Reads the percentile headline (`ttfs_p50`) or legacy flat `ttfs` off the
+ * row, falling back to the matching provider result's `ttfs` block.
+ */
+function withTtfs(
+  leaderboardSummary: LeaderboardSummaryForDetails[],
+  providerResults?: Array<{
+    provider: string;
+    metrics?: Record<string, unknown> | null;
+  }>,
+): { rows: LeaderboardSummaryForDetails[]; showTtfs: boolean } {
+  const ttfsByRun: Record<string, number> = {};
+  for (const pr of providerResults ?? []) {
+    const t = readLatencySeconds(pr.metrics?.ttfs);
+    if (t != null) ttfsByRun[pr.provider] = t;
+  }
+  const { rows, show } = withRowMetric(
+    leaderboardSummary,
+    TTFS_KEY,
+    (row) =>
+      readLatencySeconds(row.ttfs_p50) ??
+      readLatencySeconds(row.ttfs) ??
+      ttfsByRun[row.run] ??
+      null,
+  );
+  return { rows, showTtfs: show };
+}
+
 /** Pairs charts into rows of two for the LeaderboardTab grid. */
 function chunkChartRows(charts: ChartConfig[]): ChartConfig[][] {
   const rows: ChartConfig[][] = [];
@@ -358,12 +575,15 @@ export function STTEvaluationAbout({
   evaluatorRows,
   showSarvamMetrics = false,
   showSemanticWer = false,
+  showTtfs = false,
 }: {
   evaluatorRows: EvaluatorAboutMetricRow[];
   /** Include the Sarvam LLM-judge metric rows — set when the run used them. */
   showSarvamMetrics?: boolean;
   /** Include the Semantic WER row — set when the run computed it. */
   showSemanticWer?: boolean;
+  /** Include the TTFS row — set when the run measured it. */
+  showTtfs?: boolean;
 }) {
   return (
     <AboutMetricsTable
@@ -372,6 +592,7 @@ export function STTEvaluationAbout({
         CER_ABOUT_METRIC,
         ...(showSemanticWer ? [SEMANTIC_WER_ABOUT_METRIC] : []),
         ...(showSarvamMetrics ? SARVAM_ABOUT_METRICS : []),
+        ...(showTtfs ? [TTFS_ABOUT_METRIC] : []),
         ...evaluatorRowsToMetricDescriptions(evaluatorRows),
       ]}
     />
@@ -397,11 +618,18 @@ export function STTEvaluationLeaderboard({
   leaderboardSummary,
   evaluatorColumns,
   getProviderLabel,
+  providerResults,
   className,
 }: {
   leaderboardSummary: LeaderboardSummaryForDetails[];
   evaluatorColumns: STTEvaluatorColumn[];
   getProviderLabel: (value: string) => string;
+  // Provider-level results, used to join per-minute cost onto leaderboard rows
+  // when the leaderboard summary doesn't carry it directly.
+  providerResults?: Array<{
+    provider: string;
+    metrics?: Record<string, unknown> | null;
+  }>;
   className?: string;
 }) {
   // Sarvam metrics only appear as leaderboard charts/columns when the
@@ -415,6 +643,12 @@ export function STTEvaluationLeaderboard({
   const showSemanticWer = leaderboardSummary.some(
     (row) => row.semantic_wer != null,
   );
+
+  // Join total USD cost (comparable) and TTFS onto each row for their columns,
+  // charts, and the Pareto axis.
+  const withCost = withTotalCostUsd(leaderboardSummary, providerResults);
+  const { rows, showTtfs } = withTtfs(withCost.rows, providerResults);
+  const showCost = withCost.showCost;
 
   // Drop evaluator columns/charts that no run carries a value for — an
   // all-"-" column (e.g. an evaluator that didn't run) is just noise.
@@ -433,8 +667,16 @@ export function STTEvaluationLeaderboard({
       : []),
     ...sarvamFields.map((field) => ({ title: field.label, dataKey: field.key })),
     ...evaluatorChartConfigs(visibleEvaluatorColumns),
+    ...(showTtfs ? [ttfsChartConfig] : []),
+    ...(showCost ? [costChartConfig] : []),
   ];
   const chartRows = chunkChartRows(allCharts);
+
+  // Pareto frontier (accuracy vs cost, TTFS as latency) — shown only with 2+
+  // providers that both have a cost and an accuracy value to trade off.
+  const paretoPoints = buildSttParetoPoints(rows, getProviderLabel);
+  const showPareto =
+    leaderboardSummary.length > 1 && countValidParetoPoints(paretoPoints) >= 2;
 
   return (
     <LeaderboardTab
@@ -448,11 +690,28 @@ export function STTEvaluationLeaderboard({
           : []),
         ...sarvamFields.map((field) => ({ key: field.key, header: field.label })),
         ...evaluatorLeaderboardColumns(visibleEvaluatorColumns),
+        ...(showTtfs ? [ttfsLeaderboardColumn] : []),
+        ...(showCost ? [costLeaderboardColumn] : []),
       ]}
-      data={leaderboardSummary}
+      data={rows}
       charts={chartRows}
       filename="stt-evaluation-leaderboard"
       getLabel={getProviderLabel}
+      afterTable={
+        showPareto ? (
+          <ParetoFrontierChart
+            points={paretoPoints}
+            colorMap={getColorMap(paretoPoints.map((p) => p.model))}
+            title="Accuracy vs cost tradeoff"
+            passRateLabel="Accuracy"
+            qualityNoun="accuracy"
+            qualityComparative="more accurate it is"
+            entityNoun="provider"
+            costAxisLabel={PARETO_COST_AXIS_LABEL}
+            filename="stt-evaluation-pareto"
+          />
+        ) : undefined
+      }
     />
   );
 }
@@ -461,11 +720,18 @@ export function TTSEvaluationLeaderboard({
   leaderboardSummary,
   evaluatorColumns,
   getProviderLabel,
+  providerResults,
   className,
 }: {
   leaderboardSummary: LeaderboardSummaryForDetails[];
   evaluatorColumns: TTSEvaluatorColumn[];
   getProviderLabel: (value: string) => string;
+  // Provider-level results, used to join per-minute cost onto leaderboard rows
+  // when the leaderboard summary doesn't carry it directly.
+  providerResults?: Array<{
+    provider: string;
+    metrics?: Record<string, unknown> | null;
+  }>;
   className?: string;
 }) {
   // Latency (TTFB) is reported as the median (p50) under `ttfb_p50`. Runs from
@@ -478,11 +744,27 @@ export function TTSEvaluationLeaderboard({
   const renderTtfb = (v: string | number | undefined) =>
     v != null ? parseFloat(Number(v).toFixed(4)) : "-";
 
+  // Join total USD cost (comparable) onto each row for the cost column/chart and
+  // the Pareto axis; the per-unit / native price stays on the per-provider card.
+  const { rows, showCost } = withTotalCostUsd(leaderboardSummary, providerResults);
+
   const allCharts: ChartConfig[] = [
     ...evaluatorChartConfigs(evaluatorColumns),
     { title: "Latency (s)", dataKey: ttfbKey },
+    ...(showCost ? [costChartConfig] : []),
   ];
   const chartRows = chunkChartRows(allCharts);
+
+  // Pareto frontier (primary evaluator quality vs cost, TTFB as latency) —
+  // shown only with 2+ providers that both have a cost and a quality score.
+  const primaryEvaluator = evaluatorColumns[0];
+  const paretoPoints = buildTtsParetoPoints(
+    rows,
+    evaluatorColumns,
+    getProviderLabel,
+  );
+  const showPareto =
+    leaderboardSummary.length > 1 && countValidParetoPoints(paretoPoints) >= 2;
 
   return (
     <LeaderboardTab
@@ -491,11 +773,27 @@ export function TTSEvaluationLeaderboard({
         { key: "run", header: "Run", render: (v) => getProviderLabel(v) },
         ...evaluatorLeaderboardColumns(evaluatorColumns),
         { key: ttfbKey, header: "Latency (s)", render: renderTtfb },
+        ...(showCost ? [costLeaderboardColumn] : []),
       ]}
-      data={leaderboardSummary}
+      data={rows}
       charts={chartRows}
       filename="tts-evaluation-leaderboard"
       getLabel={getProviderLabel}
+      afterTable={
+        showPareto ? (
+          <ParetoFrontierChart
+            points={paretoPoints}
+            colorMap={getColorMap(paretoPoints.map((p) => p.model))}
+            title={`${primaryEvaluator?.label ?? "Quality"} vs cost tradeoff`}
+            passRateLabel={primaryEvaluator?.label ?? "Quality"}
+            qualityNoun="quality"
+            qualityComparative="higher it scores"
+            entityNoun="provider"
+            costAxisLabel={PARETO_COST_AXIS_LABEL}
+            filename="tts-evaluation-pareto"
+          />
+        ) : undefined
+      }
     />
   );
 }
@@ -509,6 +807,7 @@ export function STTEvaluationOutputs({
   getProviderLabel,
   className = "flex flex-col md:flex-row border border-border rounded-xl overflow-hidden md:h-[calc(100vh-220px)]",
   tableRef,
+  runDate,
   labellingSelection,
   onToggleLabellingSelection,
   onLabellingBulkToggle,
@@ -521,6 +820,8 @@ export function STTEvaluationOutputs({
   getProviderLabel: (value: string) => string;
   className?: string;
   tableRef?: React.RefObject<HTMLDivElement | null>;
+  // Run date (created_at) — used to date the INR conversion-rate caveat.
+  runDate?: string | null;
   // Labelling selection (opt-in). Keys are scoped per provider — the active
   // provider's key prefix is prepended so a row's identity is stable across
   // provider switches (e.g. `openai:0`).
@@ -606,6 +907,11 @@ export function STTEvaluationOutputs({
             <div className="space-y-4 md:space-y-6">
               {providerResult.success && providerResult.metrics && (
                 <ProviderMetricsCard
+                  footnote={costCaveatFootnote(
+                    providerResult.metrics,
+                    "stt",
+                    runDate,
+                  )}
                   metrics={[
                     {
                       label: "WER",
@@ -642,6 +948,22 @@ export function STTEvaluationOutputs({
                         ? [{ label: field.label, value: parseFloat(value.toFixed(4)) }]
                         : [];
                     }),
+                    // TTFS tile — shown only when the run measured it.
+                    ...(readLatencySeconds(providerResult.metrics?.ttfs) != null
+                      ? [
+                          {
+                            label: TTFS_LABEL,
+                            value: parseFloat(
+                              readLatencySeconds(
+                                providerResult.metrics?.ttfs,
+                              )!.toFixed(4),
+                            ),
+                          },
+                        ]
+                      : []),
+                    // Cost tiles — total USD cost + native per-unit price.
+                    // Shown only when the run computed cost.
+                    ...costTiles(providerResult.metrics),
                     // Evaluator tiles — shown only when this provider actually
                     // has a value for the evaluator (mirrors the Sarvam tiles),
                     // so e.g. a "Semantic match" tile is hidden when it didn't
@@ -699,6 +1021,7 @@ export function TTSEvaluationOutputs({
   evaluatorColumns,
   getProviderLabel,
   className = "flex flex-col md:flex-row border border-border rounded-xl overflow-hidden md:h-[calc(100vh-220px)]",
+  runDate,
   labellingSelection,
   onToggleLabellingSelection,
   onLabellingBulkToggle,
@@ -710,6 +1033,8 @@ export function TTSEvaluationOutputs({
   status: EvaluationStatus;
   evaluatorColumns: TTSEvaluatorColumn[];
   getProviderLabel: (value: string) => string;
+  // Run date (created_at) — used to date the INR conversion-rate caveat.
+  runDate?: string | null;
   className?: string;
   // Labelling selection (opt-in). Keys are scoped per provider — the active
   // provider's key prefix is prepended so a row's identity is stable across
@@ -807,6 +1132,11 @@ export function TTSEvaluationOutputs({
             <div className="space-y-4 md:space-y-6">
               {providerResult.success && providerResult.metrics && (
                 <ProviderMetricsCard
+                  footnote={costCaveatFootnote(
+                    providerResult.metrics,
+                    "tts",
+                    runDate,
+                  )}
                   metrics={[
                     ...evaluatorColumns.map((col) => ({
                       label: col.label,
@@ -817,6 +1147,9 @@ export function TTSEvaluationOutputs({
                       ),
                     })),
                     { label: "Latency (s)", value: ttfbValue },
+                    // Cost tiles — total USD cost + native per-unit price.
+                    // Shown only when the run computed cost.
+                    ...costTiles(providerResult.metrics),
                   ]}
                 />
               )}

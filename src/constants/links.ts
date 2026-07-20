@@ -19,3 +19,9 @@ export const SARVAM_ASR_BLOG_URL =
  * understanding. Linked from the STT results About tab. */
 export const PIPECAT_SEMANTIC_WER_URL =
   "https://github.com/pipecat-ai/stt-benchmark#semantic-wer";
+
+/** Pipecat's STT benchmark — the reference for TTFS (Time To Final Segment),
+ * the streaming latency from when the user stops speaking to when the final
+ * transcription segment is received. Linked from the STT results About tab. */
+export const PIPECAT_STT_TTFS_URL =
+  "https://github.com/pipecat-ai/stt-benchmark#ttfs-measurement";

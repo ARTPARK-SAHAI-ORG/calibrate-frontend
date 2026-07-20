@@ -29,6 +29,7 @@ export {
   hasSTTEmptyPredictions,
   getFirstSTTEmptyPredictionIndex,
   hasSemanticWerMetric,
+  hasTtfsMetric,
   findFirstEvaluatorRuns,
   evaluatorColumnsFromRuns,
   evaluatorDescriptionMapFromRuns,
@@ -49,6 +50,13 @@ export { TestRunOutputsPanel } from "./TestRunOutputsPanel";
 export type { TestRunResult } from "./TestRunOutputsPanel";
 
 export { TestRunSummary } from "./TestRunSummary";
+
+export {
+  LLMEvaluationAbout,
+  evaluatorSummaryToAbout,
+  evaluatorColumnsToAbout,
+} from "./LLMEvaluationAbout";
+export type { AboutEvaluator } from "./LLMEvaluationAbout";
 
 export { SimulationMetricsGrid, LATENCY_KEYS } from "./SimulationMetricsGrid";
 export type { MetricData } from "./SimulationMetricsGrid";

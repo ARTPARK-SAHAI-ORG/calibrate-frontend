@@ -23,7 +23,12 @@ import {
   isLabellingEligibleRaw,
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useLabellingSelection } from "@/components/human-labelling/useLabellingSelection";
-import { TestRunOutputsPanel, TestRunSummary } from "./eval-details";
+import {
+  TestRunOutputsPanel,
+  TestRunSummary,
+  LLMEvaluationAbout,
+  evaluatorSummaryToAbout,
+} from "./eval-details";
 import { buildTestRunCsv } from "@/lib/exportTestResults";
 import {
   buildEvaluatorSummaryFromResults,
@@ -96,7 +101,9 @@ export function TestRunnerDialog({
     useState<DefaultEvaluatorSummary | null>(null);
   // Which tab is showing. Tabs only render once the run is done; we default to
   // the Summary tab on completion (mirrors the benchmark dialog).
-  const [activeTab, setActiveTab] = useState<"summary" | "outputs">("outputs");
+  const [activeTab, setActiveTab] = useState<"summary" | "outputs" | "about">(
+    "outputs",
+  );
   const [addToTaskOpen, setAddToTaskOpen] = useState(false);
   // Guards the rerun POST: a test run is billed, so a second click while the
   // first request is in flight must not start a second run.
@@ -514,6 +521,16 @@ export function TestRunnerDialog({
                   >
                     Outputs
                   </button>
+                  <button
+                    onClick={() => setActiveTab("about")}
+                    className={`pb-3 px-1 text-sm md:text-base font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                      activeTab === "about"
+                        ? "border-foreground text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    About
+                  </button>
                 </div>
               </div>
             )}
@@ -528,6 +545,16 @@ export function TestRunnerDialog({
                   tokens={run?.total_tokens ?? null}
                   toolCall={toolCall}
                   evaluatorSummary={evaluatorSummary}
+                />
+              </div>
+            ) : runStatus === "done" && activeTab === "about" ? (
+              <div className="flex-1 overflow-y-auto p-4 md:p-6">
+                <LLMEvaluationAbout
+                  showToolCalls={toolCall.total > 0}
+                  showLatency={!!run?.latency_ms}
+                  showCost={!!run?.cost}
+                  showTokens={!!run?.total_tokens}
+                  evaluators={evaluatorSummaryToAbout(evaluatorSummary)}
                 />
               </div>
             ) : (

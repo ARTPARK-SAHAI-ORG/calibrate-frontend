@@ -8,6 +8,7 @@ import {
   hasSTTEmptyPredictions,
   getFirstSTTEmptyPredictionIndex,
   hasSemanticWerMetric,
+  hasTtfsMetric,
   STTEvaluationAbout,
   TTSEvaluationAbout,
   STTEvaluationLeaderboard,
@@ -96,8 +97,10 @@ jest.mock("../ProviderSidebar", () => ({
 jest.mock("../ProviderMetricsCard", () => ({
   ProviderMetricsCard: ({
     metrics,
+    footnote,
   }: {
     metrics: Array<{ label: string; value: unknown }>;
+    footnote?: React.ReactNode;
   }) => (
     <div data-testid="provider-metrics-card">
       {metrics.map((m) => (
@@ -105,6 +108,7 @@ jest.mock("../ProviderMetricsCard", () => ({
           {String(m.value)}
         </div>
       ))}
+      {footnote && <div data-testid="metrics-footnote">{footnote}</div>}
     </div>
   ),
 }));
@@ -1533,5 +1537,674 @@ describe("TTSEvaluationOutputs", () => {
     expect(
       screen.getByTestId("sidebar-item-elevenlabs").getAttribute("data-success"),
     ).toBe("false");
+  });
+});
+
+// ---- Cost ----------------------------------------------------------------
+
+describe("STT/TTS leaderboard Total cost (USD) column", () => {
+  it("adds a Total cost (USD) column + chart when providers carry cost, keyed cost_usd", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "cartesia", wer: 0.1, cer: 0.05 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          { provider: "cartesia", metrics: { cost: { cost_usd: 0.0096 } } },
+        ]}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns).toContainEqual({
+      key: "cost_usd",
+      header: "Total cost (USD)",
+    });
+    const charts = JSON.parse(
+      screen.getByTestId("leaderboard-charts").textContent ?? "[]",
+    ).flat();
+    expect(charts).toContainEqual({
+      title: "Total cost (USD)",
+      dataKey: "cost_usd",
+    });
+    // The joined value is on the row data (comparable across providers).
+    const data = JSON.parse(
+      screen.getByTestId("leaderboard-data").textContent ?? "[]",
+    );
+    expect(data[0].cost_usd).toBeCloseTo(0.0096);
+  });
+
+  it("formats the Total cost column via formatMoney (USD)", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "cartesia", wer: 0.1, cost_usd: 0.0096 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const columns = (
+      mockLeaderboardCapture.props as unknown as Record<string, unknown>
+    ).columns as Array<{ key: string; render?: (v: unknown) => unknown }>;
+    const costColumn = columns.find((c) => c.key === "cost_usd");
+    expect(costColumn?.render?.(0.0096)).toBe("$0.0096");
+    expect(costColumn?.render?.(undefined)).toBe("-");
+  });
+
+  it("appends the Total cost column after Latency on the TTS leaderboard", () => {
+    render(
+      <TTSEvaluationLeaderboard
+        leaderboardSummary={[{ run: "cartesia", ttfb_p50: 0.5 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          { provider: "cartesia", metrics: { cost: { cost_usd: 11 } } },
+        ]}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns.map((c: { key: string }) => c.key)).toEqual([
+      "run",
+      "ttfb_p50",
+      "cost_usd",
+    ]);
+  });
+
+  it("omits the Total cost column when no provider carries cost", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "openai", wer: 0.1, cer: 0.05 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[{ provider: "openai", metrics: { wer: 0.1 } }]}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns.map((c: { key: string }) => c.key)).not.toContain("cost_usd");
+  });
+});
+
+describe("STTEvaluationOutputs cost tiles", () => {
+  const baseProps = {
+    activeProviderKey: null as string | null,
+    onProviderSelect: jest.fn(),
+    status: "done" as const,
+    evaluatorColumns: [],
+    getProviderLabel,
+  };
+
+  it("shows total USD + native per-minute tiles for a USD provider", () => {
+    render(
+      <STTEvaluationOutputs
+        {...baseProps}
+        providerResults={[
+          {
+            provider: "deepgram",
+            success: true,
+            metrics: {
+              wer: 0.1,
+              cer: 0.05,
+              cost: {
+                billing_unit: "minute",
+                currency: "USD",
+                cost_per_minute_currency: 0.0048,
+                cost_usd: 0.0096,
+              },
+            },
+            results: [],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("metric-Total cost").textContent).toBe("$0.0096");
+    expect(screen.getByTestId("metric-Cost per minute").textContent).toBe(
+      "$0.0048",
+    );
+    // General estimate caveat is shown; no FX-conversion line for a USD provider.
+    expect(screen.getByText(/Cost is an estimate from bundled/)).toBeInTheDocument();
+    expect(screen.queryByText(/converted from/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the INR conversion caveat dated with the run for an INR provider", () => {
+    render(
+      <STTEvaluationOutputs
+        {...baseProps}
+        runDate="2026-07-15 10:00:00"
+        providerResults={[
+          {
+            provider: "sarvam",
+            success: true,
+            metrics: {
+              wer: 0.1,
+              cost: {
+                billing_unit: "minute",
+                currency: "INR",
+                cost_per_minute_currency: 0.5,
+                cost_in_currency: 1.0,
+                conversion_rate: 96.35,
+                cost_usd: 0.01038,
+              },
+            },
+            results: [],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("metric-Cost per minute").textContent).toBe("₹0.5");
+    expect(screen.getByTestId("metric-Total cost").textContent).toBe("$0.0104");
+    // General estimate caveat is always present when cost is shown.
+    expect(screen.getByText(/Cost is an estimate from bundled/)).toBeInTheDocument();
+    // Plus the dated FX-conversion caveat for the INR provider.
+    expect(
+      screen.getByText(
+        "Total cost converted from INR at a live mid-market rate (₹96.35 = $1 as of Jul 15, 2026); a real payment also incurs FX margin and GST.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("omits the cost tiles when no cost was computed", () => {
+    render(
+      <STTEvaluationOutputs
+        {...baseProps}
+        providerResults={[
+          { provider: "openai", success: true, metrics: { wer: 0.1 }, results: [] },
+        ]}
+      />,
+    );
+    expect(screen.queryByTestId("metric-Total cost")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("metric-Cost per minute")).not.toBeInTheDocument();
+  });
+});
+
+describe("TTSEvaluationOutputs cost tiles", () => {
+  const baseProps = {
+    activeProviderKey: null as string | null,
+    onProviderSelect: jest.fn(),
+    status: "done" as const,
+    evaluatorColumns: [],
+    getProviderLabel,
+  };
+
+  it("shows total USD + per-1M-characters tiles for a character-billed provider", () => {
+    render(
+      <TTSEvaluationOutputs
+        {...baseProps}
+        providerResults={[
+          {
+            provider: "groq",
+            success: true,
+            metrics: {
+              ttfb: { p50: 0.5 },
+              cost: {
+                billing_unit: "character",
+                currency: "USD",
+                cost_per_million_chars_currency: 22,
+                cost_usd: 11,
+              },
+            },
+            results: [],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("metric-Latency (s)").textContent).toBe("0.5");
+    expect(screen.getByTestId("metric-Total cost").textContent).toBe("$11");
+    expect(screen.getByTestId("metric-Cost per 1M characters").textContent).toBe(
+      "$22",
+    );
+  });
+
+  it("shows the INR caveat for a character-billed INR provider", () => {
+    render(
+      <TTSEvaluationOutputs
+        {...baseProps}
+        runDate="2026-07-15 10:00:00"
+        providerResults={[
+          {
+            provider: "sarvam",
+            success: true,
+            metrics: {
+              ttfb: { p50: 0.5 },
+              cost: {
+                billing_unit: "character",
+                currency: "INR",
+                cost_per_million_chars_currency: 3000,
+                cost_in_currency: 1500,
+                conversion_rate: 96.35,
+                cost_usd: 15.57,
+              },
+            },
+            results: [],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("metric-Cost per 1M characters").textContent).toBe(
+      "₹3000",
+    );
+    expect(
+      screen.getByText(
+        /Total cost converted from INR at a live mid-market rate \(₹96.35 = \$1 as of Jul 15, 2026\)/,
+      ),
+    ).toBeInTheDocument();
+    // Character-billed → no audio-billed approximation caveat.
+    expect(screen.queryByText(/Audio-billed models/)).not.toBeInTheDocument();
+  });
+
+  it("shows the audio-billed approximation caveat for a minute-billed TTS provider", () => {
+    render(
+      <TTSEvaluationOutputs
+        {...baseProps}
+        providerResults={[
+          {
+            provider: "openai",
+            success: true,
+            metrics: {
+              ttfb: { p50: 0.5 },
+              cost: {
+                billing_unit: "minute",
+                currency: "USD",
+                cost_per_minute_currency: 0.015,
+                cost_usd: 0.045,
+              },
+            },
+            results: [],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText(/Audio-billed models/)).toBeInTheDocument();
+    expect(screen.getByText(/Cost is an estimate from bundled/)).toBeInTheDocument();
+  });
+
+  it("omits the cost tiles when no cost was computed", () => {
+    render(
+      <TTSEvaluationOutputs
+        {...baseProps}
+        providerResults={[
+          {
+            provider: "openai",
+            success: true,
+            metrics: { ttfb: { p50: 0.5 } },
+            results: [],
+          },
+        ]}
+      />,
+    );
+    expect(screen.queryByTestId("metric-Total cost")).not.toBeInTheDocument();
+  });
+});
+
+// ---- TTFS (Time To Final Segment) ----------------------------------------
+
+describe("hasTtfsMetric", () => {
+  it("is true when a provider reports ttfs as a latency block", () => {
+    expect(hasTtfsMetric([{ metrics: { ttfs: { p50: 0.42 } } }])).toBe(true);
+  });
+
+  it("is true when a provider reports ttfs as a plain number", () => {
+    expect(hasTtfsMetric([{ metrics: { ttfs: 0.42 } }])).toBe(true);
+  });
+
+  it("is false when no provider reports ttfs", () => {
+    expect(hasTtfsMetric([{ metrics: { wer: 0.1 } }])).toBe(false);
+    expect(hasTtfsMetric([])).toBe(false);
+    expect(hasTtfsMetric(undefined)).toBe(false);
+  });
+
+  it("treats a null ttfs (e.g. Gemini) as no ttfs", () => {
+    expect(hasTtfsMetric([{ metrics: { ttfs: null } }])).toBe(false);
+    expect(
+      hasTtfsMetric([{ metrics: { ttfs: { p50: null, mean: null } } }]),
+    ).toBe(false);
+  });
+
+  it("is still true when at least one provider reports ttfs alongside a null one", () => {
+    expect(
+      hasTtfsMetric([
+        { metrics: { ttfs: null } },
+        { metrics: { ttfs: { p50: 0.4 } } },
+      ]),
+    ).toBe(true);
+  });
+});
+
+describe("STTEvaluationAbout TTFS row", () => {
+  it("omits the TTFS row by default", () => {
+    render(<STTEvaluationAbout evaluatorRows={[]} />);
+    const metrics = JSON.parse(
+      screen.getByTestId("about-metrics-table").textContent ?? "",
+    );
+    expect(metrics.map((m: { key?: string }) => m.key)).not.toContain("ttfs");
+  });
+
+  it("appends the latency row (explained as TTFS) when showTtfs is set", () => {
+    render(<STTEvaluationAbout evaluatorRows={[]} showTtfs />);
+    const metrics = JSON.parse(
+      screen.getByTestId("about-metrics-table").textContent ?? "",
+    );
+    const ttfsRow = metrics.find((m: { key?: string }) => m.key === "ttfs");
+    expect(ttfsRow).toMatchObject({ preference: "Lower is better" });
+    // The About tab is where the "Latency" table label is explained as TTFS.
+    expect(ttfsRow.description).toMatch(/TTFS \(Time To Final Segment\)/);
+  });
+});
+
+describe("STTEvaluationLeaderboard TTFS column", () => {
+  it("joins TTFS from providerResults into the row, column and chart", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "deepgram", wer: 0.1, cer: 0.05 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          { provider: "deepgram", metrics: { ttfs: { p50: 0.42 } } },
+        ]}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns).toContainEqual({ key: "ttfs", header: "Latency (s)" });
+
+    const charts = JSON.parse(
+      screen.getByTestId("leaderboard-charts").textContent ?? "[]",
+    ).flat();
+    expect(charts).toContainEqual({ title: "Latency (s)", dataKey: "ttfs" });
+
+    const data = JSON.parse(
+      screen.getByTestId("leaderboard-data").textContent ?? "[]",
+    );
+    expect(data[0].ttfs).toBeCloseTo(0.42);
+  });
+
+  it("reads the flattened ttfs_p50 headline off the row", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "openai", wer: 0.1, ttfs_p50: 0.3 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const data = JSON.parse(
+      screen.getByTestId("leaderboard-data").textContent ?? "[]",
+    );
+    expect(data[0].ttfs).toBe(0.3);
+  });
+
+  it("falls back to the legacy flat ttfs key", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "openai", wer: 0.1, ttfs: 0.55 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns.map((c: { key: string }) => c.key)).toContain("ttfs");
+  });
+
+  it("orders TTFS before the Total cost column", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[
+          { run: "openai", wer: 0.1, ttfs_p50: 0.3, cost_usd: 0.004 },
+        ]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    const keys = columns.map((c: { key: string }) => c.key);
+    expect(keys.indexOf("ttfs")).toBeLessThan(keys.indexOf("cost_usd"));
+    expect(keys[keys.length - 1]).toBe("cost_usd");
+  });
+
+  it("omits the TTFS column/chart when no run measured it", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "openai", wer: 0.1, cer: 0.05 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    expect(columns.map((c: { key: string }) => c.key)).not.toContain("ttfs");
+  });
+
+  it("keeps the TTFS column but shows '-' for a provider whose ttfs is null", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[
+          { run: "deepgram", wer: 0.1 },
+          { run: "gemini", wer: 0.2 },
+        ]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          { provider: "deepgram", metrics: { ttfs: { p50: 0.4 } } },
+          { provider: "gemini", metrics: { ttfs: null } },
+        ]}
+      />,
+    );
+    const columns = JSON.parse(
+      screen.getByTestId("leaderboard-columns").textContent ?? "[]",
+    );
+    // Column is present (deepgram has TTFS)...
+    expect(columns.map((c: { key: string }) => c.key)).toContain("ttfs");
+    // ...but gemini's row has no ttfs value, so the cell renders "-".
+    const data = JSON.parse(
+      screen.getByTestId("leaderboard-data").textContent ?? "[]",
+    );
+    const gemini = data.find((r: { run: string }) => r.run === "gemini");
+    expect(gemini.ttfs).toBeUndefined();
+    const deepgram = data.find((r: { run: string }) => r.run === "deepgram");
+    expect(deepgram.ttfs).toBeCloseTo(0.4);
+  });
+
+  it("formats the TTFS column to 4 decimals, '-' for non-numbers", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "openai", wer: 0.1, ttfs_p50: 0.123456789 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const columns = (
+      mockLeaderboardCapture.props as unknown as Record<string, unknown>
+    ).columns as Array<{ key: string; render?: (v: unknown) => unknown }>;
+    const ttfsColumn = columns.find((c) => c.key === "ttfs");
+    expect(ttfsColumn?.render?.(0.123456789)).toBe(0.1235);
+    expect(ttfsColumn?.render?.(undefined)).toBe("-");
+  });
+});
+
+describe("STTEvaluationOutputs TTFS tile", () => {
+  const baseProps = {
+    activeProviderKey: null as string | null,
+    onProviderSelect: jest.fn(),
+    status: "done" as const,
+    evaluatorColumns: [],
+    getProviderLabel,
+  };
+
+  it("shows a TTFS tile from the latency block (p50 headline)", () => {
+    render(
+      <STTEvaluationOutputs
+        {...baseProps}
+        providerResults={[
+          {
+            provider: "deepgram",
+            success: true,
+            metrics: { wer: 0.1, cer: 0.05, ttfs: { p50: 0.42 } },
+            results: [],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("metric-Latency (s)").textContent).toBe("0.42");
+  });
+
+  it("shows a TTFS tile from a plain number", () => {
+    render(
+      <STTEvaluationOutputs
+        {...baseProps}
+        providerResults={[
+          {
+            provider: "openai",
+            success: true,
+            metrics: { wer: 0.1, ttfs: 0.5 },
+            results: [],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("metric-Latency (s)").textContent).toBe("0.5");
+  });
+
+  it("omits the TTFS tile when no ttfs was measured", () => {
+    render(
+      <STTEvaluationOutputs
+        {...baseProps}
+        providerResults={[
+          { provider: "openai", success: true, metrics: { wer: 0.1 }, results: [] },
+        ]}
+      />,
+    );
+    expect(screen.queryByTestId("metric-Latency (s)")).not.toBeInTheDocument();
+  });
+
+  it("omits the TTFS tile when ttfs is null (e.g. Gemini)", () => {
+    render(
+      <STTEvaluationOutputs
+        {...baseProps}
+        providerResults={[
+          {
+            provider: "gemini",
+            success: true,
+            metrics: { wer: 0.1, ttfs: null },
+            results: [],
+          },
+        ]}
+      />,
+    );
+    expect(screen.queryByTestId("metric-Latency (s)")).not.toBeInTheDocument();
+    // WER still renders — the null ttfs doesn't break the metrics card.
+    expect(screen.getByTestId("metric-WER").textContent).toBe("0.1");
+  });
+});
+
+// ---- Pareto frontier (afterTable) ----------------------------------------
+
+type CapturedPareto = {
+  points: Array<{ model: string; cost: number; passRate: number }>;
+  title: string;
+  passRateLabel: string;
+};
+
+function capturedAfterTable(): React.ReactElement<CapturedPareto> | undefined {
+  return (mockLeaderboardCapture.props as { afterTable?: unknown })
+    .afterTable as React.ReactElement<CapturedPareto> | undefined;
+}
+
+describe("STTEvaluationLeaderboard Pareto frontier", () => {
+  it("renders the Pareto chart when 2+ providers have cost and accuracy", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[
+          { run: "openai", wer: 0.1, semantic_wer: 0.05 },
+          { run: "deepgram", wer: 0.2, semantic_wer: 0.15 },
+        ]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
+          { provider: "deepgram", metrics: { cost: { cost_usd: 0.002 } } },
+        ]}
+      />,
+    );
+    const after = capturedAfterTable();
+    expect(after).toBeTruthy();
+    expect(after!.props.title).toBe("Accuracy vs cost tradeoff");
+    expect(after!.props.passRateLabel).toBe("Accuracy");
+    expect(after!.props.points).toHaveLength(2);
+  });
+
+  it("omits the Pareto chart with only one provider", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "openai", wer: 0.1, semantic_wer: 0.05 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
+        ]}
+      />,
+    );
+    expect(capturedAfterTable()).toBeUndefined();
+  });
+
+  it("omits the Pareto chart when fewer than two providers have cost", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[
+          { run: "openai", wer: 0.1 },
+          { run: "deepgram", wer: 0.2 },
+        ]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
+          { provider: "deepgram", metrics: { wer: 0.2 } },
+        ]}
+      />,
+    );
+    expect(capturedAfterTable()).toBeUndefined();
+  });
+});
+
+describe("TTSEvaluationLeaderboard Pareto frontier", () => {
+  it("renders the Pareto chart using the primary evaluator for quality", () => {
+    render(
+      <TTSEvaluationLeaderboard
+        leaderboardSummary={[
+          { run: "eleven", nat: 0.9, cost_usd: 0.01 },
+          { run: "azure", nat: 0.7, cost_usd: 0.006 },
+        ]}
+        evaluatorColumns={[
+          { key: "nat", label: "Naturalness", outputType: "binary", scoreField: "nat" },
+        ]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const after = capturedAfterTable();
+    expect(after).toBeTruthy();
+    expect(after!.props.title).toBe("Naturalness vs cost tradeoff");
+    expect(after!.props.passRateLabel).toBe("Naturalness");
+    expect(after!.props.points).toHaveLength(2);
+  });
+
+  it("omits the Pareto chart when there is no evaluator to score quality", () => {
+    render(
+      <TTSEvaluationLeaderboard
+        leaderboardSummary={[
+          { run: "eleven", cost_usd: 0.01 },
+          { run: "azure", cost_usd: 0.006 },
+        ]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    expect(capturedAfterTable()).toBeUndefined();
   });
 });
