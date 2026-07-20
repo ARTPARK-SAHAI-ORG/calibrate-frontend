@@ -61,15 +61,46 @@ describe("sttQualityMetrics", () => {
     outputType: "binary" as const,
   };
 
-  it("offers accuracy from each error rate present, then each judge", () => {
+  it("offers each error rate (as accuracy), then each judge, named plainly", () => {
     const metrics = sttQualityMetrics(rows, [judgeCol]);
     expect(metrics.map((m) => m.id)).toEqual([
       "semantic_wer",
       "wer",
       "judge:judge",
     ]);
-    expect(metrics[0].label).toBe("Accuracy (Semantic WER)");
+    // Dropdown label is the plain metric name; the axis label spells out accuracy.
+    expect(metrics[0].label).toBe("Semantic WER");
+    expect(metrics[0].axisLabel).toBe("Accuracy (Semantic WER)");
     expect(metrics[2].label).toBe("Correctness");
+  });
+
+  it("includes Sarvam metrics: LLM-WER/LLM-CER as accuracy, Intent/Entity as scores", () => {
+    const sarvamRows = [
+      {
+        run: "openai",
+        cost_usd: 0.004,
+        sarvam_llm_wer: 0.1,
+        sarvam_intent_score: 0.9,
+        sarvam_entity_score: 0.8,
+      },
+      {
+        run: "deepgram",
+        cost_usd: 0.002,
+        sarvam_llm_wer: 0.2,
+        sarvam_intent_score: 0.7,
+        sarvam_entity_score: 0.6,
+      },
+    ];
+    const metrics = sttQualityMetrics(sarvamRows, []);
+    const byId = Object.fromEntries(metrics.map((m) => [m.id, m]));
+    // LLM-WER is an error rate → accuracy.
+    expect(byId["sarvam_llm_wer"].label).toBe("LLM-WER");
+    expect(byId["sarvam_llm_wer"].score(sarvamRows[0])).toBeCloseTo(90);
+    // Intent Score is a 0–1 fraction → percentage, plain name on both labels.
+    expect(byId["sarvam_intent_score"].label).toBe("Intent Score");
+    expect(byId["sarvam_intent_score"].axisLabel).toBe("Intent Score");
+    expect(byId["sarvam_intent_score"].score(sarvamRows[0])).toBeCloseTo(90);
+    expect(byId["sarvam_entity_score"].score(sarvamRows[1])).toBeCloseTo(60);
   });
 
   it("derives accuracy as 1 − error rate", () => {
@@ -114,7 +145,8 @@ describe("ttsQualityMetrics", () => {
 describe("buildAudioParetoPoints", () => {
   const metric: AudioQualityMetric = {
     id: "semantic_wer",
-    label: "Accuracy (Semantic WER)",
+    label: "Semantic WER",
+    axisLabel: "Accuracy (Semantic WER)",
     qualityNoun: "accuracy",
     qualityComparative: "how accurate it is",
     score: (row) => {

@@ -1027,7 +1027,7 @@ function TopPicksChart({
         points={points}
         colorMap={getColorMap(points.map((p) => p.model))}
         title="Quality vs cost vs latency tradeoff"
-        passRateLabel={selected.label}
+        passRateLabel={selected.axisLabel}
         qualityNoun={selected.qualityNoun}
         qualityComparative={selected.qualityComparative}
         entityNoun="provider"

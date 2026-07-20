@@ -35,8 +35,10 @@ type EvaluatorColumnLike = {
 export type AudioQualityMetric = {
   /** Stable id for the picker + React key. */
   id: string;
-  /** Picker option text and Y-axis label. */
+  /** Picker option text (the metric's plain name, matching the leaderboard). */
   label: string;
+  /** Y-axis label — spells out that an error rate is plotted as accuracy. */
+  axisLabel: string;
   /** Quality noun for the chart caption ("accuracy" / "quality"). */
   qualityNoun: string;
   /** Comparative phrase for the caption ("how accurate it is" / "how well it scores"). */
@@ -89,47 +91,75 @@ function isPlottable(rows: Row[], score: (row: Row) => number | null): boolean {
   );
 }
 
-// STT error rates, best-first: the default is the first one present.
-const STT_ERROR_METRICS = [
+/** An error rate (lower better) plotted as accuracy (1 − rate), higher better. */
+function accuracyMetric(key: string, name: string): AudioQualityMetric {
+  return {
+    id: key,
+    label: name,
+    axisLabel: `Accuracy (${name})`,
+    qualityNoun: "accuracy",
+    qualityComparative: "how accurate it is",
+    score: (row) => {
+      const rate = toFiniteNumber(row[key]);
+      return rate == null ? null : clampPercent((1 - rate) * 100);
+    },
+  };
+}
+
+/** A 0–1 fraction score (higher better) plotted as a percentage. */
+function fractionMetric(key: string, name: string): AudioQualityMetric {
+  return {
+    id: key,
+    label: name,
+    axisLabel: name,
+    qualityNoun: "quality",
+    qualityComparative: "how well it scores",
+    score: (row) => {
+      const v = toFiniteNumber(row[key]);
+      return v == null ? null : clampPercent(v * 100);
+    },
+  };
+}
+
+/** An attached LLM judge (binary or rating) as a 0–100 score. */
+function judgeMetric(col: EvaluatorColumnLike): AudioQualityMetric {
+  return {
+    id: `judge:${col.key}`,
+    label: col.label,
+    axisLabel: col.label,
+    qualityNoun: "quality",
+    qualityComparative: "how well it scores",
+    score: (row) => evaluatorScorePercent(row, col),
+  };
+}
+
+// STT accuracy sources (error rates), best-first — includes Sarvam's LLM-judged
+// WER/CER. The default is the first one with data.
+const STT_ACCURACY_METRICS = [
   { key: "semantic_wer", name: "Semantic WER" },
   { key: "wer", name: "WER" },
   { key: "cer", name: "CER" },
+  { key: "sarvam_llm_wer", name: "LLM-WER" },
+  { key: "sarvam_llm_cer", name: "LLM-CER" },
 ] as const;
 
-/** Quality metrics the STT chart can plot: accuracy from each error rate, then each judge. */
+// STT Sarvam scores that are 0–1 fractions (higher better), not error rates.
+const STT_FRACTION_METRICS = [
+  { key: "sarvam_intent_score", name: "Intent Score" },
+  { key: "sarvam_entity_score", name: "Entity Score" },
+] as const;
+
+/** Quality metrics the STT chart can plot, keeping only those with data for 2+ providers. */
 export function sttQualityMetrics(
   rows: Row[],
   evaluatorColumns: EvaluatorColumnLike[],
 ): AudioQualityMetric[] {
-  const metrics: AudioQualityMetric[] = [];
-  for (const { key, name } of STT_ERROR_METRICS) {
-    const score = (row: Row) => {
-      const rate = toFiniteNumber(row[key]);
-      return rate == null ? null : clampPercent((1 - rate) * 100);
-    };
-    if (isPlottable(rows, score)) {
-      metrics.push({
-        id: key,
-        label: `Accuracy (${name})`,
-        qualityNoun: "accuracy",
-        qualityComparative: "how accurate it is",
-        score,
-      });
-    }
-  }
-  for (const col of evaluatorColumns) {
-    const score = (row: Row) => evaluatorScorePercent(row, col);
-    if (isPlottable(rows, score)) {
-      metrics.push({
-        id: `judge:${col.key}`,
-        label: col.label,
-        qualityNoun: "quality",
-        qualityComparative: "how well it scores",
-        score,
-      });
-    }
-  }
-  return metrics;
+  const candidates = [
+    ...STT_ACCURACY_METRICS.map(({ key, name }) => accuracyMetric(key, name)),
+    ...STT_FRACTION_METRICS.map(({ key, name }) => fractionMetric(key, name)),
+    ...evaluatorColumns.map(judgeMetric),
+  ];
+  return candidates.filter((m) => isPlottable(rows, m.score));
 }
 
 /** Quality metrics the TTS chart can plot: each LLM judge with data. */
@@ -137,20 +167,7 @@ export function ttsQualityMetrics(
   rows: Row[],
   evaluatorColumns: EvaluatorColumnLike[],
 ): AudioQualityMetric[] {
-  const metrics: AudioQualityMetric[] = [];
-  for (const col of evaluatorColumns) {
-    const score = (row: Row) => evaluatorScorePercent(row, col);
-    if (isPlottable(rows, score)) {
-      metrics.push({
-        id: `judge:${col.key}`,
-        label: col.label,
-        qualityNoun: "quality",
-        qualityComparative: "how well it scores",
-        score,
-      });
-    }
-  }
-  return metrics;
+  return evaluatorColumns.map(judgeMetric).filter((m) => isPlottable(rows, m.score));
 }
 
 /** Pareto points for a chosen quality metric (STT reads TTFS latency, TTS reads TTFB). */
