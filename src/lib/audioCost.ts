@@ -149,13 +149,12 @@ export type CostCaveatContext = {
 };
 
 /** When the bundled provider rates were captured. Bump when rates are refreshed. */
-export const RATES_CAPTURED_DATE = "20 Jul 2026";
+export const RATES_CAPTURED_DATE = "mid-Jul 2026";
 
 /** The estimate caveats, one short point per line, shown as a cost footnote. */
 export const COST_CAVEAT_POINTS = [
   "Cost is an estimate. Your actual bill may differ as it includes per-request minimums, rounding, taxes, and discounts.",
-  `Pricing per provider as of ${RATES_CAPTURED_DATE} assumes their standard pay-as-you-go pricing plan.`,
-  "Short requests can read low.",
+  `Pricing per provider assumes their standard pay-as-you-go pricing plan as of ${RATES_CAPTURED_DATE}.`,
 ];
 
 /**
@@ -181,7 +180,7 @@ export function costCaveats(
     const date = formatCaveatDate(ctx.runDate);
     const asOf = date ? ` as of ${date}` : "";
     lines.push(
-      `Sarvam converts from ${currency} at a live mid-market rate (${ratePart}${asOf}).`,
+      `For Sarvam, we convert from ${currency} using the exchange rate on ${RATES_CAPTURED_DATE} (${ratePart}).`,
     );
   }
   return lines;

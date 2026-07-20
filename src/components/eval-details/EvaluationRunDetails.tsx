@@ -550,7 +550,7 @@ const COST_ABOUT_METRIC: MetricDescription = {
 function CostCaveatFootnote({ lines }: { lines: string[] }) {
   if (lines.length === 0) return null;
   return (
-    <div className="text-[12px] text-muted-foreground space-y-0.5">
+    <div className="text-[12px] text-muted-foreground space-y-0.5 pb-8 md:pb-10">
       {lines.map((line, i) => (
         <p key={i} className={i === 0 ? "" : "pl-3"}>
           {i === 0 ? `* ${line}` : line}
