@@ -26,6 +26,8 @@ import {
   type TTSEvaluatorColumn,
   type LatencyMetric,
   type TTSLeaderboardSummary,
+  TTSEvaluationTopPicks,
+  hasTtsTopPicks,
 } from "@/components/eval-details";
 import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
 import type { AudioCostBreakdown } from "@/lib/audioCost";
@@ -181,8 +183,13 @@ const getProviderLabel = (value: string): string => {
   return provider ? provider.label : value;
 };
 
-type ActiveTab = "leaderboard" | "outputs" | "about";
-const ACTIVE_TABS: readonly ActiveTab[] = ["leaderboard", "outputs", "about"];
+type ActiveTab = "leaderboard" | "top-picks" | "outputs" | "about";
+const ACTIVE_TABS: readonly ActiveTab[] = [
+  "leaderboard",
+  "top-picks",
+  "outputs",
+  "about",
+];
 
 export default function TTSEvaluationDetailPage() {
   const router = useRouter();
@@ -623,9 +630,18 @@ export default function TTSEvaluationDetailPage() {
   const canShowLeaderboard =
     evaluationResult?.status === "done" &&
     !!evaluationResult.leaderboard_summary;
+  const canShowTopPicks =
+    canShowLeaderboard &&
+    hasTtsTopPicks(
+      evaluationResult?.leaderboard_summary ?? [],
+      evaluatorColumns,
+      getProviderLabel,
+      evaluationResult?.provider_results,
+    );
   const displayedActiveTab =
-    (activeTab === "leaderboard" || activeTab === "about") &&
-    !canShowLeaderboard
+    ((activeTab === "leaderboard" || activeTab === "about") &&
+      !canShowLeaderboard) ||
+    (activeTab === "top-picks" && !canShowTopPicks)
       ? "outputs"
       : activeTab;
 
@@ -883,6 +899,18 @@ export default function TTSEvaluationDetailPage() {
                         Leaderboard
                       </button>
                     )}
+                    {canShowTopPicks && (
+                      <button
+                        onClick={() => handleTabChange("top-picks")}
+                        className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
+                          displayedActiveTab === "top-picks"
+                            ? "border-foreground text-foreground"
+                            : "border-transparent text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Model selection
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         handleTabChange("outputs");
@@ -952,6 +980,21 @@ export default function TTSEvaluationDetailPage() {
                   {displayedActiveTab === "leaderboard" &&
                     evaluationResult.leaderboard_summary && (
                       <TTSEvaluationLeaderboard
+                        className="-mx-4 md:-mx-8 px-4 md:px-8 relative"
+                        leaderboardSummary={
+                          evaluationResult.leaderboard_summary
+                        }
+                        evaluatorColumns={evaluatorColumns}
+                        getProviderLabel={getProviderLabel}
+                        providerResults={evaluationResult.provider_results}
+                      />
+                    )}
+
+                  {/* Model selection Tab */}
+                  {displayedActiveTab === "top-picks" &&
+                    canShowTopPicks &&
+                    evaluationResult.leaderboard_summary && (
+                      <TTSEvaluationTopPicks
                         className="-mx-4 md:-mx-8 px-4 md:px-8 relative"
                         leaderboardSummary={
                           evaluationResult.leaderboard_summary

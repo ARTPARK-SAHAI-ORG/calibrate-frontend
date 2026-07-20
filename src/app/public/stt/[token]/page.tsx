@@ -17,6 +17,8 @@ import {
   visibleEvaluatorColumns,
   ratingRange,
   type STTEvaluatorColumn,
+  STTEvaluationTopPicks,
+  hasSttTopPicks,
 } from "@/components/eval-details";
 import type { LatencyMetric } from "@/components/eval-details/ttsEvalTypes";
 import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
@@ -124,7 +126,7 @@ export default function PublicSTTPage() {
   const [data, setData] = useState<EvaluationResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [activeTab, setActiveTab] = useState<"leaderboard" | "outputs" | "about">("leaderboard");
+  const [activeTab, setActiveTab] = useState<"leaderboard" | "top-picks" | "outputs" | "about">("leaderboard");
   const [activeProviderTab, setActiveProviderTab] = useState<string | null>(null);
   const [defaultEvaluator, setDefaultEvaluator] =
     useState<PublicDefaultEvaluator | null>(null);
@@ -204,6 +206,12 @@ export default function PublicSTTPage() {
   if (isLoading) return <PublicPageLayout><PublicLoading /></PublicPageLayout>;
   if (notFound || !data) return <PublicPageLayout><PublicNotFound /></PublicPageLayout>;
 
+  const showTopPicks = hasSttTopPicks(
+    data.leaderboard_summary ?? [],
+    getProviderLabel,
+    data.provider_results,
+  );
+
   return (
     <PublicPageLayout
       title="Speech-to-text evaluation"
@@ -278,15 +286,24 @@ export default function PublicSTTPage() {
             )}
             {/* Tab Nav */}
             <div className="flex gap-2 border-b border-border">
-              {(["leaderboard", "outputs", "about"] as const).map((tab) => (
+              {(
+                [
+                  { id: "leaderboard", label: "Leaderboard" },
+                  ...(showTopPicks
+                    ? [{ id: "top-picks", label: "Model selection" }]
+                    : []),
+                  { id: "outputs", label: "Outputs" },
+                  { id: "about", label: "About" },
+                ] as { id: typeof activeTab; label: string }[]
+              ).map((t) => (
                 <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer capitalize ${
-                    activeTab === tab ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+                  key={t.id}
+                  onClick={() => setActiveTab(t.id)}
+                  className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${
+                    activeTab === t.id ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {tab}
+                  {t.label}
                 </button>
               ))}
             </div>
@@ -296,6 +313,15 @@ export default function PublicSTTPage() {
               <STTEvaluationLeaderboard
                 leaderboardSummary={data.leaderboard_summary}
                 evaluatorColumns={evaluatorColumns}
+                getProviderLabel={getProviderLabel}
+                providerResults={data.provider_results}
+              />
+            )}
+
+            {/* Model selection Tab */}
+            {activeTab === "top-picks" && data.leaderboard_summary && (
+              <STTEvaluationTopPicks
+                leaderboardSummary={data.leaderboard_summary}
                 getProviderLabel={getProviderLabel}
                 providerResults={data.provider_results}
               />

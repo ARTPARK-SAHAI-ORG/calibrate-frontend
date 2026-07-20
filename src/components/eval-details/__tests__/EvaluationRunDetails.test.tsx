@@ -15,6 +15,10 @@ import {
   TTSEvaluationAbout,
   STTEvaluationLeaderboard,
   TTSEvaluationLeaderboard,
+  STTEvaluationTopPicks,
+  TTSEvaluationTopPicks,
+  hasSttTopPicks,
+  hasTtsTopPicks,
   STTEvaluationOutputs,
   TTSEvaluationOutputs,
   WER_ABOUT_METRIC,
@@ -67,6 +71,19 @@ jest.mock("../LeaderboardTab", () => ({
         <div data-testid="leaderboard-filename">{props.filename as string}</div>
       </div>
     );
+  },
+}));
+
+// Capture the props passed to the Pareto chart so the Top-picks tests can
+// assert on the built points / labels without rendering recharts.
+const mockParetoCapture: { props: Record<string, unknown> | null } = {
+  props: null,
+};
+
+jest.mock("../../charts/ParetoFrontierChart", () => ({
+  ParetoFrontierChart: (props: Record<string, unknown>) => {
+    mockParetoCapture.props = props;
+    return <div data-testid="pareto-chart" />;
   },
 }));
 
@@ -2280,28 +2297,33 @@ describe("STTEvaluationOutputs TTFS tile", () => {
   });
 });
 
-// ---- Pareto frontier (afterTable) ----------------------------------------
+// ---- Model selection tab (Pareto frontier) -------------------------------
 
-type CapturedPareto = {
-  points: Array<{ model: string; cost: number; passRate: number }>;
-  title: string;
-  passRateLabel: string;
-};
+// The Pareto chart no longer renders below the leaderboard — it lives in the
+// "Model selection" tab, rendered by STTEvaluationTopPicks / TTSEvaluationTopPicks.
 
-function capturedAfterTable(): React.ReactElement<CapturedPareto> | undefined {
-  return (mockLeaderboardCapture.props as { afterTable?: unknown })
-    .afterTable as React.ReactElement<CapturedPareto> | undefined;
+beforeEach(() => {
+  mockParetoCapture.props = null;
+});
+
+function capturedPareto():
+  | {
+      points: Array<{ model: string; cost: number; passRate: number }>;
+      title: string;
+      passRateLabel: string;
+    }
+  | null {
+  return mockParetoCapture.props as ReturnType<typeof capturedPareto>;
 }
 
-describe("STTEvaluationLeaderboard Pareto frontier", () => {
+describe("STTEvaluationTopPicks", () => {
   it("renders the Pareto chart when 2+ providers have cost and accuracy", () => {
     render(
-      <STTEvaluationLeaderboard
+      <STTEvaluationTopPicks
         leaderboardSummary={[
           { run: "openai", wer: 0.1, semantic_wer: 0.05 },
           { run: "deepgram", wer: 0.2, semantic_wer: 0.15 },
         ]}
-        evaluatorColumns={[]}
         getProviderLabel={getProviderLabel}
         providerResults={[
           { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
@@ -2309,35 +2331,34 @@ describe("STTEvaluationLeaderboard Pareto frontier", () => {
         ]}
       />,
     );
-    const after = capturedAfterTable();
-    expect(after).toBeTruthy();
-    expect(after!.props.title).toBe("Accuracy vs cost tradeoff");
-    expect(after!.props.passRateLabel).toBe("Accuracy");
-    expect(after!.props.points).toHaveLength(2);
+    expect(screen.getByTestId("pareto-chart")).toBeInTheDocument();
+    const pareto = capturedPareto()!;
+    expect(pareto.title).toBe("Accuracy vs cost tradeoff");
+    expect(pareto.passRateLabel).toBe("Accuracy");
+    expect(pareto.points).toHaveLength(2);
   });
 
-  it("omits the Pareto chart with only one provider", () => {
-    render(
-      <STTEvaluationLeaderboard
+  it("renders nothing with only one provider", () => {
+    const { container } = render(
+      <STTEvaluationTopPicks
         leaderboardSummary={[{ run: "openai", wer: 0.1, semantic_wer: 0.05 }]}
-        evaluatorColumns={[]}
         getProviderLabel={getProviderLabel}
         providerResults={[
           { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
         ]}
       />,
     );
-    expect(capturedAfterTable()).toBeUndefined();
+    expect(container).toBeEmptyDOMElement();
+    expect(mockParetoCapture.props).toBeNull();
   });
 
-  it("omits the Pareto chart when fewer than two providers have cost", () => {
-    render(
-      <STTEvaluationLeaderboard
+  it("renders nothing when fewer than two providers have cost", () => {
+    const { container } = render(
+      <STTEvaluationTopPicks
         leaderboardSummary={[
           { run: "openai", wer: 0.1 },
           { run: "deepgram", wer: 0.2 },
         ]}
-        evaluatorColumns={[]}
         getProviderLabel={getProviderLabel}
         providerResults={[
           { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
@@ -2345,14 +2366,53 @@ describe("STTEvaluationLeaderboard Pareto frontier", () => {
         ]}
       />,
     );
-    expect(capturedAfterTable()).toBeUndefined();
+    expect(container).toBeEmptyDOMElement();
   });
 });
 
-describe("TTSEvaluationLeaderboard Pareto frontier", () => {
+describe("hasSttTopPicks", () => {
+  it("is true with 2+ providers that have cost and accuracy", () => {
+    expect(
+      hasSttTopPicks(
+        [
+          { run: "openai", semantic_wer: 0.05 },
+          { run: "deepgram", semantic_wer: 0.15 },
+        ],
+        getProviderLabel,
+        [
+          { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
+          { provider: "deepgram", metrics: { cost: { cost_usd: 0.002 } } },
+        ],
+      ),
+    ).toBe(true);
+  });
+
+  it("is false with a single provider", () => {
+    expect(
+      hasSttTopPicks([{ run: "openai", semantic_wer: 0.05 }], getProviderLabel, [
+        { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
+      ]),
+    ).toBe(false);
+  });
+
+  it("is false when fewer than two providers have cost", () => {
+    expect(
+      hasSttTopPicks(
+        [
+          { run: "openai", semantic_wer: 0.05 },
+          { run: "deepgram", semantic_wer: 0.15 },
+        ],
+        getProviderLabel,
+        [{ provider: "openai", metrics: { cost: { cost_usd: 0.004 } } }],
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("TTSEvaluationTopPicks", () => {
   it("renders the Pareto chart using the primary evaluator for quality", () => {
     render(
-      <TTSEvaluationLeaderboard
+      <TTSEvaluationTopPicks
         leaderboardSummary={[
           { run: "eleven", nat: 0.9, cost_usd: 0.01 },
           { run: "azure", nat: 0.7, cost_usd: 0.006 },
@@ -2363,16 +2423,16 @@ describe("TTSEvaluationLeaderboard Pareto frontier", () => {
         getProviderLabel={getProviderLabel}
       />,
     );
-    const after = capturedAfterTable();
-    expect(after).toBeTruthy();
-    expect(after!.props.title).toBe("Naturalness vs cost tradeoff");
-    expect(after!.props.passRateLabel).toBe("Naturalness");
-    expect(after!.props.points).toHaveLength(2);
+    expect(screen.getByTestId("pareto-chart")).toBeInTheDocument();
+    const pareto = capturedPareto()!;
+    expect(pareto.title).toBe("Naturalness vs cost tradeoff");
+    expect(pareto.passRateLabel).toBe("Naturalness");
+    expect(pareto.points).toHaveLength(2);
   });
 
-  it("omits the Pareto chart when there is no evaluator to score quality", () => {
-    render(
-      <TTSEvaluationLeaderboard
+  it("renders nothing when there is no evaluator to score quality", () => {
+    const { container } = render(
+      <TTSEvaluationTopPicks
         leaderboardSummary={[
           { run: "eleven", cost_usd: 0.01 },
           { run: "azure", cost_usd: 0.006 },
@@ -2381,6 +2441,36 @@ describe("TTSEvaluationLeaderboard Pareto frontier", () => {
         getProviderLabel={getProviderLabel}
       />,
     );
-    expect(capturedAfterTable()).toBeUndefined();
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("hasTtsTopPicks", () => {
+  it("is true with 2+ providers that have cost and a primary evaluator score", () => {
+    expect(
+      hasTtsTopPicks(
+        [
+          { run: "eleven", nat: 0.9, cost_usd: 0.01 },
+          { run: "azure", nat: 0.7, cost_usd: 0.006 },
+        ],
+        [
+          { key: "nat", label: "Naturalness", outputType: "binary", scoreField: "nat" },
+        ],
+        getProviderLabel,
+      ),
+    ).toBe(true);
+  });
+
+  it("is false without an evaluator to score quality", () => {
+    expect(
+      hasTtsTopPicks(
+        [
+          { run: "eleven", cost_usd: 0.01 },
+          { run: "azure", cost_usd: 0.006 },
+        ],
+        [],
+        getProviderLabel,
+      ),
+    ).toBe(false);
   });
 });
