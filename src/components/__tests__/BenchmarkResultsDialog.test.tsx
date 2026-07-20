@@ -80,6 +80,9 @@ jest.mock("../eval-details", () => {
       </div>
     ),
     evaluatorColumnsToAbout: (cols: any) => cols ?? [],
+    BenchmarkTopPicks: (props: any) => (
+      <div data-testid="top-picks">{props.filename}</div>
+    ),
   };
 });
 
@@ -878,6 +881,21 @@ describe("BenchmarkResultsDialog", () => {
 
       await user.click(screen.getByRole("button", { name: "Leaderboard" }));
       expect(screen.getByTestId("leaderboard")).toBeInTheDocument();
+    });
+
+    it("shows the Top picks tab content when the Top picks tab is clicked", async () => {
+      await renderDoneRun();
+      const user = setupUser();
+
+      // Auto-switched to leaderboard once done; Top picks not yet shown.
+      await waitFor(() =>
+        expect(screen.getByTestId("leaderboard")).toBeInTheDocument(),
+      );
+      expect(screen.queryByTestId("top-picks")).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Top picks" }));
+      expect(screen.getByTestId("top-picks")).toBeInTheDocument();
+      expect(screen.queryByTestId("leaderboard")).not.toBeInTheDocument();
     });
 
     it("shows the nav pager only on the outputs tab once nav + selectedTest are set", async () => {

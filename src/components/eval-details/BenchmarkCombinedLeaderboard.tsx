@@ -2,11 +2,6 @@
 
 import React, { useMemo } from "react";
 import { LeaderboardTab, type LeaderboardColumn } from "./LeaderboardTab";
-import { getColorMap } from "@/components/charts/LeaderboardBarChart";
-import {
-  ParetoFrontierChart,
-  type ParetoModelPoint,
-} from "@/components/charts/ParetoFrontierChart";
 import {
   benchmarkRatingEvaluatorCaption,
   buildBenchmarkCombinedLeaderboardPayload,
@@ -167,24 +162,6 @@ export function BenchmarkCombinedLeaderboard({
     [payload, formatModelName, benchmarkScoreLabel],
   );
 
-  // Pareto points (cost vs pass rate, latency as bubble size). Only meaningful
-  // when both a cost and an overall pass rate are available for the run.
-  const paretoPoints = useMemo<ParetoModelPoint[]>(() => {
-    if (!payload) return [];
-    return payload.rows.map((row) => ({
-      model: String(row.model),
-      label: formatModelName(String(row.model)),
-      cost: row.avg_cost as number,
-      passRate: row.pass_rate as number,
-      latency: row.avg_latency_ms as number | undefined,
-    }));
-  }, [payload, formatModelName]);
-
-  const paretoColorMap = useMemo(
-    () => getColorMap(paretoPoints.map((p) => p.model)),
-    [paretoPoints],
-  );
-
   if (!payload || payload.rows.length === 0) {
     return (
       <div className="text-center py-12">
@@ -192,8 +169,6 @@ export function BenchmarkCombinedLeaderboard({
       </div>
     );
   }
-
-  const showPareto = payload.plan.showCost && payload.plan.showOverallPassRate;
 
   return (
     <LeaderboardTab
@@ -204,16 +179,6 @@ export function BenchmarkCombinedLeaderboard({
       filename={filename}
       getLabel={(key) => formatModelName(key)}
       nameKey="model"
-      afterTable={
-        showPareto ? (
-          <ParetoFrontierChart
-            points={paretoPoints}
-            colorMap={paretoColorMap}
-            passRateLabel={benchmarkScoreLabel.replace(/\s*\(%\)\s*$/, "")}
-            filename={`${filename}-pareto`}
-          />
-        ) : undefined
-      }
     />
   );
 }

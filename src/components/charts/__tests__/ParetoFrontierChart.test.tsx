@@ -1,4 +1,4 @@
-import { render, screen } from "@/test-utils";
+import { render, screen, within } from "@/test-utils";
 import {
   ParetoFrontierChart,
   type ParetoModelPoint,
@@ -49,10 +49,14 @@ beforeAll(() => {
   };
 });
 
+// cheap / mid / premium are all on the frontier (each best on some axis).
+// "worst" is dominated by premium (pricier, worse pass rate, slower) so it is
+// never on the frontier — it stays an unlabeled dominated dot.
 const points: ParetoModelPoint[] = [
   { model: "cheap", label: "Cheap", cost: 0.005, passRate: 70, latency: 400 },
   { model: "mid", label: "Mid", cost: 0.01, passRate: 85, latency: 900 },
   { model: "premium", label: "Premium", cost: 0.05, passRate: 95, latency: 1500 },
+  { model: "worst", label: "Worst", cost: 0.06, passRate: 60, latency: 2000 },
 ];
 
 function renderChart(pts: ParetoModelPoint[]) {
@@ -62,38 +66,46 @@ function renderChart(pts: ParetoModelPoint[]) {
 }
 
 describe("ParetoFrontierChart", () => {
-  it("renders the title and mentions speed when latency is present", () => {
+  it("renders the default title and subtitle (mentions speed with latency)", () => {
     renderChart(points);
+    expect(screen.getByText("Top picks for their cost")).toBeInTheDocument();
     expect(
-      screen.getByText(/Pass rate vs cost vs latency tradeoff/i),
+      screen.getByText(
+        /Which models pass the most tests, for the lowest cost, with the fastest replies\./i,
+      ),
     ).toBeInTheDocument();
-    expect(screen.getByText(/the faster it replies/i)).toBeInTheDocument();
   });
 
   it("omits the speed wording when latency is not reported", () => {
     renderChart(points.map((p) => ({ ...p, latency: undefined })));
-    expect(screen.queryByText(/replies/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/the less it costs to run/i)).toBeInTheDocument();
+    expect(screen.queryByText(/fastest replies/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Which models pass the most tests, for the lowest cost\./i,
+      ),
+    ).toBeInTheDocument();
   });
 
-  it("renders model-name labels beside the bubbles", () => {
+  it("labels frontier models in-plot but not a dominated model", () => {
     renderChart(points);
-    expect(screen.getByText("Cheap")).toBeInTheDocument();
-    expect(screen.getByText("Mid")).toBeInTheDocument();
-    expect(screen.getByText("Premium")).toBeInTheDocument();
+    // Frontier names appear (side list and/or in-plot label).
+    expect(screen.getAllByText("Cheap").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Mid").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Premium").length).toBeGreaterThan(0);
+    // The dominated model is neither labeled nor listed.
+    expect(screen.queryByText("Worst")).not.toBeInTheDocument();
   });
 
-  it("drops the dashed-line wording when only one model is on the frontier", () => {
-    // "champion" dominates all others (cheapest, best pass rate, fastest), so it
-    // is the sole frontier model and no line is drawn.
-    renderChart([
-      { model: "champion", label: "champion", cost: 0.001, passRate: 96, latency: 300 },
-      { model: "weak", label: "weak", cost: 0.02, passRate: 88, latency: 1400 },
-    ]);
-    expect(screen.queryByText(/dashed line/i)).not.toBeInTheDocument();
-    const boldName = screen.getByText("champion", { selector: "strong" });
-    expect(boldName).toHaveClass("font-semibold", "text-foreground");
-    expect(screen.getByText(/comes out on top: it matches or beats every other model/i)).toBeInTheDocument();
+  it("renders the side list with one row per frontier model and its pass rate", () => {
+    renderChart(points);
+    const list = screen.getByText("Top performers for their cost").parentElement!;
+    expect(within(list).getByText("Cheap")).toBeInTheDocument();
+    expect(within(list).getByText("Mid")).toBeInTheDocument();
+    expect(within(list).getByText("Premium")).toBeInTheDocument();
+    expect(within(list).queryByText("Worst")).not.toBeInTheDocument();
+    expect(within(list).getByText("70%")).toBeInTheDocument();
+    expect(within(list).getByText("85%")).toBeInTheDocument();
+    expect(within(list).getByText("95%")).toBeInTheDocument();
   });
 
   it("shows the empty state when no model has cost + pass rate", () => {

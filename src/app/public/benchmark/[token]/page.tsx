@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
 import {
   BenchmarkCombinedLeaderboard,
+  BenchmarkTopPicks,
   BenchmarkOutputsPanel,
   LLMEvaluationAbout,
   evaluatorColumnsToAbout,
@@ -36,7 +37,7 @@ export default function PublicBenchmarkPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    "leaderboard" | "outputs" | "about"
+    "leaderboard" | "top-picks" | "outputs" | "about"
   >("leaderboard");
   const [expandedModels, setExpandedModels] = useState<Set<string>>(new Set());
   const [selectedTest, setSelectedTest] = useState<{ model: string; testIndex: number } | null>(null);
@@ -103,13 +104,13 @@ export default function PublicBenchmarkPage() {
         {/* Tab nav */}
         <div className="relative flex items-end justify-between gap-2 border-b border-border">
           <div className="flex gap-2">
-            {(["leaderboard", "outputs", "about"] as const).map((tab) => (
+            {(["leaderboard", "top-picks", "outputs", "about"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer capitalize ${activeTab === tab ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
               >
-                {tab}
+                {{ leaderboard: "Leaderboard", "top-picks": "Top picks", outputs: "Outputs", about: "About" }[tab]}
               </button>
             ))}
           </div>
@@ -168,6 +169,16 @@ export default function PublicBenchmarkPage() {
             showCost={!!aboutPlan?.showCost}
             showTokens={!!aboutPlan?.showTokens}
             evaluators={evaluatorColumnsToAbout(aboutPlan?.evaluators)}
+          />
+        )}
+
+        {/* Top Picks Tab */}
+        {activeTab === "top-picks" && (
+          <BenchmarkTopPicks
+            leaderboardSummary={data.leaderboard_summary}
+            modelResults={data.model_results ?? []}
+            filename={`benchmark-leaderboard-${token.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
+            benchmarkScoreLabel={benchmarkScoreLabel}
           />
         )}
 
