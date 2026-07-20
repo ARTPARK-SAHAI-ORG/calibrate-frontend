@@ -15,24 +15,19 @@ import {
 type BenchmarkTopPicksProps = {
   leaderboardSummary?: BenchmarkLeaderboardSummaryRow[];
   modelResults: BenchmarkModelLike[];
-  /** Chart label for `model`; default shows the API string unchanged. */
-  formatModelName?: (model: string) => string;
   filename: string;
   benchmarkScoreLabel?: string;
-  className?: string;
 };
 
 /**
- * "Top picks" cost/pass-rate frontier for a benchmark's models — the Pareto
+ * Cost / quality / speed tradeoff view for a benchmark's models — the Pareto
  * scatter lifted out of BenchmarkCombinedLeaderboard so it can stand on its own.
  */
 export function BenchmarkTopPicks({
   leaderboardSummary,
   modelResults,
-  formatModelName = (m: string) => m,
   filename,
   benchmarkScoreLabel = "Test pass rate (%)",
-  className,
 }: BenchmarkTopPicksProps) {
   const payload = useMemo(
     () =>
@@ -48,12 +43,12 @@ export function BenchmarkTopPicks({
     () =>
       (payload?.rows ?? []).map((row) => ({
         model: String(row.model),
-        label: formatModelName(String(row.model)),
+        label: String(row.model),
         cost: row.avg_cost as number,
         passRate: row.pass_rate as number,
         latency: row.avg_latency_ms as number | undefined,
       })),
-    [payload, formatModelName],
+    [payload],
   );
 
   const paretoColorMap = useMemo(
@@ -72,13 +67,11 @@ export function BenchmarkTopPicks({
   if (!showPareto) return null;
 
   return (
-    <div className={className}>
-      <ParetoFrontierChart
-        points={paretoPoints}
-        colorMap={paretoColorMap}
-        passRateLabel={benchmarkScoreLabel.replace(/\s*\(%\)\s*$/, "")}
-        filename={`${filename}-pareto`}
-      />
-    </div>
+    <ParetoFrontierChart
+      points={paretoPoints}
+      colorMap={paretoColorMap}
+      passRateLabel={benchmarkScoreLabel.replace(/\s*\(%\)\s*$/, "")}
+      filename={`${filename}-pareto`}
+    />
   );
 }

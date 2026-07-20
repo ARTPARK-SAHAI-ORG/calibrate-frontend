@@ -49,7 +49,7 @@ describe("BenchmarkTopPicks", () => {
       />,
     );
 
-    expect(screen.getByText("Top picks for their cost")).toBeInTheDocument();
+    expect(screen.getByText("Cost, quality and speed tradeoff")).toBeInTheDocument();
   });
 
   it("renders nothing when rows lack cost", () => {
@@ -66,7 +66,7 @@ describe("BenchmarkTopPicks", () => {
       />,
     );
 
-    expect(screen.queryByText("Top picks for their cost")).not.toBeInTheDocument();
+    expect(screen.queryByText("Cost, quality and speed tradeoff")).not.toBeInTheDocument();
     expect(container).toBeEmptyDOMElement();
   });
 

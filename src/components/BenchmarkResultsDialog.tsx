@@ -793,7 +793,7 @@ export function BenchmarkResultsDialog({
                       : "border-transparent text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  Top picks
+                  Model selection
                 </button>
               )}
               <button

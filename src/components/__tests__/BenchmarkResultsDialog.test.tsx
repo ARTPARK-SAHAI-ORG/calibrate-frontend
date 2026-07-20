@@ -896,7 +896,7 @@ describe("BenchmarkResultsDialog", () => {
       );
       expect(screen.queryByTestId("top-picks")).not.toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: "Top picks" }));
+      await user.click(screen.getByRole("button", { name: "Model selection" }));
       expect(screen.getByTestId("top-picks")).toBeInTheDocument();
       expect(screen.queryByTestId("leaderboard")).not.toBeInTheDocument();
     });
@@ -907,7 +907,7 @@ describe("BenchmarkResultsDialog", () => {
         expect(screen.getByTestId("leaderboard")).toBeInTheDocument(),
       );
       expect(
-        screen.queryByRole("button", { name: "Top picks" }),
+        screen.queryByRole("button", { name: "Model selection" }),
       ).not.toBeInTheDocument();
     });
 
