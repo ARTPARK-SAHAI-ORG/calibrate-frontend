@@ -111,22 +111,26 @@ export function VerifyConnectionDialog({
           )}
         </div>
 
-        {/* Footer */}
+        {/* Footer — two buttons, matching the app's dialog pattern. Before a
+            failure: Cancel + Verify. After a failure: View connection settings
+            + Try again. The header X handles dismissal, so no separate Cancel
+            is needed once the two failure actions are shown. */}
         <div className="px-4 md:px-6 py-3 flex flex-wrap items-center justify-end gap-2 md:gap-3">
-          {hasFailed && (
+          {hasFailed ? (
             <button
               onClick={onGoToConnectionSettings}
               className="h-9 md:h-10 px-4 md:px-5 rounded-lg text-xs md:text-base font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors cursor-pointer mr-auto"
             >
-              Connection settings
+              View connection settings
+            </button>
+          ) : (
+            <button
+              onClick={onClose}
+              className="h-9 md:h-10 px-4 md:px-5 rounded-lg text-xs md:text-base font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
+            >
+              Cancel
             </button>
           )}
-          <button
-            onClick={onClose}
-            className="h-9 md:h-10 px-4 md:px-5 rounded-lg text-xs md:text-base font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors cursor-pointer"
-          >
-            Cancel
-          </button>
           <button
             onClick={runCheck}
             disabled={verify.isVerifying}

@@ -93,9 +93,13 @@ describe("VerifyConnectionDialog", () => {
     expect(screen.getByText(/"detail": "boom"/)).toBeInTheDocument();
     // The Verify button becomes "Try again" once a failure is shown.
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+    // Two-button footer: Cancel is replaced by the two failure actions.
+    expect(
+      screen.queryByRole("button", { name: "Cancel" }),
+    ).not.toBeInTheDocument();
 
     await user.click(
-      screen.getByRole("button", { name: "Connection settings" }),
+      screen.getByRole("button", { name: "View connection settings" }),
     );
     expect(baseProps.onGoToConnectionSettings).toHaveBeenCalledTimes(1);
   });
