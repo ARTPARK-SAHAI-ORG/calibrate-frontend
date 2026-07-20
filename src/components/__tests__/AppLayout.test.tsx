@@ -123,6 +123,8 @@ describe("AppLayout", () => {
     renderLayout();
     const toolsLink = screen.getByText("Tools").closest("a");
     expect(toolsLink).toHaveAttribute("href", "/tools");
+    const tracesLink = screen.getByText("Traces").closest("a");
+    expect(tracesLink).toHaveAttribute("href", "/traces");
   });
 
   it("toggles the sidebar", async () => {

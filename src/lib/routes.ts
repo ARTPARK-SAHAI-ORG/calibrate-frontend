@@ -51,6 +51,7 @@ export const SECTION_LIST_PAGES = new Set([
   "stt",
   "tests",
   "tools",
+  "traces",
   "tts",
 ]);
 
