@@ -1,4 +1,4 @@
-import { render, screen, setupUser } from "@/test-utils";
+import { render, screen, setupUser, within } from "@/test-utils";
 import {
   ParetoFrontierChart,
   type ParetoModelPoint,
@@ -69,18 +69,28 @@ describe("ParetoFrontierChart", () => {
   it("renders the default title and a subtitle that explains the frontier", () => {
     renderChart(points);
     expect(
-      screen.getByText("Cost, quality and speed tradeoff"),
+      screen.getByText("Cost, quality and latency tradeoff"),
     ).toBeInTheDocument();
-    expect(screen.getByText(/faster models are bigger/i)).toBeInTheDocument();
+    expect(screen.getByText(/how fast it replies/i)).toBeInTheDocument();
     expect(
       screen.getByText(/there is no reason to choose it/i),
     ).toBeInTheDocument();
   });
 
-  it("drops the speed wording from the title and subtitle when latency is absent", () => {
+  it("shows a bubble-size legend with the fastest and slowest reply times", () => {
+    renderChart(points);
+    // points span 400 ms (fastest) to 2000 ms = 2 s (slowest).
+    const legend = screen.getByTestId("pareto-size-legend");
+    expect(within(legend).getByText("Latency")).toBeInTheDocument();
+    expect(within(legend).getByText("400 ms")).toBeInTheDocument();
+    expect(within(legend).getByText("2 s")).toBeInTheDocument();
+  });
+
+  it("drops the speed wording and the size legend when latency is absent", () => {
     renderChart(points.map((p) => ({ ...p, latency: undefined })));
     expect(screen.getByText("Cost and quality tradeoff")).toBeInTheDocument();
-    expect(screen.queryByText(/faster models are bigger/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/how fast it replies/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pareto-size-legend")).not.toBeInTheDocument();
     expect(
       screen.getByText(/on both quality and cost at once/i),
     ).toBeInTheDocument();
@@ -98,7 +108,7 @@ describe("ParetoFrontierChart", () => {
       screen.getByRole("columnheader", { name: "Cost" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("columnheader", { name: "Speed" }),
+      screen.getByRole("columnheader", { name: "Latency" }),
     ).toBeInTheDocument();
     // Best-only is on by default: frontier models show, dominated ones don't.
     expect(screen.getAllByText("Premium").length).toBeGreaterThan(0);
@@ -189,10 +199,55 @@ describe("ParetoFrontierChart", () => {
     expect(rows[1]).toHaveTextContent("Worst");
   });
 
+  it("shows raw quality values (not percentages) when formatQuality is set", () => {
+    // passRate is accuracy (position/rank); qualityDisplay is the raw error rate.
+    const errPoints: ParetoModelPoint[] = [
+      { model: "a", label: "Best", cost: 0.005, passRate: 98, latency: 400, qualityDisplay: 0.02 },
+      { model: "b", label: "Worse", cost: 0.002, passRate: 80, latency: 900, qualityDisplay: 0.2 },
+    ];
+    render(
+      <ParetoFrontierChart
+        points={errPoints}
+        colorMap={getColorMap(errPoints.map((p) => p.model))}
+        passRateLabel="Semantic WER"
+        formatQuality={(v) => String(v)}
+      />,
+    );
+    // Best model shows its raw rate 0.02, not "98%".
+    expect(screen.getByText("0.02")).toBeInTheDocument();
+    expect(screen.queryByText("98%")).not.toBeInTheDocument();
+  });
+
   it("shows the empty state when no model has cost + pass rate", () => {
     renderChart([{ model: "x", label: "X", cost: NaN, passRate: NaN }]);
     expect(
       screen.getByText(/missing cost or pass-rate values/i),
     ).toBeInTheDocument();
+  });
+
+  it("takes STT/TTS wording overrides for the subtitle, header and cost axis", () => {
+    render(
+      <ParetoFrontierChart
+        points={points}
+        colorMap={getColorMap(points.map((p) => p.model))}
+        entityNoun="provider"
+        qualityNoun="accuracy"
+        qualityComparative="how accurate it is"
+        costAxisLabel="Total cost (USD)"
+      />,
+    );
+    // Subtitle reads in provider/accuracy wording, not model/pass-rate.
+    expect(
+      screen.getByText(/each provider is placed by how accurate it is/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/nothing else beats on accuracy, cost and latency/i),
+    ).toBeInTheDocument();
+    // Table header is capitalised from the entity noun.
+    expect(
+      screen.getByRole("columnheader", { name: "Provider" }),
+    ).toBeInTheDocument();
+    // Cost-axis title override is rendered.
+    expect(screen.getByText("Total cost (USD)")).toBeInTheDocument();
   });
 });

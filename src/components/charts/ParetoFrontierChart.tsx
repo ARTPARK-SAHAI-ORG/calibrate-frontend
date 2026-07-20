@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   ScatterChart,
   Scatter,
@@ -27,10 +34,16 @@ export type ParetoModelPoint = {
   label: string;
   /** Cost objective (USD, per test) — X axis, lower is better. */
   cost: number;
-  /** Pass-rate objective (0–100) — Y axis, higher is better. */
+  /** Pass-rate objective (0–100) — Y axis, higher is better. Used for position and ranking. */
   passRate: number;
   /** Latency (ms) — bubble size AND third frontier objective (lower is better). Optional. */
   latency?: number;
+  /**
+   * Raw value to SHOW the user instead of `passRate`, when they differ. Used for
+   * STT error rates: the point is positioned/ranked by accuracy (`passRate`), but
+   * the tooltip/table show the raw error rate. `formatQuality` renders it.
+   */
+  qualityDisplay?: number;
 };
 
 type ParetoFrontierChartProps = {
@@ -41,6 +54,23 @@ type ParetoFrontierChartProps = {
   passRateLabel?: string;
   filename?: string;
   height?: number;
+  /** Noun for a plotted item — "model" (LLM) / "provider" (STT/TTS). */
+  entityNoun?: string;
+  /** Quality noun in the frontier clause — "quality" / "accuracy". */
+  qualityNoun?: string;
+  /** Placement phrase after "placed by" — "how many tests it passes" / "how accurate it is". */
+  qualityComparative?: string;
+  /** X-axis title line. */
+  costAxisLabel?: string;
+  /**
+   * When set, quality is shown as a raw number instead of a percentage: this
+   * formats a raw value for the Y-axis ticks, tooltip and table. Points still
+   * sit and rank by `passRate` (accuracy); a tick's raw value is derived as
+   * `1 − passRate/100`. Omit for the default percentage display.
+   */
+  formatQuality?: (rawValue: number) => string;
+  /** Optional controls (e.g. a metric picker) shown below the description, above the plot. */
+  toolbar?: ReactNode;
 };
 
 // Bright solid green for the frontier line + best-value highlights — the hero
@@ -76,14 +106,27 @@ const MARGIN = {
 
 type ChartDatum = ParetoModelPoint & { onFrontier: boolean };
 
+// The quality value shown to the user. Default is the pass rate as a percentage;
+// when `formatQuality` is set (STT error rates) it shows the raw value instead,
+// taken from the point's `qualityDisplay` or derived from the accuracy position.
+function qualityText(
+  d: Pick<ChartDatum, "passRate" | "qualityDisplay">,
+  formatQuality?: (rawValue: number) => string,
+): string {
+  if (!formatQuality) return formatPercent(d.passRate);
+  return formatQuality(d.qualityDisplay ?? (100 - d.passRate) / 100);
+}
+
 function ParetoTooltip({
   active,
   payload,
   passRateLabel,
+  formatQuality,
 }: {
   active?: boolean;
   payload?: Array<{ payload: ChartDatum }>;
   passRateLabel: string;
+  formatQuality?: (rawValue: number) => string;
 }) {
   if (!active || !payload || payload.length === 0) return null;
   const d = payload[0].payload;
@@ -98,14 +141,15 @@ function ParetoTooltip({
         )}
       </div>
       <div className="text-muted-foreground">
-        {passRateLabel}: <span className="text-foreground">{formatPercent(d.passRate)}</span>
+        {passRateLabel}:{" "}
+        <span className="text-foreground">{qualityText(d, formatQuality)}</span>
       </div>
       <div className="text-muted-foreground">
         Cost: <span className="text-foreground">{formatCostUsd(d.cost)}</span>
       </div>
       {typeof d.latency === "number" && Number.isFinite(d.latency) && (
         <div className="text-muted-foreground">
-          Speed: <span className="text-foreground">{formatLatencyMs(d.latency)}</span>
+          Latency: <span className="text-foreground">{formatLatencyMs(d.latency)}</span>
         </div>
       )}
     </div>
@@ -131,6 +175,12 @@ export function ParetoFrontierChart({
   passRateLabel = "Pass rate",
   filename = "pareto-frontier",
   height = 460,
+  entityNoun = "model",
+  qualityNoun = "quality",
+  qualityComparative = "how many tests it passes",
+  costAxisLabel = "Average cost (USD)",
+  formatQuality,
+  toolbar,
 }: ParetoFrontierChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
   // Default to the best models only; toggling off reveals every model.
@@ -179,7 +229,7 @@ export function ParetoFrontierChart({
   const resolvedTitle =
     title ??
     (hasLatency
-      ? "Cost, quality and speed tradeoff"
+      ? "Cost, quality and latency tradeoff"
       : "Cost and quality tradeoff");
 
   useEffect(() => {
@@ -218,8 +268,8 @@ export function ParetoFrontierChart({
   const resolvedSubtitle =
     subtitle ??
     (hasLatency
-      ? "Each model is placed by how many tests it passes, what it costs, and how fast it replies (faster models are bigger). The green line joins the best models: the ones that nothing else beats on quality, cost and speed all at once. Any model below the line is beaten by one on it, so there is no reason to choose it."
-      : "Each model is placed by how many tests it passes and what it costs. The green line joins the best models: the ones that nothing else beats on both quality and cost at once. Any model below the line is beaten by one on it, so there is no reason to choose it.");
+      ? `Each ${entityNoun} is placed by ${qualityComparative}, what it costs, and how fast it replies. The green line joins the best ${entityNoun}s: the ones that nothing else beats on ${qualityNoun}, cost and latency all at once. Any ${entityNoun} below the line is beaten by one on it, so there is no reason to choose it.`
+      : `Each ${entityNoun} is placed by ${qualityComparative} and what it costs. The green line joins the best ${entityNoun}s: the ones that nothing else beats on both ${qualityNoun} and cost at once. Any ${entityNoun} below the line is beaten by one on it, so there is no reason to choose it.`);
 
   // Domains are derived from ALL models (not just the visible ones) so points
   // keep their exact position when the toggle hides dominated models —
@@ -242,15 +292,23 @@ export function ParetoFrontierChart({
     .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
   const zMin = latencies.length ? Math.min(...latencies) : 0;
   const zMax = latencies.length ? Math.max(...latencies) : 0;
+  // Bubble grows with latency: the slowest reply is the biggest bubble, matching
+  // the intuition that a bigger number is a bigger dot.
+  const radiusForLatency = (latency: number): number => {
+    if (zMax === zMin) return (R_MIN + R_MAX) / 2;
+    const t = (latency - zMin) / (zMax - zMin);
+    return R_MIN + t * (R_MAX - R_MIN);
+  };
   const radiusFor = (d: ChartDatum): number => {
     if (!hasLatency || typeof d.latency !== "number" || !Number.isFinite(d.latency)) {
       return R_FIXED;
     }
-    if (zMax === zMin) return (R_MIN + R_MAX) / 2;
-    // Faster (lower latency) → bigger bubble, so the quickest models stand out.
-    const t = (d.latency - zMin) / (zMax - zMin);
-    return R_MIN + (1 - t) * (R_MAX - R_MIN);
+    return radiusForLatency(d.latency);
   };
+  // The bubble-size legend explains "bigger = faster" visually: the fastest and
+  // slowest latencies in the run, drawn at their actual bubble sizes. Only shown
+  // when speed is a real, varying factor.
+  const showSizeLegend = hasLatency && zMax > zMin;
 
   // Best value per column (over ALL models) so the table can highlight the
   // winner in each dimension.
@@ -443,8 +501,8 @@ export function ParetoFrontierChart({
               onClick={() => setFrontierOnly((v) => !v)}
               className={`rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
                 frontierOnly
-                  ? "border-green-500 bg-green-500 text-white hover:bg-green-600"
-                  : "border-green-500 text-green-700 hover:bg-green-500/10 dark:text-green-400"
+                  ? "border-green-600 bg-green-600 text-white hover:bg-green-700"
+                  : "border-green-600 text-green-700 hover:bg-green-600/10 dark:text-green-400"
               }`}
               title="Show only the best models (the ones on the green line)"
             >
@@ -473,8 +531,51 @@ export function ParetoFrontierChart({
           </button>
         </div>
       </div>
+      {toolbar && <div className="mb-3">{toolbar}</div>}
       <div className="flex flex-col gap-4 md:flex-row">
-        <div ref={chartRef} className="flex-1 min-w-0">
+        <div ref={chartRef} className="relative flex-1 min-w-0">
+          {showSizeLegend && (
+            <div
+              data-testid="pareto-size-legend"
+              className="pointer-events-none absolute bottom-12 right-3 z-10 flex items-end gap-3 rounded-lg border border-border bg-background/85 px-2.5 py-1.5 backdrop-blur-sm"
+            >
+              <span className="max-w-[3.5rem] self-center text-[10px] font-medium leading-tight text-muted-foreground">
+                Latency
+              </span>
+              {[
+                { latency: zMin, caption: "fastest" },
+                { latency: zMax, caption: "slowest" },
+              ].map(({ latency, caption }) => {
+                const r = radiusForLatency(latency);
+                return (
+                  <div
+                    key={caption}
+                    className="flex flex-col items-center gap-0.5"
+                  >
+                    <svg
+                      width={R_MAX * 2}
+                      height={R_MAX * 2}
+                      className="text-muted-foreground"
+                    >
+                      <circle
+                        cx={R_MAX}
+                        cy={R_MAX * 2 - r}
+                        r={r}
+                        fill="currentColor"
+                        fillOpacity={0.3}
+                        stroke="currentColor"
+                        strokeOpacity={0.55}
+                        strokeWidth={1}
+                      />
+                    </svg>
+                    <span className="text-[9px] tabular-nums text-muted-foreground">
+                      {formatLatencyMs(latency)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <ResponsiveContainer width="100%" height={height}>
             <ScatterChart margin={MARGIN}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -486,7 +587,7 @@ export function ParetoFrontierChart({
                 tick={{ fontSize: 12 }}
                 tickFormatter={(v) => formatCostUsd(v)}
                 label={{
-                  value: "Average cost (USD)",
+                  value: costAxisLabel,
                   position: "insideBottom",
                   offset: -24,
                   style: { fontSize: 12, fill: "currentColor" },
@@ -498,9 +599,13 @@ export function ParetoFrontierChart({
                 name={passRateLabel}
                 domain={yDomain}
                 tick={{ fontSize: 12 }}
-                tickFormatter={(v) => `${v}%`}
+                tickFormatter={
+                  formatQuality
+                    ? (v) => formatQuality((100 - v) / 100)
+                    : (v) => `${v}%`
+                }
                 label={{
-                  value: `${passRateLabel} (%)`,
+                  value: formatQuality ? passRateLabel : `${passRateLabel} (%)`,
                   angle: -90,
                   position: "insideLeft",
                   style: { fontSize: 12, fill: "currentColor", textAnchor: "middle" },
@@ -508,7 +613,12 @@ export function ParetoFrontierChart({
               />
               <Tooltip
                 cursor={{ strokeDasharray: "3 3" }}
-                content={<ParetoTooltip passRateLabel={passRateLabel} />}
+                content={
+                  <ParetoTooltip
+                    passRateLabel={passRateLabel}
+                    formatQuality={formatQuality}
+                  />
+                }
               />
               {/* Frontier points, connected by the bright solid green hero line in
                   cost order — but only when there are 2+ of them. */}
@@ -538,10 +648,12 @@ export function ParetoFrontierChart({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
-                <th className="py-1.5 text-left font-medium">Model</th>
+                <th className="py-1.5 text-left font-medium">
+                  {entityNoun.charAt(0).toUpperCase() + entityNoun.slice(1)}
+                </th>
                 {sortHeader("Quality", "quality")}
                 {sortHeader("Cost", "cost")}
-                {hasLatency && sortHeader("Speed", "speed", "pl-3")}
+                {hasLatency && sortHeader("Latency", "speed", "pl-3")}
               </tr>
             </thead>
             <tbody>
@@ -585,7 +697,7 @@ export function ParetoFrontierChart({
                           : "text-foreground"
                       }`}
                     >
-                      {formatPercent(d.passRate)}
+                      {qualityText(d, formatQuality)}
                     </td>
                     <td
                       className={`py-1 text-right tabular-nums whitespace-nowrap ${

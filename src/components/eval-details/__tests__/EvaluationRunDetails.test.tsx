@@ -11,11 +11,14 @@ import {
   hasSarvamMetrics,
   hasTtfsMetric,
   visibleEvaluatorColumns,
-  evaluatorColumnHasData,
   STTEvaluationAbout,
   TTSEvaluationAbout,
   STTEvaluationLeaderboard,
   TTSEvaluationLeaderboard,
+  STTEvaluationTopPicks,
+  TTSEvaluationTopPicks,
+  hasSttTopPicks,
+  hasTtsTopPicks,
   STTEvaluationOutputs,
   TTSEvaluationOutputs,
   WER_ABOUT_METRIC,
@@ -67,6 +70,21 @@ jest.mock("../LeaderboardTab", () => ({
         </div>
         <div data-testid="leaderboard-filename">{props.filename as string}</div>
       </div>
+    );
+  },
+}));
+
+// Capture the props passed to the Pareto chart so the Top-picks tests can
+// assert on the built points / labels without rendering recharts.
+const mockParetoCapture: { props: Record<string, unknown> | null } = {
+  props: null,
+};
+
+jest.mock("../../charts/ParetoFrontierChart", () => ({
+  ParetoFrontierChart: (props: Record<string, unknown>) => {
+    mockParetoCapture.props = props;
+    return (
+      <div data-testid="pareto-chart">{props.toolbar as React.ReactNode}</div>
     );
   },
 }));
@@ -2278,5 +2296,241 @@ describe("STTEvaluationOutputs TTFS tile", () => {
     expect(screen.queryByTestId("metric-Latency (s)")).not.toBeInTheDocument();
     // WER still renders — the null ttfs doesn't break the metrics card.
     expect(screen.getByTestId("metric-WER").textContent).toBe("0.1");
+  });
+});
+
+// ---- Model selection tab (Pareto frontier) -------------------------------
+
+// The Pareto chart no longer renders below the leaderboard — it lives in the
+// "Model selection" tab, rendered by STTEvaluationTopPicks / TTSEvaluationTopPicks.
+
+beforeEach(() => {
+  mockParetoCapture.props = null;
+});
+
+function capturedPareto():
+  | {
+      points: Array<{ model: string; cost: number; passRate: number }>;
+      title: string;
+      passRateLabel: string;
+    }
+  | null {
+  return mockParetoCapture.props as ReturnType<typeof capturedPareto>;
+}
+
+describe("STTEvaluationTopPicks", () => {
+  it("renders the chart, defaulting the quality axis to accuracy from Semantic WER", () => {
+    render(
+      <STTEvaluationTopPicks
+        leaderboardSummary={[
+          { run: "openai", semantic_wer: 0.05 },
+          { run: "deepgram", semantic_wer: 0.15 },
+        ]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
+          { provider: "deepgram", metrics: { cost: { cost_usd: 0.002 } } },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("pareto-chart")).toBeInTheDocument();
+    const pareto = capturedPareto()!;
+    expect(pareto.title).toBe("Quality vs cost vs latency tradeoff");
+    expect(pareto.passRateLabel).toBe("Semantic WER");
+    expect(pareto.points).toHaveLength(2);
+    // Only one metric available → no picker.
+    expect(screen.queryByLabelText("Plot quality by")).not.toBeInTheDocument();
+  });
+
+  it("lets the user switch the quality metric to an LLM judge", async () => {
+    const user = setupUser();
+    render(
+      <STTEvaluationTopPicks
+        leaderboardSummary={[
+          { run: "openai", semantic_wer: 0.05, judge_score: 0.9 },
+          { run: "deepgram", semantic_wer: 0.15, judge_score: 0.7 },
+        ]}
+        evaluatorColumns={[
+          {
+            key: "judge",
+            label: "Correctness",
+            outputType: "binary",
+            scoreField: "judge_score",
+          },
+        ]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
+          { provider: "deepgram", metrics: { cost: { cost_usd: 0.002 } } },
+        ]}
+      />,
+    );
+    // Two metrics → picker shown, defaulting to Semantic WER accuracy.
+    const picker = screen.getByLabelText("Plot quality by");
+    expect(capturedPareto()!.passRateLabel).toBe("Semantic WER");
+
+    await user.selectOptions(picker, "Correctness");
+    expect(capturedPareto()!.passRateLabel).toBe("Correctness");
+  });
+
+  it("renders nothing with only one provider", () => {
+    const { container } = render(
+      <STTEvaluationTopPicks
+        leaderboardSummary={[{ run: "openai", semantic_wer: 0.05 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
+        ]}
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
+    expect(mockParetoCapture.props).toBeNull();
+  });
+
+  it("renders nothing when fewer than two providers have cost", () => {
+    const { container } = render(
+      <STTEvaluationTopPicks
+        leaderboardSummary={[
+          { run: "openai", semantic_wer: 0.05 },
+          { run: "deepgram", semantic_wer: 0.15 },
+        ]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
+          { provider: "deepgram", metrics: { wer: 0.2 } },
+        ]}
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("hasSttTopPicks", () => {
+  it("is true with 2+ providers that have cost and accuracy", () => {
+    expect(
+      hasSttTopPicks(
+        [
+          { run: "openai", semantic_wer: 0.05 },
+          { run: "deepgram", semantic_wer: 0.15 },
+        ],
+        [],
+        [
+          { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
+          { provider: "deepgram", metrics: { cost: { cost_usd: 0.002 } } },
+        ],
+      ),
+    ).toBe(true);
+  });
+
+  it("is false with a single provider", () => {
+    expect(
+      hasSttTopPicks([{ run: "openai", semantic_wer: 0.05 }], [], [
+        { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
+      ]),
+    ).toBe(false);
+  });
+
+  it("is false when fewer than two providers have cost", () => {
+    expect(
+      hasSttTopPicks(
+        [
+          { run: "openai", semantic_wer: 0.05 },
+          { run: "deepgram", semantic_wer: 0.15 },
+        ],
+        [],
+        [{ provider: "openai", metrics: { cost: { cost_usd: 0.004 } } }],
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("TTSEvaluationTopPicks", () => {
+  it("renders the chart, defaulting the quality axis to the first judge", () => {
+    render(
+      <TTSEvaluationTopPicks
+        leaderboardSummary={[
+          { run: "eleven", nat: 0.9, cost_usd: 0.01 },
+          { run: "azure", nat: 0.7, cost_usd: 0.006 },
+        ]}
+        evaluatorColumns={[
+          { key: "nat", label: "Naturalness", outputType: "binary", scoreField: "nat" },
+        ]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    expect(screen.getByTestId("pareto-chart")).toBeInTheDocument();
+    const pareto = capturedPareto()!;
+    expect(pareto.title).toBe("Quality vs cost vs latency tradeoff");
+    expect(pareto.passRateLabel).toBe("Naturalness");
+    expect(pareto.points).toHaveLength(2);
+    // Single judge → no picker.
+    expect(screen.queryByLabelText("Plot quality by")).not.toBeInTheDocument();
+  });
+
+  it("lets the user switch between judges when there is more than one", async () => {
+    const user = setupUser();
+    render(
+      <TTSEvaluationTopPicks
+        leaderboardSummary={[
+          { run: "eleven", nat: 0.9, clar: 0.8, cost_usd: 0.01 },
+          { run: "azure", nat: 0.7, clar: 0.6, cost_usd: 0.006 },
+        ]}
+        evaluatorColumns={[
+          { key: "nat", label: "Naturalness", outputType: "binary", scoreField: "nat" },
+          { key: "clar", label: "Clarity", outputType: "binary", scoreField: "clar" },
+        ]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const picker = screen.getByLabelText("Plot quality by");
+    expect(capturedPareto()!.passRateLabel).toBe("Naturalness");
+
+    await user.selectOptions(picker, "Clarity");
+    expect(capturedPareto()!.passRateLabel).toBe("Clarity");
+  });
+
+  it("renders nothing when there is no evaluator to score quality", () => {
+    const { container } = render(
+      <TTSEvaluationTopPicks
+        leaderboardSummary={[
+          { run: "eleven", cost_usd: 0.01 },
+          { run: "azure", cost_usd: 0.006 },
+        ]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("hasTtsTopPicks", () => {
+  it("is true with 2+ providers that have cost and a judge score", () => {
+    expect(
+      hasTtsTopPicks(
+        [
+          { run: "eleven", nat: 0.9, cost_usd: 0.01 },
+          { run: "azure", nat: 0.7, cost_usd: 0.006 },
+        ],
+        [
+          { key: "nat", label: "Naturalness", outputType: "binary", scoreField: "nat" },
+        ],
+      ),
+    ).toBe(true);
+  });
+
+  it("is false without an evaluator to score quality", () => {
+    expect(
+      hasTtsTopPicks(
+        [
+          { run: "eleven", cost_usd: 0.01 },
+          { run: "azure", cost_usd: 0.006 },
+        ],
+        [],
+      ),
+    ).toBe(false);
   });
 });
