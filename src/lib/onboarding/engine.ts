@@ -86,6 +86,13 @@ function setPopoverHidden(hidden: boolean): void {
     el.style.opacity = hidden ? "0" : "1";
     el.style.pointerEvents = hidden ? "none" : "auto";
   });
+  // Hide the highlight cutout with the card. Its bright hole sits at the PREVIOUS
+  // anchor, so during setup it would dangle over whatever opens (e.g. the new
+  // test dialog) until the next step re-cuts it. Toggle visibility, not opacity,
+  // so we never overwrite driver's own overlay opacity (the dimming level).
+  document.querySelectorAll<HTMLElement>(".driver-overlay").forEach((el) => {
+    el.style.visibility = hidden ? "hidden" : "visible";
+  });
 }
 
 function clearAnchorWatch(): void {
@@ -149,6 +156,12 @@ export async function runTour(tour: Tour): Promise<void> {
         el.style.opacity = show ? "1" : "0";
         el.style.pointerEvents = show ? "auto" : "none";
       }
+      // Keep the highlight cutout in sync with the card on every re-render, so a
+      // refresh during setup (driver refreshes on scroll/resize while a dialog
+      // opens) cannot bring the stale cutout back over the new surface.
+      document.querySelectorAll<HTMLElement>(".driver-overlay").forEach((el) => {
+        el.style.visibility = popoverHidden ? "hidden" : "visible";
+      });
       // A visible "Skip tour" affordance so the guide can be ended any time,
       // placed just left of the advance button. Ensure the footer + nav group
       // exist even on auto-advance cards (which render no next/prev buttons), so

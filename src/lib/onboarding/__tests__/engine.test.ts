@@ -169,18 +169,27 @@ describe("onboarding engine", () => {
     await Promise.resolve();
     expect(prepare).toHaveBeenCalled();
 
+    // The dark overlay carries the highlight cutout; it must hide with the card.
+    const overlay = document.createElement("div");
+    overlay.className = "driver-overlay";
+    document.body.appendChild(overlay);
+
     // A re-render during setup (e.g. driver refreshing while the app navigates)
-    // must NOT un-hide the stale card.
+    // must NOT un-hide the stale card or its highlight cutout.
     const midSetup = document.createElement("div");
     capturedDriverConfig?.onPopoverRender?.({ wrapper: midSetup });
     expect(midSetup.style.opacity).toBe("0");
+    expect(overlay.style.visibility).toBe("hidden");
 
-    // Once setup finishes the new card renders and is revealed.
+    // Once setup finishes the new card renders and both are revealed.
     resolvePrepare();
     await new Promise((r) => setTimeout(r, 0));
     const shown = document.createElement("div");
     capturedDriverConfig?.onPopoverRender?.({ wrapper: shown });
     expect(shown.style.opacity).toBe("1");
+    expect(overlay.style.visibility).toBe("visible");
+
+    overlay.remove();
   });
 
   it("injects a Skip tour button that ends the tour", async () => {
