@@ -35,6 +35,13 @@ import {
   formatMoney,
   readTotalCostUsd,
 } from "@/lib/audioCost";
+import {
+  buildSttParetoPoints,
+  buildTtsParetoPoints,
+  countValidParetoPoints,
+} from "@/lib/audioPareto";
+import { ParetoFrontierChart } from "@/components/charts/ParetoFrontierChart";
+import { getColorMap } from "@/components/charts/LeaderboardBarChart";
 
 type EvaluationStatus = "queued" | "in_progress" | "done" | "failed";
 type EvaluatorOutputType = "binary" | "rating";
@@ -546,6 +553,9 @@ const COST_ABOUT_METRIC: MetricDescription = {
   range: "0 - ∞",
 };
 
+/** X-axis title for the STT/TTS Pareto frontier (total run cost, USD). */
+const PARETO_COST_AXIS_LABEL = "Total cost (USD) →  cheaper is better";
+
 /** The cost caveats as a footnote: a single * marker, one point per line. */
 function CostCaveatFootnote({ lines }: { lines: string[] }) {
   if (lines.length === 0) return null;
@@ -584,8 +594,8 @@ function withRowMetric(
  * Joins total USD cost onto leaderboard rows under a flat `cost_usd` key (the
  * comparable cost figure). Reads the cost off the row itself when the summary
  * carries it, otherwise off the matching provider result. Drives both the "Total
- * cost (USD)" leaderboard column/chart; the per-unit / native price stays on
- * the per-provider Overall Metrics card.
+ * cost (USD)" leaderboard column/chart and the Pareto cost axis; the per-unit /
+ * native price stays on the per-provider Overall Metrics card.
  */
 function withTotalCostUsd(
   leaderboardSummary: LeaderboardSummaryForDetails[],
@@ -742,8 +752,8 @@ export function STTEvaluationLeaderboard({
     (row) => row.semantic_wer != null,
   );
 
-  // Join total USD cost (comparable) and TTFS onto each row for their columns
-  // and charts.
+  // Join total USD cost (comparable) and TTFS onto each row for their columns,
+  // charts, and the Pareto axis / latency.
   const withCost = withTotalCostUsd(leaderboardSummary, providerResults);
   const { rows, showTtfs } = withTtfs(withCost.rows, providerResults);
   const showCost = withCost.showCost;
@@ -769,6 +779,12 @@ export function STTEvaluationLeaderboard({
   ];
   const chartRows = chunkChartRows(allCharts);
 
+  // Pareto frontier (accuracy vs cost, TTFS as latency) — shown only with 2+
+  // providers that both have a cost and an accuracy value to trade off.
+  const paretoPoints = buildSttParetoPoints(rows, getProviderLabel);
+  const showPareto =
+    leaderboardSummary.length > 1 && countValidParetoPoints(paretoPoints) >= 2;
+
   return (
     <LeaderboardTab
       className={className}
@@ -791,6 +807,21 @@ export function STTEvaluationLeaderboard({
       charts={chartRows}
       filename="stt-evaluation-leaderboard"
       getLabel={getProviderLabel}
+      afterTable={
+        showPareto ? (
+          <ParetoFrontierChart
+            points={paretoPoints}
+            colorMap={getColorMap(paretoPoints.map((p) => p.model))}
+            title="Accuracy vs cost tradeoff"
+            passRateLabel="Accuracy"
+            qualityNoun="accuracy"
+            qualityComparative="how accurate it is"
+            entityNoun="provider"
+            costAxisLabel={PARETO_COST_AXIS_LABEL}
+            filename="stt-evaluation-pareto"
+          />
+        ) : undefined
+      }
     />
   );
 }
@@ -823,8 +854,8 @@ export function TTSEvaluationLeaderboard({
   const renderTtfb = (v: string | number | undefined) =>
     v != null ? parseFloat(Number(v).toFixed(4)) : "-";
 
-  // Join total USD cost (comparable) onto each row for the cost column/chart;
-  // the per-unit / native price stays on the per-provider card.
+  // Join total USD cost (comparable) onto each row for the cost column/chart and
+  // the Pareto axis; the per-unit / native price stays on the per-provider card.
   const { rows, showCost } = withTotalCostUsd(
     leaderboardSummary,
     providerResults,
@@ -836,6 +867,17 @@ export function TTSEvaluationLeaderboard({
     ...(showCost ? [costChartConfig] : []),
   ];
   const chartRows = chunkChartRows(allCharts);
+
+  // Pareto frontier (primary evaluator quality vs cost, TTFB as latency) —
+  // shown only with 2+ providers that both have a cost and a quality score.
+  const primaryEvaluator = evaluatorColumns[0];
+  const paretoPoints = buildTtsParetoPoints(
+    rows,
+    evaluatorColumns,
+    getProviderLabel,
+  );
+  const showPareto =
+    leaderboardSummary.length > 1 && countValidParetoPoints(paretoPoints) >= 2;
 
   return (
     <LeaderboardTab
@@ -850,6 +892,21 @@ export function TTSEvaluationLeaderboard({
       charts={chartRows}
       filename="tts-evaluation-leaderboard"
       getLabel={getProviderLabel}
+      afterTable={
+        showPareto ? (
+          <ParetoFrontierChart
+            points={paretoPoints}
+            colorMap={getColorMap(paretoPoints.map((p) => p.model))}
+            title={`${primaryEvaluator?.label ?? "Quality"} vs cost tradeoff`}
+            passRateLabel={primaryEvaluator?.label ?? "Quality"}
+            qualityNoun="quality"
+            qualityComparative="how well it scores"
+            entityNoun="provider"
+            costAxisLabel={PARETO_COST_AXIS_LABEL}
+            filename="tts-evaluation-pareto"
+          />
+        ) : undefined
+      }
     />
   );
 }

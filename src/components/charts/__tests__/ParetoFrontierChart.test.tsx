@@ -195,4 +195,30 @@ describe("ParetoFrontierChart", () => {
       screen.getByText(/missing cost or pass-rate values/i),
     ).toBeInTheDocument();
   });
+
+  it("takes STT/TTS wording overrides for the subtitle, header and cost axis", () => {
+    render(
+      <ParetoFrontierChart
+        points={points}
+        colorMap={getColorMap(points.map((p) => p.model))}
+        entityNoun="provider"
+        qualityNoun="accuracy"
+        qualityComparative="how accurate it is"
+        costAxisLabel="Total cost (USD)"
+      />,
+    );
+    // Subtitle reads in provider/accuracy wording, not model/pass-rate.
+    expect(
+      screen.getByText(/each provider is placed by how accurate it is/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/nothing else beats on accuracy, cost and speed/i),
+    ).toBeInTheDocument();
+    // Table header is capitalised from the entity noun.
+    expect(
+      screen.getByRole("columnheader", { name: "Provider" }),
+    ).toBeInTheDocument();
+    // Cost-axis title override is rendered.
+    expect(screen.getByText("Total cost (USD)")).toBeInTheDocument();
+  });
 });

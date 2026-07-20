@@ -41,6 +41,14 @@ type ParetoFrontierChartProps = {
   passRateLabel?: string;
   filename?: string;
   height?: number;
+  /** Noun for a plotted item — "model" (LLM) / "provider" (STT/TTS). */
+  entityNoun?: string;
+  /** Quality noun in the frontier clause — "quality" / "accuracy". */
+  qualityNoun?: string;
+  /** Placement phrase after "placed by" — "how many tests it passes" / "how accurate it is". */
+  qualityComparative?: string;
+  /** X-axis title line. */
+  costAxisLabel?: string;
 };
 
 // Bright solid green for the frontier line + best-value highlights — the hero
@@ -131,6 +139,10 @@ export function ParetoFrontierChart({
   passRateLabel = "Pass rate",
   filename = "pareto-frontier",
   height = 460,
+  entityNoun = "model",
+  qualityNoun = "quality",
+  qualityComparative = "how many tests it passes",
+  costAxisLabel = "Average cost (USD)",
 }: ParetoFrontierChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
   // Default to the best models only; toggling off reveals every model.
@@ -218,8 +230,8 @@ export function ParetoFrontierChart({
   const resolvedSubtitle =
     subtitle ??
     (hasLatency
-      ? "Each model is placed by how many tests it passes, what it costs, and how fast it replies (faster models are bigger). The green line joins the best models: the ones that nothing else beats on quality, cost and speed all at once. Any model below the line is beaten by one on it, so there is no reason to choose it."
-      : "Each model is placed by how many tests it passes and what it costs. The green line joins the best models: the ones that nothing else beats on both quality and cost at once. Any model below the line is beaten by one on it, so there is no reason to choose it.");
+      ? `Each ${entityNoun} is placed by ${qualityComparative}, what it costs, and how fast it replies (faster ${entityNoun}s are bigger). The green line joins the best ${entityNoun}s: the ones that nothing else beats on ${qualityNoun}, cost and speed all at once. Any ${entityNoun} below the line is beaten by one on it, so there is no reason to choose it.`
+      : `Each ${entityNoun} is placed by ${qualityComparative} and what it costs. The green line joins the best ${entityNoun}s: the ones that nothing else beats on both ${qualityNoun} and cost at once. Any ${entityNoun} below the line is beaten by one on it, so there is no reason to choose it.`);
 
   // Domains are derived from ALL models (not just the visible ones) so points
   // keep their exact position when the toggle hides dominated models —
@@ -486,7 +498,7 @@ export function ParetoFrontierChart({
                 tick={{ fontSize: 12 }}
                 tickFormatter={(v) => formatCostUsd(v)}
                 label={{
-                  value: "Average cost (USD)",
+                  value: costAxisLabel,
                   position: "insideBottom",
                   offset: -24,
                   style: { fontSize: 12, fill: "currentColor" },
@@ -538,7 +550,9 @@ export function ParetoFrontierChart({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
-                <th className="py-1.5 text-left font-medium">Model</th>
+                <th className="py-1.5 text-left font-medium">
+                  {entityNoun.charAt(0).toUpperCase() + entityNoun.slice(1)}
+                </th>
                 {sortHeader("Quality", "quality")}
                 {sortHeader("Cost", "cost")}
                 {hasLatency && sortHeader("Speed", "speed", "pl-3")}

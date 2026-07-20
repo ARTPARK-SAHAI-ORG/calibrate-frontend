@@ -11,7 +11,6 @@ import {
   hasSarvamMetrics,
   hasTtfsMetric,
   visibleEvaluatorColumns,
-  evaluatorColumnHasData,
   STTEvaluationAbout,
   TTSEvaluationAbout,
   STTEvaluationLeaderboard,
@@ -2278,5 +2277,110 @@ describe("STTEvaluationOutputs TTFS tile", () => {
     expect(screen.queryByTestId("metric-Latency (s)")).not.toBeInTheDocument();
     // WER still renders — the null ttfs doesn't break the metrics card.
     expect(screen.getByTestId("metric-WER").textContent).toBe("0.1");
+  });
+});
+
+// ---- Pareto frontier (afterTable) ----------------------------------------
+
+type CapturedPareto = {
+  points: Array<{ model: string; cost: number; passRate: number }>;
+  title: string;
+  passRateLabel: string;
+};
+
+function capturedAfterTable(): React.ReactElement<CapturedPareto> | undefined {
+  return (mockLeaderboardCapture.props as { afterTable?: unknown })
+    .afterTable as React.ReactElement<CapturedPareto> | undefined;
+}
+
+describe("STTEvaluationLeaderboard Pareto frontier", () => {
+  it("renders the Pareto chart when 2+ providers have cost and accuracy", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[
+          { run: "openai", wer: 0.1, semantic_wer: 0.05 },
+          { run: "deepgram", wer: 0.2, semantic_wer: 0.15 },
+        ]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
+          { provider: "deepgram", metrics: { cost: { cost_usd: 0.002 } } },
+        ]}
+      />,
+    );
+    const after = capturedAfterTable();
+    expect(after).toBeTruthy();
+    expect(after!.props.title).toBe("Accuracy vs cost tradeoff");
+    expect(after!.props.passRateLabel).toBe("Accuracy");
+    expect(after!.props.points).toHaveLength(2);
+  });
+
+  it("omits the Pareto chart with only one provider", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[{ run: "openai", wer: 0.1, semantic_wer: 0.05 }]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
+        ]}
+      />,
+    );
+    expect(capturedAfterTable()).toBeUndefined();
+  });
+
+  it("omits the Pareto chart when fewer than two providers have cost", () => {
+    render(
+      <STTEvaluationLeaderboard
+        leaderboardSummary={[
+          { run: "openai", wer: 0.1 },
+          { run: "deepgram", wer: 0.2 },
+        ]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
+          { provider: "deepgram", metrics: { wer: 0.2 } },
+        ]}
+      />,
+    );
+    expect(capturedAfterTable()).toBeUndefined();
+  });
+});
+
+describe("TTSEvaluationLeaderboard Pareto frontier", () => {
+  it("renders the Pareto chart using the primary evaluator for quality", () => {
+    render(
+      <TTSEvaluationLeaderboard
+        leaderboardSummary={[
+          { run: "eleven", nat: 0.9, cost_usd: 0.01 },
+          { run: "azure", nat: 0.7, cost_usd: 0.006 },
+        ]}
+        evaluatorColumns={[
+          { key: "nat", label: "Naturalness", outputType: "binary", scoreField: "nat" },
+        ]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const after = capturedAfterTable();
+    expect(after).toBeTruthy();
+    expect(after!.props.title).toBe("Naturalness vs cost tradeoff");
+    expect(after!.props.passRateLabel).toBe("Naturalness");
+    expect(after!.props.points).toHaveLength(2);
+  });
+
+  it("omits the Pareto chart when there is no evaluator to score quality", () => {
+    render(
+      <TTSEvaluationLeaderboard
+        leaderboardSummary={[
+          { run: "eleven", cost_usd: 0.01 },
+          { run: "azure", cost_usd: 0.006 },
+        ]}
+        evaluatorColumns={[]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    expect(capturedAfterTable()).toBeUndefined();
   });
 });
