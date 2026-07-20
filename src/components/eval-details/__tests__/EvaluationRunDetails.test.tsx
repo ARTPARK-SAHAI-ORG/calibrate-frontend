@@ -1765,8 +1765,8 @@ describe("TTSEvaluationOutputs", () => {
 
 // ---- Cost ----------------------------------------------------------------
 
-describe("STT/TTS leaderboard Total cost (USD) column", () => {
-  it("adds a Total cost (USD) column + chart when providers carry cost, keyed cost_usd", () => {
+describe("STT/TTS leaderboard Total cost column", () => {
+  it("adds a Total cost column + chart when providers carry cost, keyed cost_usd", () => {
     render(
       <STTEvaluationLeaderboard
         leaderboardSummary={[{ run: "cartesia", wer: 0.1, cer: 0.05 }]}
@@ -1782,13 +1782,13 @@ describe("STT/TTS leaderboard Total cost (USD) column", () => {
     );
     expect(columns).toContainEqual({
       key: "cost_usd",
-      header: "Total cost (USD)",
+      header: "Total cost",
     });
     const charts = JSON.parse(
       screen.getByTestId("leaderboard-charts").textContent ?? "[]",
     ).flat();
     expect(charts).toContainEqual({
-      title: "Total cost (USD)",
+      title: "Total cost",
       dataKey: "cost_usd",
     });
     // The joined value is on the row data (comparable across providers).

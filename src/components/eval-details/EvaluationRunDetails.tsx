@@ -522,7 +522,7 @@ const ttfsChartConfig: ChartConfig = { title: TTFS_LABEL, dataKey: TTFS_KEY };
 // Shown as a leaderboard column + chart, keyed on the `cost_usd` joined by
 // `withTotalCostUsd`.
 const COST_USD_KEY = "cost_usd";
-const COST_USD_LABEL = "Total cost (USD)";
+const COST_USD_LABEL = "Total cost";
 
 /** Leaderboard column for total USD cost (shared by STT and TTS). */
 const costLeaderboardColumn = {
