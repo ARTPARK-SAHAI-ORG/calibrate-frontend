@@ -137,6 +137,11 @@ export function ParetoFrontierChart({
   const [frontierOnly, setFrontierOnly] = useState(true);
   const [hoveredModel, setHoveredModel] = useState<string | null>(null);
   const [chartWidth, setChartWidth] = useState(DEFAULT_CHART_WIDTH);
+  // Which column the table is sorted by. null = the default frontier-first order.
+  const [sort, setSort] = useState<{
+    key: "quality" | "cost" | "speed";
+    dir: "asc" | "desc";
+  } | null>(null);
 
   const { allData, frontierData, dominatedData, hasLatency } = useMemo(() => {
     const valid = points.filter(isValidParetoPoint);
@@ -252,17 +257,69 @@ export function ParetoFrontierChart({
   const bestPassRate = Math.max(...prVals);
   const bestCost = Math.min(...allData.map((d) => d.cost));
   const bestLatency = latencies.length ? Math.min(...latencies) : null;
-  // Table rows: honour the toggle. When every model is shown, the best
-  // (frontier) models come first as a group, then the rest — each block sorted
-  // by quality.
+  // Table rows honour the toggle (all vs. best only). By default the best
+  // (frontier) models come first as a group, each block by quality; clicking a
+  // column header sorts every row by that dimension instead.
+  const sortValue = (d: ChartDatum, key: "quality" | "cost" | "speed") => {
+    if (key === "quality") return d.passRate;
+    if (key === "cost") return d.cost;
+    return typeof d.latency === "number" && Number.isFinite(d.latency)
+      ? d.latency
+      : Infinity;
+  };
   const rankedRows = [...(showDominated ? allData : frontierData)].sort(
-    (a, b) =>
-      a.onFrontier === b.onFrontier
-        ? b.passRate - a.passRate
-        : a.onFrontier
-          ? -1
-          : 1,
+    (a, b) => {
+      if (!sort) {
+        return a.onFrontier === b.onFrontier
+          ? b.passRate - a.passRate
+          : a.onFrontier
+            ? -1
+            : 1;
+      }
+      const diff = sortValue(a, sort.key) - sortValue(b, sort.key);
+      return sort.dir === "asc" ? diff : -diff;
+    },
   );
+
+  // Click a column header to sort by it; higher quality / lower cost / faster
+  // speed come first, and a second click flips the direction.
+  const toggleSort = (key: "quality" | "cost" | "speed") =>
+    setSort((prev) =>
+      prev?.key === key
+        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: key === "quality" ? "desc" : "asc" },
+    );
+  const sortHeader = (
+    label: string,
+    key: "quality" | "cost" | "speed",
+    extraClass = "",
+  ) => {
+    const active = sort?.key === key;
+    return (
+      <th
+        className={`py-1.5 text-right font-medium ${extraClass}`}
+        aria-sort={
+          active ? (sort!.dir === "asc" ? "ascending" : "descending") : "none"
+        }
+      >
+        <button
+          type="button"
+          onClick={() => toggleSort(key)}
+          className={`ml-auto inline-flex items-center gap-1 whitespace-nowrap cursor-pointer hover:text-foreground ${
+            active ? "text-foreground" : ""
+          }`}
+        >
+          {label}
+          <span
+            aria-hidden
+            className={`text-[8px] leading-none ${active ? "" : "opacity-40"}`}
+          >
+            {active ? (sort!.dir === "asc" ? "▲" : "▼") : "▾"}
+          </span>
+        </button>
+      </th>
+    );
+  };
 
   // Only FRONTIER points get an in-plot name label — lay those out (with side +
   // vertical nudge) over the frontier alone. Dominated dots stay unlabeled.
@@ -484,11 +541,9 @@ export function ParetoFrontierChart({
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
                 <th className="py-1.5 text-left font-medium">Model</th>
-                <th className="py-1.5 text-right font-medium">Quality</th>
-                <th className="py-1.5 text-right font-medium">Cost</th>
-                {hasLatency && (
-                  <th className="py-1.5 pl-3 text-right font-medium">Speed</th>
-                )}
+                {sortHeader("Quality", "quality")}
+                {sortHeader("Cost", "cost")}
+                {hasLatency && sortHeader("Speed", "speed", "pl-3")}
               </tr>
             </thead>
             <tbody>
@@ -526,7 +581,7 @@ export function ParetoFrontierChart({
                       </div>
                     </td>
                     <td
-                      className={`py-1 text-right tabular-nums ${
+                      className={`py-1 text-right tabular-nums whitespace-nowrap ${
                         d.passRate === bestPassRate
                           ? "font-bold text-green-600 dark:text-green-400"
                           : "text-foreground"
@@ -535,7 +590,7 @@ export function ParetoFrontierChart({
                       {formatPercent(d.passRate)}
                     </td>
                     <td
-                      className={`py-1 text-right tabular-nums ${
+                      className={`py-1 text-right tabular-nums whitespace-nowrap ${
                         d.cost === bestCost
                           ? "font-bold text-green-600 dark:text-green-400"
                           : "text-foreground"
@@ -545,7 +600,7 @@ export function ParetoFrontierChart({
                     </td>
                     {hasLatency && (
                       <td
-                        className={`py-1 pl-3 text-right tabular-nums ${
+                        className={`py-1 pl-3 text-right tabular-nums whitespace-nowrap ${
                           hasLat && d.latency === bestLatency
                             ? "font-bold text-green-600 dark:text-green-400"
                             : "text-muted-foreground"

@@ -131,6 +131,25 @@ describe("ParetoFrontierChart", () => {
     expect(rows[rows.length - 1]).toHaveTextContent("Worst");
   });
 
+  it("sorts the table by a column when its header is clicked", async () => {
+    const user = setupUser();
+    renderChart(points);
+    // Show every model so the ordering is visible.
+    await user.click(
+      screen.getByRole("button", { name: "Show the best models only" }),
+    );
+
+    // Sort by Cost: cheapest first (Cheap = $0.005).
+    await user.click(screen.getByRole("button", { name: "Cost" }));
+    let rows = screen.getAllByRole("row");
+    expect(rows[1]).toHaveTextContent("Cheap");
+
+    // Click again to flip: most expensive first (Worst = $0.06).
+    await user.click(screen.getByRole("button", { name: "Cost" }));
+    rows = screen.getAllByRole("row");
+    expect(rows[1]).toHaveTextContent("Worst");
+  });
+
   it("shows the empty state when no model has cost + pass rate", () => {
     renderChart([{ model: "x", label: "X", cost: NaN, passRate: NaN }]);
     expect(
