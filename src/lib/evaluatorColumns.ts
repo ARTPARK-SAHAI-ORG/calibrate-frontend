@@ -226,6 +226,8 @@ export const STT_RESERVED_METRIC_KEYS: ReadonlySet<string> = new Set([
   "ttfs_p50",
   "ttfs_p95",
   "ttfs_p99",
+  // Per-provider cost block — a built-in metric, not a user evaluator.
+  "cost",
 ]);
 
 /** TTS-specific reserved keys — skip latency / processing-time / legacy llm_judge.
@@ -238,4 +240,6 @@ export const TTS_RESERVED_METRIC_KEYS: ReadonlySet<string> = new Set([
   "ttfb_p95",
   "ttfb_p99",
   "processing_time",
+  // Per-provider cost block — a built-in metric, not a user evaluator.
+  "cost",
 ]);

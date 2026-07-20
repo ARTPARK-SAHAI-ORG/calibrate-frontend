@@ -51,6 +51,7 @@ import {
   deriveEvaluatorColumns,
   STT_RESERVED_METRIC_KEYS,
 } from "@/lib/evaluatorColumns";
+import type { AudioCostBreakdown } from "@/lib/audioCost";
 
 // The STT evaluate API response now carries per-attached-evaluator data in
 // three formats we need to support side-by-side:
@@ -117,9 +118,13 @@ type ProviderMetrics = {
   // TTFS (Time To Final Segment) streaming latency. Reported as a latency
   // block (`p50` headline) or a plain number. Present only when measured.
   ttfs?: LatencyMetric | number;
+  // Per-provider cost block (per-minute USD pricing × audio duration). Present
+  // only when the run computed cost.
+  cost?: AudioCostBreakdown;
   [k: string]:
     | number
     | LatencyMetric
+    | AudioCostBreakdown
     | { type?: string; mean?: number; scale_min?: number; scale_max?: number }
     | undefined;
 };
@@ -192,6 +197,8 @@ type EvaluationResult = {
   error?: string | null;
   is_public?: boolean;
   share_token?: string | null;
+  /** When the run was created — dates the INR conversion-rate caveat. */
+  created_at?: string | null;
 };
 
 type EvaluatorSummary = {
@@ -1049,6 +1056,7 @@ export default function STTEvaluationDetailPage() {
                       status={evaluationResult.status}
                       evaluatorColumns={evaluatorColumns}
                       getProviderLabel={getProviderLabel}
+                      runDate={evaluationResult.created_at}
                       tableRef={tableContainerRef}
                       labellingSelection={
                         evaluationResult.status === "done"

@@ -28,6 +28,7 @@ import {
   type TTSLeaderboardSummary,
 } from "@/components/eval-details";
 import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
+import type { AudioCostBreakdown } from "@/lib/audioCost";
 import {
   AddRunToLabellingTaskDialog,
   type TtsLabellingRow,
@@ -104,9 +105,12 @@ type ProviderMetrics = {
   llm_judge_score?: number;
   ttfb?: LatencyMetric;
   processing_time?: LatencyMetric;
+  // Per-provider cost block. Present only when the run computed cost.
+  cost?: AudioCostBreakdown;
   [k: string]:
     | number
     | LatencyMetric
+    | AudioCostBreakdown
     | { type?: string; mean?: number; scale_min?: number; scale_max?: number }
     | undefined;
 };
@@ -148,6 +152,8 @@ type EvaluationResult = {
   error?: string | null;
   is_public?: boolean;
   share_token?: string | null;
+  /** When the run was created — dates the INR conversion-rate caveat. */
+  created_at?: string | null;
 };
 
 type EvaluatorSummary = {
@@ -950,6 +956,7 @@ export default function TTSEvaluationDetailPage() {
                         }
                         evaluatorColumns={evaluatorColumns}
                         getProviderLabel={getProviderLabel}
+                        providerResults={evaluationResult.provider_results}
                       />
                     )}
 
@@ -962,6 +969,7 @@ export default function TTSEvaluationDetailPage() {
                       status={evaluationResult.status}
                       evaluatorColumns={evaluatorColumns}
                       getProviderLabel={getProviderLabel}
+                      runDate={evaluationResult.created_at}
                       labellingSelection={
                         evaluationResult.status === "done"
                           ? ttsLabellingSelected

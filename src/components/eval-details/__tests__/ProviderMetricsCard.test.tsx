@@ -35,4 +35,24 @@ describe("ProviderMetricsCard", () => {
     render(<ProviderMetricsCard metrics={[]} />);
     expect(screen.getByText("Overall Metrics")).toBeInTheDocument();
   });
+
+  it("renders a footnote when provided", () => {
+    render(
+      <ProviderMetricsCard
+        metrics={[{ label: "Total cost", value: "$0.01" }]}
+        footnote="Total cost converted from INR at ₹96.35 = $1."
+      />,
+    );
+    expect(
+      screen.getByText("Total cost converted from INR at ₹96.35 = $1."),
+    ).toBeInTheDocument();
+  });
+
+  it("omits the footnote node when not provided", () => {
+    const { container } = render(
+      <ProviderMetricsCard metrics={[{ label: "WER", value: 0.1 }]} />,
+    );
+    // Only the heading + one metric block; no trailing footnote div.
+    expect(container.querySelector(".mt-3")).toBeNull();
+  });
 });

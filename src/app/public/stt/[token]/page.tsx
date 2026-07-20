@@ -20,6 +20,7 @@ import {
 } from "@/components/eval-details";
 import type { LatencyMetric } from "@/components/eval-details/ttsEvalTypes";
 import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
+import type { AudioCostBreakdown } from "@/lib/audioCost";
 import {
   ExportResultsButton,
   type ExportColumn,
@@ -58,9 +59,12 @@ type ProviderMetrics = {
   llm_judge_score?: number;
   // TTFS streaming latency. Reported as a latency block or a plain number.
   ttfs?: LatencyMetric | number;
+  // Per-provider cost block. Present only when the run computed cost.
+  cost?: AudioCostBreakdown;
   [k: string]:
     | number
     | LatencyMetric
+    | AudioCostBreakdown
     | { type?: string; mean?: number; scale_min?: number; scale_max?: number }
     | undefined;
 };
@@ -104,6 +108,8 @@ type EvaluationResult = {
   provider_results?: ProviderResult[];
   leaderboard_summary?: LeaderboardSummary[];
   error?: string | null;
+  /** When the run was created — dates the INR conversion-rate caveat. */
+  created_at?: string | null;
 };
 
 const getProviderLabel = (value: string): string => {
@@ -304,6 +310,7 @@ export default function PublicSTTPage() {
                 status={data.status}
                 evaluatorColumns={evaluatorColumns}
                 getProviderLabel={getProviderLabel}
+                runDate={data.created_at}
                 className="flex flex-col md:flex-row border border-border rounded-xl overflow-hidden min-h-[480px]"
               />
             )}
