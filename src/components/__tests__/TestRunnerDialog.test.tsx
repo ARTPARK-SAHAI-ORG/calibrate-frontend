@@ -462,7 +462,12 @@ describe("TestRunnerDialog", () => {
   // like new input and fired another run, and each run re-rendered the parent.
   // One click could put ~115 POSTs on the wire in three seconds. The dialog now
   // only ever POSTs from a click handler, so re-rendering it must stay silent.
-  it("never starts a run on its own, no matter how often the parent re-renders", async () => {
+  it("never starts a run on its own, from a re-render or from a poll tick", async () => {
+    // Fake timers so advancing time actually fires the poll interval, which is
+    // the second way a run could be started without a click.
+    jest.useFakeTimers();
+    // The run never reaches a terminal status, so the poll interval keeps
+    // firing for as long as the dialog is open.
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {
         return Promise.resolve(jsonResponse([]));
@@ -471,10 +476,10 @@ describe("TestRunnerDialog", () => {
         return Promise.resolve(
           jsonResponse({
             task_id: "task-idle",
-            status: "completed",
+            status: "in_progress",
             name: "Idle Run",
             test_uuids: ["real-test-1"],
-            results: [{ name: "Real Test 1", status: "passed", passed: true }],
+            results: [{ name: "Real Test 1", passed: null }],
           }),
         );
       }
@@ -490,21 +495,23 @@ describe("TestRunnerDialog", () => {
       onNewRun: jest.fn(),
     };
     const { rerender } = render(<TestRunnerDialog {...props} />);
-    await screen.findByText("Idle Run");
+    await flush();
+    expect(screen.getByText("Idle Run")).toBeInTheDocument();
 
     // Re-render repeatedly with fresh inline callback identities, which is what
     // a parent doing setState on every optimistic row update looks like.
     for (let i = 0; i < 20; i++) {
       rerender(
-        <TestRunnerDialog
-          {...props}
-          onClose={() => {}}
-          onNewRun={() => {}}
-        />,
+        <TestRunnerDialog {...props} onClose={() => {}} onNewRun={() => {}} />,
       );
     }
-    await flush(30_000);
+    // Then let the poll interval fire several times.
+    await flush(POLL_MS * 5);
 
+    // The timer kept polling (reads), proving the interval was live and this
+    // test actually exercised the poll path.
+    expect(runFetchCount("task-idle")).toBeGreaterThan(1);
+    // But nothing ever started a run: no POST, no onNewRun.
     const runPosts = (global.fetch as jest.Mock).mock.calls.filter(
       ([url, init]) =>
         String(url).endsWith("/agent-tests/agent/agent-1/run") &&
