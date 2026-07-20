@@ -37,7 +37,10 @@ import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
 } from "@/lib/defaultEvaluators";
-import type { BenchmarkLeaderboardSummaryRow } from "@/lib/benchmarkEvaluatorSummary";
+import {
+  hasBenchmarkTopPicks,
+  type BenchmarkLeaderboardSummaryRow,
+} from "@/lib/benchmarkEvaluatorSummary";
 
 type BenchmarkStatusResponse = {
   task_id: string;
@@ -536,6 +539,12 @@ export function BenchmarkResultsDialog({
   if (!isOpen) return null;
 
   const benchmarkScoreLabel = "Test pass rate (%)";
+  // Only offer the Top picks tab when there is cost + pass-rate data to plot.
+  const showTopPicks = hasBenchmarkTopPicks(
+    leaderboardSummary,
+    modelResults,
+    benchmarkScoreLabel,
+  );
 
   // Metric-presence plan for the About tab (built only when it's showing so the
   // scan doesn't run on every poll). Shares the leaderboard's builder.
@@ -661,7 +670,7 @@ export function BenchmarkResultsDialog({
               currentTaskId && (
                 <button
                   onClick={() => {
-                    if (activeTab === "leaderboard") {
+                    if (activeTab !== "outputs") {
                       setActiveTab("outputs");
                     }
                     if (labellingSelectedKeys.size === 0) {
@@ -775,16 +784,18 @@ export function BenchmarkResultsDialog({
               >
                 Leaderboard
               </button>
-              <button
-                onClick={() => setActiveTab("top-picks")}
-                className={`pb-3 px-1 text-sm md:text-base font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
-                  activeTab === "top-picks"
-                    ? "border-foreground text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Top picks
-              </button>
+              {showTopPicks && (
+                <button
+                  onClick={() => setActiveTab("top-picks")}
+                  className={`pb-3 px-1 text-sm md:text-base font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
+                    activeTab === "top-picks"
+                      ? "border-foreground text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Top picks
+                </button>
+              )}
               <button
                 onClick={() => setActiveTab("outputs")}
                 className={`pb-3 px-1 text-sm md:text-base font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 ${
@@ -837,8 +848,8 @@ export function BenchmarkResultsDialog({
               </div>
             )}
 
-            {/* Top Picks Tab - Only when done */}
-            {isDone && activeTab === "top-picks" && (
+            {/* Top Picks Tab - Only when done and there is data to plot */}
+            {isDone && showTopPicks && activeTab === "top-picks" && (
               <div className="p-4 md:p-6 space-y-4 md:space-y-6 overflow-y-auto h-full">
                 <BenchmarkTopPicks
                   leaderboardSummary={leaderboardSummary}

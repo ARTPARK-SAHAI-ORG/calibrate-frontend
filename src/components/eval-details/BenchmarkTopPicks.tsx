@@ -61,24 +61,15 @@ export function BenchmarkTopPicks({
     [paretoPoints],
   );
 
-  if (!payload || payload.rows.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-sm text-muted-foreground">No leaderboard data available</p>
-      </div>
-    );
-  }
-
-  const showPareto = payload.plan.showCost && payload.plan.showOverallPassRate;
-  if (!showPareto) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-sm text-muted-foreground">
-          No cost or pass-rate data to compare models on value.
-        </p>
-      </div>
-    );
-  }
+  // Nothing to plot without both a cost and an overall pass rate. The parent
+  // gates the Top picks tab on the same check (hasBenchmarkTopPicks), so this is
+  // a safety net rather than a visible empty state.
+  const showPareto =
+    !!payload &&
+    payload.rows.length > 0 &&
+    payload.plan.showCost &&
+    payload.plan.showOverallPassRate;
+  if (!showPareto) return null;
 
   return (
     <div className={className}>

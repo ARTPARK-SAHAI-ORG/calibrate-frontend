@@ -13,6 +13,7 @@ import {
 import type { BenchmarkModelResult } from "@/components/eval-details";
 import {
   buildBenchmarkCombinedLeaderboardPayload,
+  hasBenchmarkTopPicks,
   type BenchmarkLeaderboardSummaryRow,
 } from "@/lib/benchmarkEvaluatorSummary";
 import { ResultPager, type TestRunEvaluator, type PagerNav } from "@/components/test-results/shared";
@@ -78,6 +79,18 @@ export default function PublicBenchmarkPage() {
   if (notFound || !data) return <PublicPageLayout><PublicNotFound /></PublicPageLayout>;
 
   const benchmarkScoreLabel = "Test pass rate (%)";
+  // Only offer the Top picks tab when there is cost + pass-rate data to plot.
+  const showTopPicks = hasBenchmarkTopPicks(
+    data.leaderboard_summary,
+    data.model_results ?? [],
+    benchmarkScoreLabel,
+  );
+  const tabs: ("leaderboard" | "top-picks" | "outputs" | "about")[] = [
+    "leaderboard",
+    ...(showTopPicks ? (["top-picks"] as const) : []),
+    "outputs",
+    "about",
+  ];
 
   // Metric-presence plan for the About tab (only built when it's showing).
   const aboutPlan =
@@ -104,11 +117,11 @@ export default function PublicBenchmarkPage() {
         {/* Tab nav */}
         <div className="relative flex items-end justify-between gap-2 border-b border-border">
           <div className="flex gap-2">
-            {(["leaderboard", "top-picks", "outputs", "about"] as const).map((tab) => (
+            {tabs.map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer capitalize ${activeTab === tab ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${activeTab === tab ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
               >
                 {{ leaderboard: "Leaderboard", "top-picks": "Top picks", outputs: "Outputs", about: "About" }[tab]}
               </button>
@@ -173,7 +186,7 @@ export default function PublicBenchmarkPage() {
         )}
 
         {/* Top Picks Tab */}
-        {activeTab === "top-picks" && (
+        {activeTab === "top-picks" && showTopPicks && (
           <BenchmarkTopPicks
             leaderboardSummary={data.leaderboard_summary}
             modelResults={data.model_results ?? []}

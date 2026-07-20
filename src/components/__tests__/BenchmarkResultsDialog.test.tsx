@@ -884,7 +884,10 @@ describe("BenchmarkResultsDialog", () => {
     });
 
     it("shows the Top picks tab content when the Top picks tab is clicked", async () => {
-      await renderDoneRun();
+      // The tab only appears when the run has cost + pass-rate data to plot.
+      await renderDoneRun({
+        leaderboard_summary: [{ model: "gpt-4", pass_rate: "100", cost: "0.05" }],
+      });
       const user = setupUser();
 
       // Auto-switched to leaderboard once done; Top picks not yet shown.
@@ -896,6 +899,16 @@ describe("BenchmarkResultsDialog", () => {
       await user.click(screen.getByRole("button", { name: "Top picks" }));
       expect(screen.getByTestId("top-picks")).toBeInTheDocument();
       expect(screen.queryByTestId("leaderboard")).not.toBeInTheDocument();
+    });
+
+    it("hides the Top picks tab when there is no cost or pass-rate data", async () => {
+      await renderDoneRun(); // default fixture: no leaderboard_summary, no cost
+      await waitFor(() =>
+        expect(screen.getByTestId("leaderboard")).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByRole("button", { name: "Top picks" }),
+      ).not.toBeInTheDocument();
     });
 
     it("shows the nav pager only on the outputs tab once nav + selectedTest are set", async () => {

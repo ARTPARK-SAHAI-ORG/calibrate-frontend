@@ -52,13 +52,13 @@ describe("BenchmarkTopPicks", () => {
     expect(screen.getByText("Top picks for their cost")).toBeInTheDocument();
   });
 
-  it("shows the no-value empty state when rows lack cost", () => {
+  it("renders nothing when rows lack cost", () => {
     const leaderboardSummary: BenchmarkLeaderboardSummaryRow[] = [
       { model: "gpt-4.1", pass_rate: "80" },
     ];
     const modelResults: BenchmarkModelLike[] = [{ model: "gpt-4.1" }];
 
-    render(
+    const { container } = render(
       <BenchmarkTopPicks
         leaderboardSummary={leaderboardSummary}
         modelResults={modelResults}
@@ -66,14 +66,12 @@ describe("BenchmarkTopPicks", () => {
       />,
     );
 
-    expect(
-      screen.getByText("No cost or pass-rate data to compare models on value."),
-    ).toBeInTheDocument();
     expect(screen.queryByText("Top picks for their cost")).not.toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
   });
 
-  it("shows the empty state when there is no leaderboard data", () => {
-    render(<BenchmarkTopPicks modelResults={[]} filename="bench" />);
-    expect(screen.getByText("No leaderboard data available")).toBeInTheDocument();
+  it("renders nothing when there is no leaderboard data", () => {
+    const { container } = render(<BenchmarkTopPicks modelResults={[]} filename="bench" />);
+    expect(container).toBeEmptyDOMElement();
   });
 });
