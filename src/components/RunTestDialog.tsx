@@ -13,7 +13,8 @@ type RunTestDialogProps = {
   onRunTest: (
     agentUuid: string,
     agentName: string,
-    attachToAgent: boolean
+    attachToAgent: boolean,
+    agent: Agent
   ) => void | Promise<void>;
 };
 
@@ -48,7 +49,12 @@ export function RunTestDialog({
     // The parent's onRunTest handles its own errors and never rejects, so a
     // finally is all that is needed to release the button when it settles.
     try {
-      await onRunTest(selectedAgent.uuid, selectedAgent.name, attachToAgent);
+      await onRunTest(
+        selectedAgent.uuid,
+        selectedAgent.name,
+        attachToAgent,
+        selectedAgent
+      );
     } finally {
       setIsStarting(false);
     }

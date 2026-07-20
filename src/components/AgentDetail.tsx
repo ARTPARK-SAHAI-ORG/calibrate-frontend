@@ -1212,6 +1212,15 @@ export function AgentDetail({
                   ? connectionConfig.benchmark_provider
                   : undefined
               }
+              onConnectionVerified={() =>
+                setConnectionConfig((prev) => ({
+                  ...prev,
+                  connection_verified: true,
+                  connection_verified_at: new Date().toISOString(),
+                  connection_verified_error: null,
+                }))
+              }
+              onGoToConnectionSettings={() => performTabSwitch("connection")}
             />
           </div>
         )}

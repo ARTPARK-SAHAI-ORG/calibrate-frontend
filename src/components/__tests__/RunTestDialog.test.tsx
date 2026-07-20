@@ -80,7 +80,11 @@ describe("RunTestDialog", () => {
     expect(runButton).toBeEnabled();
     await user.click(runButton);
 
-    expect(onRunTest).toHaveBeenCalledWith("agent-1", "My Agent", true);
+    expect(onRunTest).toHaveBeenCalledWith("agent-1", "My Agent", true, {
+      uuid: "agent-1",
+      name: "My Agent",
+      type: "agent",
+    });
   });
 
   it("toggles the attach checkbox off and passes false to onRunTest", async () => {
@@ -102,7 +106,11 @@ describe("RunTestDialog", () => {
     );
     await user.click(screen.getByRole("button", { name: /Run test/ }));
 
-    expect(onRunTest).toHaveBeenCalledWith("agent-1", "My Agent", false);
+    expect(onRunTest).toHaveBeenCalledWith("agent-1", "My Agent", false, {
+      uuid: "agent-1",
+      name: "My Agent",
+      type: "agent",
+    });
   });
 
   it("calls onClose when the close (X) button is clicked", async () => {

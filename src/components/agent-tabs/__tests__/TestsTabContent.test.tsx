@@ -1440,14 +1440,18 @@ describe("TestsTabContent — benchmark & past runs", () => {
 });
 
 describe("TestsTabContent — connection agent", () => {
-  it("disables Run all for an unverified connection agent", async () => {
+  it("opens the verify window from Run all for an unverified connection agent", async () => {
+    const user = setupUser();
     state.agentTests = [responseTest];
     renderComponent({
       agentType: "connection",
       connectionVerified: false,
     });
     await screen.findAllByText("Greeting test");
-    const runAll = screen.getByText("Run all tests").closest("button");
-    expect(runAll).toBeDisabled();
+    const runAll = screen.getByText("Run all tests").closest("button")!;
+    // No longer disabled — clicking now prompts to verify the connection first.
+    expect(runAll).toBeEnabled();
+    await user.click(runAll);
+    expect(screen.getByText("Verify connection")).toBeInTheDocument();
   });
 });

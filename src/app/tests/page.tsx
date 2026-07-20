@@ -29,6 +29,8 @@ import {
   type OptimisticRun,
 } from "@/lib/optimisticRuns";
 import { RunTestDialog } from "@/components/RunTestDialog";
+import { VerifyConnectionDialog } from "@/components/VerifyConnectionDialog";
+import type { Agent } from "@/components/AgentPicker";
 import {
   AddTestDialog,
   TestConfig,
@@ -252,6 +254,13 @@ function LLMPageInner() {
   // Run test dialog state
   const [runTestDialogOpen, setRunTestDialogOpen] = useState(false);
   const [testToRun, setTestToRun] = useState<TestData | null>(null);
+  // A run intent held while an unverified connection agent verifies its
+  // endpoint. Cleared on verify success (the run then starts) or on cancel.
+  const [pendingVerify, setPendingVerify] = useState<{
+    agentUuid: string;
+    agentName: string;
+    attachToAgent: boolean;
+  } | null>(null);
 
   // Direct benchmark rerun (fresh benchmark, same models + test subset, no
   // picker).
@@ -620,8 +629,29 @@ function LLMPageInner() {
     setRunIdParam(taskId);
   };
 
-  // Handle running the test
+  // Handle running the test. A connection agent whose endpoint has not been
+  // checked (verified === false) is gated behind VerifyConnectionDialog first;
+  // everything else runs straight away.
   const handleRunTest = async (
+    agentUuid: string,
+    agentName: string,
+    attachToAgent: boolean,
+    agent?: Agent
+  ) => {
+    if (!testToRun) return;
+    if (agent && agent.type === "connection" && agent.verified === false) {
+      setPendingVerify({ agentUuid, agentName, attachToAgent });
+      setRunTestDialogOpen(false);
+      return;
+    }
+    await startRunNow(agentUuid, agentName, attachToAgent);
+  };
+
+  // Start the run: attach the test if asked, create the run, prepend the
+  // optimistic row, close the picker, and open the run window. Reads
+  // `testToRun` from state (still set — it is not cleared until the run starts
+  // or fails).
+  const startRunNow = async (
     agentUuid: string,
     agentName: string,
     attachToAgent: boolean
@@ -1950,6 +1980,26 @@ function LLMPageInner() {
         testUuid={testToRun?.uuid || ""}
         onRunTest={handleRunTest}
       />
+
+      {/* Verify an unverified connection agent's endpoint before running. */}
+      {pendingVerify && (
+        <VerifyConnectionDialog
+          isOpen
+          agentUuid={pendingVerify.agentUuid}
+          agentName={pendingVerify.agentName}
+          onClose={() => setPendingVerify(null)}
+          onVerified={() => {
+            const p = pendingVerify;
+            setPendingVerify(null);
+            void startRunNow(p.agentUuid, p.agentName, p.attachToAgent);
+          }}
+          onGoToConnectionSettings={() => {
+            const uuid = pendingVerify.agentUuid;
+            setPendingVerify(null);
+            router.push(`/agents/${uuid}?tab=connection`);
+          }}
+        />
+      )}
 
       {/* Test Runner Dialog — always views an existing run, whether it was
           just started here or picked from the Runs tab. */}

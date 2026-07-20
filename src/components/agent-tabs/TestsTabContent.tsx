@@ -10,6 +10,7 @@ import { startTestRunOrNotify } from "@/lib/testRunApi";
 
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TestRunnerDialog } from "@/components/TestRunnerDialog";
+import { VerifyConnectionDialog } from "@/components/VerifyConnectionDialog";
 import { BenchmarkDialog } from "@/components/BenchmarkDialog";
 import { BenchmarkResultsDialog } from "@/components/BenchmarkResultsDialog";
 import {
@@ -219,6 +220,10 @@ type TestsTabContentProps = {
     { verified: boolean; verified_at: string; error: string | null }
   >;
   benchmarkProvider?: string;
+  // Called after a passing endpoint check so the parent flips connectionVerified true.
+  onConnectionVerified?: () => void;
+  // Called when the user opts to fix the connection; parent switches to the Connection tab.
+  onGoToConnectionSettings?: () => void;
 };
 
 export function TestsTabContent({
@@ -229,6 +234,8 @@ export function TestsTabContent({
   supportsBenchmark,
   benchmarkModelsVerified,
   benchmarkProvider,
+  onConnectionVerified,
+  onGoToConnectionSettings,
 }: TestsTabContentProps) {
   const backendAccessToken = useAccessToken();
   const maxRowsPerEval = useMaxRowsPerEval();
@@ -360,6 +367,13 @@ export function TestsTabContent({
   // Key of the run control whose "create run" call is in flight ("all",
   // "bulk", or a test uuid). Non-null disables every run control.
   const [startingRun, setStartingRun] = useState<string | null>(null);
+  // Set when a Run was clicked on an unverified connection agent: holds the
+  // run the user asked for so it can start once the verify dialog passes.
+  const [pendingRun, setPendingRun] = useState<{
+    tests: TestData[];
+    allLinked: boolean;
+    runKey: string;
+  } | null>(null);
 
   // Benchmark dialog state
   const [benchmarkDialogOpen, setBenchmarkDialogOpen] = useState(false);
@@ -1062,7 +1076,9 @@ export function TestsTabContent({
   // uuid) so only that one shows a spinner while every run control is disabled.
   // Returns the new run id, or null if nothing started. Callers use that to
   // hold their state (e.g. keep the bulk selection) until the run is created.
-  const launchTestRun = async (
+  // Actually create and open the run. No verification check — the gate lives
+  // in `launchTestRun` (and in the verify dialog's success handler).
+  const startRunNow = async (
     tests: TestData[],
     allLinked = false,
     runKey = "all",
@@ -1087,6 +1103,20 @@ export function TestsTabContent({
     } finally {
       setStartingRun(null);
     }
+  };
+
+  // The one gate every Run action funnels through. On an unverified connection
+  // agent it holds the intent and opens the verify dialog instead of running.
+  const launchTestRun = async (
+    tests: TestData[],
+    allLinked = false,
+    runKey = "all",
+  ): Promise<string | null> => {
+    if (isConnectionUnverified) {
+      setPendingRun({ tests, allLinked, runKey });
+      return null;
+    }
+    return startRunNow(tests, allLinked, runKey);
   };
 
   // Open the test runner for a single just-saved test. Backing the dialog's
@@ -1922,11 +1952,10 @@ export function TestsTabContent({
           {/* Left group: act-on-the-tests buttons. */}
           <div className="flex flex-wrap items-center gap-2 md:gap-3">
             {/* Run all tests — sky tint, "play" semantic. */}
-            <div className="relative group/runall">
+            <div>
               <button
                 data-tour="tests-run-all"
                 onClick={() => {
-                  if (isConnectionUnverified) return;
                   if (agentTests.length > maxRowsPerEval) {
                     showLimitToast(
                       `You can only run up to ${maxRowsPerEval} tests at a time.`,
@@ -1935,10 +1964,10 @@ export function TestsTabContent({
                   }
                   void launchTestRun(agentTests, true, "all");
                 }}
-                disabled={isConnectionUnverified || startingRun !== null}
+                disabled={startingRun !== null}
                 aria-busy={startingRun === "all"}
                 className={`h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border transition-colors flex items-center gap-2 bg-sky-500/12 border-sky-500/45 text-sky-950 dark:text-sky-100 disabled:opacity-50 ${
-                  isConnectionUnverified || startingRun !== null
+                  startingRun !== null
                     ? "cursor-not-allowed"
                     : "hover:bg-sky-500/22 dark:hover:bg-sky-500/18 cursor-pointer"
                 }`}
@@ -1963,11 +1992,6 @@ export function TestsTabContent({
                 <span className="hidden sm:inline">Run all tests</span>
                 <span className="sm:hidden">Run all</span>
               </button>
-              {isConnectionUnverified && (
-                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/runall:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
-                  Verify agent connection first
-                </div>
-              )}
             </div>
 
             {/* Compare models — amber tint, "analyse" semantic. */}
@@ -2224,10 +2248,9 @@ export function TestsTabContent({
                       setSelectedTestUuids(new Set());
                     }}
                   />
-                  <div className="relative group/runselected">
+                  <div>
                     <button
                       onClick={() => {
-                        if (isConnectionUnverified) return;
                         if (selectedTestUuids.size > maxRowsPerEval) {
                           showLimitToast(
                             `You can only run up to ${maxRowsPerEval} tests at a time.`,
@@ -2247,10 +2270,10 @@ export function TestsTabContent({
                           },
                         );
                       }}
-                      disabled={isConnectionUnverified || startingRun !== null}
+                      disabled={startingRun !== null}
                       aria-busy={startingRun === "bulk"}
                       className={`h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background transition-opacity flex items-center gap-1.5 disabled:opacity-50 ${
-                        isConnectionUnverified || startingRun !== null
+                        startingRun !== null
                           ? "cursor-not-allowed"
                           : "hover:opacity-90 cursor-pointer"
                       }`}
@@ -2274,11 +2297,6 @@ export function TestsTabContent({
                       )}
                       Run
                     </button>
-                    {isConnectionUnverified && (
-                      <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-lg shadow-lg opacity-0 group-hover/runselected:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
-                        Verify agent connection first
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -2747,6 +2765,28 @@ export function TestsTabContent({
               agentTests.filter((t) => uuids.has(t.uuid)),
             );
             setOpenTestRunId(taskId);
+          }}
+        />
+      )}
+
+      {/* Shown when a Run is clicked on an unverified connection agent. On a
+          passing check it flips the parent's verified state and starts the
+          held run; otherwise it offers a jump to the Connection settings. */}
+      {pendingRun && (
+        <VerifyConnectionDialog
+          isOpen
+          agentUuid={agentUuid}
+          agentName={agentName}
+          onClose={() => setPendingRun(null)}
+          onVerified={() => {
+            const p = pendingRun;
+            setPendingRun(null);
+            onConnectionVerified?.();
+            void startRunNow(p.tests, p.allLinked, p.runKey);
+          }}
+          onGoToConnectionSettings={() => {
+            setPendingRun(null);
+            onGoToConnectionSettings?.();
           }}
         />
       )}
