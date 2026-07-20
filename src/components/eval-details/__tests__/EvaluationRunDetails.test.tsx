@@ -83,7 +83,9 @@ const mockParetoCapture: { props: Record<string, unknown> | null } = {
 jest.mock("../../charts/ParetoFrontierChart", () => ({
   ParetoFrontierChart: (props: Record<string, unknown>) => {
     mockParetoCapture.props = props;
-    return <div data-testid="pareto-chart" />;
+    return (
+      <div data-testid="pareto-chart">{props.toolbar as React.ReactNode}</div>
+    );
   },
 }));
 
@@ -2335,7 +2337,7 @@ describe("STTEvaluationTopPicks", () => {
     expect(screen.getByTestId("pareto-chart")).toBeInTheDocument();
     const pareto = capturedPareto()!;
     expect(pareto.title).toBe("Quality vs cost vs latency tradeoff");
-    expect(pareto.passRateLabel).toBe("Accuracy (Semantic WER)");
+    expect(pareto.passRateLabel).toBe("Semantic WER");
     expect(pareto.points).toHaveLength(2);
     // Only one metric available → no picker.
     expect(screen.queryByLabelText("Plot quality by")).not.toBeInTheDocument();
@@ -2366,7 +2368,7 @@ describe("STTEvaluationTopPicks", () => {
     );
     // Two metrics → picker shown, defaulting to Semantic WER accuracy.
     const picker = screen.getByLabelText("Plot quality by");
-    expect(capturedPareto()!.passRateLabel).toBe("Accuracy (Semantic WER)");
+    expect(capturedPareto()!.passRateLabel).toBe("Semantic WER");
 
     await user.selectOptions(picker, "Correctness");
     expect(capturedPareto()!.passRateLabel).toBe("Correctness");

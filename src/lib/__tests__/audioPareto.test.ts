@@ -68,9 +68,8 @@ describe("sttQualityMetrics", () => {
       "wer",
       "judge:judge",
     ]);
-    // Dropdown label is the plain metric name; the axis label spells out accuracy.
+    // Both the dropdown option and the axis use the plain metric name.
     expect(metrics[0].label).toBe("Semantic WER");
-    expect(metrics[0].axisLabel).toBe("Accuracy (Semantic WER)");
     expect(metrics[2].label).toBe("Correctness");
   });
 
@@ -96,9 +95,8 @@ describe("sttQualityMetrics", () => {
     // LLM-WER is an error rate → accuracy.
     expect(byId["sarvam_llm_wer"].label).toBe("LLM-WER");
     expect(byId["sarvam_llm_wer"].score(sarvamRows[0])).toBeCloseTo(90);
-    // Intent Score is a 0–1 fraction → percentage, plain name on both labels.
+    // Intent Score is a 0–1 fraction → percentage.
     expect(byId["sarvam_intent_score"].label).toBe("Intent Score");
-    expect(byId["sarvam_intent_score"].axisLabel).toBe("Intent Score");
     expect(byId["sarvam_intent_score"].score(sarvamRows[0])).toBeCloseTo(90);
     expect(byId["sarvam_entity_score"].score(sarvamRows[1])).toBeCloseTo(60);
   });
@@ -146,7 +144,6 @@ describe("buildAudioParetoPoints", () => {
   const metric: AudioQualityMetric = {
     id: "semantic_wer",
     label: "Semantic WER",
-    axisLabel: "Accuracy (Semantic WER)",
     qualityNoun: "accuracy",
     qualityComparative: "how accurate it is",
     score: (row) => {

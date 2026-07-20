@@ -1001,38 +1001,40 @@ function TopPicksChart({
   const points = buildAudioParetoPoints(rows, getProviderLabel, selected, kind);
   return (
     <div className={className}>
-      {metrics.length > 1 && (
-        <div className="mb-3 flex items-center gap-2">
-          <label
-            htmlFor={`${filename}-metric`}
-            className="text-xs font-medium text-muted-foreground"
-          >
-            Plot quality by
-          </label>
-          <select
-            id={`${filename}-metric`}
-            value={selected.id}
-            onChange={(e) => setMetricId(e.target.value)}
-            className="rounded-md border border-border bg-background px-2 py-1 text-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent"
-          >
-            {metrics.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
       <ParetoFrontierChart
         points={points}
         colorMap={getColorMap(points.map((p) => p.model))}
         title="Quality vs cost vs latency tradeoff"
-        passRateLabel={selected.axisLabel}
+        passRateLabel={selected.label}
         qualityNoun={selected.qualityNoun}
         qualityComparative={selected.qualityComparative}
         entityNoun="provider"
         costAxisLabel={PARETO_COST_AXIS_LABEL}
         filename={filename}
+        toolbar={
+          metrics.length > 1 ? (
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor={`${filename}-metric`}
+                className="text-xs font-medium text-muted-foreground"
+              >
+                Plot quality by
+              </label>
+              <select
+                id={`${filename}-metric`}
+                value={selected.id}
+                onChange={(e) => setMetricId(e.target.value)}
+                className="rounded-md border border-border bg-background py-1 pl-2 pr-8 text-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent"
+              >
+                {metrics.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : undefined
+        }
       />
     </div>
   );

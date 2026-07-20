@@ -35,10 +35,8 @@ type EvaluatorColumnLike = {
 export type AudioQualityMetric = {
   /** Stable id for the picker + React key. */
   id: string;
-  /** Picker option text (the metric's plain name, matching the leaderboard). */
+  /** Picker option text and Y-axis label — the metric's plain name. */
   label: string;
-  /** Y-axis label — spells out that an error rate is plotted as accuracy. */
-  axisLabel: string;
   /** Quality noun for the chart caption ("accuracy" / "quality"). */
   qualityNoun: string;
   /** Comparative phrase for the caption ("how accurate it is" / "how well it scores"). */
@@ -96,7 +94,6 @@ function accuracyMetric(key: string, name: string): AudioQualityMetric {
   return {
     id: key,
     label: name,
-    axisLabel: `Accuracy (${name})`,
     qualityNoun: "accuracy",
     qualityComparative: "how accurate it is",
     score: (row) => {
@@ -111,7 +108,6 @@ function fractionMetric(key: string, name: string): AudioQualityMetric {
   return {
     id: key,
     label: name,
-    axisLabel: name,
     qualityNoun: "quality",
     qualityComparative: "how well it scores",
     score: (row) => {
@@ -126,7 +122,6 @@ function judgeMetric(col: EvaluatorColumnLike): AudioQualityMetric {
   return {
     id: `judge:${col.key}`,
     label: col.label,
-    axisLabel: col.label,
     qualityNoun: "quality",
     qualityComparative: "how well it scores",
     score: (row) => evaluatorScorePercent(row, col),

@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   ScatterChart,
   Scatter,
@@ -49,6 +56,8 @@ type ParetoFrontierChartProps = {
   qualityComparative?: string;
   /** X-axis title line. */
   costAxisLabel?: string;
+  /** Optional controls (e.g. a metric picker) shown below the description, above the plot. */
+  toolbar?: ReactNode;
 };
 
 // Bright solid green for the frontier line + best-value highlights — the hero
@@ -143,6 +152,7 @@ export function ParetoFrontierChart({
   qualityNoun = "quality",
   qualityComparative = "how many tests it passes",
   costAxisLabel = "Average cost (USD)",
+  toolbar,
 }: ParetoFrontierChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
   // Default to the best models only; toggling off reveals every model.
@@ -492,6 +502,7 @@ export function ParetoFrontierChart({
           </button>
         </div>
       </div>
+      {toolbar && <div className="mb-3">{toolbar}</div>}
       <div className="flex flex-col gap-4 md:flex-row">
         <div ref={chartRef} className="relative flex-1 min-w-0">
           {showSizeLegend && (
