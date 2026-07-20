@@ -66,7 +66,10 @@ const DEFAULT_CHART_WIDTH = 560;
 const EDGE_PAD = Math.ceil(R_MAX * HOVER_SCALE) + 8;
 const MARGIN = {
   top: EDGE_PAD,
-  right: EDGE_PAD + LABEL_GUTTER,
+  // A small right pad, not a full label gutter: only frontier dots are labeled
+  // and they cluster top-left, so a wide right margin was just empty space
+  // between the plot and the table beside it.
+  right: EDGE_PAD + 24,
   bottom: 44,
   left: 12 + Math.floor(LABEL_GUTTER / 2),
 };
@@ -130,7 +133,8 @@ export function ParetoFrontierChart({
   height = 460,
 }: ParetoFrontierChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
-  const [frontierOnly, setFrontierOnly] = useState(false);
+  // Default to the best models only; toggling off reveals every model.
+  const [frontierOnly, setFrontierOnly] = useState(true);
   const [hoveredModel, setHoveredModel] = useState<string | null>(null);
   const [chartWidth, setChartWidth] = useState(DEFAULT_CHART_WIDTH);
 
@@ -248,9 +252,16 @@ export function ParetoFrontierChart({
   const bestPassRate = Math.max(...prVals);
   const bestCost = Math.min(...allData.map((d) => d.cost));
   const bestLatency = latencies.length ? Math.min(...latencies) : null;
-  // Table rows: honour the toggle, best quality first.
+  // Table rows: honour the toggle. When every model is shown, the best
+  // (frontier) models come first as a group, then the rest — each block sorted
+  // by quality.
   const rankedRows = [...(showDominated ? allData : frontierData)].sort(
-    (a, b) => b.passRate - a.passRate,
+    (a, b) =>
+      a.onFrontier === b.onFrontier
+        ? b.passRate - a.passRate
+        : a.onFrontier
+          ? -1
+          : 1,
   );
 
   // Only FRONTIER points get an in-plot name label — lay those out (with side +
@@ -468,7 +479,7 @@ export function ParetoFrontierChart({
             </ScatterChart>
           </ResponsiveContainer>
         </div>
-        <div className="md:w-80 lg:w-96 flex-shrink-0">
+        <div className="md:w-80 lg:w-[26rem] flex-shrink-0">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
@@ -503,7 +514,7 @@ export function ParetoFrontierChart({
                           }}
                         />
                         <span
-                          className={`block max-w-[9rem] truncate ${
+                          className={`block max-w-[13rem] overflow-x-auto whitespace-nowrap pb-0.5 [scrollbar-width:thin] ${
                             d.onFrontier
                               ? "font-medium text-foreground"
                               : "text-muted-foreground"

@@ -86,7 +86,7 @@ describe("ParetoFrontierChart", () => {
     ).toBeInTheDocument();
   });
 
-  it("lists every model in the table with quality, cost and speed columns", () => {
+  it("shows the columns and, by default, only the best models", () => {
     renderChart(points);
     expect(
       screen.getByRole("columnheader", { name: "Model" }),
@@ -100,10 +100,9 @@ describe("ParetoFrontierChart", () => {
     expect(
       screen.getByRole("columnheader", { name: "Speed" }),
     ).toBeInTheDocument();
-    // Toggle is off by default, so dominated models show too.
-    for (const name of ["Cheap", "Mid", "Premium", "Worst"]) {
-      expect(screen.getAllByText(name).length).toBeGreaterThan(0);
-    }
+    // Best-only is on by default: frontier models show, dominated ones don't.
+    expect(screen.getAllByText("Premium").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Worst")).not.toBeInTheDocument();
   });
 
   it("highlights the best value in a column in green", () => {
@@ -113,16 +112,23 @@ describe("ParetoFrontierChart", () => {
     expect(bestQuality).toHaveClass("text-green-600");
   });
 
-  it("drops dominated models when 'Show the best models only' is on", async () => {
+  it("reveals every model, best first, when the toggle is turned off", async () => {
     const user = setupUser();
     renderChart(points);
-    expect(screen.getByText("Worst")).toBeInTheDocument();
+    // Hidden by default.
+    expect(screen.queryByText("Worst")).not.toBeInTheDocument();
+
     await user.click(
       screen.getByRole("button", { name: "Show the best models only" }),
     );
-    expect(screen.queryByText("Worst")).not.toBeInTheDocument();
-    // The best models are still listed (in-plot label + table row).
-    expect(screen.getAllByText("Premium").length).toBeGreaterThan(0);
+
+    // Dominated model now appears.
+    expect(screen.getByText("Worst")).toBeInTheDocument();
+    // Best (frontier) models come first: the top table row is the best-quality
+    // frontier model (Premium, 95%), not the dominated one.
+    const rows = screen.getAllByRole("row");
+    expect(rows[1]).toHaveTextContent("Premium");
+    expect(rows[rows.length - 1]).toHaveTextContent("Worst");
   });
 
   it("shows the empty state when no model has cost + pass rate", () => {
