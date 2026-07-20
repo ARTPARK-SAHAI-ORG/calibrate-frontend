@@ -83,6 +83,22 @@ describe("AppLayout", () => {
     expect(screen.getByText("Page content")).toBeInTheDocument();
   });
 
+  it("reveals the WhatsApp link when the sidebar Talk to us button is clicked", async () => {
+    const user = setupUser();
+    renderLayout();
+    expect(screen.queryByText("Join WhatsApp")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Talk to us" }));
+    expect(screen.getByText("Join WhatsApp").closest("a")).toHaveAttribute(
+      "target",
+      "_blank",
+    );
+  });
+
+  it("shows the Talk to us button in the collapsed rail", () => {
+    renderLayout({ sidebarOpen: false });
+    expect(screen.getByRole("button", { name: "Talk to us" })).toBeInTheDocument();
+  });
+
   it("renders custom header and header actions when provided", () => {
     renderLayout({
       customHeader: <div>Custom header</div>,
