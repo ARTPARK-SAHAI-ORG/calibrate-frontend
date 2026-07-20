@@ -149,6 +149,40 @@ describe("onboarding engine", () => {
     jest.useRealTimers();
   });
 
+  it("keeps the popover hidden while the next step sets up, then reveals it", async () => {
+    let resolvePrepare!: () => void;
+    const prepare = jest.fn(
+      () => new Promise<void>((r) => (resolvePrepare = r)),
+    );
+    (waitForElement as jest.Mock).mockResolvedValue(null);
+
+    await runTour({
+      id: "demo",
+      steps: [
+        { title: "One", description: "First" },
+        { title: "Two", description: "Second", prepare },
+      ],
+    });
+
+    // Advance into step two; its prepare is pending, so the card is hidden.
+    mockHighlight.mock.calls[0][0].popover.onNextClick();
+    await Promise.resolve();
+    expect(prepare).toHaveBeenCalled();
+
+    // A re-render during setup (e.g. driver refreshing while the app navigates)
+    // must NOT un-hide the stale card.
+    const midSetup = document.createElement("div");
+    capturedDriverConfig?.onPopoverRender?.({ wrapper: midSetup });
+    expect(midSetup.style.opacity).toBe("0");
+
+    // Once setup finishes the new card renders and is revealed.
+    resolvePrepare();
+    await new Promise((r) => setTimeout(r, 0));
+    const shown = document.createElement("div");
+    capturedDriverConfig?.onPopoverRender?.({ wrapper: shown });
+    expect(shown.style.opacity).toBe("1");
+  });
+
   it("injects a Skip tour button that ends the tour", async () => {
     await runTour({
       id: "demo",
