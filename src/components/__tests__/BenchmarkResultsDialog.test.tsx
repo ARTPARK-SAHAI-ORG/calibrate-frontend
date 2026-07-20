@@ -68,6 +68,18 @@ jest.mock("../eval-details", () => {
     BenchmarkCombinedLeaderboard: (props: any) => (
       <div data-testid="leaderboard">{props.filename}</div>
     ),
+    LLMEvaluationAbout: (props: any) => (
+      <div data-testid="about-panel">
+        {JSON.stringify({
+          showLatency: props.showLatency,
+          showCost: props.showCost,
+          showTokens: props.showTokens,
+          showToolCalls: props.showToolCalls,
+          evaluators: props.evaluators?.length ?? 0,
+        })}
+      </div>
+    ),
+    evaluatorColumnsToAbout: (cols: any) => cols ?? [],
   };
 });
 
@@ -401,6 +413,10 @@ describe("BenchmarkResultsDialog", () => {
         "{}",
       ),
     );
+
+    // The About tab renders and receives metric-presence flags from the plan.
+    await setupUser().click(screen.getByRole("button", { name: "About" }));
+    expect(screen.getByTestId("about-panel")).toBeInTheDocument();
   });
 
   it("sets error and calls reportError when the poll response carries a result-level error", async () => {
