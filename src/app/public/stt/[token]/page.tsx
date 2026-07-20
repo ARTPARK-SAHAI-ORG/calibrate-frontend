@@ -12,6 +12,7 @@ import {
   evaluatorColumnsFromRuns,
   evaluatorDescriptionMapFromRuns,
   hasSemanticWerMetric,
+  hasSarvamMetrics,
   hasTtfsMetric,
   ratingRange,
   type STTEvaluatorColumn,
@@ -321,6 +322,7 @@ export default function PublicSTTPage() {
                         ? "Pass / Fail"
                         : "-",
                 }))}
+                showSarvamMetrics={hasSarvamMetrics(data.provider_results)}
                 showSemanticWer={hasSemanticWerMetric(data.provider_results)}
                 showTtfs={hasTtfsMetric(data.provider_results)}
               />

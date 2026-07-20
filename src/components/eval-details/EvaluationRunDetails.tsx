@@ -211,6 +211,21 @@ export function hasSemanticWerMetric(
   return (providerResults ?? []).some((pr) => pr.metrics?.semantic_wer != null);
 }
 
+/** Whether any provider computed Sarvam LLM-judge metrics. Drives the STT
+ * About-tab rows and CSV columns on both the detail and public pages. */
+export function hasSarvamMetrics(
+  providerResults:
+    | Array<{ metrics?: Record<string, unknown> | null }>
+    | null
+    | undefined,
+): boolean {
+  return (providerResults ?? []).some(
+    (pr) =>
+      pr.metrics?.sarvam_llm_wer != null ||
+      pr.metrics?.sarvam_llm_cer != null,
+  );
+}
+
 // Sarvam's LLM-based ASR metrics (see the "Evaluating Indian Language ASR"
 // blog). Rendered on the STT About tab only when a run used Sarvam judges.
 // Each metric name links out to the blog in a new tab. LLM-WER / LLM-CER are

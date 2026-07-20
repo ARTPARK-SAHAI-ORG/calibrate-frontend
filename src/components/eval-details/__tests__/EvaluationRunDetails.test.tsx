@@ -8,6 +8,7 @@ import {
   hasSTTEmptyPredictions,
   getFirstSTTEmptyPredictionIndex,
   hasSemanticWerMetric,
+  hasSarvamMetrics,
   hasTtfsMetric,
   STTEvaluationAbout,
   TTSEvaluationAbout,
@@ -381,6 +382,37 @@ describe("hasSemanticWerMetric", () => {
     expect(hasSemanticWerMetric(undefined)).toBe(false);
     expect(hasSemanticWerMetric([])).toBe(false);
     expect(hasSemanticWerMetric([{ metrics: null }])).toBe(false);
+  });
+});
+
+describe("hasSarvamMetrics", () => {
+  it("returns true when any provider carries sarvam_llm_wer", () => {
+    expect(
+      hasSarvamMetrics([{ metrics: { wer: 0.1, sarvam_llm_wer: 0.02 } }]),
+    ).toBe(true);
+  });
+
+  it("returns true when any provider carries sarvam_llm_cer", () => {
+    expect(
+      hasSarvamMetrics([{ metrics: { sarvam_llm_cer: 0.01 } }]),
+    ).toBe(true);
+  });
+
+  it("treats a zero value as present", () => {
+    expect(hasSarvamMetrics([{ metrics: { sarvam_llm_wer: 0 } }])).toBe(true);
+  });
+
+  it("returns false when no provider carries Sarvam metrics", () => {
+    expect(
+      hasSarvamMetrics([{ metrics: { wer: 0.1, cer: 0.05, semantic_wer: 0.02 } }]),
+    ).toBe(false);
+  });
+
+  it("returns false for null/undefined/empty input", () => {
+    expect(hasSarvamMetrics(null)).toBe(false);
+    expect(hasSarvamMetrics(undefined)).toBe(false);
+    expect(hasSarvamMetrics([])).toBe(false);
+    expect(hasSarvamMetrics([{ metrics: null }])).toBe(false);
   });
 });
 
