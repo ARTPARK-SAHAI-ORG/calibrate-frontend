@@ -123,7 +123,7 @@ describe("ParetoFrontierChart", () => {
     expect(bestQuality).toHaveClass("text-green-600");
   });
 
-  it("reveals every model, best first, when the toggle is turned off", async () => {
+  it("reveals every model when the toggle is turned off, in strict quality order", async () => {
     const user = setupUser();
     renderChart(points);
     // Hidden by default.
@@ -133,13 +133,41 @@ describe("ParetoFrontierChart", () => {
       screen.getByRole("button", { name: "Show the best models only" }),
     );
 
-    // Dominated model now appears.
+    // Dominated model now appears. Default sort is quality, highest first, and
+    // it is followed strictly (no best-models-first grouping): the highest
+    // pass rate (Premium, 95%) is the top row, the lowest (Worst, 60%) the last.
     expect(screen.getByText("Worst")).toBeInTheDocument();
-    // Best (frontier) models come first: the top table row is the best-quality
-    // frontier model (Premium, 95%), not the dominated one.
     const rows = screen.getAllByRole("row");
     expect(rows[1]).toHaveTextContent("Premium");
     expect(rows[rows.length - 1]).toHaveTextContent("Worst");
+  });
+
+  it("follows the sort strictly, without grouping the best models first", async () => {
+    const user = setupUser();
+    // A is a best model only because it is the cheapest and fastest, yet its
+    // quality (60%) is below the dominated model C (88%).
+    const pts: ParetoModelPoint[] = [
+      { model: "a", label: "A", cost: 0.001, passRate: 60, latency: 300 },
+      { model: "b", label: "B", cost: 0.05, passRate: 99, latency: 2000 },
+      { model: "c", label: "C", cost: 0.06, passRate: 88, latency: 2500 },
+    ];
+    render(
+      <ParetoFrontierChart
+        points={pts}
+        colorMap={getColorMap(pts.map((p) => p.model))}
+      />,
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Show the best models only" }),
+    );
+
+    // Quality, highest first, strictly: B (99), then the dominated C (88), then
+    // the best-but-lower-quality A (60). C outranks A because the sort is not
+    // grouped by best-first.
+    const rows = screen.getAllByRole("row");
+    expect(rows[1]).toHaveTextContent("B");
+    expect(rows[2]).toHaveTextContent("C");
+    expect(rows[3]).toHaveTextContent("A");
   });
 
   it("sorts the table by a column when its header is clicked", async () => {

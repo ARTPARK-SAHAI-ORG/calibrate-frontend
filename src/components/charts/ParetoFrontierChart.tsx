@@ -137,11 +137,11 @@ export function ParetoFrontierChart({
   const [frontierOnly, setFrontierOnly] = useState(true);
   const [hoveredModel, setHoveredModel] = useState<string | null>(null);
   const [chartWidth, setChartWidth] = useState(DEFAULT_CHART_WIDTH);
-  // Which column the table is sorted by. null = the default frontier-first order.
+  // Which column the table is sorted by. Defaults to quality, highest first.
   const [sort, setSort] = useState<{
     key: "quality" | "cost" | "speed";
     dir: "asc" | "desc";
-  } | null>(null);
+  }>({ key: "quality", dir: "desc" });
 
   const { allData, frontierData, dominatedData, hasLatency } = useMemo(() => {
     const valid = points.filter(isValidParetoPoint);
@@ -257,9 +257,8 @@ export function ParetoFrontierChart({
   const bestPassRate = Math.max(...prVals);
   const bestCost = Math.min(...allData.map((d) => d.cost));
   const bestLatency = latencies.length ? Math.min(...latencies) : null;
-  // Table rows honour the toggle (all vs. best only). By default the best
-  // (frontier) models come first as a group, each block by quality; clicking a
-  // column header sorts every row by that dimension instead.
+  // Table rows honour the toggle (all vs. best only) and follow the active sort
+  // strictly — every visible row in the sorted order, no special grouping.
   const sortValue = (d: ChartDatum, key: "quality" | "cost" | "speed") => {
     if (key === "quality") return d.passRate;
     if (key === "cost") return d.cost;
@@ -269,13 +268,6 @@ export function ParetoFrontierChart({
   };
   const rankedRows = [...(showDominated ? allData : frontierData)].sort(
     (a, b) => {
-      if (!sort) {
-        return a.onFrontier === b.onFrontier
-          ? b.passRate - a.passRate
-          : a.onFrontier
-            ? -1
-            : 1;
-      }
       const diff = sortValue(a, sort.key) - sortValue(b, sort.key);
       return sort.dir === "asc" ? diff : -diff;
     },
@@ -284,17 +276,13 @@ export function ParetoFrontierChart({
   // Click a column header to sort by it; higher quality / lower cost / faster
   // speed come first, and a second click flips the direction.
   const toggleSort = (key: "quality" | "cost" | "speed") =>
-    setSort((prev) => {
-      // The default (no explicit sort) already reads as Quality, highest first.
-      const cur = prev ?? { key: "quality" as const, dir: "desc" as const };
-      return cur.key === key
-        ? { key, dir: cur.dir === "asc" ? "desc" : "asc" }
-        : { key, dir: key === "quality" ? "desc" : "asc" };
-    });
-  // The default order (sort === null) reads as Quality, highest first, so show
-  // the Quality arrow on open even before the user clicks a header.
-  const activeSortKey = sort?.key ?? "quality";
-  const activeSortDir = sort?.dir ?? "desc";
+    setSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: key === "quality" ? "desc" : "asc" },
+    );
+  const activeSortKey = sort.key;
+  const activeSortDir = sort.dir;
   const sortHeader = (
     label: string,
     key: "quality" | "cost" | "speed",
