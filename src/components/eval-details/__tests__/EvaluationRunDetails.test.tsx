@@ -641,7 +641,7 @@ describe("STTEvaluationAbout", () => {
       screen.getByTestId("about-metrics-table").textContent ?? "",
     ).map((m: { key?: string }) => m.key);
     expect(keys).toContain("cost_usd");
-    expect(screen.getByText(/Cost is an estimate from bundled/)).toBeInTheDocument();
+    expect(screen.getByText(/\* Cost is an estimate/)).toBeInTheDocument();
     // USD provider → no FX-conversion line.
     expect(screen.queryByText(/converted from/i)).not.toBeInTheDocument();
   });
@@ -665,11 +665,11 @@ describe("STTEvaluationAbout", () => {
         ]}
       />,
     );
-    // General caveat appears once even though two providers have cost.
-    expect(screen.getAllByText(/Cost is an estimate from bundled/)).toHaveLength(1);
+    // General caveat lead point appears once even though two providers have cost.
+    expect(screen.getAllByText(/\* Cost is an estimate/)).toHaveLength(1);
     expect(
       screen.getByText(
-        /Total cost converted from INR at a live mid-market rate \(₹96.35 = \$1 as of Jul 15, 2026\)/,
+        /Converted from INR at a live mid-market rate \(₹96.35 = \$1 as of Jul 15, 2026\)/,
       ),
     ).toBeInTheDocument();
   });
@@ -703,7 +703,7 @@ describe("TTSEvaluationAbout", () => {
     expect(metrics[1]).toEqual(TTFB_ABOUT_METRIC);
   });
 
-  it("appends the cost row after TTFB and shows the audio-billed caveat for minute-billed TTS", () => {
+  it("appends the cost row after TTFB and shows the estimate footnote", () => {
     render(
       <TTSEvaluationAbout
         evaluatorRows={[binaryRow]}
@@ -725,8 +725,7 @@ describe("TTSEvaluationAbout", () => {
     );
     expect(metrics[1]).toEqual(TTFB_ABOUT_METRIC);
     expect(metrics[2]).toMatchObject({ key: "cost_usd" });
-    expect(screen.getByText(/Cost is an estimate from bundled/)).toBeInTheDocument();
-    expect(screen.getByText(/Audio-billed models/)).toBeInTheDocument();
+    expect(screen.getByText(/\* Cost is an estimate/)).toBeInTheDocument();
   });
 
   it("omits the cost row when no provider computed a cost", () => {

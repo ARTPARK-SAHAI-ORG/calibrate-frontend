@@ -237,8 +237,7 @@ export function hasSarvamMetrics(
 ): boolean {
   return (providerResults ?? []).some(
     (pr) =>
-      pr.metrics?.sarvam_llm_wer != null ||
-      pr.metrics?.sarvam_llm_cer != null,
+      pr.metrics?.sarvam_llm_wer != null || pr.metrics?.sarvam_llm_cer != null,
   );
 }
 
@@ -381,9 +380,7 @@ export function evaluatorColumnHasData(
         const aggregate = (run as { aggregate?: { mean?: unknown } | null })
           .aggregate;
         return (
-          metricKey === col.key &&
-          aggregate != null &&
-          aggregate.mean != null
+          metricKey === col.key && aggregate != null && aggregate.mean != null
         );
       });
     })
@@ -538,25 +535,26 @@ const costChartConfig: ChartConfig = {
   formatTooltip: (v: number) => formatMoney(v, "USD"),
 };
 
-
 // Total run cost, explained on the STT/TTS About tab. Rendered only when a run
 // computed a cost; the applicable estimate caveats show as prose below the table.
 const COST_ABOUT_METRIC: MetricDescription = {
   key: "cost_usd",
-  metric: COST_USD_LABEL,
+  metric: `${COST_USD_LABEL}*`,
   description:
-    "Estimated total cost to run this dataset through the provider, converted to US dollars so providers on different billing units and currencies can be compared. The provider's Outputs card shows the native per-unit price.",
+    "Estimated total cost (USD) to run this dataset through the provider.",
   preference: "Lower is better",
   range: "0 - ∞",
 };
 
-/** Renders the applicable cost caveats as stacked muted lines (or nothing). */
-function CostCaveatLines({ lines }: { lines: string[] }) {
+/** The cost caveats as a footnote: a single * marker, one point per line. */
+function CostCaveatFootnote({ lines }: { lines: string[] }) {
   if (lines.length === 0) return null;
   return (
-    <div className="space-y-1 text-[13px] text-muted-foreground">
+    <div className="text-[12px] text-muted-foreground space-y-0.5">
       {lines.map((line, i) => (
-        <p key={i}>{line}</p>
+        <p key={i} className={i === 0 ? "" : "pl-3"}>
+          {i === 0 ? `* ${line}` : line}
+        </p>
       ))}
     </div>
   );
@@ -667,10 +665,7 @@ export function STTEvaluationAbout({
   /** Run date (created_at) — dates the FX-conversion caveat. */
   runDate?: string | null;
 }) {
-  const costCaveatLines = aggregateCostCaveats(providerResults, {
-    component: "stt",
-    runDate,
-  });
+  const costCaveatLines = aggregateCostCaveats(providerResults, { runDate });
   const showCost = costCaveatLines.length > 0;
   return (
     <div className="space-y-4 md:space-y-6">
@@ -685,7 +680,7 @@ export function STTEvaluationAbout({
           ...evaluatorRowsToMetricDescriptions(evaluatorRows),
         ]}
       />
-      <CostCaveatLines lines={costCaveatLines} />
+      <CostCaveatFootnote lines={costCaveatLines} />
     </div>
   );
 }
@@ -701,10 +696,7 @@ export function TTSEvaluationAbout({
   /** Run date (created_at) — dates the FX-conversion caveat. */
   runDate?: string | null;
 }) {
-  const costCaveatLines = aggregateCostCaveats(providerResults, {
-    component: "tts",
-    runDate,
-  });
+  const costCaveatLines = aggregateCostCaveats(providerResults, { runDate });
   const showCost = costCaveatLines.length > 0;
   return (
     <div className="space-y-4 md:space-y-6">
@@ -715,7 +707,7 @@ export function TTSEvaluationAbout({
           ...(showCost ? [COST_ABOUT_METRIC] : []),
         ]}
       />
-      <CostCaveatLines lines={costCaveatLines} />
+      <CostCaveatFootnote lines={costCaveatLines} />
     </div>
   );
 }
@@ -767,7 +759,10 @@ export function STTEvaluationLeaderboard({
     ...(showSemanticWer
       ? [{ title: "Semantic WER", dataKey: "semantic_wer" }]
       : []),
-    ...sarvamFields.map((field) => ({ title: field.label, dataKey: field.key })),
+    ...sarvamFields.map((field) => ({
+      title: field.label,
+      dataKey: field.key,
+    })),
     ...evaluatorChartConfigs(visibleEvaluatorColumnsForLeaderboard),
     ...(showTtfs ? [ttfsChartConfig] : []),
     ...(showCost ? [costChartConfig] : []),
@@ -784,7 +779,10 @@ export function STTEvaluationLeaderboard({
         ...(showSemanticWer
           ? [{ key: "semantic_wer", header: "Semantic WER" }]
           : []),
-        ...sarvamFields.map((field) => ({ key: field.key, header: field.label })),
+        ...sarvamFields.map((field) => ({
+          key: field.key,
+          header: field.label,
+        })),
         ...evaluatorLeaderboardColumns(visibleEvaluatorColumnsForLeaderboard),
         ...(showTtfs ? [ttfsLeaderboardColumn] : []),
         ...(showCost ? [costLeaderboardColumn] : []),
@@ -827,7 +825,10 @@ export function TTSEvaluationLeaderboard({
 
   // Join total USD cost (comparable) onto each row for the cost column/chart;
   // the per-unit / native price stays on the per-provider card.
-  const { rows, showCost } = withTotalCostUsd(leaderboardSummary, providerResults);
+  const { rows, showCost } = withTotalCostUsd(
+    leaderboardSummary,
+    providerResults,
+  );
 
   const allCharts: ChartConfig[] = [
     ...evaluatorChartConfigs(evaluatorColumns),
@@ -992,7 +993,12 @@ export function STTEvaluationOutputs({
                         providerResult.metrics?.[field.key],
                       );
                       return value != null
-                        ? [{ label: field.label, value: parseFloat(value.toFixed(4)) }]
+                        ? [
+                            {
+                              label: field.label,
+                              value: parseFloat(value.toFixed(4)),
+                            },
+                          ]
                         : [];
                     }),
                     // TTFS tile — shown only when the run measured it.
@@ -1016,7 +1022,10 @@ export function STTEvaluationOutputs({
                     // so e.g. a "Semantic match" tile is hidden when it didn't
                     // run rather than rendering "-".
                     ...evaluatorColumns.flatMap((col) => {
-                      const mean = readProviderEvaluatorMean(col, providerResult);
+                      const mean = readProviderEvaluatorMean(
+                        col,
+                        providerResult,
+                      );
                       return mean != null
                         ? [
                             {

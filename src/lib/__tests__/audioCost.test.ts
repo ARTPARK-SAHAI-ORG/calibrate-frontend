@@ -8,8 +8,7 @@ import {
   formatCaveatDate,
   costCaveats,
   aggregateCostCaveats,
-  GENERAL_COST_CAVEAT,
-  TTS_AUDIO_BILLED_CAVEAT,
+  COST_CAVEAT_POINTS,
 } from "../audioCost";
 
 // Sample payloads mirroring the six backend shapes.
@@ -153,100 +152,72 @@ describe("formatCaveatDate", () => {
 });
 
 describe("costCaveats", () => {
-  it("always leads with the general estimate caveat when cost is present", () => {
-    const lines = costCaveats({ cost: sttMinuteUsd }, { component: "stt" });
-    expect(lines[0]).toBe(GENERAL_COST_CAVEAT);
-    expect(lines).toHaveLength(1);
-  });
-
-  it("adds the audio-billed note for minute-billed TTS only", () => {
-    const ttsMinute = costCaveats(
-      { cost: { billing_unit: "minute", currency: "USD", cost_usd: 0.045 } },
-      { component: "tts" },
-    );
-    expect(ttsMinute).toContain(TTS_AUDIO_BILLED_CAVEAT);
-
-    // Character-billed TTS and any STT don't get the audio-billed note.
-    expect(costCaveats({ cost: ttsCharUsd }, { component: "tts" })).not.toContain(
-      TTS_AUDIO_BILLED_CAVEAT,
-    );
-    expect(
-      costCaveats({ cost: sttMinuteUsd }, { component: "stt" }),
-    ).not.toContain(TTS_AUDIO_BILLED_CAVEAT);
+  it("leads with the general estimate points when cost is present", () => {
+    const lines = costCaveats({ cost: sttMinuteUsd });
+    expect(lines).toEqual(COST_CAVEAT_POINTS);
+    expect(lines[0]).toMatch(/^Cost is an estimate/);
   });
 
   it("adds the FX-conversion caveat (rate + run date) for a non-USD provider", () => {
     const lines = costCaveats(
       { cost: sttMinuteInr },
-      { component: "stt", runDate: "2026-07-15 10:00:00" },
+      { runDate: "2026-07-15 10:00:00" },
     );
     expect(lines).toContain(
-      "Total cost converted from INR at a live mid-market rate (₹96.35 = $1 as of Jul 15, 2026); a real payment also incurs FX margin and GST.",
+      "Converted from INR at a live mid-market rate (₹96.35 = $1 as of Jul 15, 2026); a real payment adds FX margin and GST.",
     );
   });
 
   it("omits the date in the FX caveat when the run date is unavailable", () => {
-    const lines = costCaveats({ cost: ttsCharInr }, { component: "tts" });
+    const lines = costCaveats({ cost: ttsCharInr });
     expect(lines).toContain(
-      "Total cost converted from INR at a live mid-market rate (₹96.35 = $1); a real payment also incurs FX margin and GST.",
+      "Converted from INR at a live mid-market rate (₹96.35 = $1); a real payment adds FX margin and GST.",
     );
-    // Character-billed → no audio-billed note; general + FX only.
-    expect(lines).toHaveLength(2);
+    // General points plus the one FX line.
+    expect(lines).toHaveLength(COST_CAVEAT_POINTS.length + 1);
   });
 
   it("has no FX caveat for USD providers", () => {
-    const lines = costCaveats({ cost: ttsCharUsd }, { component: "tts" });
-    expect(lines).toEqual([GENERAL_COST_CAVEAT]);
+    const lines = costCaveats({ cost: ttsCharUsd });
+    expect(lines).toEqual(COST_CAVEAT_POINTS);
   });
 
   it("falls back to a generic FX phrase when the rate is missing", () => {
-    const lines = costCaveats(
-      { cost: { billing_unit: "minute", currency: "INR", cost_usd: 0.01 } },
-      { component: "stt" },
-    );
-    expect(lines[1]).toBe(
-      "Total cost converted from INR at a live mid-market rate (INR to USD); a real payment also incurs FX margin and GST.",
+    const lines = costCaveats({
+      cost: { billing_unit: "minute", currency: "INR", cost_usd: 0.01 },
+    });
+    expect(lines[lines.length - 1]).toBe(
+      "Converted from INR at a live mid-market rate (INR to USD); a real payment adds FX margin and GST.",
     );
   });
 
   it("returns [] when there is no cost", () => {
-    expect(costCaveats({ wer: 0.1 }, { component: "stt" })).toEqual([]);
+    expect(costCaveats({ wer: 0.1 })).toEqual([]);
   });
 });
 
 describe("aggregateCostCaveats", () => {
   it("returns [] when no provider has a cost", () => {
     expect(
-      aggregateCostCaveats(
-        [{ metrics: { wer: 0.1 } }, { metrics: null }],
-        { component: "stt" },
-      ),
+      aggregateCostCaveats([{ metrics: { wer: 0.1 } }, { metrics: null }]),
     ).toEqual([]);
   });
 
-  it("shows the general estimate line once across many costed providers", () => {
-    const lines = aggregateCostCaveats(
-      [
-        { metrics: { cost: { currency: "USD", cost_usd: 0.01 } } },
-        { metrics: { cost: { currency: "USD", cost_usd: 0.02 } } },
-      ],
-      { component: "stt" },
-    );
-    expect(lines).toEqual([GENERAL_COST_CAVEAT]);
+  it("shows the general estimate points once across many costed providers", () => {
+    const lines = aggregateCostCaveats([
+      { metrics: { cost: { currency: "USD", cost_usd: 0.01 } } },
+      { metrics: { cost: { currency: "USD", cost_usd: 0.02 } } },
+    ]);
+    expect(lines).toEqual(COST_CAVEAT_POINTS);
   });
 
-  it("adds the audio-billed and FX lines only when some provider needs them", () => {
+  it("adds the FX line once when some provider needs it, without duplicating the points", () => {
     const lines = aggregateCostCaveats(
       [
-        {
-          metrics: {
-            cost: { billing_unit: "minute", currency: "USD", cost_usd: 0.045 },
-          },
-        },
+        { metrics: { cost: { currency: "USD", cost_usd: 0.045 } } },
         {
           metrics: {
             cost: {
-              billing_unit: "character",
               currency: "INR",
               conversion_rate: 96.35,
               cost_usd: 0.01,
@@ -254,19 +225,18 @@ describe("aggregateCostCaveats", () => {
           },
         },
       ],
-      { component: "tts", runDate: "2026-07-15 10:00:00" },
+      { runDate: "2026-07-15 10:00:00" },
     );
-    expect(lines[0]).toBe(GENERAL_COST_CAVEAT);
-    expect(lines).toContain(TTS_AUDIO_BILLED_CAVEAT);
+    expect(lines.slice(0, COST_CAVEAT_POINTS.length)).toEqual(COST_CAVEAT_POINTS);
     expect(lines).toContain(
-      "Total cost converted from INR at a live mid-market rate (₹96.35 = $1 as of Jul 15, 2026); a real payment also incurs FX margin and GST.",
+      "Converted from INR at a live mid-market rate (₹96.35 = $1 as of Jul 15, 2026); a real payment adds FX margin and GST.",
     );
-    // No duplicate general line.
-    expect(lines.filter((l) => l === GENERAL_COST_CAVEAT)).toHaveLength(1);
+    // General points appear once, not once per provider.
+    expect(lines.filter((l) => l === COST_CAVEAT_POINTS[0])).toHaveLength(1);
   });
 
   it("tolerates null/undefined provider lists", () => {
-    expect(aggregateCostCaveats(null, { component: "stt" })).toEqual([]);
-    expect(aggregateCostCaveats(undefined, { component: "tts" })).toEqual([]);
+    expect(aggregateCostCaveats(null)).toEqual([]);
+    expect(aggregateCostCaveats(undefined)).toEqual([]);
   });
 });

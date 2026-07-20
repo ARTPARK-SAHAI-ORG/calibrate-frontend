@@ -144,33 +144,32 @@ export function formatCaveatDate(dateString?: string | null): string | null {
 }
 
 export type CostCaveatContext = {
-  /** Which evaluation this cost is for — decides the audio-billed TTS caveat. */
-  component: "stt" | "tts";
   /** Run date (created_at) — dates the FX conversion for non-USD providers. */
   runDate?: string | null;
 };
 
-/** Applies to every estimated cost — rates are bundled, tier/variant-limited. */
-export const GENERAL_COST_CAVEAT =
-  "Cost is an estimate from bundled provider rates (captured mid-2026) at each provider's standard pay-as-you-go tier and a single model variant. Per-request minimums, rounding, taxes, and volume or committed-use discounts are not modeled, so many short requests read low.";
+/** When the bundled provider rates were captured. Bump when rates are refreshed. */
+export const RATES_CAPTURED_DATE = "20 Jul 2026";
 
-/** Applies to minute-billed TTS (audio-token models estimated from audio length). */
-export const TTS_AUDIO_BILLED_CAVEAT =
-  "Audio-billed models (e.g. OpenAI, Gemini) are approximated as measured audio length × per-minute rate, so the same text can cost differently across providers.";
+/** The estimate caveats, one short point per line, shown as a cost footnote. */
+export const COST_CAVEAT_POINTS = [
+  "Cost is an estimate. Your actual bill may differ as it includes per-request minimums, rounding, taxes, and discounts.",
+  `Pricing per provider as of ${RATES_CAPTURED_DATE} assumes their standard pay-as-you-go pricing plan.`,
+  "Short requests can read low.",
+];
 
 /**
- * The caveats to surface wherever this provider's cost is shown. Always includes
- * the general estimate caveat; adds the audio-billed-TTS note for minute-billed
- * TTS and the FX-conversion note (rate + run date) for non-USD providers. Empty
- * when the run computed no cost.
+ * The caveats to surface wherever this provider's cost is shown: the general
+ * estimate points, plus the FX-conversion note (rate + run date) for non-USD
+ * providers. Empty when the run computed no cost.
  */
-export function costCaveats(source: unknown, ctx: CostCaveatContext): string[] {
+export function costCaveats(
+  source: unknown,
+  ctx: CostCaveatContext = {},
+): string[] {
   const cost = readCost(source);
   if (!cost) return [];
-  const lines: string[] = [GENERAL_COST_CAVEAT];
-  if (ctx.component === "tts" && cost.billing_unit === "minute") {
-    lines.push(TTS_AUDIO_BILLED_CAVEAT);
-  }
+  const lines = [...COST_CAVEAT_POINTS];
   const currency = (cost.currency ?? "USD").toUpperCase();
   if (currency !== "USD") {
     const rate = coerceNumber(cost.conversion_rate);
@@ -182,7 +181,7 @@ export function costCaveats(source: unknown, ctx: CostCaveatContext): string[] {
     const date = formatCaveatDate(ctx.runDate);
     const asOf = date ? ` as of ${date}` : "";
     lines.push(
-      `Total cost converted from ${currency} at a live mid-market rate (${ratePart}${asOf}); a real payment also incurs FX margin and GST.`,
+      `Sarvam converts from ${currency} at a live mid-market rate (${ratePart}${asOf}).`,
     );
   }
   return lines;
@@ -190,16 +189,16 @@ export function costCaveats(source: unknown, ctx: CostCaveatContext): string[] {
 
 /**
  * Every cost caveat that applies across a run's providers, deduped and in first-
- * seen order. Combines each provider's `costCaveats` so the About tab shows the
- * general estimate line once, plus the audio-billed / FX-conversion lines only
- * when some provider needs them. Empty when no provider computed a cost.
+ * seen order. Combines each provider's `costCaveats` so the general points show
+ * once, plus the FX-conversion line only when some provider needs it. Empty when
+ * no provider computed a cost.
  */
 export function aggregateCostCaveats(
   providerResults:
     | Array<{ metrics?: Record<string, unknown> | null }>
     | null
     | undefined,
-  ctx: CostCaveatContext,
+  ctx: CostCaveatContext = {},
 ): string[] {
   const seen = new Set<string>();
   const lines: string[] = [];
