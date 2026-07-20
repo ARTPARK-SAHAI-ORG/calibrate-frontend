@@ -62,6 +62,12 @@ type ActiveTour = {
 
 let active: ActiveTour | null = null;
 
+// Whether the popover is currently meant to be hidden (a step is setting up).
+// `onPopoverRender` reads this so a re-render during the hidden window (driver
+// refreshes on scroll/resize while the app navigates) keeps the stale card
+// hidden instead of un-hiding it — otherwise it dangles over the loading page.
+let popoverHidden = false;
+
 export function isTourActive(): boolean {
   return active !== null;
 }
@@ -74,10 +80,18 @@ export function isTourActive(): boolean {
  * "waiting" card (e.g. a run in progress) must stay visible while it waits.
  */
 function setPopoverHidden(hidden: boolean): void {
+  popoverHidden = hidden;
   document.querySelectorAll<HTMLElement>(".driver-popover").forEach((el) => {
     el.style.transition = "none";
     el.style.opacity = hidden ? "0" : "1";
     el.style.pointerEvents = hidden ? "none" : "auto";
+  });
+  // Hide the highlight cutout with the card. Its bright hole sits at the PREVIOUS
+  // anchor, so during setup it would dangle over whatever opens (e.g. the new
+  // test dialog) until the next step re-cuts it. Toggle visibility, not opacity,
+  // so we never overwrite driver's own overlay opacity (the dimming level).
+  document.querySelectorAll<HTMLElement>(".driver-overlay").forEach((el) => {
+    el.style.visibility = hidden ? "hidden" : "visible";
   });
 }
 
@@ -133,12 +147,21 @@ export async function runTour(tour: Tour): Promise<void> {
         overlays.forEach((el, i) => {
           if (i < overlays.length - 1) el.remove();
         });
-        // The new card is now positioned — reveal it (it was hidden during the
-        // step's setup so the previous card did not dangle).
+        // Reveal the card only when we are not mid-setup. During a step's
+        // prepare/anchor wait we keep it hidden; driver re-renders on scroll/
+        // resize while the app navigates, and un-hiding here would make the
+        // stale card dangle over the loading page.
         const el = wrapper as HTMLElement;
-        el.style.opacity = "1";
-        el.style.pointerEvents = "auto";
+        const show = !popoverHidden;
+        el.style.opacity = show ? "1" : "0";
+        el.style.pointerEvents = show ? "auto" : "none";
       }
+      // Keep the highlight cutout in sync with the card on every re-render, so a
+      // refresh during setup (driver refreshes on scroll/resize while a dialog
+      // opens) cannot bring the stale cutout back over the new surface.
+      document.querySelectorAll<HTMLElement>(".driver-overlay").forEach((el) => {
+        el.style.visibility = popoverHidden ? "hidden" : "visible";
+      });
       // A visible "Skip tour" affordance so the guide can be ended any time,
       // placed just left of the advance button. Ensure the footer + nav group
       // exist even on auto-advance cards (which render no next/prev buttons), so
@@ -233,6 +256,9 @@ async function showStep(): Promise<void> {
     },
   };
 
+  // The new card is set up and about to render — allow onPopoverRender to
+  // reveal it (and keep it revealed across any later re-render this step).
+  popoverHidden = false;
   driverObj.highlight({ element: element ?? undefined, popover });
 
   // If the anchored element later disappears (e.g. the user closes the dialog it
@@ -272,6 +298,13 @@ async function advance(): Promise<void> {
   if (!active) return;
   clearAnchorWatch();
   const step = active.tour.steps[active.index];
+
+  // Hide the card and highlight the moment the user acts, before running the
+  // action. A slow action (one that opens a dialog or navigates, then keeps
+  // clicking, waiting, or fetching) changes the screen well before the next
+  // step's showStep runs, so hiding only there would leave the old highlight
+  // lingering over the changed content. Hiding now closes that gap.
+  setPopoverHidden(true);
 
   if (step.action) {
     try {
