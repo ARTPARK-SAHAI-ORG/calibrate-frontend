@@ -41,9 +41,25 @@ export type AudioQualityMetric = {
   qualityNoun: string;
   /** Comparative phrase for the caption ("how accurate it is" / "how well it scores"). */
   qualityComparative: string;
-  /** Row → 0–100 score (higher is better), or null when the row lacks it. */
+  /**
+   * Row → 0–100 score (higher is better), for positioning and ranking. For an
+   * error rate this is accuracy (1 − rate), so the frontier still treats a lower
+   * error as better.
+   */
   score: (row: Row) => number | null;
+  /**
+   * "raw" shows the underlying number to the user (an error rate) via `rawValue`;
+   * "percent" shows the score itself. Ranking always uses `score`.
+   */
+  display: "percent" | "raw";
+  /** The raw value to show when display is "raw" (e.g. the error rate itself). */
+  rawValue?: (row: Row) => number | null;
 };
+
+/** Show an error rate as a plain number (trims trailing zeros: 0.05, not 0.050). */
+export function formatErrorRate(v: number): string {
+  return String(parseFloat(v.toFixed(3)));
+}
 
 function toFiniteNumber(v: unknown): number | null {
   const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
@@ -89,13 +105,18 @@ function isPlottable(rows: Row[], score: (row: Row) => number | null): boolean {
   );
 }
 
-/** An error rate (lower better) plotted as accuracy (1 − rate), higher better. */
+/**
+ * An error rate: ranked by accuracy (1 − rate, higher better) so the frontier is
+ * correct, but shown to the user as the raw rate.
+ */
 function accuracyMetric(key: string, name: string): AudioQualityMetric {
   return {
     id: key,
     label: name,
     qualityNoun: "accuracy",
     qualityComparative: "how accurate it is",
+    display: "raw",
+    rawValue: (row) => toFiniteNumber(row[key]),
     score: (row) => {
       const rate = toFiniteNumber(row[key]);
       return rate == null ? null : clampPercent((1 - rate) * 100);
@@ -103,13 +124,14 @@ function accuracyMetric(key: string, name: string): AudioQualityMetric {
   };
 }
 
-/** A 0–1 fraction score (higher better) plotted as a percentage. */
+/** A 0–1 fraction score (higher better) shown as a percentage. */
 function fractionMetric(key: string, name: string): AudioQualityMetric {
   return {
     id: key,
     label: name,
     qualityNoun: "quality",
     qualityComparative: "how well it scores",
+    display: "percent",
     score: (row) => {
       const v = toFiniteNumber(row[key]);
       return v == null ? null : clampPercent(v * 100);
@@ -124,6 +146,7 @@ function judgeMetric(col: EvaluatorColumnLike): AudioQualityMetric {
     label: col.label,
     qualityNoun: "quality",
     qualityComparative: "how well it scores",
+    display: "percent",
     score: (row) => evaluatorScorePercent(row, col),
   };
 }
@@ -179,6 +202,7 @@ export function buildAudioParetoPoints(
     cost: readTotalCostUsd(row) ?? NaN,
     passRate: metric.score(row) ?? NaN,
     latency: latencyOf(row),
+    qualityDisplay: metric.rawValue?.(row) ?? undefined,
   }));
 }
 

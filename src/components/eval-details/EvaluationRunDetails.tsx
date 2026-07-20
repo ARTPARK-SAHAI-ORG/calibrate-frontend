@@ -39,6 +39,7 @@ import {
   sttQualityMetrics,
   ttsQualityMetrics,
   buildAudioParetoPoints,
+  formatErrorRate,
   type AudioQualityMetric,
 } from "@/lib/audioPareto";
 import { ParetoFrontierChart } from "@/components/charts/ParetoFrontierChart";
@@ -1010,6 +1011,9 @@ function TopPicksChart({
         qualityComparative={selected.qualityComparative}
         entityNoun="provider"
         costAxisLabel={PARETO_COST_AXIS_LABEL}
+        formatQuality={
+          selected.display === "raw" ? formatErrorRate : undefined
+        }
         filename={filename}
         toolbar={
           metrics.length > 1 ? (

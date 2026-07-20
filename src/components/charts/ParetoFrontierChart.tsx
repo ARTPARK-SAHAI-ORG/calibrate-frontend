@@ -34,10 +34,16 @@ export type ParetoModelPoint = {
   label: string;
   /** Cost objective (USD, per test) — X axis, lower is better. */
   cost: number;
-  /** Pass-rate objective (0–100) — Y axis, higher is better. */
+  /** Pass-rate objective (0–100) — Y axis, higher is better. Used for position and ranking. */
   passRate: number;
   /** Latency (ms) — bubble size AND third frontier objective (lower is better). Optional. */
   latency?: number;
+  /**
+   * Raw value to SHOW the user instead of `passRate`, when they differ. Used for
+   * STT error rates: the point is positioned/ranked by accuracy (`passRate`), but
+   * the tooltip/table show the raw error rate. `formatQuality` renders it.
+   */
+  qualityDisplay?: number;
 };
 
 type ParetoFrontierChartProps = {
@@ -56,6 +62,13 @@ type ParetoFrontierChartProps = {
   qualityComparative?: string;
   /** X-axis title line. */
   costAxisLabel?: string;
+  /**
+   * When set, quality is shown as a raw number instead of a percentage: this
+   * formats a raw value for the Y-axis ticks, tooltip and table. Points still
+   * sit and rank by `passRate` (accuracy); a tick's raw value is derived as
+   * `1 − passRate/100`. Omit for the default percentage display.
+   */
+  formatQuality?: (rawValue: number) => string;
   /** Optional controls (e.g. a metric picker) shown below the description, above the plot. */
   toolbar?: ReactNode;
 };
@@ -93,14 +106,27 @@ const MARGIN = {
 
 type ChartDatum = ParetoModelPoint & { onFrontier: boolean };
 
+// The quality value shown to the user. Default is the pass rate as a percentage;
+// when `formatQuality` is set (STT error rates) it shows the raw value instead,
+// taken from the point's `qualityDisplay` or derived from the accuracy position.
+function qualityText(
+  d: Pick<ChartDatum, "passRate" | "qualityDisplay">,
+  formatQuality?: (rawValue: number) => string,
+): string {
+  if (!formatQuality) return formatPercent(d.passRate);
+  return formatQuality(d.qualityDisplay ?? (100 - d.passRate) / 100);
+}
+
 function ParetoTooltip({
   active,
   payload,
   passRateLabel,
+  formatQuality,
 }: {
   active?: boolean;
   payload?: Array<{ payload: ChartDatum }>;
   passRateLabel: string;
+  formatQuality?: (rawValue: number) => string;
 }) {
   if (!active || !payload || payload.length === 0) return null;
   const d = payload[0].payload;
@@ -115,7 +141,8 @@ function ParetoTooltip({
         )}
       </div>
       <div className="text-muted-foreground">
-        {passRateLabel}: <span className="text-foreground">{formatPercent(d.passRate)}</span>
+        {passRateLabel}:{" "}
+        <span className="text-foreground">{qualityText(d, formatQuality)}</span>
       </div>
       <div className="text-muted-foreground">
         Cost: <span className="text-foreground">{formatCostUsd(d.cost)}</span>
@@ -152,6 +179,7 @@ export function ParetoFrontierChart({
   qualityNoun = "quality",
   qualityComparative = "how many tests it passes",
   costAxisLabel = "Average cost (USD)",
+  formatQuality,
   toolbar,
 }: ParetoFrontierChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
@@ -570,9 +598,13 @@ export function ParetoFrontierChart({
                 name={passRateLabel}
                 domain={yDomain}
                 tick={{ fontSize: 12 }}
-                tickFormatter={(v) => `${v}%`}
+                tickFormatter={
+                  formatQuality
+                    ? (v) => formatQuality((100 - v) / 100)
+                    : (v) => `${v}%`
+                }
                 label={{
-                  value: `${passRateLabel} (%)`,
+                  value: formatQuality ? passRateLabel : `${passRateLabel} (%)`,
                   angle: -90,
                   position: "insideLeft",
                   style: { fontSize: 12, fill: "currentColor", textAnchor: "middle" },
@@ -580,7 +612,12 @@ export function ParetoFrontierChart({
               />
               <Tooltip
                 cursor={{ strokeDasharray: "3 3" }}
-                content={<ParetoTooltip passRateLabel={passRateLabel} />}
+                content={
+                  <ParetoTooltip
+                    passRateLabel={passRateLabel}
+                    formatQuality={formatQuality}
+                  />
+                }
               />
               {/* Frontier points, connected by the bright solid green hero line in
                   cost order — but only when there are 2+ of them. */}
@@ -659,7 +696,7 @@ export function ParetoFrontierChart({
                           : "text-foreground"
                       }`}
                     >
-                      {formatPercent(d.passRate)}
+                      {qualityText(d, formatQuality)}
                     </td>
                     <td
                       className={`py-1 text-right tabular-nums whitespace-nowrap ${

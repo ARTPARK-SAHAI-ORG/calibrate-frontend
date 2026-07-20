@@ -4,8 +4,18 @@ import {
   ttsQualityMetrics,
   buildAudioParetoPoints,
   countValidParetoPoints,
+  formatErrorRate,
   type AudioQualityMetric,
 } from "../audioPareto";
+
+describe("formatErrorRate", () => {
+  it("shows a plain number and trims trailing zeros", () => {
+    expect(formatErrorRate(0.05)).toBe("0.05");
+    expect(formatErrorRate(0.283)).toBe("0.283");
+    expect(formatErrorRate(0)).toBe("0");
+    expect(formatErrorRate(1.5)).toBe("1.5");
+  });
+});
 
 const label = (run: string) => `Provider ${run}`;
 
@@ -71,6 +81,23 @@ describe("sttQualityMetrics", () => {
     // Both the dropdown option and the axis use the plain metric name.
     expect(metrics[0].label).toBe("Semantic WER");
     expect(metrics[2].label).toBe("Correctness");
+  });
+
+  it("ranks error rates by accuracy but shows the raw rate", () => {
+    const [semantic] = sttQualityMetrics(rows, []);
+    // Ranking value is accuracy (higher is better)...
+    expect(semantic.score(rows[0])).toBeCloseTo(98);
+    // ...but the user-facing value is the raw error rate.
+    expect(semantic.display).toBe("raw");
+    expect(semantic.rawValue!(rows[0])).toBeCloseTo(0.02);
+  });
+
+  it("shows judges as a percentage, not a raw value", () => {
+    const judge = sttQualityMetrics(rows, [judgeCol]).find(
+      (m) => m.id === "judge:judge",
+    )!;
+    expect(judge.display).toBe("percent");
+    expect(judge.rawValue).toBeUndefined();
   });
 
   it("includes Sarvam metrics: LLM-WER/LLM-CER as accuracy, Intent/Entity as scores", () => {
@@ -146,6 +173,9 @@ describe("buildAudioParetoPoints", () => {
     label: "Semantic WER",
     qualityNoun: "accuracy",
     qualityComparative: "how accurate it is",
+    display: "raw",
+    rawValue: (row) =>
+      typeof row.semantic_wer === "number" ? row.semantic_wer : null,
     score: (row) => {
       const v = row.semantic_wer;
       return typeof v === "number" ? (1 - v) * 100 : null;
@@ -169,6 +199,8 @@ describe("buildAudioParetoPoints", () => {
       latency: 400,
     });
     expect(points[0].passRate).toBeCloseTo(98);
+    // The raw error rate rides along for display (position/rank stays accuracy).
+    expect(points[0].qualityDisplay).toBeCloseTo(0.02);
     expect(points[1]).toMatchObject({ cost: 0.002, latency: undefined });
   });
 

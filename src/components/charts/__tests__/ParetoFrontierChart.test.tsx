@@ -199,6 +199,25 @@ describe("ParetoFrontierChart", () => {
     expect(rows[1]).toHaveTextContent("Worst");
   });
 
+  it("shows raw quality values (not percentages) when formatQuality is set", () => {
+    // passRate is accuracy (position/rank); qualityDisplay is the raw error rate.
+    const errPoints: ParetoModelPoint[] = [
+      { model: "a", label: "Best", cost: 0.005, passRate: 98, latency: 400, qualityDisplay: 0.02 },
+      { model: "b", label: "Worse", cost: 0.002, passRate: 80, latency: 900, qualityDisplay: 0.2 },
+    ];
+    render(
+      <ParetoFrontierChart
+        points={errPoints}
+        colorMap={getColorMap(errPoints.map((p) => p.model))}
+        passRateLabel="Semantic WER"
+        formatQuality={(v) => String(v)}
+      />,
+    );
+    // Best model shows its raw rate 0.02, not "98%".
+    expect(screen.getByText("0.02")).toBeInTheDocument();
+    expect(screen.queryByText("98%")).not.toBeInTheDocument();
+  });
+
   it("shows the empty state when no model has cost + pass rate", () => {
     renderChart([{ model: "x", label: "X", cost: NaN, passRate: NaN }]);
     expect(
