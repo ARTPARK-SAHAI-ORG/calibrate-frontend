@@ -156,6 +156,52 @@ test.describe("Run -> results (authenticated, fake-AI backend)", () => {
     await deleteAgent(page, agentName);
   });
 
+  // Regression: rerun from the /tests Runs tab must swap the URL to the NEW
+  // run and show it, not snap back to the old one. The bug was the ?runId
+  // effect firing on the runs-list update while router.replace hadn't yet
+  // updated the URL, so it re-opened the stale run.
+  test("rerun from the /tests Runs tab opens the new run", async ({ page }) => {
+    const agentName = `E2E Rerun Agent ${Date.now()}`;
+    const testName = `E2E Rerun Test ${Date.now()}`;
+
+    await createBuildAgent(page, agentName);
+    await createNextReplyTestOnAgent(page, testName);
+
+    // Seed one completed run from the Tests tab, then close the dialog.
+    await page.getByRole("button", { name: /Run all/ }).click();
+    await expect(
+      page.getByRole("button", { name: "Summary", exact: true }),
+    ).toBeVisible({ timeout: 30000 });
+    await page.keyboard.press("Escape");
+
+    // Open that run from the /tests Runs tab. Clicking a run row sets ?runId=.
+    await page.goto("/tests?tab=runs");
+    await waitForOrgReady(page);
+    const runRow = page
+      .locator("tr, div.grid")
+      .filter({ hasText: agentName })
+      .first();
+    await expect(runRow).toBeVisible({ timeout: 15000 });
+    await runRow.click();
+    await expect(
+      page.getByRole("button", { name: "Summary", exact: true }),
+    ).toBeVisible({ timeout: 30000 });
+
+    await expect(page).toHaveURL(/runId=/, { timeout: 15000 });
+    const firstRunId = new URL(page.url()).searchParams.get("runId");
+
+    // Rerun. The URL's runId must change to the freshly created run.
+    await page.getByRole("button", { name: "Rerun" }).click();
+    await expect(async () => {
+      const current = new URL(page.url()).searchParams.get("runId");
+      expect(current).toBeTruthy();
+      expect(current).not.toBe(firstRunId);
+    }).toPass({ timeout: 15000 });
+
+    await page.keyboard.press("Escape");
+    await deleteAgent(page, agentName);
+  });
+
   test("benchmarks an agent across models and shows a leaderboard", async ({
     page,
   }) => {

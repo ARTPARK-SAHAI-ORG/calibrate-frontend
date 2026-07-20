@@ -490,6 +490,12 @@ function LLMPageInner() {
   useEffect(() => {
     const runId = searchParams.get("runId");
     if (activeTab !== "runs" && !runId) return;
+    // A run dialog is already open (opened directly via handleRunClick or
+    // openRun). This effect only drives the open-from-URL-on-load case; if we
+    // let it run while a dialog is open, a list refetch under a URL that has
+    // not caught up yet (e.g. right after a rerun, when `openRun`'s
+    // router.replace hasn't propagated) would re-open the stale run.
+    if (openTestRun || (selectedRun && viewingRunBenchmark)) return;
     if (lastHandledRunIdRef.current === runId) return;
     if (!runId) {
       // URL no longer references a run — record that and bail. The dialog
