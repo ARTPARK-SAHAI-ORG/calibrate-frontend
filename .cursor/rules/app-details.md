@@ -1020,6 +1020,21 @@ Don't introduce new pill colors here; reuse the per-type Tailwind classes alread
 
 ---
 
+### 11. Traces (`/traces`)
+
+Production agent turns ingested from the customer's backend via `POST /traces` (API-key authed — the backend endpoint, not this UI). The Traces tab (sidebar "Production" group) is a **read + curate** surface: there is no ingest form. Files: `src/app/traces/{page,layout}.tsx`, `src/components/traces/{TracesTable,TraceDetailDialog,TracesEmptyState}.tsx`, `src/lib/tracesApi.ts`, and the `useTraces`/`useTraceCount`/`useMaxTraces`/`useTraceDeletion` hooks.
+
+- **Server-side pagination (the deliberate exception).** Every other list page fetches the whole list and filters client-side; traces are machine-written and can far outgrow that, so `useTraces` drives `limit`/`offset`/`q`/`conversation_id` on `GET /traces` and holds only one page. `q` (debounced 300ms) and the conversation filter round-trip to the backend. Do not convert this to the fetch-everything pattern. `GET /traces` returns the standard `Paginated<T>` envelope of slim `TraceSummary` rows (previews + `turn_count`/`tool_call_count`/`metadata_count`, no bodies).
+- **List** (`TracesTable`): desktop table / mobile cards. Each row shows the `message_id` + last-user-message preview, the response preview (or "Tool calls only" for tool-call-only turns), a conversation pill (click → filter to that `conversation_id`), turn/tool counts, and created date. Rows open the detail dialog.
+- **Detail** (`TraceDetailDialog`): fetches its own full trace (`fetchTrace`) so the list stays slim. Renders the conversation history as role bubbles (OpenAI-format tool calls on history turns shown as `name(args)`), the agent output highlighted (the reply plus any `output.tool_calls` in the flat `{tool, arguments}` shape), and the metadata key/value table.
+- **Usage indicator**: `count / max_traces` under the page title — `useTraceCount` (a filter-independent `limit=1` probe reading the envelope `total`) over `useMaxTraces` (`GET /org-limits/me/max-traces`, `DEFAULT_MAX_TRACES` fallback). Makes the backend's 429 storage cap visible before it's hit.
+- **Delete**: single (row trash icon) and bulk (select checkboxes → "Delete selected (N)") both go through `POST /traces/bulk-delete` with `trace_ids` (via `useTraceDeletion` over the shared `useBulkDeletion`); there is no per-trace DELETE. When a search/conversation filter is active, a **"Delete all N matching"** button uses the backend `select_all` contract to remove every match across pages, not just the loaded ones (`bulkDeleteMatchingTraces`). Deletes are soft; they free workspace capacity and the `(org, message_id)` idempotency key.
+- **Deep-links**: `?conversation_id=` (filter, with a clearable chip) and `?traceId=` (open detail, via `useDialogUrlParam`) so a filtered view or an open trace survives reload and is shareable.
+- **Empty state** (`TracesEmptyState`): feature blurb + copy-paste `curl` ingest snippet against the resolved backend URL, linking to `/workspace-settings` for the API key.
+- **Not yet built (Phase 3)**: converting a curated trace into a Test (to reuse the existing eval + human-alignment flows). Traces currently only inspect and delete.
+
+---
+
 ## Key Concepts Explained
 
 ### Voice Agent Pipeline
@@ -3360,6 +3375,7 @@ All endpoints are relative to `NEXT_PUBLIC_BACKEND_URL`:
 | STT Evaluation  | `POST /stt/evaluate`, `GET /stt/evaluate/{uuid}`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | TTS Evaluation  | `POST /tts/evaluate`, `GET /tts/evaluate/{uuid}`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Jobs            | `GET /jobs` (optional `job_type` query param: `stt` or `tts`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Traces          | `GET /traces?limit=&offset=&q=&conversation_id=` (paginated `TraceSummary` envelope, server-side filtering), `GET /traces/{uuid}` (full detail), `POST /traces/bulk-delete` (`{ trace_ids }` or `{ select_all, q?, conversation_id? }`), `GET /org-limits/me/max-traces`. Ingestion (`POST /traces`) is backend/API-key only, not called from this UI                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Presigned URLs  | `POST /presigned-url`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 ### Jobs API Response Structure
@@ -4550,7 +4566,10 @@ This pattern ensures textareas grow with content on: typing, pasting, and initia
    - Metrics
    - Simulations
 
-4. **Resources**
+4. **Production**
+   - Traces (route: `/traces`) - production agent turns ingested via the backend `POST /traces`; a read + curate surface, categorically separate from the authored Unit/End-to-End tests above
+
+5. **Resources**
    - Documentation (external link to `process.env.NEXT_PUBLIC_DOCS_URL`, opens in new tab with external link icon indicator)
 
 ### External Links in Sidebar
