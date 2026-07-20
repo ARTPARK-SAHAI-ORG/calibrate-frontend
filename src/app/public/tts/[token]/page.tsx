@@ -187,7 +187,6 @@ export default function PublicTTSPage() {
   const showTopPicks = hasTtsTopPicks(
     data.leaderboard_summary ?? [],
     evaluatorColumns,
-    getProviderLabel,
     data.provider_results,
   );
 

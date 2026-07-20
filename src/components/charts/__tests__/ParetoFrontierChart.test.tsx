@@ -81,7 +81,7 @@ describe("ParetoFrontierChart", () => {
     renderChart(points);
     // points span 400 ms (fastest) to 2000 ms = 2 s (slowest).
     const legend = screen.getByTestId("pareto-size-legend");
-    expect(within(legend).getByText("Reply speed")).toBeInTheDocument();
+    expect(within(legend).getByText("Latency")).toBeInTheDocument();
     expect(within(legend).getByText("400 ms")).toBeInTheDocument();
     expect(within(legend).getByText("2 s")).toBeInTheDocument();
   });

@@ -2317,13 +2317,14 @@ function capturedPareto():
 }
 
 describe("STTEvaluationTopPicks", () => {
-  it("renders the Pareto chart when 2+ providers have cost and accuracy", () => {
+  it("renders the chart, defaulting the quality axis to accuracy from Semantic WER", () => {
     render(
       <STTEvaluationTopPicks
         leaderboardSummary={[
-          { run: "openai", wer: 0.1, semantic_wer: 0.05 },
-          { run: "deepgram", wer: 0.2, semantic_wer: 0.15 },
+          { run: "openai", semantic_wer: 0.05 },
+          { run: "deepgram", semantic_wer: 0.15 },
         ]}
+        evaluatorColumns={[]}
         getProviderLabel={getProviderLabel}
         providerResults={[
           { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
@@ -2334,14 +2335,48 @@ describe("STTEvaluationTopPicks", () => {
     expect(screen.getByTestId("pareto-chart")).toBeInTheDocument();
     const pareto = capturedPareto()!;
     expect(pareto.title).toBe("Quality vs cost vs latency tradeoff");
-    expect(pareto.passRateLabel).toBe("Accuracy");
+    expect(pareto.passRateLabel).toBe("Accuracy (Semantic WER)");
     expect(pareto.points).toHaveLength(2);
+    // Only one metric available → no picker.
+    expect(screen.queryByLabelText("Plot quality by")).not.toBeInTheDocument();
+  });
+
+  it("lets the user switch the quality metric to an LLM judge", async () => {
+    const user = setupUser();
+    render(
+      <STTEvaluationTopPicks
+        leaderboardSummary={[
+          { run: "openai", semantic_wer: 0.05, judge_score: 0.9 },
+          { run: "deepgram", semantic_wer: 0.15, judge_score: 0.7 },
+        ]}
+        evaluatorColumns={[
+          {
+            key: "judge",
+            label: "Correctness",
+            outputType: "binary",
+            scoreField: "judge_score",
+          },
+        ]}
+        getProviderLabel={getProviderLabel}
+        providerResults={[
+          { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
+          { provider: "deepgram", metrics: { cost: { cost_usd: 0.002 } } },
+        ]}
+      />,
+    );
+    // Two metrics → picker shown, defaulting to Semantic WER accuracy.
+    const picker = screen.getByLabelText("Plot quality by");
+    expect(capturedPareto()!.passRateLabel).toBe("Accuracy (Semantic WER)");
+
+    await user.selectOptions(picker, "Correctness");
+    expect(capturedPareto()!.passRateLabel).toBe("Correctness");
   });
 
   it("renders nothing with only one provider", () => {
     const { container } = render(
       <STTEvaluationTopPicks
-        leaderboardSummary={[{ run: "openai", wer: 0.1, semantic_wer: 0.05 }]}
+        leaderboardSummary={[{ run: "openai", semantic_wer: 0.05 }]}
+        evaluatorColumns={[]}
         getProviderLabel={getProviderLabel}
         providerResults={[
           { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
@@ -2356,9 +2391,10 @@ describe("STTEvaluationTopPicks", () => {
     const { container } = render(
       <STTEvaluationTopPicks
         leaderboardSummary={[
-          { run: "openai", wer: 0.1 },
-          { run: "deepgram", wer: 0.2 },
+          { run: "openai", semantic_wer: 0.05 },
+          { run: "deepgram", semantic_wer: 0.15 },
         ]}
+        evaluatorColumns={[]}
         getProviderLabel={getProviderLabel}
         providerResults={[
           { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
@@ -2378,7 +2414,7 @@ describe("hasSttTopPicks", () => {
           { run: "openai", semantic_wer: 0.05 },
           { run: "deepgram", semantic_wer: 0.15 },
         ],
-        getProviderLabel,
+        [],
         [
           { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
           { provider: "deepgram", metrics: { cost: { cost_usd: 0.002 } } },
@@ -2389,7 +2425,7 @@ describe("hasSttTopPicks", () => {
 
   it("is false with a single provider", () => {
     expect(
-      hasSttTopPicks([{ run: "openai", semantic_wer: 0.05 }], getProviderLabel, [
+      hasSttTopPicks([{ run: "openai", semantic_wer: 0.05 }], [], [
         { provider: "openai", metrics: { cost: { cost_usd: 0.004 } } },
       ]),
     ).toBe(false);
@@ -2402,7 +2438,7 @@ describe("hasSttTopPicks", () => {
           { run: "openai", semantic_wer: 0.05 },
           { run: "deepgram", semantic_wer: 0.15 },
         ],
-        getProviderLabel,
+        [],
         [{ provider: "openai", metrics: { cost: { cost_usd: 0.004 } } }],
       ),
     ).toBe(false);
@@ -2410,7 +2446,7 @@ describe("hasSttTopPicks", () => {
 });
 
 describe("TTSEvaluationTopPicks", () => {
-  it("renders the Pareto chart using the primary evaluator for quality", () => {
+  it("renders the chart, defaulting the quality axis to the first judge", () => {
     render(
       <TTSEvaluationTopPicks
         leaderboardSummary={[
@@ -2428,6 +2464,30 @@ describe("TTSEvaluationTopPicks", () => {
     expect(pareto.title).toBe("Quality vs cost vs latency tradeoff");
     expect(pareto.passRateLabel).toBe("Naturalness");
     expect(pareto.points).toHaveLength(2);
+    // Single judge → no picker.
+    expect(screen.queryByLabelText("Plot quality by")).not.toBeInTheDocument();
+  });
+
+  it("lets the user switch between judges when there is more than one", async () => {
+    const user = setupUser();
+    render(
+      <TTSEvaluationTopPicks
+        leaderboardSummary={[
+          { run: "eleven", nat: 0.9, clar: 0.8, cost_usd: 0.01 },
+          { run: "azure", nat: 0.7, clar: 0.6, cost_usd: 0.006 },
+        ]}
+        evaluatorColumns={[
+          { key: "nat", label: "Naturalness", outputType: "binary", scoreField: "nat" },
+          { key: "clar", label: "Clarity", outputType: "binary", scoreField: "clar" },
+        ]}
+        getProviderLabel={getProviderLabel}
+      />,
+    );
+    const picker = screen.getByLabelText("Plot quality by");
+    expect(capturedPareto()!.passRateLabel).toBe("Naturalness");
+
+    await user.selectOptions(picker, "Clarity");
+    expect(capturedPareto()!.passRateLabel).toBe("Clarity");
   });
 
   it("renders nothing when there is no evaluator to score quality", () => {
@@ -2446,7 +2506,7 @@ describe("TTSEvaluationTopPicks", () => {
 });
 
 describe("hasTtsTopPicks", () => {
-  it("is true with 2+ providers that have cost and a primary evaluator score", () => {
+  it("is true with 2+ providers that have cost and a judge score", () => {
     expect(
       hasTtsTopPicks(
         [
@@ -2456,7 +2516,6 @@ describe("hasTtsTopPicks", () => {
         [
           { key: "nat", label: "Naturalness", outputType: "binary", scoreField: "nat" },
         ],
-        getProviderLabel,
       ),
     ).toBe(true);
   });
@@ -2469,7 +2528,6 @@ describe("hasTtsTopPicks", () => {
           { run: "azure", cost_usd: 0.006 },
         ],
         [],
-        getProviderLabel,
       ),
     ).toBe(false);
   });

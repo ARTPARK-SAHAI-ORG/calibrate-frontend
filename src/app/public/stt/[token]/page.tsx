@@ -208,7 +208,7 @@ export default function PublicSTTPage() {
 
   const showTopPicks = hasSttTopPicks(
     data.leaderboard_summary ?? [],
-    getProviderLabel,
+    evaluatorColumns,
     data.provider_results,
   );
 
@@ -322,6 +322,7 @@ export default function PublicSTTPage() {
             {activeTab === "top-picks" && data.leaderboard_summary && (
               <STTEvaluationTopPicks
                 leaderboardSummary={data.leaderboard_summary}
+                evaluatorColumns={evaluatorColumns}
                 getProviderLabel={getProviderLabel}
                 providerResults={data.provider_results}
               />

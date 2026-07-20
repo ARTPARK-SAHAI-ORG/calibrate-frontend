@@ -500,7 +500,7 @@ export function ParetoFrontierChart({
               className="pointer-events-none absolute bottom-12 right-3 z-10 flex items-end gap-3 rounded-lg border border-border bg-background/85 px-2.5 py-1.5 backdrop-blur-sm"
             >
               <span className="max-w-[3.5rem] self-center text-[10px] font-medium leading-tight text-muted-foreground">
-                Reply speed
+                Latency
               </span>
               {[
                 { latency: zMin, caption: "fastest" },

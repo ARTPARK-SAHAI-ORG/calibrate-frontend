@@ -635,7 +635,6 @@ export default function TTSEvaluationDetailPage() {
     hasTtsTopPicks(
       evaluationResult?.leaderboard_summary ?? [],
       evaluatorColumns,
-      getProviderLabel,
       evaluationResult?.provider_results,
     );
   const displayedActiveTab =

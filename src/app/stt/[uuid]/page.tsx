@@ -704,7 +704,7 @@ export default function STTEvaluationDetailPage() {
     canShowLeaderboard &&
     hasSttTopPicks(
       evaluationResult?.leaderboard_summary ?? [],
-      getProviderLabel,
+      evaluatorColumns,
       evaluationResult?.provider_results,
     );
   const displayedActiveTab =
@@ -1061,6 +1061,7 @@ export default function STTEvaluationDetailPage() {
                         leaderboardSummary={
                           evaluationResult.leaderboard_summary
                         }
+                        evaluatorColumns={evaluatorColumns}
                         getProviderLabel={getProviderLabel}
                         providerResults={evaluationResult.provider_results}
                       />
