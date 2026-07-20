@@ -726,6 +726,18 @@ export function AgentDetail({
     backendAccessToken,
   ]);
 
+  // Cmd+S / Ctrl+S saves the agent, same as the header Save button.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "s" || !(e.metaKey || e.ctrlKey) || e.altKey) return;
+      e.preventDefault();
+      if (isSavingRef.current) return;
+      saveRef.current();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   // Auto-save the benchmarking toggle every time it changes, regardless of
   // verification state. Toggling `supports_benchmark` doesn't change the
   // connection identity (URL + headers), so there's no risk of persisting a
