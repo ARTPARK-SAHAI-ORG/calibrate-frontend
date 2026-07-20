@@ -382,9 +382,23 @@ describe("deriveEvaluatorColumns", () => {
   });
 
   describe("(3) legacy single-evaluator fallback", () => {
-    it("returns a single llm_judge column with defaults when nothing else matches", () => {
+    it("returns an empty list when nothing else matches and no legacy scores exist", () => {
       const result = deriveEvaluatorColumns({
         providerResults: [{}],
+        aboutEvaluators: [],
+        reservedMetricKeys: new Set(),
+        singleJudgeFallback: { defaultLabel: "LLM Judge" },
+      });
+      expect(result).toEqual([]);
+    });
+
+    it("returns a single llm_judge column when rows carry legacy scores", () => {
+      const result = deriveEvaluatorColumns({
+        providerResults: [
+          {
+            results: [{ llm_judge_score: "true" }],
+          },
+        ],
         aboutEvaluators: [],
         reservedMetricKeys: new Set(),
         singleJudgeFallback: { defaultLabel: "LLM Judge" },
@@ -400,15 +414,14 @@ describe("deriveEvaluatorColumns", () => {
       ]);
     });
 
-    it("returns the fallback when providerResults is empty", () => {
+    it("returns an empty list when providerResults is empty", () => {
       const result = deriveEvaluatorColumns({
         providerResults: [],
         aboutEvaluators: [],
         reservedMetricKeys: new Set(),
         singleJudgeFallback: { defaultLabel: "LLM Judge" },
       });
-      expect(result).toHaveLength(1);
-      expect(result[0].key).toBe("llm_judge");
+      expect(result).toEqual([]);
     });
 
     it("resolves the label and outputType from aboutEvaluators via defaultEvaluatorUuid", () => {
@@ -416,7 +429,11 @@ describe("deriveEvaluatorColumns", () => {
         { uuid: "u1", name: "Custom Judge", outputType: "rating" },
       ];
       const result = deriveEvaluatorColumns({
-        providerResults: [{}],
+        providerResults: [
+          {
+            results: [{ llm_judge_score: "4" }],
+          },
+        ],
         aboutEvaluators,
         reservedMetricKeys: new Set(),
         singleJudgeFallback: {
@@ -430,7 +447,7 @@ describe("deriveEvaluatorColumns", () => {
 
     it("falls back to defaultOutputType when no matching evaluator is found", () => {
       const result = deriveEvaluatorColumns({
-        providerResults: [{}],
+        providerResults: [{ results: [{ llm_judge_score: "true" }] }],
         aboutEvaluators: [],
         reservedMetricKeys: new Set(),
         singleJudgeFallback: {
@@ -445,7 +462,7 @@ describe("deriveEvaluatorColumns", () => {
 
     it("uses custom key/scoreField/reasoningField overrides when provided", () => {
       const result = deriveEvaluatorColumns({
-        providerResults: [{}],
+        providerResults: [{ results: [{ custom_score: "true" }] }],
         aboutEvaluators: [],
         reservedMetricKeys: new Set(),
         singleJudgeFallback: {
@@ -469,7 +486,7 @@ describe("deriveEvaluatorColumns", () => {
         { uuid: "u1", name: "Custom Judge" },
       ];
       const result = deriveEvaluatorColumns({
-        providerResults: [{}],
+        providerResults: [{ results: [{ llm_judge_score: "true" }] }],
         aboutEvaluators,
         reservedMetricKeys: new Set(),
         singleJudgeFallback: { defaultLabel: "LLM Judge" },

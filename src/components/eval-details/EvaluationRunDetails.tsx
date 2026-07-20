@@ -24,6 +24,10 @@ import {
   SARVAM_ASR_BLOG_URL,
 } from "@/constants/links";
 import { SARVAM_METRIC_FIELDS } from "./sarvamMetrics";
+import {
+  readEvaluatorCell,
+  type EvaluatorColumnLike,
+} from "./EvaluatorScoreCell";
 
 type EvaluationStatus = "queued" | "in_progress" | "done" | "failed";
 type EvaluatorOutputType = "binary" | "rating";
@@ -337,6 +341,66 @@ export function hasTtfsMetric(
   );
 }
 
+export type EvaluatorColumnsVisibilityInput = {
+  leaderboardSummary?: Array<Record<string, unknown>> | null;
+  providerResults?: Array<Record<string, unknown>> | null;
+};
+
+/** Whether a run actually carries values for an evaluator column — used to
+ * drop phantom defaults (e.g. the public page's legacy llm_judge fallback)
+ * and all-"-" columns from About tabs, exports, etc. */
+export function evaluatorColumnHasData(
+  col: EvaluatorColumnLike,
+  input: EvaluatorColumnsVisibilityInput,
+): boolean {
+  const scoreKey = col.scoreField ?? `${col.key}_score`;
+
+  if ((input.leaderboardSummary ?? []).some((row) => row[scoreKey] != null)) {
+    return true;
+  }
+
+  if (
+    (input.providerResults ?? []).some((pr) => {
+      const runs = pr.evaluator_runs;
+      if (!Array.isArray(runs)) return false;
+      return runs.some((run) => {
+        if (!run || typeof run !== "object") return false;
+        const metricKey = (run as { metric_key?: string }).metric_key;
+        const aggregate = (run as { aggregate?: { mean?: unknown } | null })
+          .aggregate;
+        return (
+          metricKey === col.key &&
+          aggregate != null &&
+          aggregate.mean != null
+        );
+      });
+    })
+  ) {
+    return true;
+  }
+
+  return (input.providerResults ?? []).some((pr) => {
+    const results = pr.results;
+    if (!Array.isArray(results)) return false;
+    return results.some((row) => {
+      if (!row || typeof row !== "object") return false;
+      const { score, error } = readEvaluatorCell(
+        row as Record<string, unknown>,
+        col,
+      );
+      return error || (score != null && score !== "");
+    });
+  });
+}
+
+export function visibleEvaluatorColumns<T extends EvaluatorColumnLike>(
+  columns: T[],
+  input: EvaluatorColumnsVisibilityInput,
+): T[] {
+  if (columns.length === 0) return [];
+  return columns.filter((col) => evaluatorColumnHasData(col, input));
+}
+
 export function ratingRange(scaleValues: number[]): string {
   if (scaleValues.length === 0) return "-";
   const min = Math.min(...scaleValues);
@@ -576,13 +640,9 @@ export function STTEvaluationLeaderboard({
   // Join TTFS onto each row for its column and chart.
   const { rows, showTtfs } = withTtfs(leaderboardSummary, providerResults);
 
-  // Drop evaluator columns/charts that no run carries a value for — an
-  // all-"-" column (e.g. an evaluator that didn't run) is just noise.
-  // Mirrors the Sarvam filtering above.
-  const visibleEvaluatorColumns = evaluatorColumns.filter((col) =>
-    leaderboardSummary.some(
-      (row) => row[col.scoreField ?? `${col.key}_score`] != null,
-    ),
+  const visibleEvaluatorColumnsForLeaderboard = visibleEvaluatorColumns(
+    evaluatorColumns,
+    { leaderboardSummary, providerResults },
   );
 
   const allCharts: ChartConfig[] = [
@@ -592,7 +652,7 @@ export function STTEvaluationLeaderboard({
       ? [{ title: "Semantic WER", dataKey: "semantic_wer" }]
       : []),
     ...sarvamFields.map((field) => ({ title: field.label, dataKey: field.key })),
-    ...evaluatorChartConfigs(visibleEvaluatorColumns),
+    ...evaluatorChartConfigs(visibleEvaluatorColumnsForLeaderboard),
     ...(showTtfs ? [ttfsChartConfig] : []),
   ];
   const chartRows = chunkChartRows(allCharts);
@@ -608,7 +668,7 @@ export function STTEvaluationLeaderboard({
           ? [{ key: "semantic_wer", header: "Semantic WER" }]
           : []),
         ...sarvamFields.map((field) => ({ key: field.key, header: field.label })),
-        ...evaluatorLeaderboardColumns(visibleEvaluatorColumns),
+        ...evaluatorLeaderboardColumns(visibleEvaluatorColumnsForLeaderboard),
         ...(showTtfs ? [ttfsLeaderboardColumn] : []),
       ]}
       data={rows}

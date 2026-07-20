@@ -22,6 +22,7 @@ import {
   TTSEvaluationLeaderboard,
   TTSEvaluationOutputs,
   ratingRange,
+  visibleEvaluatorColumns,
   type TTSEvaluatorColumn,
   type LatencyMetric,
   type TTSLeaderboardSummary,
@@ -562,6 +563,18 @@ export default function TTSEvaluationDetailPage() {
     [aboutEvaluators, evaluationResult, defaultEvaluator, judgeLabel],
   );
 
+  const visibleAboutEvaluators = useMemo(() => {
+    const visibleUuids = new Set(
+      visibleEvaluatorColumns(evaluatorColumns, {
+        leaderboardSummary: evaluationResult?.leaderboard_summary,
+        providerResults: evaluationResult?.provider_results,
+      })
+        .map((c) => c.evaluatorUuid)
+        .filter((uuid): uuid is string => !!uuid),
+    );
+    return aboutEvaluators.filter((e) => visibleUuids.has(e.uuid));
+  }, [aboutEvaluators, evaluatorColumns, evaluationResult]);
+
   // "Submit for labelling": pick individual result rows (per provider) and
   // send them to a TTS annotation task. Rows are keyed `${provider}:${index}`
   // — the same keys `TTSResultsTable` toggles — so selection is stable across
@@ -902,7 +915,7 @@ export default function TTSEvaluationDetailPage() {
                   {/* About Tab */}
                   {displayedActiveTab === "about" && canShowLeaderboard && (
                     <TTSEvaluationAbout
-                      evaluatorRows={aboutEvaluators.map((e) => ({
+                      evaluatorRows={visibleAboutEvaluators.map((e) => ({
                         key: e.uuid,
                         metric: (
                           <Link

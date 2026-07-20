@@ -14,6 +14,7 @@ import {
   hasSemanticWerMetric,
   hasSarvamMetrics,
   hasTtfsMetric,
+  visibleEvaluatorColumns,
   ratingRange,
   type STTEvaluatorColumn,
 } from "@/components/eval-details";
@@ -163,19 +164,22 @@ export default function PublicSTTPage() {
     const providerResults = data?.provider_results ?? [];
     const firstRuns = findFirstEvaluatorRuns(providerResults);
 
-    if (firstRuns) {
-      return evaluatorColumnsFromRuns<STTEvaluatorColumn>(firstRuns);
-    }
+    const columns = firstRuns
+      ? evaluatorColumnsFromRuns<STTEvaluatorColumn>(firstRuns)
+      : [
+          {
+            key: "llm_judge",
+            label: defaultEvaluator?.name ?? "Evaluator",
+            outputType: defaultEvaluator?.output_type ?? "binary",
+            scoreField: "llm_judge_score",
+            reasoningField: "llm_judge_reasoning",
+          },
+        ];
 
-    return [
-      {
-        key: "llm_judge",
-        label: defaultEvaluator?.name ?? "Evaluator",
-        outputType: defaultEvaluator?.output_type ?? "binary",
-        scoreField: "llm_judge_score",
-        reasoningField: "llm_judge_reasoning",
-      },
-    ];
+    return visibleEvaluatorColumns(columns, {
+      leaderboardSummary: data?.leaderboard_summary,
+      providerResults,
+    });
   }, [data, defaultEvaluator]);
 
   const evaluatorDescriptions = useMemo(() => {

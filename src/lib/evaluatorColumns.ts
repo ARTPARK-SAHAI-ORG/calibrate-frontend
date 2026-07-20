@@ -59,6 +59,7 @@ export type EvaluatorRunForColumns = {
 export type ProviderForColumns = {
   metrics?: Record<string, unknown> | null;
   evaluator_runs?: EvaluatorRunForColumns[] | null;
+  results?: Array<Record<string, unknown>> | null;
 };
 
 export type AboutEvaluatorLite = {
@@ -180,8 +181,17 @@ export function deriveEvaluatorColumns({
     });
   }
 
-  // (3) Legacy single-evaluator fallback.
+  // (3) Legacy single-evaluator fallback — only when rows actually carry a score.
   const fallback = singleJudgeFallback;
+  const scoreField = fallback.scoreField ?? "llm_judge_score";
+  const hasLegacyJudge = providerResults.some((pr) =>
+    (pr.results ?? []).some((row) => {
+      const score = row[scoreField];
+      return score != null && String(score).trim() !== "";
+    }),
+  );
+  if (!hasLegacyJudge) return [];
+
   const defaultAbout = fallback.defaultEvaluatorUuid
     ? aboutEvaluators.find((e) => e.uuid === fallback.defaultEvaluatorUuid)
     : undefined;

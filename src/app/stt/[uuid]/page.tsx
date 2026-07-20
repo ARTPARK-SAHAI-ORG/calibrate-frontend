@@ -27,6 +27,7 @@ import {
   hasSemanticWerMetric,
   hasSarvamMetrics as runHasSarvamMetrics,
   hasTtfsMetric,
+  visibleEvaluatorColumns,
   type STTEvaluatorColumn,
 } from "@/components/eval-details";
 import type { LatencyMetric } from "@/components/eval-details/ttsEvalTypes";
@@ -603,6 +604,18 @@ export default function STTEvaluationDetailPage() {
     [aboutEvaluators, evaluationResult, defaultEvaluator, judgeLabel],
   );
 
+  const visibleAboutEvaluators = useMemo(() => {
+    const visibleUuids = new Set(
+      visibleEvaluatorColumns(evaluatorColumns, {
+        leaderboardSummary: evaluationResult?.leaderboard_summary,
+        providerResults: evaluationResult?.provider_results,
+      })
+        .map((c) => c.evaluatorUuid)
+        .filter((uuid): uuid is string => !!uuid),
+    );
+    return aboutEvaluators.filter((e) => visibleUuids.has(e.uuid));
+  }, [aboutEvaluators, evaluatorColumns, evaluationResult]);
+
   const hasSarvamMetrics = useMemo(
     () => runHasSarvamMetrics(evaluationResult?.provider_results),
     [evaluationResult],
@@ -964,7 +977,7 @@ export default function STTEvaluationDetailPage() {
                       showSarvamMetrics={hasSarvamMetrics}
                       showSemanticWer={hasSemanticWer}
                       showTtfs={hasTtfs}
-                      evaluatorRows={aboutEvaluators.map((e) => ({
+                      evaluatorRows={visibleAboutEvaluators.map((e) => ({
                         key: e.uuid,
                         metric: (
                           <Link

@@ -31,6 +31,8 @@ export {
   hasSemanticWerMetric,
   hasSarvamMetrics,
   hasTtfsMetric,
+  visibleEvaluatorColumns,
+  evaluatorColumnHasData,
   findFirstEvaluatorRuns,
   evaluatorColumnsFromRuns,
   evaluatorDescriptionMapFromRuns,

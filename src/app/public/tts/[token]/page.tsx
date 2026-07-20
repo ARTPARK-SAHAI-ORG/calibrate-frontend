@@ -12,6 +12,7 @@ import {
   evaluatorColumnsFromRuns,
   evaluatorDescriptionMapFromRuns,
   ratingRange,
+  visibleEvaluatorColumns,
   type TTSEvaluatorColumn,
   type LatencyMetric,
   type TTSLeaderboardSummary,
@@ -141,19 +142,22 @@ export default function PublicTTSPage() {
     const providerResults = data?.provider_results ?? [];
     const firstRuns = findFirstEvaluatorRuns(providerResults);
 
-    if (firstRuns) {
-      return evaluatorColumnsFromRuns<TTSEvaluatorColumn>(firstRuns);
-    }
+    const columns = firstRuns
+      ? evaluatorColumnsFromRuns<TTSEvaluatorColumn>(firstRuns)
+      : [
+          {
+            key: "llm_judge",
+            label: defaultEvaluator?.name ?? "Evaluator",
+            outputType: defaultEvaluator?.output_type ?? "binary",
+            scoreField: "llm_judge_score",
+            reasoningField: "llm_judge_reasoning",
+          },
+        ];
 
-    return [
-      {
-        key: "llm_judge",
-        label: defaultEvaluator?.name ?? "Evaluator",
-        outputType: defaultEvaluator?.output_type ?? "binary",
-        scoreField: "llm_judge_score",
-        reasoningField: "llm_judge_reasoning",
-      },
-    ];
+    return visibleEvaluatorColumns(columns, {
+      leaderboardSummary: data?.leaderboard_summary,
+      providerResults,
+    });
   }, [data, defaultEvaluator]);
 
   const evaluatorDescriptions = useMemo(() => {
