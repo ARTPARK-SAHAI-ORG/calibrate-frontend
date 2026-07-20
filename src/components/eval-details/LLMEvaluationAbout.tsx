@@ -32,7 +32,7 @@ export const LLM_LATENCY_ABOUT_METRIC: MetricDescription = {
   key: "latency",
   metric: "Latency",
   description:
-    "Agent response time per test. The reported value is the median (p50) across all tests, not the average; the p95 / p99 tail is shown beneath it.",
+    "Agent response time per test. The reported value is the median (p50) across all tests, not the average.",
   preference: "Lower is better",
   range: "0 - ∞",
 };
@@ -41,7 +41,7 @@ export const LLM_COST_ABOUT_METRIC: MetricDescription = {
   key: "cost",
   metric: "Average cost",
   description:
-    "Mean cost per test in USD (input + output) across all tests. This is an average, not a median.",
+    "Average cost per test in USD (input + output) across all tests.",
   preference: "Lower is better",
   range: "0 - ∞",
 };
@@ -50,7 +50,7 @@ export const LLM_TOKENS_ABOUT_METRIC: MetricDescription = {
   key: "tokens",
   metric: "Average tokens",
   description:
-    "Mean total input + output tokens per test across all tests. This is an average, not a median.",
+    "Average total input + output tokens per test across all tests.",
   preference: "Lower is better",
   range: "0 - ∞",
 };
