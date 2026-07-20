@@ -29,6 +29,7 @@ export {
   hasSTTEmptyPredictions,
   getFirstSTTEmptyPredictionIndex,
   hasSemanticWerMetric,
+  hasTtfsMetric,
   findFirstEvaluatorRuns,
   evaluatorColumnsFromRuns,
   evaluatorDescriptionMapFromRuns,

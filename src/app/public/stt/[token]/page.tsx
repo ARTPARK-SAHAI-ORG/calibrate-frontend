@@ -12,9 +12,11 @@ import {
   evaluatorColumnsFromRuns,
   evaluatorDescriptionMapFromRuns,
   hasSemanticWerMetric,
+  hasTtfsMetric,
   ratingRange,
   type STTEvaluatorColumn,
 } from "@/components/eval-details";
+import type { LatencyMetric } from "@/components/eval-details/ttsEvalTypes";
 import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
 import {
   ExportResultsButton,
@@ -52,8 +54,11 @@ type ProviderMetrics = {
   cer?: number;
   string_similarity?: number;
   llm_judge_score?: number;
+  // TTFS streaming latency. Reported as a latency block or a plain number.
+  ttfs?: LatencyMetric | number;
   [k: string]:
     | number
+    | LatencyMetric
     | { type?: string; mean?: number; scale_min?: number; scale_max?: number }
     | undefined;
 };
@@ -84,6 +89,9 @@ type LeaderboardSummary = {
   cer?: number;
   string_similarity?: number;
   llm_judge_score?: number;
+  // TTFS streaming latency (seconds), flattened onto the leaderboard row.
+  ttfs_p50?: number;
+  ttfs?: number;
   [k: string]: string | number | undefined;
 };
 
@@ -278,6 +286,7 @@ export default function PublicSTTPage() {
                 leaderboardSummary={data.leaderboard_summary}
                 evaluatorColumns={evaluatorColumns}
                 getProviderLabel={getProviderLabel}
+                providerResults={data.provider_results}
               />
             )}
 
@@ -313,6 +322,7 @@ export default function PublicSTTPage() {
                         : "-",
                 }))}
                 showSemanticWer={hasSemanticWerMetric(data.provider_results)}
+                showTtfs={hasTtfsMetric(data.provider_results)}
               />
             )}
           </>

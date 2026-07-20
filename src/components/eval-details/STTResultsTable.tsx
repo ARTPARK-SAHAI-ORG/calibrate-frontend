@@ -52,6 +52,9 @@ export type STTResultRow = {
   // `semantic_wer_reasoning` is the judge's plain-text explanation.
   semantic_wer?: number | string;
   semantic_wer_reasoning?: string;
+  // Per-row latency in seconds — TTFS (Time To Final Segment). Labelled
+  // "Latency (s)" in the UI; `null` for providers that don't report it.
+  ttfs?: number | string | null;
   string_similarity?: string;
   // Sarvam LLM-judge metrics — present only when the run used Sarvam LLM
   // judges. `sarvam_llm_wer_reasoning` is a JSON string of the judged segments;
@@ -131,6 +134,7 @@ const STT_COL_WIDTHS = {
   cer: 80,
   semanticWer: 130,
   similarity: 110,
+  latency: 100,
   evaluator: 130,
   llmJudge: 110,
 } as const;
@@ -141,6 +145,13 @@ function fmtMetric(v: number | string | undefined | null): string {
   if (v == null || v === "") return "-";
   const n = typeof v === "number" ? v : parseFloat(v);
   return Number.isNaN(n) ? "-" : String(parseFloat(n.toFixed(4)));
+}
+
+// Whether a per-row latency (TTFS) value is a usable finite number.
+function hasRowTtfs(v: unknown): boolean {
+  if (typeof v === "number") return Number.isFinite(v);
+  if (typeof v === "string" && v.trim() !== "") return !Number.isNaN(parseFloat(v));
+  return false;
 }
 
 // Reasoning shown in a metric tooltip. Sarvam LLM-WER carries a JSON string of
@@ -236,6 +247,9 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
   const hasSemanticWer = results.some(
     (r) => r.semantic_wer != null && r.semantic_wer !== "",
   );
+  // Per-row latency (TTFS) column renders only when the run carries it (absent
+  // for providers like Gemini that don't report TTFS). Mirrors the filters above.
+  const hasTtfs = results.some((r) => hasRowTtfs(r.ttfs));
   // When `evaluatorColumns` is provided, each evaluator gets its own column;
   // the legacy `llm_judge_*` rendering branch is skipped.
   const useDynamic = Array.isArray(evaluatorColumns) && evaluatorColumns.length > 0;
@@ -286,6 +300,7 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
       if (hasSemanticWer) total += STT_COL_WIDTHS.semanticWer;
       total += sarvamFields.reduce((sum, f) => sum + f.width, 0);
       if (showSimilarity) total += STT_COL_WIDTHS.similarity;
+      if (hasTtfs) total += STT_COL_WIDTHS.latency;
       if (useDynamic) total += visibleEvaluatorColumns.length * STT_COL_WIDTHS.evaluator;
       else total += STT_COL_WIDTHS.llmJudge;
     }
@@ -325,6 +340,9 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                     ))}
                     {showSimilarity && (
                       <th style={{ width: STT_COL_WIDTHS.similarity }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">Similarity</th>
+                    )}
+                    {hasTtfs && (
+                      <th style={{ width: STT_COL_WIDTHS.latency }} className="px-3 py-3 text-left text-[12px] font-medium text-foreground">Latency (s)</th>
                     )}
                     {useDynamic
                       ? visibleEvaluatorColumns.map((col) => (
@@ -402,6 +420,11 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                         {showSimilarity && (
                           <td className="px-4 py-3 text-[13px] text-foreground">
                             {result.string_similarity != null ? parseFloat(parseFloat(result.string_similarity).toFixed(4)) : "-"}
+                          </td>
+                        )}
+                        {hasTtfs && (
+                          <td className="px-4 py-3 text-[13px] text-foreground">
+                            {fmtMetric(result.ttfs)}
                           </td>
                         )}
                         {useDynamic ? (
@@ -523,6 +546,12 @@ export function STTResultsTable({ results, showMetrics = true, showSimilarity = 
                       <div>
                         <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Similarity</span>
                         <p className="text-[13px] text-foreground">{result.string_similarity != null ? parseFloat(parseFloat(result.string_similarity).toFixed(4)) : "-"}</p>
+                      </div>
+                    )}
+                    {hasTtfs && (
+                      <div>
+                        <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Latency (s)</span>
+                        <p className="text-[13px] text-foreground">{fmtMetric(result.ttfs)}</p>
                       </div>
                     )}
                   </div>

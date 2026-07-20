@@ -380,4 +380,43 @@ describe("STTResultsTable", () => {
     screen.getByLabelText("Select all").click();
     expect(onBulk).toHaveBeenCalledWith(["openai:0", "openai:1"]);
   });
+
+  describe("per-row Latency (TTFS)", () => {
+    it("renders a Latency (s) column with the per-row value when present", () => {
+      render(<STTResultsTable results={[{ ...baseRow, ttfs: 0.42 }]} />);
+      expect(screen.getAllByText("Latency (s)").length).toBeGreaterThan(0);
+      // Formatted value appears in both desktop + mobile layouts.
+      expect(screen.getAllByText("0.42").length).toBeGreaterThan(0);
+    });
+
+    it("accepts a stringified latency value", () => {
+      render(<STTResultsTable results={[{ ...baseRow, ttfs: "0.5" }]} />);
+      expect(screen.getAllByText("0.5").length).toBeGreaterThan(0);
+    });
+
+    it("omits the Latency column when no row reports it", () => {
+      render(<STTResultsTable results={[baseRow]} />);
+      expect(screen.queryByText("Latency (s)")).not.toBeInTheDocument();
+    });
+
+    it("keeps the column but shows '-' for a row whose latency is null", () => {
+      render(
+        <STTResultsTable
+          results={[
+            { ...baseRow, id: "1", ttfs: 0.4 },
+            { ...baseRow, id: "2", ttfs: null },
+          ]}
+        />,
+      );
+      expect(screen.getAllByText("Latency (s)").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("0.4").length).toBeGreaterThan(0);
+    });
+
+    it("hides the Latency column when showMetrics=false", () => {
+      render(
+        <STTResultsTable results={[{ ...baseRow, ttfs: 0.42 }]} showMetrics={false} />,
+      );
+      expect(screen.queryByText("Latency (s)")).not.toBeInTheDocument();
+    });
+  });
 });
