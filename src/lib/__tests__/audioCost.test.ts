@@ -158,20 +158,20 @@ describe("costCaveats", () => {
     expect(lines[0]).toMatch(/^Cost is an estimate/);
   });
 
-  it("adds the FX-conversion caveat (rate + run date) for a non-USD provider", () => {
+  it("adds the FX-conversion caveat for a non-USD provider", () => {
     const lines = costCaveats(
       { cost: sttMinuteInr },
       { runDate: "2026-07-15 10:00:00" },
     );
     expect(lines).toContain(
-      "Converted from INR at a live mid-market rate (₹96.35 = $1 as of Jul 15, 2026); a real payment adds FX margin and GST.",
+      "For Sarvam, we convert from INR using the exchange rate on mid-Jul 2026 (₹96.35 = $1).",
     );
   });
 
-  it("omits the date in the FX caveat when the run date is unavailable", () => {
+  it("uses the same FX caveat regardless of run date", () => {
     const lines = costCaveats({ cost: ttsCharInr });
     expect(lines).toContain(
-      "Converted from INR at a live mid-market rate (₹96.35 = $1); a real payment adds FX margin and GST.",
+      "For Sarvam, we convert from INR using the exchange rate on mid-Jul 2026 (₹96.35 = $1).",
     );
     // General points plus the one FX line.
     expect(lines).toHaveLength(COST_CAVEAT_POINTS.length + 1);
@@ -187,7 +187,7 @@ describe("costCaveats", () => {
       cost: { billing_unit: "minute", currency: "INR", cost_usd: 0.01 },
     });
     expect(lines[lines.length - 1]).toBe(
-      "Converted from INR at a live mid-market rate (INR to USD); a real payment adds FX margin and GST.",
+      "For Sarvam, we convert from INR using the exchange rate on mid-Jul 2026 (INR to USD).",
     );
   });
 
@@ -229,7 +229,7 @@ describe("aggregateCostCaveats", () => {
     );
     expect(lines.slice(0, COST_CAVEAT_POINTS.length)).toEqual(COST_CAVEAT_POINTS);
     expect(lines).toContain(
-      "Converted from INR at a live mid-market rate (₹96.35 = $1 as of Jul 15, 2026); a real payment adds FX margin and GST.",
+      "For Sarvam, we convert from INR using the exchange rate on mid-Jul 2026 (₹96.35 = $1).",
     );
     // General points appear once, not once per provider.
     expect(lines.filter((l) => l === COST_CAVEAT_POINTS[0])).toHaveLength(1);

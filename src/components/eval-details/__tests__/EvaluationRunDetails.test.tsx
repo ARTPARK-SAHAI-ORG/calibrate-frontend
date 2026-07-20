@@ -669,7 +669,7 @@ describe("STTEvaluationAbout", () => {
     expect(screen.getAllByText(/\* Cost is an estimate/)).toHaveLength(1);
     expect(
       screen.getByText(
-        /Converted from INR at a live mid-market rate \(₹96.35 = \$1 as of Jul 15, 2026\)/,
+        /For Sarvam, we convert from INR using the exchange rate on mid-Jul 2026 \(₹96\.35 = \$1\)/,
       ),
     ).toBeInTheDocument();
   });
