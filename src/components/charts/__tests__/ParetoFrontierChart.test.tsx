@@ -105,6 +105,17 @@ describe("ParetoFrontierChart", () => {
     expect(screen.queryByText("Worst")).not.toBeInTheDocument();
   });
 
+  it("sorts by Quality (highest first) by default, shown on the header", () => {
+    renderChart(points);
+    expect(
+      screen.getByRole("columnheader", { name: "Quality" }),
+    ).toHaveAttribute("aria-sort", "descending");
+    expect(screen.getByRole("columnheader", { name: "Cost" })).toHaveAttribute(
+      "aria-sort",
+      "none",
+    );
+  });
+
   it("highlights the best value in a column in green", () => {
     renderChart(points);
     // Premium has the best pass rate (95%); its quality cell is bold green.

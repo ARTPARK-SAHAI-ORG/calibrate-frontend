@@ -284,22 +284,32 @@ export function ParetoFrontierChart({
   // Click a column header to sort by it; higher quality / lower cost / faster
   // speed come first, and a second click flips the direction.
   const toggleSort = (key: "quality" | "cost" | "speed") =>
-    setSort((prev) =>
-      prev?.key === key
-        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
-        : { key, dir: key === "quality" ? "desc" : "asc" },
-    );
+    setSort((prev) => {
+      // The default (no explicit sort) already reads as Quality, highest first.
+      const cur = prev ?? { key: "quality" as const, dir: "desc" as const };
+      return cur.key === key
+        ? { key, dir: cur.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: key === "quality" ? "desc" : "asc" };
+    });
+  // The default order (sort === null) reads as Quality, highest first, so show
+  // the Quality arrow on open even before the user clicks a header.
+  const activeSortKey = sort?.key ?? "quality";
+  const activeSortDir = sort?.dir ?? "desc";
   const sortHeader = (
     label: string,
     key: "quality" | "cost" | "speed",
     extraClass = "",
   ) => {
-    const active = sort?.key === key;
+    const active = activeSortKey === key;
     return (
       <th
         className={`py-1.5 text-right font-medium ${extraClass}`}
         aria-sort={
-          active ? (sort!.dir === "asc" ? "ascending" : "descending") : "none"
+          active
+            ? activeSortDir === "asc"
+              ? "ascending"
+              : "descending"
+            : "none"
         }
       >
         <button
@@ -314,7 +324,7 @@ export function ParetoFrontierChart({
             aria-hidden
             className={`text-[8px] leading-none ${active ? "" : "opacity-40"}`}
           >
-            {active ? (sort!.dir === "asc" ? "▲" : "▼") : "▾"}
+            {active ? (activeSortDir === "asc" ? "▲" : "▼") : "▾"}
           </span>
         </button>
       </th>
