@@ -24,6 +24,7 @@ import {
   getPublicDefaultEvaluator,
   type PublicDefaultEvaluator,
 } from "@/lib/publicEvaluators";
+import type { AudioCostBreakdown } from "@/lib/audioCost";
 
 // Mirrors the auth TTS page: the response now optionally carries
 // `evaluator_runs` per provider with the live evaluator `name`, stable
@@ -51,9 +52,12 @@ type ProviderMetrics = {
   llm_judge_score?: number;
   ttfb?: LatencyMetric;
   processing_time?: LatencyMetric;
+  // Per-provider cost block. Present only when the run computed cost.
+  cost?: AudioCostBreakdown;
   [k: string]:
     | number
     | LatencyMetric
+    | AudioCostBreakdown
     | { type?: string; mean?: number; scale_min?: number; scale_max?: number }
     | undefined;
 };
@@ -82,6 +86,8 @@ type EvaluationResult = {
   provider_results?: ProviderResult[];
   leaderboard_summary?: TTSLeaderboardSummary[];
   error?: string | null;
+  /** When the run was created — dates the INR conversion-rate caveat. */
+  created_at?: string | null;
 };
 
 const getProviderLabel = (value: string): string => {
@@ -290,6 +296,7 @@ export default function PublicTTSPage() {
                 leaderboardSummary={data.leaderboard_summary}
                 evaluatorColumns={evaluatorColumns}
                 getProviderLabel={getProviderLabel}
+                providerResults={data.provider_results}
               />
             )}
 
@@ -324,6 +331,8 @@ export default function PublicTTSPage() {
                         ? "Pass / Fail"
                         : "-",
                 }))}
+                providerResults={data.provider_results}
+                runDate={data.created_at}
               />
             )}
           </>
