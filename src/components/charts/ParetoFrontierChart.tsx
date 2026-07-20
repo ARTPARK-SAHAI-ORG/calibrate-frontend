@@ -37,12 +37,17 @@ type ParetoFrontierChartProps = {
   points: ParetoModelPoint[];
   colorMap: Map<string, string>;
   title?: string;
+  subtitle?: string;
   passRateLabel?: string;
   filename?: string;
   height?: number;
 };
 
-// Bubble radius range (px) mapped from latency (min latency → small, max → big).
+// Bright solid green for the frontier line + best-value highlights — the hero
+// colour. design.md uses text-green-500 for success, whose hex is #22c55e.
+const FRONTIER_GREEN = "#22c55e";
+
+// Bubble radius range (px) mapped from latency (fastest → big, slowest → small).
 const R_MIN = 7;
 const R_MAX = 18;
 // Radius when a model has no latency (uniform mid-size bubble).
@@ -55,13 +60,16 @@ const LABEL_GAP = 15;
 // Extra horizontal margin so model-name labels beside edge bubbles aren't clipped.
 const LABEL_GUTTER = 72;
 // Fallback plot width before the container has been measured (jsdom / first paint).
-const DEFAULT_CHART_WIDTH = 640;
+const DEFAULT_CHART_WIDTH = 560;
 // Chart margins must clear the largest (hovered) bubble so points sitting on an
 // axis edge (e.g. a model at 100%) aren't clipped.
 const EDGE_PAD = Math.ceil(R_MAX * HOVER_SCALE) + 8;
 const MARGIN = {
   top: EDGE_PAD,
-  right: EDGE_PAD + LABEL_GUTTER,
+  // A small right pad, not a full label gutter: only frontier dots are labeled
+  // and they cluster top-left, so a wide right margin was just empty space
+  // between the plot and the table beside it.
+  right: EDGE_PAD + 24,
   bottom: 44,
   left: 12 + Math.floor(LABEL_GUTTER / 2),
 };
@@ -85,7 +93,7 @@ function ParetoTooltip({
         {d.label}
         {d.onFrontier && (
           <span className="rounded bg-foreground px-1.5 py-0.5 text-[10px] font-medium text-background">
-            Frontier
+            Best pick
           </span>
         )}
       </div>
@@ -97,7 +105,7 @@ function ParetoTooltip({
       </div>
       {typeof d.latency === "number" && Number.isFinite(d.latency) && (
         <div className="text-muted-foreground">
-          Latency: <span className="text-foreground">{formatLatencyMs(d.latency)}</span>
+          Speed: <span className="text-foreground">{formatLatencyMs(d.latency)}</span>
         </div>
       )}
     </div>
@@ -105,27 +113,35 @@ function ParetoTooltip({
 }
 
 /**
- * Pareto-frontier scatter of the benchmarked models: cost on X (lower better),
- * pass rate on Y (higher better), latency as bubble size. The frontier itself is
- * computed across all three objectives (cost, pass rate AND latency), so a model
- * that looks dominated on the 2-D cost/pass-rate plane can still be on the
- * frontier by being the fastest. The dashed line connects the frontier models in
- * cost order. Dominated models are faded (and can be hidden entirely via the
- * "Frontier only" toggle). Renders nothing when no model has a finite cost and
- * pass rate.
+ * Cost / quality / speed tradeoff scatter beside a compact table of the models.
+ * Cost on X (lower better), pass rate on Y (higher better), latency as bubble
+ * size (faster is bigger). The Pareto frontier is computed across all three
+ * objectives, so a model that looks dominated on the 2-D plane can still make
+ * the frontier by being fastest. A bright green line joins the frontier (best)
+ * models in cost order; only frontier dots are labeled in-plot. The table lists
+ * every model (or only the best ones when "Show the best models only" is on),
+ * highlights the winning value in each column, and shares one hover state with
+ * the plot. Renders nothing when no model has a finite cost and pass rate.
  */
 export function ParetoFrontierChart({
   points,
   colorMap,
-  title = "Pass rate vs cost vs latency tradeoff",
+  title,
+  subtitle,
   passRateLabel = "Pass rate",
   filename = "pareto-frontier",
-  height = 400,
+  height = 460,
 }: ParetoFrontierChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
-  const [frontierOnly, setFrontierOnly] = useState(false);
+  // Default to the best models only; toggling off reveals every model.
+  const [frontierOnly, setFrontierOnly] = useState(true);
   const [hoveredModel, setHoveredModel] = useState<string | null>(null);
   const [chartWidth, setChartWidth] = useState(DEFAULT_CHART_WIDTH);
+  // Which column the table is sorted by. Defaults to quality, highest first.
+  const [sort, setSort] = useState<{
+    key: "quality" | "cost" | "speed";
+    dir: "asc" | "desc";
+  }>({ key: "quality", dir: "desc" });
 
   const { allData, frontierData, dominatedData, hasLatency } = useMemo(() => {
     const valid = points.filter(isValidParetoPoint);
@@ -159,6 +175,13 @@ export function ParetoFrontierChart({
     };
   }, [points]);
 
+  // Title varies with whether speed is a factor, unless the caller overrides it.
+  const resolvedTitle =
+    title ??
+    (hasLatency
+      ? "Cost, quality and speed tradeoff"
+      : "Cost and quality tradeoff");
+
   useEffect(() => {
     const el = chartRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
@@ -172,8 +195,8 @@ export function ParetoFrontierChart({
   }, [allData.length]);
 
   const download = useCallback(() => {
-    downloadChartPng(chartRef.current, title, filename);
-  }, [title, filename]);
+    downloadChartPng(chartRef.current, resolvedTitle, filename);
+  }, [resolvedTitle, filename]);
 
   const hasDominated = dominatedData.length > 0;
   const showDominated = !frontierOnly;
@@ -181,7 +204,7 @@ export function ParetoFrontierChart({
   if (allData.length === 0) {
     return (
       <div className="flex flex-col min-h-[160px]">
-        <h3 className="text-[15px] font-semibold mb-2">{title}</h3>
+        <h3 className="text-[15px] font-semibold mb-2">{resolvedTitle}</h3>
         <p className="text-xs text-muted-foreground mt-auto mb-auto text-center py-8">
           No chart data (models are missing cost or pass-rate values).
         </p>
@@ -189,9 +212,18 @@ export function ParetoFrontierChart({
     );
   }
 
+  // Plain-language explanation of the frontier, honest about whether speed is a
+  // factor. This is the simple Pareto explanation: the line joins the models
+  // that nothing else beats on every measure at once.
+  const resolvedSubtitle =
+    subtitle ??
+    (hasLatency
+      ? "Each model is placed by how many tests it passes, what it costs, and how fast it replies (faster models are bigger). The green line joins the best models: the ones that nothing else beats on quality, cost and speed all at once. Any model below the line is beaten by one on it, so there is no reason to choose it."
+      : "Each model is placed by how many tests it passes and what it costs. The green line joins the best models: the ones that nothing else beats on both quality and cost at once. Any model below the line is beaten by one on it, so there is no reason to choose it.");
+
   // Domains are derived from ALL models (not just the visible ones) so points
-  // keep their exact position when the "Frontier only" toggle hides dominated
-  // models — toggling filters points, it never rescales the axes.
+  // keep their exact position when the toggle hides dominated models —
+  // toggling filters points, it never rescales the axes.
   const costMax = Math.max(...allData.map((d) => d.cost));
   const xDomainMax = costMax * 1.1;
   const prVals = allData.map((d) => d.passRate);
@@ -215,15 +247,82 @@ export function ParetoFrontierChart({
       return R_FIXED;
     }
     if (zMax === zMin) return (R_MIN + R_MAX) / 2;
+    // Faster (lower latency) → bigger bubble, so the quickest models stand out.
     const t = (d.latency - zMin) / (zMax - zMin);
-    return R_MIN + t * (R_MAX - R_MIN);
+    return R_MIN + (1 - t) * (R_MAX - R_MIN);
   };
 
-  // Precompute label side + vertical nudge (with horizontal AABB resolution for
-  // long names like openai/gpt-4.1 that would otherwise paint over each other).
-  const visiblePoints = showDominated ? allData : frontierData;
+  // Best value per column (over ALL models) so the table can highlight the
+  // winner in each dimension.
+  const bestPassRate = Math.max(...prVals);
+  const bestCost = Math.min(...allData.map((d) => d.cost));
+  const bestLatency = latencies.length ? Math.min(...latencies) : null;
+  // Table rows honour the toggle (all vs. best only) and follow the active sort
+  // strictly — every visible row in the sorted order, no special grouping.
+  const sortValue = (d: ChartDatum, key: "quality" | "cost" | "speed") => {
+    if (key === "quality") return d.passRate;
+    if (key === "cost") return d.cost;
+    return typeof d.latency === "number" && Number.isFinite(d.latency)
+      ? d.latency
+      : Infinity;
+  };
+  const rankedRows = [...(showDominated ? allData : frontierData)].sort(
+    (a, b) => {
+      const diff = sortValue(a, sort.key) - sortValue(b, sort.key);
+      return sort.dir === "asc" ? diff : -diff;
+    },
+  );
+
+  // Click a column header to sort by it; higher quality / lower cost / faster
+  // speed come first, and a second click flips the direction.
+  const toggleSort = (key: "quality" | "cost" | "speed") =>
+    setSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: key === "quality" ? "desc" : "asc" },
+    );
+  const activeSortKey = sort.key;
+  const activeSortDir = sort.dir;
+  const sortHeader = (
+    label: string,
+    key: "quality" | "cost" | "speed",
+    extraClass = "",
+  ) => {
+    const active = activeSortKey === key;
+    return (
+      <th
+        className={`py-1.5 text-right font-medium ${extraClass}`}
+        aria-sort={
+          active
+            ? activeSortDir === "asc"
+              ? "ascending"
+              : "descending"
+            : "none"
+        }
+      >
+        <button
+          type="button"
+          onClick={() => toggleSort(key)}
+          className={`ml-auto inline-flex items-center gap-1 whitespace-nowrap cursor-pointer hover:text-foreground ${
+            active ? "text-foreground" : ""
+          }`}
+        >
+          {label}
+          <span
+            aria-hidden
+            className={`text-[8px] leading-none ${active ? "" : "opacity-40"}`}
+          >
+            {active ? (activeSortDir === "asc" ? "▲" : "▼") : "▾"}
+          </span>
+        </button>
+      </th>
+    );
+  };
+
+  // Only FRONTIER points get an in-plot name label — lay those out (with side +
+  // vertical nudge) over the frontier alone. Dominated dots stay unlabeled.
   const labelLayout = layoutParetoLabels(
-    visiblePoints.map((d) => ({
+    frontierData.map((d) => ({
       model: d.model,
       label: d.label,
       cost: d.cost,
@@ -240,9 +339,9 @@ export function ParetoFrontierChart({
     },
   );
 
-  // Custom point renderer: bubble + model-name label (with leader line when the
-  // de-overlap pass nudged the label). Reads `hoveredModel` so the hovered dot
-  // pops (grows, full opacity, dark ring) while the others dim.
+  // Custom point renderer: bubble + (frontier-only) model-name label with a
+  // leader line when the de-overlap pass nudged the label. Reads `hoveredModel`
+  // so the hovered dot pops (grows, full opacity, green ring) while others dim.
   const renderDot = (props: { cx?: number; cy?: number; payload?: ChartDatum }) => {
     const { cx, cy, payload } = props;
     if (cx == null || cy == null || !payload) return <g />;
@@ -259,13 +358,20 @@ export function ParetoFrontierChart({
         : d.onFrontier
           ? 0.9
           : 0.4;
-    const stroke = isHovered || d.onFrontier ? "#0f172a" : "#94a3b8";
+    const stroke = isHovered
+      ? FRONTIER_GREEN
+      : d.onFrontier
+        ? "#0f172a"
+        : "#94a3b8";
     const strokeWidth = isHovered ? 2.5 : d.onFrontier ? 1.5 : 1;
 
-    const layout = labelLayout.get(d.model) ?? { side: "right" as const, dy: 0 };
-    const labelX = layout.side === "left" ? cx - r - 5 : cx + r + 5;
-    const labelY = cy + layout.dy;
-    const edgeX = layout.side === "left" ? cx - r : cx + r;
+    const layout = labelLayout.get(d.model);
+    const showLabel = d.onFrontier && !!layout;
+    const side = layout?.side ?? "right";
+    const dy = layout?.dy ?? 0;
+    const labelX = side === "left" ? cx - r - 5 : cx + r + 5;
+    const labelY = cy + dy;
+    const edgeX = side === "left" ? cx - r : cx + r;
     const labelOpacity = isHovered ? 1 : someHovered ? 0.25 : 0.85;
 
     return (
@@ -287,7 +393,7 @@ export function ParetoFrontierChart({
               "r 120ms ease, fill-opacity 120ms ease, stroke-width 120ms ease",
           }}
         />
-        {Math.abs(layout.dy) > 1 && (
+        {showLabel && Math.abs(dy) > 1 && (
           <line
             x1={edgeX}
             y1={cy}
@@ -298,74 +404,51 @@ export function ParetoFrontierChart({
             strokeOpacity={labelOpacity * 0.6}
           />
         )}
-        <text
-          x={labelX}
-          y={labelY}
-          textAnchor={layout.side === "left" ? "end" : "start"}
-          dominantBaseline="central"
-          fontSize={11}
-          fontWeight={isHovered ? 600 : 500}
-          fill="currentColor"
-          fillOpacity={labelOpacity}
-          style={{
-            paintOrder: "stroke",
-            stroke: "var(--background)",
-            strokeWidth: 3,
-            strokeLinejoin: "round",
-          }}
-        >
-          {d.label}
-        </text>
+        {showLabel && (
+          <text
+            x={labelX}
+            y={labelY}
+            textAnchor={side === "left" ? "end" : "start"}
+            dominantBaseline="central"
+            fontSize={11}
+            fontWeight={isHovered ? 600 : 500}
+            fill="currentColor"
+            fillOpacity={labelOpacity}
+            style={{
+              paintOrder: "stroke",
+              stroke: "var(--background)",
+              strokeWidth: 3,
+              strokeLinejoin: "round",
+            }}
+          >
+            {d.label}
+          </text>
+        )}
       </g>
     );
   };
 
-  // Caption is assembled from three parts so it stays honest: what the axes and
-  // bubble size mean, then how to read the result. The result sentence differs
-  // when only one model is on the frontier (no dashed line is drawn) vs. several.
-  const axisSentence = hasLatency
-    ? "Each dot is a model. The higher it sits, the more tests it passes. The further left, the less it costs to run. The smaller it is, the faster it replies. So the best models sit toward the top-left."
-    : "Each dot is a model. The higher it sits, the more tests it passes, and the further left, the less it costs to run. So the best models sit toward the top-left.";
-  const axesList = hasLatency ? "pass rate, cost, and speed" : "both pass rate and cost";
-  const hasFrontierLine = frontierData.length >= 2;
-  const winnerLabel = frontierData[0]?.label;
-  const resultSentence = hasFrontierLine ? (
-    <>
-      Stick to the models on the dashed line: they are the best picks. For any
-      model not on it, one that is will match or beat it on {axesList}, so there
-      is no reason to choose it.
-    </>
-  ) : (
-    <>
-      <strong className="font-semibold text-foreground">
-        {winnerLabel ?? "One model"}
-      </strong>{" "}
-      comes out on top: it matches or beats every other model on {axesList}, so
-      it is the clear pick.
-    </>
-  );
-
   return (
     <div>
-      <div className="flex items-start justify-between mb-2 gap-3">
+      <div className="flex items-start justify-between mb-3 gap-3">
         <div>
-          <h3 className="text-[15px] font-semibold">{title}</h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {axisSentence} {resultSentence}
+          <h3 className="text-[15px] font-semibold">{resolvedTitle}</h3>
+          <p className="mt-0.5 max-w-3xl text-xs text-muted-foreground">
+            {resolvedSubtitle}
           </p>
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
           {hasDominated && (
             <button
               onClick={() => setFrontierOnly((v) => !v)}
-              className={`rounded-md border px-2 py-1 text-xs font-medium transition-colors cursor-pointer ${
+              className={`rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
                 frontierOnly
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  ? "border-green-500 bg-green-500 text-white hover:bg-green-600"
+                  : "border-green-500 text-green-700 hover:bg-green-500/10 dark:text-green-400"
               }`}
-              title="Show only the models on the Pareto frontier"
+              title="Show only the best models (the ones on the green line)"
             >
-              Frontier only
+              Show the best models only
             </button>
           )}
           <button
@@ -390,65 +473,146 @@ export function ParetoFrontierChart({
           </button>
         </div>
       </div>
-      <div ref={chartRef}>
-        <ResponsiveContainer width="100%" height={height}>
-          <ScatterChart margin={MARGIN}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              type="number"
-              dataKey="cost"
-              name="Cost"
-              domain={[0, xDomainMax || "auto"]}
-              tick={{ fontSize: 12 }}
-              tickFormatter={(v) => formatCostUsd(v)}
-              label={{
-                value: "Average cost (USD) →  cheaper is better",
-                position: "insideBottom",
-                offset: -24,
-                style: { fontSize: 12, fill: "currentColor" },
-              }}
-            />
-            <YAxis
-              type="number"
-              dataKey="passRate"
-              name={passRateLabel}
-              domain={yDomain}
-              tick={{ fontSize: 12 }}
-              tickFormatter={(v) => `${v}%`}
-              label={{
-                value: `${passRateLabel} (%)`,
-                angle: -90,
-                position: "insideLeft",
-                style: { fontSize: 12, fill: "currentColor", textAnchor: "middle" },
-              }}
-            />
-            <Tooltip
-              cursor={{ strokeDasharray: "3 3" }}
-              content={<ParetoTooltip passRateLabel={passRateLabel} />}
-            />
-            {/* Frontier points, connected by a dashed line in cost order — but
-                only when there are 2+ of them (a single point has no line). */}
-            <Scatter
-              data={frontierData}
-              line={
-                frontierData.length >= 2
-                  ? { stroke: "#64748b", strokeWidth: 2, strokeDasharray: "6 4" }
-                  : false
-              }
-              lineType="joint"
-              isAnimationActive={false}
-              shape={renderDot}
-            />
-            {/* Dominated points (no connecting line) — hidden in "Frontier only". */}
-            {showDominated && (
+      <div className="flex flex-col gap-4 md:flex-row">
+        <div ref={chartRef} className="flex-1 min-w-0">
+          <ResponsiveContainer width="100%" height={height}>
+            <ScatterChart margin={MARGIN}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                type="number"
+                dataKey="cost"
+                name="Cost"
+                domain={[0, xDomainMax || "auto"]}
+                tick={{ fontSize: 12 }}
+                tickFormatter={(v) => formatCostUsd(v)}
+                label={{
+                  value: "Average cost (USD)",
+                  position: "insideBottom",
+                  offset: -24,
+                  style: { fontSize: 12, fill: "currentColor" },
+                }}
+              />
+              <YAxis
+                type="number"
+                dataKey="passRate"
+                name={passRateLabel}
+                domain={yDomain}
+                tick={{ fontSize: 12 }}
+                tickFormatter={(v) => `${v}%`}
+                label={{
+                  value: `${passRateLabel} (%)`,
+                  angle: -90,
+                  position: "insideLeft",
+                  style: { fontSize: 12, fill: "currentColor", textAnchor: "middle" },
+                }}
+              />
+              <Tooltip
+                cursor={{ strokeDasharray: "3 3" }}
+                content={<ParetoTooltip passRateLabel={passRateLabel} />}
+              />
+              {/* Frontier points, connected by the bright solid green hero line in
+                  cost order — but only when there are 2+ of them. */}
               <Scatter
-                data={dominatedData}
+                data={frontierData}
+                line={
+                  frontierData.length >= 2
+                    ? { stroke: FRONTIER_GREEN, strokeWidth: 2.5 }
+                    : false
+                }
+                lineType="joint"
                 isAnimationActive={false}
                 shape={renderDot}
               />
-            )}
-          </ScatterChart>
-        </ResponsiveContainer>
+              {/* Dominated points (no connecting line) — hidden when the toggle is on. */}
+              {showDominated && (
+                <Scatter
+                  data={dominatedData}
+                  isAnimationActive={false}
+                  shape={renderDot}
+                />
+              )}
+            </ScatterChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="md:w-80 lg:w-[26rem] flex-shrink-0">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-xs text-muted-foreground">
+                <th className="py-1.5 text-left font-medium">Model</th>
+                {sortHeader("Quality", "quality")}
+                {sortHeader("Cost", "cost")}
+                {hasLatency && sortHeader("Speed", "speed", "pl-3")}
+              </tr>
+            </thead>
+            <tbody>
+              {rankedRows.map((d) => {
+                const isHovered = hoveredModel === d.model;
+                const hasLat =
+                  typeof d.latency === "number" && Number.isFinite(d.latency);
+                return (
+                  <tr
+                    key={d.model}
+                    onMouseEnter={() => setHoveredModel(d.model)}
+                    onMouseLeave={() => setHoveredModel(null)}
+                    className={`cursor-pointer border-b border-border/40 transition-colors ${
+                      isHovered ? "bg-muted" : "hover:bg-muted/50"
+                    } ${d.onFrontier ? "" : "opacity-55"}`}
+                  >
+                    <td className="py-1 pr-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                          style={{
+                            backgroundColor: colorMap.get(d.model) || "#A8D5E2",
+                          }}
+                        />
+                        <span
+                          className={`block max-w-[13rem] overflow-x-auto whitespace-nowrap pb-0.5 [scrollbar-width:thin] ${
+                            d.onFrontier
+                              ? "font-medium text-foreground"
+                              : "text-muted-foreground"
+                          }`}
+                          title={d.label}
+                        >
+                          {d.label}
+                        </span>
+                      </div>
+                    </td>
+                    <td
+                      className={`py-1 text-right tabular-nums whitespace-nowrap ${
+                        d.passRate === bestPassRate
+                          ? "font-bold text-green-600 dark:text-green-400"
+                          : "text-foreground"
+                      }`}
+                    >
+                      {formatPercent(d.passRate)}
+                    </td>
+                    <td
+                      className={`py-1 text-right tabular-nums whitespace-nowrap ${
+                        d.cost === bestCost
+                          ? "font-bold text-green-600 dark:text-green-400"
+                          : "text-foreground"
+                      }`}
+                    >
+                      {formatCostUsd(d.cost)}
+                    </td>
+                    {hasLatency && (
+                      <td
+                        className={`py-1 pl-3 text-right tabular-nums whitespace-nowrap ${
+                          hasLat && d.latency === bestLatency
+                            ? "font-bold text-green-600 dark:text-green-400"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {hasLat ? formatLatencyMs(d.latency as number) : "—"}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

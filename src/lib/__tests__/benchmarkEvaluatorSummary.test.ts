@@ -5,6 +5,7 @@ import {
   benchmarkMetricKeyOrder,
   benchmarkCanonicalModelId,
   buildBenchmarkCombinedLeaderboardPayload,
+  hasBenchmarkTopPicks,
   type BenchmarkModelLike,
   type BenchmarkLeaderboardSummaryRow,
 } from "../benchmarkEvaluatorSummary";
@@ -609,5 +610,28 @@ describe("buildBenchmarkCombinedLeaderboardPayload", () => {
     expect(result!.rows).toHaveLength(2);
     const m2Row = result!.rows.find((r) => r.model === "m2")!;
     expect(m2Row).toEqual({ model: "m2" });
+  });
+});
+
+describe("hasBenchmarkTopPicks", () => {
+  const models: BenchmarkModelLike[] = [{ model: "m1" }];
+
+  it("is true when a model has both a cost and an overall pass rate", () => {
+    const summary: BenchmarkLeaderboardSummaryRow[] = [
+      { model: "m1", pass_rate: "90", cost: "0.05" },
+    ];
+    expect(hasBenchmarkTopPicks(summary, models)).toBe(true);
+  });
+
+  it("is false when there is a pass rate but no cost", () => {
+    const summary: BenchmarkLeaderboardSummaryRow[] = [
+      { model: "m1", pass_rate: "90" },
+    ];
+    expect(hasBenchmarkTopPicks(summary, models)).toBe(false);
+  });
+
+  it("is false when there is no leaderboard summary", () => {
+    expect(hasBenchmarkTopPicks(undefined, models)).toBe(false);
+    expect(hasBenchmarkTopPicks([], models)).toBe(false);
   });
 });

@@ -80,6 +80,9 @@ jest.mock("../eval-details", () => {
       </div>
     ),
     evaluatorColumnsToAbout: (cols: any) => cols ?? [],
+    BenchmarkTopPicks: (props: any) => (
+      <div data-testid="top-picks">{props.filename}</div>
+    ),
   };
 });
 
@@ -878,6 +881,34 @@ describe("BenchmarkResultsDialog", () => {
 
       await user.click(screen.getByRole("button", { name: "Leaderboard" }));
       expect(screen.getByTestId("leaderboard")).toBeInTheDocument();
+    });
+
+    it("shows the Top picks tab content when the Top picks tab is clicked", async () => {
+      // The tab only appears when the run has cost + pass-rate data to plot.
+      await renderDoneRun({
+        leaderboard_summary: [{ model: "gpt-4", pass_rate: "100", cost: "0.05" }],
+      });
+      const user = setupUser();
+
+      // Auto-switched to leaderboard once done; Top picks not yet shown.
+      await waitFor(() =>
+        expect(screen.getByTestId("leaderboard")).toBeInTheDocument(),
+      );
+      expect(screen.queryByTestId("top-picks")).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Model selection" }));
+      expect(screen.getByTestId("top-picks")).toBeInTheDocument();
+      expect(screen.queryByTestId("leaderboard")).not.toBeInTheDocument();
+    });
+
+    it("hides the Top picks tab when there is no cost or pass-rate data", async () => {
+      await renderDoneRun(); // default fixture: no leaderboard_summary, no cost
+      await waitFor(() =>
+        expect(screen.getByTestId("leaderboard")).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByRole("button", { name: "Model selection" }),
+      ).not.toBeInTheDocument();
     });
 
     it("shows the nav pager only on the outputs tab once nav + selectedTest are set", async () => {

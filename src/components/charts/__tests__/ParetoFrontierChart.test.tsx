@@ -1,4 +1,4 @@
-import { render, screen } from "@/test-utils";
+import { render, screen, setupUser } from "@/test-utils";
 import {
   ParetoFrontierChart,
   type ParetoModelPoint,
@@ -49,10 +49,14 @@ beforeAll(() => {
   };
 });
 
+// cheap / mid / premium are all on the frontier (each best on some axis).
+// "worst" is dominated by premium (pricier, worse pass rate, slower) so it is
+// never on the frontier — it stays a dimmed row and an unlabeled dot.
 const points: ParetoModelPoint[] = [
   { model: "cheap", label: "Cheap", cost: 0.005, passRate: 70, latency: 400 },
   { model: "mid", label: "Mid", cost: 0.01, passRate: 85, latency: 900 },
   { model: "premium", label: "Premium", cost: 0.05, passRate: 95, latency: 1500 },
+  { model: "worst", label: "Worst", cost: 0.06, passRate: 60, latency: 2000 },
 ];
 
 function renderChart(pts: ParetoModelPoint[]) {
@@ -62,38 +66,127 @@ function renderChart(pts: ParetoModelPoint[]) {
 }
 
 describe("ParetoFrontierChart", () => {
-  it("renders the title and mentions speed when latency is present", () => {
+  it("renders the default title and a subtitle that explains the frontier", () => {
     renderChart(points);
     expect(
-      screen.getByText(/Pass rate vs cost vs latency tradeoff/i),
+      screen.getByText("Cost, quality and speed tradeoff"),
     ).toBeInTheDocument();
-    expect(screen.getByText(/the faster it replies/i)).toBeInTheDocument();
+    expect(screen.getByText(/faster models are bigger/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/there is no reason to choose it/i),
+    ).toBeInTheDocument();
   });
 
-  it("omits the speed wording when latency is not reported", () => {
+  it("drops the speed wording from the title and subtitle when latency is absent", () => {
     renderChart(points.map((p) => ({ ...p, latency: undefined })));
-    expect(screen.queryByText(/replies/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/the less it costs to run/i)).toBeInTheDocument();
+    expect(screen.getByText("Cost and quality tradeoff")).toBeInTheDocument();
+    expect(screen.queryByText(/faster models are bigger/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/on both quality and cost at once/i),
+    ).toBeInTheDocument();
   });
 
-  it("renders model-name labels beside the bubbles", () => {
+  it("shows the columns and, by default, only the best models", () => {
     renderChart(points);
-    expect(screen.getByText("Cheap")).toBeInTheDocument();
-    expect(screen.getByText("Mid")).toBeInTheDocument();
-    expect(screen.getByText("Premium")).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Model" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Quality" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Cost" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Speed" }),
+    ).toBeInTheDocument();
+    // Best-only is on by default: frontier models show, dominated ones don't.
+    expect(screen.getAllByText("Premium").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Worst")).not.toBeInTheDocument();
   });
 
-  it("drops the dashed-line wording when only one model is on the frontier", () => {
-    // "champion" dominates all others (cheapest, best pass rate, fastest), so it
-    // is the sole frontier model and no line is drawn.
-    renderChart([
-      { model: "champion", label: "champion", cost: 0.001, passRate: 96, latency: 300 },
-      { model: "weak", label: "weak", cost: 0.02, passRate: 88, latency: 1400 },
-    ]);
-    expect(screen.queryByText(/dashed line/i)).not.toBeInTheDocument();
-    const boldName = screen.getByText("champion", { selector: "strong" });
-    expect(boldName).toHaveClass("font-semibold", "text-foreground");
-    expect(screen.getByText(/comes out on top: it matches or beats every other model/i)).toBeInTheDocument();
+  it("sorts by Quality (highest first) by default, shown on the header", () => {
+    renderChart(points);
+    expect(
+      screen.getByRole("columnheader", { name: "Quality" }),
+    ).toHaveAttribute("aria-sort", "descending");
+    expect(screen.getByRole("columnheader", { name: "Cost" })).toHaveAttribute(
+      "aria-sort",
+      "none",
+    );
+  });
+
+  it("highlights the best value in a column in green", () => {
+    renderChart(points);
+    // Premium has the best pass rate (95%); its quality cell is bold green.
+    const bestQuality = screen.getByText("95%");
+    expect(bestQuality).toHaveClass("text-green-600");
+  });
+
+  it("reveals every model when the toggle is turned off, in strict quality order", async () => {
+    const user = setupUser();
+    renderChart(points);
+    // Hidden by default.
+    expect(screen.queryByText("Worst")).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "Show the best models only" }),
+    );
+
+    // Dominated model now appears. Default sort is quality, highest first, and
+    // it is followed strictly (no best-models-first grouping): the highest
+    // pass rate (Premium, 95%) is the top row, the lowest (Worst, 60%) the last.
+    expect(screen.getByText("Worst")).toBeInTheDocument();
+    const rows = screen.getAllByRole("row");
+    expect(rows[1]).toHaveTextContent("Premium");
+    expect(rows[rows.length - 1]).toHaveTextContent("Worst");
+  });
+
+  it("follows the sort strictly, without grouping the best models first", async () => {
+    const user = setupUser();
+    // A is a best model only because it is the cheapest and fastest, yet its
+    // quality (60%) is below the dominated model C (88%).
+    const pts: ParetoModelPoint[] = [
+      { model: "a", label: "A", cost: 0.001, passRate: 60, latency: 300 },
+      { model: "b", label: "B", cost: 0.05, passRate: 99, latency: 2000 },
+      { model: "c", label: "C", cost: 0.06, passRate: 88, latency: 2500 },
+    ];
+    render(
+      <ParetoFrontierChart
+        points={pts}
+        colorMap={getColorMap(pts.map((p) => p.model))}
+      />,
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Show the best models only" }),
+    );
+
+    // Quality, highest first, strictly: B (99), then the dominated C (88), then
+    // the best-but-lower-quality A (60). C outranks A because the sort is not
+    // grouped by best-first.
+    const rows = screen.getAllByRole("row");
+    expect(rows[1]).toHaveTextContent("B");
+    expect(rows[2]).toHaveTextContent("C");
+    expect(rows[3]).toHaveTextContent("A");
+  });
+
+  it("sorts the table by a column when its header is clicked", async () => {
+    const user = setupUser();
+    renderChart(points);
+    // Show every model so the ordering is visible.
+    await user.click(
+      screen.getByRole("button", { name: "Show the best models only" }),
+    );
+
+    // Sort by Cost: cheapest first (Cheap = $0.005).
+    await user.click(screen.getByRole("button", { name: "Cost" }));
+    let rows = screen.getAllByRole("row");
+    expect(rows[1]).toHaveTextContent("Cheap");
+
+    // Click again to flip: most expensive first (Worst = $0.06).
+    await user.click(screen.getByRole("button", { name: "Cost" }));
+    rows = screen.getAllByRole("row");
+    expect(rows[1]).toHaveTextContent("Worst");
   });
 
   it("shows the empty state when no model has cost + pass rate", () => {

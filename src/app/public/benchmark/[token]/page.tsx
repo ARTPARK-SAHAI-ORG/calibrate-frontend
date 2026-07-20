@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { PublicPageLayout, PublicNotFound, PublicLoading } from "@/components/PublicPageLayout";
 import {
   BenchmarkCombinedLeaderboard,
+  BenchmarkTopPicks,
   BenchmarkOutputsPanel,
   LLMEvaluationAbout,
   evaluatorColumnsToAbout,
@@ -12,6 +13,7 @@ import {
 import type { BenchmarkModelResult } from "@/components/eval-details";
 import {
   buildBenchmarkCombinedLeaderboardPayload,
+  hasBenchmarkTopPicks,
   type BenchmarkLeaderboardSummaryRow,
 } from "@/lib/benchmarkEvaluatorSummary";
 import { ResultPager, type TestRunEvaluator, type PagerNav } from "@/components/test-results/shared";
@@ -36,7 +38,7 @@ export default function PublicBenchmarkPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    "leaderboard" | "outputs" | "about"
+    "leaderboard" | "top-picks" | "outputs" | "about"
   >("leaderboard");
   const [expandedModels, setExpandedModels] = useState<Set<string>>(new Set());
   const [selectedTest, setSelectedTest] = useState<{ model: string; testIndex: number } | null>(null);
@@ -77,6 +79,18 @@ export default function PublicBenchmarkPage() {
   if (notFound || !data) return <PublicPageLayout><PublicNotFound /></PublicPageLayout>;
 
   const benchmarkScoreLabel = "Test pass rate (%)";
+  // Only offer the Top picks tab when there is cost + pass-rate data to plot.
+  const showTopPicks = hasBenchmarkTopPicks(
+    data.leaderboard_summary,
+    data.model_results ?? [],
+    benchmarkScoreLabel,
+  );
+  const tabs: ("leaderboard" | "top-picks" | "outputs" | "about")[] = [
+    "leaderboard",
+    ...(showTopPicks ? (["top-picks"] as const) : []),
+    "outputs",
+    "about",
+  ];
 
   // Metric-presence plan for the About tab (only built when it's showing).
   const aboutPlan =
@@ -103,13 +117,13 @@ export default function PublicBenchmarkPage() {
         {/* Tab nav */}
         <div className="relative flex items-end justify-between gap-2 border-b border-border">
           <div className="flex gap-2">
-            {(["leaderboard", "outputs", "about"] as const).map((tab) => (
+            {tabs.map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer capitalize ${activeTab === tab ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                className={`px-4 py-2 text-[13px] font-medium border-b-2 transition-colors cursor-pointer ${activeTab === tab ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
               >
-                {tab}
+                {{ leaderboard: "Leaderboard", "top-picks": "Model selection", outputs: "Outputs", about: "About" }[tab]}
               </button>
             ))}
           </div>
@@ -168,6 +182,16 @@ export default function PublicBenchmarkPage() {
             showCost={!!aboutPlan?.showCost}
             showTokens={!!aboutPlan?.showTokens}
             evaluators={evaluatorColumnsToAbout(aboutPlan?.evaluators)}
+          />
+        )}
+
+        {/* Top Picks Tab */}
+        {activeTab === "top-picks" && showTopPicks && (
+          <BenchmarkTopPicks
+            leaderboardSummary={data.leaderboard_summary}
+            modelResults={data.model_results ?? []}
+            filename={`benchmark-leaderboard-${token.replace(/[^a-zA-Z0-9_-]/g, "_")}`}
+            benchmarkScoreLabel={benchmarkScoreLabel}
           />
         )}
 

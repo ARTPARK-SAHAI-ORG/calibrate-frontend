@@ -432,3 +432,26 @@ export function buildBenchmarkCombinedLeaderboardPayload(
     },
   };
 }
+
+/**
+ * True when the benchmark has both a cost and an overall pass rate for its
+ * models — i.e. the "Top picks" cost/pass-rate frontier has something to plot.
+ * Used to decide whether to show the Top picks tab at all.
+ */
+export function hasBenchmarkTopPicks(
+  leaderboardSummary: BenchmarkLeaderboardSummaryRow[] | undefined,
+  modelResults: BenchmarkModelLike[],
+  benchmarkScoreLabel = "Test pass rate (%)",
+): boolean {
+  const payload = buildBenchmarkCombinedLeaderboardPayload(
+    leaderboardSummary,
+    modelResults,
+    benchmarkScoreLabel,
+  );
+  return (
+    !!payload &&
+    payload.rows.length > 0 &&
+    payload.plan.showCost &&
+    payload.plan.showOverallPassRate
+  );
+}
