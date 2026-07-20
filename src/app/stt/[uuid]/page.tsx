@@ -25,8 +25,10 @@ import {
   hasSTTEmptyPredictions,
   getFirstSTTEmptyPredictionIndex,
   hasSemanticWerMetric,
+  hasTtfsMetric,
   type STTEvaluatorColumn,
 } from "@/components/eval-details";
+import type { LatencyMetric } from "@/components/eval-details/ttsEvalTypes";
 import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
 import { SARVAM_METRIC_FIELDS } from "@/components/eval-details/sarvamMetrics";
 import {
@@ -110,8 +112,12 @@ type ProviderMetrics = {
   sarvam_llm_cer?: number;
   sarvam_intent_score?: number;
   sarvam_entity_score?: number;
+  // TTFS (Time To Final Segment) streaming latency. Reported as a latency
+  // block (`p50` headline) or a plain number. Present only when measured.
+  ttfs?: LatencyMetric | number;
   [k: string]:
     | number
+    | LatencyMetric
     | { type?: string; mean?: number; scale_min?: number; scale_max?: number }
     | undefined;
 };
@@ -125,6 +131,8 @@ type ProviderResultRow = {
   cer?: string;
   semantic_wer?: number | string;
   semantic_wer_reasoning?: string;
+  // Per-row latency in seconds (TTFS). `null` for providers that don't report it.
+  ttfs?: number | string | null;
   string_similarity?: string;
   llm_judge_score?: string;
   llm_judge_reasoning?: string;
@@ -163,6 +171,10 @@ type LeaderboardSummary = {
   sarvam_llm_cer?: number;
   sarvam_intent_score?: number;
   sarvam_entity_score?: number;
+  // TTFS streaming latency (seconds), flattened onto the leaderboard row. New
+  // runs report the median under `ttfs_p50`; older runs used a flat `ttfs`.
+  ttfs_p50?: number;
+  ttfs?: number;
   [k: string]: string | number | undefined;
 };
 
@@ -610,6 +622,13 @@ export default function STTEvaluationDetailPage() {
     [evaluationResult],
   );
 
+  // Whether this run measured TTFS — drives the extra About-tab row. Detected
+  // from the aggregate latency metric on any provider.
+  const hasTtfs = useMemo(
+    () => hasTtfsMetric(evaluationResult?.provider_results),
+    [evaluationResult],
+  );
+
   // "Submit for labelling": pick individual result rows (per provider) and
   // send them to an STT annotation task. Rows are keyed `${provider}:${index}`
   // — the same keys `STTResultsTable` toggles — so selection is stable across
@@ -951,6 +970,7 @@ export default function STTEvaluationDetailPage() {
                     <STTEvaluationAbout
                       showSarvamMetrics={hasSarvamMetrics}
                       showSemanticWer={hasSemanticWer}
+                      showTtfs={hasTtfs}
                       evaluatorRows={aboutEvaluators.map((e) => ({
                         key: e.uuid,
                         metric: (
@@ -986,6 +1006,7 @@ export default function STTEvaluationDetailPage() {
                         }
                         evaluatorColumns={evaluatorColumns}
                         getProviderLabel={getProviderLabel}
+                        providerResults={evaluationResult.provider_results}
                       />
                     )}
 

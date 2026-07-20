@@ -18,7 +18,11 @@ import {
   type TTSResultRow,
 } from "./TTSResultsTable";
 import type { LatencyMetric } from "./ttsEvalTypes";
-import { PIPECAT_SEMANTIC_WER_URL, SARVAM_ASR_BLOG_URL } from "@/constants/links";
+import {
+  PIPECAT_SEMANTIC_WER_URL,
+  PIPECAT_STT_TTFS_URL,
+  SARVAM_ASR_BLOG_URL,
+} from "@/constants/links";
 import { SARVAM_METRIC_FIELDS } from "./sarvamMetrics";
 
 type EvaluationStatus = "queued" | "in_progress" | "done" | "failed";
@@ -112,6 +116,12 @@ export type STTProviderResultForDetails = ProviderResultLike & {
         sarvam_llm_cer?: number;
         sarvam_intent_score?: number;
         sarvam_entity_score?: number;
+        // TTFS (Time To Final Segment) — streaming latency from when the user
+        // stops speaking to the final transcription segment. Reported as a
+        // latency block (`p50` headline) or a plain number. Present only when
+        // the run measured it — `null` for providers that don't report it
+        // (e.g. Gemini STT).
+        ttfs?: LatencyMetric | number | null;
       })
     | null;
   results?: STTResultRow[] | null;
@@ -130,7 +140,12 @@ function readNumericMetric(v: unknown): number | null {
 export type TTSProviderResultForDetails = ProviderResultLike & {
   // `ttfb` now reports percentiles (`p50` headline + `p95` / `p99`); legacy
   // runs still carry `mean`. Read `p50 ?? mean`.
-  metrics?: (Record<string, unknown> & { ttfb?: LatencyMetric }) | null;
+  metrics?:
+    | (Record<string, unknown> & {
+        // `null` for a provider that didn't report latency.
+        ttfb?: LatencyMetric | null;
+      })
+    | null;
   results?: TTSResultRow[] | null;
 };
 
@@ -258,6 +273,55 @@ export const TTFB_ABOUT_METRIC: MetricDescription = {
   range: "0 - \u221E",
 };
 
+// STT latency is surfaced as "Latency" in the table/tiles; the About tab is
+// where it's explained as TTFS (Time To Final Segment), the streaming STT
+// latency defined by Pipecat's STT benchmark. The metric name links out to the
+// benchmark's definition in a new tab. Rendered only when a run measured it.
+export const TTFS_ABOUT_METRIC: MetricDescription = {
+  key: "ttfs",
+  metric: (
+    <a
+      href={PIPECAT_STT_TTFS_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-foreground underline-offset-2 hover:underline"
+      title="Learn more in the Pipecat STT benchmark"
+    >
+      Latency
+    </a>
+  ),
+  description:
+    "For streaming STT, latency is measured as TTFS (Time To Final Segment): the time from when the user stops speaking to when the final transcription segment is received. Lower is better \u2014 faster responses for voice agents. The reported value is the median (p50) across the dataset.",
+  preference: "Lower is better",
+  range: "0 - \u221E",
+};
+
+/**
+ * Read a latency value in seconds from a TTFS/TTFB-style metric, tolerating
+ * both the percentile block (`p50` headline, legacy `mean`) and a plain number.
+ */
+function readLatencySeconds(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (value && typeof value === "object") {
+    const m = value as LatencyMetric;
+    const v = m.p50 ?? m.mean;
+    return typeof v === "number" && Number.isFinite(v) ? v : null;
+  }
+  return null;
+}
+
+/** Whether any provider measured TTFS. Drives the STT About-tab row. */
+export function hasTtfsMetric(
+  providerResults:
+    | Array<{ metrics?: Record<string, unknown> | null }>
+    | null
+    | undefined,
+): boolean {
+  return (providerResults ?? []).some(
+    (pr) => readLatencySeconds(pr.metrics?.ttfs) != null,
+  );
+}
+
 export function ratingRange(scaleValues: number[]): string {
   if (scaleValues.length === 0) return "-";
   const min = Math.min(...scaleValues);
@@ -345,6 +409,73 @@ function evaluatorLeaderboardColumns(
   }));
 }
 
+// STT latency lives on the `ttfs` row key (TTFS = Time To Final Segment) but is
+// labelled "Latency (s)" in the UI, matching the TTS latency column; the About
+// tab explains that STT latency is TTFS.
+const TTFS_KEY = "ttfs";
+const TTFS_LABEL = "Latency (s)";
+
+/** Leaderboard column for TTFS (STT only). */
+const ttfsLeaderboardColumn = {
+  key: TTFS_KEY,
+  header: TTFS_LABEL,
+  render: (v: unknown) =>
+    typeof v === "number" ? parseFloat(v.toFixed(4)) : "-",
+};
+
+/** Leaderboard chart for TTFS (STT only). */
+const ttfsChartConfig: ChartConfig = { title: TTFS_LABEL, dataKey: TTFS_KEY };
+
+
+/**
+ * Adds a derived numeric metric to leaderboard rows under `key`, reading it via
+ * `read` (row → value, falling back to a joined provider value). Rows without a
+ * value are left untouched; returns whether any row ended up with one.
+ */
+function withRowMetric(
+  rows: LeaderboardSummaryForDetails[],
+  key: string,
+  read: (row: LeaderboardSummaryForDetails) => number | null,
+): { rows: LeaderboardSummaryForDetails[]; show: boolean } {
+  let show = false;
+  const out = rows.map((row) => {
+    const v = read(row);
+    if (v == null) return row;
+    show = true;
+    return { ...row, [key]: v };
+  });
+  return { rows: out, show };
+}
+
+/**
+ * Joins TTFS (seconds) onto STT leaderboard rows under a single flat `ttfs`
+ * key. Reads the percentile headline (`ttfs_p50`) or legacy flat `ttfs` off the
+ * row, falling back to the matching provider result's `ttfs` block.
+ */
+function withTtfs(
+  leaderboardSummary: LeaderboardSummaryForDetails[],
+  providerResults?: Array<{
+    provider: string;
+    metrics?: Record<string, unknown> | null;
+  }>,
+): { rows: LeaderboardSummaryForDetails[]; showTtfs: boolean } {
+  const ttfsByRun: Record<string, number> = {};
+  for (const pr of providerResults ?? []) {
+    const t = readLatencySeconds(pr.metrics?.ttfs);
+    if (t != null) ttfsByRun[pr.provider] = t;
+  }
+  const { rows, show } = withRowMetric(
+    leaderboardSummary,
+    TTFS_KEY,
+    (row) =>
+      readLatencySeconds(row.ttfs_p50) ??
+      readLatencySeconds(row.ttfs) ??
+      ttfsByRun[row.run] ??
+      null,
+  );
+  return { rows, showTtfs: show };
+}
+
 /** Pairs charts into rows of two for the LeaderboardTab grid. */
 function chunkChartRows(charts: ChartConfig[]): ChartConfig[][] {
   const rows: ChartConfig[][] = [];
@@ -358,12 +489,15 @@ export function STTEvaluationAbout({
   evaluatorRows,
   showSarvamMetrics = false,
   showSemanticWer = false,
+  showTtfs = false,
 }: {
   evaluatorRows: EvaluatorAboutMetricRow[];
   /** Include the Sarvam LLM-judge metric rows — set when the run used them. */
   showSarvamMetrics?: boolean;
   /** Include the Semantic WER row — set when the run computed it. */
   showSemanticWer?: boolean;
+  /** Include the TTFS row — set when the run measured it. */
+  showTtfs?: boolean;
 }) {
   return (
     <AboutMetricsTable
@@ -372,6 +506,7 @@ export function STTEvaluationAbout({
         CER_ABOUT_METRIC,
         ...(showSemanticWer ? [SEMANTIC_WER_ABOUT_METRIC] : []),
         ...(showSarvamMetrics ? SARVAM_ABOUT_METRICS : []),
+        ...(showTtfs ? [TTFS_ABOUT_METRIC] : []),
         ...evaluatorRowsToMetricDescriptions(evaluatorRows),
       ]}
     />
@@ -397,11 +532,18 @@ export function STTEvaluationLeaderboard({
   leaderboardSummary,
   evaluatorColumns,
   getProviderLabel,
+  providerResults,
   className,
 }: {
   leaderboardSummary: LeaderboardSummaryForDetails[];
   evaluatorColumns: STTEvaluatorColumn[];
   getProviderLabel: (value: string) => string;
+  // Provider-level results, used to join per-minute cost onto leaderboard rows
+  // when the leaderboard summary doesn't carry it directly.
+  providerResults?: Array<{
+    provider: string;
+    metrics?: Record<string, unknown> | null;
+  }>;
   className?: string;
 }) {
   // Sarvam metrics only appear as leaderboard charts/columns when the
@@ -415,6 +557,9 @@ export function STTEvaluationLeaderboard({
   const showSemanticWer = leaderboardSummary.some(
     (row) => row.semantic_wer != null,
   );
+
+  // Join TTFS onto each row for its column and chart.
+  const { rows, showTtfs } = withTtfs(leaderboardSummary, providerResults);
 
   // Drop evaluator columns/charts that no run carries a value for — an
   // all-"-" column (e.g. an evaluator that didn't run) is just noise.
@@ -433,6 +578,7 @@ export function STTEvaluationLeaderboard({
       : []),
     ...sarvamFields.map((field) => ({ title: field.label, dataKey: field.key })),
     ...evaluatorChartConfigs(visibleEvaluatorColumns),
+    ...(showTtfs ? [ttfsChartConfig] : []),
   ];
   const chartRows = chunkChartRows(allCharts);
 
@@ -448,8 +594,9 @@ export function STTEvaluationLeaderboard({
           : []),
         ...sarvamFields.map((field) => ({ key: field.key, header: field.label })),
         ...evaluatorLeaderboardColumns(visibleEvaluatorColumns),
+        ...(showTtfs ? [ttfsLeaderboardColumn] : []),
       ]}
-      data={leaderboardSummary}
+      data={rows}
       charts={chartRows}
       filename="stt-evaluation-leaderboard"
       getLabel={getProviderLabel}
@@ -642,6 +789,19 @@ export function STTEvaluationOutputs({
                         ? [{ label: field.label, value: parseFloat(value.toFixed(4)) }]
                         : [];
                     }),
+                    // TTFS tile — shown only when the run measured it.
+                    ...(readLatencySeconds(providerResult.metrics?.ttfs) != null
+                      ? [
+                          {
+                            label: TTFS_LABEL,
+                            value: parseFloat(
+                              readLatencySeconds(
+                                providerResult.metrics?.ttfs,
+                              )!.toFixed(4),
+                            ),
+                          },
+                        ]
+                      : []),
                     // Evaluator tiles — shown only when this provider actually
                     // has a value for the evaluator (mirrors the Sarvam tiles),
                     // so e.g. a "Semantic match" tile is hidden when it didn't
