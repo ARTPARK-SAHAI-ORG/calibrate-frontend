@@ -192,6 +192,44 @@ describe("onboarding engine", () => {
     overlay.remove();
   });
 
+  it("hides the card and highlight as soon as a step's action starts", async () => {
+    const overlay = document.createElement("div");
+    overlay.className = "driver-overlay";
+    const card = document.createElement("div");
+    card.className = "driver-popover";
+    document.body.appendChild(overlay);
+    document.body.appendChild(card);
+
+    let resolveAction!: () => void;
+    const action = jest.fn(() => new Promise<void>((r) => (resolveAction = r)));
+    (waitForElement as jest.Mock).mockResolvedValue(null);
+
+    await runTour({
+      id: "demo",
+      steps: [
+        { title: "One", description: "First", action },
+        { title: "Two", description: "Second" },
+      ],
+    });
+
+    // Step one is showing: simulate its render so the card and highlight show.
+    capturedDriverConfig?.onPopoverRender?.({ wrapper: card });
+    expect(card.style.opacity).toBe("1");
+    expect(overlay.style.visibility).toBe("visible");
+
+    // Click Next. The action is still running, but the card and its highlight
+    // must already be hidden so they do not linger over the changing screen.
+    mockHighlight.mock.calls[0][0].popover.onNextClick();
+    await Promise.resolve();
+    expect(action).toHaveBeenCalled();
+    expect(card.style.opacity).toBe("0");
+    expect(overlay.style.visibility).toBe("hidden");
+
+    resolveAction();
+    overlay.remove();
+    card.remove();
+  });
+
   it("injects a Skip tour button that ends the tour", async () => {
     await runTour({
       id: "demo",

@@ -299,6 +299,13 @@ async function advance(): Promise<void> {
   clearAnchorWatch();
   const step = active.tour.steps[active.index];
 
+  // Hide the card and highlight the moment the user acts, before running the
+  // action. A slow action (one that opens a dialog or navigates, then keeps
+  // clicking, waiting, or fetching) changes the screen well before the next
+  // step's showStep runs, so hiding only there would leave the old highlight
+  // lingering over the changed content. Hiding now closes that gap.
+  setPopoverHidden(true);
+
   if (step.action) {
     try {
       await step.action();
